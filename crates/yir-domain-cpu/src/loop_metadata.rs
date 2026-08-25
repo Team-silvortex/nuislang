@@ -54,7 +54,11 @@ pub(crate) fn validate_post_flow_loop_compare_kind(
     kind: &str,
     node_name: &str,
 ) -> Result<(), String> {
-    if matches!(kind, "always" | "invariant_true") {
+    if matches!(kind, "always" | "invariant_true" | "pattern_exit")
+        || kind
+            .strip_prefix("pattern_carry")
+            .is_some_and(|index| index.parse::<usize>().is_ok())
+    {
         Ok(())
     } else {
         validate_loop_compare_kind(kind, node_name)

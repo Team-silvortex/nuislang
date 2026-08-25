@@ -56,10 +56,27 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     continue;
                 };
                 let mut carry_initials = Vec::new();
-                let mut carry_specs = Vec::new();
+                let mut carry_specs =
+                    Vec::<(String, Option<String>, Vec<String>, Vec<String>)>::new();
                 let mut deferred = false;
-                for chunk in node.op.args[carry_start_index..].chunks(5) {
-                    let carry_initial_value = registers.get(&chunk[0]).cloned();
+                let mut cursor = carry_start_index;
+                while cursor < node.op.args.len() {
+                    let Some(initial_name) = node.op.args.get(cursor) else {
+                        break;
+                    };
+                    let Some(cond_kind) = node.op.args.get(cursor + 1) else {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` has truncated carry condition during LLVM lowering",
+                            node.name,
+                        ));
+                    };
+                    let Some(cond_rhs_name) = node.op.args.get(cursor + 2) else {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` has truncated carry condition rhs during LLVM lowering",
+                            node.name,
+                        ));
+                    };
+                    let carry_initial_value = registers.get(initial_name).cloned();
                     let Some(carry_initial_value) = carry_initial_value else {
                         body.push(format!(
                             "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry initials are outside the current CPU LLVM slice",
@@ -78,10 +95,10 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         deferred = true;
                         break;
                     };
-                    let cond_rhs = if chunk[1] == "always" {
+                    let cond_rhs = if cond_kind == "always" {
                         None
                     } else {
-                        let cond_rhs_value = registers.get(&chunk[2]).cloned();
+                        let cond_rhs_value = registers.get(cond_rhs_name).cloned();
                         let Some(cond_rhs_value) = cond_rhs_value else {
                             body.push(format!(
                                 "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more condition rhs values are outside the current CPU LLVM slice",
@@ -102,13 +119,102 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         };
                         Some(cond_rhs)
                     };
+                    let then_start = cursor + 3;
+                    let Some(then_kind) = node.op.args.get(then_start).cloned() else {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` has truncated then carry source during LLVM lowering",
+                            node.name,
+                        ));
+                    };
+                    let Some(then_payload_len) =
+                        async_post_flow_carry_source_payload_len(&then_kind)
+                    else {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{then_kind}` during LLVM lowering",
+                            node.name,
+                        ));
+                    };
+                    let then_end = then_start + 1 + then_payload_len;
+                    if then_end > node.op.args.len() {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` is missing payload for carry kind `{then_kind}` during LLVM lowering",
+                            node.name,
+                        ));
+                    }
+                    let mut then_source = vec![then_kind];
+                    for payload_name in &node.op.args[then_start + 1..then_end] {
+                        let Some(payload_value) = registers.get(payload_name).cloned() else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is outside the current CPU LLVM slice",
+                                node.name,
+                            ));
+                            deferred = true;
+                            break;
+                        };
+                        let Some(payload) =
+                            coerce_to_i64(&payload_value, &mut body, &mut next_reg)
+                        else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is not coercible to i64",
+                                node.name,
+                            ));
+                            deferred = true;
+                            break;
+                        };
+                        then_source.push(payload);
+                    }
+                    if deferred {
+                        break;
+                    }
+                    let Some(else_kind) = node.op.args.get(then_end).cloned() else {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` has truncated else carry source during LLVM lowering",
+                            node.name,
+                        ));
+                    };
+                    let Some(else_payload_len) =
+                        async_post_flow_carry_source_payload_len(&else_kind)
+                    else {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{else_kind}` during LLVM lowering",
+                            node.name,
+                        ));
+                    };
+                    let else_end = then_end + 1 + else_payload_len;
+                    if else_end > node.op.args.len() {
+                        return Err(format!(
+                            "cpu.{loop_instruction} `{}` is missing payload for carry kind `{else_kind}` during LLVM lowering",
+                            node.name,
+                        ));
+                    }
+                    let mut else_source = vec![else_kind];
+                    for payload_name in &node.op.args[then_end + 1..else_end] {
+                        let Some(payload_value) = registers.get(payload_name).cloned() else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is outside the current CPU LLVM slice",
+                                node.name,
+                            ));
+                            deferred = true;
+                            break;
+                        };
+                        let Some(payload) =
+                            coerce_to_i64(&payload_value, &mut body, &mut next_reg)
+                        else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is not coercible to i64",
+                                node.name,
+                            ));
+                            deferred = true;
+                            break;
+                        };
+                        else_source.push(payload);
+                    }
+                    if deferred {
+                        break;
+                    }
                     carry_initials.push(carry_initial);
-                    carry_specs.push((
-                        chunk[1].clone(),
-                        cond_rhs,
-                        chunk[3].clone(),
-                        chunk[4].clone(),
-                    ));
+                    carry_specs.push((cond_kind.clone(), cond_rhs, then_source, else_source));
+                    cursor = else_end;
                 }
                 if deferred {
                     continue;
@@ -137,9 +243,28 @@ macro_rules! lower_loop_post_flow_cond_chain {
                 if cmp_kind == "always" {
                     body.push(format!("  br label %{loop_body}"));
                 } else {
-                    let cmp = fresh_reg(&mut next_reg);
-                    if cmp_kind == "invariant_true" {
+                    let cmp = if let Some(index) = cmp_kind.strip_prefix("pattern_carry") {
+                        let index = index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported compare kind `{cmp_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let carry_slot = carry_slots.get(index).ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` references unavailable pattern entry carry `{cmp_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let active = fresh_reg(&mut next_reg);
+                        body.push(format!("  {active} = load i64, ptr {carry_slot}"));
+                        let cmp = fresh_reg(&mut next_reg);
+                        body.push(format!("  {cmp} = icmp ne i64 {active}, 0"));
+                        cmp
+                    } else if matches!(cmp_kind, "invariant_true" | "pattern_exit") {
+                        let cmp = fresh_reg(&mut next_reg);
                         body.push(format!("  {cmp} = icmp ne i64 {limit}, 0"));
+                        cmp
                     } else {
                         let pred = match cmp_kind {
                             "eq" => "eq",
@@ -155,8 +280,10 @@ macro_rules! lower_loop_post_flow_cond_chain {
                                 ));
                             }
                         };
+                        let cmp = fresh_reg(&mut next_reg);
                         body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
-                    }
+                        cmp
+                    };
                     body.push(format!(
                         "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
                     ));
@@ -186,60 +313,27 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     body.push(format!("  {carry_before} = load i64, ptr {carry_slot}"));
                     current_carries.push(carry_before);
                 }
-                let resolve_source = |kind: &str,
-                                      next_current: &String,
-                                      next_carries: &Vec<String>|
-                 -> Result<String, String> {
-                    if matches!(kind, "keep" | "keep_prev_carry") {
-                        return Ok(String::new());
-                    }
-                    if kind == "add_current" {
-                        return Ok(next_current.clone());
-                    }
-                    if kind == "add_prev_current" {
-                        return Ok(current.clone());
-                    }
-                    if let Some(rest) = kind.strip_prefix("add_prev_carry") {
-                        let source_index = rest.parse::<usize>().map_err(|_| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        return current_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable carry source `{kind}` during LLVM lowering",
-                                node.name,
-                            )
-                        });
-                    }
-                    if let Some(rest) = kind.strip_prefix("add_carry") {
-                        let source_index = rest.parse::<usize>().map_err(|_| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        return next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable carry source `{kind}` during LLVM lowering",
-                                node.name,
-                            )
-                        });
-                    }
-                    Err(format!(
-                        "cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering",
-                        node.name,
-                    ))
-                };
                 let mut next_carries = Vec::new();
-                for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
+                for (index, (cond_kind, cond_rhs, then_source_spec, else_source_spec)) in
                     carry_specs.iter().enumerate()
                 {
-                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
+                    let then_value = if matches!(
+                        then_source_spec[0].as_str(),
+                        "keep" | "keep_prev_carry"
+                    ) {
                         current_carries[index].clone()
                     } else {
-                        let source = resolve_source(then_kind, &next_current, &next_carries)?;
+                        let source = resolve_source_for_async_post_flow(
+                            then_source_spec,
+                            &current,
+                            &next_current,
+                            &current_carries,
+                            &next_carries,
+                            &mut body,
+                            &mut next_reg,
+                            &node.name,
+                            loop_instruction,
+                        )?;
                         let reg = fresh_reg(&mut next_reg);
                         body.push(format!(
                             "  {reg} = add i64 {}, {}",
@@ -247,10 +341,23 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         ));
                         reg
                     };
-                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
+                    let else_value = if matches!(
+                        else_source_spec[0].as_str(),
+                        "keep" | "keep_prev_carry"
+                    ) {
                         current_carries[index].clone()
                     } else {
-                        let source = resolve_source(else_kind, &next_current, &next_carries)?;
+                        let source = resolve_source_for_async_post_flow(
+                            else_source_spec,
+                            &current,
+                            &next_current,
+                            &current_carries,
+                            &next_carries,
+                            &mut body,
+                            &mut next_reg,
+                            &node.name,
+                            loop_instruction,
+                        )?;
                         let reg = fresh_reg(&mut next_reg);
                         body.push(format!(
                             "  {reg} = add i64 {}, {}",
@@ -531,6 +638,9 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     }
                     match *action {
                         "break" => body.push(format!("  br label %{loop_exit}")),
+                        "continue" if cmp_kind == "pattern_exit" => {
+                            body.push(format!("  br label %{loop_exit}"))
+                        }
                         "continue" => body.push(format!("  br label %{loop_cond}")),
                         other => {
                             return Err(format!(
@@ -545,7 +655,11 @@ macro_rules! lower_loop_post_flow_cond_chain {
                 for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
                     body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
                 }
-                body.push(format!("  br label %{loop_cond}"));
+                if cmp_kind == "pattern_exit" {
+                    body.push(format!("  br label %{loop_exit}"));
+                } else {
+                    body.push(format!("  br label %{loop_cond}"));
+                }
                 body.push(format!("{loop_exit}:"));
                 let final_current = fresh_reg(&mut next_reg);
                 body.push(format!("  {final_current} = load i64, ptr {current_slot}"));

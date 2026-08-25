@@ -41,10 +41,17 @@ real native backedge. A `while let` over a loop-invariant enum scrutinee can now
 project its payload into scalar post-flow control, enter on `Some`, exhaust on
 `None`, and execute through LLVM as a native binary. Compile-time false gates
 also skip unreachable payload projection across inlined helper boundaries.
-Rebuilding or rebinding
-the matched enum on each backedge still requires the dynamic variant-state
-carry contract; the compiler rejects that shape explicitly instead of hoisting
-its condition incorrectly.
+A loop body may also replace the matched value with a pure, loop-state-independent
+variant from the same enum family. The `pattern_exit` contract executes at most
+one matching iteration and reconstructs the post-loop enum through `cpu.select`,
+including an initially mismatched value. Single-field scalar variants can also
+cross multiple backedges through the dynamic tag/payload carry contract. The
+entry block re-reads `pattern_carryN` every iteration, payload consumers read the
+previous backedge value, and a conditional transition can rebuild the matched
+variant or move to a same-enum unit variant. LLVM/native coverage proves
+`Active(3) -> Active(2) -> Active(1) -> Done` while preserving an initially
+mismatched `Done`. Multi-field payloads and non-affine payload replacement remain
+explicitly rejected rather than being hoisted or treated as loop invariants.
 
 ## Boundary
 

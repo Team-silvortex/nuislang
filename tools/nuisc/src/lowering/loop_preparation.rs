@@ -5,11 +5,18 @@ use crate::lowering::loop_carries::{
     parse_loop_carry_branch_source, parse_loop_carry_linear,
     parse_prepared_dynamic_read_carry_source, parse_prepared_fixed_read_carry_source,
     parse_prepared_loop_state_ref_expr, parse_prepared_loop_state_ref_name,
-    unsupported_loop_carry_branch_source_message,
+    tail_recursive_prev_carry_binding, unsupported_loop_carry_branch_source_message,
 };
 use crate::lowering::loop_purity::{
     expr_references_names, normalize_pure_bool_test_expr, substitute_branch_binding,
     substitute_stmt_bindings,
+};
+
+#[path = "loop_preparation_pattern.rs"]
+mod loop_preparation_pattern;
+use loop_preparation_pattern::{
+    prepare_dynamic_pattern_carries, prepare_dynamic_pattern_plan,
+    prepare_terminal_pattern_transition,
 };
 
 #[path = "loop_preparation_flow.rs"]
@@ -61,9 +68,26 @@ fn prepare_loop_carry_sequence(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
     pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> Option<Vec<PreparedCarryUpdate>> {
+    prepare_loop_carry_sequence_with_prefix(
+        stmts,
+        binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+        pure_helper_blocks,
+        Vec::new(),
+    )
+}
+
+fn prepare_loop_carry_sequence_with_prefix(
+    stmts: &[NirStmt],
+    binding_name: &str,
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+    mut carries: Vec<PreparedCarryUpdate>,
+) -> Option<Vec<PreparedCarryUpdate>> {
     let carry_names =
         collect_loop_carry_binding_names(stmts, pure_helpers, inlineable_pure_helpers)?;
-    let mut carries = Vec::<PreparedCarryUpdate>::new();
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
     let mut conditional_temps = BTreeMap::<String, PreparedConditionalTempBinding>::new();
     let mut carry_index = 0usize;
@@ -388,7 +412,7 @@ pub(super) fn diagnose_unsupported_pattern_while_shape(
         .collect::<BTreeSet<_>>();
     if expr_references_names(gate_condition, &rebound_names) {
         return Some(
-            "pattern-controlled `while let` currently requires a loop-invariant enum scrutinee; rebuilding or rebinding the matched enum on a backedge needs the dynamic variant-state carry contract"
+            "pattern-controlled `while let` supports single-field scalar matched variants with affine payload rebuilds and an optional same-enum unit exit variant; this transition shape cannot be represented by the dynamic tag/payload carry contract"
                 .to_owned(),
         );
     }

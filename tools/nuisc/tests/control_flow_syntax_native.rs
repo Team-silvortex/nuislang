@@ -200,3 +200,89 @@ fn invariant_while_let_accepts_runtime_enum_arguments() {
     );
     assert_eq!(status.code(), Some(6));
 }
+
+#[test]
+fn terminal_while_let_variant_transition_runs_as_a_native_binary() {
+    let status = compile_and_run(
+        "terminal_while_let_variant_transition",
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn consume(selected: Phase) -> i64 {
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + cursor;
+              let selected: Phase = Phase.Done;
+              if cursor > payload {
+                break;
+              }
+            }
+            match selected {
+              Phase.Done => {
+                return acc + 10;
+              },
+              Phase.Active(payload) => {
+                return payload + 100;
+              },
+            }
+          }
+
+          fn main() -> i64 {
+            return consume(Phase.Active(2)) + consume(Phase.Done);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(21));
+}
+
+#[test]
+fn dynamic_while_let_variant_state_runs_across_native_backedges() {
+    let status = compile_and_run(
+        "dynamic_while_let_variant_state",
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn consume(selected: Phase) -> i64 {
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              if payload > 1 {
+                let selected: Phase = Phase.Active(payload - 1);
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if cursor > 100 {
+                break;
+              }
+            }
+            match selected {
+              Phase.Done => {
+                return acc + 10;
+              },
+              Phase.Active(payload) => {
+                return acc + payload + 100;
+              },
+            }
+          }
+
+          fn main() -> i64 {
+            return consume(Phase.Active(3)) + consume(Phase.Done);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(26));
+}

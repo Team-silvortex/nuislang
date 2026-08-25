@@ -138,7 +138,51 @@ fn lowers_invariant_while_let_payload_into_post_flow_chain() {
 }
 
 #[test]
-fn rejects_dynamically_rebound_while_let_scrutinee_precisely() {
+fn lowers_terminal_while_let_variant_transition() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active(2);
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + cursor;
+              let selected: Phase = Phase.Done;
+              if cursor > payload {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_chain")
+        .expect("terminal pattern loop");
+    assert_eq!(loop_node.op.args[3], "pattern_exit");
+    assert!(yir.nodes.iter().any(|node| {
+        node.name.starts_with("loop_variant_state_") && node.op.instruction == "select"
+    }));
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(!llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
+fn lowers_multi_backedge_while_let_variant_rebuild() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -154,7 +198,102 @@ fn rejects_dynamically_rebound_while_let_scrutinee_precisely() {
             while let Option.Some(payload) = selected {
               let cursor: i64 = cursor + 1;
               let acc: i64 = acc + payload;
-              let selected: Option = Option.None;
+              let selected: Option = Option.Some(payload);
+              if cursor > 2 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_cond_chain")
+        .expect("dynamic pattern loop");
+    assert_eq!(loop_node.op.args[3], "pattern_carry0");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_carry1"));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name.starts_with("loop_variant_state_") && node.op.instruction == "select"
+    }));
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(!llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
+fn lowers_conditional_while_let_variant_transition_across_backedges() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active(3);
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              if payload > 1 {
+                let selected: Phase = Phase.Active(payload - 1);
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if cursor > 100 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_cond_chain")
+        .expect("dynamic variant transition loop");
+    assert_eq!(loop_node.op.args[3], "pattern_carry0");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "add_invariant"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name.starts_with("loop_variant_exit_state_")));
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(!llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
+fn rejects_non_affine_dynamic_while_let_payload_rebuild_precisely() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active(3);
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              let selected: Phase = Phase.Active(payload / 2);
               if cursor > 2 {
                 break;
               }
@@ -169,13 +308,10 @@ fn rejects_dynamically_rebound_while_let_scrutinee_precisely() {
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
     assert!(
-        error.contains("requires a loop-invariant enum scrutinee"),
+        error.contains("dynamic tag/payload carry contract"),
         "{error}"
     );
-    assert!(
-        error.contains("dynamic variant-state carry contract"),
-        "{error}"
-    );
+    assert!(error.contains("affine payload rebuilds"), "{error}");
 }
 
 #[test]

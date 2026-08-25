@@ -42,6 +42,13 @@ pub(crate) fn resolve_source_for_async_post_flow(
     if matches!(kind.as_str(), "keep" | "keep_prev_carry") {
         return Ok(String::new());
     }
+    if kind == "add_invariant" {
+        return source_spec.get(1).cloned().ok_or_else(|| {
+            format!(
+                "cpu.{loop_instruction} `{node_name}` is missing invariant payload for `{kind}` during LLVM lowering"
+            )
+        });
+    }
     if kind == "add_current" {
         return Ok(next_current.to_owned());
     }

@@ -443,9 +443,36 @@ pub(in crate::lowering) fn prepare_post_flow_while(
         }
         _ => None,
     };
-    let prepared_body = pattern_gate
-        .as_ref()
-        .map_or(body, |(_, then_body)| *then_body);
+    let mut terminal_pattern_transition = None;
+    let mut transitioned_pattern_body = None;
+    if let Some((gate_condition, then_body)) = &pattern_gate {
+        if let Some((transition, prepared_body)) =
+            prepare_terminal_pattern_transition(gate_condition, then_body, pure_helpers)
+        {
+            terminal_pattern_transition = Some(transition);
+            transitioned_pattern_body = Some(prepared_body);
+        }
+    }
+    let mut dynamic_pattern_plan = None;
+    let mut dynamic_pattern_body = None;
+    if terminal_pattern_transition.is_none() {
+        if let Some((gate_condition, then_body)) = &pattern_gate {
+            if let Some((plan, prepared_body)) =
+                prepare_dynamic_pattern_plan(gate_condition, then_body, pure_helpers)
+            {
+                dynamic_pattern_plan = Some(plan);
+                dynamic_pattern_body = Some(prepared_body);
+            }
+        }
+    }
+    let prepared_body = dynamic_pattern_body
+        .as_deref()
+        .or(transitioned_pattern_body.as_deref())
+        .unwrap_or_else(|| {
+            pattern_gate
+                .as_ref()
+                .map_or(body, |(_, then_body)| *then_body)
+        });
     let (binding_name, entry_condition) = if let Some((condition, _)) = &pattern_gate {
         (
             parse_unbounded_loop_step_binding(
@@ -454,8 +481,14 @@ pub(in crate::lowering) fn prepare_post_flow_while(
                 pure_helpers,
                 inlineable_pure_helpers,
             )?,
-            PreparedLoopEntryCondition::InvariantPattern {
-                condition: condition.clone(),
+            if dynamic_pattern_plan.is_some() {
+                PreparedLoopEntryCondition::DynamicPattern {
+                    active_carry_index: 0,
+                }
+            } else {
+                PreparedLoopEntryCondition::InvariantPattern {
+                    condition: condition.clone(),
+                }
             },
         )
     } else if let Some((binding_name, limit, compare)) =
@@ -506,12 +539,24 @@ pub(in crate::lowering) fn prepare_post_flow_while(
         &substituted_control_stmt,
         pure_helpers,
     )?;
-    let prepared_carries = prepare_loop_carry_sequence(
+    let (dynamic_pattern_transition, carry_prefix) = if let Some(plan) = dynamic_pattern_plan {
+        let (transition, carries) = prepare_dynamic_pattern_carries(
+            plan,
+            &binding_name,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
+        (Some(transition), carries)
+    } else {
+        (None, Vec::new())
+    };
+    let prepared_carries = prepare_loop_carry_sequence_with_prefix(
         carry_bindings,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
         pure_helper_blocks,
+        carry_prefix,
     )?;
     let final_control_stmt =
         substitute_stmt_bindings(&substituted_control_stmt, &control_temp_bindings);
@@ -529,13 +574,16 @@ pub(in crate::lowering) fn prepare_post_flow_while(
                 .iter()
                 .map(|carry| carry.binding_name.as_str()),
         );
-        if expr_references_names(condition, &updated_names) {
+        if terminal_pattern_transition.is_none() && expr_references_names(condition, &updated_names)
+        {
             return None;
         }
     }
     Some(PreparedPostFlowWhile {
         binding_name,
         entry_condition,
+        terminal_pattern_transition,
+        dynamic_pattern_transition,
         step,
         step_kind,
         carries: prepared_carries,

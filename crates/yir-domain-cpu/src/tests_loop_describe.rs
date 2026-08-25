@@ -134,6 +134,91 @@ fn post_flow_chain_accepts_an_invariant_pattern_gate() {
 }
 
 #[test]
+fn post_flow_chain_accepts_a_terminal_pattern_transition() {
+    let node = Node {
+        name: "loop".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.loop_while_scalar_post_flow_chain",
+            [
+                "initial",
+                "pattern_condition",
+                "step",
+                "pattern_exit",
+                "add",
+                "current_gt",
+                "control_rhs",
+                "continue",
+                "carry_initial",
+                "add_current",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        )
+        .unwrap(),
+    };
+    let semantics = describe_cpu_node(&node, &cpu_resource()).unwrap();
+
+    assert_eq!(
+        semantics.dependencies,
+        [
+            "initial",
+            "pattern_condition",
+            "step",
+            "control_rhs",
+            "carry_initial",
+        ]
+    );
+}
+
+#[test]
+fn post_flow_cond_chain_accepts_a_dynamic_pattern_carry_gate() {
+    let node = Node {
+        name: "loop".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.loop_while_scalar_post_flow_cond_chain",
+            [
+                "initial",
+                "unused_limit",
+                "step",
+                "pattern_carry0",
+                "add",
+                "current_gt",
+                "control_rhs",
+                "break",
+                "active",
+                "prev_carry1_gt",
+                "threshold",
+                "keep",
+                "add_invariant",
+                "minus_one",
+                "payload",
+                "prev_carry1_gt",
+                "threshold",
+                "add_invariant",
+                "minus_one",
+                "keep",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        )
+        .unwrap(),
+    };
+    let semantics = describe_cpu_node(&node, &cpu_resource()).unwrap();
+
+    assert!(semantics.has_effect);
+    for dependency in ["active", "payload", "threshold", "minus_one"] {
+        assert!(semantics
+            .dependencies
+            .iter()
+            .any(|candidate| candidate == dependency));
+    }
+}
+
+#[test]
 fn guarded_loop_continue_effects_preserve_their_inputs() {
     for (instruction, args, expected) in [
         (

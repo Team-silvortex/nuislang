@@ -209,10 +209,29 @@ pub(super) struct PreparedFlowWhile {
 pub(super) struct PreparedPostFlowWhile {
     pub(super) binding_name: String,
     pub(super) entry_condition: PreparedLoopEntryCondition,
+    pub(super) terminal_pattern_transition: Option<PreparedTerminalPatternTransition>,
+    pub(super) dynamic_pattern_transition: Option<PreparedDynamicPatternTransition>,
     pub(super) step: NirExpr,
     pub(super) step_kind: PreparedLoopStepKind,
     pub(super) carries: Vec<PreparedCarryUpdate>,
     pub(super) control: PreparedLoopFlowControl,
+}
+
+pub(super) struct PreparedTerminalPatternTransition {
+    pub(super) binding_name: String,
+    pub(super) value: NirExpr,
+}
+
+pub(super) struct PreparedDynamicPatternTransition {
+    pub(super) binding_name: String,
+    pub(super) matched_variant: String,
+    pub(super) matched_type_args: Vec<NirTypeRef>,
+    pub(super) payload_field: String,
+    pub(super) active_carry_name: String,
+    pub(super) payload_carry_name: String,
+    pub(super) initial_condition: NirExpr,
+    pub(super) initial_payload: NirExpr,
+    pub(super) exit_value: Option<NirExpr>,
 }
 
 pub(super) enum PreparedLoopEntryCondition {
@@ -222,6 +241,9 @@ pub(super) enum PreparedLoopEntryCondition {
     },
     InvariantPattern {
         condition: NirExpr,
+    },
+    DynamicPattern {
+        active_carry_index: usize,
     },
     Unbounded,
 }

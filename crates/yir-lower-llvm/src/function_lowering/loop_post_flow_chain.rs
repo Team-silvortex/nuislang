@@ -114,7 +114,7 @@ macro_rules! lower_loop_post_flow_chain {
                     body.push(format!("  br label %{loop_body}"));
                 } else {
                     let cmp = fresh_reg(&mut next_reg);
-                    if cmp_kind == "invariant_true" {
+                    if matches!(cmp_kind, "invariant_true" | "pattern_exit") {
                         body.push(format!("  {cmp} = icmp ne i64 {limit}, 0"));
                     } else {
                         let pred = match cmp_kind {
@@ -322,6 +322,9 @@ macro_rules! lower_loop_post_flow_chain {
                 }
                 match control_action {
                     "break" => body.push(format!("  br label %{loop_exit}")),
+                    "continue" if cmp_kind == "pattern_exit" => {
+                        body.push(format!("  br label %{loop_exit}"))
+                    }
                     "continue" => body.push(format!("  br label %{loop_cond}")),
                     other => {
                         return Err(format!(
@@ -335,7 +338,11 @@ macro_rules! lower_loop_post_flow_chain {
                 for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
                     body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
                 }
-                body.push(format!("  br label %{loop_cond}"));
+                if cmp_kind == "pattern_exit" {
+                    body.push(format!("  br label %{loop_exit}"));
+                } else {
+                    body.push(format!("  br label %{loop_cond}"));
+                }
                 body.push(format!("{loop_exit}:"));
                 let final_current = fresh_reg(&mut next_reg);
                 body.push(format!("  {final_current} = load i64, ptr {current_slot}"));

@@ -31,7 +31,7 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `644/644` implementation-drift checks across `26/26` registered
+manifest, and `652/652` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
 bootstrap-critical average honest at `93/100`; the weakest coordinate is now
 `developer-system/bootstrap/differential-reproducibility-gate` at `early`,
@@ -102,6 +102,9 @@ The following surfaces are implemented and exercised today:
   the development tensor.
 * `nuisc` owns parsing, type/control-flow/generic validation, NIR and YIR
   production, verification, LLVM lowering, AOT emission, and project metadata.
+  Its normalized `while let` path now carries a single-field enum tag and scalar
+  payload across real native backedges, including matched-variant rebuild and a
+  conditional transition to a same-enum unit variant.
 * Nustar registration covers `cpu`, `data`, `shader`, `kernel`, `network`, and
   first-class `official.cffi` host compatibility without making the compiler a
   finite table of backend implementations. The CFFI package also owns the first
