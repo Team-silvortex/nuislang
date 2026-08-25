@@ -64,7 +64,7 @@ pub struct CompilerDiagnosticReport {
 pub fn build_compiler_diagnostic_report(
     input: &CompilerDiagnosticReportInput<'_>,
 ) -> Result<CompilerDiagnosticReport, ArtifactError> {
-    validate_token(&input.producer_id, "producer id")?;
+    validate_token(input.producer_id, "producer id")?;
     validate_token(input.bootstrap_subset_protocol, "bootstrap subset protocol")?;
     validate_sha256(input.component_record_sha256, "component record")?;
     validate_pipeline(input.semantic_pipeline)?;

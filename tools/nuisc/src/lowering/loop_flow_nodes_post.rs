@@ -12,6 +12,12 @@ pub(in crate::lowering) fn lower_post_flow_while(
         ));
     };
     let dynamic_pattern_initials = if let Some(transition) = &prepared.dynamic_pattern_transition {
+        if transition.protocol != DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2 {
+            return Err(format!(
+                "dynamic pattern transition requires `{DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2}`, found `{}`",
+                transition.protocol
+            ));
+        }
         let initial_variant = bindings
             .get(&transition.binding_name)
             .cloned()
@@ -22,13 +28,13 @@ pub(in crate::lowering) fn lower_post_flow_while(
                 )
         })?;
         let active_initial = lower_expr(&transition.initial_condition, state, bindings)?;
-        let zero_payload = lower_expr(&NirExpr::Int(0), state, bindings)?;
         bindings.insert(transition.active_carry_name.clone(), active_initial.clone());
         for payload in &transition.payloads {
             let projected_payload = lower_expr(&payload.initial, state, bindings)?;
-            let payload_initial = next_name(state, "pattern_payload_initial");
+            let neutral_payload = lower_expr(&payload.transport.neutral_expr(), state, bindings)?;
+            let selected_payload = next_name(state, "pattern_payload_initial");
             state.yir.nodes.push(Node {
-                name: payload_initial.clone(),
+                name: selected_payload.clone(),
                 resource: "cpu0".to_owned(),
                 op: Operation {
                     module: "cpu".to_owned(),
@@ -36,13 +42,15 @@ pub(in crate::lowering) fn lower_post_flow_while(
                     args: vec![
                         active_initial.clone(),
                         projected_payload.clone(),
-                        zero_payload.clone(),
+                        neutral_payload.clone(),
                     ],
                 },
             });
-            for dep in [&active_initial, &projected_payload, &zero_payload] {
-                push_dep_edges(state, dep, &payload_initial);
+            for dep in [&active_initial, &projected_payload, &neutral_payload] {
+                push_dep_edges(state, dep, &selected_payload);
             }
+            let payload_initial =
+                encode_dynamic_pattern_payload(payload.transport, selected_payload, state);
             bindings.insert(payload.carry_name.clone(), payload_initial);
         }
         Some((initial_variant, active_initial))
@@ -170,6 +178,20 @@ pub(in crate::lowering) fn lower_post_flow_while(
             }
         }
     }
+    if let Some(transition) = &prepared.dynamic_pattern_transition {
+        let contract = DynamicPatternPayloadCarryContract {
+            slots: transition
+                .payloads
+                .iter()
+                .enumerate()
+                .map(|(index, payload)| DynamicPatternPayloadCarrySlot {
+                    carry_index: index + 1,
+                    codec: payload.transport.yir_codec(),
+                })
+                .collect(),
+        };
+        args.extend(encode_dynamic_pattern_payload_carry_trailer(&contract)?);
+    }
     let name = next_name(
         state,
         if uses_cond_chain {
@@ -282,7 +304,9 @@ pub(in crate::lowering) fn lower_post_flow_while(
                     .map(|payload| {
                         (
                             payload.field.clone(),
-                            NirExpr::Var(payload.carry_name.clone()),
+                            payload
+                                .transport
+                                .decode_expr(NirExpr::Var(payload.carry_name.clone())),
                         )
                     })
                     .collect(),
@@ -333,4 +357,28 @@ pub(in crate::lowering) fn lower_post_flow_while(
         bindings.insert(transition.binding_name.clone(), selected_variant);
     }
     Ok(())
+}
+
+fn encode_dynamic_pattern_payload(
+    transport: PreparedDynamicPatternPayloadTransport,
+    source: String,
+    state: &mut LoweringState<'_>,
+) -> String {
+    match transport {
+        PreparedDynamicPatternPayloadTransport::I64Identity => source,
+        PreparedDynamicPatternPayloadTransport::BoolAsI64 => {
+            let encoded = next_name(state, "pattern_payload_bool_i64");
+            state.yir.nodes.push(Node {
+                name: encoded.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "cast_bool_to_i64".to_owned(),
+                    args: vec![source.clone()],
+                },
+            });
+            push_dep_edges(state, &source, &encoded);
+            encoded
+        }
+    }
 }

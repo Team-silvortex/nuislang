@@ -31,7 +31,7 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `658/658` implementation-drift checks across `26/26` registered
+manifest, and `665/665` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
 bootstrap-critical average honest at `93/100`; the weakest coordinate is now
 `developer-system/bootstrap/differential-reproducibility-gate` at `early`,
@@ -102,11 +102,16 @@ The following surfaces are implemented and exercised today:
   the development tensor.
 * `nuisc` owns parsing, type/control-flow/generic validation, NIR and YIR
   production, verification, LLVM lowering, AOT emission, and project metadata.
-  Its normalized `while let` path now carries ordered integer enum payload
-  fields across real native backedges, including field-identity-preserving
-  matched-variant rebuild and a conditional transition to a same-enum unit
-  variant. Structured `continue` and `break` retain every matched binding's
-  pre-transition value.
+  Its normalized `while let` path now carries ordered `i64` fields and
+  identity-updated `bool` fields across real native backedges. The versioned
+  bool transport selects a source-typed neutral value before encoding into the
+  loop ABI and decodes during field-identity-preserving variant rebuild. Its
+  per-slot codec is serialized in an optional YIR tail contract, then parsed
+  and fail-closed validated by both the CPU domain and LLVM lowering; legacy
+  YIR without the tail remains valid.
+  Structured `continue` and `break` retain every matched binding's
+  pre-transition value. `i32`, floating-point, and owned payloads still fail
+  before carry construction with a typed-scalar or GLM-owned diagnostic.
 * Nustar registration covers `cpu`, `data`, `shader`, `kernel`, `network`, and
   first-class `official.cffi` host compatibility without making the compiler a
   finite table of backend implementations. The CFFI package also owns the first

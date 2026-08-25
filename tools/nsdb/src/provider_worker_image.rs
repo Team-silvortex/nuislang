@@ -110,10 +110,12 @@ pub(crate) fn resolve_provider_worker_image(
         &source,
         output_dir,
         &source_text,
-        &pipeline.ast,
-        &pipeline.nir,
-        &pipeline.yir,
-        &pipeline.llvm_ir,
+        nuisc::aot::AotCompileProgram {
+            ast: &pipeline.ast,
+            nir: &pipeline.nir,
+            yir: &pipeline.yir,
+            llvm_ir: &pipeline.llvm_ir,
+        },
         &target,
     )?;
     nuisc::cache::store_compile_cache(&cache_key, output_dir)?;

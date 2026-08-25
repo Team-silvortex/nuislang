@@ -174,7 +174,7 @@ fn parse_node(
     }
 
     let (resource_name, lane) = split_resource_lane(&tokens[2]);
-    let op = Operation::parse(opcode, tokens[3..].iter().cloned().collect())
+    let op = Operation::parse(opcode, tokens[3..].to_vec())
         .map_err(|error| format!("line {line_no}: {error}"))?;
 
     module.nodes.push(Node {
@@ -204,7 +204,7 @@ fn parse_shorthand_node(
     let instruction = &tokens[1];
     let name = &tokens[2];
     let resource = &tokens[3];
-    let args = tokens[4..].iter().cloned().collect::<Vec<_>>();
+    let args = tokens[4..].to_vec();
     let (resource_name, lane) = split_resource_lane(resource);
     let opcode = canonicalize_shorthand_opcode(module, instruction, name, resource, &args)
         .map_err(|error| format!("line {line_no}: {error}"))?;
@@ -730,5 +730,34 @@ edge dep lowering_cpu_target_contract_type lowering_cpu_target_config
                 && edge.from == "lowering_cpu_target_config"
                 && edge.to == "lowering_cpu_target_contract_type"
         }));
+    }
+
+    #[test]
+    fn preserves_dynamic_pattern_payload_carry_trailers_in_text_yir() {
+        let module = parse_module(
+            r#"
+resource cpu0 cpu.arm64
+
+cpu.loop_while_scalar_post_flow_cond_chain loop cpu0 initial limit step pattern_carry0 add current_gt rhs break active always initial keep keep payload always initial keep keep @dynamic-pattern-payload-carry dynamic-pattern-payload-carry-v2 1 1 bool-as-i64
+"#,
+        )
+        .unwrap();
+        let loop_node = module
+            .nodes
+            .iter()
+            .find(|node| node.name == "loop")
+            .expect("loop node");
+
+        let (loop_args, contract) =
+            yir_core::split_dynamic_pattern_payload_carry_trailer(&loop_node.op.args).unwrap();
+
+        assert_eq!(loop_args.last().map(String::as_str), Some("keep"));
+        assert_eq!(
+            contract.unwrap().slots,
+            [yir_core::DynamicPatternPayloadCarrySlot {
+                carry_index: 1,
+                codec: yir_core::DynamicPatternPayloadCodec::BoolAsI64,
+            }]
+        );
     }
 }

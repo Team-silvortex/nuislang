@@ -439,28 +439,37 @@ impl RegisteredMod for CpuMod {
                 Ok(Value::Unit)
             }
             "loop_while_i64_post_flow_cond_chain" | "loop_while_scalar_post_flow_cond_chain" => {
-                let initial = state.expect_value(&node.op.args[0])?.clone();
-                let limit = state.expect_value(&node.op.args[1])?.clone();
-                let step = state.expect_value(&node.op.args[2])?.clone();
-                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
-                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let (loop_args, payload_contract) =
+                    split_dynamic_pattern_payload_args(&node.op.args, &node.name)?;
+                let initial = state.expect_value(&loop_args[0])?.clone();
+                let limit = state.expect_value(&loop_args[1])?.clone();
+                let step = state.expect_value(&loop_args[2])?.clone();
+                let cmp = loop_args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = loop_args.get(4).map_or("<missing>", String::as_str);
                 let (control_expr, carry_start_index) = parse_loop_flow_expr(
-                    &node.op.args,
+                    loop_args,
                     5,
                     &node.name,
                     &validate_post_flow_control_kind,
                 )?;
-                let carries =
-                    parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?
-                        .iter()
-                        .map(|carry| {
-                            format_conditional_carry(carry, &|value_name| {
-                                state
-                                    .expect_value(value_name)
-                                    .map(|value| value.to_string())
-                            })
+                let parsed_carries =
+                    parse_conditional_carries(loop_args, carry_start_index, &node.name, true)?;
+                validate_dynamic_pattern_payload_slots(
+                    payload_contract.as_ref(),
+                    &loop_args[3],
+                    parsed_carries.len(),
+                    &node.name,
+                )?;
+                let carries = parsed_carries
+                    .iter()
+                    .map(|carry| {
+                        format_conditional_carry(carry, &|value_name| {
+                            state
+                                .expect_value(value_name)
+                                .map(|value| value.to_string())
                         })
-                        .collect::<Result<Vec<_>, String>>()?;
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
                 let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)

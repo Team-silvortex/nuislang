@@ -5,12 +5,14 @@ use std::{
 
 use nuis_semantics::model::{
     nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirKernelMapOp,
-    NirModule, NirMutexCapabilityOp, NirStmt, NirStructDef, NirTypeRef,
+    NirModule, NirMutexCapabilityOp, NirScalarKind, NirStmt, NirStructDef, NirTypeRef,
 };
 use yir_core::{
-    Edge, EdgeKind, ModRegistry, Node, Operation, Resource, ResourceKind, SemanticOp,
-    TaskLifecycleState, YirFunction, YirFunctionParameter, YirFunctionResult, YirFunctionRole,
-    YirModule, YirResultRole, YirResultState, YirValueOwnership,
+    encode_dynamic_pattern_payload_carry_trailer, DynamicPatternPayloadCarryContract,
+    DynamicPatternPayloadCarrySlot, DynamicPatternPayloadCodec, Edge, EdgeKind, ModRegistry, Node,
+    Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState, YirFunction,
+    YirFunctionParameter, YirFunctionResult, YirFunctionRole, YirModule, YirResultRole,
+    YirResultState, YirValueOwnership,
 };
 
 use crate::registry::{

@@ -149,10 +149,12 @@ pub(crate) fn run_compile_resolved(
             &resolved.effective_input_path,
             &output_dir,
             &source,
-            &artifacts.ast,
-            &artifacts.nir,
-            &artifacts.yir,
-            &artifacts.llvm_ir,
+            aot::AotCompileProgram {
+                ast: &artifacts.ast,
+                nir: &artifacts.nir,
+                yir: &artifacts.yir,
+                llvm_ir: &artifacts.llvm_ir,
+            },
             &cpu_target,
         )?;
         if let Some(packaging_mode) = requested_packaging_mode {

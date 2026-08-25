@@ -194,4 +194,70 @@ pub(crate) const DEV_TENSOR_LANGUAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "assert_eq!(status.code(), Some(34))",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-payload-admission-contract",
+        path: "tools/nuisc/src/lowering/loop_preparation_pattern.rs",
+        required_patterns: &[
+            "DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2",
+            "PreparedDynamicPatternPayloadTransport",
+            "`i64` and `bool` payload carries",
+            "GLM-owned payload carry contract",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-payload-admission-regression",
+        path: "tools/nuisc/src/lowering/tests_loops_terminal.rs",
+        required_patterns: &[
+            "admits_bool_dynamic_while_let_payload_through_the_v2_transport",
+            "rejects_i32_dynamic_while_let_payload_before_carry_lowering",
+            "typed-scalar payload carry contract",
+            "rejects_owned_text_dynamic_while_let_payload_before_carry_lowering",
+            "GLM-owned payload carry contract",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-bool-native-regression",
+        path: "tools/nuisc/tests/control_flow_syntax_native.rs",
+        required_patterns: &[
+            "dynamic_while_let_preserves_bool_payloads_across_native_backedges",
+            "consume(Phase.Active { ready: false })",
+            "assert_eq!(status.code(), Some(64))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-yir-carry-contract",
+        path: "crates/yir-core/src/dynamic_pattern_carry.rs",
+        required_patterns: &[
+            "DYNAMIC_PATTERN_PAYLOAD_CARRY_TRAILER_MARKER",
+            "split_dynamic_pattern_payload_carry_trailer",
+            "validate_dynamic_pattern_payload_carry_context",
+            "BoolAsI64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-yir-carry-emission",
+        path: "tools/nuisc/src/lowering/loop_flow_nodes_post.rs",
+        required_patterns: &[
+            "encode_dynamic_pattern_payload_carry_trailer",
+            "carry_index: index + 1",
+            "payload.transport.yir_codec()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-yir-carry-domain-validation",
+        path: "crates/yir-domain-cpu/src/loop_metadata.rs",
+        required_patterns: &[
+            "split_dynamic_pattern_payload_args",
+            "validate_dynamic_pattern_payload_carry_context",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-yir-carry-llvm-validation",
+        path: "crates/yir-lower-llvm/src/function_lowering/loop_post_flow_cond_chain.rs",
+        required_patterns: &[
+            "split_dynamic_pattern_payload_carry_trailer",
+            "validate_dynamic_pattern_payload_carry_context",
+            "slot.codec.render()",
+        ],
+    },
 ];

@@ -8,11 +8,20 @@ macro_rules! lower_loop_post_flow_cond_chain {
         let last_cpu_value = $last_cpu_value;
                 let loop_instruction = canonical_loop_instruction(&node.op.instruction);
                 let loop_block_prefix = canonical_loop_block_prefix(&node.op.instruction);
-                let initial_value = registers.get(&node.op.args[0]).cloned();
-                let limit_value = registers.get(&node.op.args[1]).cloned();
-                let step_value = registers.get(&node.op.args[2]).cloned();
+                let (loop_args, payload_contract) =
+                    yir_core::split_dynamic_pattern_payload_carry_trailer(&node.op.args).map_err(
+                        |error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has invalid dynamic pattern payload carry contract during LLVM lowering: {error}",
+                                node.name,
+                            )
+                        },
+                    )?;
+                let initial_value = registers.get(&loop_args[0]).cloned();
+                let limit_value = registers.get(&loop_args[1]).cloned();
+                let step_value = registers.get(&loop_args[2]).cloned();
                 let (flow_expr, carry_start_index) =
-                    parse_loop_flow_expr_for_llvm(&node.op.args, 5, &node.name, loop_instruction)?;
+                    parse_loop_flow_expr_for_llvm(loop_args, 5, &node.name, loop_instruction)?;
                 let (Some(initial_value), Some(limit_value), Some(step_value)) =
                     (initial_value, limit_value, step_value)
                 else {
@@ -43,8 +52,8 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     ));
                     continue;
                 };
-                let cmp_kind = node.op.args[3].as_str();
-                let step_kind = node.op.args[4].as_str();
+                let cmp_kind = loop_args[3].as_str();
+                let step_kind = loop_args[4].as_str();
                 let Some(resolved_flow_expr) = resolve_loop_flow_expr_for_llvm(
                     &flow_expr,
                     &registers,
@@ -60,17 +69,17 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     Vec::<(String, Option<String>, Vec<String>, Vec<String>)>::new();
                 let mut deferred = false;
                 let mut cursor = carry_start_index;
-                while cursor < node.op.args.len() {
-                    let Some(initial_name) = node.op.args.get(cursor) else {
+                while cursor < loop_args.len() {
+                    let Some(initial_name) = loop_args.get(cursor) else {
                         break;
                     };
-                    let Some(cond_kind) = node.op.args.get(cursor + 1) else {
+                    let Some(cond_kind) = loop_args.get(cursor + 1) else {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` has truncated carry condition during LLVM lowering",
                             node.name,
                         ));
                     };
-                    let Some(cond_rhs_name) = node.op.args.get(cursor + 2) else {
+                    let Some(cond_rhs_name) = loop_args.get(cursor + 2) else {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` has truncated carry condition rhs during LLVM lowering",
                             node.name,
@@ -120,7 +129,7 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         Some(cond_rhs)
                     };
                     let then_start = cursor + 3;
-                    let Some(then_kind) = node.op.args.get(then_start).cloned() else {
+                    let Some(then_kind) = loop_args.get(then_start).cloned() else {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` has truncated then carry source during LLVM lowering",
                             node.name,
@@ -135,14 +144,14 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         ));
                     };
                     let then_end = then_start + 1 + then_payload_len;
-                    if then_end > node.op.args.len() {
+                    if then_end > loop_args.len() {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` is missing payload for carry kind `{then_kind}` during LLVM lowering",
                             node.name,
                         ));
                     }
                     let mut then_source = vec![then_kind];
-                    for payload_name in &node.op.args[then_start + 1..then_end] {
+                    for payload_name in &loop_args[then_start + 1..then_end] {
                         let Some(payload_value) = registers.get(payload_name).cloned() else {
                             body.push(format!(
                                 "  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is outside the current CPU LLVM slice",
@@ -166,7 +175,7 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     if deferred {
                         break;
                     }
-                    let Some(else_kind) = node.op.args.get(then_end).cloned() else {
+                    let Some(else_kind) = loop_args.get(then_end).cloned() else {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` has truncated else carry source during LLVM lowering",
                             node.name,
@@ -181,14 +190,14 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         ));
                     };
                     let else_end = then_end + 1 + else_payload_len;
-                    if else_end > node.op.args.len() {
+                    if else_end > loop_args.len() {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` is missing payload for carry kind `{else_kind}` during LLVM lowering",
                             node.name,
                         ));
                     }
                     let mut else_source = vec![else_kind];
-                    for payload_name in &node.op.args[then_end + 1..else_end] {
+                    for payload_name in &loop_args[then_end + 1..else_end] {
                         let Some(payload_value) = registers.get(payload_name).cloned() else {
                             body.push(format!(
                                 "  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is outside the current CPU LLVM slice",
@@ -218,6 +227,27 @@ macro_rules! lower_loop_post_flow_cond_chain {
                 }
                 if deferred {
                     continue;
+                }
+                if let Some(contract) = &payload_contract {
+                    yir_core::validate_dynamic_pattern_payload_carry_context(
+                        contract,
+                        cmp_kind,
+                        carry_initials.len(),
+                    )
+                    .map_err(|error| {
+                        format!(
+                            "cpu.{loop_instruction} `{}` has invalid dynamic pattern payload carry context during LLVM lowering: {error}",
+                            node.name,
+                        )
+                    })?;
+                    for slot in &contract.slots {
+                        body.push(format!(
+                            "  ; {} carry{} {}",
+                            yir_core::DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2,
+                            slot.carry_index,
+                            slot.codec.render(),
+                        ));
+                    }
                 }
                 let current_slot = fresh_reg(&mut next_reg);
                 body.push(format!("  {current_slot} = alloca i64"));

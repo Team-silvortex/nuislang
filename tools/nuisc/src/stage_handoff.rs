@@ -27,7 +27,7 @@ pub(crate) fn write_and_verify_compiler_stage_handoff(
     if source.contains('\r') || source.contains('\0') {
         return Err("compiler stage source must use UTF-8/LF text without NUL bytes".to_owned());
     }
-    let tokens = frontend::render_stage_neutral_token_stream(&source)?;
+    let tokens = frontend::render_stage_neutral_token_stream(source)?;
     let ast_text = render::render_ast(ast);
     let nir_text = render::render_nir(nir);
     let yir_text = render::render_yir(yir);

@@ -219,10 +219,20 @@ fn lowers_multi_backedge_while_let_variant_rebuild() {
         .expect("dynamic pattern loop");
     assert_eq!(loop_node.op.args[3], "pattern_carry0");
     assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_carry1"));
+    let (_, payload_contract) =
+        yir_core::split_dynamic_pattern_payload_carry_trailer(&loop_node.op.args).unwrap();
+    assert_eq!(
+        payload_contract.unwrap().slots,
+        [yir_core::DynamicPatternPayloadCarrySlot {
+            carry_index: 1,
+            codec: yir_core::DynamicPatternPayloadCodec::I64,
+        }]
+    );
     assert!(yir.nodes.iter().any(|node| {
         node.name.starts_with("loop_variant_state_") && node.op.instruction == "select"
     }));
     let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(llvm_ir.contains("dynamic-pattern-payload-carry-v2 carry1 i64"));
     assert!(!llvm_ir.contains("deferred lowering"));
 }
 
@@ -429,6 +439,141 @@ fn rejects_non_affine_dynamic_while_let_payload_rebuild_precisely() {
         "{error}"
     );
     assert!(error.contains("affine payload rebuilds"), "{error}");
+}
+
+#[test]
+fn admits_bool_dynamic_while_let_payload_through_the_v2_transport() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active { ready: bool },
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active { ready: true };
+            let cursor: i64 = 0;
+            while let Phase.Active { ready: flag } = selected {
+              let cursor: i64 = cursor + 1;
+              let selected: Phase = Phase.Active { ready: flag };
+              if cursor > 1 {
+                break;
+              }
+            }
+            return cursor;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_cond_chain")
+        .expect("dynamic bool pattern loop");
+    assert_eq!(loop_node.op.args[3], "pattern_carry0");
+    let (_, payload_contract) =
+        yir_core::split_dynamic_pattern_payload_carry_trailer(&loop_node.op.args).unwrap();
+    assert_eq!(
+        payload_contract.unwrap().slots,
+        [yir_core::DynamicPatternPayloadCarrySlot {
+            carry_index: 1,
+            codec: yir_core::DynamicPatternPayloadCodec::BoolAsI64,
+        }]
+    );
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "cast_bool_to_i64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "cast_i64_to_bool"));
+}
+
+#[test]
+fn rejects_i32_dynamic_while_let_payload_before_carry_lowering() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active { value: i32 },
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active { value: i32_from_i64(7) };
+            let cursor: i64 = 0;
+            while let Phase.Active { value: item } = selected {
+              let cursor: i64 = cursor + 1;
+              let selected: Phase = Phase.Active { value: item };
+              if cursor > 1 {
+                break;
+              }
+            }
+            return cursor;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(
+        error.contains("`i64` and `bool` payload carries"),
+        "{error}"
+    );
+    assert!(error.contains("field `value` bound as `item`"), "{error}");
+    assert!(error.contains("type `i32`"), "{error}");
+    assert!(
+        error.contains("typed-scalar payload carry contract"),
+        "{error}"
+    );
+}
+
+#[test]
+fn rejects_owned_text_dynamic_while_let_payload_before_carry_lowering() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active { label: String },
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active { label: "ready" };
+            let cursor: i64 = 0;
+            while let Phase.Active { label: text } = selected {
+              let cursor: i64 = cursor + 1;
+              let selected: Phase = Phase.Active { label: text };
+              if cursor > 1 {
+                break;
+              }
+            }
+            return cursor;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(
+        error.contains("`i64` and `bool` payload carries"),
+        "{error}"
+    );
+    assert!(error.contains("field `label` bound as `text`"), "{error}");
+    assert!(error.contains("type `String`"), "{error}");
+    assert!(
+        error.contains("GLM-owned payload carry contract"),
+        "{error}"
+    );
 }
 
 #[test]

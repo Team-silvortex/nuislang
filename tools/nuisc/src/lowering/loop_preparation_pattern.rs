@@ -16,14 +16,16 @@ enum DynamicPatternUpdate {
     },
     Conditional {
         condition: NirExpr,
-        then_branch: DynamicPatternBranch,
-        else_branch: DynamicPatternBranch,
+        then_branch: Box<DynamicPatternBranch>,
+        else_branch: Box<DynamicPatternBranch>,
     },
 }
 
 struct DynamicPatternPayload {
     binding_name: String,
     field: String,
+    ty: NirTypeRef,
+    transport: PreparedDynamicPatternPayloadTransport,
     initial: NirExpr,
 }
 
@@ -114,39 +116,7 @@ pub(super) fn prepare_dynamic_pattern_plan(
     let NirExpr::Var(binding_name) = base.as_ref() else {
         return None;
     };
-    let payloads = body
-        .iter()
-        .enumerate()
-        .map_while(|(index, stmt)| match stmt {
-            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
-                let NirExpr::VariantFieldAccess {
-                    base,
-                    variant: field_variant,
-                    field,
-                } = value
-                else {
-                    return None;
-                };
-                if field_variant != variant
-                    || !matches!(base.as_ref(), NirExpr::Var(name) if name == binding_name)
-                {
-                    return None;
-                }
-                Some((
-                    index,
-                    DynamicPatternPayload {
-                        binding_name: name.clone(),
-                        field: field.clone(),
-                        initial: value.clone(),
-                    },
-                ))
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    if payloads.is_empty() {
-        return None;
-    }
+    let payloads = collect_dynamic_pattern_payloads(gate_condition, body)?.ok()?;
     let distinct_fields = payloads
         .iter()
         .map(|(_, payload)| payload.field.as_str())
@@ -213,6 +183,80 @@ pub(super) fn prepare_dynamic_pattern_plan(
     ))
 }
 
+pub(super) fn diagnose_dynamic_pattern_payload_admission(
+    gate_condition: &NirExpr,
+    body: &[NirStmt],
+) -> Option<String> {
+    collect_dynamic_pattern_payloads(gate_condition, body)?.err()
+}
+
+fn collect_dynamic_pattern_payloads(
+    gate_condition: &NirExpr,
+    body: &[NirStmt],
+) -> Option<Result<Vec<(usize, DynamicPatternPayload)>, String>> {
+    let NirExpr::VariantIs { base, variant } = gate_condition else {
+        return None;
+    };
+    let NirExpr::Var(binding_name) = base.as_ref() else {
+        return None;
+    };
+    let mut payloads = Vec::new();
+    for (index, stmt) in body.iter().enumerate() {
+        let (name, ty, value) = match stmt {
+            NirStmt::Let { name, ty, value } => (name, ty.as_ref(), value),
+            NirStmt::Const { name, ty, value } => (name, Some(ty), value),
+            _ => break,
+        };
+        let NirExpr::VariantFieldAccess {
+            base,
+            variant: field_variant,
+            field,
+        } = value
+        else {
+            break;
+        };
+        if field_variant != variant
+            || !matches!(base.as_ref(), NirExpr::Var(name) if name == binding_name)
+        {
+            break;
+        }
+        let Some(ty) = ty else {
+            return Some(Err(format!(
+                "pattern-controlled `while let` cannot lower payload field `{field}` bound as `{name}` because its NIR type is unresolved; dynamic backedges require an explicit payload transport type"
+            )));
+        };
+        let Some(transport) = PreparedDynamicPatternPayloadTransport::for_type(ty) else {
+            let required_contract = match ty.scalar_kind() {
+                Some(
+                    NirScalarKind::I32
+                    | NirScalarKind::F32
+                    | NirScalarKind::F64
+                    | NirScalarKind::Unit,
+                ) => "typed-scalar payload carry contract",
+                Some(NirScalarKind::Text) | None => "GLM-owned payload carry contract",
+                Some(NirScalarKind::Bool | NirScalarKind::I64) => {
+                    unreachable!("admitted scalar payloads have a transport")
+                }
+            };
+            return Some(Err(format!(
+                "pattern-controlled `while let` dynamic backedges currently support `i64` and `bool` payload carries through `{DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2}`; field `{field}` bound as `{name}` has type `{}` and requires a {required_contract}",
+                ty.render()
+            )));
+        };
+        payloads.push((
+            index,
+            DynamicPatternPayload {
+                binding_name: name.clone(),
+                field: field.clone(),
+                ty: ty.clone(),
+                transport,
+                initial: value.clone(),
+            },
+        ));
+    }
+    (!payloads.is_empty()).then_some(Ok(payloads))
+}
+
 fn parse_dynamic_pattern_update(
     stmt: &NirStmt,
     binding_name: &str,
@@ -270,8 +314,8 @@ fn parse_dynamic_pattern_update(
     }
     Some(DynamicPatternUpdate::Conditional {
         condition: condition.clone(),
-        then_branch,
-        else_branch,
+        then_branch: Box::new(then_branch),
+        else_branch: Box::new(else_branch),
     })
 }
 
@@ -284,7 +328,7 @@ fn dynamic_pattern_update_type_args(update: &DynamicPatternUpdate) -> Option<&[N
             ..
         } => [then_branch, else_branch]
             .into_iter()
-            .find_map(|branch| match branch {
+            .find_map(|branch| match branch.as_ref() {
                 DynamicPatternBranch::Matched { type_args, .. } => Some(type_args.as_slice()),
                 DynamicPatternBranch::Exit(_) => None,
             }),
@@ -352,6 +396,11 @@ pub(super) fn prepare_dynamic_pattern_carries(
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<(PreparedDynamicPatternTransition, Vec<PreparedCarryUpdate>)> {
+    if plan.payloads.iter().any(|payload| {
+        PreparedDynamicPatternPayloadTransport::for_type(&payload.ty) != Some(payload.transport)
+    }) {
+        return None;
+    }
     let active_carry_name = format!("__pattern_active_{}", plan.binding_name);
     let prepared_payloads = plan
         .payloads
@@ -360,6 +409,7 @@ pub(super) fn prepare_dynamic_pattern_carries(
         .map(|(index, payload)| PreparedDynamicPatternPayload {
             field: payload.field.clone(),
             carry_name: format!("__pattern_payload_{}_{index}", plan.binding_name),
+            transport: payload.transport,
             initial: payload.initial.clone(),
         })
         .collect::<Vec<_>>();
@@ -383,7 +433,9 @@ pub(super) fn prepare_dynamic_pattern_carries(
         .map(|(index, payload)| {
             (
                 payload.binding_name.clone(),
-                NirExpr::Var(tail_recursive_prev_carry_binding(index + 1)),
+                payload
+                    .transport
+                    .decode_expr(NirExpr::Var(tail_recursive_prev_carry_binding(index + 1))),
             )
         })
         .collect::<Vec<_>>();
@@ -423,14 +475,13 @@ pub(super) fn prepare_dynamic_pattern_carries(
                 pure_helpers,
                 inlineable_pure_helpers,
             )?;
-            let exit_value =
-                [&then_branch, &else_branch]
-                    .into_iter()
-                    .find_map(|branch| match branch {
-                        DynamicPatternBranch::Exit(value) => Some(value.clone()),
-                        DynamicPatternBranch::Matched { .. } => None,
-                    });
-            (condition, then_branch, else_branch, exit_value)
+            let exit_value = [then_branch.as_ref(), else_branch.as_ref()]
+                .into_iter()
+                .find_map(|branch| match branch {
+                    DynamicPatternBranch::Exit(value) => Some(value.clone()),
+                    DynamicPatternBranch::Matched { .. } => None,
+                });
+            (condition, *then_branch, *else_branch, exit_value)
         }
     };
 
@@ -457,7 +508,10 @@ pub(super) fn prepare_dynamic_pattern_carries(
                 } else {
                     NirExpr::Var(tail_recursive_prev_carry_binding(source_index + 1))
                 };
-                (payload.binding_name.clone(), value)
+                (
+                    payload.binding_name.clone(),
+                    payload.transport.decode_expr(value),
+                )
             })
             .collect::<Vec<_>>();
         let payload_source = |branch: &DynamicPatternBranch| match branch {
@@ -465,6 +519,7 @@ pub(super) fn prepare_dynamic_pattern_carries(
                 payloads.get(index)?,
                 &payload_substitutions,
                 &prepared_payload.carry_name,
+                prepared_payload.transport,
                 loop_binding_name,
                 &carries,
                 inlineable_pure_helpers,
@@ -480,6 +535,7 @@ pub(super) fn prepare_dynamic_pattern_carries(
 
     Some((
         PreparedDynamicPatternTransition {
+            protocol: DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2,
             binding_name: plan.binding_name,
             matched_variant: plan.matched_variant,
             matched_type_args: plan.matched_type_args,
@@ -496,12 +552,14 @@ fn prepare_payload_branch_source(
     payload: &NirExpr,
     payload_substitutions: &[(String, NirExpr)],
     payload_carry_name: &str,
+    transport: PreparedDynamicPatternPayloadTransport,
     loop_binding_name: &str,
     carries: &[PreparedCarryUpdate],
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedCarryBranchSource> {
     let renamed = substitute_expr_bindings(payload, payload_substitutions);
-    let normalized = match renamed {
+    let encoded = transport.encode_expr(renamed);
+    let normalized = match encoded {
         NirExpr::Binary {
             op: NirBinaryOp::Sub,
             lhs,

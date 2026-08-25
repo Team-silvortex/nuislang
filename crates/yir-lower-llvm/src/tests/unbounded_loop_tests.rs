@@ -232,6 +232,11 @@ fn dynamic_pattern_carry_false_still_produces_loop_fields() {
             "initial",
             "keep",
             "keep",
+            "@dynamic-pattern-payload-carry",
+            "dynamic-pattern-payload-carry-v2",
+            "1",
+            "1",
+            "bool-as-i64",
         ],
     );
     push_cpu_node(&mut module, "result", "cpu.field", vec!["loop", "carry0"]);
@@ -252,6 +257,7 @@ fn dynamic_pattern_carry_false_still_produces_loop_fields() {
 
     let llvm_ir = emit_module(&module).expect("dynamic false pattern carry should lower");
     assert!(llvm_ir.contains("loop_while_scalar_post_flow_cond_chain_cond."));
+    assert!(llvm_ir.contains("dynamic-pattern-payload-carry-v2 carry1 bool-as-i64"));
     assert!(!llvm_ir.contains("deferred lowering"));
 }
 

@@ -304,7 +304,7 @@ fn analyze_pure_helper_block(
                 return Some(true);
             }
             let tail_terminates = analyze_pure_helper_block(tail, function_map, memo, visiting)?;
-            Some((then_terminates || tail_terminates) && (else_terminates || tail_terminates))
+            Some(tail_terminates || (then_terminates && else_terminates))
         }
         NirStmt::Return(Some(expr)) => {
             is_pure_helper_expr(expr, function_map, memo, visiting).then_some(true)

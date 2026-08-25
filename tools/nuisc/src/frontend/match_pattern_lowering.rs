@@ -302,13 +302,11 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
             let mut conditions = conditions.into_iter();
             let first = conditions.next().unwrap_or(NirExpr::Bool(true));
             Ok((
-                conditions
-                    .into_iter()
-                    .fold(first, |lhs, rhs| NirExpr::Binary {
-                        op: NirBinaryOp::And,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    }),
+                conditions.fold(first, |lhs, rhs| NirExpr::Binary {
+                    op: NirBinaryOp::And,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                }),
                 bindings,
             ))
         }

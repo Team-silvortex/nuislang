@@ -518,7 +518,7 @@ pub(in crate::lowering) fn prepare_post_flow_while(
     let [middle @ .., control_stmt] = rest else {
         return None;
     };
-    if middle.is_empty() {
+    if middle.is_empty() && dynamic_pattern_plan.is_none() {
         return None;
     }
     let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);

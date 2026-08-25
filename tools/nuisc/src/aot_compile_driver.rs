@@ -13,6 +13,14 @@ use crate::aot_native_runner::{
 };
 use crate::aot_output_layout::output_layout;
 
+#[derive(Clone, Copy)]
+pub struct AotCompileProgram<'a> {
+    pub ast: &'a AstModule,
+    pub nir: &'a NirModule,
+    pub yir: &'a YirModule,
+    pub llvm_ir: &'a str,
+}
+
 pub fn write_and_link(
     input: &Path,
     output_dir: &Path,
@@ -22,41 +30,43 @@ pub fn write_and_link(
     llvm_ir: &str,
     cpu_target: &CpuBuildTarget,
 ) -> Result<CompileArtifacts, String> {
-    write_and_link_impl(input, output_dir, None, ast, nir, yir, llvm_ir, cpu_target)
+    write_and_link_impl(
+        input,
+        output_dir,
+        None,
+        AotCompileProgram {
+            ast,
+            nir,
+            yir,
+            llvm_ir,
+        },
+        cpu_target,
+    )
 }
 
 pub fn write_and_link_with_source(
     input: &Path,
     output_dir: &Path,
     source: &str,
-    ast: &AstModule,
-    nir: &NirModule,
-    yir: &YirModule,
-    llvm_ir: &str,
+    program: AotCompileProgram<'_>,
     cpu_target: &CpuBuildTarget,
 ) -> Result<CompileArtifacts, String> {
-    write_and_link_impl(
-        input,
-        output_dir,
-        Some(source),
-        ast,
-        nir,
-        yir,
-        llvm_ir,
-        cpu_target,
-    )
+    write_and_link_impl(input, output_dir, Some(source), program, cpu_target)
 }
 
 fn write_and_link_impl(
     input: &Path,
     output_dir: &Path,
     source: Option<&str>,
-    ast: &AstModule,
-    nir: &NirModule,
-    yir: &YirModule,
-    llvm_ir: &str,
+    program: AotCompileProgram<'_>,
     cpu_target: &CpuBuildTarget,
 ) -> Result<CompileArtifacts, String> {
+    let AotCompileProgram {
+        ast,
+        nir,
+        yir,
+        llvm_ir,
+    } = program;
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
 

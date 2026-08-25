@@ -1,6 +1,7 @@
 // Loop and carry metadata parsing helpers for the CPU domain.
 
 use crate::carry_payload::carry_source_payload_len;
+use yir_core::DynamicPatternPayloadCarryContract;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LoopCondExpr {
     Leaf {
@@ -72,6 +73,34 @@ pub(crate) fn validate_loop_step_kind(kind: &str, node_name: &str) -> Result<(),
             node_name, other
         )),
     }
+}
+
+pub(crate) fn split_dynamic_pattern_payload_args<'a>(
+    args: &'a [String],
+    node_name: &str,
+) -> Result<(&'a [String], Option<DynamicPatternPayloadCarryContract>), String> {
+    let (loop_args, contract) = yir_core::split_dynamic_pattern_payload_carry_trailer(args)
+        .map_err(|error| {
+            format!(
+                "node `{node_name}` has invalid dynamic pattern payload carry contract: {error}"
+            )
+        })?;
+    Ok((loop_args, contract))
+}
+
+pub(crate) fn validate_dynamic_pattern_payload_slots(
+    contract: Option<&DynamicPatternPayloadCarryContract>,
+    compare_kind: &str,
+    carry_count: usize,
+    node_name: &str,
+) -> Result<(), String> {
+    let Some(contract) = contract else {
+        return Ok(());
+    };
+    yir_core::validate_dynamic_pattern_payload_carry_context(contract, compare_kind, carry_count)
+        .map_err(|error| {
+            format!("node `{node_name}` has invalid dynamic pattern payload carry context: {error}")
+        })
 }
 pub(crate) fn validate_indexed_compare_kind(
     kind: &str,

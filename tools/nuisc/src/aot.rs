@@ -12,7 +12,7 @@ pub use crate::aot_artifact::{
 use crate::aot_c_shim_source::render_c_shim_source as c_shim_source;
 pub use crate::aot_compile_driver::{
     compile_artifacts_for_output_dir, compile_artifacts_for_output_dir_with_packaging_mode,
-    write_and_link, write_and_link_with_source,
+    write_and_link, write_and_link_with_source, AotCompileProgram,
 };
 pub use crate::aot_compiled_artifact_verify::verify_nuis_compiled_artifact;
 pub use crate::aot_cpu_target::{

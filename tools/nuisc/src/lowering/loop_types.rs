@@ -222,7 +222,56 @@ pub(super) struct PreparedTerminalPatternTransition {
     pub(super) value: NirExpr,
 }
 
+pub(super) const DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2: &str =
+    yir_core::DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PreparedDynamicPatternPayloadTransport {
+    I64Identity,
+    BoolAsI64,
+}
+
+impl PreparedDynamicPatternPayloadTransport {
+    pub(super) fn for_type(ty: &NirTypeRef) -> Option<Self> {
+        match ty.scalar_kind()? {
+            NirScalarKind::I64 => Some(Self::I64Identity),
+            NirScalarKind::Bool => Some(Self::BoolAsI64),
+            _ => None,
+        }
+    }
+
+    pub(super) fn neutral_expr(self) -> NirExpr {
+        match self {
+            Self::I64Identity => NirExpr::Int(0),
+            Self::BoolAsI64 => NirExpr::Bool(false),
+        }
+    }
+
+    pub(super) fn encode_expr(self, expr: NirExpr) -> NirExpr {
+        match (self, expr) {
+            (Self::I64Identity, expr) => expr,
+            (Self::BoolAsI64, NirExpr::CastI64ToBool(value)) => *value,
+            (Self::BoolAsI64, expr) => NirExpr::CastBoolToI64(Box::new(expr)),
+        }
+    }
+
+    pub(super) fn decode_expr(self, expr: NirExpr) -> NirExpr {
+        match self {
+            Self::I64Identity => expr,
+            Self::BoolAsI64 => NirExpr::CastI64ToBool(Box::new(expr)),
+        }
+    }
+
+    pub(super) fn yir_codec(self) -> DynamicPatternPayloadCodec {
+        match self {
+            Self::I64Identity => DynamicPatternPayloadCodec::I64,
+            Self::BoolAsI64 => DynamicPatternPayloadCodec::BoolAsI64,
+        }
+    }
+}
+
 pub(super) struct PreparedDynamicPatternTransition {
+    pub(super) protocol: &'static str,
     pub(super) binding_name: String,
     pub(super) matched_variant: String,
     pub(super) matched_type_args: Vec<NirTypeRef>,
@@ -235,6 +284,7 @@ pub(super) struct PreparedDynamicPatternTransition {
 pub(super) struct PreparedDynamicPatternPayload {
     pub(super) field: String,
     pub(super) carry_name: String,
+    pub(super) transport: PreparedDynamicPatternPayloadTransport,
     pub(super) initial: NirExpr,
 }
 

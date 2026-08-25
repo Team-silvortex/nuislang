@@ -243,17 +243,21 @@ pub(super) fn describe_cpu_post_control_node(
             Ok(InstructionSemantics::effect(inputs))
         }
         "loop_while_i64_post_flow_cond_chain" | "loop_while_scalar_post_flow_cond_chain" => {
-            validate_post_flow_loop_compare_kind(&node.op.args[3], &node.name)?;
-            validate_loop_step_kind(&node.op.args[4], &node.name)?;
-            let (control_expr, carry_start_index) = parse_loop_flow_expr(
-                &node.op.args,
-                5,
-                &node.name,
-                &validate_post_flow_control_kind,
-            )?;
+            let (loop_args, payload_contract) =
+                split_dynamic_pattern_payload_args(&node.op.args, &node.name)?;
+            validate_post_flow_loop_compare_kind(&loop_args[3], &node.name)?;
+            validate_loop_step_kind(&loop_args[4], &node.name)?;
+            let (control_expr, carry_start_index) =
+                parse_loop_flow_expr(loop_args, 5, &node.name, &validate_post_flow_control_kind)?;
             let carries =
-                parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
-            let mut inputs = node.op.args[..3].to_vec();
+                parse_conditional_carries(loop_args, carry_start_index, &node.name, true)?;
+            validate_dynamic_pattern_payload_slots(
+                payload_contract.as_ref(),
+                &loop_args[3],
+                carries.len(),
+                &node.name,
+            )?;
+            let mut inputs = loop_args[..3].to_vec();
             collect_loop_flow_rhs_inputs(&control_expr, &mut inputs);
             for carry in &carries {
                 inputs.push(carry.initial.clone());

@@ -50,10 +50,9 @@ fn compile_and_run(project_name: &str, source: &str) -> std::process::ExitStatus
         String::from_utf8_lossy(&compile.stderr)
     );
 
-    let status = Command::new(output_dir.join(project_name))
+    Command::new(output_dir.join(project_name))
         .status()
-        .expect("run native binary");
-    status
+        .expect("run native binary")
 }
 
 #[test]
@@ -384,4 +383,48 @@ fn dynamic_while_let_carries_ordered_multi_field_payloads() {
         "#,
     );
     assert_eq!(status.code(), Some(34));
+}
+
+#[test]
+fn dynamic_while_let_preserves_bool_payloads_across_native_backedges() {
+    let status = compile_and_run(
+        "dynamic_while_let_bool_payload",
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active { ready: bool },
+          }
+
+          fn consume(selected: Phase) -> i64 {
+            let cursor: i64 = 0;
+            while let Phase.Active { ready: flag } = selected {
+              let cursor: i64 = cursor + 1;
+              let selected: Phase = Phase.Active { ready: flag };
+              if cursor > 1 {
+                break;
+              }
+            }
+            match selected {
+              Phase.Active { ready: flag } => {
+                if flag {
+                  return cursor + 10;
+                }
+                return cursor + 20;
+              }
+              Phase.Done => {
+                return 30;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            return consume(Phase.Active { ready: true })
+              + consume(Phase.Active { ready: false })
+              + consume(Phase.Done);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(64));
 }

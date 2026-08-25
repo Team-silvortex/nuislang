@@ -66,7 +66,7 @@ fn ensure_bootstrap_report(report: &BootstrapCheckReport) -> Result<(), String> 
     if report.accepted() {
         Ok(())
     } else {
-        Err(render_bootstrap_check_text(&report))
+        Err(render_bootstrap_check_text(report))
     }
 }
 

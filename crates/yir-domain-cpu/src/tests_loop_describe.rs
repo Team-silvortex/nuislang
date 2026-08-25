@@ -174,38 +174,46 @@ fn post_flow_chain_accepts_a_terminal_pattern_transition() {
 
 #[test]
 fn post_flow_cond_chain_accepts_a_dynamic_pattern_carry_gate() {
+    let mut args = [
+        "initial",
+        "unused_limit",
+        "step",
+        "pattern_carry0",
+        "add",
+        "prev_carry1_gt",
+        "control_rhs",
+        "break",
+        "active",
+        "prev_carry1_gt",
+        "threshold",
+        "keep",
+        "add_invariant",
+        "minus_one",
+        "payload",
+        "prev_carry1_gt",
+        "threshold",
+        "add_invariant",
+        "minus_one",
+        "keep",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect::<Vec<_>>();
+    args.extend(
+        yir_core::encode_dynamic_pattern_payload_carry_trailer(
+            &yir_core::DynamicPatternPayloadCarryContract {
+                slots: vec![yir_core::DynamicPatternPayloadCarrySlot {
+                    carry_index: 1,
+                    codec: yir_core::DynamicPatternPayloadCodec::BoolAsI64,
+                }],
+            },
+        )
+        .unwrap(),
+    );
     let node = Node {
         name: "loop".to_owned(),
         resource: "cpu0".to_owned(),
-        op: Operation::parse(
-            "cpu.loop_while_scalar_post_flow_cond_chain",
-            [
-                "initial",
-                "unused_limit",
-                "step",
-                "pattern_carry0",
-                "add",
-                "prev_carry1_gt",
-                "control_rhs",
-                "break",
-                "active",
-                "prev_carry1_gt",
-                "threshold",
-                "keep",
-                "add_invariant",
-                "minus_one",
-                "payload",
-                "prev_carry1_gt",
-                "threshold",
-                "add_invariant",
-                "minus_one",
-                "keep",
-            ]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-        )
-        .unwrap(),
+        op: Operation::parse("cpu.loop_while_scalar_post_flow_cond_chain", args).unwrap(),
     };
     let semantics = describe_cpu_node(&node, &cpu_resource()).unwrap();
 
@@ -216,6 +224,53 @@ fn post_flow_cond_chain_accepts_a_dynamic_pattern_carry_gate() {
             .iter()
             .any(|candidate| candidate == dependency));
     }
+    assert!(!semantics.dependencies.iter().any(|candidate| {
+        candidate == yir_core::DYNAMIC_PATTERN_PAYLOAD_CARRY_TRAILER_MARKER
+            || candidate == yir_core::DYNAMIC_PATTERN_PAYLOAD_CARRY_PROTOCOL_V2
+    }));
+}
+
+#[test]
+fn post_flow_cond_chain_rejects_an_unavailable_dynamic_payload_slot() {
+    let mut args = [
+        "initial",
+        "unused_limit",
+        "step",
+        "pattern_carry0",
+        "add",
+        "current_gt",
+        "control_rhs",
+        "break",
+        "active",
+        "always",
+        "initial",
+        "keep",
+        "keep",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect::<Vec<_>>();
+    args.extend(
+        yir_core::encode_dynamic_pattern_payload_carry_trailer(
+            &yir_core::DynamicPatternPayloadCarryContract {
+                slots: vec![yir_core::DynamicPatternPayloadCarrySlot {
+                    carry_index: 1,
+                    codec: yir_core::DynamicPatternPayloadCodec::I64,
+                }],
+            },
+        )
+        .unwrap(),
+    );
+    let node = Node {
+        name: "loop".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.loop_while_scalar_post_flow_cond_chain", args).unwrap(),
+    };
+
+    let error = describe_cpu_node(&node, &cpu_resource()).unwrap_err();
+
+    assert!(error.contains("carry1"), "{error}");
+    assert!(error.contains("loop has 1 carries"), "{error}");
 }
 
 #[test]

@@ -216,7 +216,7 @@ fn push_hex_token(out: &mut String, kind: &str, bytes: &[u8]) {
 }
 
 fn decode_hex_utf8(value: &str, kind: &str) -> Result<String, String> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return Err(format!("{kind} token contains odd-length hexadecimal data"));
     }
     let mut bytes = Vec::with_capacity(value.len() / 2);

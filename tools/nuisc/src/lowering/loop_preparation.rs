@@ -15,8 +15,8 @@ use crate::lowering::loop_purity::{
 #[path = "loop_preparation_pattern.rs"]
 mod loop_preparation_pattern;
 use loop_preparation_pattern::{
-    prepare_dynamic_pattern_carries, prepare_dynamic_pattern_plan,
-    prepare_terminal_pattern_transition,
+    diagnose_dynamic_pattern_payload_admission, prepare_dynamic_pattern_carries,
+    prepare_dynamic_pattern_plan, prepare_terminal_pattern_transition,
 };
 
 #[path = "loop_preparation_flow.rs"]
@@ -401,6 +401,10 @@ pub(super) fn diagnose_unsupported_pattern_while_shape(
     };
     if !matches!(else_body.as_slice(), [NirStmt::Break]) {
         return None;
+    }
+    if let Some(diagnostic) = diagnose_dynamic_pattern_payload_admission(gate_condition, then_body)
+    {
+        return Some(diagnostic);
     }
 
     let rebound_names = then_body
