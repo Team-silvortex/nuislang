@@ -102,12 +102,22 @@ pub(crate) const DEV_TENSOR_LANGUAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "language-named-enum-pattern-tagged-field-projection",
+        path: "tools/nuisc/src/frontend/match_pattern_lowering.rs",
+        required_patterns: &[
+            "let is_enum_variant =",
+            "NirExpr::VariantIs",
+            "NirExpr::VariantFieldAccess",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "language-dynamic-pattern-carry-preparation",
         path: "tools/nuisc/src/lowering/loop_preparation_pattern.rs",
         required_patterns: &[
             "prepare_dynamic_pattern_plan",
             "prepare_dynamic_pattern_carries",
             "PreviousCarry(0)",
+            "tail_recursive_prev_carry_binding(source_index + 1)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -126,7 +136,11 @@ pub(crate) const DEV_TENSOR_LANGUAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
     DevTensorDriftCheckSpec {
         id: "language-dynamic-pattern-lazy-payload-gate",
         path: "tools/nuisc/src/lowering/loop_flow_nodes_post.rs",
-        required_patterns: &["pattern_payload_initial", "transition.initial_payload"],
+        required_patterns: &[
+            "pattern_payload_initial",
+            "for payload in &transition.payloads",
+            "&payload.initial",
+        ],
     },
     DevTensorDriftCheckSpec {
         id: "language-dynamic-pattern-native-regression",
@@ -135,6 +149,49 @@ pub(crate) const DEV_TENSOR_LANGUAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "dynamic_while_let_variant_state_runs_across_native_backedges",
             "Phase.Active(payload - 1)",
             "assert_eq!(status.code(), Some(26))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-post-flow-previous-control-domain-contract",
+        path: "crates/yir-domain-cpu/src/loop_metadata.rs",
+        required_patterns: &[
+            "validate_post_flow_control_kind",
+            "other.starts_with(\"prev_carry\")",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-post-flow-previous-control-llvm-contract",
+        path: "crates/yir-lower-llvm/src/loop_flow_control_lowering.rs",
+        required_patterns: &[
+            "emit_post_loop_flow_control_expr",
+            "resolve_previous_carry_operand",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-post-flow-previous-control-execution-routing",
+        path: "crates/yir-domain-cpu/src/tests_loop_describe.rs",
+        required_patterns: &[
+            "execution_path_routes_previous_state_validation_to_async_post_flow_only",
+            "cpu.loop_while_scalar_async_post_flow_cond_chain",
+            "cpu.loop_while_scalar_async_flow_cond_chain",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-previous-control-native-regression",
+        path: "tools/nuisc/tests/control_flow_syntax_native.rs",
+        required_patterns: &[
+            "dynamic_while_let_flow_control_reads_the_previous_payload",
+            "if payload == 3",
+            "assert_eq!(status.code(), Some(50))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-multi-field-native-regression",
+        path: "tools/nuisc/tests/control_flow_syntax_native.rs",
+        required_patterns: &[
+            "dynamic_while_let_carries_ordered_multi_field_payloads",
+            "value: payload, step: stride",
+            "assert_eq!(status.code(), Some(34))",
         ],
     },
 ];

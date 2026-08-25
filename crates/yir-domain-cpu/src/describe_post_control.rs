@@ -224,8 +224,12 @@ pub(super) fn describe_cpu_post_control_node(
         "loop_while_i64_async_post_flow_cond_chain"
         | "loop_while_scalar_async_post_flow_cond_chain" => {
             validate_loop_compare_kind(&node.op.args[3], &node.name)?;
-            let (control_expr, carry_start_index) =
-                parse_loop_flow_expr(&node.op.args, 4, &node.name, &validate_flow_control_kind)?;
+            let (control_expr, carry_start_index) = parse_loop_flow_expr(
+                &node.op.args,
+                4,
+                &node.name,
+                &validate_post_flow_control_kind,
+            )?;
             let carries =
                 parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
             let mut inputs = vec![node.op.args[0].clone(), node.op.args[1].clone()];
@@ -241,8 +245,12 @@ pub(super) fn describe_cpu_post_control_node(
         "loop_while_i64_post_flow_cond_chain" | "loop_while_scalar_post_flow_cond_chain" => {
             validate_post_flow_loop_compare_kind(&node.op.args[3], &node.name)?;
             validate_loop_step_kind(&node.op.args[4], &node.name)?;
-            let (control_expr, carry_start_index) =
-                parse_loop_flow_expr(&node.op.args, 5, &node.name, &validate_flow_control_kind)?;
+            let (control_expr, carry_start_index) = parse_loop_flow_expr(
+                &node.op.args,
+                5,
+                &node.name,
+                &validate_post_flow_control_kind,
+            )?;
             let carries =
                 parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
             let mut inputs = node.op.args[..3].to_vec();

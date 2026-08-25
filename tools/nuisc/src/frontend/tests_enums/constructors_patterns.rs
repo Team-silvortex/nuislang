@@ -95,6 +95,74 @@ fn lowers_qualified_enum_variant_constructors_via_synthesized_variant_structs() 
 }
 
 #[test]
+fn lowers_named_enum_variant_bindings_with_tag_and_ordered_field_projections() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active {
+              value: i64,
+              step: i64,
+            },
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active { value: 3, step: 2 };
+            match selected {
+              Phase.Active { value: payload, step: stride } => {
+                return payload + stride;
+              }
+              _ => {
+                return 0;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        &module.functions[0].body[1],
+        NirStmt::If {
+            condition: NirExpr::VariantIs { variant, .. },
+            then_body,
+            ..
+        } if variant == "Phase.Active"
+            && matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name: payload_name,
+                        value: NirExpr::VariantFieldAccess {
+                            variant: payload_variant,
+                            field: payload_field,
+                            ..
+                        },
+                        ..
+                    },
+                    NirStmt::Let {
+                        name: stride_name,
+                        value: NirExpr::VariantFieldAccess {
+                            variant: stride_variant,
+                            field: stride_field,
+                            ..
+                        },
+                        ..
+                    },
+                    NirStmt::Return(_),
+                ] if payload_name == "payload"
+                    && payload_variant == "Phase.Active"
+                    && payload_field == "value"
+                    && stride_name == "stride"
+                    && stride_variant == "Phase.Active"
+                    && stride_field == "step"
+            )
+    ));
+}
+
+#[test]
 fn lowers_unit_and_payload_variant_match_patterns() {
     let module = parse_nuis_module(
         r#"

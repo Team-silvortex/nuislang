@@ -295,10 +295,12 @@ for (index, (condition, action)) in flow_leaves.iter().enumerate() {
         .get(index + 1)
         .and_then(|block| block.clone())
         .unwrap_or_else(|| loop_continue.clone());
-    let control_cond = emit_loop_flow_control_expr(
+    let control_cond = emit_post_loop_flow_control_expr(
         condition,
         &next_current,
         &next_carries,
+        &current,
+        &current_carries,
         &mut body,
         &mut next_reg,
         &node.name,

@@ -104,6 +104,21 @@ pub(crate) fn validate_flow_control_kind(kind: &str, node_name: &str) -> Result<
         other => validate_indexed_compare_kind(other, node_name, "flow control kind", &["carry"]),
     }
 }
+
+pub(crate) fn validate_post_flow_control_kind(kind: &str, node_name: &str) -> Result<(), String> {
+    match kind {
+        "prev_current_eq" | "prev_current_ne" | "prev_current_lt" | "prev_current_le"
+        | "prev_current_gt" | "prev_current_ge" => Ok(()),
+        other if other.starts_with("prev_carry") => validate_indexed_compare_kind(
+            other,
+            node_name,
+            "post-flow control kind",
+            &["prev_carry"],
+        ),
+        other => validate_flow_control_kind(other, node_name),
+    }
+}
+
 pub(crate) fn validate_carry_condition_kind(
     kind: &str,
     node_name: &str,

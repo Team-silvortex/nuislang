@@ -403,7 +403,7 @@ impl RegisteredMod for CpuMod {
                     &node.op.args,
                     4,
                     &node.name,
-                    &validate_flow_control_kind,
+                    &validate_post_flow_control_kind,
                 )?;
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?
@@ -448,7 +448,7 @@ impl RegisteredMod for CpuMod {
                     &node.op.args,
                     5,
                     &node.name,
-                    &validate_flow_control_kind,
+                    &validate_post_flow_control_kind,
                 )?;
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?

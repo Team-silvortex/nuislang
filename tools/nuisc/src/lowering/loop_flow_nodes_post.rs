@@ -22,27 +22,29 @@ pub(in crate::lowering) fn lower_post_flow_while(
                 )
         })?;
         let active_initial = lower_expr(&transition.initial_condition, state, bindings)?;
-        let projected_payload = lower_expr(&transition.initial_payload, state, bindings)?;
         let zero_payload = lower_expr(&NirExpr::Int(0), state, bindings)?;
-        let payload_initial = next_name(state, "pattern_payload_initial");
-        state.yir.nodes.push(Node {
-            name: payload_initial.clone(),
-            resource: "cpu0".to_owned(),
-            op: Operation {
-                module: "cpu".to_owned(),
-                instruction: "select".to_owned(),
-                args: vec![
-                    active_initial.clone(),
-                    projected_payload.clone(),
-                    zero_payload.clone(),
-                ],
-            },
-        });
-        for dep in [&active_initial, &projected_payload, &zero_payload] {
-            push_dep_edges(state, dep, &payload_initial);
-        }
         bindings.insert(transition.active_carry_name.clone(), active_initial.clone());
-        bindings.insert(transition.payload_carry_name.clone(), payload_initial);
+        for payload in &transition.payloads {
+            let projected_payload = lower_expr(&payload.initial, state, bindings)?;
+            let payload_initial = next_name(state, "pattern_payload_initial");
+            state.yir.nodes.push(Node {
+                name: payload_initial.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "select".to_owned(),
+                    args: vec![
+                        active_initial.clone(),
+                        projected_payload.clone(),
+                        zero_payload.clone(),
+                    ],
+                },
+            });
+            for dep in [&active_initial, &projected_payload, &zero_payload] {
+                push_dep_edges(state, dep, &payload_initial);
+            }
+            bindings.insert(payload.carry_name.clone(), payload_initial);
+        }
         Some((initial_variant, active_initial))
     } else {
         None
@@ -274,10 +276,16 @@ pub(in crate::lowering) fn lower_post_flow_while(
             &NirExpr::StructLiteral {
                 type_name: transition.matched_variant.clone(),
                 type_args: transition.matched_type_args.clone(),
-                fields: vec![(
-                    transition.payload_field.clone(),
-                    NirExpr::Var(transition.payload_carry_name.clone()),
-                )],
+                fields: transition
+                    .payloads
+                    .iter()
+                    .map(|payload| {
+                        (
+                            payload.field.clone(),
+                            NirExpr::Var(payload.carry_name.clone()),
+                        )
+                    })
+                    .collect(),
             },
             state,
             bindings,

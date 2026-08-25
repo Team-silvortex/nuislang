@@ -44,14 +44,20 @@ also skip unreachable payload projection across inlined helper boundaries.
 A loop body may also replace the matched value with a pure, loop-state-independent
 variant from the same enum family. The `pattern_exit` contract executes at most
 one matching iteration and reconstructs the post-loop enum through `cpu.select`,
-including an initially mismatched value. Single-field scalar variants can also
-cross multiple backedges through the dynamic tag/payload carry contract. The
-entry block re-reads `pattern_carryN` every iteration, payload consumers read the
-previous backedge value, and a conditional transition can rebuild the matched
-variant or move to a same-enum unit variant. LLVM/native coverage proves
-`Active(3) -> Active(2) -> Active(1) -> Done` while preserving an initially
-mismatched `Done`. Multi-field payloads and non-affine payload replacement remain
-explicitly rejected rather than being hoisted or treated as loop invariants.
+including an initially mismatched value. Ordered integer payload fields can also
+cross multiple backedges through the dynamic tag/payload carry contract. Hidden
+carry indices follow source pattern order, while reconstruction matches fields
+by name, so constructor field order cannot change state identity. The entry block
+re-reads `pattern_carryN` every iteration, and payload consumers read the previous
+backedge value. A conditional transition can rebuild the matched variant or move
+to a same-enum unit variant. Structured `continue` and `break` conditions also
+read those previous payloads, so control decisions retain source-level binding
+values even after the next enum state has been prepared. LLVM/native coverage
+proves both `Active(3) -> Active(2) -> Active(1) -> Done` and the two-field route
+`{ value: 1, step: 1 } -> { value: 2, step: 2 } -> { value: 4, step: 3 } ->
+{ value: 7, step: 4 } -> Done`, while preserving an initially mismatched `Done`.
+Owned payload fields and non-affine payload replacement remain explicitly
+rejected rather than being hoisted or treated as loop invariants.
 
 ## Boundary
 

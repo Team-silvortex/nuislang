@@ -90,7 +90,7 @@ use loop_expr::{
     canonical_loop_block_prefix, canonical_loop_instruction, collect_resolved_loop_flow_leaves,
     parse_loop_flow_expr_for_llvm, resolve_loop_flow_expr_for_llvm, ResolvedLoopControlExpr,
 };
-use loop_flow_control_lowering::emit_loop_flow_control_expr;
+use loop_flow_control_lowering::{emit_loop_flow_control_expr, emit_post_loop_flow_control_expr};
 use loop_scalar::{
     coerce_to_loop_scalar, emit_loop_compare, emit_loop_numeric_op, infer_loop_scalar_kind,
     loop_scalar_llvm_type, loop_scalar_value_ref,

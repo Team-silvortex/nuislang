@@ -132,7 +132,7 @@ fn emits_mixed_break_continue_async_post_flow_cond_chain() {
                 "gt".to_owned(),
                 "flow_or".to_owned(),
                 "flow_break".to_owned(),
-                "current_gt".to_owned(),
+                "prev_current_gt".to_owned(),
                 "rhs0".to_owned(),
                 "flow_continue".to_owned(),
                 "current_gt".to_owned(),
@@ -200,6 +200,7 @@ fn emits_mixed_break_continue_async_post_flow_cond_chain() {
     assert!(llvm_ir.contains("call i64 @nuis_fn_step(i64"));
     assert!(llvm_ir.contains("br label %loop_while_scalar_async_post_flow_cond_chain_exit"));
     assert!(llvm_ir.contains("br label %loop_while_scalar_async_post_flow_cond_chain_cond"));
+    assert!(!llvm_ir.contains("deferred lowering"));
 }
 
 #[test]

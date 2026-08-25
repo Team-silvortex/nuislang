@@ -229,7 +229,36 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
                     lowered_pattern_ty.render()
                 )
             })?;
+            let is_enum_variant = lowered_pattern_ty
+                .name
+                .rsplit_once('.')
+                .is_some_and(|(parent, _)| parent == value_ty.name);
+            if fields.is_empty() {
+                if definition.fields.is_empty() {
+                    return Ok((
+                        if is_enum_variant {
+                            NirExpr::VariantIs {
+                                base: Box::new(lowered_value.clone()),
+                                variant: lowered_pattern_ty.name,
+                            }
+                        } else {
+                            NirExpr::Bool(true)
+                        },
+                        Vec::new(),
+                    ));
+                }
+                return Err(format!(
+                    "empty struct match pattern `{}` is only supported for zero-field structs",
+                    lowered_pattern_ty.render()
+                ));
+            }
             let mut conditions = Vec::new();
+            if is_enum_variant {
+                conditions.push(NirExpr::VariantIs {
+                    base: Box::new(lowered_value.clone()),
+                    variant: lowered_pattern_ty.name.clone(),
+                });
+            }
             let mut bindings = Vec::new();
             for (field_name, field_pattern) in fields {
                 if matches!(field_pattern, AstMatchPattern::Wildcard) {
@@ -244,9 +273,17 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
                         field_name
                     )
                 })?;
-                let field_expr = NirExpr::FieldAccess {
-                    base: Box::new(lowered_value.clone()),
-                    field: field_name.clone(),
+                let field_expr = if is_enum_variant {
+                    NirExpr::VariantFieldAccess {
+                        base: Box::new(lowered_value.clone()),
+                        variant: lowered_pattern_ty.name.clone(),
+                        field: field_name.clone(),
+                    }
+                } else {
+                    NirExpr::FieldAccess {
+                        base: Box::new(lowered_value.clone()),
+                        field: field_name.clone(),
+                    }
                 };
                 let field_ty =
                     instantiate_struct_field_type(&lowered_pattern_ty, definition, &field_def.ty);
@@ -257,35 +294,13 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
                     type_aliases,
                     struct_table,
                 )?;
-                conditions.push(field_condition);
+                if !is_enum_variant || !matches!(field_condition, NirExpr::Bool(true)) {
+                    conditions.push(field_condition);
+                }
                 bindings.extend(field_bindings);
             }
-            if conditions.is_empty() {
-                if definition.fields.is_empty() {
-                    if lowered_pattern_ty
-                        .name
-                        .rsplit_once('.')
-                        .is_some_and(|(parent, _)| parent == value_ty.name)
-                    {
-                        return Ok((
-                            NirExpr::VariantIs {
-                                base: Box::new(lowered_value.clone()),
-                                variant: lowered_pattern_ty.name,
-                            },
-                            Vec::new(),
-                        ));
-                    }
-                    return Ok((NirExpr::Bool(true), Vec::new()));
-                }
-                return Err(format!(
-                    "empty struct match pattern `{}` is only supported for zero-field structs",
-                    lowered_pattern_ty.render()
-                ));
-            }
-            let first = conditions
-                .drain(..1)
-                .next()
-                .ok_or_else(|| "struct match pattern cannot be empty".to_owned())?;
+            let mut conditions = conditions.into_iter();
+            let first = conditions.next().unwrap_or(NirExpr::Bool(true));
             Ok((
                 conditions
                     .into_iter()

@@ -277,6 +277,123 @@ fn lowers_conditional_while_let_variant_transition_across_backedges() {
 }
 
 #[test]
+fn lowers_previous_pattern_payload_in_structured_flow_control() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active(4);
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              if payload > 1 {
+                let selected: Phase = Phase.Active(payload - 1);
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if payload == 3 {
+                continue;
+              } else if payload == 2 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_cond_chain")
+        .expect("dynamic pattern flow-control loop");
+    assert_eq!(loop_node.op.args[3], "pattern_carry0");
+    assert_eq!(
+        loop_node
+            .op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "prev_carry1_eq")
+            .count(),
+        2
+    );
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(!llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
+fn lowers_ordered_multi_field_pattern_payloads_across_backedges() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active {
+              value: i64,
+              step: i64,
+            },
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active { value: 1, step: 1 };
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active { value: payload, step: stride } = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              if payload < 6 {
+                let selected: Phase = Phase.Active {
+                  step: stride + 1,
+                  value: payload + stride,
+                };
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if cursor > 100 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_cond_chain")
+        .expect("multi-field dynamic pattern loop");
+    assert_eq!(loop_node.op.args[3], "pattern_carry0");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_carry2"));
+    assert_eq!(
+        loop_node
+            .op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "prev_carry1_lt")
+            .count(),
+        3
+    );
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(!llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
 fn rejects_non_affine_dynamic_while_let_payload_rebuild_precisely() {
     let mut module = parse_nuis_module(
         r#"

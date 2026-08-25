@@ -286,3 +286,102 @@ fn dynamic_while_let_variant_state_runs_across_native_backedges() {
     );
     assert_eq!(status.code(), Some(26));
 }
+
+#[test]
+fn dynamic_while_let_flow_control_reads_the_previous_payload() {
+    let status = compile_and_run(
+        "dynamic_while_let_previous_payload_flow",
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active(i64),
+          }
+
+          fn consume(selected: Phase) -> i64 {
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              if payload > 1 {
+                let selected: Phase = Phase.Active(payload - 1);
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if payload == 3 {
+                continue;
+              } else if payload == 2 {
+                break;
+              }
+            }
+            match selected {
+              Phase.Done => {
+                return acc + 40;
+              },
+              Phase.Active(payload) => {
+                return acc + payload;
+              },
+            }
+          }
+
+          fn main() -> i64 {
+            return consume(Phase.Active(4)) + consume(Phase.Done);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(50));
+}
+
+#[test]
+fn dynamic_while_let_carries_ordered_multi_field_payloads() {
+    let status = compile_and_run(
+        "dynamic_while_let_multi_field_payloads",
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active {
+              value: i64,
+              step: i64,
+            },
+          }
+
+          fn consume(selected: Phase) -> i64 {
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Phase.Active { value: payload, step: stride } = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + payload;
+              if payload < 6 {
+                let selected: Phase = Phase.Active {
+                  step: stride + 1,
+                  value: payload + stride,
+                };
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if cursor > 100 {
+                break;
+              }
+            }
+            match selected {
+              Phase.Done => {
+                return acc + 10;
+              }
+              _ => {
+                return -1;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            return consume(Phase.Active { value: 1, step: 1 })
+              + consume(Phase.Done);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(34));
+}

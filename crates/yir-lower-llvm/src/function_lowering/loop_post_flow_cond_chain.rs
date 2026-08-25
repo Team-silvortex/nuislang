@@ -485,122 +485,6 @@ macro_rules! lower_loop_post_flow_cond_chain {
                     };
                     next_carries.push(next_carry);
                 }
-                let resolve_control_operand =
-                    |kind: &str, next_current: &String, next_carries: &Vec<String>| {
-                        match kind {
-                            "current_eq" => Ok((next_current.clone(), "eq")),
-                            "current_ne" => Ok((next_current.clone(), "ne")),
-                            "current_lt" => Ok((next_current.clone(), "slt")),
-                            "current_le" => Ok((next_current.clone(), "sle")),
-                            "current_gt" => Ok((next_current.clone(), "sgt")),
-                            "current_ge" => Ok((next_current.clone(), "sge")),
-                            other if other.starts_with("carry") && other.ends_with("_eq") => {
-                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
-                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "eq"))
-                            }
-                            other if other.starts_with("carry") && other.ends_with("_ne") => {
-                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
-                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "ne"))
-                            }
-                            other if other.starts_with("carry") && other.ends_with("_lt") => {
-                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
-                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "slt"))
-                            }
-                            other if other.starts_with("carry") && other.ends_with("_le") => {
-                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
-                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "sle"))
-                            }
-                            other if other.starts_with("carry") && other.ends_with("_gt") => {
-                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
-                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "sgt"))
-                            }
-                            other if other.starts_with("carry") && other.ends_with("_ge") => {
-                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
-                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "sge"))
-                            }
-                            other => Err(format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name)),
-                        }
-                    };
-                let eval_control_expr = |expr: &ResolvedLoopControlExpr,
-                                         next_current: &String,
-                                         next_carries: &Vec<String>,
-                                         body: &mut Vec<String>,
-                                         next_reg: &mut usize|
-                 -> Result<String, String> {
-                    fn eval(
-                        expr: &ResolvedLoopControlExpr,
-                        next_current: &String,
-                        next_carries: &Vec<String>,
-                        body: &mut Vec<String>,
-                        next_reg: &mut usize,
-                        resolve_control_operand: &impl Fn(
-                            &str,
-                            &String,
-                            &Vec<String>,
-                        )
-                            -> Result<(String, &'static str), String>,
-                    ) -> Result<String, String> {
-                        match expr {
-                            ResolvedLoopControlExpr::Cond { kind, rhs } => {
-                                let (lhs, pred) =
-                                    resolve_control_operand(kind, next_current, next_carries)?;
-                                let reg = fresh_reg(next_reg);
-                                body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
-                                Ok(reg)
-                            }
-                            ResolvedLoopControlExpr::And(lhs, rhs) => {
-                                let lhs_reg = eval(
-                                    lhs,
-                                    next_current,
-                                    next_carries,
-                                    body,
-                                    next_reg,
-                                    resolve_control_operand,
-                                )?;
-                                let rhs_reg = eval(
-                                    rhs,
-                                    next_current,
-                                    next_carries,
-                                    body,
-                                    next_reg,
-                                    resolve_control_operand,
-                                )?;
-                                let reg = fresh_reg(next_reg);
-                                body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
-                                Ok(reg)
-                            }
-                            ResolvedLoopControlExpr::Or(lhs, rhs) => {
-                                let lhs_reg = eval(
-                                    lhs,
-                                    next_current,
-                                    next_carries,
-                                    body,
-                                    next_reg,
-                                    resolve_control_operand,
-                                )?;
-                                let rhs_reg = eval(
-                                    rhs,
-                                    next_current,
-                                    next_carries,
-                                    body,
-                                    next_reg,
-                                    resolve_control_operand,
-                                )?;
-                                let reg = fresh_reg(next_reg);
-                                body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
-                                Ok(reg)
-                            }
-                        }
-                    }
-                    eval(
-                        expr,
-                        next_current,
-                        next_carries,
-                        body,
-                        next_reg,
-                        &resolve_control_operand,
-                    )
-                };
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
                 let condition_blocks = (0..flow_leaves.len())
@@ -620,12 +504,16 @@ macro_rules! lower_loop_post_flow_cond_chain {
                         .get(index + 1)
                         .and_then(|block| block.clone())
                         .unwrap_or_else(|| loop_continue.clone());
-                    let control_cond = eval_control_expr(
+                    let control_cond = emit_post_loop_flow_control_expr(
                         condition,
                         &next_current,
                         &next_carries,
+                        &current,
+                        &current_carries,
                         &mut body,
                         &mut next_reg,
+                        &node.name,
+                        loop_instruction,
                     )?;
                     let action_block = fresh_block(&mut next_block, "loop_post_flow_action");
                     body.push(format!(

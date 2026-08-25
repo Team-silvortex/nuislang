@@ -412,7 +412,7 @@ pub(super) fn diagnose_unsupported_pattern_while_shape(
         .collect::<BTreeSet<_>>();
     if expr_references_names(gate_condition, &rebound_names) {
         return Some(
-            "pattern-controlled `while let` supports single-field scalar matched variants with affine payload rebuilds and an optional same-enum unit exit variant; this transition shape cannot be represented by the dynamic tag/payload carry contract"
+            "pattern-controlled `while let` supports ordered scalar matched-variant fields with affine payload rebuilds and an optional same-enum unit exit variant; this transition shape cannot be represented by the dynamic tag/payload carry contract"
                 .to_owned(),
         );
     }

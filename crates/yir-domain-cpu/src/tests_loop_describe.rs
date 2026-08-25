@@ -185,7 +185,7 @@ fn post_flow_cond_chain_accepts_a_dynamic_pattern_carry_gate() {
                 "step",
                 "pattern_carry0",
                 "add",
-                "current_gt",
+                "prev_carry1_gt",
                 "control_rhs",
                 "break",
                 "active",
@@ -216,6 +216,73 @@ fn post_flow_cond_chain_accepts_a_dynamic_pattern_carry_gate() {
             .iter()
             .any(|candidate| candidate == dependency));
     }
+}
+
+#[test]
+fn previous_carry_flow_control_remains_post_flow_only() {
+    let node = flow_node(vec![
+        "initial",
+        "limit",
+        "step",
+        "lt",
+        "add",
+        "prev_carry0_gt",
+        "control_rhs",
+        "break",
+        "carry_initial",
+        "add_current",
+    ]);
+
+    let error = describe_cpu_node(&node, &cpu_resource()).unwrap_err();
+    assert!(error.contains("invalid flow control kind"), "{error}");
+}
+
+#[test]
+fn execution_path_routes_previous_state_validation_to_async_post_flow_only() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    for (name, value) in [("initial", 4), ("limit", 0), ("rhs", 3)] {
+        state.values.insert(name.to_owned(), Value::Int(value));
+    }
+    let node = |instruction: &str| Node {
+        name: "loop".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            instruction,
+            [
+                "initial",
+                "limit",
+                "step",
+                "gt",
+                "prev_current_gt",
+                "rhs",
+                "break",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        )
+        .unwrap(),
+    };
+
+    assert_eq!(
+        cpu.execute(
+            &node("cpu.loop_while_scalar_async_post_flow_cond_chain"),
+            &resource,
+            &mut state,
+        )
+        .unwrap(),
+        Value::Unit
+    );
+    let error = cpu
+        .execute(
+            &node("cpu.loop_while_scalar_async_flow_cond_chain"),
+            &resource,
+            &mut state,
+        )
+        .unwrap_err();
+    assert!(error.contains("invalid flow control kind"), "{error}");
 }
 
 #[test]

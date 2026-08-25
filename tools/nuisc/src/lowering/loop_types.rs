@@ -226,12 +226,16 @@ pub(super) struct PreparedDynamicPatternTransition {
     pub(super) binding_name: String,
     pub(super) matched_variant: String,
     pub(super) matched_type_args: Vec<NirTypeRef>,
-    pub(super) payload_field: String,
     pub(super) active_carry_name: String,
-    pub(super) payload_carry_name: String,
     pub(super) initial_condition: NirExpr,
-    pub(super) initial_payload: NirExpr,
+    pub(super) payloads: Vec<PreparedDynamicPatternPayload>,
     pub(super) exit_value: Option<NirExpr>,
+}
+
+pub(super) struct PreparedDynamicPatternPayload {
+    pub(super) field: String,
+    pub(super) carry_name: String,
+    pub(super) initial: NirExpr,
 }
 
 pub(super) enum PreparedLoopEntryCondition {

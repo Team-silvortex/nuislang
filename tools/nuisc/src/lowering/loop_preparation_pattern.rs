@@ -3,7 +3,7 @@ use super::*;
 #[derive(Clone)]
 enum DynamicPatternBranch {
     Matched {
-        payload: NirExpr,
+        payloads: Vec<NirExpr>,
         type_args: Vec<NirTypeRef>,
     },
     Exit(NirExpr),
@@ -11,7 +11,7 @@ enum DynamicPatternBranch {
 
 enum DynamicPatternUpdate {
     Matched {
-        payload: NirExpr,
+        payloads: Vec<NirExpr>,
         type_args: Vec<NirTypeRef>,
     },
     Conditional {
@@ -21,14 +21,18 @@ enum DynamicPatternUpdate {
     },
 }
 
+struct DynamicPatternPayload {
+    binding_name: String,
+    field: String,
+    initial: NirExpr,
+}
+
 pub(super) struct DynamicPatternPlan {
     binding_name: String,
     matched_variant: String,
-    payload_binding_name: String,
-    payload_field: String,
+    payloads: Vec<DynamicPatternPayload>,
     matched_type_args: Vec<NirTypeRef>,
     initial_condition: NirExpr,
-    initial_payload: NirExpr,
     update: DynamicPatternUpdate,
 }
 
@@ -110,10 +114,10 @@ pub(super) fn prepare_dynamic_pattern_plan(
     let NirExpr::Var(binding_name) = base.as_ref() else {
         return None;
     };
-    let (payload_index, payload_binding_name, payload_field, initial_payload) = body
+    let payloads = body
         .iter()
         .enumerate()
-        .find_map(|(index, stmt)| match stmt {
+        .map_while(|(index, stmt)| match stmt {
             NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
                 let NirExpr::VariantFieldAccess {
                     base,
@@ -128,16 +132,46 @@ pub(super) fn prepare_dynamic_pattern_plan(
                 {
                     return None;
                 }
-                Some((index, name.clone(), field.clone(), value.clone()))
+                Some((
+                    index,
+                    DynamicPatternPayload {
+                        binding_name: name.clone(),
+                        field: field.clone(),
+                        initial: value.clone(),
+                    },
+                ))
             }
             _ => None,
-        })?;
+        })
+        .collect::<Vec<_>>();
+    if payloads.is_empty() {
+        return None;
+    }
+    let distinct_fields = payloads
+        .iter()
+        .map(|(_, payload)| payload.field.as_str())
+        .collect::<BTreeSet<_>>();
+    let distinct_bindings = payloads
+        .iter()
+        .map(|(_, payload)| payload.binding_name.as_str())
+        .collect::<BTreeSet<_>>();
+    if distinct_fields.len() != payloads.len() || distinct_bindings.len() != payloads.len() {
+        return None;
+    }
+    let payload_indices = payloads
+        .iter()
+        .map(|(index, _)| *index)
+        .collect::<BTreeSet<_>>();
+    let payloads = payloads
+        .into_iter()
+        .map(|(_, payload)| payload)
+        .collect::<Vec<_>>();
 
     let mut update = None;
     let mut transition_index = None;
     for (index, stmt) in body.iter().enumerate() {
         let candidate =
-            parse_dynamic_pattern_update(stmt, binding_name, variant, &payload_field, pure_helpers);
+            parse_dynamic_pattern_update(stmt, binding_name, variant, &payloads, pure_helpers);
         if candidate.is_some() {
             if update.is_some() {
                 return None;
@@ -149,12 +183,20 @@ pub(super) fn prepare_dynamic_pattern_plan(
     let update = update?;
     let matched_type_args = dynamic_pattern_update_type_args(&update)?.to_vec();
     let transition_index = transition_index?;
-    let previous_payload = NirExpr::Var(tail_recursive_prev_carry_binding(1));
-    let substitutions = vec![(payload_binding_name.clone(), previous_payload)];
+    let substitutions = payloads
+        .iter()
+        .enumerate()
+        .map(|(index, payload)| {
+            (
+                payload.binding_name.clone(),
+                NirExpr::Var(tail_recursive_prev_carry_binding(index + 1)),
+            )
+        })
+        .collect::<Vec<_>>();
     let prepared_body = body
         .iter()
         .enumerate()
-        .filter(|(index, _)| *index != payload_index && *index != transition_index)
+        .filter(|(index, _)| !payload_indices.contains(index) && *index != transition_index)
         .map(|(_, stmt)| substitute_stmt_bindings(stmt, &substitutions))
         .collect();
 
@@ -162,11 +204,9 @@ pub(super) fn prepare_dynamic_pattern_plan(
         DynamicPatternPlan {
             binding_name: binding_name.clone(),
             matched_variant: variant.clone(),
-            payload_binding_name,
-            payload_field,
+            payloads,
             matched_type_args,
             initial_condition: gate_condition.clone(),
-            initial_payload,
             update,
         },
         prepared_body,
@@ -177,17 +217,19 @@ fn parse_dynamic_pattern_update(
     stmt: &NirStmt,
     binding_name: &str,
     matched_variant: &str,
-    payload_field: &str,
+    payloads: &[DynamicPatternPayload],
     pure_helpers: &BTreeSet<String>,
 ) -> Option<DynamicPatternUpdate> {
-    if let Some(DynamicPatternBranch::Matched { payload, type_args }) = parse_dynamic_pattern_branch(
-        stmt,
-        binding_name,
-        matched_variant,
-        payload_field,
-        pure_helpers,
-    ) {
-        return Some(DynamicPatternUpdate::Matched { payload, type_args });
+    if let Some(DynamicPatternBranch::Matched {
+        payloads,
+        type_args,
+    }) =
+        parse_dynamic_pattern_branch(stmt, binding_name, matched_variant, payloads, pure_helpers)
+    {
+        return Some(DynamicPatternUpdate::Matched {
+            payloads,
+            type_args,
+        });
     }
     let NirStmt::If {
         condition,
@@ -210,14 +252,14 @@ fn parse_dynamic_pattern_update(
         then_stmt,
         binding_name,
         matched_variant,
-        payload_field,
+        payloads,
         pure_helpers,
     )?;
     let else_branch = parse_dynamic_pattern_branch(
         else_stmt,
         binding_name,
         matched_variant,
-        payload_field,
+        payloads,
         pure_helpers,
     )?;
     if matches!(
@@ -253,7 +295,7 @@ fn parse_dynamic_pattern_branch(
     stmt: &NirStmt,
     binding_name: &str,
     matched_variant: &str,
-    payload_field: &str,
+    payload_slots: &[DynamicPatternPayload],
     pure_helpers: &BTreeSet<String>,
 ) -> Option<DynamicPatternBranch> {
     let (name, value) = match stmt {
@@ -275,14 +317,26 @@ fn parse_dynamic_pattern_branch(
         return None;
     }
     if type_name == matched_variant {
-        let [(field, payload)] = fields.as_slice() else {
-            return None;
-        };
-        if field != payload_field {
+        if fields.len() != payload_slots.len() {
             return None;
         }
+        let distinct_fields = fields
+            .iter()
+            .map(|(field, _)| field.as_str())
+            .collect::<BTreeSet<_>>();
+        if distinct_fields.len() != fields.len() {
+            return None;
+        }
+        let payloads = payload_slots
+            .iter()
+            .map(|slot| {
+                fields
+                    .iter()
+                    .find_map(|(field, payload)| (field == &slot.field).then(|| payload.clone()))
+            })
+            .collect::<Option<Vec<_>>>()?;
         Some(DynamicPatternBranch::Matched {
-            payload: payload.clone(),
+            payloads,
             type_args: type_args.clone(),
         })
     } else if fields.is_empty() {
@@ -299,21 +353,40 @@ pub(super) fn prepare_dynamic_pattern_carries(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<(PreparedDynamicPatternTransition, Vec<PreparedCarryUpdate>)> {
     let active_carry_name = format!("__pattern_active_{}", plan.binding_name);
-    let payload_carry_name = format!("__pattern_payload_{}", plan.binding_name);
+    let prepared_payloads = plan
+        .payloads
+        .iter()
+        .enumerate()
+        .map(|(index, payload)| PreparedDynamicPatternPayload {
+            field: payload.field.clone(),
+            carry_name: format!("__pattern_payload_{}_{index}", plan.binding_name),
+            initial: payload.initial.clone(),
+        })
+        .collect::<Vec<_>>();
     let placeholder = || PreparedCarryUpdateKind::Linear {
         op: PreparedCarryLinearOp::Add,
         source: Box::new(PreparedCarrySource::InvariantExpr(NirExpr::Int(0))),
     };
-    let mut carries = vec![
-        PreparedCarryUpdate {
-            binding_name: active_carry_name.clone(),
-            kind: placeholder(),
-        },
-        PreparedCarryUpdate {
-            binding_name: payload_carry_name.clone(),
-            kind: placeholder(),
-        },
-    ];
+    let mut carries = Vec::with_capacity(prepared_payloads.len() + 1);
+    carries.push(PreparedCarryUpdate {
+        binding_name: active_carry_name.clone(),
+        kind: placeholder(),
+    });
+    carries.extend(prepared_payloads.iter().map(|payload| PreparedCarryUpdate {
+        binding_name: payload.carry_name.clone(),
+        kind: placeholder(),
+    }));
+    let previous_payload_substitutions = plan
+        .payloads
+        .iter()
+        .enumerate()
+        .map(|(index, payload)| {
+            (
+                payload.binding_name.clone(),
+                NirExpr::Var(tail_recursive_prev_carry_binding(index + 1)),
+            )
+        })
+        .collect::<Vec<_>>();
     let active_condition = PreparedLoopFlowCondition::Simple(PreparedLoopCarryCondition {
         lhs: PreparedCarryCondSource::PreviousCarry(0),
         compare: PreparedLoopCompare::Ne,
@@ -321,14 +394,18 @@ pub(super) fn prepare_dynamic_pattern_carries(
     });
 
     let (condition, then_branch, else_branch, exit_value) = match plan.update {
-        DynamicPatternUpdate::Matched { payload, .. } => (
+        DynamicPatternUpdate::Matched { payloads, .. } => (
             active_condition,
             DynamicPatternBranch::Matched {
-                payload,
+                payloads,
                 type_args: plan.matched_type_args.clone(),
             },
             DynamicPatternBranch::Matched {
-                payload: NirExpr::Var(plan.payload_binding_name.clone()),
+                payloads: plan
+                    .payloads
+                    .iter()
+                    .map(|payload| NirExpr::Var(payload.binding_name.clone()))
+                    .collect(),
                 type_args: plan.matched_type_args.clone(),
             },
             None,
@@ -338,11 +415,7 @@ pub(super) fn prepare_dynamic_pattern_carries(
             then_branch,
             else_branch,
         } => {
-            let rewritten = substitute_branch_binding(
-                &condition,
-                &plan.payload_binding_name,
-                &NirExpr::Var(tail_recursive_prev_carry_binding(1)),
-            );
+            let rewritten = substitute_expr_bindings(&condition, &previous_payload_substitutions);
             let condition = parse_loop_flow_condition(
                 &rewritten,
                 loop_binding_name,
@@ -368,40 +441,51 @@ pub(super) fn prepare_dynamic_pattern_carries(
             PreparedCarrySource::InvariantExpr(NirExpr::Int(-1)),
         ),
     };
-    let payload_source = |branch: &DynamicPatternBranch| match branch {
-        DynamicPatternBranch::Matched { payload, .. } => prepare_payload_branch_source(
-            payload,
-            &plan.payload_binding_name,
-            &payload_carry_name,
-            loop_binding_name,
-            &carries,
-            inlineable_pure_helpers,
-        ),
-        DynamicPatternBranch::Exit(_) => Some(PreparedCarryBranchSource::keep()),
-    };
-    let then_payload = payload_source(&then_branch)?;
-    let else_payload = payload_source(&else_branch)?;
     carries[0].kind = PreparedCarryUpdateKind::Conditional {
         condition: condition.clone(),
         then_source: Box::new(active_source(&then_branch)),
         else_source: Box::new(active_source(&else_branch)),
     };
-    carries[1].kind = PreparedCarryUpdateKind::Conditional {
-        condition,
-        then_source: Box::new(then_payload),
-        else_source: Box::new(else_payload),
-    };
+    for (index, prepared_payload) in prepared_payloads.iter().enumerate() {
+        let payload_substitutions = plan
+            .payloads
+            .iter()
+            .enumerate()
+            .map(|(source_index, payload)| {
+                let value = if source_index == index {
+                    NirExpr::Var(prepared_payload.carry_name.clone())
+                } else {
+                    NirExpr::Var(tail_recursive_prev_carry_binding(source_index + 1))
+                };
+                (payload.binding_name.clone(), value)
+            })
+            .collect::<Vec<_>>();
+        let payload_source = |branch: &DynamicPatternBranch| match branch {
+            DynamicPatternBranch::Matched { payloads, .. } => prepare_payload_branch_source(
+                payloads.get(index)?,
+                &payload_substitutions,
+                &prepared_payload.carry_name,
+                loop_binding_name,
+                &carries,
+                inlineable_pure_helpers,
+            ),
+            DynamicPatternBranch::Exit(_) => Some(PreparedCarryBranchSource::keep()),
+        };
+        carries[index + 1].kind = PreparedCarryUpdateKind::Conditional {
+            condition: condition.clone(),
+            then_source: Box::new(payload_source(&then_branch)?),
+            else_source: Box::new(payload_source(&else_branch)?),
+        };
+    }
 
     Some((
         PreparedDynamicPatternTransition {
             binding_name: plan.binding_name,
             matched_variant: plan.matched_variant,
             matched_type_args: plan.matched_type_args,
-            payload_field: plan.payload_field,
             active_carry_name,
-            payload_carry_name,
             initial_condition: plan.initial_condition,
-            initial_payload: plan.initial_payload,
+            payloads: prepared_payloads,
             exit_value,
         },
         carries,
@@ -410,17 +494,13 @@ pub(super) fn prepare_dynamic_pattern_carries(
 
 fn prepare_payload_branch_source(
     payload: &NirExpr,
-    payload_binding_name: &str,
+    payload_substitutions: &[(String, NirExpr)],
     payload_carry_name: &str,
     loop_binding_name: &str,
     carries: &[PreparedCarryUpdate],
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedCarryBranchSource> {
-    let renamed = substitute_branch_binding(
-        payload,
-        payload_binding_name,
-        &NirExpr::Var(payload_carry_name.to_owned()),
-    );
+    let renamed = substitute_expr_bindings(payload, payload_substitutions);
     let normalized = match renamed {
         NirExpr::Binary {
             op: NirBinaryOp::Sub,
@@ -445,4 +525,12 @@ fn prepare_payload_branch_source(
         carries,
         inlineable_pure_helpers,
     )
+}
+
+fn substitute_expr_bindings(expr: &NirExpr, bindings: &[(String, NirExpr)]) -> NirExpr {
+    bindings
+        .iter()
+        .fold(expr.clone(), |rewritten, (name, value)| {
+            substitute_branch_binding(&rewritten, name, value)
+        })
 }
