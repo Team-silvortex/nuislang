@@ -50,6 +50,16 @@ pub(crate) fn validate_loop_compare_kind(kind: &str, node_name: &str) -> Result<
         )),
     }
 }
+pub(crate) fn validate_post_flow_loop_compare_kind(
+    kind: &str,
+    node_name: &str,
+) -> Result<(), String> {
+    if matches!(kind, "always" | "invariant_true") {
+        Ok(())
+    } else {
+        validate_loop_compare_kind(kind, node_name)
+    }
+}
 pub(crate) fn validate_loop_step_kind(kind: &str, node_name: &str) -> Result<(), String> {
     match kind {
         "add" | "sub" => Ok(()),

@@ -134,25 +134,33 @@ macro_rules! lower_loop_post_flow_cond_chain {
                 body.push(format!("{loop_cond}:"));
                 let current = fresh_reg(&mut next_reg);
                 body.push(format!("  {current} = load i64, ptr {current_slot}"));
-                let cmp = fresh_reg(&mut next_reg);
-                let pred = match cmp_kind {
-                    "eq" => "eq",
-                    "ne" => "ne",
-                    "lt" => "slt",
-                    "le" => "sle",
-                    "gt" => "sgt",
-                    "ge" => "sge",
-                    other => {
-                        return Err(format!(
-                            "cpu.{loop_instruction} `{}` has unsupported compare kind `{other}` during LLVM lowering",
-                            node.name,
-                        ));
+                if cmp_kind == "always" {
+                    body.push(format!("  br label %{loop_body}"));
+                } else {
+                    let cmp = fresh_reg(&mut next_reg);
+                    if cmp_kind == "invariant_true" {
+                        body.push(format!("  {cmp} = icmp ne i64 {limit}, 0"));
+                    } else {
+                        let pred = match cmp_kind {
+                            "eq" => "eq",
+                            "ne" => "ne",
+                            "lt" => "slt",
+                            "le" => "sle",
+                            "gt" => "sgt",
+                            "ge" => "sge",
+                            other => {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported compare kind `{other}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                        };
+                        body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
                     }
-                };
-                body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
-                body.push(format!(
-                    "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
-                ));
+                    body.push(format!(
+                        "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
+                    ));
+                }
                 body.push(format!("{loop_body}:"));
                 let next_current = match step_kind {
                     "add" => {

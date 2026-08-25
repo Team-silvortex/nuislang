@@ -208,12 +208,22 @@ pub(super) struct PreparedFlowWhile {
 
 pub(super) struct PreparedPostFlowWhile {
     pub(super) binding_name: String,
-    pub(super) limit: NirExpr,
+    pub(super) entry_condition: PreparedLoopEntryCondition,
     pub(super) step: NirExpr,
-    pub(super) compare: PreparedLoopCompare,
     pub(super) step_kind: PreparedLoopStepKind,
     pub(super) carries: Vec<PreparedCarryUpdate>,
     pub(super) control: PreparedLoopFlowControl,
+}
+
+pub(super) enum PreparedLoopEntryCondition {
+    Bounded {
+        limit: NirExpr,
+        compare: PreparedLoopCompare,
+    },
+    InvariantPattern {
+        condition: NirExpr,
+    },
+    Unbounded,
 }
 
 pub(super) struct PreparedCarryUpdate {

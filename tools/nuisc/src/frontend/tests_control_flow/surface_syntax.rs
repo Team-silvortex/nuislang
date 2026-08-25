@@ -209,3 +209,68 @@ fn rejects_irrefutable_if_let_wildcard() {
 
     assert!(error.contains("`if let _ = ...` is irrefutable"), "{error}");
 }
+
+#[test]
+fn lowers_while_let_into_unbounded_match_gate() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option {
+            None,
+            Some(i64),
+          }
+
+          fn consume(value: Option) -> i64 {
+            let mut total: i64 = 0;
+            while let Option.Some(payload) = value {
+              total += payload;
+              break;
+            }
+            return total;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let consume = module
+        .functions
+        .iter()
+        .find(|function| function.name == "consume")
+        .unwrap();
+    assert!(matches!(
+        consume.body.get(1),
+        Some(NirStmt::While {
+            condition: NirExpr::Bool(true),
+            body,
+        }) if matches!(body.as_slice(), [NirStmt::If {
+            condition: NirExpr::VariantIs { variant, .. },
+            then_body,
+            else_body,
+        }] if variant == "Option.Some"
+            && matches!(then_body.first(), Some(NirStmt::Let { name, .. }) if name == "payload")
+            && matches!(else_body.as_slice(), [NirStmt::Break]))
+    ));
+}
+
+#[test]
+fn rejects_irrefutable_while_let_wildcard() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main(value: i64) -> i64 {
+            while let _ = value {
+              break;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("`while let _ = ...` is irrefutable"),
+        "{error}"
+    );
+}

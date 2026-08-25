@@ -137,7 +137,8 @@
 <match_stmt> ::= "match" <expression> "{" { <match_arm> } "}"
 <match_arm> ::= <pattern> [ "if" <expression> ] "=>" <block> [ "," ]
 
-<while_stmt> ::= "while" <expression> <block>
+<while_condition> ::= <expression> | "let" <pattern> "=" <expression>
+<while_stmt> ::= "while" <while_condition> <block>
 <loop_stmt> ::= "loop" <block>
 <break_stmt> ::= "break" ";"
 <continue_stmt> ::= "continue" ";"

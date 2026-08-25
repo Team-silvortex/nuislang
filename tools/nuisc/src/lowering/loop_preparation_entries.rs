@@ -428,10 +428,56 @@ pub(in crate::lowering) fn prepare_post_flow_while(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
     pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> Option<PreparedPostFlowWhile> {
-    let (binding_name, limit, compare) =
-        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
+    let pattern_gate = match (condition, body) {
+        (
+            NirExpr::Bool(true),
+            [NirStmt::If {
+                condition: gate_condition @ NirExpr::VariantIs { .. },
+                then_body,
+                else_body,
+            }],
+        ) if matches!(else_body.as_slice(), [NirStmt::Break])
+            && is_terminal_branch_pure_expr(gate_condition, pure_helpers) =>
+        {
+            Some((gate_condition.clone(), then_body.as_slice()))
+        }
+        _ => None,
+    };
+    let prepared_body = pattern_gate
+        .as_ref()
+        .map_or(body, |(_, then_body)| *then_body);
+    let (binding_name, entry_condition) = if let Some((condition, _)) = &pattern_gate {
+        (
+            parse_unbounded_loop_step_binding(
+                &NirExpr::Bool(true),
+                prepared_body,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?,
+            PreparedLoopEntryCondition::InvariantPattern {
+                condition: condition.clone(),
+            },
+        )
+    } else if let Some((binding_name, limit, compare)) =
+        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)
+    {
+        (
+            binding_name,
+            PreparedLoopEntryCondition::Bounded { limit, compare },
+        )
+    } else {
+        (
+            parse_unbounded_loop_step_binding(
+                condition,
+                body,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?,
+            PreparedLoopEntryCondition::Unbounded,
+        )
+    };
     let (temp_bindings, step_binding, rest) = split_temp_prefixed_loop_step_bindings(
-        body,
+        prepared_body,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
@@ -476,11 +522,21 @@ pub(in crate::lowering) fn prepare_post_flow_while(
         pure_helpers,
         inlineable_pure_helpers,
     )?;
+    if let PreparedLoopEntryCondition::InvariantPattern { condition } = &entry_condition {
+        let mut updated_names = BTreeSet::from([binding_name.as_str()]);
+        updated_names.extend(
+            prepared_carries
+                .iter()
+                .map(|carry| carry.binding_name.as_str()),
+        );
+        if expr_references_names(condition, &updated_names) {
+            return None;
+        }
+    }
     Some(PreparedPostFlowWhile {
         binding_name,
-        limit,
+        entry_condition,
         step,
-        compare,
         step_kind,
         carries: prepared_carries,
         control,

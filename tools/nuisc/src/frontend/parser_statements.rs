@@ -367,9 +367,41 @@ impl Parser {
 
     fn parse_while_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("while")?;
+        if self.peek_word("let") {
+            return self.parse_while_let_stmt_after_keyword();
+        }
         let condition = self.parse_condition_expr()?;
         let body = self.parse_stmt_block()?;
         Ok(AstStmt::While { condition, body })
+    }
+
+    fn parse_while_let_stmt_after_keyword(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("let")?;
+        let pattern = self.parse_match_pattern()?;
+        if matches!(pattern, AstMatchPattern::Wildcard) {
+            return Err("`while let _ = ...` is irrefutable; use `loop` instead".to_owned());
+        }
+        self.expect_symbol('=')?;
+        let value = self.parse_match_scrutinee_expr()?;
+        let matched_body = self.parse_stmt_block()?;
+        Ok(AstStmt::While {
+            condition: AstExpr::Bool(true),
+            body: vec![AstStmt::Match {
+                value,
+                arms: vec![
+                    AstMatchArm {
+                        pattern,
+                        guard: None,
+                        body: matched_body,
+                    },
+                    AstMatchArm {
+                        pattern: AstMatchPattern::Wildcard,
+                        guard: None,
+                        body: vec![AstStmt::Break],
+                    },
+                ],
+            }],
+        })
     }
 
     fn parse_loop_stmt(&mut self) -> Result<AstStmt, String> {

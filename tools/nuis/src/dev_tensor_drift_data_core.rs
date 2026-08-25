@@ -63,7 +63,7 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/control_flow_syntax_native.rs",
         required_patterns: &[
             "mixed_loop_terminal_tree_runs_as_a_native_binary",
-            "assert_eq!(run.status.code(), Some(10))",
+            "assert_eq!(status.code(), Some(10))",
         ],
     },
     DevTensorDriftCheckSpec {

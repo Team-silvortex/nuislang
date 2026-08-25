@@ -25,16 +25,26 @@ best first stop for current semantic truth.
 ## Control-Flow Surface
 
 The executable frontend accepts `while`, unbounded `loop`, `break`, `continue`,
-statement or expression `else if` chains, and statement or expression `if let`.
+statement or expression `else if` chains, statement or expression `if let`, and
+statement `while let`.
 `loop { ... }` normalizes to `while true { ... }`; `else if` normalizes to
-nested `if`; `if let` normalizes to a two-arm `match`. These forms therefore
-share the existing AST, NIR, YIR, ownership, pattern-binding, and lowering
-contracts rather than creating parallel control-flow nodes.
+nested `if`; `if let` normalizes to a two-arm `match`; `while let` normalizes to
+an unbounded loop containing a two-arm match gate whose mismatch arm breaks.
+These forms therefore share the existing AST, NIR, YIR, ownership,
+pattern-binding, and lowering contracts rather than creating parallel
+control-flow nodes.
 
-Syntax admission does not widen backend semantics silently. A normalized
-`loop` supports the same proven lowering shapes as `while true`; arbitrary
-mixed `continue`/`break`/`return` trees remain a separate loop-lowering closure
-task.
+Syntax admission does not widen backend semantics silently. Normalized `loop`
+forms now preserve mixed terminal `continue`/`break`/function-`return` trees,
+and state/carry post-flow loops can use an explicit unbounded entry mode with a
+real native backedge. A `while let` over a loop-invariant enum scrutinee can now
+project its payload into scalar post-flow control, enter on `Some`, exhaust on
+`None`, and execute through LLVM as a native binary. Compile-time false gates
+also skip unreachable payload projection across inlined helper boundaries.
+Rebuilding or rebinding
+the matched enum on each backedge still requires the dynamic variant-state
+carry contract; the compiler rejects that shape explicitly instead of hoisting
+its condition incorrectly.
 
 ## Boundary
 

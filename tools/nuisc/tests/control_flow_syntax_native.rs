@@ -5,27 +5,61 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-fn temp_dir() -> PathBuf {
+struct TempProject(PathBuf);
+
+impl Drop for TempProject {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn temp_dir(project_name: &str) -> TempProject {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("nuisc_mixed_loop_terminal_{nonce}"));
+    let dir = std::env::temp_dir().join(format!("nuisc_{project_name}_{nonce}"));
     fs::create_dir_all(&dir).unwrap();
-    dir
+    TempProject(dir)
+}
+
+fn compile_and_run(project_name: &str, source: &str) -> std::process::ExitStatus {
+    let project = temp_dir(project_name);
+    let output_dir = project.0.join("out");
+    fs::write(
+        project.0.join("nuis.toml"),
+        format!(
+            "name = \"{project_name}\"\nversion = \"0.1.0\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\n"
+        ),
+    )
+    .unwrap();
+    fs::write(project.0.join("main.ns"), source).unwrap();
+
+    let compile = Command::new(env!("CARGO_BIN_EXE_nuisc"))
+        .args([
+            "compile",
+            &project.0.display().to_string(),
+            &output_dir.display().to_string(),
+        ])
+        .output()
+        .expect("run nuisc compile");
+    assert!(
+        compile.status.success(),
+        "compile failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&compile.stdout),
+        String::from_utf8_lossy(&compile.stderr)
+    );
+
+    let status = Command::new(output_dir.join(project_name))
+        .status()
+        .expect("run native binary");
+    status
 }
 
 #[test]
 fn mixed_loop_terminal_tree_runs_as_a_native_binary() {
-    let project = temp_dir();
-    let output_dir = project.join("out");
-    fs::write(
-        project.join("nuis.toml"),
-        "name = \"mixed_loop_terminal\"\nversion = \"0.1.0\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\n",
-    )
-    .unwrap();
-    fs::write(
-        project.join("main.ns"),
+    let status = compile_and_run(
+        "mixed_loop_terminal",
         r#"
         mod cpu Main {
           fn classify(value: i64) -> i64 {
@@ -46,26 +80,123 @@ fn mixed_loop_terminal_tree_runs_as_a_native_binary() {
           }
         }
         "#,
-    )
-    .unwrap();
-
-    let compile = Command::new(env!("CARGO_BIN_EXE_nuisc"))
-        .args([
-            "compile",
-            &project.display().to_string(),
-            &output_dir.display().to_string(),
-        ])
-        .output()
-        .expect("run nuisc compile");
-    assert!(
-        compile.status.success(),
-        "compile failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&compile.stdout),
-        String::from_utf8_lossy(&compile.stderr)
     );
+    assert_eq!(status.code(), Some(10));
+}
 
-    let binary = output_dir.join("mixed_loop_terminal");
-    let run = Command::new(&binary).output().expect("run native binary");
-    assert_eq!(run.status.code(), Some(10));
-    fs::remove_dir_all(project).unwrap();
+#[test]
+fn state_carrying_unbounded_loop_runs_as_a_native_binary() {
+    let status = compile_and_run(
+        "state_carrying_unbounded_loop",
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            loop {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + value;
+              if acc >= 6 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(6));
+}
+
+#[test]
+fn invariant_while_let_payload_runs_as_a_native_binary() {
+    let status = compile_and_run(
+        "invariant_while_let_payload",
+        r#"
+        mod cpu Main {
+          enum Option {
+            None,
+            Some(i64),
+          }
+
+          fn main() -> i64 {
+            let selected: Option = Option.Some(2);
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Option.Some(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + cursor;
+              if cursor > payload {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(6));
+}
+
+#[test]
+fn invariant_while_let_mismatch_skips_the_native_loop() {
+    let status = compile_and_run(
+        "invariant_while_let_mismatch",
+        r#"
+        mod cpu Main {
+          enum Option {
+            None,
+            Some(i64),
+          }
+
+          fn main() -> i64 {
+            let selected: Option = Option.None;
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Option.Some(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + cursor;
+              if cursor > 2 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[test]
+fn invariant_while_let_accepts_runtime_enum_arguments() {
+    let status = compile_and_run(
+        "invariant_while_let_runtime_enum",
+        r#"
+        mod cpu Main {
+          enum Option {
+            None,
+            Some(i64),
+          }
+
+          fn consume(selected: Option) -> i64 {
+            let cursor: i64 = 0;
+            let acc: i64 = 0;
+            while let Option.Some(payload) = selected {
+              let cursor: i64 = cursor + 1;
+              let acc: i64 = acc + cursor;
+              if cursor > payload {
+                break;
+              }
+            }
+            return acc;
+          }
+
+          fn main() -> i64 {
+            return consume(Option.Some(2)) + consume(Option.None);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(6));
 }

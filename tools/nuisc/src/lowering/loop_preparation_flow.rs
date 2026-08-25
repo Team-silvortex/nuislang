@@ -142,6 +142,38 @@ pub(super) fn parse_prepared_loop_header(
     }
 }
 
+pub(super) fn parse_unbounded_loop_step_binding(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<String> {
+    if !matches!(
+        inline_pure_helper_calls(condition, inlineable_pure_helpers),
+        NirExpr::Bool(true)
+    ) {
+        return None;
+    }
+
+    for stmt in body {
+        let (name, value) = extract_pure_branch_binding(stmt, pure_helpers)?;
+        let value = inline_pure_helper_calls(&value, inlineable_pure_helpers);
+        let is_self_step = matches!(
+            value,
+            NirExpr::Binary {
+                op: NirBinaryOp::Add | NirBinaryOp::Sub,
+                lhs,
+                rhs,
+            } if matches!(lhs.as_ref(), NirExpr::Var(lhs_name) if lhs_name == &name)
+                && is_terminal_branch_pure_expr(&rhs, pure_helpers)
+        );
+        if is_self_step {
+            return Some(name);
+        }
+    }
+    None
+}
+
 pub(super) fn parse_prepared_loop_step(
     stmt: &NirStmt,
     binding_name: &str,

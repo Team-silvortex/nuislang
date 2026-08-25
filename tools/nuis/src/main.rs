@@ -58,6 +58,7 @@ mod dev_tensor_data;
 mod dev_tensor_drift;
 mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
+mod dev_tensor_drift_data_language;
 mod dev_tensor_drift_data_runtime;
 mod dev_tensor_drift_data_runtime_bootstrap;
 mod dev_tensor_drift_data_runtime_cffi_object;

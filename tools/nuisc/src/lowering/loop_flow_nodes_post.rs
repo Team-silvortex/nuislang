@@ -21,7 +21,18 @@ pub(in crate::lowering) fn lower_post_flow_while(
         };
         carry_initial_names.push(carry_initial_name);
     }
-    let limit_name = lower_expr(&prepared.limit, state, bindings)?;
+    let (limit_name, compare) = match &prepared.entry_condition {
+        PreparedLoopEntryCondition::Bounded { limit, compare } => (
+            lower_expr(limit, state, bindings)?,
+            render_loop_compare(*compare),
+        ),
+        PreparedLoopEntryCondition::InvariantPattern { condition } => {
+            (lower_expr(condition, state, bindings)?, "invariant_true")
+        }
+        PreparedLoopEntryCondition::Unbounded => {
+            (lower_expr(&NirExpr::Int(0), state, bindings)?, "always")
+        }
+    };
     let step_name = lower_expr(&prepared.step, state, bindings)?;
     let (control_args, control_dep_inputs, control_effect_inputs, control_uses_cond_chain) =
         encode_loop_flow_control_args(&prepared.control, state, bindings)?;
@@ -30,7 +41,6 @@ pub(in crate::lowering) fn lower_post_flow_while(
         .iter()
         .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
     let uses_cond_chain = has_conditional || control_uses_cond_chain;
-    let compare = render_loop_compare(prepared.compare);
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",

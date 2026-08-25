@@ -8,7 +8,8 @@ use crate::lowering::loop_carries::{
     unsupported_loop_carry_branch_source_message,
 };
 use crate::lowering::loop_purity::{
-    normalize_pure_bool_test_expr, substitute_branch_binding, substitute_stmt_bindings,
+    expr_references_names, normalize_pure_bool_test_expr, substitute_branch_binding,
+    substitute_stmt_bindings,
 };
 
 #[path = "loop_preparation_flow.rs"]
@@ -16,6 +17,7 @@ mod loop_preparation_flow;
 use loop_preparation_flow::{
     diagnose_unstructured_loop_flow_control, parse_loop_flow_condition, parse_loop_flow_control,
     parse_prepared_async_loop_step, parse_prepared_loop_header, parse_prepared_loop_step,
+    parse_unbounded_loop_step_binding,
 };
 
 #[path = "loop_preparation_carry_tree.rs"]
@@ -356,6 +358,44 @@ pub(super) fn diagnose_unstructured_while_shape(
     Some(format!(
         "structured `while` lowering recognized loop state `{binding_name}` and its step, but the remaining body is not reducible to supported carry updates or flow/post-flow control"
     ))
+}
+
+pub(super) fn diagnose_unsupported_pattern_while_shape(
+    condition: &NirExpr,
+    body: &[NirStmt],
+) -> Option<String> {
+    let (
+        NirExpr::Bool(true),
+        [NirStmt::If {
+            condition: gate_condition @ NirExpr::VariantIs { .. },
+            then_body,
+            else_body,
+        }],
+    ) = (condition, body)
+    else {
+        return None;
+    };
+    if !matches!(else_body.as_slice(), [NirStmt::Break]) {
+        return None;
+    }
+
+    let rebound_names = then_body
+        .iter()
+        .filter_map(|stmt| match stmt {
+            NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    if expr_references_names(gate_condition, &rebound_names) {
+        return Some(
+            "pattern-controlled `while let` currently requires a loop-invariant enum scrutinee; rebuilding or rebinding the matched enum on a backedge needs the dynamic variant-state carry contract"
+                .to_owned(),
+        );
+    }
+    Some(
+        "pattern-controlled `while let` currently requires a scalar post-flow step/carry body ending in structured `break` or `continue`; arbitrary pattern-loop bodies are not lowered yet"
+            .to_owned(),
+    )
 }
 
 #[path = "loop_preparation_entries.rs"]

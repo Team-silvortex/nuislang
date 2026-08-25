@@ -24,6 +24,9 @@ mod loop_async_post_flow_cond_chain;
 mod loop_post_flow_cond_chain;
 #[macro_use]
 mod loop_flow_cond_chain;
+mod invariant_pattern_gate;
+
+use invariant_pattern_gate::lower_false_invariant_post_flow_loop;
 
 pub(super) fn emit_cpu_function(
     module: &YirModule,
@@ -127,6 +130,17 @@ pub(super) fn emit_cpu_function(
         }
 
         if lower_cpu_async_resource_node(node, &mut state) {
+            continue;
+        }
+
+        if lower_false_invariant_post_flow_loop(
+            node,
+            &mut state.body,
+            &mut state.registers,
+            &state.facts,
+            &mut state.next_reg,
+            &mut state.last_cpu_value,
+        )? {
             continue;
         }
 

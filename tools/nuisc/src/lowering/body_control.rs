@@ -221,6 +221,12 @@ pub(in crate::lowering) fn lower_while_stmt(
         return Err(diagnostic);
     }
 
+    if let Some(diagnostic) =
+        super::loop_preparation::diagnose_unsupported_pattern_while_shape(condition, body)
+    {
+        return Err(diagnostic);
+    }
+
     if let Some(diagnostic) = super::loop_preparation::diagnose_unstructured_while_shape(
         condition,
         body,
