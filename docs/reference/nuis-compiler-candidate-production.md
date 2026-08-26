@@ -1,16 +1,18 @@
 # Nuis Compiler Candidate Production
 
-`nuis-compiler-candidate-production-v1` is the first attested path from an
-executed Nuis compiler-shaped program to a separately identified
-`stage1-candidate` leaf component. Its machine-readable contract is
-[nuis-compiler-candidate-production-v1.toml](nuis-compiler-candidate-production-v1.toml).
+`nuis-compiler-candidate-production-v2` is the first attested path from an
+executed Nuis compiler-shaped program with a bounded token decoder to a
+separately identified `stage1-candidate` leaf component. Its machine-readable
+contract is
+[nuis-compiler-candidate-production-v2.toml](nuis-compiler-candidate-production-v2.toml).
 
 This closes one leaf production loop. It does not mean that `nuisc` is
 self-hosted, and it never authorizes replacing stage0.
 
 ## Frontdoor
 
-Build the checked-in projection relay through both producers with:
+Build the checked-in bounded token-decoder candidate through both producers
+with:
 
 ```bash
 nuis bootstrap-candidate-build path/to/project path/to/output
@@ -27,21 +29,30 @@ The output root contains:
 
 ## Producer Boundary
 
-The Nuis source exports four exact scalar functions for stage seed/fold and
-bundle seed/fold. Bootstrap subset v1 accepts only those exact function names,
-symbol names, parameter counts, and all-`i64` signatures. Arbitrary exports
-continue to fail as `NBS004`.
+The Nuis source exports twelve exact scalar functions: four for stage and
+bundle folds, plus eight for a bounded token-stream DFA. Bootstrap subset v2
+accepts only those exact function names, symbol names, parameter counts, and
+all-`i64` signatures. Arbitrary exports continue to fail as `NBS004`.
 
 The generated host adapter opens the five verified payload files and passes
-every byte, in order, through the Nuis fold function. It performs no parsing,
-diagnostic, stage, or replacement decision. The Rust host independently
-recomputes the same folds before it can materialize a candidate handoff.
+every byte, in order, through the Nuis fold function. For the token payload it
+also carries scalar mode, count, and fold state between calls into the Nuis
+decoder. It performs no token classification, diagnostic, stage, or
+replacement decision. The Rust host independently recomputes the same stage
+folds and token summary before it can materialize a candidate handoff.
+
+`StdCompilerTokens` recognizes the exact `nuis-token-stream-v1` header, all
+seven record kinds, tabs and LF boundaries, lowercase even-length hex payload
+shape, and signed/unsigned decimal payload shape. It is bounded to 4 MiB and
+65,535 records. Its output is a record count plus semantic fold over decoded
+hex nibbles, decimal units, and record kinds. Complete UTF-8/numeric value
+materialization and canonical token re-emission remain later work.
 
 This split is deliberate:
 
 ```text
-host adapter = byte transport
-Nuis image = candidate projection computation
+host adapter = byte transport and scalar-state orchestration
+Nuis image = candidate stage folds and token decoding
 shared artifact layer = identity and authority verification
 ```
 
@@ -53,27 +64,28 @@ are part of the production proof.
 
 The candidate handoff preserves the producer-neutral semantic bundle while
 changing the auditable producer identity to
-`nuis-stage1-projection-relay-v1`. The promoted component keeps the same
+`nuis-stage1-token-decoder-v2`. The promoted component keeps the same
 component identity, native output, dependency closure, and five stage payloads,
 but declares the explicit `stage1-candidate` role and uses the executed Nuis
 image as its compiler image.
 
 The production proof binds both components, the earlier execution proof, the
 candidate image, all five byte lengths/SHA-256/folds, the bundle fold, and the
-adapter. `bootstrap-diff` verifies this proof before writing its report.
-Changing the adapter, a stage payload, role, producer, component record, or
-proof therefore fails closed.
+adapter. V2 additionally binds `nuis-compiler-token-decoder-v1`, its token
+record count, and semantic fold. `bootstrap-diff` verifies this proof before
+writing its report. Changing the adapter, token summary, a stage payload, role,
+producer, component record, or proof therefore fails closed.
 
 ## Current Limit
 
-The first producer is an identity projection relay: Nuis consumes every
-serialized stage byte and owns the deterministic bundle fold, while the shared
-host codec still owns token and structural-body decoding. Its reproducible
-identity is now proven across two empty, compile-cache-bypassed roots by
-`nuis bootstrap-reproducibility`; see
+The first producer now performs a real, bounded token-decoding step while
+preserving the canonical five-stage bytes required by the current 13/13 gate.
+It does not yet materialize complete token values, re-emit a token stream, or
+decode AST/NIR bodies. Its reproducible identity remains proven across two
+empty, compile-cache-bypassed roots by `nuis bootstrap-reproducibility`; see
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
-The next compiler step is to move one real token or structural transformation
-behind the same ABI and retain that aggregate.
+The next compiler step is complete token value materialization or one bounded
+AST/NIR structural-body decoder behind the same ABI.
 
 Replacement authorization remains a separate future protocol with rollback
 evidence. A `13/13` report is evidence of equivalence, not permission to switch

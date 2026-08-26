@@ -1,11 +1,12 @@
 use std::{fs, path::Path, process::Command};
 
 use nuis_artifact::{
-    compiler_candidate_bundle_fold, compiler_candidate_stage_fold, parse_build_manifest,
-    CompilerStageHandoff, COMPILER_CANDIDATE_ADAPTER_FILE,
+    compiler_candidate_bundle_fold, compiler_candidate_stage_fold, decode_compiler_token_stream,
+    parse_build_manifest, CompilerStageHandoff, CompilerTokenDecodeSummary,
+    COMPILER_CANDIDATE_ADAPTER_FILE,
 };
 
-const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v1";
+const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v2";
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
 const ADAPTER_RUNTIME_OBJECT_FILE: &str = "nuis.compiler-candidate-runtime.o";
 
@@ -14,6 +15,7 @@ pub(crate) struct CandidateAdapterOutput {
     pub(crate) adapter: Vec<u8>,
     pub(crate) stage_folds: Vec<usize>,
     pub(crate) bundle_fold: usize,
+    pub(crate) token_decode: CompilerTokenDecodeSummary,
 }
 
 pub(crate) fn run_candidate_adapter(
@@ -119,7 +121,7 @@ pub(crate) fn run_candidate_adapter(
             String::from_utf8_lossy(&output.stderr),
         ));
     }
-    let (stage_folds, bundle_fold) = parse_adapter_output(&output.stdout)?;
+    let (stage_folds, bundle_fold, token_decode) = parse_adapter_output(&output.stdout)?;
     let expected_folds = payload_paths
         .iter()
         .enumerate()
@@ -135,9 +137,21 @@ pub(crate) fn run_candidate_adapter(
         })
         .collect::<Result<Vec<_>, _>>()?;
     let expected_bundle = compiler_candidate_bundle_fold(&expected_folds);
-    if stage_folds != expected_folds || bundle_fold != expected_bundle {
+    let token_bytes = fs::read(&payload_paths[1]).map_err(|error| {
+        format!(
+            "failed to read candidate token payload `{}`: {error}",
+            payload_paths[1].display()
+        )
+    })?;
+    let expected_token_decode = decode_compiler_token_stream(&token_bytes)
+        .map_err(|error| format!("failed to independently decode candidate tokens: {error}"))?;
+    if stage_folds != expected_folds
+        || bundle_fold != expected_bundle
+        || token_decode != expected_token_decode
+    {
         return Err(
-            "Nuis candidate scalar output disagrees with the independent host fold".to_owned(),
+            "Nuis candidate scalar output disagrees with the independent host fold or token decode"
+                .to_owned(),
         );
     }
 
@@ -152,24 +166,31 @@ pub(crate) fn run_candidate_adapter(
         adapter,
         stage_folds,
         bundle_fold,
+        token_decode,
     })
 }
 
-fn parse_adapter_output(bytes: &[u8]) -> Result<(Vec<usize>, usize), String> {
+fn parse_adapter_output(
+    bytes: &[u8],
+) -> Result<(Vec<usize>, usize, CompilerTokenDecodeSummary), String> {
     let source = std::str::from_utf8(bytes)
         .map_err(|error| format!("candidate scalar output is not UTF-8: {error}"))?;
     if source.contains('\r') || source.contains('\0') || !source.ends_with('\n') {
         return Err("candidate scalar output must use canonical UTF-8/LF text".to_owned());
     }
     let lines = source.lines().collect::<Vec<_>>();
-    if lines.len() != 7 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
+    if lines.len() != 9 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
         return Err("candidate scalar output has an invalid protocol or line count".to_owned());
     }
     let stage_folds = (0..5)
         .map(|ordinal| parse_output_usize(lines[ordinal + 1], &format!("stage.{ordinal}")))
         .collect::<Result<Vec<_>, _>>()?;
     let bundle_fold = parse_output_usize(lines[6], "bundle")?;
-    Ok((stage_folds, bundle_fold))
+    let token_decode = CompilerTokenDecodeSummary {
+        record_count: parse_output_usize(lines[7], "tokens.record_count")?,
+        semantic_fold: parse_output_usize(lines[8], "tokens.semantic_fold")?,
+    };
+    Ok((stage_folds, bundle_fold, token_decode))
 }
 
 fn parse_output_usize(line: &str, expected_key: &str) -> Result<usize, String> {
@@ -208,21 +229,73 @@ extern int64_t nuis_bootstrap_candidate_stage_seed_v1(int64_t ordinal);
 extern int64_t nuis_bootstrap_candidate_stage_fold_v1(int64_t state, int64_t ordinal, int64_t byte);
 extern int64_t nuis_bootstrap_candidate_bundle_seed_v1(void);
 extern int64_t nuis_bootstrap_candidate_bundle_fold_v1(int64_t state, int64_t ordinal, int64_t stage_fold);
+extern int64_t nuis_bootstrap_candidate_token_start_v1(void);
+extern int64_t nuis_bootstrap_candidate_token_error_mode_v1(void);
+extern int64_t nuis_bootstrap_candidate_token_max_bytes_v1(void);
+extern int64_t nuis_bootstrap_candidate_token_semantic_seed_v1(void);
+extern int64_t nuis_bootstrap_candidate_token_step_v1(int64_t mode, int64_t byte);
+extern int64_t nuis_bootstrap_candidate_token_count_step_v1(int64_t count, int64_t mode, int64_t byte);
+extern int64_t nuis_bootstrap_candidate_token_semantic_step_v1(int64_t state, int64_t mode, int64_t byte);
+extern int64_t nuis_bootstrap_candidate_token_finish_v1(int64_t mode, int64_t count);
 
-static int fold_file(const char* path, int64_t ordinal, int64_t* out) {
+static int fold_file(
+    const char* path,
+    int64_t ordinal,
+    int64_t* out,
+    int64_t* token_count,
+    int64_t* token_semantic
+) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) return 65;
     int64_t state = nuis_bootstrap_candidate_stage_seed_v1(ordinal);
+    int64_t token_mode = nuis_bootstrap_candidate_token_start_v1();
+    int64_t token_error = nuis_bootstrap_candidate_token_error_mode_v1();
+    int64_t token_max_bytes = nuis_bootstrap_candidate_token_max_bytes_v1();
+    int64_t token_bytes = 0;
+    if (ordinal == 1) {
+        *token_count = 0;
+        *token_semantic = nuis_bootstrap_candidate_token_semantic_seed_v1();
+        if (token_max_bytes <= 0) {
+            fclose(file);
+            return 68;
+        }
+    }
     for (;;) {
         int byte = fgetc(file);
         if (byte == EOF) break;
         state = nuis_bootstrap_candidate_stage_fold_v1(state, ordinal, (int64_t)byte);
+        if (ordinal == 1) {
+            if (token_bytes >= token_max_bytes) {
+                fclose(file);
+                return 68;
+            }
+            *token_semantic = nuis_bootstrap_candidate_token_semantic_step_v1(
+                *token_semantic,
+                token_mode,
+                (int64_t)byte
+            );
+            *token_count = nuis_bootstrap_candidate_token_count_step_v1(
+                *token_count,
+                token_mode,
+                (int64_t)byte
+            );
+            token_mode = nuis_bootstrap_candidate_token_step_v1(token_mode, (int64_t)byte);
+            token_bytes += 1;
+            if (token_mode == token_error || *token_count < 0) {
+                fclose(file);
+                return 69;
+            }
+        }
     }
     if (ferror(file) != 0) {
         fclose(file);
         return 66;
     }
     if (fclose(file) != 0) return 67;
+    if (ordinal == 1 && nuis_bootstrap_candidate_token_finish_v1(
+        token_mode,
+        *token_count
+    ) != 0) return 70;
     *out = state;
     return 0;
 }
@@ -231,16 +304,26 @@ int main(int argc, char** argv) {
     if (argc != 6) return 64;
     int64_t folds[5] = {0, 0, 0, 0, 0};
     int64_t bundle = nuis_bootstrap_candidate_bundle_seed_v1();
+    int64_t token_count = 0;
+    int64_t token_semantic = 0;
     for (int64_t ordinal = 0; ordinal < 5; ++ordinal) {
-        int status = fold_file(argv[ordinal + 1], ordinal, &folds[ordinal]);
+        int status = fold_file(
+            argv[ordinal + 1],
+            ordinal,
+            &folds[ordinal],
+            &token_count,
+            &token_semantic
+        );
         if (status != 0) return status;
         bundle = nuis_bootstrap_candidate_bundle_fold_v1(bundle, ordinal, folds[ordinal]);
     }
-    puts("protocol=nuis-bootstrap-candidate-scalar-output-v1");
+    puts("protocol=nuis-bootstrap-candidate-scalar-output-v2");
     for (int ordinal = 0; ordinal < 5; ++ordinal) {
         printf("stage.%d=%lld\n", ordinal, (long long)folds[ordinal]);
     }
     printf("bundle=%lld\n", (long long)bundle);
+    printf("tokens.record_count=%lld\n", (long long)token_count);
+    printf("tokens.semantic_fold=%lld\n", (long long)token_semantic);
     return 0;
 }
 "#
@@ -252,13 +335,20 @@ mod tests {
 
     #[test]
     fn adapter_output_parser_requires_exact_order_and_utf8_lf() {
-        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v1\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\n";
+        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v2\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\n";
         assert_eq!(
             parse_adapter_output(source).unwrap(),
-            (vec![1, 2, 3, 4, 5], 6)
+            (
+                vec![1, 2, 3, 4, 5],
+                6,
+                CompilerTokenDecodeSummary {
+                    record_count: 7,
+                    semantic_fold: 8,
+                }
+            )
         );
 
-        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v1\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\n";
+        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v2\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\n";
         assert!(parse_adapter_output(reordered).is_err());
         assert!(parse_adapter_output(&source[..source.len() - 1]).is_err());
     }

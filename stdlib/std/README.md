@@ -107,8 +107,9 @@ Use these as the primary cluster names when placing new work:
     `lib/language_core.ns -> lib/compiler_projection.ns -> lib/language_ops.ns`
   - bootstrap compiler consumer:
     `bootstrap_structural_projection_candidate` consumes
-    `StdCompilerProjection`, validates typed AST/NIR record transitions, and
-    crosses the native candidate execution proof without FFI or host effects.
+    `StdCompilerProjection` and `StdCompilerTokens`, validates typed AST/NIR
+    record transitions plus the bounded serialized-token DFA, and crosses the
+    native candidate execution proof without FFI or host effects.
   - current smoke:
     `std_language_galaxy_bootstrap_demo` consumes `StdLanguageCore` and
     `StdLanguageOps` through `std=workspace`, proving reusable std-level
@@ -166,6 +167,11 @@ patterns.
 
 First auto-injectable library module:
 
+* [lib/compiler_tokens.ns](lib/compiler_tokens.ns)
+  exposes the bootstrap-safe `StdCompilerTokens` byte-state DFA for the frozen
+  `nuis-token-stream-v1` wire format, including exact record boundaries,
+  bounded byte/count admission, deterministic semantic folding, and
+  fail-closed malformed-input states without FFI or host effects
 * [lib/task_contracts.ns](lib/task_contracts.ns)
   exposes the initial `StdTaskContracts` helper surface for project-level
   stdlib galaxy injection, including completed/timed-out/cancelled status

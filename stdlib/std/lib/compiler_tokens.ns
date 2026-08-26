@@ -1,0 +1,254 @@
+/// Bounded streaming decoder for the producer-neutral token handoff.
+mod cpu StdCompilerTokens {
+  pub fn compiler_token_decoder_start() -> i64 { return 0; }
+  pub fn compiler_token_decoder_error_mode() -> i64 { return 127; }
+  pub fn compiler_token_decoder_max_bytes() -> i64 { return 4194304; }
+  pub fn compiler_token_decoder_semantic_seed() -> i64 { return 313; }
+
+  pub fn compiler_token_decoder_expect(
+    byte: i64,
+    expected: i64,
+    next: i64
+  ) -> i64 {
+    if byte == expected { return next; }
+    return compiler_token_decoder_error_mode();
+  }
+
+  pub fn compiler_token_decoder_is_digit(byte: i64) -> bool {
+    return byte >= 48 && byte <= 57;
+  }
+
+  pub fn compiler_token_decoder_is_hex(byte: i64) -> bool {
+    return compiler_token_decoder_is_digit(byte) || (byte >= 97 && byte <= 102);
+  }
+
+  pub fn compiler_token_decoder_hex_value(byte: i64) -> i64 {
+    if compiler_token_decoder_is_digit(byte) { return byte - 48; }
+    return byte - 87;
+  }
+
+  pub fn compiler_token_decoder_fold(state: i64, unit: i64) -> i64 {
+    return ((state * 257) + unit) % 2147483629;
+  }
+
+  pub fn compiler_token_decoder_record_kind(mode: i64) -> i64 {
+    if mode == 102 { return 1; }
+    if mode == 70 { return 2; }
+    if mode == 105 { return 3; }
+    if mode == 73 { return 4; }
+    if mode == 63 { return 5; }
+    if mode == 106 { return 6; }
+    if mode == 108 { return 7; }
+    return 0;
+  }
+
+  pub fn compiler_token_decoder_count_step(
+    count: i64,
+    mode: i64,
+    byte: i64
+  ) -> i64 {
+    if byte != 10 || compiler_token_decoder_record_kind(mode) == 0 {
+      return count;
+    }
+    if count < 0 || count >= 65535 { return -1; }
+    return count + 1;
+  }
+
+  pub fn compiler_token_decoder_semantic_step(
+    state: i64,
+    mode: i64,
+    byte: i64
+  ) -> i64 {
+    let next: i64 = if mode >= 100 && mode <= 109 && compiler_token_decoder_is_hex(byte) {
+      compiler_token_decoder_fold(
+        state,
+        compiler_token_decoder_hex_value(byte) + 1
+      )
+    } else if mode == 68 && byte == 45 {
+      compiler_token_decoder_fold(state, 17)
+    } else if (
+      mode == 68 || mode == 69 || mode == 70 || mode == 72 || mode == 73
+    ) && compiler_token_decoder_is_digit(byte) {
+      compiler_token_decoder_fold(state, byte - 47)
+    } else {
+      state
+    };
+    let kind: i64 = compiler_token_decoder_record_kind(mode);
+    if byte == 10 && kind != 0 {
+      return compiler_token_decoder_fold(next, 128 + kind);
+    }
+    return next;
+  }
+
+  pub fn compiler_token_decoder_finish(mode: i64, count: i64) -> i64 {
+    if mode == 30 && count >= 0 { return 0; }
+    return 1;
+  }
+
+  pub fn compiler_token_decoder_step(mode: i64, byte: i64) -> i64 {
+    if mode == 127 { return 127; }
+
+    // nuis-token-stream-v1 followed by LF.
+    if mode == 0 { return compiler_token_decoder_expect(byte, 110, 1); }
+    if mode == 1 { return compiler_token_decoder_expect(byte, 117, 2); }
+    if mode == 2 { return compiler_token_decoder_expect(byte, 105, 3); }
+    if mode == 3 { return compiler_token_decoder_expect(byte, 115, 4); }
+    if mode == 4 { return compiler_token_decoder_expect(byte, 45, 5); }
+    if mode == 5 { return compiler_token_decoder_expect(byte, 116, 6); }
+    if mode == 6 { return compiler_token_decoder_expect(byte, 111, 7); }
+    if mode == 7 { return compiler_token_decoder_expect(byte, 107, 8); }
+    if mode == 8 { return compiler_token_decoder_expect(byte, 101, 9); }
+    if mode == 9 { return compiler_token_decoder_expect(byte, 110, 10); }
+    if mode == 10 { return compiler_token_decoder_expect(byte, 45, 11); }
+    if mode == 11 { return compiler_token_decoder_expect(byte, 115, 12); }
+    if mode == 12 { return compiler_token_decoder_expect(byte, 116, 13); }
+    if mode == 13 { return compiler_token_decoder_expect(byte, 114, 14); }
+    if mode == 14 { return compiler_token_decoder_expect(byte, 101, 15); }
+    if mode == 15 { return compiler_token_decoder_expect(byte, 97, 16); }
+    if mode == 16 { return compiler_token_decoder_expect(byte, 109, 17); }
+    if mode == 17 { return compiler_token_decoder_expect(byte, 45, 18); }
+    if mode == 18 { return compiler_token_decoder_expect(byte, 118, 19); }
+    if mode == 19 { return compiler_token_decoder_expect(byte, 49, 20); }
+    if mode == 20 { return compiler_token_decoder_expect(byte, 10, 30); }
+
+    if mode == 30 {
+      if byte == 119 { return 31; }
+      if byte == 105 { return 35; }
+      if byte == 102 { return 42; }
+      if byte == 115 { return 47; }
+      if byte == 97 { return 59; }
+      if byte == 100 { return 80; }
+      return 127;
+    }
+
+    // word<TAB><lowercase-even-hex>
+    if mode == 31 { return compiler_token_decoder_expect(byte, 111, 32); }
+    if mode == 32 { return compiler_token_decoder_expect(byte, 114, 33); }
+    if mode == 33 { return compiler_token_decoder_expect(byte, 100, 34); }
+    if mode == 34 { return compiler_token_decoder_expect(byte, 9, 100); }
+
+    // integer<TAB><signed-decimal-shape>
+    if mode == 35 { return compiler_token_decoder_expect(byte, 110, 36); }
+    if mode == 36 { return compiler_token_decoder_expect(byte, 116, 37); }
+    if mode == 37 { return compiler_token_decoder_expect(byte, 101, 38); }
+    if mode == 38 { return compiler_token_decoder_expect(byte, 103, 39); }
+    if mode == 39 { return compiler_token_decoder_expect(byte, 101, 40); }
+    if mode == 40 { return compiler_token_decoder_expect(byte, 114, 41); }
+    if mode == 41 { return compiler_token_decoder_expect(byte, 9, 68); }
+
+    // float<TAB><lowercase-even-hex>
+    if mode == 42 { return compiler_token_decoder_expect(byte, 108, 43); }
+    if mode == 43 { return compiler_token_decoder_expect(byte, 111, 44); }
+    if mode == 44 { return compiler_token_decoder_expect(byte, 97, 45); }
+    if mode == 45 { return compiler_token_decoder_expect(byte, 116, 46); }
+    if mode == 46 { return compiler_token_decoder_expect(byte, 9, 103); }
+
+    // symbol and string share the first byte.
+    if mode == 47 {
+      if byte == 121 { return 48; }
+      if byte == 116 { return 54; }
+      return 127;
+    }
+    if mode == 48 { return compiler_token_decoder_expect(byte, 109, 49); }
+    if mode == 49 { return compiler_token_decoder_expect(byte, 98, 50); }
+    if mode == 50 { return compiler_token_decoder_expect(byte, 111, 51); }
+    if mode == 51 { return compiler_token_decoder_expect(byte, 108, 52); }
+    if mode == 52 { return compiler_token_decoder_expect(byte, 9, 72); }
+    if mode == 54 { return compiler_token_decoder_expect(byte, 114, 55); }
+    if mode == 55 { return compiler_token_decoder_expect(byte, 105, 56); }
+    if mode == 56 { return compiler_token_decoder_expect(byte, 110, 57); }
+    if mode == 57 { return compiler_token_decoder_expect(byte, 103, 58); }
+    if mode == 58 { return compiler_token_decoder_expect(byte, 9, 106); }
+
+    // arrow has no payload.
+    if mode == 59 { return compiler_token_decoder_expect(byte, 114, 60); }
+    if mode == 60 { return compiler_token_decoder_expect(byte, 114, 61); }
+    if mode == 61 { return compiler_token_decoder_expect(byte, 111, 62); }
+    if mode == 62 { return compiler_token_decoder_expect(byte, 119, 63); }
+    if mode == 63 { return compiler_token_decoder_expect(byte, 10, 30); }
+
+    // doc-comment<TAB><lowercase-even-hex>
+    if mode == 80 { return compiler_token_decoder_expect(byte, 111, 81); }
+    if mode == 81 { return compiler_token_decoder_expect(byte, 99, 82); }
+    if mode == 82 { return compiler_token_decoder_expect(byte, 45, 83); }
+    if mode == 83 { return compiler_token_decoder_expect(byte, 99, 84); }
+    if mode == 84 { return compiler_token_decoder_expect(byte, 111, 85); }
+    if mode == 85 { return compiler_token_decoder_expect(byte, 109, 86); }
+    if mode == 86 { return compiler_token_decoder_expect(byte, 109, 87); }
+    if mode == 87 { return compiler_token_decoder_expect(byte, 101, 88); }
+    if mode == 88 { return compiler_token_decoder_expect(byte, 110, 89); }
+    if mode == 89 { return compiler_token_decoder_expect(byte, 116, 90); }
+    if mode == 90 { return compiler_token_decoder_expect(byte, 9, 108); }
+
+    // Hex modes alternate high/low nibble; word/float require one byte.
+    if mode == 100 {
+      if compiler_token_decoder_is_hex(byte) { return 101; }
+      return 127;
+    }
+    if mode == 101 {
+      if compiler_token_decoder_is_hex(byte) { return 102; }
+      return 127;
+    }
+    if mode == 102 {
+      if byte == 10 { return 30; }
+      if compiler_token_decoder_is_hex(byte) { return 101; }
+      return 127;
+    }
+    if mode == 103 {
+      if compiler_token_decoder_is_hex(byte) { return 104; }
+      return 127;
+    }
+    if mode == 104 {
+      if compiler_token_decoder_is_hex(byte) { return 105; }
+      return 127;
+    }
+    if mode == 105 {
+      if byte == 10 { return 30; }
+      if compiler_token_decoder_is_hex(byte) { return 104; }
+      return 127;
+    }
+    if mode == 106 {
+      if byte == 10 { return 30; }
+      if compiler_token_decoder_is_hex(byte) { return 107; }
+      return 127;
+    }
+    if mode == 107 {
+      if compiler_token_decoder_is_hex(byte) { return 106; }
+      return 127;
+    }
+    if mode == 108 {
+      if byte == 10 { return 30; }
+      if compiler_token_decoder_is_hex(byte) { return 109; }
+      return 127;
+    }
+    if mode == 109 {
+      if compiler_token_decoder_is_hex(byte) { return 108; }
+      return 127;
+    }
+
+    if mode == 68 {
+      if byte == 45 { return 69; }
+      if compiler_token_decoder_is_digit(byte) { return 70; }
+      return 127;
+    }
+    if mode == 69 {
+      if compiler_token_decoder_is_digit(byte) { return 70; }
+      return 127;
+    }
+    if mode == 70 {
+      if byte == 10 { return 30; }
+      if compiler_token_decoder_is_digit(byte) { return 70; }
+      return 127;
+    }
+    if mode == 72 {
+      if compiler_token_decoder_is_digit(byte) { return 73; }
+      return 127;
+    }
+    if mode == 73 {
+      if byte == 10 { return 30; }
+      if compiler_token_decoder_is_digit(byte) { return 73; }
+      return 127;
+    }
+    return 127;
+  }
+}

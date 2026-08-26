@@ -11,10 +11,10 @@ coordinate = "language-core/nuisc/bootstrap-language-subset"
 status = "stable"
 progress = 100
 required_before = "beta-0.10.0"
-next_action = "preserve v1 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability"
+next_action = "preserve v2 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
-expected_artifact = "nuis-bootstrap-language-subset-v1, nuisc bootstrap-check, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
-blocker = "none for subset v1; compiler-owned text, vector, map, arena, span, diagnostic, and path behavior remains the next independent readiness gate"
+expected_artifact = "nuis-bootstrap-language-subset-v2, nuisc bootstrap-check, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
+blocker = "none for subset v2; compiler-owned token records, paged maps, arena storage, and aggregate cost remain the next independent readiness gate"
 
 [[gates]]
 id = "compiler-data-model"
@@ -31,31 +31,31 @@ blocker = "v2 raises vectors to sixteen ordered i64 values, but maps remain four
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "usable"
-progress = 78
+progress = 84
 required_before = "beta-0.10.0"
-next_action = "move one real token or structural-body transformation behind the verified scalar producer boundary without giving the adapter compiler semantics"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
-expected_artifact = "a Nuis-produced non-identity stage transformation whose complete five-stage semantic identity still crosses the attested differential gate"
-blocker = "the Nuis producer now consumes every serialized stage byte and owns the bundle fold, but shared host code still owns token and structural-body decoding"
+next_action = "materialize complete token values and canonical re-emission in Nuis, then move one AST or NIR body decoder behind the same scalar boundary"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_token_decoder -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
+expected_artifact = "a Nuis-owned complete token record page and canonical re-emission whose five-stage bundle still crosses the attested differential gate"
+blocker = "Nuis now owns bounded token syntax decoding and semantic summary, but complete token values, canonical re-emission, AST/NIR bodies, and changed stage bytes remain open"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 84
+progress = 87
 required_before = "beta-0.10.0"
-next_action = "generalize the reproducible projection-relay producer boundary to one non-identity leaf while retaining its clean-build aggregate"
+next_action = "bind complete decoded token records to the compiler data model and canonically re-emit them while retaining the clean-build aggregate"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "a non-identity Nuis-produced stage1-candidate leaf retaining stable identity across two clean builds without replacement authority"
-blocker = "the first candidate is reproducible under one local frontdoor, but its producer remains an identity relay and independent attester trust is open"
+expected_artifact = "a Nuis-decoded and canonically re-emitted token stage retaining stable identity across two clean builds without replacement authority"
+blocker = "the first candidate performs bounded token decoding, but complete token materialization, independent attester trust, and reversible authorization remain open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 84
+progress = 87
 required_before = "beta-0.10.0"
-next_action = "carry one non-identity Nuis token transformation through the implemented clean-build aggregate, then add independent attester evidence"
+next_action = "carry canonical Nuis token re-emission through the implemented clean-build aggregate, then add independent attester evidence"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "a non-identity Nuis token transformation retaining the path-free two-clean-build aggregate without replacement authority"
-blocker = "local repeated clean-build evidence exists; non-identity production, independent attester trust, and reversible authorization remain open"
+expected_artifact = "a Nuis-decoded and canonically re-emitted token payload retaining the path-free two-clean-build aggregate without replacement authority"
+blocker = "local repeated clean-build evidence covers bounded token decoding; canonical re-emission, independent attester trust, and reversible authorization remain open"

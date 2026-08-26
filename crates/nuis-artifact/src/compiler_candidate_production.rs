@@ -3,17 +3,21 @@ use std::{collections::BTreeMap, fs, path::Path};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    decode_compiler_token_stream,
     toml::{
         escape_toml_string, parse_optional_map_usize, parse_required_map_string_in_block,
         parse_required_toml_bool, parse_required_toml_string, parse_required_toml_usize,
     },
     ArtifactError, CompilerCandidateExecution, CompilerComponentBuild, CompilerStageHandoff,
-    VerifiedCompilerStagePayload, COMPILER_COMPONENT_STAGE0_ROLE,
-    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    CompilerStageKind, CompilerTokenDecodeSummary, VerifiedCompilerStagePayload,
+    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_DECODER_FOLD_MODULUS,
+    COMPILER_TOKEN_DECODER_MAX_RECORDS,
 };
 
-pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v1";
-pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str = "nuis-stage1-scalar-byte-producer-v1";
+pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v2";
+pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str =
+    "nuis-stage1-scalar-token-decoder-producer-v2";
 pub const COMPILER_CANDIDATE_PRODUCTION_AUTHORITY: &str =
     "stage1-candidate-component-production-no-replacement";
 pub const COMPILER_CANDIDATE_PRODUCTION_FILE: &str = "nuis.compiler-candidate-production.toml";
@@ -31,6 +35,7 @@ pub struct CompilerCandidateProductionInput<'a> {
     pub payloads: &'a [VerifiedCompilerStagePayload],
     pub stage_folds: &'a [usize],
     pub bundle_fold: usize,
+    pub token_decode: &'a CompilerTokenDecodeSummary,
     pub adapter_file: &'a str,
     pub adapter: &'a [u8],
 }
@@ -60,6 +65,9 @@ pub struct CompilerCandidateProduction {
     pub adapter_sha256: String,
     pub record_count: usize,
     pub bundle_fold: usize,
+    pub token_decoder_contract: String,
+    pub token_record_count: usize,
+    pub token_semantic_fold: usize,
     pub replacement_authorized: bool,
     pub proof_sha256: String,
     pub records: Vec<CompilerCandidateProductionRecord>,
@@ -116,6 +124,9 @@ pub fn build_compiler_candidate_production(
         adapter_sha256: sha256_hex(input.adapter),
         record_count: records.len(),
         bundle_fold: input.bundle_fold,
+        token_decoder_contract: COMPILER_TOKEN_DECODER_CONTRACT.to_owned(),
+        token_record_count: input.token_decode.record_count,
+        token_semantic_fold: input.token_decode.semantic_fold,
         replacement_authorized: false,
         proof_sha256: String::new(),
         records,
@@ -127,7 +138,7 @@ pub fn build_compiler_candidate_production(
 
 pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction) -> String {
     let mut out = format!(
-        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
+        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
         proof.protocol,
         proof.producer_contract,
         proof.authority,
@@ -142,6 +153,9 @@ pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction)
         proof.adapter_sha256,
         proof.record_count,
         proof.bundle_fold,
+        proof.token_decoder_contract,
+        proof.token_record_count,
+        proof.token_semantic_fold,
         proof.replacement_authorized,
         proof.proof_sha256,
     );
@@ -210,6 +224,9 @@ pub fn parse_compiler_candidate_production_from_source(
         adapter_sha256: parse_required_toml_string(source, "adapter_sha256", path)?,
         record_count: parse_required_toml_usize(source, "record_count", path)?,
         bundle_fold: parse_required_toml_usize(source, "bundle_fold", path)?,
+        token_decoder_contract: parse_required_toml_string(source, "token_decoder_contract", path)?,
+        token_record_count: parse_required_toml_usize(source, "token_record_count", path)?,
+        token_semantic_fold: parse_required_toml_usize(source, "token_semantic_fold", path)?,
         replacement_authorized: parse_required_toml_bool(source, "replacement_authorized", path)?,
         proof_sha256: parse_required_toml_string(source, "proof_sha256", path)?,
         records: parse_record_blocks(source, path)?,
@@ -250,6 +267,10 @@ pub fn read_compiler_candidate_production(
         .iter()
         .map(|record| record.fold)
         .collect::<Vec<_>>();
+    let token_decode = CompilerTokenDecodeSummary {
+        record_count: proof.token_record_count,
+        semantic_fold: proof.token_semantic_fold,
+    };
     validate_evidence(&CompilerCandidateProductionInput {
         stage0,
         execution,
@@ -258,6 +279,7 @@ pub fn read_compiler_candidate_production(
         payloads,
         stage_folds: &stage_folds,
         bundle_fold: proof.bundle_fold,
+        token_decode: &token_decode,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     })?;
@@ -269,6 +291,7 @@ pub fn read_compiler_candidate_production(
         payloads,
         stage_folds: &stage_folds,
         bundle_fold: proof.bundle_fold,
+        token_decode: &token_decode,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     })?;
@@ -353,6 +376,17 @@ fn validate_evidence(input: &CompilerCandidateProductionInput<'_>) -> Result<(),
             "compiler candidate production bundle fold mismatch",
         ));
     }
+    let token_payload = input
+        .payloads
+        .iter()
+        .find(|payload| payload.stage == CompilerStageKind::Tokens)
+        .ok_or_else(|| ArtifactError::new("compiler candidate token payload is missing"))?;
+    let expected_token_decode = decode_compiler_token_stream(&token_payload.bytes)?;
+    if *input.token_decode != expected_token_decode {
+        return Err(ArtifactError::new(
+            "compiler candidate production token decode summary mismatch",
+        ));
+    }
     validate_file_name(input.adapter_file, "candidate adapter")?;
     if input.adapter.is_empty() {
         return Err(ArtifactError::new(
@@ -366,6 +400,7 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
     if proof.protocol != COMPILER_CANDIDATE_PRODUCTION_PROTOCOL
         || proof.producer_contract != COMPILER_CANDIDATE_PRODUCER_CONTRACT
         || proof.authority != COMPILER_CANDIDATE_PRODUCTION_AUTHORITY
+        || proof.token_decoder_contract != COMPILER_TOKEN_DECODER_CONTRACT
         || proof.replacement_authorized
     {
         return Err(ArtifactError::new(
@@ -402,6 +437,13 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
     if proof.adapter_bytes == 0 || proof.bundle_fold >= FOLD_MODULUS as usize {
         return Err(ArtifactError::new(
             "compiler candidate production adapter length or bundle fold is invalid",
+        ));
+    }
+    if proof.token_record_count > COMPILER_TOKEN_DECODER_MAX_RECORDS
+        || proof.token_semantic_fold >= COMPILER_TOKEN_DECODER_FOLD_MODULUS
+    {
+        return Err(ArtifactError::new(
+            "compiler candidate production token decode summary is invalid",
         ));
     }
     for (ordinal, record) in proof.records.iter().enumerate() {
@@ -516,6 +558,7 @@ fn production_identity(proof: &CompilerCandidateProduction) -> String {
         proof.stage_handoff_bundle_sha256.as_bytes(),
         proof.adapter_file.as_bytes(),
         proof.adapter_sha256.as_bytes(),
+        proof.token_decoder_contract.as_bytes(),
     ] {
         hash_field(&mut hash, value);
     }
@@ -523,6 +566,8 @@ fn production_identity(proof: &CompilerCandidateProduction) -> String {
         proof.adapter_bytes,
         proof.record_count,
         proof.bundle_fold,
+        proof.token_record_count,
+        proof.token_semantic_fold,
         usize::from(proof.replacement_authorized),
     ] {
         hash_field(&mut hash, &(value as u64).to_le_bytes());

@@ -55,7 +55,7 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
         candidate.stage_role,
         COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE
     );
-    assert_eq!(candidate.producer_id, "nuis-stage1-projection-relay-v1");
+    assert_eq!(candidate.producer_id, "nuis-stage1-token-decoder-v2");
     assert_ne!(candidate.producer_id, stage0.producer_id);
     assert_eq!(candidate.compiler_image_sha256, stage0.native_binary_sha256);
 
@@ -72,6 +72,8 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     )
     .expect("verify candidate production proof");
     assert_eq!(production.record_count, 5);
+    assert!(production.token_record_count > 0);
+    assert!(production.token_semantic_fold > 0);
     assert!(!production.replacement_authorized);
 
     let differential = parse_compiler_component_differential(

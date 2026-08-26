@@ -10,6 +10,7 @@ mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
 mod compiler_structural_projection;
+mod compiler_token_decoder;
 mod domain_unit;
 mod envelope;
 mod error;
@@ -102,6 +103,12 @@ pub use compiler_structural_projection::{
     verify_compiler_projection_identity, CompilerProjectionKind, CompilerProjectionRecord,
     CompilerProjectionRecordKind, CompilerStructuralProjection, COMPILER_AST_PROJECTION_ENCODING,
     COMPILER_NIR_PROJECTION_ENCODING, COMPILER_STRUCTURAL_PROJECTION_CONTRACT,
+};
+pub use compiler_token_decoder::{
+    decode_compiler_token_stream, CompilerTokenDecodeSummary, COMPILER_TOKEN_DECODER_CONTRACT,
+    COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_BYTES,
+    COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_DECODER_SEMANTIC_SEED,
+    COMPILER_TOKEN_STREAM_PROTOCOL,
 };
 pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{

@@ -72,7 +72,7 @@ fn build_evidence(
     }];
     let component = build_compiler_component_build(&CompilerComponentBuildInput {
         stage_role: role,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v1",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
         component_id: "compiler_scanner",
         component_domain: "cpu",
         component_unit: "Main",
@@ -92,7 +92,7 @@ fn build_evidence(
     let diagnostics = build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: producer,
         component_record_sha256: &component.record_sha256,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v1",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
         accepted: true,
         semantic_pipeline: "checked",
         semantic_error: None,

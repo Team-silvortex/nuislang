@@ -75,4 +75,51 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "assert_eq!(first, second)",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-token-decoder-artifact",
+        path: "crates/nuis-artifact/src/compiler_token_decoder.rs",
+        required_patterns: &[
+            "nuis-compiler-token-decoder-v1",
+            "decode_compiler_token_stream",
+            "COMPILER_TOKEN_DECODER_MAX_BYTES",
+            "COMPILER_TOKEN_DECODER_MAX_RECORDS",
+            "fold_hex_payload",
+            "fold_integer_payload",
+            "fold_symbol_payload",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-token-decoder-stdlib",
+        path: "stdlib/std/lib/compiler_tokens.ns",
+        required_patterns: &[
+            "mod cpu StdCompilerTokens",
+            "compiler_token_decoder_step",
+            "compiler_token_decoder_count_step",
+            "compiler_token_decoder_semantic_step",
+            "compiler_token_decoder_finish",
+            "2147483629",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-token-decoder-candidate-abi",
+        path: "examples/projects/tooling/bootstrap_structural_projection_candidate/main.ns",
+        required_patterns: &[
+            "use cpu StdCompilerTokens",
+            "nuis_bootstrap_candidate_token_start_v1",
+            "nuis_bootstrap_candidate_token_step_v1",
+            "nuis_bootstrap_candidate_token_semantic_step_v1",
+            "nuis_bootstrap_candidate_token_finish_v1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-token-decoder-production-binding",
+        path: "crates/nuis-artifact/src/compiler_candidate_production.rs",
+        required_patterns: &[
+            "nuis-compiler-candidate-production-v2",
+            "token_decoder_contract",
+            "token_record_count",
+            "token_semantic_fold",
+            "token decode summary mismatch",
+        ],
+    },
 ];

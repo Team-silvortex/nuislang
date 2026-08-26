@@ -19,7 +19,7 @@ const REJECTED_TRAIT_HARNESS: &str =
 const REJECTED_INSTANTIATE: &str =
     include_str!("../../../tests/fixtures/bootstrap/rejected/instantiate_effect.ns");
 const SUBSET_CONTRACT: &str =
-    include_str!("../../../docs/reference/nuis-bootstrap-language-subset-v1.toml");
+    include_str!("../../../docs/reference/nuis-bootstrap-language-subset-v2.toml");
 
 #[test]
 fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
@@ -35,7 +35,7 @@ fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
     assert!(report.checked_nodes() >= 80);
 
     let json = render_bootstrap_check_json(&report);
-    assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v1\""));
+    assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v2\""));
     assert!(json.contains("\"accepted\":true"));
     assert!(json.contains("\"semantic_pipeline\":\"checked\""));
 }
@@ -50,8 +50,14 @@ fn exact_scalar_candidate_export_is_allowed_but_symbol_spoofing_is_rejected() {
             return 97 + ordinal;
           }
 
+          @export(name = "nuis_bootstrap_candidate_token_step_v1")
+          fn compiler_candidate_token_step(mode: i64, byte: i64) -> i64 {
+            return mode + byte;
+          }
+
           fn main() -> i64 {
-            return compiler_candidate_stage_seed(0) - 97;
+            return compiler_candidate_stage_seed(0) - 97
+              + compiler_candidate_token_step(0, 0);
           }
         }
         "#,
@@ -230,7 +236,7 @@ fn rejected_json_is_structured_and_fail_closed() {
 #[test]
 fn machine_readable_contract_tracks_the_executable_policy() {
     for required in [
-        "nuis-bootstrap-language-subset-v1",
+        "nuis-bootstrap-language-subset-v2",
         "cpu/CorePrelude",
         "cpu/StdLanguageCore",
         "cpu/StdTextContracts",

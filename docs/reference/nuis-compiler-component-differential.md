@@ -7,7 +7,7 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v1.toml](nuis-compiler-candidate-production-v1.toml)
+* [nuis-compiler-candidate-production-v2.toml](nuis-compiler-candidate-production-v2.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not
@@ -113,7 +113,7 @@ identity and canonical parser reject any such mutation.
 
 The comparison engine, diagnostic sidecar, CLI, canonical readers, identity
 recomputation, and drift tests are implemented. The checked-in structural
-projection relay is now the first Nuis-written leaf producer: it consumes all
+bounded token decoder is now the first Nuis-written leaf producer: it consumes all
 five serialized payloads through the exact scalar ABI, emits a bound candidate
 bundle fold, receives a distinct `stage1-candidate` component record, and
 reaches repository-native `13/13` equivalence.

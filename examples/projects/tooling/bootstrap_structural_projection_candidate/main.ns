@@ -1,4 +1,5 @@
 use cpu StdLanguageCore;
+use cpu StdCompilerTokens;
 use cpu StdCompilerProjection;
 
 /// First Nuis-written consumer of the producer-neutral AST/NIR record model.
@@ -21,6 +22,46 @@ mod cpu Main {
   @export(name = "nuis_bootstrap_candidate_bundle_fold_v1")
   fn compiler_candidate_bundle_fold(state: i64, ordinal: i64, stage_fold: i64) -> i64 {
     return ((state * 65537) + stage_fold + ordinal + 1) % 2147483629;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_start_v1")
+  fn compiler_candidate_token_start() -> i64 {
+    return compiler_token_decoder_start();
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_error_mode_v1")
+  fn compiler_candidate_token_error_mode() -> i64 {
+    return compiler_token_decoder_error_mode();
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_max_bytes_v1")
+  fn compiler_candidate_token_max_bytes() -> i64 {
+    return compiler_token_decoder_max_bytes();
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_semantic_seed_v1")
+  fn compiler_candidate_token_semantic_seed() -> i64 {
+    return compiler_token_decoder_semantic_seed();
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_step_v1")
+  fn compiler_candidate_token_step(mode: i64, byte: i64) -> i64 {
+    return compiler_token_decoder_step(mode, byte);
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_count_step_v1")
+  fn compiler_candidate_token_count_step(count: i64, mode: i64, byte: i64) -> i64 {
+    return compiler_token_decoder_count_step(count, mode, byte);
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_semantic_step_v1")
+  fn compiler_candidate_token_semantic_step(state: i64, mode: i64, byte: i64) -> i64 {
+    return compiler_token_decoder_semantic_step(state, mode, byte);
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_finish_v1")
+  fn compiler_candidate_token_finish(mode: i64, count: i64) -> i64 {
+    return compiler_token_decoder_finish(mode, count);
   }
 
   fn ast_projection() -> CompilerProjectionState {
@@ -163,6 +204,16 @@ mod cpu Main {
     );
     if sample_fold != 29408 || sample_bundle != 12678050 {
       return 70;
+    }
+    if compiler_candidate_token_max_bytes() != 4194304 {
+      return 74;
+    }
+    let token_start: i64 = compiler_candidate_token_start();
+    if compiler_candidate_token_step(token_start, 110) != 1 {
+      return 75;
+    }
+    if compiler_candidate_token_step(token_start, 120) != compiler_candidate_token_error_mode() {
+      return 76;
     }
     let ast: CompilerProjectionState = ast_projection();
     if ast.error != 0 || ast.record_count != 6 {

@@ -19,6 +19,7 @@ surfaces = [
   "surface.std.language-result-hof-contracts.v1",
   "surface.std.compiler-data-model.v1",
   "surface.std.compiler-data-model.v2",
+  "surface.std.compiler-token-decoder.v1",
   "surface.std.compiler-structural-projection.v1",
   "surface.std.provider-worker-lifecycle.v1",
   "surface.std.provider-worker-dispatch.v1"
@@ -35,6 +36,7 @@ library_modules = [
   "lib/hetero_contracts.ns",
   "lib/report_contracts.ns",
   "lib/language_core.ns",
+  "lib/compiler_tokens.ns",
   "lib/compiler_projection.ns",
   "lib/language_ops.ns",
   "lib/provider_worker_contracts.ns",

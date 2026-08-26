@@ -36,7 +36,7 @@ fn build_record_for_stage_and_outputs(
     ];
     build_compiler_component_build(&CompilerComponentBuildInput {
         stage_role,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v1",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
         component_id: "compiler_scanner",
         component_domain: "cpu",
         component_unit: "Main",
@@ -147,7 +147,7 @@ fn component_build_rejects_duplicate_dependencies_and_escaping_files() {
     let dependencies = [duplicate, duplicate];
     let mut input = CompilerComponentBuildInput {
         stage_role: COMPILER_COMPONENT_STAGE0_ROLE,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v1",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
         component_id: "compiler_scanner",
         component_domain: "cpu",
         component_unit: "Main",

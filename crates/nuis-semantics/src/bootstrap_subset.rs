@@ -8,11 +8,12 @@ use crate::model::{
 #[path = "bootstrap_subset_walk.rs"]
 mod walk;
 
-pub const BOOTSTRAP_SUBSET_PROTOCOL: &str = "nuis-bootstrap-language-subset-v1";
+pub const BOOTSTRAP_SUBSET_PROTOCOL: &str = "nuis-bootstrap-language-subset-v2";
 
 pub const BOOTSTRAP_APPROVED_IMPORTS: &[(&str, &str)] = &[
     ("cpu", "CorePrelude"),
     ("cpu", "StdLanguageCore"),
+    ("cpu", "StdCompilerTokens"),
     ("cpu", "StdCompilerProjection"),
     ("cpu", "StdTextContracts"),
 ];
@@ -54,6 +55,46 @@ const BOOTSTRAP_SCALAR_EXPORTS: &[(&str, &str, usize)] = &[
         "compiler_candidate_bundle_fold",
         "nuis_bootstrap_candidate_bundle_fold_v1",
         3,
+    ),
+    (
+        "compiler_candidate_token_start",
+        "nuis_bootstrap_candidate_token_start_v1",
+        0,
+    ),
+    (
+        "compiler_candidate_token_error_mode",
+        "nuis_bootstrap_candidate_token_error_mode_v1",
+        0,
+    ),
+    (
+        "compiler_candidate_token_max_bytes",
+        "nuis_bootstrap_candidate_token_max_bytes_v1",
+        0,
+    ),
+    (
+        "compiler_candidate_token_semantic_seed",
+        "nuis_bootstrap_candidate_token_semantic_seed_v1",
+        0,
+    ),
+    (
+        "compiler_candidate_token_step",
+        "nuis_bootstrap_candidate_token_step_v1",
+        2,
+    ),
+    (
+        "compiler_candidate_token_count_step",
+        "nuis_bootstrap_candidate_token_count_step_v1",
+        3,
+    ),
+    (
+        "compiler_candidate_token_semantic_step",
+        "nuis_bootstrap_candidate_token_semantic_step_v1",
+        3,
+    ),
+    (
+        "compiler_candidate_token_finish",
+        "nuis_bootstrap_candidate_token_finish_v1",
+        2,
     ),
 ];
 

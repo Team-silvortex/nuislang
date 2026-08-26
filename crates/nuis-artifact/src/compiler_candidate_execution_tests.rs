@@ -11,7 +11,7 @@ fn component() -> CompilerComponentBuild {
         protocol: COMPILER_COMPONENT_BUILD_PROTOCOL.to_owned(),
         driver_contract: COMPILER_COMPONENT_DRIVER_CONTRACT.to_owned(),
         stage_role: COMPILER_COMPONENT_STAGE0_ROLE.to_owned(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v1".to_owned(),
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2".to_owned(),
         component_id: "projection-candidate".to_owned(),
         component_domain: "cpu".to_owned(),
         component_unit: "Main".to_owned(),

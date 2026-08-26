@@ -6,8 +6,8 @@ machine-readable contract is
 [nuis-compiler-component-reproducibility-v1.toml](nuis-compiler-component-reproducibility-v1.toml).
 
 This protocol closes the first repeated-build evidence loop. It does not make
-the current identity projection relay a complete compiler stage, and it never
-authorizes replacing stage0.
+the current bounded token-summary transform a complete compiler stage, and it
+never authorizes replacing stage0.
 
 ## Frontdoor
 

@@ -93,7 +93,7 @@ The first identity-projection path is now stage1-candidate ready:
   payloads and computes a Nuis-owned deterministic stage/bundle fold.
 * `nuis bootstrap-candidate-build` materializes a separately identified
   candidate handoff and binds it through
-  `nuis-compiler-candidate-production-v1`.
+  `nuis-compiler-candidate-production-v2`.
 * The Nuis consumer still does not decode complete token and structural record
   bodies or emit a non-identity transformation.
 * Compiler image and dependency-closure identity are added by the separate
@@ -101,10 +101,10 @@ The first identity-projection path is now stage1-candidate ready:
 * Replacement still requires the separate differential and authorization
   contracts; matching payload hashes alone never authorize it.
 
-The independent codec, native Nuis consumer, scalar byte producer, production
-proof, and `13/13` differential advance this coordinate to `usable/78`. The
-next closure task moves one real token or structural transformation behind the
-same producer-neutral boundary. See
+The independent codec, native Nuis consumer, bounded serialized-token DFA,
+production proof, and `13/13` differential advance this coordinate to
+`usable/84`. The next closure task materializes complete token values and
+canonical re-emission behind the same producer-neutral boundary. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
 and [Nuis Compiler Component Build](nuis-compiler-component-build.md).

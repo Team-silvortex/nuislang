@@ -27,7 +27,7 @@ use crate::{
 const STAGE0_DIR: &str = "stage0";
 const CANDIDATE_DIR: &str = "stage1-candidate";
 const STAGE_HANDOFF_FILE: &str = "nuis.compiler-stage-handoff.toml";
-const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-projection-relay-v1";
+const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-token-decoder-v2";
 
 pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
@@ -139,6 +139,7 @@ fn handle_bootstrap_candidate_build_with_cache(
         payloads: &verified_payloads,
         stage_folds: &adapter.stage_folds,
         bundle_fold: adapter.bundle_fold,
+        token_decode: &adapter.token_decode,
         adapter_file: adapter.adapter_file,
         adapter: &adapter.adapter,
     })
@@ -183,6 +184,14 @@ fn handle_bootstrap_candidate_build_with_cache(
     println!("  stage_role: {}", verified_candidate.stage_role);
     println!("  stage_records: {}", verified_production.record_count);
     println!("  bundle_fold: {}", verified_production.bundle_fold);
+    println!(
+        "  token_records: {}",
+        verified_production.token_record_count
+    );
+    println!(
+        "  token_semantic_fold: {}",
+        verified_production.token_semantic_fold
+    );
     println!("  production_sha256: {}", verified_production.proof_sha256);
     println!("  differential: {}", differential.verdict);
     println!("  replacement_authorized: false");
