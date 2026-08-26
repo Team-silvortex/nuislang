@@ -3,6 +3,7 @@ mod aot_artifact;
 mod aot_artifact_hash;
 mod aot_c_shim_buffer_runtime;
 mod aot_c_shim_env_io_runtime;
+mod aot_c_shim_error_runtime;
 mod aot_c_shim_file_runtime;
 mod aot_c_shim_fs_runtime;
 mod aot_c_shim_header_runtime;

@@ -692,6 +692,7 @@ fn write_native_cpu_fixture_with_objects(
                     path: runtime_object.display().to_string(),
                 },
             ],
+            stage_handoff: None,
         },
         &BuildManifestContext {
             input_path: source.display().to_string(),

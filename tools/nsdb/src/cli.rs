@@ -25,7 +25,7 @@ pub(crate) enum Command {
         input: PathBuf,
         json: bool,
         event_filter: NsdbPayloadExecutionEventFilter,
-        replay_control: NsdbReplayControl,
+        replay_control: Box<NsdbReplayControl>,
         cursor_input: Option<PathBuf>,
         cursor_output: Option<PathBuf>,
     },
@@ -85,7 +85,7 @@ where
                 input,
                 json,
                 event_filter,
-                replay_control,
+                replay_control: Box::new(replay_control),
                 cursor_input,
                 cursor_output,
             })
@@ -151,19 +151,16 @@ where
     Ok((input.ok_or_else(|| usage().to_owned())?, json))
 }
 
-fn parse_replay_args<I>(
-    args: &mut I,
-) -> Result<
-    (
-        PathBuf,
-        bool,
-        NsdbPayloadExecutionEventFilter,
-        NsdbReplayControl,
-        Option<PathBuf>,
-        Option<PathBuf>,
-    ),
-    String,
->
+type ParsedReplayArgs = (
+    PathBuf,
+    bool,
+    NsdbPayloadExecutionEventFilter,
+    NsdbReplayControl,
+    Option<PathBuf>,
+    Option<PathBuf>,
+);
+
+fn parse_replay_args<I>(args: &mut I) -> Result<ParsedReplayArgs, String>
 where
     I: Iterator<Item = String>,
 {
@@ -467,7 +464,7 @@ mod tests {
                     phase: None,
                     trace_id: Some("trace-1".to_owned()),
                 },
-                replay_control: NsdbReplayControl::default(),
+                replay_control: Box::new(NsdbReplayControl::default()),
                 cursor_input: None,
                 cursor_output: None,
             })
@@ -492,10 +489,10 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: true,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
-                replay_control: NsdbReplayControl {
+                replay_control: Box::new(NsdbReplayControl {
                     request_id: Some("kernel.cuda.copy".to_owned()),
                     ..NsdbReplayControl::default()
-                },
+                }),
                 cursor_input: None,
                 cursor_output: None,
             })
@@ -533,7 +530,7 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
-                replay_control: NsdbReplayControl {
+                replay_control: Box::new(NsdbReplayControl {
                     request_id: None,
                     frame_selector: Some("3".to_owned()),
                     breakpoint_selector: None,
@@ -541,7 +538,7 @@ mod tests {
                     breakpoint_entry: None,
                     resume_after_frame_id: None,
                     resume_next_frame_id: None,
-                },
+                }),
                 cursor_input: None,
                 cursor_output: None,
             })
@@ -581,7 +578,7 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
-                replay_control: NsdbReplayControl {
+                replay_control: Box::new(NsdbReplayControl {
                     request_id: None,
                     frame_selector: None,
                     breakpoint_selector: None,
@@ -589,7 +586,7 @@ mod tests {
                     breakpoint_entry: Some("pixelmagic.blur".to_owned()),
                     resume_after_frame_id: None,
                     resume_next_frame_id: None,
-                },
+                }),
                 cursor_input: None,
                 cursor_output: None,
             })
@@ -617,7 +614,7 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
-                replay_control: NsdbReplayControl {
+                replay_control: Box::new(NsdbReplayControl {
                     request_id: None,
                     frame_selector: None,
                     breakpoint_selector: None,
@@ -625,7 +622,7 @@ mod tests {
                     breakpoint_entry: None,
                     resume_after_frame_id: Some("frame-0".to_owned()),
                     resume_next_frame_id: Some("frame-1".to_owned()),
-                },
+                }),
                 cursor_input: None,
                 cursor_output: Some(PathBuf::from("cursor.toml")),
             })
@@ -663,10 +660,10 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
-                replay_control: NsdbReplayControl {
+                replay_control: Box::new(NsdbReplayControl {
                     breakpoint_selector: Some("frame-2".to_owned()),
                     ..NsdbReplayControl::default()
-                },
+                }),
                 cursor_input: Some(PathBuf::from("cursor.toml")),
                 cursor_output: None,
             })

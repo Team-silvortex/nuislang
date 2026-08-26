@@ -697,6 +697,16 @@ fn parse_carry_branch_source_accepts_add_scaled_current_plus_current_plus_invari
 }
 
 #[test]
+fn parse_carry_branch_source_accepts_single_state_scaled_kind() {
+    let args = vec!["add_scaled_prev_carry1".to_owned(), "factor0".to_owned()];
+    let (source, next) =
+        parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+    assert_eq!(source.kind, "add_scaled_prev_carry1");
+    assert_eq!(source.payload, vec!["factor0".to_owned()]);
+    assert_eq!(next, 2);
+}
+
+#[test]
 fn parse_carry_branch_source_accepts_add_scaled_by_current_kind() {
     let args = vec!["add_scaled_by_current_current_plus_current".to_owned()];
     let (source, next) =

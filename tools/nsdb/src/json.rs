@@ -396,7 +396,7 @@ fn payload_decoder_manifest_records_json(
     records
         .iter()
         .map(|record| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("index", record.index),
                 json_bool_field("valid", record.valid),
                 json_string_field("payload_format", &record.payload_format),
@@ -604,7 +604,7 @@ fn domains_json(domains: &[NsdbDomainDebugInfo]) -> String {
     domains
         .iter()
         .map(|domain| {
-            let fields = vec![
+            let fields = [
                 json_string_field("domain_family", &domain.domain_family),
                 json_string_field("package_id", &domain.package_id),
                 json_string_field("kind", &domain.kind),
@@ -622,7 +622,7 @@ fn clock_edges_json(edges: &[NsdbClockEdgeDebugInfo]) -> String {
     edges
         .iter()
         .map(|edge| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("index", edge.index),
                 json_string_field("from", &edge.from),
                 json_string_field("to", &edge.to),
@@ -639,7 +639,7 @@ fn data_segments_json(segments: &[NsdbDataSegmentDebugInfo]) -> String {
     segments
         .iter()
         .map(|segment| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("index", segment.index),
                 json_string_field("segment_id", &segment.segment_id),
                 json_string_field("domain_family", &segment.domain_family),
@@ -658,7 +658,7 @@ fn lowering_units_json(units: &[NsdbLoweringUnitDebugInfo]) -> String {
     units
         .iter()
         .map(|unit| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("index", unit.index),
                 json_string_field("package_id", &unit.package_id),
                 json_string_field("domain_family", &unit.domain_family),

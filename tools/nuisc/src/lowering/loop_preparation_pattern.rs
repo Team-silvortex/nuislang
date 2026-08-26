@@ -518,7 +518,7 @@ pub(super) fn prepare_dynamic_pattern_carries(
             DynamicPatternBranch::Matched { payloads, .. } => prepare_payload_branch_source(
                 payloads.get(index)?,
                 &payload_substitutions,
-                &prepared_payload.carry_name,
+                index + 1,
                 prepared_payload.transport,
                 loop_binding_name,
                 &carries,
@@ -551,13 +551,26 @@ pub(super) fn prepare_dynamic_pattern_carries(
 fn prepare_payload_branch_source(
     payload: &NirExpr,
     payload_substitutions: &[(String, NirExpr)],
-    payload_carry_name: &str,
+    payload_carry_index: usize,
     transport: PreparedDynamicPatternPayloadTransport,
     loop_binding_name: &str,
     carries: &[PreparedCarryUpdate],
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedCarryBranchSource> {
+    let payload_carry_name = &carries.get(payload_carry_index)?.binding_name;
     let renamed = substitute_expr_bindings(payload, payload_substitutions);
+    if transport == PreparedDynamicPatternPayloadTransport::BoolAsI64 {
+        if let NirExpr::Bool(value) = renamed {
+            return Some(PreparedCarryBranchSource::from_linear_source(
+                PreparedCarryLinearOp::Add,
+                PreparedCarrySource::ScaledStateList {
+                    terms: vec![PreparedLoopStateRef::PreviousCarry(payload_carry_index)],
+                    factor: NirExpr::Int(-1),
+                    offset: value.then_some(NirExpr::Int(-1)),
+                },
+            ));
+        }
+    }
     let encoded = transport.encode_expr(renamed);
     let normalized = match encoded {
         NirExpr::Binary {

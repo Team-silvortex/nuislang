@@ -7,11 +7,11 @@ mod if_lowering_effects;
 #[path = "if_lowering_runtime.rs"]
 mod if_lowering_runtime;
 
-pub(super) use if_lowering_chains::lower_guard_return_chain;
 use if_lowering_chains::{
     lower_binding_if_chain, lower_binding_if_chain_with_shared_context, lower_return_if_chain,
     lower_return_if_chain_with_shared_context,
 };
+pub(super) use if_lowering_chains::{lower_function_guard_return_chain, lower_guard_return_chain};
 pub(super) use if_lowering_effects::stmts_contain_conditional_effect_primitive;
 use if_lowering_runtime::{
     lower_direct_selectable_binary_runtime_binding, lower_direct_selectable_binary_runtime_return,

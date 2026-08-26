@@ -2,6 +2,7 @@ use nuis_semantics::model::AstModule;
 
 use crate::aot_c_shim_buffer_runtime::append_c_shim_buffer_runtime;
 use crate::aot_c_shim_env_io_runtime::append_c_shim_env_io_runtime;
+use crate::aot_c_shim_error_runtime::append_c_shim_error_runtime;
 use crate::aot_c_shim_file_runtime::append_c_shim_file_runtime;
 use crate::aot_c_shim_fs_runtime::append_c_shim_fs_runtime;
 use crate::aot_c_shim_header_runtime::append_c_shim_header_runtime;
@@ -58,6 +59,7 @@ pub(crate) fn render_c_shim_source(ast: &AstModule) -> String {
     append_c_shim_buffer_runtime(&mut out);
     append_c_shim_file_runtime(&mut out);
     append_c_shim_env_io_runtime(&mut out);
+    append_c_shim_error_runtime(&mut out);
     append_c_shim_path_runtime(&mut out);
     append_c_shim_fs_runtime(&mut out);
     append_c_shim_process_runtime(&mut out);

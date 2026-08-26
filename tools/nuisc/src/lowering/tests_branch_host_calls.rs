@@ -177,3 +177,96 @@ fn lowers_two_way_host_call_branches_into_branch_host_call_return() {
     assert!(branch.op.args.contains(&"host_stderr_write".to_owned()));
     assert!(branch.op.args.contains(&"1".to_owned()));
 }
+
+#[test]
+fn lowers_unconditional_host_call_prefix_once_before_guard_return_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cffi Main {
+          extern "c" fn host_argv_count() -> i64;
+          extern "c" fn host_monotonic_time_ns() -> i64;
+
+          fn classify(value: i64) -> i64 {
+            let observed: i64 = host_monotonic_time_ns();
+            if value > 0 {
+              return observed + 1;
+            }
+            return observed + 2;
+          }
+
+          fn main() -> i64 {
+            return classify(host_argv_count());
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let host_calls = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.instruction == "extern_call_i64"
+                && node
+                    .op
+                    .args
+                    .get(1)
+                    .is_some_and(|arg| arg == "host_monotonic_time_ns")
+        })
+        .count();
+    assert_eq!(host_calls, 1, "unconditional prefix must execute once");
+    assert!(yir.nodes.iter().any(|node| node.op.instruction == "select"));
+    assert!(!yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "guard_return"));
+}
+
+#[test]
+fn rolls_back_function_prefix_effect_when_guard_return_probe_falls_back() {
+    let module = parse_nuis_module(
+        r#"
+        mod cffi Main {
+          extern "c" fn host_argv_count() -> i64;
+          extern "c" fn host_monotonic_time_ns() -> i64;
+
+          fn classify(value: i64) -> i64 {
+            let observed: i64 = host_monotonic_time_ns();
+            print(observed);
+            if value > 0 {
+              return observed + 1;
+            }
+            return observed + 2;
+          }
+
+          fn main() -> i64 {
+            return classify(host_argv_count());
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let host_calls = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.instruction == "extern_call_i64"
+                && node
+                    .op
+                    .args
+                    .get(1)
+                    .is_some_and(|arg| arg == "host_monotonic_time_ns")
+        })
+        .count();
+    assert_eq!(host_calls, 1, "failed probes must not retain host calls");
+    assert_eq!(
+        yir.nodes
+            .iter()
+            .filter(|node| node.op.module == "cpu" && node.op.instruction == "print")
+            .count(),
+        1
+    );
+}

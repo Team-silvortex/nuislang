@@ -99,6 +99,16 @@ Current stable error kind mapping:
   intended use:
   diagnostic-oriented or secondary failure fallback
 
+Current bootstrap host-facade rule:
+
+* AOT registers `host_error_code`, `host_error_message`, and
+  `host_error_severity` as explicit compatibility-runtime calls rather than
+  generic host stubs
+* all three currently preserve the stable numeric kind token unchanged
+* this token-preserving behavior is a bootstrap boundary, not the final error
+  catalog; a native `std` catalog can replace it without changing the source
+  bridge shape
+
 Current practical rule:
 
 * keep checked-in bridge modules self-contained for now

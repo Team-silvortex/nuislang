@@ -428,3 +428,48 @@ fn dynamic_while_let_preserves_bool_payloads_across_native_backedges() {
     );
     assert_eq!(status.code(), Some(64));
 }
+
+#[test]
+fn dynamic_while_let_bool_payload_drives_native_replacement() {
+    let status = compile_and_run(
+        "dynamic_while_let_bool_replacement",
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active { ready: bool },
+          }
+
+          fn consume(selected: Phase) -> i64 {
+            let cursor: i64 = 0;
+            while let Phase.Active { ready: flag } = selected {
+              let cursor: i64 = cursor + 1;
+              if flag {
+                let selected: Phase = Phase.Active { ready: false };
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if cursor > 4 {
+                break;
+              }
+            }
+            match selected {
+              Phase.Done => {
+                return cursor + 10;
+              }
+              _ => {
+                return 90;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            return consume(Phase.Active { ready: true })
+              + consume(Phase.Active { ready: false })
+              + consume(Phase.Done);
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(33));
+}

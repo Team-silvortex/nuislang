@@ -6,6 +6,7 @@ mod data_mod_describe;
 mod dynamic_pattern_carry;
 pub mod ffi;
 mod glm;
+pub mod loop_carry_contract;
 mod module_graph;
 mod mutex_contract;
 mod operation_results;

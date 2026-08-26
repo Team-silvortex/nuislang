@@ -495,6 +495,57 @@ fn admits_bool_dynamic_while_let_payload_through_the_v2_transport() {
 }
 
 #[test]
+fn lowers_bool_driven_dynamic_while_let_replacement() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Phase {
+            Done,
+            Active { ready: bool },
+          }
+
+          fn main() -> i64 {
+            let selected: Phase = Phase.Active { ready: true };
+            let cursor: i64 = 0;
+            while let Phase.Active { ready: flag } = selected {
+              let cursor: i64 = cursor + 1;
+              if flag {
+                let selected: Phase = Phase.Active { ready: false };
+              } else {
+                let selected: Phase = Phase.Done;
+              }
+              if cursor > 4 {
+                break;
+              }
+            }
+            return cursor;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_while_scalar_post_flow_cond_chain")
+        .expect("bool-driven dynamic pattern loop");
+
+    assert_eq!(loop_node.op.args[3], "pattern_carry0");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "prev_carry1_ne"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_scaled_prev_carry1"));
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).unwrap();
+    assert!(llvm_ir.contains("dynamic-pattern-payload-carry-v2 carry1 bool-as-i64"));
+    assert!(!llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
 fn rejects_i32_dynamic_while_let_payload_before_carry_lowering() {
     let mut module = parse_nuis_module(
         r#"

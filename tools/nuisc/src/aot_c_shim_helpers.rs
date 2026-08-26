@@ -253,6 +253,9 @@ pub(crate) fn render_registered_host_ffi_body(
         "host_argv_at" => ("nuis_host_argv_at", 1),
         "host_env_has" => ("nuis_host_env_has", 1),
         "host_env_get" => ("nuis_host_env_get", 1),
+        "host_error_code" => ("nuis_host_error_code", 1),
+        "host_error_message" => ("nuis_host_error_message", 1),
+        "host_error_severity" => ("nuis_host_error_severity", 1),
         "host_text_handle" => ("nuis_host_text_handle", 1),
         "host_text_len" => ("nuis_host_text_len_value", 1),
         "host_text_line_count" => ("nuis_host_text_line_count", 1),
@@ -427,7 +430,7 @@ pub(crate) fn c_type_for_ast_type(ty: &AstTypeRef) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::collect_host_ffi_symbols;
+    use super::{collect_host_ffi_symbols, render_host_ffi_stub};
 
     #[test]
     fn collects_lowered_symbol_for_std_host_extern() {
@@ -445,5 +448,30 @@ mod tests {
         assert!(symbols.contains_key("host_stdout_write"));
         assert!(!symbols.contains_key("stdout_write"));
         assert_eq!(symbols["host_stdout_write"].name, "stdout_write");
+    }
+
+    #[test]
+    fn renders_registered_error_facades_instead_of_generic_host_stubs() {
+        let ast = crate::frontend::parse_nuis_ast(
+            r#"
+            mod cffi Main {
+              extern "c" fn host_error_code(kind: i64) -> i64;
+              extern "c" fn host_error_message(kind: i64) -> i64;
+              extern "c" fn host_error_severity(kind: i64) -> i64;
+              fn main() -> i64 { return host_error_code(1202); }
+            }
+            "#,
+        )
+        .expect("parse error facade externs");
+
+        let symbols = collect_host_ffi_symbols(&ast);
+        for symbol in [
+            "host_error_code",
+            "host_error_message",
+            "host_error_severity",
+        ] {
+            let stub = render_host_ffi_stub(symbol, symbols[symbol].clone());
+            assert!(stub.contains(&format!("return nuis_{symbol}(kind);")));
+        }
     }
 }

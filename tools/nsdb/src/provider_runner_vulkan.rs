@@ -265,7 +265,7 @@ mod tests {
             RUNNER_PROFILE.available_adapter.kind,
             "vulkan-spirv-real-device-runner"
         );
-        assert!(RUNNER_PROFILE.available_adapter.real_device_capable);
+        const { assert!(RUNNER_PROFILE.available_adapter.real_device_capable) };
         assert_eq!(
             RUNNER_PROFILE.available_adapter.execution_mode,
             "real-device-provider-runner"

@@ -225,6 +225,98 @@ pub(crate) const DEV_TENSOR_LANGUAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "language-physical-bool-loop-condition-lowering",
+        path: "tools/nuisc/src/lowering/loop_preparation_flow.rs",
+        required_patterns: &[
+            "NirExpr::CastI64ToBool(lhs)",
+            "PreparedLoopCompare::Ne",
+            "NirExpr::Int(0)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-loop-carry-arity-core-contract",
+        path: "crates/yir-core/src/loop_carry_contract.rs",
+        required_patterns: &[
+            "carry_source_payload_len",
+            "if terms.is_empty()",
+            "add_scaled_prev_carry1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-yir-function-metadata-token-rendering",
+        path: "tools/nuisc/src/render.rs",
+        required_patterns: &[
+            "render_yir_token(&parameter.ty)",
+            "render_yir_token(&result.ty)",
+            "fn render_yir_token(value: &str)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-yir-function-metadata-token-roundtrip",
+        path: "tools/nuisc/src/render/tests.rs",
+        required_patterns: &[
+            "yir_function_types_with_whitespace_round_trip_as_single_tokens",
+            "function-result forward_buffer \\\"ref Buffer\\\" owned",
+            "assert_eq!(reparsed.functions, module.functions)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-bool-replacement-lowering",
+        path: "tools/nuisc/src/lowering/loop_preparation_pattern.rs",
+        required_patterns: &[
+            "PreparedDynamicPatternPayloadTransport::BoolAsI64",
+            "PreviousCarry(payload_carry_index)",
+            "value.then_some(NirExpr::Int(-1))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-dynamic-pattern-bool-replacement-native-regression",
+        path: "tools/nuisc/tests/control_flow_syntax_native.rs",
+        required_patterns: &[
+            "dynamic_while_let_bool_payload_drives_native_replacement",
+            "Phase.Active { ready: false }",
+            "assert_eq!(status.code(), Some(33))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-function-prefix-effect-guard-return-lowering",
+        path: "tools/nuisc/src/lowering/if_lowering_chains.rs",
+        required_patterns: &[
+            "lower_function_guard_return_chain",
+            "lower_guard_return_chain_with_prefix_effects",
+            "allow_prefix_effects",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-function-guard-return-probe-rollback",
+        path: "tools/nuisc/src/lowering/body_control.rs",
+        required_patterns: &[
+            "GuardReturnAttemptCheckpoint",
+            "checkpoint.rollback(state)",
+            "state.yir.nodes.truncate(self.nodes_len)",
+            "function_guard_prefix_contains_task_survivor",
+            "type_contains_task_survivor",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-task-result-native-error-facade-regression",
+        path: "tools/nuis/tests/language_bootstrap_smoke.rs",
+        required_patterns: &[
+            "task_result_enum_project_anchors_language_bootstrap_smoke",
+            "task_result_enum_demo should execute the Result/task/error path",
+            "80",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-registered-error-facade-runtime",
+        path: "tools/nuisc/src/aot_c_shim_helpers.rs",
+        required_patterns: &[
+            "host_error_code\" => (\"nuis_host_error_code",
+            "host_error_message\" => (\"nuis_host_error_message",
+            "host_error_severity\" => (\"nuis_host_error_severity",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "language-dynamic-pattern-yir-carry-contract",
         path: "crates/yir-core/src/dynamic_pattern_carry.rs",
         required_patterns: &[

@@ -16,6 +16,72 @@ pub(in crate::lowering) fn unsupported_sync_while_message() -> String {
         .to_owned()
 }
 
+struct GuardReturnAttemptCheckpoint {
+    resources_len: usize,
+    functions_len: usize,
+    nodes_len: usize,
+    edges_len: usize,
+    value_counter: usize,
+    print_counter: usize,
+    await_counter: usize,
+    call_stack: Vec<String>,
+    effect_anchor: Option<String>,
+}
+
+impl GuardReturnAttemptCheckpoint {
+    fn capture(state: &LoweringState<'_>) -> Self {
+        Self {
+            resources_len: state.yir.resources.len(),
+            functions_len: state.yir.functions.len(),
+            nodes_len: state.yir.nodes.len(),
+            edges_len: state.yir.edges.len(),
+            value_counter: state.value_counter,
+            print_counter: state.print_counter,
+            await_counter: state.await_counter,
+            call_stack: state.call_stack.clone(),
+            effect_anchor: state.last_effect_anchor.clone(),
+        }
+    }
+
+    fn rollback(self, state: &mut LoweringState<'_>) {
+        for node in &state.yir.nodes[self.nodes_len..] {
+            state.yir.node_lanes.remove(&node.name);
+        }
+        state.yir.resources.truncate(self.resources_len);
+        state.yir.functions.truncate(self.functions_len);
+        state.yir.nodes.truncate(self.nodes_len);
+        state.yir.edges.truncate(self.edges_len);
+        state.value_counter = self.value_counter;
+        state.print_counter = self.print_counter;
+        state.await_counter = self.await_counter;
+        state.call_stack = self.call_stack;
+        state.last_effect_anchor = self.effect_anchor;
+    }
+}
+
+fn type_contains_task_survivor(ty: &NirTypeRef) -> bool {
+    ty.name == "Task" || ty.generic_args.iter().any(type_contains_task_survivor)
+}
+
+fn function_guard_prefix_contains_task_survivor(function: &NirFunction) -> bool {
+    if function
+        .return_type
+        .as_ref()
+        .is_some_and(type_contains_task_survivor)
+    {
+        return true;
+    }
+    function
+        .body
+        .iter()
+        .take_while(|stmt| !matches!(stmt, NirStmt::If { .. }))
+        .any(|stmt| match stmt {
+            NirStmt::Let { ty, .. } => ty.as_ref().is_some_and(type_contains_task_survivor),
+            NirStmt::Const { ty, .. } => type_contains_task_survivor(ty),
+            _ => false,
+        })
+}
+
 pub(in crate::lowering) fn lower_function_body(
     function: &NirFunction,
     state: &mut LoweringState<'_>,
@@ -27,12 +93,21 @@ pub(in crate::lowering) fn lower_function_body(
         .body
         .iter()
         .any(|stmt| matches!(stmt, NirStmt::If { else_body, .. } if else_body.is_empty()))
+        && !function_guard_prefix_contains_task_survivor(function)
     {
-        if let Some(returned) =
-            super::if_lowering::lower_guard_return_chain(&function.body, state, bindings)?
+        let checkpoint = GuardReturnAttemptCheckpoint::capture(state);
+        match super::if_lowering::lower_function_guard_return_chain(&function.body, state, bindings)
         {
-            state.last_effect_anchor = saved_effect_anchor;
-            return Ok(Some(returned));
+            Ok(Some(returned)) => {
+                state.last_effect_anchor = saved_effect_anchor;
+                return Ok(Some(returned));
+            }
+            Ok(None) => checkpoint.rollback(state),
+            Err(error) => {
+                checkpoint.rollback(state);
+                state.last_effect_anchor = saved_effect_anchor;
+                return Err(error);
+            }
         }
     }
     let mut const_bindings = BTreeMap::new();

@@ -1,4 +1,7 @@
 use super::*;
+use yir_core::{
+    YirFunction, YirFunctionParameter, YirFunctionResult, YirFunctionRole, YirValueOwnership,
+};
 
 #[test]
 fn renders_mutable_and_reassigned_ast_locals() {
@@ -372,5 +375,36 @@ fn yir_text_projection_round_trips_empty_and_embedded_quote_arguments() {
     assert!(rendered.contains("cpu.text empty cpu0 \"\""));
     assert!(rendered.contains("cpu.text quoted cpu0 \"left\\\"right\""));
     assert_eq!(reparsed.nodes, module.nodes);
+    assert_eq!(render_yir(&reparsed), rendered);
+}
+
+#[test]
+fn yir_function_types_with_whitespace_round_trip_as_single_tokens() {
+    let mut module = YirModule::new("0.1");
+    module.functions.push(YirFunction {
+        name: "forward_buffer".to_owned(),
+        domain: "cpu".to_owned(),
+        role: YirFunctionRole::Helper,
+        parameters: vec![YirFunctionParameter {
+            name: "input".to_owned(),
+            ty: "ref Buffer".to_owned(),
+            ownership: YirValueOwnership::Borrowed,
+            node: "input_node".to_owned(),
+        }],
+        result: Some(YirFunctionResult {
+            ty: "ref Buffer".to_owned(),
+            ownership: YirValueOwnership::Owned,
+            node: "result_node".to_owned(),
+        }),
+        body_nodes: vec!["input_node".to_owned(), "result_node".to_owned()],
+    });
+
+    let rendered = render_yir(&module);
+    let reparsed =
+        yir_syntax::parse_explicit_module(&rendered).expect("YIR projection should parse");
+
+    assert!(rendered.contains("function-param forward_buffer input \"ref Buffer\" borrowed"));
+    assert!(rendered.contains("function-result forward_buffer \"ref Buffer\" owned"));
+    assert_eq!(reparsed.functions, module.functions);
     assert_eq!(render_yir(&reparsed), rendered);
 }

@@ -113,7 +113,24 @@ pub(in crate::lowering) fn lower_guard_return_chain(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<Option<String>, String> {
-    if stmts_contain_conditional_effect_primitive(stmts) {
+    lower_guard_return_chain_with_prefix_effects(stmts, state, bindings, false)
+}
+
+pub(in crate::lowering) fn lower_function_guard_return_chain(
+    stmts: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    lower_guard_return_chain_with_prefix_effects(stmts, state, bindings, true)
+}
+
+fn lower_guard_return_chain_with_prefix_effects(
+    stmts: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    allow_prefix_effects: bool,
+) -> Result<Option<String>, String> {
+    if !allow_prefix_effects && stmts_contain_conditional_effect_primitive(stmts) {
         return Ok(None);
     }
     match stmts {
@@ -127,10 +144,32 @@ pub(in crate::lowering) fn lower_guard_return_chain(
         }
         [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
             let pure_helpers = state.pure_helpers.clone();
+            let (raw_name, raw_value) = match binding {
+                NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                    (name.clone(), value.clone())
+                }
+                _ => unreachable!("binding pattern is exhaustive"),
+            };
+            if allow_prefix_effects {
+                let lowered = lower_expr(&raw_value, state, bindings)?;
+                let mut local_bindings = bindings.clone();
+                local_bindings.insert(raw_name, lowered);
+                return lower_guard_return_chain_with_prefix_effects(
+                    tail,
+                    state,
+                    &local_bindings,
+                    true,
+                );
+            }
+            let contains_effect = expr_contains_conditional_effect_primitive(&raw_value);
+            let contains_call = branch_binding_contains_function_call(&raw_value);
             let Some((name, value)) = extract_pure_branch_binding(binding, &pure_helpers) else {
                 return Ok(None);
             };
-            if !branch_binding_contains_function_call(&value) {
+            if contains_effect {
+                return Ok(None);
+            }
+            if !contains_call && !contains_effect {
                 let substituted = tail
                     .iter()
                     .map(|stmt| {
@@ -140,12 +179,17 @@ pub(in crate::lowering) fn lower_guard_return_chain(
                         )
                     })
                     .collect::<Vec<_>>();
-                return lower_guard_return_chain(&substituted, state, bindings);
+                return lower_guard_return_chain_with_prefix_effects(
+                    &substituted,
+                    state,
+                    bindings,
+                    false,
+                );
             }
             let lowered = lower_expr(&value, state, bindings)?;
             let mut local_bindings = bindings.clone();
             local_bindings.insert(name, lowered);
-            lower_guard_return_chain(tail, state, &local_bindings)
+            lower_guard_return_chain_with_prefix_effects(tail, state, &local_bindings, false)
         }
         [NirStmt::If {
             condition,
@@ -193,7 +237,9 @@ pub(in crate::lowering) fn lower_guard_return_chain(
             let Some(lhs) = lower_return_if_chain(then_body, state, bindings)? else {
                 return Ok(None);
             };
-            let Some(rhs) = lower_guard_return_chain(tail, state, bindings)? else {
+            let Some(rhs) =
+                lower_guard_return_chain_with_prefix_effects(tail, state, bindings, false)?
+            else {
                 return Ok(None);
             };
             Ok(Some(lower_select(condition_name, lhs, rhs, state)?))

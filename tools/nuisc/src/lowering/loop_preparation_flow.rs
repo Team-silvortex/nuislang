@@ -9,7 +9,8 @@ fn parse_loop_flow_condition_atom(
 ) -> Option<PreparedLoopCarryCondition> {
     let normalized =
         normalize_pure_bool_test_expr(inline_pure_helper_calls(expr, inlineable_pure_helpers));
-    let (lhs, compare, rhs) = match &normalized {
+    let (lhs, compare, mut rhs) = match &normalized {
+        NirExpr::CastI64ToBool(lhs) => (lhs.as_ref(), PreparedLoopCompare::Ne, NirExpr::Int(0)),
         NirExpr::Binary {
             op: NirBinaryOp::Eq,
             lhs,
@@ -53,6 +54,17 @@ fn parse_loop_flow_condition_atom(
             (lhs.as_ref(), PreparedLoopCompare::Ge, rhs.as_ref().clone())
         }
         _ => return None,
+    };
+    let lhs = match (lhs, &rhs, compare) {
+        (
+            NirExpr::CastI64ToBool(inner),
+            NirExpr::Bool(value),
+            PreparedLoopCompare::Eq | PreparedLoopCompare::Ne,
+        ) => {
+            rhs = NirExpr::Int(i64::from(*value));
+            inner.as_ref()
+        }
+        _ => lhs,
     };
     let lhs = loop_state_ref_into_cond_source(parse_prepared_loop_state_ref_expr(
         lhs,

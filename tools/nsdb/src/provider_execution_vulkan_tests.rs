@@ -17,7 +17,7 @@ fn vulkan_execution_registration_still_fails_closed_at_probe_boundary() {
         PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT
     );
     assert_eq!(REGISTRATION.adapter_kind, "vulkan-spirv-real-device-runner");
-    assert!(REGISTRATION.requires_worker_descriptors);
+    const { assert!(REGISTRATION.requires_worker_descriptors) };
     #[cfg(target_os = "linux")]
     assert!(REGISTRATION.prepare_worker_adapter.is_some());
     #[cfg(not(target_os = "linux"))]

@@ -196,6 +196,7 @@ fn write_multi_dependency_fixture(
                     path: runtime_object.display().to_string(),
                 },
             ],
+            stage_handoff: None,
         },
         &BuildManifestContext {
             input_path: source.display().to_string(),

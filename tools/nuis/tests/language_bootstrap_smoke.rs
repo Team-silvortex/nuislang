@@ -144,7 +144,7 @@ fn task_result_enum_project_anchors_language_bootstrap_smoke() {
 
     assert_binary_exit(
         &output_dir.join("task_result_enum_demo"),
-        39,
+        80,
         "task_result_enum_demo should execute the Result/task/error path to a deterministic exit code",
     );
 }

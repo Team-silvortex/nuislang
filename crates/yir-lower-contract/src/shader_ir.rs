@@ -194,7 +194,7 @@ fn collect_shader_stage_sources(wgsl_source: &str) -> Vec<ShaderStageSource> {
                 .map(|(next_start, _)| *next_start)
                 .unwrap_or(searchable.len());
             ShaderStageSource {
-                stage: *stage,
+                stage,
                 source: searchable[*start..end].to_owned(),
             }
         })

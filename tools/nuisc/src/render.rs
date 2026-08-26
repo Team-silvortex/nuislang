@@ -394,7 +394,7 @@ pub fn render_yir(module: &YirModule) -> String {
                 "function-param {} {} {} {} {}\n",
                 function.name,
                 parameter.name,
-                parameter.ty,
+                render_yir_token(&parameter.ty),
                 parameter.ownership.as_str(),
                 parameter.node
             ));
@@ -403,7 +403,7 @@ pub fn render_yir(module: &YirModule) -> String {
             out.push_str(&format!(
                 "function-result {} {} {} {}\n",
                 function.name,
-                result.ty,
+                render_yir_token(&result.ty),
                 result.ownership.as_str(),
                 result.node
             ));
@@ -426,11 +426,8 @@ pub fn render_yir(module: &YirModule) -> String {
             node.op.module, node.op.instruction, node.name, node.resource, lane_suffix
         ));
         for arg in &node.op.args {
-            if arg.is_empty() || arg.contains('"') || arg.chars().any(char::is_whitespace) {
-                out.push_str(&format!(" \"{}\"", escape_debug(arg)));
-            } else {
-                out.push_str(&format!(" {}", arg));
-            }
+            out.push(' ');
+            out.push_str(&render_yir_token(arg));
         }
         out.push('\n');
     }
@@ -446,6 +443,14 @@ pub fn render_yir(module: &YirModule) -> String {
         ));
     }
     out
+}
+
+fn render_yir_token(value: &str) -> String {
+    if value.is_empty() || value.contains('"') || value.chars().any(char::is_whitespace) {
+        format!("\"{}\"", escape_debug(value))
+    } else {
+        value.to_owned()
+    }
 }
 
 #[cfg(test)]

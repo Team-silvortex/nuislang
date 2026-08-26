@@ -217,77 +217,6 @@ fn compile_c_process_adapter(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cache_identity_binds_source_contract_frameworks_and_target() {
-        let base = process_adapter_cache_identity("source-a", "contract-a", &["Foundation"]);
-        assert_eq!(
-            base,
-            process_adapter_cache_identity("source-a", "contract-a", &["Foundation"])
-        );
-        assert_ne!(
-            base,
-            process_adapter_cache_identity("source-b", "contract-a", &["Foundation"])
-        );
-        assert_ne!(
-            base,
-            process_adapter_cache_identity("source-a", "contract-b", &["Foundation"])
-        );
-        assert_ne!(
-            base,
-            process_adapter_cache_identity("source-a", "contract-a", &["Foundation", "CoreML"])
-        );
-    }
-
-    #[test]
-    fn portable_c_adapter_uses_the_same_content_addressed_cache() {
-        let mut cache = ProviderProcessAdapterCache::default();
-        let first = cache
-            .resolve_c(
-                "cache-probe",
-                "int main(void) { return 0; }",
-                "nuis-provider-cache-probe-v1",
-            )
-            .expect("compile C adapter");
-        assert_eq!(first.cache_status, "compiled");
-        let first_identity = first.cache_identity.to_owned();
-        let second = cache
-            .resolve_c(
-                "cache-probe",
-                "int main(void) { return 0; }",
-                "nuis-provider-cache-probe-v1",
-            )
-            .expect("reuse C adapter");
-        assert_eq!(second.cache_status, "hit");
-        assert_eq!(second.cache_identity, first_identity);
-    }
-
-    #[test]
-    fn portable_c_adapter_cache_binds_declared_system_libraries() {
-        let plain =
-            process_adapter_cache_identity("int main(void) { return 0; }", "contract", &["abi:c"]);
-        let with_dl = process_adapter_cache_identity(
-            "int main(void) { return 0; }",
-            "contract",
-            &["abi:c", "dl"],
-        );
-        assert_ne!(plain, with_dl);
-
-        let mut cache = ProviderProcessAdapterCache::default();
-        assert!(cache
-            .resolve_c_with_libraries(
-                "invalid-library",
-                "int main(void) { return 0; }",
-                "contract",
-                &["../dl"],
-            )
-            .is_err());
-    }
-}
-
 impl Drop for PreparedProviderProcessAdapter {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.source_path);
@@ -408,4 +337,75 @@ pub(crate) fn provider_output_manifest(request: &ProviderRequest) -> (Vec<String
         .iter()
         .map(|binding| (binding.role.clone(), binding.byte_length))
         .unzip()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cache_identity_binds_source_contract_frameworks_and_target() {
+        let base = process_adapter_cache_identity("source-a", "contract-a", &["Foundation"]);
+        assert_eq!(
+            base,
+            process_adapter_cache_identity("source-a", "contract-a", &["Foundation"])
+        );
+        assert_ne!(
+            base,
+            process_adapter_cache_identity("source-b", "contract-a", &["Foundation"])
+        );
+        assert_ne!(
+            base,
+            process_adapter_cache_identity("source-a", "contract-b", &["Foundation"])
+        );
+        assert_ne!(
+            base,
+            process_adapter_cache_identity("source-a", "contract-a", &["Foundation", "CoreML"])
+        );
+    }
+
+    #[test]
+    fn portable_c_adapter_uses_the_same_content_addressed_cache() {
+        let mut cache = ProviderProcessAdapterCache::default();
+        let first = cache
+            .resolve_c(
+                "cache-probe",
+                "int main(void) { return 0; }",
+                "nuis-provider-cache-probe-v1",
+            )
+            .expect("compile C adapter");
+        assert_eq!(first.cache_status, "compiled");
+        let first_identity = first.cache_identity.to_owned();
+        let second = cache
+            .resolve_c(
+                "cache-probe",
+                "int main(void) { return 0; }",
+                "nuis-provider-cache-probe-v1",
+            )
+            .expect("reuse C adapter");
+        assert_eq!(second.cache_status, "hit");
+        assert_eq!(second.cache_identity, first_identity);
+    }
+
+    #[test]
+    fn portable_c_adapter_cache_binds_declared_system_libraries() {
+        let plain =
+            process_adapter_cache_identity("int main(void) { return 0; }", "contract", &["abi:c"]);
+        let with_dl = process_adapter_cache_identity(
+            "int main(void) { return 0; }",
+            "contract",
+            &["abi:c", "dl"],
+        );
+        assert_ne!(plain, with_dl);
+
+        let mut cache = ProviderProcessAdapterCache::default();
+        assert!(cache
+            .resolve_c_with_libraries(
+                "invalid-library",
+                "int main(void) { return 0; }",
+                "contract",
+                &["../dl"],
+            )
+            .is_err());
+    }
 }
