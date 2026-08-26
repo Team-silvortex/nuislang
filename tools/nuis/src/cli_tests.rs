@@ -147,6 +147,26 @@ fn parses_bootstrap_candidate_build_command() {
 }
 
 #[test]
+fn parses_bootstrap_reproducibility_command() {
+    let command = parse_args(
+        [
+            "bootstrap-reproducibility".to_owned(),
+            "compiler-project".to_owned(),
+            "build/reproducibility".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap-reproducibility parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapReproducibility {
+            input: PathBuf::from("compiler-project"),
+            output_dir: PathBuf::from("build/reproducibility"),
+        }
+    );
+}
+
+#[test]
 fn parses_bootstrap_diff_command() {
     let command = parse_args(
         [

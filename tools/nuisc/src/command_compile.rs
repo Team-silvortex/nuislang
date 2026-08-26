@@ -7,6 +7,22 @@ use crate::command_helpers::{
 use crate::inspect_report::{collect_benchmark_inventory, write_compile_doc_index};
 use crate::{aot, cache, lowering, pipeline, project, registry, render};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CompileCachePolicy {
+    Reuse,
+    Bypass,
+}
+
+impl CompileCachePolicy {
+    fn manifest_status(self, restored: bool) -> &'static str {
+        match (self, restored) {
+            (Self::Bypass, _) => "bypass",
+            (Self::Reuse, true) => "hit",
+            (Self::Reuse, false) => "miss",
+        }
+    }
+}
+
 pub(crate) fn run_dump_ast(input: PathBuf) -> Result<(), String> {
     let compiled = compile_command_input(&input)?;
     print_project_context(&compiled.resolved);
@@ -98,6 +114,7 @@ pub(crate) fn run_compile(
         target,
         packaging_mode,
         &resolved,
+        CompileCachePolicy::Reuse,
     )
 }
 
@@ -109,6 +126,7 @@ pub(crate) fn run_compile_resolved(
     target: Option<String>,
     packaging_mode: Option<String>,
     resolved: &pipeline::ResolvedCompileInput,
+    cache_policy: CompileCachePolicy,
 ) -> Result<(), String> {
     if let Some(project) = &resolved.project {
         project::verify_committed_project_galaxy_resolution_lock(project)?;
@@ -137,7 +155,10 @@ pub(crate) fn run_compile_resolved(
         resolved.project.as_ref(),
         resolved.project_plan.as_ref(),
     )?;
-    let cache_hit = cache::lookup_compile_cache(&cache_key)?;
+    let cache_hit = match cache_policy {
+        CompileCachePolicy::Reuse => cache::lookup_compile_cache(&cache_key)?,
+        CompileCachePolicy::Bypass => None,
+    };
     let compile_fresh = || -> Result<(aot::CompileArtifacts, Vec<String>), String> {
         let source = resolved.source_text()?;
         let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
@@ -206,11 +227,7 @@ pub(crate) fn run_compile_resolved(
             output_dir: output_dir.display().to_string(),
             loaded_nustar: loaded_nustar.clone(),
             compile_cache: Some(aot::BuildManifestCacheInfo {
-                status: if used_cache_restore {
-                    "hit".to_owned()
-                } else {
-                    "miss".to_owned()
-                },
+                status: cache_policy.manifest_status(used_cache_restore).to_owned(),
                 key: cache_key.key.clone(),
                 root: cache_key.root.display().to_string(),
             }),
@@ -352,14 +369,14 @@ pub(crate) fn run_compile_resolved(
             cpu_target: cpu_target.clone(),
         },
     )?;
-    if !used_cache_restore {
+    if cache_policy == CompileCachePolicy::Reuse && !used_cache_restore {
         cache::store_compile_cache(&cache_key, &output_dir)?;
     }
     if success_logs_enabled() {
         println!("compiled nuis source: {}", input.display());
         println!(
             "compile_cache: {} ({})",
-            if used_cache_restore { "hit" } else { "miss" },
+            cache_policy.manifest_status(used_cache_restore),
             cache_key.key
         );
         println!("compile_cache_inputs: {}", cache_key.input_labels.len());

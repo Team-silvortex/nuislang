@@ -111,6 +111,8 @@ mod tests_parse_annotations;
 #[cfg(test)]
 mod tests_parse_extern_boundaries;
 #[cfg(test)]
+mod tests_reproducibility;
+#[cfg(test)]
 mod tests_return_inference;
 #[cfg(test)]
 mod tests_test_functions;
@@ -265,6 +267,7 @@ pub fn lower_project_ast_to_nir(
     module: &AstModule,
     local_modules: &[AstModule],
 ) -> Result<NirModule, String> {
+    stmt_lowering_try::reset_try_expansion_counter();
     let expanded_module = expand_module_lambdas(module)?;
     let expanded_local_modules = local_modules
         .iter()

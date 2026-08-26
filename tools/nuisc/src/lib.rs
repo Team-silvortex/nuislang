@@ -297,6 +297,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         CommandKind::BootstrapBuild { input, output_dir } => {
             bootstrap_stage_driver::run_bootstrap_build(input, output_dir)?
         }
+        CommandKind::BootstrapCleanBuild { input, output_dir } => {
+            bootstrap_stage_driver::run_bootstrap_clean_build(input, output_dir)?
+        }
         CommandKind::BootstrapDiff {
             stage0_record,
             candidate_record,

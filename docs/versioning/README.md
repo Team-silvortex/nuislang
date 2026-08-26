@@ -41,7 +41,7 @@ Earlier alpha anchors are:
 
 Use this section when the question is:
 
-* what the current `beta-0.6.*` line inherits and hardens after the first beta
+* what the current `beta-0.7.*` line inherits and hardens after the first beta
   foundation snapshots
 * what `beta-0.0.1` established at the alpha-to-beta transition
 * what `alpha-0.20.*` added by closing alpha around a beta-prep
@@ -62,7 +62,7 @@ Use this section when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `beta-0.6.*`
+* what the current mainline should optimize during `beta-0.7.*`
 * which documentation routes and wording are current after the beta entry
   refresh
 * which broad README surfaces were refreshed for the current beta line
@@ -176,7 +176,7 @@ Read:
 
 Practical rule:
 
-* start at the `beta-0.6.*` mainline entry first
+* start at the latest curated `beta-0.6.*` mainline entry first
 * use `beta-0.3.*` for the previous curated linker/runtime snapshot
 * use `beta-0.1.0` for the earlier curated beta foundation snapshot
 * use `beta-0.0.1` for the recorded first-beta predecessor

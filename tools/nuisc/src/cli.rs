@@ -121,6 +121,10 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
     },
+    BootstrapCleanBuild {
+        input: PathBuf,
+        output_dir: PathBuf,
+    },
     BootstrapDiff {
         stage0_record: PathBuf,
         candidate_record: PathBuf,

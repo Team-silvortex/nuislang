@@ -48,6 +48,6 @@ invariants = [
 status = "execution-proof-consumed-by-first-stage1-leaf-producer"
 missing = [
   "general-stage1-producer-beyond-the-projection-relay",
-  "repeated-clean-build-reproducibility-proof",
+  "independent-machine-or-attester-reproducibility-proof",
   "reversible-component-replacement-authorization",
 ]

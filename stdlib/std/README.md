@@ -25,7 +25,7 @@ Current source-style rule:
 
 ## Current Refactor Frontdoor
 
-For the current `beta-0.6.*` line, do not read `std` as one flat bucket first.
+For the current `beta-0.7.*` line, do not read `std` as one flat bucket first.
 
 Read it in this order:
 

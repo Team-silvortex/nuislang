@@ -68,9 +68,12 @@ proof therefore fails closed.
 
 The first producer is an identity projection relay: Nuis consumes every
 serialized stage byte and owns the deterministic bundle fold, while the shared
-host codec still owns token and structural-body decoding. The next compiler
-step is to move one real token or structural transformation behind the same
-ABI, then prove candidate reproducibility across independent clean builds.
+host codec still owns token and structural-body decoding. Its reproducible
+identity is now proven across two empty, compile-cache-bypassed roots by
+`nuis bootstrap-reproducibility`; see
+[Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
+The next compiler step is to move one real token or structural transformation
+behind the same ABI and retain that aggregate.
 
 Replacement authorization remains a separate future protocol with rollback
 evidence. A `13/13` report is evidence of equivalence, not permission to switch

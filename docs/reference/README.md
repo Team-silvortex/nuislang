@@ -57,6 +57,7 @@ Start in this order:
   - [nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md)
   - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
   - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
+  - [nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
@@ -130,6 +131,10 @@ project-form compiler-component build?”, start with
 If your question is specifically “how are stage0 and a candidate stage1
 compared without implicitly authorizing replacement?”, start with
 [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md).
+
+If your question is specifically “how do two independent cache-bypassed clean
+candidate builds prove a stable compiler identity?”, start with
+[nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md).
 
 If your question is specifically “what did the alpha-0.20 closeout establish?”,
 read

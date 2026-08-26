@@ -119,10 +119,12 @@ the production proof, candidate component, diagnostics, and differential. See
 The fail-closed comparison protocol and `nuis bootstrap-diff` frontdoor now
 exist; see
 [Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md).
-The current Nuis producer is deliberately an identity projection relay, not a
-tokenizer/parser replacement. A later component must own a real transformation
-and repeat clean-build equivalence. Only an independent reversible
-authorization record may permit replacing one compiler component.
+`nuis bootstrap-reproducibility` now proves the current identity relay across
+two empty, compile-cache-bypassed roots; see
+[Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
+The current producer is still not a tokenizer/parser replacement. A later
+component must own a real transformation and retain clean-build equivalence.
+Only an independent reversible authorization record may permit replacement.
 
 ## Validation
 

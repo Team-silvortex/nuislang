@@ -1751,10 +1751,10 @@ The five required coordinates are:
 Subset v1 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the
 roadmap score, and readiness waits for all five to reach `stable/100`.
 
-The pure Nuis consumer moves the stage-neutral boundary to `usable/78`; its
-attested candidate moves the driver to `usable/80` with `13/13` fail-closed
-equivalence. Data model v2 reaches `usable/80` through four pages and native
-score `59`; the `usable/78` reproducibility gate remains weakest.
+The pure Nuis consumer leaves the stage-neutral boundary at `usable/78`; its
+attested candidate and two cache-bypassed clean builds move both driver and
+reproducibility gate to `usable/84`. Data model v2 remains `usable/80` through
+four pages and native score `59`; the stage-neutral boundary is now weakest.
 
 ## Runtime Lifecycle Loader Bootstrap
 

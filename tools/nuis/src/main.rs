@@ -41,6 +41,7 @@ mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_probe;
+mod bootstrap_reproducibility;
 mod bootstrap_status;
 mod build_report_command;
 mod build_report_nsld_status;
@@ -63,6 +64,7 @@ mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_language;
 mod dev_tensor_drift_data_runtime;
 mod dev_tensor_drift_data_runtime_bootstrap;
+mod dev_tensor_drift_data_runtime_bootstrap_reproducibility;
 mod dev_tensor_drift_data_runtime_cffi_object;
 mod dev_tensor_drift_data_runtime_cuda;
 mod dev_tensor_drift_data_runtime_dev;
@@ -386,6 +388,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapCandidateBuild { input, output_dir } => {
             bootstrap_candidate_build::handle_bootstrap_candidate_build(input, output_dir)?;
+        }
+        cli::CommandKind::BootstrapReproducibility { input, output_dir } => {
+            bootstrap_reproducibility::handle_bootstrap_reproducibility(input, output_dir)?;
         }
         cli::CommandKind::BootstrapDiff {
             stage0_record,

@@ -6,14 +6,15 @@ use std::{
 };
 
 use nuis_artifact::{
-    parse_compiler_component_differential, parse_compiler_structural_projection,
-    read_compiler_candidate_execution, read_compiler_candidate_production,
-    read_compiler_component_build, read_compiler_stage_handoff, CompilerProjectionKind,
+    parse_build_manifest, parse_compiler_component_differential,
+    parse_compiler_structural_projection, read_compiler_candidate_execution,
+    read_compiler_candidate_production, read_compiler_component_build,
+    read_compiler_component_reproducibility, read_compiler_stage_handoff, CompilerProjectionKind,
     CompilerProjectionRecordKind, CompilerStageKind, COMPILER_CANDIDATE_ADAPTER_FILE,
     COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
-    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
 };
 
 fn temp_dir() -> PathBuf {
@@ -111,6 +112,80 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert!(!tampered_report_path.exists());
 
     fs::remove_dir_all(output_dir).expect("remove candidate component output");
+}
+
+#[test]
+fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
+    let project = "../../examples/projects/tooling/bootstrap_structural_projection_candidate";
+    let output_dir = temp_dir();
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&["bootstrap-reproducibility", project, &output_dir_text]);
+    assert!(
+        build.status.success(),
+        "clean candidate builds failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr),
+    );
+
+    let roots = [
+        output_dir.join("clean-build-0"),
+        output_dir.join("clean-build-1"),
+    ];
+    let aggregate_path = output_dir.join(COMPILER_COMPONENT_REPRODUCIBILITY_FILE);
+    let aggregate = read_compiler_component_reproducibility(&aggregate_path, &roots)
+        .expect("verify clean-build aggregate");
+    assert_eq!(aggregate.run_count, 2);
+    assert_eq!(aggregate.equivalent_run_count, 2);
+    assert_eq!(aggregate.comparison_count, 13);
+    assert!(aggregate.all_runs_equivalent);
+    assert_eq!(
+        aggregate.verdict,
+        "reproducible-equivalent-awaiting-authorization"
+    );
+    assert!(!aggregate.replacement_authorized);
+    assert_eq!(
+        aggregate.runs[0].candidate_reproducible_build_sha256,
+        aggregate.runs[1].candidate_reproducible_build_sha256
+    );
+    assert_ne!(
+        aggregate.runs[0].clean_root_witness_sha256,
+        aggregate.runs[1].clean_root_witness_sha256
+    );
+
+    for root in &roots {
+        let stage0 =
+            read_compiler_component_build(&root.join("stage0").join(COMPILER_COMPONENT_BUILD_FILE))
+                .expect("verify clean stage0 component");
+        let manifest = parse_build_manifest(&root.join("stage0").join(&stage0.build_manifest_file))
+            .expect("verify clean stage0 manifest");
+        assert_eq!(manifest.compile_cache_status.as_deref(), Some("bypass"));
+    }
+    let source = fs::read_to_string(&aggregate_path).expect("read aggregate source");
+    assert!(!source.contains(&output_dir_text));
+
+    let rerun = run_nuis(&["bootstrap-reproducibility", project, &output_dir_text]);
+    assert!(!rerun.status.success());
+    assert!(String::from_utf8_lossy(&rerun.stderr).contains("must be empty"));
+
+    let candidate = read_compiler_component_build(
+        &roots[1]
+            .join("stage1-candidate")
+            .join(COMPILER_COMPONENT_BUILD_FILE),
+    )
+    .expect("verify second clean candidate");
+    let candidate_binary = roots[1]
+        .join("stage1-candidate")
+        .join(&candidate.native_binary_file);
+    let mut tampered = fs::read(&candidate_binary).expect("read second candidate binary");
+    tampered.push(0);
+    fs::write(&candidate_binary, tampered).expect("tamper second candidate binary");
+    let error = read_compiler_component_reproducibility(&aggregate_path, &roots)
+        .expect_err("bound root tampering must invalidate aggregate");
+    assert!(error
+        .to_string()
+        .contains("native binary length or SHA-256 mismatch"));
+
+    fs::remove_dir_all(output_dir).expect("remove reproducibility output");
 }
 
 fn run_nuis(args: &[&str]) -> std::process::Output {

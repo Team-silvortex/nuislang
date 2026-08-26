@@ -118,15 +118,20 @@ five serialized payloads through the exact scalar ABI, emits a bound candidate
 bundle fold, receives a distinct `stage1-candidate` component record, and
 reaches repository-native `13/13` equivalence.
 
+`nuis bootstrap-reproducibility` now repeats this complete path in two empty,
+compile-cache-bypassed roots and binds both reports plus stable component
+identities into `nuis-compiler-component-reproducibility-v1`. See
+[Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
+
 This is not replacement authority or full compiler self-hosting. The next
-closures are a non-identity token/structural transformation, equivalent
-results across independent clean rebuilds, and a separate reversible
-authorization protocol.
+closures are a non-identity token/structural transformation, independent
+machine/attester evidence, and a separate reversible authorization protocol.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_diagnostic_report -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1

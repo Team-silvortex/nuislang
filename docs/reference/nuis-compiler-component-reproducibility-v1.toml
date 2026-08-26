@@ -1,0 +1,62 @@
+protocol = "nuis-compiler-component-reproducibility-v1"
+version = 1
+status = "usable-first-clean-aggregate"
+scope = "two-clean-stage1-candidate-builds"
+manifest_name = "nuis.compiler-component-reproducibility.toml"
+frontdoor = "nuis bootstrap-reproducibility"
+clean_build_contract = "nuis-compiler-two-clean-build-roots-v1"
+attestation_authority = "local-frontdoor-procedural-witness-no-independent-trust"
+replacement_authority_contract = "nuis-compiler-replacement-authorization-separate-v1"
+run_count = 2
+run_ids = ["clean-build-0", "clean-build-1"]
+clean_root_state = "absent-or-empty-before-build"
+compile_cache_status = "bypass"
+differential_comparison_count = 13
+required_differential_verdict = "equivalent-awaiting-authorization"
+aggregate_verdict = "reproducible-equivalent-awaiting-authorization"
+digest = "sha256-lowercase"
+path_policy = "no-physical-paths-or-timestamps-in-aggregate"
+replacement_authorized = false
+
+stable_cross_run_identities = [
+  "stage0-reproducible-build-sha256",
+  "candidate-reproducible-build-sha256",
+  "candidate-compiler-image-sha256",
+  "native-output-sha256",
+  "differential-verdict",
+]
+
+per_run_exact_evidence = [
+  "distinct-clean-root-witness-sha256",
+  "stage0-record-sha256",
+  "candidate-record-sha256",
+  "candidate-production-proof-sha256",
+  "differential-report-sha256",
+  "thirteen-of-thirteen-equivalent-comparisons",
+]
+
+invariants = [
+  "frontdoor-rejects-a-symlink-nondirectory-or-nonempty-output-root",
+  "each-run-root-is-absent-before-its-build",
+  "both-runs-bypass-compile-cache-read-and-write",
+  "two-canonical-build-roots-must-be-distinct",
+  "all-component-production-and-differential-evidence-is-reread",
+  "stable-reproducible-identities-must-match-across-runs",
+  "exact-record-and-report-identities-may-differ-across-output-roots",
+  "aggregate-contains-no-physical-path-or-timestamp",
+  "root-binary-proof-or-aggregate-tampering-fails-closed",
+  "reproducibility-never-implies-replacement-authorization",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]
+
+[open_boundary]
+missing = [
+  "independent-machine-or-attester-trust",
+  "non-identity-nuis-stage-transformation",
+  "reversible-component-replacement-authorization",
+]

@@ -42,20 +42,20 @@ blocker = "the Nuis producer now consumes every serialized stage byte and owns t
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 80
+progress = 84
 required_before = "beta-0.10.0"
-next_action = "generalize the first projection-relay producer boundary to one non-identity leaf and prove its candidate identity across independent clean builds"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
-expected_artifact = "two independent clean builds of a Nuis-produced stage1-candidate leaf with stable reproducible identity and no replacement authority"
-blocker = "the first Nuis stage1-candidate component, diagnostics, production proof, and differential now exist; clean-build reproducibility and a general producer ABI remain open"
+next_action = "generalize the reproducible projection-relay producer boundary to one non-identity leaf while retaining its clean-build aggregate"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "a non-identity Nuis-produced stage1-candidate leaf retaining stable identity across two clean builds without replacement authority"
+blocker = "the first candidate is reproducible under one local frontdoor, but its producer remains an identity relay and independent attester trust is open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 78
+progress = 84
 required_before = "beta-0.10.0"
-next_action = "repeat the repository-native 13/13 candidate differential across independent clean builds and aggregate stable reproducible identities"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
-expected_artifact = "a repeated-clean-build differential aggregate that remains equivalent while an independent reversible authorization is still absent"
-blocker = "one repository-native Nuis stage1 leaf reaches attested 13/13 equivalence, but repeated clean-build evidence and reversible replacement authorization remain open"
+next_action = "carry one non-identity Nuis token transformation through the implemented clean-build aggregate, then add independent attester evidence"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "a non-identity Nuis token transformation retaining the path-free two-clean-build aggregate without replacement authority"
+blocker = "local repeated clean-build evidence exists; non-identity production, independent attester trust, and reversible authorization remain open"

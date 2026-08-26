@@ -11,7 +11,7 @@ use nuis_artifact::{
 use nuis_semantics::bootstrap_subset::BOOTSTRAP_SUBSET_PROTOCOL;
 
 use crate::command_bootstrap::ensure_bootstrap_resolved;
-use crate::command_compile::run_compile_resolved;
+use crate::command_compile::{run_compile_resolved, CompileCachePolicy};
 use crate::command_helpers::{resolve_compile_input, NUSTAR_REGISTRY_ROOT};
 use crate::{aot, registry, registry_load};
 
@@ -26,6 +26,18 @@ struct OwnedDependency {
 }
 
 pub(crate) fn run_bootstrap_build(input: PathBuf, output_dir: PathBuf) -> Result<(), String> {
+    run_bootstrap_build_with_cache_policy(input, output_dir, CompileCachePolicy::Reuse)
+}
+
+pub(crate) fn run_bootstrap_clean_build(input: PathBuf, output_dir: PathBuf) -> Result<(), String> {
+    run_bootstrap_build_with_cache_policy(input, output_dir, CompileCachePolicy::Bypass)
+}
+
+fn run_bootstrap_build_with_cache_policy(
+    input: PathBuf,
+    output_dir: PathBuf,
+    cache_policy: CompileCachePolicy,
+) -> Result<(), String> {
     let resolved = resolve_compile_input(&input)?;
     let project = resolved.project.as_ref().ok_or_else(|| {
         "bootstrap-build v1 requires a Nuis project so its complete dependency closure can be recorded"
@@ -41,6 +53,7 @@ pub(crate) fn run_bootstrap_build(input: PathBuf, output_dir: PathBuf) -> Result
         None,
         None,
         &resolved,
+        cache_policy,
     )?;
 
     let build_manifest_path = output_dir.join(BUILD_MANIFEST_FILE);

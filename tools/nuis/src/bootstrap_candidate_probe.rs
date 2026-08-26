@@ -15,6 +15,21 @@ pub(crate) fn handle_bootstrap_candidate_probe(
     input: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), String> {
+    handle_bootstrap_candidate_probe_with_cache(input, output_dir, true)
+}
+
+pub(crate) fn handle_bootstrap_clean_candidate_probe(
+    input: PathBuf,
+    output_dir: PathBuf,
+) -> Result<(), String> {
+    handle_bootstrap_candidate_probe_with_cache(input, output_dir, false)
+}
+
+fn handle_bootstrap_candidate_probe_with_cache(
+    input: PathBuf,
+    output_dir: PathBuf,
+    reuse_compile_cache: bool,
+) -> Result<(), String> {
     let execution_path = output_dir.join(COMPILER_CANDIDATE_EXECUTION_FILE);
     if execution_path.exists() {
         fs::remove_file(&execution_path).map_err(|error| {
@@ -24,10 +39,18 @@ pub(crate) fn handle_bootstrap_candidate_probe(
             )
         })?;
     }
-    nuisc::run(nuisc::CommandKind::BootstrapBuild {
-        input,
-        output_dir: output_dir.clone(),
-    })?;
+    let command = if reuse_compile_cache {
+        nuisc::CommandKind::BootstrapBuild {
+            input,
+            output_dir: output_dir.clone(),
+        }
+    } else {
+        nuisc::CommandKind::BootstrapCleanBuild {
+            input,
+            output_dir: output_dir.clone(),
+        }
+    };
+    nuisc::run(command)?;
 
     let component_path = output_dir.join(COMPILER_COMPONENT_BUILD_FILE);
     let component = read_compiler_component_build(&component_path)

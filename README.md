@@ -10,7 +10,7 @@ backends, but they do not define the language model.
 
 ## Current Line
 
-The repository is on `beta-0.6.*`. Git history is the authoritative source for
+The repository is on `beta-0.7.*`. Git history is the authoritative source for
 the exact patch checkpoint; the independent Cargo package versions are not the
 project release number yet.
 
@@ -31,12 +31,12 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `683/683` implementation-drift checks across `26/26` registered
+manifest, and `689/689` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
-bootstrap-critical average honest at `95/100`; the weakest coordinate is now
-`developer-system/bootstrap/differential-reproducibility-gate` at `usable`,
-`78/100`. The paged compiler data model and stage driver are `usable/80`, while
-the stage-neutral handoff and differential gate are `usable/78`. The dedicated
+bootstrap-critical average honest at `96/100`; the weakest coordinate is now
+`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `78/100`. The paged
+compiler data model is `usable/80`, the stage driver and differential gate are
+`usable/84`, and the stage-neutral handoff remains `usable/78`. The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
 audit record, and component-bound diagnostic proof for one project-form
@@ -53,7 +53,11 @@ image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
 then feeds all five serialized payloads through four exact Nuis scalar exports,
 independently verifies their folds, emits a distinct attested stage1-candidate,
 and reaches repository-native `13/13` differential equivalence while retaining
-`replacement_authorized = false`. This closes one real Nuis leaf production
+`replacement_authorized = false`. `nuis bootstrap-reproducibility` now performs
+two cache-bypassed clean candidate builds, rereads both evidence roots, requires
+stable compiler-image, native-output, and differential identities, and emits a
+path-free reproducibility aggregate with independent replacement authorization
+still disabled. This closes one real Nuis leaf production and reproducibility
 loop; it is not a claim that the compiler is already self-hosted.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
@@ -71,11 +75,11 @@ The first GNU resolver providers and symbol-version rows now belong to
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, candidate execution proof, paged compiler
-data, and first attested stage1 leaf in place, the tensor now routes mainline
-work to repeated clean-build reproducibility and broader compiler-data growth. A
-non-identity Nuis transformation, reversible replacement authorization, Galaxy
-hardening, broader ELF architecture coverage, and PE/COFF remain separate
-registered foundation work.
+data, first attested stage1 leaf, and two-clean-build aggregate in place, the
+tensor now routes mainline work to a bounded Nuis-native serialized-token
+decoder and broader compiler-data growth. A non-identity Nuis transformation,
+reversible replacement authorization, Galaxy hardening, broader ELF
+architecture coverage, and PE/COFF remain separate registered foundation work.
 
 Start with these documents:
 
@@ -89,6 +93,7 @@ Start with these documents:
 * [Compiler candidate execution](docs/reference/nuis-compiler-candidate-execution.md)
 * [Compiler candidate production](docs/reference/nuis-compiler-candidate-production.md)
 * [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
+* [Compiler component reproducibility](docs/reference/nuis-compiler-component-reproducibility.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
 * [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)
@@ -159,6 +164,7 @@ cargo run -p nuis -- bootstrap-status
 cargo run -p nuis -- bootstrap-build examples/projects/tooling/bootstrap_compiler_data_model_demo build/bootstrap-component
 cargo run -p nuis -- bootstrap-candidate-probe examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate
 cargo run -p nuis -- bootstrap-candidate-build examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-production
+cargo run -p nuis -- bootstrap-reproducibility examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-reproducibility
 cargo run -p nuis -- workflow examples/projects/kernel_tensor_demo
 cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo
 cargo run -p nuis -- check examples/projects/kernel_tensor_demo

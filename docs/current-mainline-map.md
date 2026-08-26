@@ -7,7 +7,7 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `beta-0.6.*` reading route, use this order:
+If you only need the shortest current `beta-0.7.*` reading route, use this order:
 
 1. [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
@@ -17,19 +17,20 @@ If you only need the shortest current `beta-0.6.*` reading route, use this order
 6. [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
 7. [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
 8. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-9. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-10. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-11. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-12. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-13. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-14. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-15. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-16. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-17. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-18. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-19. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-20. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-21. [versioning/README.md](versioning/README.md)
+9. [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
+10. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+11. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+12. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+13. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+14. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+15. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+16. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+17. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+18. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+19. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+20. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+21. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+22. [versioning/README.md](versioning/README.md)
 
 Short rule:
 
@@ -53,7 +54,9 @@ Short rule:
   [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
 * current stage0/stage1 candidate differential gate:
   [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-* current `beta-0.6.*` entry:
+* current two-clean-build compiler reproducibility aggregate:
+  [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
+* latest curated minor-line entry, `beta-0.6.*`:
   [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 * previous curated `beta-0.3.*` entry:
   [versioning/nuis-beta-0.3.0-mainline-entry.md](versioning/nuis-beta-0.3.0-mainline-entry.md)
@@ -131,10 +134,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-diff -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned data -> producer-neutral structural handoff -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed differential report -> separate replacement authorization`
+`frozen compiler subset -> compiler-owned data -> producer-neutral structural handoff -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed differential report -> two-clean-build aggregate -> separate replacement authorization`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

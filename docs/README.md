@@ -6,7 +6,7 @@ tests, the development tensor, and `docs/reference/` in that order.
 
 ## Read This First
 
-Use this short route for the current `beta-0.6.*` repository:
+Use this short route for the current `beta-0.7.*` repository:
 
 1. [Current mainline map](current-mainline-map.md)
 2. [Beta 0.6 mainline entry](versioning/nuis-beta-0.6.0-mainline-entry.md)
@@ -50,6 +50,7 @@ For the compiler and project frontdoor:
 * [Compiler candidate execution](reference/nuis-compiler-candidate-execution.md)
 * [Compiler candidate production](reference/nuis-compiler-candidate-production.md)
 * [Compiler component differential gate](reference/nuis-compiler-component-differential.md)
+* [Compiler component reproducibility](reference/nuis-compiler-component-reproducibility.md)
 * [Nuis frontdoor surface](reference/nuis-frontdoor-surface-reference.md)
 * [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
 * [YIR tools](reference/yir-tools-reference.md)

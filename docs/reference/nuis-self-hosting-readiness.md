@@ -129,11 +129,17 @@ See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 The first producer is an identity projection relay; no replacement authority
 exists.
 
+`nuis bootstrap-reproducibility` now runs that complete production chain in
+two initially empty roots with compile-cache read/write bypass. Its path-free
+`nuis-compiler-component-reproducibility-v1` aggregate binds distinct local
+witnesses, both exact report lineages, and stable component/native identities.
+The local witness intentionally carries no independent attester authority.
+
 ### `differential-reproducibility-gate`
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/78`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/84`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -144,9 +150,11 @@ and returns a failing command status. See
 The checked-in Nuis projection relay now enters this path as a real
 `stage1-candidate` leaf and reaches repository-native `13/13` equivalence. The
 path frontdoor verifies its execution and production proofs, including exact
-adapter bytes and all stage folds, before writing the report. Repeated
-independent clean-build evidence, a non-identity compiler transformation, and
-separate reversible replacement authorization remain open.
+adapter bytes and all stage folds, before writing the report. Two local clean,
+cache-bypassed runs now retain stable reproducible identities and 13/13
+verdicts; root or aggregate tampering fails closed. A non-identity compiler
+transformation, independent-machine trust, and separate reversible replacement
+authorization remain open.
 
 ## Migration Rule
 

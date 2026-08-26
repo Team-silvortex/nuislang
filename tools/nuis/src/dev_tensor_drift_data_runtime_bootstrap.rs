@@ -606,12 +606,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         id: "nuis-development-tensor-candidate-production-baseline",
         path: "docs/reference/nuis-development-tensor.md",
         required_patterns: &[
-            "stage-neutral boundary to `usable/78`",
-            "attested candidate moves the driver to `usable/80`",
-            "`13/13` fail-closed\nequivalence",
-            "Data model v2 reaches `usable/80`",
-            "native\nscore `59`",
-            "`usable/78` reproducibility gate remains weakest",
+            "stage-neutral boundary at `usable/78`",
+            "cache-bypassed clean builds move both driver and\nreproducibility gate to `usable/84`",
+            "Data model v2 remains `usable/80`",
+            "four pages and native score `59`",
+            "stage-neutral boundary is now weakest",
         ],
     },
     DevTensorDriftCheckSpec {

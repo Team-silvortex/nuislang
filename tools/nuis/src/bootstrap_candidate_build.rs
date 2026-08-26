@@ -19,7 +19,9 @@ use nuis_artifact::{
 
 use crate::{
     bootstrap_candidate_adapter::run_candidate_adapter,
-    bootstrap_candidate_probe::handle_bootstrap_candidate_probe,
+    bootstrap_candidate_probe::{
+        handle_bootstrap_candidate_probe, handle_bootstrap_clean_candidate_probe,
+    },
 };
 
 const STAGE0_DIR: &str = "stage0";
@@ -31,6 +33,21 @@ pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
     output_dir: PathBuf,
 ) -> Result<(), String> {
+    handle_bootstrap_candidate_build_with_cache(input, output_dir, true)
+}
+
+pub(crate) fn handle_bootstrap_clean_candidate_build(
+    input: PathBuf,
+    output_dir: PathBuf,
+) -> Result<(), String> {
+    handle_bootstrap_candidate_build_with_cache(input, output_dir, false)
+}
+
+fn handle_bootstrap_candidate_build_with_cache(
+    input: PathBuf,
+    output_dir: PathBuf,
+    reuse_compile_cache: bool,
+) -> Result<(), String> {
     let stage0_dir = output_dir.join(STAGE0_DIR);
     let candidate_dir = output_dir.join(CANDIDATE_DIR);
     fs::create_dir_all(&output_dir).map_err(|error| {
@@ -39,7 +56,11 @@ pub(crate) fn handle_bootstrap_candidate_build(
             output_dir.display()
         )
     })?;
-    handle_bootstrap_candidate_probe(input, stage0_dir.clone())?;
+    if reuse_compile_cache {
+        handle_bootstrap_candidate_probe(input, stage0_dir.clone())?;
+    } else {
+        handle_bootstrap_clean_candidate_probe(input, stage0_dir.clone())?;
+    }
 
     let stage0_path = stage0_dir.join(COMPILER_COMPONENT_BUILD_FILE);
     let stage0 = read_compiler_component_build(&stage0_path)

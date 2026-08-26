@@ -12,6 +12,8 @@ digest = "sha256-lowercase"
 replacement_authorized = false
 candidate_production_protocol = "nuis-compiler-candidate-production-v1"
 candidate_production_required_by_path_frontdoor = true
+reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
+reproducibility_frontdoor = "nuis bootstrap-reproducibility"
 
 ordered_comparisons = [
   "component-id",
@@ -44,11 +46,12 @@ invariants = [
   "equivalence-never-implies-replacement-authorization",
   "report-and-aggregate-verdicts-are-sha256-bound",
   "tampering-fails-closed",
+  "two-cache-bypassed-clean-runs-can-be-bound-by-the-successor-aggregate",
 ]
 
 [open_boundary]
 missing = [
-  "repeated-clean-build-cross-producer-reproducibility-proof",
   "non-identity-nuis-stage-transformation",
+  "independent-machine-or-attester-reproducibility-proof",
   "reversible-component-replacement-authorization",
 ]

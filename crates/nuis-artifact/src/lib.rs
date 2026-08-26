@@ -6,6 +6,7 @@ mod compiler_candidate_execution;
 mod compiler_candidate_production;
 mod compiler_component_build;
 mod compiler_component_diff;
+mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
 mod compiler_structural_projection;
@@ -71,6 +72,15 @@ pub use compiler_component_diff::{
     CompilerComponentDifferential, CompilerComponentEvidence, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_DIFFERENTIAL_GATE_CONTRACT, COMPILER_COMPONENT_DIFFERENTIAL_PROTOCOL,
     COMPILER_COMPONENT_REPLACEMENT_AUTHORITY_CONTRACT,
+};
+pub use compiler_component_reproducibility::{
+    build_compiler_component_reproducibility, build_compiler_component_reproducibility_from_paths,
+    parse_compiler_component_reproducibility, parse_compiler_component_reproducibility_from_source,
+    read_compiler_component_reproducibility, render_compiler_component_reproducibility,
+    CompilerComponentReproducibility, CompilerComponentReproducibilityRootInput,
+    CompilerComponentReproducibilityRun, CompilerComponentReproducibilityRunInput,
+    COMPILER_COMPONENT_CLEAN_BUILD_CONTRACT, COMPILER_COMPONENT_REPRODUCIBILITY_AUTHORITY,
+    COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_PROTOCOL,
 };
 pub use compiler_diagnostic_report::{
     build_compiler_diagnostic_report, parse_compiler_diagnostic_report,

@@ -16,6 +16,8 @@ text_policy = "utf8-lf-without-nul"
 digest = "sha256-lowercase"
 record_count = 5
 replacement_authorized = false
+reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
+reproducibility_frontdoor = "nuis bootstrap-reproducibility"
 
 scalar_exports = [
   "nuis_bootstrap_candidate_stage_seed_v1(i64)->i64",
@@ -62,7 +64,7 @@ validation_commands = [
 
 [open_boundary]
 missing = [
-  "repeated-clean-build-candidate-reproducibility-proof",
   "nuis-owned-token-and-structural-body-decoding-instead-of-identity-relay",
+  "independent-machine-or-attester-reproducibility-proof",
   "independent-reversible-component-replacement-authorization",
 ]

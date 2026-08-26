@@ -1,5 +1,5 @@
+use std::cell::Cell;
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use nuis_semantics::model::{AstMatchArm, NirExpr};
 
@@ -10,7 +10,21 @@ use super::{
     FunctionSignature, NirStructDef, NirTypeRef,
 };
 
-static TRY_EXPANSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static TRY_EXPANSION_COUNTER: Cell<usize> = const { Cell::new(0) };
+}
+
+pub(super) fn reset_try_expansion_counter() {
+    TRY_EXPANSION_COUNTER.with(|counter| counter.set(0));
+}
+
+fn next_try_expansion_id() -> usize {
+    TRY_EXPANSION_COUNTER.with(|counter| {
+        let id = counter.get();
+        counter.set(id + 1);
+        id
+    })
+}
 
 use super::stmt_lowering_try_helpers::{ast_expr_from_nir, rewrite_try_payload_placeholder};
 
@@ -214,7 +228,7 @@ pub(super) fn synthesize_try_statements(
     inner_ty: NirTypeRef,
     ok_terminal: AstStmt,
 ) -> Result<Vec<AstStmt>, String> {
-    let id = TRY_EXPANSION_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let id = next_try_expansion_id();
     let result_name = format!("__nuis_try_result_{id}");
     let payload_name = format!("__nuis_try_payload_{id}");
     let error_name = format!("__nuis_try_error_{id}");
@@ -274,7 +288,7 @@ fn synthesize_try_expr_statements(
     lowered_inner: NirExpr,
     inner_ty: NirTypeRef,
 ) -> Result<Vec<AstStmt>, String> {
-    let id = TRY_EXPANSION_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let id = next_try_expansion_id();
     let result_name = format!("__nuis_try_result_{id}");
     let error_name = format!("__nuis_try_error_{id}");
     Ok(vec![

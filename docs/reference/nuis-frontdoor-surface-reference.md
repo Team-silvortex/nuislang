@@ -23,7 +23,9 @@ The bootstrap frontdoors are deliberately outside this grouped field contract.
 Their current route is documented by
 [Self-hosting readiness](nuis-self-hosting-readiness.md) and
 [Compiler candidate production](nuis-compiler-candidate-production.md),
-including `nuis bootstrap-candidate-build`.
+plus [Compiler component reproducibility](nuis-compiler-component-reproducibility.md),
+including `nuis bootstrap-candidate-build` and
+`nuis bootstrap-reproducibility`.
 
 It does not attempt to freeze:
 
