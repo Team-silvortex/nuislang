@@ -15,6 +15,8 @@ diagnostic_companion_protocol = "nuis-compiler-diagnostic-report-v1"
 diagnostic_companion_name = "nuis.compiler-diagnostics.toml"
 candidate_execution_companion_protocol = "nuis-compiler-candidate-execution-v1"
 candidate_execution_companion_authority = "execution-only-no-component-production"
+candidate_production_companion_protocol = "nuis-compiler-candidate-production-v1"
+candidate_production_frontdoor = "nuis bootstrap-candidate-build"
 input_policy = "project-or-project-manifest-only"
 path_policy = "portable-logical-identities-and-sibling-output-files"
 text_policy = "utf8-lf-without-nul"
@@ -92,9 +94,9 @@ validation_commands = [
 ]
 
 [open_boundary]
-status = "not-stage1-ready"
+status = "first-stage1-leaf-produced"
 missing = [
-  "real-nuis-stage1-component-producer",
-  "repository-native-cross-producer-equivalence-run",
+  "general-stage1-component-production-beyond-identity-projection",
+  "repeated-clean-build-reproducibility-proof",
   "reversible-component-replacement-authorization",
 ]

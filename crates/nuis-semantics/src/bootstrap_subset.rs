@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::model::{
-    AstAttribute, AstConstItem, AstEnumDef, AstEnumVariantKind, AstFunction, AstGenericParam,
-    AstModule, AstStructDef, AstTypeAlias, AstTypeRef, AstWherePredicate,
+    AstAttribute, AstAttributeValue, AstConstItem, AstEnumDef, AstEnumVariantKind, AstFunction,
+    AstGenericParam, AstModule, AstStructDef, AstTypeAlias, AstTypeRef, AstWherePredicate,
 };
 
 #[path = "bootstrap_subset_walk.rs"]
@@ -32,6 +32,29 @@ pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerVector",
     "Option",
     "Result",
+];
+
+const BOOTSTRAP_SCALAR_EXPORTS: &[(&str, &str, usize)] = &[
+    (
+        "compiler_candidate_stage_seed",
+        "nuis_bootstrap_candidate_stage_seed_v1",
+        1,
+    ),
+    (
+        "compiler_candidate_stage_fold",
+        "nuis_bootstrap_candidate_stage_fold_v1",
+        3,
+    ),
+    (
+        "compiler_candidate_bundle_seed",
+        "nuis_bootstrap_candidate_bundle_seed_v1",
+        0,
+    ),
+    (
+        "compiler_candidate_bundle_fold",
+        "nuis_bootstrap_candidate_bundle_fold_v1",
+        3,
+    ),
 ];
 
 pub const CODE_UNSUPPORTED_DOMAIN: &str = "NBS001";
@@ -299,7 +322,7 @@ impl<'a> Validator<'a> {
     fn validate_function(&mut self, item: &AstFunction, root: &str) {
         self.checked_nodes += 1;
         let path = format!("{root} fn {}", item.name);
-        self.validate_attributes(&item.attributes, &path);
+        self.validate_function_attributes(item, &path);
         if item.is_async {
             self.reject(
                 CODE_ASYNC,
@@ -331,6 +354,20 @@ impl<'a> Validator<'a> {
             self.validate_type(ty, &generics, &format!("{path} return"));
         }
         self.validate_body(&item.body, &generics, &path);
+    }
+
+    fn validate_function_attributes(&mut self, item: &AstFunction, path: &str) {
+        for attribute in &item.attributes {
+            self.checked_nodes += 1;
+            if attribute.name == "doc" || is_approved_scalar_export(item, attribute) {
+                continue;
+            }
+            self.reject(
+                CODE_ATTRIBUTE,
+                &format!("{path} @{}", attribute.name),
+                "bootstrap functions permit only documentation or the exact scalar candidate producer ABI exports",
+            );
+        }
     }
 
     fn validate_generics(
@@ -417,6 +454,34 @@ impl<'a> Validator<'a> {
             message: message.into(),
         });
     }
+}
+
+fn is_approved_scalar_export(item: &AstFunction, attribute: &AstAttribute) -> bool {
+    if attribute.name != "export"
+        || attribute.args.len() != 1
+        || attribute.args[0].name.as_deref() != Some("name")
+        || item.is_async
+        || !item.generic_params.is_empty()
+        || !item.where_bounds.is_empty()
+        || !item.params.iter().all(|param| is_plain_i64(&param.ty))
+        || !item.return_type.as_ref().is_some_and(is_plain_i64)
+    {
+        return false;
+    }
+    let AstAttributeValue::String(symbol) = &attribute.args[0].value else {
+        return false;
+    };
+    BOOTSTRAP_SCALAR_EXPORTS
+        .iter()
+        .any(|(function, expected_symbol, parameter_count)| {
+            item.name == *function
+                && symbol == *expected_symbol
+                && item.params.len() == *parameter_count
+        })
+}
+
+fn is_plain_i64(ty: &AstTypeRef) -> bool {
+    ty.name == "i64" && ty.generic_args.is_empty() && !ty.is_ref && !ty.is_optional
 }
 
 fn render_type(ty: &AstTypeRef) -> String {

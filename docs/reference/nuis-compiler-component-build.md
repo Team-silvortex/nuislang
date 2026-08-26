@@ -4,13 +4,15 @@
 for a Nuis-written compiler component. Its machine-readable contract is
 [nuis-compiler-component-build-v1.toml](nuis-compiler-component-build-v1.toml).
 
-This is an `early` stage0 capability. It does not claim that a Nuis stage1
-compiler exists and it grants no component-replacement authority.
+This now supports stage0 plus the first bounded Nuis-produced
+`stage1-candidate` leaf. It does not claim that the whole compiler is stage1,
+and it grants no component-replacement authority.
 
 The shared record accepts only the explicit roles `stage0` and
 `stage1-candidate`. Role and producer identity participate in both component
-identities, so a candidate can never masquerade as stage0. The current public
-driver emits only `stage0`.
+identities, so a candidate can never masquerade as stage0. `bootstrap-build`
+emits stage0; the separately attested `bootstrap-candidate-build` path may
+promote only an executed Nuis image whose five-stage production proof verifies.
 
 ## Frontdoor
 
@@ -106,23 +108,28 @@ rejects it.
 
 ## Honest Boundary
 
-The current stage0 half is reusable and attested, but stage1 is still absent.
-`nuis bootstrap-candidate-probe` now executes the first pure Nuis structural
-consumer and writes an identity-bound, explicitly non-authoritative execution
-proof. This closes candidate-image execution, not component production; see
-[Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md).
+The reusable stage0 half and the first stage1 leaf are now both attested.
+`nuis bootstrap-candidate-probe` executes the pure Nuis structural consumer and
+writes an explicitly non-authoritative execution proof. The new
+`nuis bootstrap-candidate-build` frontdoor then passes every stage byte through
+the candidate's exact scalar ABI, independently verifies its folds, and emits
+the production proof, candidate component, diagnostics, and differential. See
+[Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md) and
+[Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 The fail-closed comparison protocol and `nuis bootstrap-diff` frontdoor now
 exist; see
 [Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md).
-The next boundary is a separately identified Nuis candidate producer. Only a
-later reversible authorization record may permit replacing one compiler
-component.
+The current Nuis producer is deliberately an identity projection relay, not a
+tokenizer/parser replacement. A later component must own a real transformation
+and repeat clean-build equivalence. Only an independent reversible
+authorization record may permit replacing one compiler component.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_execution -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib parse_bootstrap_build_command -j 1

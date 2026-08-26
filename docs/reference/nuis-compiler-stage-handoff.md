@@ -5,7 +5,8 @@ boundary between the Rust-hosted stage0 compiler and a future Nuis-written
 stage1 component. Its machine-readable contract is
 [nuis-compiler-stage-handoff-v1.toml](nuis-compiler-stage-handoff-v1.toml).
 
-This is an `early` self-hosting primitive, not a claim that stage1 exists.
+This self-hosting primitive is now consumed by the first bounded stage1 leaf,
+not a claim that the whole compiler is stage1.
 
 ## Ordered Bundle
 
@@ -82,24 +83,30 @@ lengths, payload hashes, and text policy before returning any payload.
 
 ## Current Limit
 
-The boundary is not yet stage1-ready:
+The first identity-projection path is now stage1-candidate ready:
 
 * `StdCompilerProjection` now provides a Nuis-owned streaming state machine for
   typed AST/NIR record tags. The checked-in candidate validates valid AST/NIR
   sequences, rejects malformed boundaries, and executes natively through the
   frozen bootstrap and normal AOT pipeline.
-* The Nuis consumer does not yet ingest the serialized five-stage payload bytes
-  or reconstruct full typed compiler nodes from their record bodies.
-* No Nuis-written producer emits this bundle yet.
+* The scalar producer ABI ingests every byte from all five serialized stage
+  payloads and computes a Nuis-owned deterministic stage/bundle fold.
+* `nuis bootstrap-candidate-build` materializes a separately identified
+  candidate handoff and binds it through
+  `nuis-compiler-candidate-production-v1`.
+* The Nuis consumer still does not decode complete token and structural record
+  bodies or emit a non-identity transformation.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
   contracts; matching payload hashes alone never authorize it.
 
-The independent codec plus native Nuis consumer advance this coordinate to
-`early/70`. The next closure task is a small Nuis stage1-candidate producer
-that emits the same bundle and enters the existing fail-closed differential
-gate. See [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md)
+The independent codec, native Nuis consumer, scalar byte producer, production
+proof, and `13/13` differential advance this coordinate to `usable/78`. The
+next closure task moves one real token or structural transformation behind the
+same producer-neutral boundary. See
+[Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
+[Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
 and [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 ## Validation

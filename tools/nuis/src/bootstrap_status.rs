@@ -504,7 +504,11 @@ mod tests {
 
     #[test]
     fn stable_status_requires_exactly_one_hundred_progress() {
-        let invalid = CHECKED_IN_MANIFEST.replacen("status = \"early\"", "status = \"stable\"", 1);
+        let invalid = CHECKED_IN_MANIFEST.replacen(
+            "status = \"usable\"\nprogress = 75",
+            "status = \"stable\"\nprogress = 75",
+            1,
+        );
         let error = parse_bootstrap_readiness(&invalid).expect_err("status drift must fail");
         assert!(error.contains("stable/100"));
     }
@@ -531,19 +535,11 @@ mod tests {
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(
-                "status = \"early\"\nprogress = 45",
+                "status = \"usable\"\nprogress = 78",
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(
-                "status = \"early\"\nprogress = 60",
-                "status = \"stable\"\nprogress = 100",
-            )
-            .replace(
-                "status = \"early\"\nprogress = 65",
-                "status = \"stable\"\nprogress = 100",
-            )
-            .replace(
-                "status = \"early\"\nprogress = 70",
+                "status = \"usable\"\nprogress = 80",
                 "status = \"stable\"\nprogress = 100",
             );
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");

@@ -519,6 +519,7 @@ pub(crate) fn append_c_shim_main(out: &mut String) {
     out.push_str(
         r#"
 
+#ifndef NUIS_RUNTIME_NO_MAIN
 int main(int argc, char** argv) {
     nuis_argc = argc;
     nuis_argv = argv;
@@ -529,6 +530,7 @@ int main(int argc, char** argv) {
     (void)nuis_lifecycle_tick_once_v1();
     return (int)nuis_lifecycle_shutdown_v1(entry_status);
 }
+#endif
 "#,
     );
 }

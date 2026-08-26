@@ -1,5 +1,5 @@
 protocol = "nuis-self-hosting-readiness-v1"
-release_line = "beta-0.6.*"
+release_line = "beta-0.7.*"
 migration_start = "beta-0.10.*"
 completion_window_start = "gamma-0.5.*"
 completion_window_end = "gamma-0.10.*"
@@ -30,32 +30,32 @@ blocker = "the v1 proof closes host-layout leakage for one real component, but f
 [[gates]]
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
-status = "early"
-progress = 70
+status = "usable"
+progress = 78
 required_before = "beta-0.10.0"
-next_action = "extend the native Nuis structural consumer from stable scalar tags to serialized five-stage payload input, then emit one candidate-owned handoff bundle"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
-expected_artifact = "a second Nuis-produced component bundle whose independently decoded AST/NIR projections and complete five-stage semantic identity can enter bootstrap-diff without producer-private reconstruction"
-blocker = "a pure Nuis typed record-state consumer now executes natively and fails closed, but it does not yet ingest serialized payload bytes or emit a candidate-owned handoff bundle"
+next_action = "move one real token or structural-body transformation behind the verified scalar producer boundary without giving the adapter compiler semantics"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
+expected_artifact = "a Nuis-produced non-identity stage transformation whose complete five-stage semantic identity still crosses the attested differential gate"
+blocker = "the Nuis producer now consumes every serialized stage byte and owns the bundle fold, but shared host code still owns token and structural-body decoding"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
-status = "early"
-progress = 65
+status = "usable"
+progress = 80
 required_before = "beta-0.10.0"
-next_action = "emit the same component and component-bound diagnostic proof from a separately identified Nuis stage1 candidate"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_execution -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
-expected_artifact = "a separately attested Nuis stage1-candidate component record and normalized diagnostic proof ready for the implemented differential gate"
-blocker = "the driver now records and revalidates successful execution of a pure Nuis candidate image without granting production authority, but no Nuis stage1 producer emits a component record"
+next_action = "generalize the first projection-relay producer boundary to one non-identity leaf and prove its candidate identity across independent clean builds"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
+expected_artifact = "two independent clean builds of a Nuis-produced stage1-candidate leaf with stable reproducible identity and no replacement authority"
+blocker = "the first Nuis stage1-candidate component, diagnostics, production proof, and differential now exist; clean-build reproducibility and a general producer ABI remain open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
-status = "early"
-progress = 60
+status = "usable"
+progress = 78
 required_before = "beta-0.10.0"
-next_action = "run the implemented thirteen-check gate against a real Nuis-produced leaf stage1 candidate across repeated clean builds"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_execution -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
-expected_artifact = "a repository-native stage0/stage1 differential report that remains equivalent across clean rebuilds and still grants no replacement authority"
-blocker = "the fail-closed comparison report and CLI exist, but no Nuis stage1 producer or independent reversible replacement authorization exists"
+next_action = "repeat the repository-native 13/13 candidate differential across independent clean builds and aggregate stable reproducible identities"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
+expected_artifact = "a repeated-clean-build differential aggregate that remains equivalent while an independent reversible authorization is still absent"
+blocker = "one repository-native Nuis stage1 leaf reaches attested 13/13 equivalence, but repeated clean-build evidence and reversible replacement authorization remain open"

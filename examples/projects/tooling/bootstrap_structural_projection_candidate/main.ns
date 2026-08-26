@@ -3,6 +3,26 @@ use cpu StdCompilerProjection;
 
 /// First Nuis-written consumer of the producer-neutral AST/NIR record model.
 mod cpu Main {
+  @export(name = "nuis_bootstrap_candidate_stage_seed_v1")
+  fn compiler_candidate_stage_seed(ordinal: i64) -> i64 {
+    return 97 + ((ordinal + 1) * 17);
+  }
+
+  @export(name = "nuis_bootstrap_candidate_stage_fold_v1")
+  fn compiler_candidate_stage_fold(state: i64, ordinal: i64, byte: i64) -> i64 {
+    return ((state * 257) + byte + ordinal + 1) % 2147483629;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_bundle_seed_v1")
+  fn compiler_candidate_bundle_seed() -> i64 {
+    return 193;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_bundle_fold_v1")
+  fn compiler_candidate_bundle_fold(state: i64, ordinal: i64, stage_fold: i64) -> i64 {
+    return ((state * 65537) + stage_fold + ordinal + 1) % 2147483629;
+  }
+
   fn ast_projection() -> CompilerProjectionState {
     let state0: CompilerProjectionState = compiler_projection_start(
       compiler_projection_ast_kind()
@@ -131,6 +151,19 @@ mod cpu Main {
   }
 
   fn main() -> i64 {
+    let sample_fold: i64 = compiler_candidate_stage_fold(
+      compiler_candidate_stage_seed(0),
+      0,
+      109
+    );
+    let sample_bundle: i64 = compiler_candidate_bundle_fold(
+      compiler_candidate_bundle_seed(),
+      0,
+      sample_fold
+    );
+    if sample_fold != 29408 || sample_bundle != 12678050 {
+      return 70;
+    }
     let ast: CompilerProjectionState = ast_projection();
     if ast.error != 0 || ast.record_count != 6 {
       if ast.module_seen == 0 {

@@ -23,6 +23,16 @@ approved_external_types = [
   "CompilerPath",
 ]
 allowed_items = ["const", "type-alias", "struct", "enum", "function"]
+allowed_function_attributes = [
+  "doc",
+  "exact-stage1-candidate-scalar-export-abi",
+]
+approved_scalar_exports = [
+  "compiler_candidate_stage_seed=nuis_bootstrap_candidate_stage_seed_v1(i64)->i64",
+  "compiler_candidate_stage_fold=nuis_bootstrap_candidate_stage_fold_v1(i64,i64,i64)->i64",
+  "compiler_candidate_bundle_seed=nuis_bootstrap_candidate_bundle_seed_v1()->i64",
+  "compiler_candidate_bundle_fold=nuis_bootstrap_candidate_bundle_fold_v1(i64,i64,i64)->i64",
+]
 allowed_generics = ["unbounded-type-parameters"]
 allowed_control_flow = ["if", "match", "while", "break", "continue", "return", "try"]
 allowed_expressions = [
@@ -42,7 +52,7 @@ rejected_capabilities = [
   "non-cpu-domain",
   "unapproved-import",
   "extern-or-ffi",
-  "non-doc-attribute",
+  "unapproved-attribute-or-export",
   "trait-or-impl",
   "bounded-generic",
   "unapproved-type",
@@ -76,7 +86,7 @@ capability = "extern-or-ffi"
 
 [[diagnostics]]
 code = "NBS004"
-capability = "non-doc-attribute"
+capability = "unapproved-attribute-or-export"
 
 [[diagnostics]]
 code = "NBS005"

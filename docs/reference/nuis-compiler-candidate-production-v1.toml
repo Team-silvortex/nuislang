@@ -1,0 +1,68 @@
+protocol = "nuis-compiler-candidate-production-v1"
+version = 1
+status = "usable-first-leaf"
+scope = "nuis-written-stage1-candidate-leaf-production"
+manifest_name = "nuis.compiler-candidate-production.toml"
+producer_contract = "nuis-stage1-scalar-byte-producer-v1"
+authority = "stage1-candidate-component-production-no-replacement"
+frontdoor = "nuis bootstrap-candidate-build"
+stage0_directory = "stage0"
+candidate_directory = "stage1-candidate"
+candidate_role = "stage1-candidate"
+candidate_producer = "nuis-stage1-projection-relay-v1"
+adapter_file = "nuis.compiler-candidate-adapter"
+adapter_role = "host-byte-transport-without-compiler-semantics"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+record_count = 5
+replacement_authorized = false
+
+scalar_exports = [
+  "nuis_bootstrap_candidate_stage_seed_v1(i64)->i64",
+  "nuis_bootstrap_candidate_stage_fold_v1(i64,i64,i64)->i64",
+  "nuis_bootstrap_candidate_bundle_seed_v1()->i64",
+  "nuis_bootstrap_candidate_bundle_fold_v1(i64,i64,i64)->i64",
+]
+
+ordered_stages = ["source", "tokens", "ast", "nir", "yir"]
+fold_modulus = 2147483629
+stage_seed = "97 + ((ordinal + 1) * 17)"
+stage_fold = "((state * 257) + byte + ordinal + 1) mod fold_modulus"
+bundle_seed = 193
+bundle_fold = "((state * 65537) + stage_fold + ordinal + 1) mod fold_modulus"
+
+bound_inputs = [
+  "verified-stage0-component-and-candidate-execution",
+  "verified-stage1-candidate-component-and-five-stage-handoff",
+  "candidate-image-equals-executed-nuis-native-image",
+  "every-stage-byte-length-sha256-and-nuis-fold",
+  "independently-recomputed-host-fold",
+  "exact-adapter-file-length-and-sha256",
+  "candidate-producer-and-stage-bundle-identities",
+  "no-replacement-authority",
+]
+
+invariants = [
+  "bootstrap-v1-allows-only-the-four-exact-scalar-export-signatures",
+  "nuis-functions-consume-every-stage-byte-in-order",
+  "adapter-performs-only-file-transport-and-canonical-number-rendering",
+  "host-independently-recomputes-all-stage-and-bundle-folds",
+  "candidate-handoff-preserves-stage0-semantic-bundle-identity",
+  "candidate-component-has-a-distinct-producer-and-explicit-stage1-candidate-role",
+  "bootstrap-diff-requires-the-production-proof-before-writing-a-report",
+  "component-payload-adapter-or-proof-tampering-fails-closed",
+  "thirteen-of-thirteen-equivalence-never-authorizes-replacement",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib exact_scalar_candidate_export_is_allowed_but_symbol_spoofing_is_rejected -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1",
+]
+
+[open_boundary]
+missing = [
+  "repeated-clean-build-candidate-reproducibility-proof",
+  "nuis-owned-token-and-structural-body-decoding-instead-of-identity-relay",
+  "independent-reversible-component-replacement-authorization",
+]

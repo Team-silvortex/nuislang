@@ -20,6 +20,8 @@ consumer_surface = "surface.std.compiler-structural-projection.v1"
 consumer_module = "stdlib/std/lib/compiler_projection.ns"
 consumer_fixture = "examples/projects/tooling/bootstrap_structural_projection_candidate"
 native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
+production_successor_protocol = "nuis-compiler-candidate-production-v1"
+production_frontdoor = "nuis bootstrap-candidate-build"
 
 bound_inputs = [
   "exact-component-record-sha256",
@@ -43,10 +45,9 @@ invariants = [
 ]
 
 [open_boundary]
-status = "not-stage1-producer"
+status = "execution-proof-consumed-by-first-stage1-leaf-producer"
 missing = [
-  "serialized-five-stage-input-consumption-by-nuis",
-  "nuis-produced-stage-handoff-bundle",
-  "nuis-produced-component-bound-diagnostics",
-  "stage1-candidate-component-record",
+  "general-stage1-producer-beyond-the-projection-relay",
+  "repeated-clean-build-reproducibility-proof",
+  "reversible-component-replacement-authorization",
 ]

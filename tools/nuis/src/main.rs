@@ -38,6 +38,8 @@ mod artifact_runtime_command;
 mod artifact_runtime_dispatch_receipt;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
+mod bootstrap_candidate_adapter;
+mod bootstrap_candidate_build;
 mod bootstrap_candidate_probe;
 mod bootstrap_status;
 mod build_report_command;
@@ -381,6 +383,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapCandidateProbe { input, output_dir } => {
             bootstrap_candidate_probe::handle_bootstrap_candidate_probe(input, output_dir)?;
+        }
+        cli::CommandKind::BootstrapCandidateBuild { input, output_dir } => {
+            bootstrap_candidate_build::handle_bootstrap_candidate_build(input, output_dir)?;
         }
         cli::CommandKind::BootstrapDiff {
             stage0_record,

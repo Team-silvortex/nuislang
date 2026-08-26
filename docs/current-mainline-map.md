@@ -15,20 +15,21 @@ If you only need the shortest current `beta-0.6.*` reading route, use this order
 4. [reference/nuis-compiler-stage-handoff.md](reference/nuis-compiler-stage-handoff.md)
 5. [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
 6. [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
-7. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-8. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-9. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-10. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-11. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-12. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-13. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-14. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-15. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-16. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-17. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-18. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-19. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-20. [versioning/README.md](versioning/README.md)
+7. [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
+8. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
+9. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+10. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+11. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+12. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+13. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+14. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+15. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+16. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+17. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+18. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+19. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+20. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+21. [versioning/README.md](versioning/README.md)
 
 Short rule:
 
@@ -48,6 +49,8 @@ Short rule:
   [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
 * current pure Nuis candidate execution proof:
   [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
+* current attested Nuis stage1 leaf production proof:
+  [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
 * current stage0/stage1 candidate differential gate:
   [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
 * current `beta-0.6.*` entry:

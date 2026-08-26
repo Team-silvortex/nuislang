@@ -57,8 +57,12 @@ They normalize before subset validation to `while true`, nested `if`, and a
 two-arm `match` respectively, so subset v1 gains no new AST capability or
 policy bypass.
 
-Only documentation attributes are allowed. Diagnostics must be returned as
-data rather than printed by a compiler component.
+Documentation attributes are generally the only metadata dependency. Four
+exact all-`i64` `@export` signatures are additionally reserved for the first
+stage1 candidate's scalar byte producer ABI. Function name, symbol name,
+parameter count, and return type must all match the machine-readable allowlist;
+every other export remains `NBS004`. Diagnostics must be returned as data
+rather than printed by a compiler component.
 
 ## Deliberate Exclusions
 
@@ -66,7 +70,8 @@ V1 rejects these capabilities even when the wider language supports them:
 
 - shader, kernel, network, data, CFFI, and other non-CPU domains
 - arbitrary library imports, extern declarations, and FFI interfaces
-- traits, impl dispatch, bounded generics, lambdas, and dynamic invocation
+- arbitrary attributes or exports, traits, impl dispatch, bounded generics,
+  lambdas, and dynamic invocation
 - async functions, `await`, tests, and benchmarks
 - floating-point values and types
 - references, nullable address types, raw dereference, and low-level memory

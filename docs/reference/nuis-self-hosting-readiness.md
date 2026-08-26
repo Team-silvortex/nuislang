@@ -83,7 +83,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `early/70`. Normal AOT builds emit the ordered five-stage
+This gate is now `usable/78`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -92,14 +92,16 @@ source reconstruction or producer-private layout. Explicit YIR crosses parse,
 verify, and canonical re-render. `StdCompilerProjection` now supplies a typed
 streaming consumer whose pure Nuis candidate crosses bootstrap-check, native
 AOT execution, malformed-sequence rejection, and tamper-checked execution
-proof. Serialized payload ingestion and a second producer remain open. See
+proof. The exact scalar producer ABI now consumes every serialized stage byte,
+emits a Nuis-owned bundle fold, and produces a separately identified candidate
+handoff. Complete token/structural-body decoding in Nuis remains open. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `early/65`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `usable/80`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -114,14 +116,20 @@ then binds its image and result to
 `nuis-compiler-candidate-execution-v1`. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md).
 
-The probe authority is explicitly execution-only. The component record remains
-stage0, so no Nuis stage1 producer or replacement authorization exists yet.
+The probe authority remains explicitly execution-only. The separate
+`nuis bootstrap-candidate-build` frontdoor feeds all five payloads through the
+candidate's exact scalar exports, independently verifies the folds, emits a
+candidate handoff/component/diagnostic set plus
+`nuis-compiler-candidate-production-v1`, and then runs the differential gate.
+See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
+The first producer is an identity projection relay; no replacement authority
+exists.
 
 ### `differential-reproducibility-gate`
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `early/60`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/78`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -129,12 +137,12 @@ report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
 and returns a failing command status. See
 [Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md).
 
-The comparison engine is implemented, but there is still no real Nuis stage1
-producer. Therefore repository-native cross-producer equivalence and a
-separate reversible replacement authorization remain open. The implemented
-codec, typed Nuis consumer, and candidate execution proof mean the next weakest
-work is no longer parsing, execution, comparison, or handoff protocol. It is
-the first real leaf component emitted by a Nuis stage1-candidate producer.
+The checked-in Nuis projection relay now enters this path as a real
+`stage1-candidate` leaf and reaches repository-native `13/13` equivalence. The
+path frontdoor verifies its execution and production proofs, including exact
+adapter bytes and all stage folds, before writing the report. Repeated
+independent clean-build evidence, a non-identity compiler transformation, and
+separate reversible replacement authorization remain open.
 
 ## Migration Rule
 

@@ -41,6 +41,50 @@ fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
 }
 
 #[test]
+fn exact_scalar_candidate_export_is_allowed_but_symbol_spoofing_is_rejected() {
+    let accepted = inspect_bootstrap_source(
+        r#"
+        mod cpu Main {
+          @export(name = "nuis_bootstrap_candidate_stage_seed_v1")
+          fn compiler_candidate_stage_seed(ordinal: i64) -> i64 {
+            return 97 + ordinal;
+          }
+
+          fn main() -> i64 {
+            return compiler_candidate_stage_seed(0) - 97;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(
+        accepted.accepted(),
+        "{}",
+        render_bootstrap_check_text(&accepted)
+    );
+    assert_eq!(accepted.semantic_pipeline, "checked");
+
+    let spoofed = inspect_bootstrap_source(
+        r#"
+        mod cpu Main {
+          @export(name = "arbitrary_bootstrap_escape")
+          fn compiler_candidate_stage_seed(ordinal: i64) -> i64 {
+            return ordinal;
+          }
+
+          fn main() -> i64 { return 0; }
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(!spoofed.accepted());
+    assert!(spoofed.modules[0]
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == "NBS004"));
+}
+
+#[test]
 fn rejected_fixtures_pin_each_frozen_boundary() {
     let cases = [
         (REJECTED_ASYNC, &["NBS009", "NBS014"][..]),

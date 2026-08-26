@@ -7,6 +7,7 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
+* [nuis-compiler-candidate-production-v1.toml](nuis-compiler-candidate-production-v1.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not
@@ -17,6 +18,12 @@ create a stage1 compiler and it never authorizes replacing stage0.
 Each side supplies a verified `nuis.compiler-component-build.toml`, its
 five-stage handoff, all handoff payloads, and a sibling
 `nuis.compiler-diagnostics.toml`.
+
+The path-based frontdoor also requires the stage0 candidate-execution proof and
+the candidate's `nuis.compiler-candidate-production.toml`. It verifies those
+cross-bindings and the exact adapter before a differential report can be
+written. The in-memory comparison builder remains reusable for protocol unit
+tests, but cannot bypass this repository frontdoor requirement.
 
 The diagnostic report binds:
 
@@ -105,19 +112,22 @@ identity and canonical parser reject any such mutation.
 ## Current Boundary
 
 The comparison engine, diagnostic sidecar, CLI, canonical readers, identity
-recomputation, and drift tests are implemented. The repository still has no
-Nuis-written stage1 producer, so the successful cross-producer path is tested
-with independently identified protocol fixtures rather than claimed as a
-self-hosting milestone.
+recomputation, and drift tests are implemented. The checked-in structural
+projection relay is now the first Nuis-written leaf producer: it consumes all
+five serialized payloads through the exact scalar ABI, emits a bound candidate
+bundle fold, receives a distinct `stage1-candidate` component record, and
+reaches repository-native `13/13` equivalence.
 
-The next real closure is a small leaf compiler component emitted by a Nuis
-producer through the existing producer-neutral handoff. Only then can this gate
-record repository-native stage0/stage1 equivalence.
+This is not replacement authority or full compiler self-hosting. The next
+closures are a non-identity token/structural transformation, equivalent
+results across independent clean rebuilds, and a separate reversible
+authorization protocol.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_diagnostic_report -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib parse_bootstrap_diff_command -j 1

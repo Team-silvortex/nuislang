@@ -2,7 +2,8 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use crate::{
     parse_compiler_component_build_from_source, parse_compiler_diagnostic_report_from_source,
-    parse_compiler_stage_handoff_from_source, read_compiler_component_build,
+    parse_compiler_stage_handoff_from_source, read_compiler_candidate_execution,
+    read_compiler_candidate_production, read_compiler_component_build,
     read_compiler_diagnostic_report, read_compiler_stage_handoff, render_compiler_component_build,
     render_compiler_diagnostic_report, render_compiler_stage_handoff,
     toml::{
@@ -10,8 +11,9 @@ use crate::{
         parse_required_toml_bool, parse_required_toml_string, parse_required_toml_usize,
     },
     ArtifactError, CompilerComponentBuild, CompilerDiagnosticReport, CompilerStageHandoff,
-    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
-    COMPILER_DIAGNOSTIC_REPORT_FILE,
+    VerifiedCompilerStagePayload, COMPILER_CANDIDATE_EXECUTION_FILE,
+    COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_STAGE0_ROLE,
+    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_DIAGNOSTIC_REPORT_FILE,
 };
 
 #[path = "compiler_component_diff_identity.rs"]
@@ -229,7 +231,7 @@ pub fn compare_compiler_component_paths(
 ) -> Result<CompilerComponentDifferential, ArtifactError> {
     let stage0 = read_evidence(stage0_path)?;
     let candidate = read_evidence(candidate_path)?;
-    build_compiler_component_differential(
+    let report = build_compiler_component_differential(
         CompilerComponentEvidence {
             component: &stage0.0,
             handoff: &stage0.1,
@@ -240,7 +242,20 @@ pub fn compare_compiler_component_paths(
             handoff: &candidate.1,
             diagnostics: &candidate.2,
         },
-    )
+    )?;
+    let stage0_root = stage0_path.parent().unwrap_or_else(|| Path::new("."));
+    let candidate_root = candidate_path.parent().unwrap_or_else(|| Path::new("."));
+    let execution =
+        read_compiler_candidate_execution(&stage0_root.join(COMPILER_CANDIDATE_EXECUTION_FILE))?;
+    read_compiler_candidate_production(
+        &candidate_root.join(COMPILER_CANDIDATE_PRODUCTION_FILE),
+        &stage0.0,
+        &execution,
+        &candidate.0,
+        &candidate.1,
+        &candidate.3,
+    )?;
+    Ok(report)
 }
 
 pub fn render_compiler_component_differential(report: &CompilerComponentDifferential) -> String {
@@ -365,18 +380,20 @@ fn read_evidence(
         CompilerComponentBuild,
         CompilerStageHandoff,
         CompilerDiagnosticReport,
+        Vec<VerifiedCompilerStagePayload>,
     ),
     ArtifactError,
 > {
     let component = read_compiler_component_build(path)?;
     let root = path.parent().unwrap_or_else(|| Path::new("."));
-    let (handoff, _) = read_compiler_stage_handoff(&root.join(&component.stage_handoff_file))?;
+    let (handoff, payloads) =
+        read_compiler_stage_handoff(&root.join(&component.stage_handoff_file))?;
     let diagnostics = read_compiler_diagnostic_report(
         &root.join(COMPILER_DIAGNOSTIC_REPORT_FILE),
         &component.record_sha256,
         &component.producer_id,
     )?;
-    Ok((component, handoff, diagnostics))
+    Ok((component, handoff, diagnostics, payloads))
 }
 
 fn validate_evidence(

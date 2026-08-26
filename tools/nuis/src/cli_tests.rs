@@ -127,6 +127,26 @@ fn parses_bootstrap_candidate_probe_command() {
 }
 
 #[test]
+fn parses_bootstrap_candidate_build_command() {
+    let command = parse_args(
+        [
+            "bootstrap-candidate-build".to_owned(),
+            "compiler-project".to_owned(),
+            "build/candidate-component".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap-candidate-build parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapCandidateBuild {
+            input: PathBuf::from("compiler-project"),
+            output_dir: PathBuf::from("build/candidate-component"),
+        }
+    );
+}
+
+#[test]
 fn parses_bootstrap_diff_command() {
     let command = parse_args(
         [

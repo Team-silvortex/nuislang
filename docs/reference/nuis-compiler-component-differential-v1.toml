@@ -10,6 +10,8 @@ candidate_role = "stage1-candidate"
 producer_policy = "distinct-producer-identities"
 digest = "sha256-lowercase"
 replacement_authorized = false
+candidate_production_protocol = "nuis-compiler-candidate-production-v1"
+candidate_production_required_by_path_frontdoor = true
 
 ordered_comparisons = [
   "component-id",
@@ -35,6 +37,7 @@ verdicts = [
 invariants = [
   "both-component-records-and-payloads-verify-before-comparison",
   "both-diagnostic-reports-bind-their-exact-component-records",
+  "candidate-production-proof-binds-stage0-execution-and-all-five-stage-folds",
   "all-thirteen-comparisons-are-required-and-canonically-ordered",
   "valid-drift-writes-an-audit-report-and-exits-failure",
   "report-output-cannot-overwrite-an-input-record",
@@ -45,7 +48,7 @@ invariants = [
 
 [open_boundary]
 missing = [
-  "real-nuis-stage1-component-producer",
-  "repository-native-cross-producer-equivalence-run",
+  "repeated-clean-build-cross-producer-reproducibility-proof",
+  "non-identity-nuis-stage-transformation",
   "reversible-component-replacement-authorization",
 ]

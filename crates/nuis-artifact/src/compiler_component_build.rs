@@ -67,6 +67,14 @@ pub struct CompilerComponentBuildInput<'a> {
     pub dependencies: &'a [CompilerComponentDependencyInput<'a>],
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CompilerComponentCandidatePromotionInput<'a> {
+    pub stage0: &'a CompilerComponentBuild,
+    pub producer_id: &'a str,
+    pub compiler_image: &'a [u8],
+    pub stage_handoff_bundle_sha256: &'a str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerComponentBuild {
     pub protocol: String,
@@ -202,6 +210,48 @@ pub fn build_compiler_component_build(
     build.record_sha256 = component_build_identity(&build);
     validate_compiler_component_build(&build)?;
     Ok(build)
+}
+
+pub fn promote_compiler_component_candidate(
+    input: &CompilerComponentCandidatePromotionInput<'_>,
+) -> Result<CompilerComponentBuild, ArtifactError> {
+    validate_compiler_component_build(input.stage0)?;
+    if input.stage0.stage_role != COMPILER_COMPONENT_STAGE0_ROLE {
+        return Err(ArtifactError::new(
+            "compiler candidate promotion requires a verified stage0 component",
+        ));
+    }
+    validate_header_value(input.producer_id, "candidate producer id")?;
+    if input.producer_id == input.stage0.producer_id {
+        return Err(ArtifactError::new(
+            "compiler candidate promotion requires a distinct producer id",
+        ));
+    }
+    if input.compiler_image.is_empty() {
+        return Err(ArtifactError::new(
+            "compiler candidate promotion requires a non-empty Nuis compiler image",
+        ));
+    }
+    validate_sha256(
+        input.stage_handoff_bundle_sha256,
+        "candidate stage handoff bundle",
+    )?;
+    if input.stage_handoff_bundle_sha256 != input.stage0.stage_handoff_bundle_sha256 {
+        return Err(ArtifactError::new(
+            "compiler candidate promotion must preserve the stage0 semantic bundle",
+        ));
+    }
+
+    let mut candidate = input.stage0.clone();
+    candidate.stage_role = COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE.to_owned();
+    candidate.producer_id = input.producer_id.to_owned();
+    candidate.compiler_image_bytes = input.compiler_image.len();
+    candidate.compiler_image_sha256 = sha256_hex(input.compiler_image);
+    candidate.stage_handoff_bundle_sha256 = input.stage_handoff_bundle_sha256.to_owned();
+    candidate.reproducible_build_sha256 = reproducible_build_identity(&candidate);
+    candidate.record_sha256 = component_build_identity(&candidate);
+    validate_compiler_component_build(&candidate)?;
+    Ok(candidate)
 }
 
 pub fn render_compiler_component_build(build: &CompilerComponentBuild) -> String {

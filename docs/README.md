@@ -48,6 +48,7 @@ For the compiler and project frontdoor:
 * [Compiler stage handoff](reference/nuis-compiler-stage-handoff.md)
 * [Compiler component build](reference/nuis-compiler-component-build.md)
 * [Compiler candidate execution](reference/nuis-compiler-candidate-execution.md)
+* [Compiler candidate production](reference/nuis-compiler-candidate-production.md)
 * [Compiler component differential gate](reference/nuis-compiler-component-differential.md)
 * [Nuis frontdoor surface](reference/nuis-frontdoor-surface-reference.md)
 * [Native artifact workflow](reference/nuis-native-artifact-workflow.md)

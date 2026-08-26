@@ -19,6 +19,12 @@ This reference only covers the current grouped frontdoor family:
 * `nuis project-doctor`
 * `nuis artifact-doctor`
 
+The bootstrap frontdoors are deliberately outside this grouped field contract.
+Their current route is documented by
+[Self-hosting readiness](nuis-self-hosting-readiness.md) and
+[Compiler candidate production](nuis-compiler-candidate-production.md),
+including `nuis bootstrap-candidate-build`.
+
 It does not attempt to freeze:
 
 * every diagnostic line

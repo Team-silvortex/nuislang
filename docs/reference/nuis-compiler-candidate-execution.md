@@ -4,8 +4,10 @@
 compiler-shaped program written in Nuis. Its machine-readable contract is
 [nuis-compiler-candidate-execution-v1.toml](nuis-compiler-candidate-execution-v1.toml).
 
-This is a candidate **probe**, not a stage1 compiler-component record. Its
-authority is fixed to `execution-only-no-component-production`.
+This record remains a candidate **probe**, not a stage1 compiler-component
+record. Its authority is fixed to `execution-only-no-component-production`.
+The separate candidate-production protocol may consume this proof, but cannot
+edit or widen its authority.
 
 ## Frontdoor
 
@@ -68,10 +70,15 @@ producer_id = nuisc-stage0-reference
 ```
 
 The sidecar role `stage1-candidate-probe` proves only that a Nuis-written
-candidate image executed under the frozen boundary. It cannot enter
+candidate image executed under the frozen boundary. By itself it cannot enter
 `bootstrap-diff`, emit a `stage1-candidate` component record, or authorize
-replacement. Those require a Nuis producer of the complete five-stage handoff
-and normalized diagnostics.
+replacement.
+
+`nuis bootstrap-candidate-build` now consumes this immutable proof as one input
+to `nuis-compiler-candidate-production-v1`. That successor additionally binds
+the Nuis scalar producer ABI, every five-stage byte fold, the candidate
+handoff/component/diagnostics, and the host adapter. See
+[Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 
 ## Validation
 

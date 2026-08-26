@@ -6,11 +6,14 @@ use std::{
 };
 
 use nuis_artifact::{
-    parse_compiler_structural_projection, read_compiler_candidate_execution,
+    parse_compiler_component_differential, parse_compiler_structural_projection,
+    read_compiler_candidate_execution, read_compiler_candidate_production,
     read_compiler_component_build, read_compiler_stage_handoff, CompilerProjectionKind,
-    CompilerProjectionRecordKind, CompilerStageKind, COMPILER_CANDIDATE_EXECUTION_AUTHORITY,
-    COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_EXECUTION_ROLE,
-    COMPILER_COMPONENT_BUILD_FILE,
+    CompilerProjectionRecordKind, CompilerStageKind, COMPILER_CANDIDATE_ADAPTER_FILE,
+    COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
+    COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
+    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
 };
 
 fn temp_dir() -> PathBuf {
@@ -21,6 +24,93 @@ fn temp_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("nuis_projection_candidate_{nonce}"));
     fs::create_dir_all(&dir).expect("create structural projection candidate output directory");
     dir
+}
+
+#[test]
+fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
+    let project = "../../examples/projects/tooling/bootstrap_structural_projection_candidate";
+    let output_dir = temp_dir();
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&["bootstrap-candidate-build", project, &output_dir_text]);
+    assert!(
+        build.status.success(),
+        "candidate component build failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr),
+    );
+
+    let stage0_dir = output_dir.join("stage0");
+    let candidate_dir = output_dir.join("stage1-candidate");
+    let stage0_record_path = stage0_dir.join(COMPILER_COMPONENT_BUILD_FILE);
+    let candidate_record_path = candidate_dir.join(COMPILER_COMPONENT_BUILD_FILE);
+    let stage0 =
+        read_compiler_component_build(&stage0_record_path).expect("verify stage0 component");
+    let execution =
+        read_compiler_candidate_execution(&stage0_dir.join(COMPILER_CANDIDATE_EXECUTION_FILE))
+            .expect("verify stage0 candidate execution");
+    let candidate = read_compiler_component_build(&candidate_record_path)
+        .expect("verify stage1 candidate component");
+    assert_eq!(
+        candidate.stage_role,
+        COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE
+    );
+    assert_eq!(candidate.producer_id, "nuis-stage1-projection-relay-v1");
+    assert_ne!(candidate.producer_id, stage0.producer_id);
+    assert_eq!(candidate.compiler_image_sha256, stage0.native_binary_sha256);
+
+    let (handoff, payloads) =
+        read_compiler_stage_handoff(&candidate_dir.join("nuis.compiler-stage-handoff.toml"))
+            .expect("verify candidate handoff");
+    let production = read_compiler_candidate_production(
+        &candidate_dir.join(COMPILER_CANDIDATE_PRODUCTION_FILE),
+        &stage0,
+        &execution,
+        &candidate,
+        &handoff,
+        &payloads,
+    )
+    .expect("verify candidate production proof");
+    assert_eq!(production.record_count, 5);
+    assert!(!production.replacement_authorized);
+
+    let differential = parse_compiler_component_differential(
+        &output_dir.join(COMPILER_COMPONENT_DIFFERENTIAL_FILE),
+    )
+    .expect("verify candidate differential");
+    assert_eq!(differential.equivalent_count, 13);
+    assert!(differential.deterministic_artifact_equivalent);
+    assert_eq!(differential.verdict, "equivalent-awaiting-authorization");
+    assert!(!differential.replacement_authorized);
+
+    let adapter_path = candidate_dir.join(COMPILER_CANDIDATE_ADAPTER_FILE);
+    let mut tampered = fs::read(&adapter_path).expect("read candidate adapter");
+    tampered.push(0);
+    fs::write(&adapter_path, tampered).expect("tamper candidate adapter");
+    let error = read_compiler_candidate_production(
+        &candidate_dir.join(COMPILER_CANDIDATE_PRODUCTION_FILE),
+        &stage0,
+        &execution,
+        &candidate,
+        &handoff,
+        &payloads,
+    )
+    .expect_err("adapter tampering must invalidate production proof");
+    assert!(error
+        .to_string()
+        .contains("adapter length or SHA-256 mismatch"));
+    let tampered_report_path = output_dir.join("tampered-differential.toml");
+    let tampered_diff = run_nuis(&[
+        "bootstrap-diff",
+        &stage0_record_path.display().to_string(),
+        &candidate_record_path.display().to_string(),
+        &tampered_report_path.display().to_string(),
+    ]);
+    assert!(!tampered_diff.status.success());
+    assert!(String::from_utf8_lossy(&tampered_diff.stderr)
+        .contains("adapter length or SHA-256 mismatch"));
+    assert!(!tampered_report_path.exists());
+
+    fs::remove_dir_all(output_dir).expect("remove candidate component output");
 }
 
 fn run_nuis(args: &[&str]) -> std::process::Output {
