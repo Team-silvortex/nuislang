@@ -1,4 +1,5 @@
 use super::*;
+use nuis_semantics::model::{NirExpr, NirStmt};
 
 #[test]
 fn lowers_match_expression_with_shared_borrow_lifecycle_and_shared_suffix() {
@@ -552,7 +553,7 @@ fn compiler_data_model_helpers_remain_pure() {
     let pure_helpers = super::super::loop_purity::collect_pure_helper_functions(&module);
 
     for expected in [
-        "compiler_vector_push__i64",
+        "compiler_vector_push",
         "compiler_text_append_byte",
         "compiler_text_push_scalar",
     ] {
@@ -605,4 +606,46 @@ fn carries_match_binding_through_return_chain_after_pure_call() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+}
+
+#[test]
+fn branch_substitution_stops_at_a_nested_shadowing_binding() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 17;
+            if true {
+              let value: i64 = 0;
+              if value != 0 {
+                return 1;
+              }
+            }
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let outer_if = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .and_then(|function| function.body.get(1))
+        .expect("outer if statement");
+    let substituted = super::super::loop_purity::substitute_stmt_bindings(
+        outer_if,
+        &[("value".to_owned(), NirExpr::Int(99))],
+    );
+    let NirStmt::If { then_body, .. } = substituted else {
+        panic!("expected substituted outer if");
+    };
+    let Some(NirStmt::If { condition, .. }) = then_body.get(1) else {
+        panic!("expected inner if after shadowing declaration");
+    };
+    let NirExpr::Binary { lhs, .. } = condition else {
+        panic!("expected inner comparison");
+    };
+
+    assert!(matches!(lhs.as_ref(), NirExpr::Var(name) if name == "value"));
 }

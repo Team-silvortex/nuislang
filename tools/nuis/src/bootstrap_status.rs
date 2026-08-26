@@ -505,8 +505,8 @@ mod tests {
     #[test]
     fn stable_status_requires_exactly_one_hundred_progress() {
         let invalid = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 75",
-            "status = \"stable\"\nprogress = 75",
+            "status = \"usable\"\nprogress = 80",
+            "status = \"stable\"\nprogress = 80",
             1,
         );
         let error = parse_bootstrap_readiness(&invalid).expect_err("status drift must fail");
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn next_gate_follows_bootstrap_dependency_order() {
         let after_data_model = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 75",
+            "status = \"usable\"\nprogress = 80",
             "status = \"stable\"\nprogress = 100",
             1,
         );
@@ -531,7 +531,7 @@ mod tests {
     fn completed_manifest_has_stable_null_next_gate_shape() {
         let complete = CHECKED_IN_MANIFEST
             .replace(
-                "status = \"usable\"\nprogress = 75",
+                "status = \"usable\"\nprogress = 80",
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(

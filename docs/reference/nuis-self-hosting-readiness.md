@@ -63,17 +63,21 @@ This gate is `stable/100`; widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. The bounded v1 model
-is now `usable/75`: `StdLanguageCore` owns the representation, the frozen
-bootstrap subset accepts it, and
-`bootstrap_compiler_data_model_demo` crosses bootstrap-check, NIR/YIR/LLVM,
-native build, and deterministic execution without FFI or host collections.
+and path contracts needed by a real compiler component. The paged v2 model is
+now `usable/80`: `StdLanguageCore` owns the representation, the frozen
+bootstrap subset accepts it, and `bootstrap_compiler_data_model_demo` crosses
+bootstrap-check, NIR/YIR/LLVM, native build, and deterministic execution
+without FFI or host collections. Its text and token streams cross the first
+four-value page boundary, while a capacity witness validates all sixteen slots
+and rejects a seventeenth push.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
-This is deliberately not `stable/100`. V1 proves the ownership and lowering
-shape with four-slot vectors/maps and integer map keys. A realistic tokenizer
-or parser still needs deterministic page- or chunk-backed growth, larger
-pressure fixtures, and preserved differential identities.
+This is deliberately not `stable/100`. V2 proves deterministic four-page
+vector growth but remains `i64`-specific and bounded to sixteen values. Maps
+remain four-entry, arenas do not yet hold object storage, generic nested-page
+specialization still lacks defining-module provenance, and large pure
+aggregate expansion remains expensive. Those constraints still prevent a
+realistic tokenizer or parser workload.
 
 ### `stage-neutral-ir-boundary`
 

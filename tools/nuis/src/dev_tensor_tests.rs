@@ -20,7 +20,10 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
         ),
         expected
     );
-    assert_eq!(expected, "standard-library/std/compiler-data-model");
+    assert_eq!(
+        expected,
+        "developer-system/bootstrap/differential-reproducibility-gate"
+    );
     assert_eq!(selected.status, "usable");
 }
 
@@ -151,14 +154,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "standard-library/std/compiler-data-model"
+        "developer-system/bootstrap/differential-reproducibility-gate"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("weakest bootstrap-critical status/progress ordering"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "standard-library/std/compiler-data-model"
+        "developer-system/bootstrap/differential-reproducibility-gate"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -199,7 +202,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "standard-library/std/compiler-data-model"
+        "developer-system/bootstrap/differential-reproducibility-gate"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -579,7 +582,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: standard-library/std/compiler-data-model"
+        "weakest_bootstrap_task_card_common_ancestor_path: developer-system/bootstrap/differential-reproducibility-gate"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("weakest bootstrap-critical status/progress ordering"));

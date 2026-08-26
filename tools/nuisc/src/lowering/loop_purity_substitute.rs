@@ -451,6 +451,32 @@ pub(in crate::lowering) fn substitute_stmt_bindings(
     stmt: &NirStmt,
     bindings: &[(String, NirExpr)],
 ) -> NirStmt {
+    fn substitute_stmt_sequence(
+        stmts: &[NirStmt],
+        binding_name: &str,
+        binding_value: &NirExpr,
+    ) -> Vec<NirStmt> {
+        let mut shadowed = false;
+        stmts
+            .iter()
+            .map(|stmt| {
+                let substituted = if shadowed {
+                    stmt.clone()
+                } else {
+                    substitute_stmt_binding(stmt, binding_name, binding_value)
+                };
+                if matches!(
+                    stmt,
+                    NirStmt::Let { name, .. } | NirStmt::Const { name, .. }
+                        if name == binding_name
+                ) {
+                    shadowed = true;
+                }
+                substituted
+            })
+            .collect()
+    }
+
     fn substitute_stmt_binding(
         stmt: &NirStmt,
         binding_name: &str,
@@ -481,21 +507,12 @@ pub(in crate::lowering) fn substitute_stmt_bindings(
                 else_body,
             } => NirStmt::If {
                 condition: substitute_branch_binding(condition, binding_name, binding_value),
-                then_body: then_body
-                    .iter()
-                    .map(|inner| substitute_stmt_binding(inner, binding_name, binding_value))
-                    .collect(),
-                else_body: else_body
-                    .iter()
-                    .map(|inner| substitute_stmt_binding(inner, binding_name, binding_value))
-                    .collect(),
+                then_body: substitute_stmt_sequence(then_body, binding_name, binding_value),
+                else_body: substitute_stmt_sequence(else_body, binding_name, binding_value),
             },
             NirStmt::While { condition, body } => NirStmt::While {
                 condition: substitute_branch_binding(condition, binding_name, binding_value),
-                body: body
-                    .iter()
-                    .map(|inner| substitute_stmt_binding(inner, binding_name, binding_value))
-                    .collect(),
+                body: substitute_stmt_sequence(body, binding_name, binding_value),
             },
             _ => stmt.clone(),
         }

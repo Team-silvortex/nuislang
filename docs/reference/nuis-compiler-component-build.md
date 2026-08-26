@@ -103,7 +103,7 @@ The native regression builds the same pure Nuis compiler-data component twice
 in one output directory. The second run exercises the cache-hit path and must
 retain compiler-image, dependency-closure, handoff, native-output, and
 reproducible-build identities. The test executes the native program with
-deterministic score 43, then mutates its bytes and proves the record reader
+deterministic score 59, then mutates its bytes and proves the record reader
 rejects it.
 
 ## Honest Boundary

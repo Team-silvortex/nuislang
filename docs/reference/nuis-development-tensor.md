@@ -1751,15 +1751,10 @@ The five required coordinates are:
 Subset v1 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the
 roadmap score, and readiness waits for all five to reach `stable/100`.
 
-The pure Nuis structural consumer and exact scalar producer move the
-stage-neutral boundary to `usable/78`; the identity-bound probe plus attested
-candidate build move the driver to `usable/80`. The candidate consumes every
-serialized stage byte, emits a separately identified `stage1-candidate`, and
-reaches `13/13` equivalence through the fail-closed differential gate, now
-`usable/78`. Replacement authorization remains false. The weakest
-bootstrap-critical coordinate therefore advances to
-`standard-library/std/compiler-data-model` at `usable/75`, where deterministic
-growth beyond the bounded proof containers remains open.
+The pure Nuis consumer moves the stage-neutral boundary to `usable/78`; its
+attested candidate moves the driver to `usable/80` with `13/13` fail-closed
+equivalence. Data model v2 reaches `usable/80` through four pages and native
+score `59`; the `usable/78` reproducibility gate remains weakest.
 
 ## Runtime Lifecycle Loader Bootstrap
 

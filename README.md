@@ -31,20 +31,20 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `682/682` implementation-drift checks across `26/26` registered
+manifest, and `683/683` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
 bootstrap-critical average honest at `95/100`; the weakest coordinate is now
-`standard-library/std/compiler-data-model` at `usable`, `75/100`. The
-stage-neutral handoff is `usable/78`, the stage driver is `usable/80`, and the
-differential gate is `usable/78`. The dedicated
+`developer-system/bootstrap/differential-reproducibility-gate` at `usable`,
+`78/100`. The paged compiler data model and stage driver are `usable/80`, while
+the stage-neutral handoff and differential gate are `usable/78`. The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
 audit record, and component-bound diagnostic proof for one project-form
 compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
-`nuis bootstrap-status` frontdoor reports `1/5` gates closed, while the bounded
-compiler data model is `usable`, `75/100` and the producer-neutral five-stage
+`nuis bootstrap-status` frontdoor reports `1/5` gates closed, while the paged
+compiler data model is `usable`, `80/100` and the producer-neutral five-stage
 handoff is `usable`, `78/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
@@ -70,9 +70,9 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
-structural codec, typed Nuis consumer, candidate execution proof, and first
-attested stage1 leaf in place, the tensor now routes mainline work to
-deterministic compiler-data growth and repeated clean-build reproducibility. A
+structural codec, typed Nuis consumer, candidate execution proof, paged compiler
+data, and first attested stage1 leaf in place, the tensor now routes mainline
+work to repeated clean-build reproducibility and broader compiler-data growth. A
 non-identity Nuis transformation, reversible replacement authorization, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.

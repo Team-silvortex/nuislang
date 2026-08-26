@@ -6,14 +6,26 @@ mod cpu Main {
     let n: CompilerText = compiler_text_push_scalar(compiler_text_empty(), 110)?;
     let u: CompilerText = compiler_text_push_scalar(n, 117)?;
     let i: CompilerText = compiler_text_push_scalar(u, 105)?;
-    return compiler_text_push_scalar(i, 115);
+    let s: CompilerText = compiler_text_push_scalar(i, 115)?;
+    let l: CompilerText = compiler_text_push_scalar(s, 108)?;
+    let a: CompilerText = compiler_text_push_scalar(l, 97)?;
+    let n2: CompilerText = compiler_text_push_scalar(a, 110)?;
+    return compiler_text_push_scalar(n2, 103);
   }
 
-  fn build_token_stream() -> Result<CompilerVector<i64>, i64> {
-    let empty: CompilerVector<i64> = compiler_vector_empty<i64>(0);
-    let identifier: CompilerVector<i64> = compiler_vector_push<i64>(empty, 11)?;
-    let end: CompilerVector<i64> = compiler_vector_push<i64>(identifier, 12)?;
-    return compiler_vector_set<i64>(end, 1, 13);
+  fn build_token_stream() -> Result<CompilerVector, i64> {
+    let empty: CompilerVector = compiler_vector_empty(0);
+    let identifier: CompilerVector = compiler_vector_push(empty, 11)?;
+    let end: CompilerVector = compiler_vector_push(identifier, 12)?;
+    let third: CompilerVector = compiler_vector_push(end, 14)?;
+    let fourth: CompilerVector = compiler_vector_push(third, 15)?;
+    let fifth: CompilerVector = compiler_vector_push(fourth, 16)?;
+    let sixth: CompilerVector = compiler_vector_push(fifth, 17)?;
+    return compiler_vector_set(sixth, 1, 13);
+  }
+
+  fn fill_token_capacity() -> Result<CompilerVector, i64> {
+    return Result.Ok(compiler_vector_full(0));
   }
 
   fn build_symbol_map(node_index: i64) -> Result<CompilerMap, i64> {
@@ -29,34 +41,74 @@ mod cpu Main {
 
   fn boundaries_fail_closed(
     text: CompilerText,
-    tokens: CompilerVector<i64>,
+    tokens: CompilerVector,
+    full_tokens: CompilerVector,
     symbols: CompilerMap,
     arena: CompilerArena
   ) -> i64 {
-    if tokens.length != 2 {
+    if text.bytes.length != 8 || text.bytes.page_count != 2 {
       return 5;
     }
-    match compiler_vector_get(tokens, 3) {
+    if tokens.length != 6 || tokens.page_count != 2 {
+      return 6;
+    }
+    match compiler_vector_get(tokens, 5) {
+      Option.Some(value) => {
+        if value != 17 {
+          return 7;
+        }
+      }
+      Option.None => {
+        return 8;
+      }
+    }
+    match compiler_vector_get(tokens, 6) {
       Option.Some(_) => {
-        return 1;
+        return 9;
       }
       Option.None => {}
     }
+    if full_tokens.length != 16 || full_tokens.page_count != 4 {
+      return 10;
+    }
+    match compiler_vector_get(full_tokens, 15) {
+      Option.Some(value) => {
+        if value != 0 {
+          return 11;
+        }
+      }
+      Option.None => {
+        return 12;
+      }
+    }
+    match compiler_vector_push(full_tokens, 99) {
+      Result.Ok(_) => {
+        return 13;
+      }
+      Result.Err(code) => {
+        if code != 1 {
+          return 14;
+        }
+      }
+    }
+    if compiler_vector_shape_valid(-1, 2, 4, -5, 0, 0) {
+      return 18;
+    }
     match compiler_map_get(symbols, 99) {
       Option.Some(_) => {
-        return 2;
+        return 15;
       }
       Option.None => {}
     }
     match compiler_arena_allocate(arena) {
       Result.Ok(_) => {
-        return 3;
+        return 16;
       }
       Result.Err(_) => {}
     }
     match compiler_text_push_scalar(text, 55296) {
       Result.Ok(_) => {
-        return 4;
+        return 17;
       }
       Result.Err(_) => {
         return 0;
@@ -66,7 +118,8 @@ mod cpu Main {
 
   fn compile_component() -> Result<i64, i64> {
     let text: CompilerText = build_source_text()?;
-    let tokens: CompilerVector<i64> = build_token_stream()?;
+    let tokens: CompilerVector = build_token_stream()?;
+    let full_tokens: CompilerVector = fill_token_capacity()?;
     let token_kind: i64 = match compiler_vector_get(tokens, 1) {
       Option.Some(value) => {
         value
@@ -89,7 +142,7 @@ mod cpu Main {
       }
     };
 
-    let span: CompilerSourceSpan = compiler_source_span(1, 0, 4)?;
+    let span: CompilerSourceSpan = compiler_source_span(1, 0, 8)?;
     let path: CompilerPath = build_path()?;
     let diagnostic: CompilerDiagnostic = compiler_diagnostic(
       7,
@@ -99,7 +152,13 @@ mod cpu Main {
       path
     )?;
 
-    let boundary_error: i64 = boundaries_fail_closed(text, tokens, symbols, arena2);
+    let boundary_error: i64 = boundaries_fail_closed(
+      text,
+      tokens,
+      full_tokens,
+      symbols,
+      arena2
+    );
     if boundary_error != 0 {
       return Result.Err(boundary_error);
     }

@@ -25,18 +25,28 @@ mod cpu StdLanguageCore {
     None,
   }
 
-  /// Four-slot owned value vector for the first compiler bootstrap boundary.
-  pub struct CompilerVector<T> {
+  /// Internal four-value page used by the deterministic compiler vector.
+  pub struct CompilerVectorPage {
     pub length: i64,
-    pub slot0: T,
-    pub slot1: T,
-    pub slot2: T,
-    pub slot3: T
+    pub slot0: i64,
+    pub slot1: i64,
+    pub slot2: i64,
+    pub slot3: i64
+  }
+
+  /// Owned compiler vector with four deterministic four-value pages.
+  pub struct CompilerVector {
+    pub length: i64,
+    pub page_count: i64,
+    pub page0: CompilerVectorPage,
+    pub page1: CompilerVectorPage,
+    pub page2: CompilerVectorPage,
+    pub page3: CompilerVectorPage
   }
 
   /// UTF-8 bytes and deterministic identity owned by the compiler component.
   pub struct CompilerText {
-    pub bytes: CompilerVector<i64>,
+    pub bytes: CompilerVector,
     pub scalar_length: i64,
     pub hash: i64
   }
@@ -71,7 +81,7 @@ mod cpu StdLanguageCore {
   /// Bounded path represented by interned segment identities.
   pub struct CompilerPath {
     pub absolute: bool,
-    pub segments: CompilerVector<i64>,
+    pub segments: CompilerVector,
     pub hash: i64
   }
 
@@ -98,9 +108,8 @@ mod cpu StdLanguageCore {
     return Result.Err(error);
   }
 
-  /// Builds an empty four-slot vector using an explicit filler value.
-  pub fn compiler_vector_empty<T>(fill: T) -> CompilerVector<T> {
-    return CompilerVector {
+  pub fn compiler_vector_page_empty(fill: i64) -> CompilerVectorPage {
+    return CompilerVectorPage {
       length: 0,
       slot0: fill,
       slot1: fill,
@@ -109,110 +118,316 @@ mod cpu StdLanguageCore {
     };
   }
 
-  /// Appends one value or reports capacity exhaustion as error code 1.
-  pub fn compiler_vector_push<T>(
-    vector: CompilerVector<T>,
-    value: T
-  ) -> Result<CompilerVector<T>, i64> {
-    if vector.length == 0 {
-      return Result.Ok(CompilerVector {
+  pub fn compiler_vector_page_full(fill: i64) -> CompilerVectorPage {
+    return CompilerVectorPage { length: 4, slot0: fill, slot1: fill, slot2: fill, slot3: fill };
+  }
+  pub fn compiler_vector_full(fill: i64) -> CompilerVector {
+    return CompilerVector {
+      length: 16,
+      page_count: 4,
+      page0: compiler_vector_page_full(fill), page1: compiler_vector_page_full(fill),
+      page2: compiler_vector_page_full(fill), page3: compiler_vector_page_full(fill)
+    };
+  }
+
+  pub fn compiler_vector_page_push(
+    page: CompilerVectorPage,
+    value: i64
+  ) -> Result<CompilerVectorPage, i64> {
+    if page.length == 0 {
+      return Result.Ok(CompilerVectorPage {
         length: 1,
         slot0: value,
-        slot1: vector.slot1,
-        slot2: vector.slot2,
-        slot3: vector.slot3
+        slot1: page.slot1,
+        slot2: page.slot2,
+        slot3: page.slot3
       });
     }
-    if vector.length == 1 {
-      return Result.Ok(CompilerVector {
+    if page.length == 1 {
+      return Result.Ok(CompilerVectorPage {
         length: 2,
-        slot0: vector.slot0,
+        slot0: page.slot0,
         slot1: value,
-        slot2: vector.slot2,
-        slot3: vector.slot3
+        slot2: page.slot2,
+        slot3: page.slot3
       });
     }
-    if vector.length == 2 {
-      return Result.Ok(CompilerVector {
+    if page.length == 2 {
+      return Result.Ok(CompilerVectorPage {
         length: 3,
-        slot0: vector.slot0,
-        slot1: vector.slot1,
+        slot0: page.slot0,
+        slot1: page.slot1,
         slot2: value,
-        slot3: vector.slot3
+        slot3: page.slot3
       });
     }
-    if vector.length == 3 {
-      return Result.Ok(CompilerVector {
+    if page.length == 3 {
+      return Result.Ok(CompilerVectorPage {
         length: 4,
-        slot0: vector.slot0,
-        slot1: vector.slot1,
-        slot2: vector.slot2,
+        slot0: page.slot0,
+        slot1: page.slot1,
+        slot2: page.slot2,
         slot3: value
       });
     }
     return Result.Err(1);
   }
 
-  /// Reads one vector value or returns None for an invalid index.
-  pub fn compiler_vector_get<T>(vector: CompilerVector<T>, index: i64) -> Option<T> {
-    if index == 0 && vector.length > 0 {
-      return Option.Some(vector.slot0);
+  pub fn compiler_vector_page_get(page: CompilerVectorPage, index: i64) -> Option<i64> {
+    if index == 0 && page.length > 0 {
+      return Option.Some(page.slot0);
     }
-    if index == 1 && vector.length > 1 {
-      return Option.Some(vector.slot1);
+    if index == 1 && page.length > 1 {
+      return Option.Some(page.slot1);
     }
-    if index == 2 && vector.length > 2 {
-      return Option.Some(vector.slot2);
+    if index == 2 && page.length > 2 {
+      return Option.Some(page.slot2);
     }
-    if index == 3 && vector.length > 3 {
-      return Option.Some(vector.slot3);
+    if index == 3 && page.length > 3 {
+      return Option.Some(page.slot3);
     }
     return Option.None;
   }
 
-  /// Replaces one vector value or reports an invalid index as error code 2.
-  pub fn compiler_vector_set<T>(
-    vector: CompilerVector<T>,
+  pub fn compiler_vector_page_set(
+    page: CompilerVectorPage,
     index: i64,
-    value: T
-  ) -> Result<CompilerVector<T>, i64> {
-    if index == 0 && vector.length > 0 {
-      return Result.Ok(CompilerVector {
-        length: vector.length,
+    value: i64
+  ) -> Result<CompilerVectorPage, i64> {
+    if index == 0 && page.length > 0 {
+      return Result.Ok(CompilerVectorPage {
+        length: page.length,
         slot0: value,
-        slot1: vector.slot1,
-        slot2: vector.slot2,
-        slot3: vector.slot3
+        slot1: page.slot1,
+        slot2: page.slot2,
+        slot3: page.slot3
       });
     }
-    if index == 1 && vector.length > 1 {
-      return Result.Ok(CompilerVector {
-        length: vector.length,
-        slot0: vector.slot0,
+    if index == 1 && page.length > 1 {
+      return Result.Ok(CompilerVectorPage {
+        length: page.length,
+        slot0: page.slot0,
         slot1: value,
-        slot2: vector.slot2,
-        slot3: vector.slot3
+        slot2: page.slot2,
+        slot3: page.slot3
       });
     }
-    if index == 2 && vector.length > 2 {
-      return Result.Ok(CompilerVector {
-        length: vector.length,
-        slot0: vector.slot0,
-        slot1: vector.slot1,
+    if index == 2 && page.length > 2 {
+      return Result.Ok(CompilerVectorPage {
+        length: page.length,
+        slot0: page.slot0,
+        slot1: page.slot1,
         slot2: value,
-        slot3: vector.slot3
+        slot3: page.slot3
       });
     }
-    if index == 3 && vector.length > 3 {
-      return Result.Ok(CompilerVector {
-        length: vector.length,
-        slot0: vector.slot0,
-        slot1: vector.slot1,
-        slot2: vector.slot2,
+    if index == 3 && page.length > 3 {
+      return Result.Ok(CompilerVectorPage {
+        length: page.length,
+        slot0: page.slot0,
+        slot1: page.slot1,
+        slot2: page.slot2,
         slot3: value
       });
     }
     return Result.Err(2);
+  }
+
+  pub fn compiler_vector_shape_valid(
+    length: i64,
+    page_count: i64,
+    page0_length: i64,
+    page1_length: i64,
+    page2_length: i64,
+    page3_length: i64
+  ) -> bool {
+    if length == 0 {
+      return page_count == 0
+        && page0_length == 0 && page1_length == 0
+        && page2_length == 0 && page3_length == 0;
+    }
+    if length > 0 && length <= 4 {
+      return page_count == 1
+        && page0_length == length && page1_length == 0
+        && page2_length == 0 && page3_length == 0;
+    }
+    if length > 4 && length <= 8 {
+      return page_count == 2
+        && page0_length == 4 && page1_length == length - 4
+        && page2_length == 0 && page3_length == 0;
+    }
+    if length > 8 && length <= 12 {
+      return page_count == 3
+        && page0_length == 4 && page1_length == 4
+        && page2_length == length - 8 && page3_length == 0;
+    }
+    if length > 12 && length <= 16 {
+      return page_count == 4
+        && page0_length == 4 && page1_length == 4
+        && page2_length == 4 && page3_length == length - 12;
+    }
+    return false;
+  }
+
+  /// Builds an empty four-page vector using an explicit filler value.
+  pub fn compiler_vector_empty(fill: i64) -> CompilerVector {
+    return CompilerVector {
+      length: 0,
+      page_count: 0,
+      page0: compiler_vector_page_empty(fill),
+      page1: compiler_vector_page_empty(fill),
+      page2: compiler_vector_page_empty(fill),
+      page3: compiler_vector_page_empty(fill)
+    };
+  }
+
+  /// Appends one value, opening pages in order, or reports capacity exhaustion.
+  pub fn compiler_vector_push(
+    vector: CompilerVector,
+    value: i64
+  ) -> Result<CompilerVector, i64> {
+    if compiler_vector_shape_valid(
+      vector.length,
+      vector.page_count,
+      vector.page0.length,
+      vector.page1.length,
+      vector.page2.length,
+      vector.page3.length
+    ) == false {
+      return Result.Err(3);
+    }
+    if vector.length < 4 {
+      let page: CompilerVectorPage = compiler_vector_page_push(vector.page0, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length + 1,
+        page_count: 1,
+        page0: page,
+        page1: vector.page1,
+        page2: vector.page2,
+        page3: vector.page3
+      });
+    }
+    if vector.length < 8 {
+      let page: CompilerVectorPage = compiler_vector_page_push(vector.page1, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length + 1,
+        page_count: 2,
+        page0: vector.page0,
+        page1: page,
+        page2: vector.page2,
+        page3: vector.page3
+      });
+    }
+    if vector.length < 12 {
+      let page: CompilerVectorPage = compiler_vector_page_push(vector.page2, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length + 1,
+        page_count: 3,
+        page0: vector.page0,
+        page1: vector.page1,
+        page2: page,
+        page3: vector.page3
+      });
+    }
+    if vector.length < 16 {
+      let page: CompilerVectorPage = compiler_vector_page_push(vector.page3, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length + 1,
+        page_count: 4,
+        page0: vector.page0,
+        page1: vector.page1,
+        page2: vector.page2,
+        page3: page
+      });
+    }
+    return Result.Err(1);
+  }
+
+  /// Reads one vector value or returns None for an invalid index.
+  pub fn compiler_vector_get(vector: CompilerVector, index: i64) -> Option<i64> {
+    if compiler_vector_shape_valid(
+      vector.length,
+      vector.page_count,
+      vector.page0.length,
+      vector.page1.length,
+      vector.page2.length,
+      vector.page3.length
+    ) == false || index < 0 || index >= vector.length {
+      return Option.None;
+    }
+    if index < 4 {
+      return compiler_vector_page_get(vector.page0, index);
+    }
+    if index < 8 {
+      return compiler_vector_page_get(vector.page1, index - 4);
+    }
+    if index < 12 {
+      return compiler_vector_page_get(vector.page2, index - 8);
+    }
+    return compiler_vector_page_get(vector.page3, index - 12);
+  }
+
+  /// Replaces one vector value or reports an invalid index as error code 2.
+  pub fn compiler_vector_set(
+    vector: CompilerVector,
+    index: i64,
+    value: i64
+  ) -> Result<CompilerVector, i64> {
+    if compiler_vector_shape_valid(
+      vector.length,
+      vector.page_count,
+      vector.page0.length,
+      vector.page1.length,
+      vector.page2.length,
+      vector.page3.length
+    ) == false {
+      return Result.Err(3);
+    }
+    if index < 0 || index >= vector.length {
+      return Result.Err(2);
+    }
+    if index < 4 {
+      let page: CompilerVectorPage = compiler_vector_page_set(vector.page0, index, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        page_count: vector.page_count,
+        page0: page,
+        page1: vector.page1,
+        page2: vector.page2,
+        page3: vector.page3
+      });
+    }
+    if index < 8 {
+      let page: CompilerVectorPage = compiler_vector_page_set(vector.page1, index - 4, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        page_count: vector.page_count,
+        page0: vector.page0,
+        page1: page,
+        page2: vector.page2,
+        page3: vector.page3
+      });
+    }
+    if index < 12 {
+      let page: CompilerVectorPage = compiler_vector_page_set(vector.page2, index - 8, value)?;
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        page_count: vector.page_count,
+        page0: vector.page0,
+        page1: vector.page1,
+        page2: page,
+        page3: vector.page3
+      });
+    }
+    let page: CompilerVectorPage = compiler_vector_page_set(vector.page3, index - 12, value)?;
+    return Result.Ok(CompilerVector {
+      length: vector.length,
+      page_count: vector.page_count,
+      page0: vector.page0,
+      page1: vector.page1,
+      page2: vector.page2,
+      page3: page
+    });
   }
 
   /// Appends one already-validated UTF-8 byte for the canonical scalar encoder.
@@ -223,7 +438,7 @@ mod cpu StdLanguageCore {
     if byte < 0 || byte > 255 {
       return Result.Err(3);
     }
-    let next_bytes: CompilerVector<i64> = compiler_vector_push<i64>(value.bytes, byte)?;
+    let next_bytes: CompilerVector = compiler_vector_push(value.bytes, byte)?;
     return Result.Ok(CompilerText {
       bytes: next_bytes,
       scalar_length: value.scalar_length,
@@ -234,7 +449,7 @@ mod cpu StdLanguageCore {
   /// Builds empty compiler-owned UTF-8 text.
   pub fn compiler_text_empty() -> CompilerText {
     return CompilerText {
-      bytes: compiler_vector_empty<i64>(0),
+      bytes: compiler_vector_empty(0),
       scalar_length: 0,
       hash: 0
     };
@@ -497,7 +712,7 @@ mod cpu StdLanguageCore {
   pub fn compiler_path_empty(absolute: bool) -> CompilerPath {
     return CompilerPath {
       absolute: absolute,
-      segments: compiler_vector_empty<i64>(0),
+      segments: compiler_vector_empty(0),
       hash: 0
     };
   }
@@ -510,7 +725,7 @@ mod cpu StdLanguageCore {
     if segment < 0 {
       return Result.Err(3);
     }
-    let segments: CompilerVector<i64> = compiler_vector_push<i64>(path.segments, segment)?;
+    let segments: CompilerVector = compiler_vector_push(path.segments, segment)?;
     return Result.Ok(CompilerPath {
       absolute: path.absolute,
       segments: segments,

@@ -343,6 +343,7 @@ mod tests {
                 "surface.std.cli-report-file-contracts.v1".to_owned(),
                 "surface.std.language-result-hof-contracts.v1".to_owned(),
                 "surface.std.compiler-data-model.v1".to_owned(),
+                "surface.std.compiler-data-model.v2".to_owned(),
                 "surface.std.compiler-structural-projection.v1".to_owned(),
                 "surface.std.provider-worker-lifecycle.v1".to_owned(),
                 "surface.std.provider-worker-dispatch.v1".to_owned(),

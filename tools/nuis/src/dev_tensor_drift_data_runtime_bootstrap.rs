@@ -311,21 +311,42 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-v2-contract",
+        path: "docs/reference/nuis-compiler-data-model-v2.toml",
+        required_patterns: &[
+            "nuis-compiler-data-model-v2",
+            "surface.std.compiler-data-model.v2",
+            "deterministic-four-pages-of-four-i64",
+            "maximum_values = 16",
+            "canonical-unicode-scalar-encoding",
+            "bootstrap_compiler_data_model_demo",
+            "expected_native_exit = 59",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-compiler-data-model-stdlib",
         path: "stdlib/std/lib/language_core.ns",
         required_patterns: &[
-            "pub struct CompilerVector<T>",
+            "pub struct CompilerVectorPage",
+            "pub struct CompilerVector",
+            "pub page_count: i64",
             "pub struct CompilerText",
             "pub struct CompilerMap",
             "pub struct CompilerArena",
             "pub struct CompilerDiagnostic",
+            "pub fn compiler_vector_full",
+            "pub fn compiler_vector_shape_valid",
             "pub fn compiler_text_push_scalar",
         ],
     },
     DevTensorDriftCheckSpec {
         id: "nuis-compiler-data-model-registration",
         path: "stdlib/std/module.toml",
-        required_patterns: &["surface.std.compiler-data-model.v1", "lib/language_core.ns"],
+        required_patterns: &[
+            "surface.std.compiler-data-model.v1",
+            "surface.std.compiler-data-model.v2",
+            "lib/language_core.ns",
+        ],
     },
     DevTensorDriftCheckSpec {
         id: "nuis-compiler-data-model-component",
@@ -334,6 +355,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "use cpu StdLanguageCore",
             "fn compile_component() -> Result<i64, i64>",
             "fn boundaries_fail_closed",
+            "full_tokens.page_count != 4",
+            "compiler_vector_shape_valid(-1, 2, 4, -5, 0, 0)",
             "compiler_diagnostic_score",
         ],
     },
@@ -343,7 +366,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         required_patterns: &[
             "compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis",
             "deferred lowering",
-            "Some(43)",
+            "Some(59)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -492,7 +515,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "reproducible_build_sha256",
             "bootstrap-diff",
             "tampered native binary must invalidate component build",
-            "Some(43)",
+            "Some(59)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -584,10 +607,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         path: "docs/reference/nuis-development-tensor.md",
         required_patterns: &[
             "stage-neutral boundary to `usable/78`",
-            "driver to `usable/80`",
-            "reaches `13/13` equivalence",
-            "differential gate, now\n`usable/78`",
-            "`standard-library/std/compiler-data-model` at `usable/75`",
+            "attested candidate moves the driver to `usable/80`",
+            "`13/13` fail-closed\nequivalence",
+            "Data model v2 reaches `usable/80`",
+            "native\nscore `59`",
+            "`usable/78` reproducibility gate remains weakest",
         ],
     },
     DevTensorDriftCheckSpec {
