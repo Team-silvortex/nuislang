@@ -637,9 +637,6 @@ impl<'a> OwnedStructLayoutParser<'a> {
             }
             self.expect(b';')?;
         }
-        if fields.is_empty() {
-            return Err(format!("owned struct layout `{type_name}` cannot be empty"));
-        }
         Ok(super::StructLlvmValueRef { type_name, fields })
     }
 

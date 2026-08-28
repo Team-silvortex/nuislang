@@ -55,7 +55,10 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
         candidate.stage_role,
         COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE
     );
-    assert_eq!(candidate.producer_id, "nuis-stage1-token-materializer-v3");
+    assert_eq!(
+        candidate.producer_id,
+        "nuis-stage1-token-ast-materializer-v4"
+    );
     assert_ne!(candidate.producer_id, stage0.producer_id);
     assert_eq!(candidate.compiler_image_sha256, stage0.native_binary_sha256);
 
@@ -79,6 +82,14 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert_eq!(production.token_page_canonical_bytes, 91);
     assert_eq!(production.token_page_canonical_hash, 1_277_127_995);
     assert_eq!(production.token_page_identity, 164_749_511_446);
+    assert_eq!(production.ast_page_record_count, 3);
+    assert_eq!(production.ast_page_bytes, 128);
+    assert_eq!(production.ast_page_projection_hash, 65_460_735);
+    assert_eq!(production.ast_page_continuation_indentation, 0);
+    assert_eq!(production.ast_page_continuation_body_bytes, 2);
+    assert_eq!(production.ast_page_continuation_body_hash, 28_497_819);
+    assert_eq!(production.ast_page_state_hash, 1_349_056_749);
+    assert_eq!(production.ast_page_identity, 174_028_320_749);
     assert!(!production.replacement_authorized);
 
     let differential = parse_compiler_component_differential(

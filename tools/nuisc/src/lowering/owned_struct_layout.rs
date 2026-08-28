@@ -46,20 +46,27 @@ fn owned_value_layout(
         return None;
     }
     if ty.generic_args.is_empty() {
-        let definition = structs.get(ty.name.as_str()).copied()?;
-        let mut visiting = BTreeSet::new();
-        return encode_definition(definition, structs, &mut visiting);
+        if let Some(definition) = structs.get(ty.name.as_str()).copied() {
+            let mut visiting = BTreeSet::new();
+            return encode_definition(definition, structs, enums, &mut visiting);
+        }
     }
-    encode_variant_union(ty, structs, enums)
+    let mut visiting = BTreeSet::new();
+    encode_variant_union(ty, structs, enums, &mut visiting)
 }
 
 fn encode_variant_union(
     ty: &NirTypeRef,
     structs: &BTreeMap<&str, &NirStructDef>,
     enums: &BTreeMap<&str, &NirEnumDef>,
+    visiting: &mut BTreeSet<String>,
 ) -> Option<String> {
     let definition = enums.get(ty.name.as_str()).copied()?;
     if definition.generic_params.len() != ty.generic_args.len() || definition.variants.is_empty() {
+        return None;
+    }
+    let visiting_key = format!("enum:{}", definition.name);
+    if !visiting.insert(visiting_key.clone()) {
         return None;
     }
     let substitutions = definition
@@ -68,114 +75,116 @@ fn encode_variant_union(
         .zip(&ty.generic_args)
         .map(|(parameter, argument)| (parameter.name.as_str(), argument))
         .collect::<BTreeMap<_, _>>();
-    let mut visiting = BTreeSet::new();
-    let variants = definition
-        .variants
-        .iter()
-        .map(|variant| {
-            let fields = match &variant.kind {
-                NirEnumVariantKind::Unit => return None,
-                NirEnumVariantKind::Tuple(types) => types
-                    .iter()
-                    .enumerate()
-                    .map(|(index, field_ty)| {
-                        let name = if types.len() == 1 {
-                            "value".to_owned()
-                        } else {
-                            format!("_{index}")
-                        };
-                        Some((
-                            name,
-                            encode_substituted_type(
-                                field_ty,
-                                &substitutions,
-                                structs,
-                                &mut visiting,
-                            )?,
-                        ))
-                    })
-                    .collect::<Option<Vec<_>>>()?,
-                NirEnumVariantKind::Struct(fields) => fields
-                    .iter()
-                    .map(|field| {
-                        Some((
-                            field.name.clone(),
-                            encode_substituted_type(
-                                &field.ty,
-                                &substitutions,
-                                structs,
-                                &mut visiting,
-                            )?,
-                        ))
-                    })
-                    .collect::<Option<Vec<_>>>()?,
-            };
-            let variant_name = format!("{}.{}", definition.name, variant.name);
-            let encoded_fields = fields
-                .into_iter()
-                .map(|(name, field)| format!("{name}:{field}"))
-                .collect::<Vec<_>>()
-                .join(";");
-            Some(format!("{variant_name}:{variant_name}{{{encoded_fields}}}"))
-        })
-        .collect::<Option<Vec<_>>>()?;
-    Some(format!(
-        "{OWNED_VARIANT_UNION_PREFIX}{}{{tag:i64;{}}}",
-        definition.name,
-        variants.join(";")
-    ))
+    let encoded = (|| {
+        let variants = definition
+            .variants
+            .iter()
+            .map(|variant| {
+                let fields = match &variant.kind {
+                    NirEnumVariantKind::Unit => Vec::new(),
+                    NirEnumVariantKind::Tuple(types) => types
+                        .iter()
+                        .enumerate()
+                        .map(|(index, field_ty)| {
+                            let name = if types.len() == 1 {
+                                "value".to_owned()
+                            } else {
+                                format!("_{index}")
+                            };
+                            Some((
+                                name,
+                                encode_substituted_type(
+                                    field_ty,
+                                    &substitutions,
+                                    structs,
+                                    enums,
+                                    visiting,
+                                )?,
+                            ))
+                        })
+                        .collect::<Option<Vec<_>>>()?,
+                    NirEnumVariantKind::Struct(fields) => fields
+                        .iter()
+                        .map(|field| {
+                            Some((
+                                field.name.clone(),
+                                encode_substituted_type(
+                                    &field.ty,
+                                    &substitutions,
+                                    structs,
+                                    enums,
+                                    visiting,
+                                )?,
+                            ))
+                        })
+                        .collect::<Option<Vec<_>>>()?,
+                };
+                let variant_name = format!("{}.{}", definition.name, variant.name);
+                let encoded_fields = fields
+                    .into_iter()
+                    .map(|(name, field)| format!("{name}:{field}"))
+                    .collect::<Vec<_>>()
+                    .join(";");
+                Some(format!("{variant_name}:{variant_name}{{{encoded_fields}}}"))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(format!(
+            "{OWNED_VARIANT_UNION_PREFIX}{}{{tag:i64;{}}}",
+            definition.name,
+            variants.join(";")
+        ))
+    })();
+    visiting.remove(&visiting_key);
+    encoded
 }
 
 fn encode_substituted_type(
     ty: &NirTypeRef,
     substitutions: &BTreeMap<&str, &NirTypeRef>,
-    definitions: &BTreeMap<&str, &NirStructDef>,
+    structs: &BTreeMap<&str, &NirStructDef>,
+    enums: &BTreeMap<&str, &NirEnumDef>,
     visiting: &mut BTreeSet<String>,
 ) -> Option<String> {
     let resolved = substitutions.get(ty.name.as_str()).copied().unwrap_or(ty);
-    if !is_plain_type(resolved) {
+    if resolved.is_ref || resolved.is_optional {
         return None;
     }
-    if is_scheduler_scalar(&resolved.name) {
+    if resolved.generic_args.is_empty() && is_scheduler_scalar(&resolved.name) {
         return Some(resolved.name.clone());
     }
-    let nested = definitions.get(resolved.name.as_str()).copied()?;
-    encode_definition(nested, definitions, visiting)
+    if resolved.generic_args.is_empty() {
+        if let Some(nested) = structs.get(resolved.name.as_str()).copied() {
+            return encode_definition(nested, structs, enums, visiting);
+        }
+    }
+    encode_variant_union(resolved, structs, enums, visiting)
 }
 
 fn encode_definition(
     definition: &NirStructDef,
-    definitions: &BTreeMap<&str, &NirStructDef>,
+    structs: &BTreeMap<&str, &NirStructDef>,
+    enums: &BTreeMap<&str, &NirEnumDef>,
     visiting: &mut BTreeSet<String>,
 ) -> Option<String> {
+    let visiting_key = format!("struct:{}", definition.name);
     if definition.fields.is_empty()
         || !definition.generic_params.is_empty()
-        || !visiting.insert(definition.name.clone())
+        || !visiting.insert(visiting_key.clone())
     {
         return None;
     }
+    let substitutions = BTreeMap::new();
     let fields = definition
         .fields
         .iter()
         .map(|field| {
-            if !is_plain_type(&field.ty) {
-                return None;
-            }
-            let encoded_type = if is_scheduler_scalar(&field.ty.name) {
-                field.ty.name.clone()
-            } else {
-                let nested = definitions.get(field.ty.name.as_str()).copied()?;
-                encode_definition(nested, definitions, visiting)?
-            };
+            let encoded_type =
+                encode_substituted_type(&field.ty, &substitutions, structs, enums, visiting)?;
             Some(format!("{}:{encoded_type}", field.name))
         })
         .collect::<Option<Vec<_>>>();
-    visiting.remove(&definition.name);
+    visiting.remove(&visiting_key);
     Some(format!("{}{{{}}}", definition.name, fields?.join(";")))
-}
-
-fn is_plain_type(ty: &NirTypeRef) -> bool {
-    !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
 }
 
 fn is_scheduler_scalar(name: &str) -> bool {

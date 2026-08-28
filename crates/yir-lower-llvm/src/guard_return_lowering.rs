@@ -3,10 +3,12 @@ use std::collections::BTreeMap;
 use yir_core::Node;
 
 use super::{
+    call_lowering::parse_owned_struct_layout,
     call_return::{
         can_emit_typed_return_from_value, cpu_scalar_kind_llvm_type, emit_typed_return_from_value,
     },
     fresh_block, fresh_reg, guard_host_call,
+    task_owned_payload::{emit_owned_struct_return, materialize_owned_variant_storage},
     value_ref::{coerce_to_cstr, coerce_to_i64, get_bool, get_f32, get_f64, get_i32},
     CpuCallScalarKind, LlvmValueRef,
 };
@@ -242,6 +244,12 @@ pub(crate) fn lower_cpu_guard_return_node(
             body.push(format!("{cont_label}:"));
         }
         "guard_return" => {
+            if !(2..=3).contains(&node.op.args.len()) {
+                return Err(format!(
+                    "cpu.guard_return `{}` expects condition, return, and optional owned-layout inputs",
+                    node.name
+                ));
+            }
             let cond_value = registers.get(&node.op.args[0]).cloned();
             let return_value = registers.get(&node.op.args[1]).cloned();
             let (Some(cond_value), Some(return_value)) = (cond_value, return_value) else {
@@ -258,12 +266,55 @@ pub(crate) fn lower_cpu_guard_return_node(
                     ));
                 return Ok(GuardReturnLoweringOutcome::Continue);
             };
-            if matches!(
-                return_value,
-                LlvmValueRef::Struct(_) | LlvmValueRef::VariantUnion(_)
-            ) {
+            let structural_value = if let Some(layout) = node.op.args.get(2) {
+                let template = parse_owned_struct_layout(layout)?;
+                Some(
+                    materialize_owned_variant_storage(&return_value, &template).ok_or_else(
+                        || {
+                            format!(
+                                "cpu.guard_return `{}` does not match its owned variant layout",
+                                node.name
+                            )
+                        },
+                    )?,
+                )
+            } else if let LlvmValueRef::Struct(struct_value) = &return_value {
+                Some(struct_value.clone())
+            } else {
+                None
+            };
+            if let Some(struct_value) = structural_value {
+                if function_return_kind != CpuCallScalarKind::I64 {
+                    body.push(format!(
+                        "  ; deferred lowering for structural cpu.guard_return `{}` because its function ABI is not i64",
+                        node.name
+                    ));
+                    return Ok(GuardReturnLoweringOutcome::Continue);
+                }
+                let cond_bool = fresh_reg(next_reg);
+                body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+                let then_label = fresh_block(next_block, "guard_return_struct_then");
+                let cont_label = fresh_block(next_block, "guard_return_struct_cont");
                 body.push(format!(
-                    "  ; structural cpu.guard_return `{}` is resolved by downstream fieldwise selection",
+                    "  br i1 {cond_bool}, label %{then_label}, label %{cont_label}"
+                ));
+                body.push(format!("{then_label}:"));
+                if !emit_owned_struct_return(&struct_value, body, next_reg) {
+                    return Err(format!(
+                        "cpu.guard_return `{}` cannot pack its structural return value",
+                        node.name
+                    ));
+                }
+                body.push(format!("{cont_label}:"));
+                body.push(format!(
+                    "  ; structural cpu.guard_return `{}` returned through the owned aggregate ABI",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            }
+            if matches!(return_value, LlvmValueRef::VariantUnion(_)) {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_return `{}` because variant-union returns require a concrete owned layout",
                     node.name
                 ));
                 return Ok(GuardReturnLoweringOutcome::Continue);

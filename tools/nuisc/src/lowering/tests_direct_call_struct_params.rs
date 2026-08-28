@@ -138,9 +138,37 @@ fn lowers_result_of_owned_struct_through_variant_union_helper_abi() {
                 .is_some_and(|callee| callee == "checked")
             && node.op.args[1].starts_with("__nuis_variant_union__Result{")
     }));
-
     let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("owned Result ABI LLVM lowering");
     assert!(llvm_ir.contains("define i64 @nuis_fn_checked("));
     assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.return_owned_struct"));
+}
+
+#[test]
+fn lowers_bootstrap_scanner_unit_enum_guard_through_variant_union_abi() {
+    let module = parse_nuis_module(include_str!(
+        "../../../../tests/fixtures/bootstrap/accepted/compiler_scanner.ns"
+    ))
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let guarded = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.instruction == "guard_return"
+                && node
+                    .op
+                    .args
+                    .get(2)
+                    .is_some_and(|layout| layout.contains("__nuis_variant_union__ScanError{"))
+        })
+        .expect("guarded Result return with nested ScanError layout");
+    assert_eq!(guarded.op.args.len(), 3);
+    assert!(guarded.op.args[2].contains("__nuis_variant_union__ScanError{"));
+    assert!(guarded.op.args[2].contains("ScanError.InvalidRange{}"));
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("bootstrap scanner ABI lowering");
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.guard_return"));
 }

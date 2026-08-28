@@ -6,13 +6,23 @@ pub(super) fn lower_guard_return(
     state: &mut LoweringState<'_>,
 ) {
     let name = next_name(state, "guard_return");
+    let owned_variant_layout = state
+        .call_stack
+        .last()
+        .and_then(|function_name| state.function_map.get(function_name.as_str()).copied())
+        .and_then(|function| function_owned_struct_layout(function, state))
+        .filter(|layout| owned_layout_is_variant_union(layout));
+    let mut args = vec![condition_name.clone(), return_name.clone()];
+    if let Some(layout) = owned_variant_layout {
+        args.push(layout);
+    }
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
             instruction: "guard_return".to_owned(),
-            args: vec![condition_name.clone(), return_name.clone()],
+            args,
         },
     });
     push_dep_edges(state, &condition_name, &name);

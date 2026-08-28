@@ -31,12 +31,12 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `694/694` implementation-drift checks across `26/26` registered
-coordinates. Five independent self-hosting readiness gates keep the
-bootstrap-critical average honest at `97/100`; the weakest coordinate is now
-`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `88/100`. The
-compiler data model is `usable/90`, while the stage driver and differential
-gate are both `usable/89`. The dedicated
+manifest, and implementation drift across `26/26` registered coordinates and
+`696/696` passing drift checks. The bootstrap-critical surface averages
+`98/100`; the weakest coordinate remains
+`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `90/100`. The
+compiler data model, stage driver, and differential gate are all `usable/91`.
+The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
 audit record, and component-bound diagnostic proof for one project-form
@@ -49,20 +49,22 @@ fixture plus the real candidate's 91-byte `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
 store, canonically re-emits the same bytes and hash, and executes natively at
 deterministic score `122`; the producer-neutral five-stage handoff is now
-`usable`, `86/100`. Its shared structural codec independently parses
+`usable`, `90/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
 image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
-then feeds all five serialized payloads through thirteen exact Nuis scalar
+then feeds all five serialized payloads through fourteen exact Nuis scalar
 exports, independently verifies their folds, drives the complete token payload
 through a bounded Nuis-native DFA, and transports the first 128 opaque bytes
-into a Nuis-owned four-record materializer. Nuis canonically re-emits the real
-91-byte page with hash `1277127995`; the artifact layer independently decodes
-and verifies identity `164749511446` before production v3 emits the distinct
-`nuis-stage1-token-materializer-v3` candidate and reaches repository-native
-`13/13` differential equivalence while retaining
-`replacement_authorized = false`. `nuis
+from both token and AST payloads. Nuis canonically re-emits the real 91-byte
+token page with hash `1277127995`, then scans three complete AST records and
+retains the unfinished line in a deterministic continuation state. The
+artifact layer independently verifies token identity `164749511446` and AST
+identity `174028320749` before production v4 emits the distinct
+`nuis-stage1-token-ast-materializer-v4` candidate and reaches repository-native
+`13/13` differential equivalence while retaining `replacement_authorized =
+false`. `nuis
 bootstrap-reproducibility` now performs
 two cache-bypassed clean candidate builds, rereads both evidence roots, requires
 stable compiler-image, native-output, and differential identities, and emits a
@@ -84,13 +86,13 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
-structural codec, typed Nuis consumer, bounded token materializer, candidate
+structural codec, typed Nuis consumer, bounded token and AST pages, candidate
 execution proof, paged compiler data, first attested stage1 leaf, and
-two-clean-build aggregate in place, the tensor now routes mainline work to
-bind the actual candidate token handoff to the materialized store and canonical
-emitter. Broader compiler-data paging, a changed stage payload, reversible replacement
-authorization, Galaxy hardening, broader ELF architecture coverage, and
-PE/COFF remain separate registered foundation work.
+two-clean-build aggregate in place, the tensor now routes mainline work to the
+first NIR page or deterministic page continuation. Broader compiler-data
+paging, a changed stage payload, reversible replacement authorization, Galaxy
+hardening, broader ELF architecture coverage, and PE/COFF remain separate
+registered foundation work.
 
 Start with these documents:
 

@@ -445,7 +445,7 @@ fn emits_two_way_owned_bytes_drop_before_each_terminal_return() {
 }
 
 #[test]
-fn resolves_structural_guard_return_through_fieldwise_selection() {
+fn emits_structural_guard_return_through_owned_aggregate_abi() {
     let mut module = module_with_cpu0();
     push_cpu_node(&mut module, "cond", "cpu.const_bool", vec!["true"]);
     push_cpu_const_i64(&mut module, "score", "64");
@@ -472,7 +472,10 @@ fn resolves_structural_guard_return_through_fieldwise_selection() {
     );
 
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-    assert!(llvm_ir.contains("structural cpu.guard_return `guard`"));
+    assert!(llvm_ir.contains("guard_return_struct_then."));
+    assert!(llvm_ir.contains("guard_return_struct_cont."));
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1(i64 1)"));
+    assert!(llvm_ir.contains("structural cpu.guard_return `guard` returned through"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.guard_return `guard`"));
     assert!(llvm_ir.contains("= add i64 0, 7"));
 }

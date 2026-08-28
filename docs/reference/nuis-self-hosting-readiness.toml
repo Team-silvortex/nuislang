@@ -11,51 +11,51 @@ coordinate = "language-core/nuisc/bootstrap-language-subset"
 status = "stable"
 progress = 100
 required_before = "beta-0.10.0"
-next_action = "preserve v4 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
+next_action = "preserve v5 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
-expected_artifact = "nuis-bootstrap-language-subset-v4, nuisc bootstrap-check, thirteen exact scalar exports, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
-blocker = "none for subset v4; broader compiler-owned paging, arena storage, and aggregate backedge lowering remain independent readiness gates"
+expected_artifact = "nuis-bootstrap-language-subset-v5, nuisc bootstrap-check, fourteen exact scalar exports, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
+blocker = "none for subset v5; broader compiler-owned paging, arena storage, and aggregate backedge lowering remain independent readiness gates"
 
 [[gates]]
 id = "compiler-data-model"
 coordinate = "standard-library/std/compiler-data-model"
 status = "usable"
-progress = 90
+progress = 91
 required_before = "beta-0.10.0"
-next_action = "paginate CompilerTokenStore beyond the first production-bound page, then page CompilerMap and arena storage while preserving v3 ownership and layout invariants"
+next_action = "add deterministic token and structural-page continuation, then page CompilerMap and arena storage while preserving v3 ownership and layout invariants"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-data-model-v3 plus a production candidate that owns, decodes, and canonically re-emits a complete token page with independently verified identity 164749511446"
-blocker = "v3 materializes and production-binds one four-record page, but pagination, map growth, arena object storage, defining-module provenance, and general aggregate loop backedges remain open"
+expected_artifact = "nuis-compiler-data-model-v3 plus a production candidate that owns a canonical token page and an AST structural page with independently verified identities"
+blocker = "v3 materializes one token page and carries first-page AST state, but continuation, map growth, arena object storage, defining-module provenance, and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "usable"
-progress = 88
+progress = 90
 required_before = "beta-0.10.0"
-next_action = "move one AST or NIR structural body decoder behind the producer-neutral boundary while retaining the production-bound token page identity"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_token_decoder -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "a Nuis-owned AST or NIR structural-body page whose five-stage bundle still crosses the attested differential gate beside canonical token identity 164749511446"
-blocker = "Nuis production now round-trips one complete real-prefix token page; token pagination, AST/NIR bodies, changed stage bytes, and general aggregate loop backedges remain open"
+next_action = "move the first NIR structural page behind the same producer-neutral boundary while retaining token identity 164749511446 and AST identity 174028320749"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
+expected_artifact = "a Nuis-owned NIR structural page whose five-stage bundle still crosses the attested differential gate beside canonical token and AST first-page identities"
+blocker = "Nuis production owns one token page and one AST structural page; continuation, a NIR page, changed stage bytes, and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 89
+progress = 91
 required_before = "beta-0.10.0"
-next_action = "carry one Nuis-owned AST or NIR body page through candidate production while retaining the clean-build aggregate"
+next_action = "carry one Nuis-owned NIR page through candidate production while retaining the clean-build aggregate"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "a production-bound Nuis token page plus one structural-body page retaining stable identity across two clean builds without replacement authority"
-blocker = "the production candidate carries one materialized token page, while pagination, structural-body production, independent attester trust, and reversible authorization remain open"
+expected_artifact = "production-bound Nuis token and AST pages plus one NIR page retaining stable identity across two clean builds without replacement authority"
+blocker = "the production candidate carries token and AST first pages, while continuation, NIR-page production, independent attester trust, and reversible authorization remain open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 89
+progress = 91
 required_before = "beta-0.10.0"
-next_action = "carry a Nuis-owned AST or NIR body page through the implemented clean-build aggregate, then add independent attester evidence"
+next_action = "carry a Nuis-owned NIR page through the implemented clean-build aggregate, then add independent attester evidence"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "a canonical token page and one structural-body page retaining the path-free two-clean-build aggregate without replacement authority"
-blocker = "local repeated clean-build evidence covers the production-bound canonical token page; structural-body production, independent attester trust, and reversible authorization remain open"
+expected_artifact = "canonical token, AST, and NIR pages retaining the path-free two-clean-build aggregate without replacement authority"
+blocker = "local repeated clean-build evidence covers production-bound token and AST pages; continuation, NIR production, independent attester trust, and reversible authorization remain open"

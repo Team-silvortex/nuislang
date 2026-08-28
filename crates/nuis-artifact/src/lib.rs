@@ -10,6 +10,7 @@ mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
 mod compiler_structural_projection;
+mod compiler_structural_projection_page;
 mod compiler_token_decoder;
 mod domain_unit;
 mod envelope;
@@ -103,6 +104,12 @@ pub use compiler_structural_projection::{
     verify_compiler_projection_identity, CompilerProjectionKind, CompilerProjectionRecord,
     CompilerProjectionRecordKind, CompilerStructuralProjection, COMPILER_AST_PROJECTION_ENCODING,
     COMPILER_NIR_PROJECTION_ENCODING, COMPILER_STRUCTURAL_PROJECTION_CONTRACT,
+};
+pub use compiler_structural_projection_page::{
+    compiler_projection_first_page_identity, CompilerProjectionPageIdentity,
+    COMPILER_PROJECTION_PAGE_BODY_HASH_SEED, COMPILER_PROJECTION_PAGE_BYTES,
+    COMPILER_PROJECTION_PAGE_CONTRACT, COMPILER_PROJECTION_PAGE_HASH_MODULUS,
+    COMPILER_PROJECTION_PAGE_HASH_SEED, COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,
 };
 pub use compiler_token_decoder::{
     compiler_token_first_page_identity, decode_compiler_token_stream, CompilerTokenDecodeSummary,

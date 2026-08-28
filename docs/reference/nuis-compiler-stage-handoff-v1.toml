@@ -29,7 +29,9 @@ standalone_structural_nir_decoder = true
 nuis_typed_structural_consumer = true
 serialized_five_stage_input_consumption_by_nuis = true
 nuis_candidate_bundle_fold_producer = true
-candidate_production_protocol = "nuis-compiler-candidate-production-v3"
+nuis_ast_first_page_materializer = true
+nuis_ast_page_contract = "nuis-compiler-structural-page-v1"
+candidate_production_protocol = "nuis-compiler-candidate-production-v4"
 source_reparse_required_for_ast_verification = false
 
 [[stages]]
@@ -71,20 +73,23 @@ invariants = [
   "multiline-inline-wgsl-is-an-exact-framed-opaque-nir-leaf",
   "normal-build-manifest-hashes-source-tokens-and-handoff",
   "cache-hit-preserves-bundle-identity",
+  "nuis-and-artifact-layer-independently-agree-on-ast-page-continuation-state",
 ]
 
 validation_commands = [
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1",
 ]
 
 [open_boundary]
-status = "first-stage1-identity-projection-ready"
+status = "first-stage1-token-and-ast-page-ready"
 missing = [
-  "nuis-owned-token-and-structural-body-decoding",
+  "token-and-structural-page-continuation",
+  "nuis-owned-nir-structural-page",
   "non-identity-stage1-transformation",
   "stage0-stage1-replacement-authorization",
 ]

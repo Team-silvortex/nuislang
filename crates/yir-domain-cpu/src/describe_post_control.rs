@@ -305,14 +305,14 @@ pub(super) fn describe_cpu_post_control_node(
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
         "guard_return" => {
-            if node.op.args.len() != 2 {
+            if !(2..=3).contains(&node.op.args.len()) {
                 return Err(format!(
-                    "node `{}` expects `cpu.guard_return <name> <resource> <condition> <return>`",
+                    "node `{}` expects `cpu.guard_return <name> <resource> <condition> <return> [owned-layout]`",
                     node.name
                 ));
             }
 
-            Ok(InstructionSemantics::effect(node.op.args.clone()))
+            Ok(InstructionSemantics::effect(node.op.args[..2].to_vec()))
         }
         "guard_drop_owned_bytes_return" => {
             if node.op.args.len() != 3 {

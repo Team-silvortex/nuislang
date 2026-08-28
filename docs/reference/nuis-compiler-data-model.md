@@ -9,10 +9,11 @@ original four-slot proof remains frozen in
 [nuis-compiler-data-model-v1.toml](nuis-compiler-data-model-v1.toml).
 
 The implementation is split across `StdLanguageCore`, `StdCompilerData`,
-`StdCompilerTokenEmit`, and `StdCompilerTokens`, all inside bootstrap subset v4. It proves that a
-compiler component can own text, token records, canonical token serialization,
-paths, source identity, allocation indices, maps, and diagnostics without
-borrowing Rust, C, libc, FFI, or host-language layouts.
+`StdCompilerTokenEmit`, `StdCompilerTokens`, and `StdCompilerProjection`, all
+inside bootstrap subset v5. It proves that a compiler component can own text,
+token records, canonical token serialization, structural page state, paths,
+source identity, allocation indices, maps, and diagnostics without borrowing
+Rust, C, libc, FFI, or host-language layouts.
 
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
@@ -95,7 +96,7 @@ candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 `StdCompilerTokens` DFA over those exact bytes into a fresh
 `CompilerTokenStore`, and the canonical emitter reproduces the same length
 and hash. Production additionally packs the actual handoff prefix through the
-thirteen-export scalar ABI, and the artifact layer independently verifies page
+fourteen-export scalar ABI, and the artifact layer independently verifies page
 identity `164749511446`. This proves an owned decode/re-emit round trip across
 the fifth and sixth former 16-byte boundaries on a real compiler prefix rather
 than only a synthetic capacity test.
@@ -111,14 +112,19 @@ nuisc bootstrap-check
 ```
 
 The production path contains no deferred LLVM lowering. Nested aggregate
-parameters use the generic scalar-leaf direct-call ABI. Because arbitrary
-aggregate loop-carried values and nested `Result<aggregate, i64>` guard returns
-remain incomplete, the page materializer uses eight deterministic sixteen-byte
-chunks and the scalar export validates raw aggregate state explicitly. The
-native regression also pins the open-record versus completed-record boundary.
+parameters use the generic scalar-leaf direct-call ABI, and structural
+`cpu.guard_return` now branches and returns through the owned aggregate ABI.
+Guarded variant returns carry the same function-level owned layout as ordinary
+returns, including recursively materialized unit-enum payloads, so all return
+paths share one aggregate shape.
+Because arbitrary aggregate loop-carried values remain incomplete, the page
+materializers use eight deterministic sixteen-byte chunks and the scalar
+exports validate raw aggregate state explicitly. The native regression also
+pins open-record versus completed-record and partial structural-line boundaries.
 
-`StdCompilerProjection` remains a separate consumer over this foundation. It
-does not claim that the bounded v3 model can parse a complete source file.
+`StdCompilerProjection` now consumes the first AST structural page over this
+foundation. It does not claim that the bounded v3 model can parse a complete
+source file or follow a second page.
 
 ## Honest Boundary
 
@@ -134,11 +140,11 @@ yet an unbounded compiler heap:
 - `CompilerMap` remains limited to four integer entries.
 - `CompilerArena` allocates indices but does not own general object storage.
 - Generic helper specialization still needs defining-module provenance.
-- Arbitrary aggregate loop-carried state and nested aggregate `Result` guard
-  returns remain lowering gaps; fixed chunks avoid pretending otherwise.
+- Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
+  avoid pretending otherwise.
 
-The readiness gate is therefore `usable/90`, not `stable/100`. The next
-mainline step is token pagination or one bounded AST/NIR structural-body page.
+The readiness gate is therefore `usable/91`, not `stable/100`. The next
+mainline step is token/AST page continuation or one bounded NIR structural page.
 Broader paging and aggregate backedge lowering follow without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
-or the frozen v4 import ceiling.
+or the frozen v5 import ceiling.

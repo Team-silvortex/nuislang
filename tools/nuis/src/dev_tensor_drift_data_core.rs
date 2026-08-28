@@ -56,6 +56,17 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "guard_loop_continue_repeat",
             "guard_loop_print_continue_repeat",
+            "guard_return_struct_then",
+            "emit_owned_struct_return",
+            "materialize_owned_variant_storage",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-guard-return-owned-layout",
+        path: "tools/nuisc/src/lowering/guard_ops.rs",
+        required_patterns: &[
+            "function_owned_struct_layout",
+            "owned_layout_is_variant_union",
         ],
     },
     DevTensorDriftCheckSpec {

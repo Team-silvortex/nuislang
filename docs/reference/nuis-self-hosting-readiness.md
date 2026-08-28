@@ -53,10 +53,12 @@ Coordinate: `language-core/nuisc/bootstrap-language-subset`.
 Freeze the syntax, type, effect, control-flow, generic, pointer, FFI, and
 library surface permitted in compiler-authoring sources. Both accepted and
 rejected fixtures are required so stage1 cannot acquire accidental dependency
-on an unstable language feature. V4 is now executable through
+on an unstable language feature. V5 is now executable through
 `nuisc bootstrap-check`; see
 [Nuis Bootstrap Language Subset](nuis-bootstrap-language-subset.md).
-This gate is `stable/100`; widening it requires a new protocol version.
+This gate is `stable/100`; its fourteen exact scalar exports add the AST-page
+identity ABI without admitting a new language capability. Widening it requires
+a new protocol version.
 
 ### `compiler-data-model`
 
@@ -64,7 +66,7 @@ Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
 and path contracts needed by a real compiler component. Data model v3 is now
-`usable/90`: `StdLanguageCore` owns the foundational representation,
+`usable/91`: `StdLanguageCore` owns the foundational representation,
 `StdCompilerData` owns materialized token records and payloads,
 `StdCompilerTokens` owns the standalone token DFA, and
 `StdCompilerTokenEmit` reconstructs canonical `nuis-token-stream-v1` bytes
@@ -81,8 +83,9 @@ See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
 This is deliberately not `stable/100`. V3 is bounded to four token records,
 64 payload bytes, and 128 output bytes. Production now feeds the actual handoff
-prefix into the owned store and independently verifies canonical page identity,
-but pagination remains open. Vectors remain `i64`-specific, maps remain
+prefix into the owned store and independently verifies canonical page identity.
+`StdCompilerProjection` also owns the first AST structural page and its
+continuation state, but pagination remains open. Vectors remain `i64`-specific, maps remain
 four-entry, arenas do not yet hold object storage, generic nested-page
 specialization lacks defining-module provenance, and arbitrary aggregate
 loop-carried state still requires general backedge lowering.
@@ -95,7 +98,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `usable/88`. Normal AOT builds emit the ordered five-stage
+This gate is now `usable/90`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -107,17 +110,19 @@ AOT execution, malformed-sequence rejection, and tamper-checked execution
 proof. The exact scalar producer ABI now consumes every serialized stage byte,
 emits a Nuis-owned bundle fold, and drives `StdCompilerTokens` across the exact
 token header, seven record kinds, payload shape, and LF boundaries. Candidate
-production v3 now binds its record count, decoded semantic fold, four owned
+production v4 now binds its record count, decoded semantic fold, four owned
 records, 21 payload bytes, 91 canonical bytes, hash `1277127995`, and identity
-`164749511446` to an independent artifact-layer result. Pagination, changed
-stage bytes, and structural-body decoding in Nuis remain open. See
+`164749511446` to an independent artifact-layer result. It also binds three
+completed AST records, unfinished-line continuation, state hash `1349056749`,
+and identity `174028320749`, all recomputed independently by the artifact
+layer. Page continuation, a NIR page, and changed stage bytes remain open. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `usable/89`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `usable/91`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -135,12 +140,12 @@ then binds its image and result to
 The probe authority remains explicitly execution-only. The separate
 `nuis bootstrap-candidate-build` frontdoor feeds all five payloads through the
 candidate's exact scalar exports, independently verifies the folds, token
-decode summary, and canonical materialized page identity, emits a
+decode summary, canonical token page, and AST continuation identity, emits a
 candidate handoff/component/diagnostic set plus
-`nuis-compiler-candidate-production-v3`, and then runs the differential gate.
+`nuis-compiler-candidate-production-v4`, and then runs the differential gate.
 See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
-The first producer is now the bounded `nuis-stage1-token-materializer-v3` leaf;
-it preserves canonical stage bytes and grants no replacement authority.
+The first producer is now the bounded `nuis-stage1-token-ast-materializer-v4`
+leaf; it preserves canonical stage bytes and grants no replacement authority.
 
 `nuis bootstrap-reproducibility` now runs that complete production chain in
 two initially empty roots with compile-cache read/write bypass. Its path-free
@@ -152,7 +157,7 @@ The local witness intentionally carries no independent attester authority.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/89`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/91`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -163,11 +168,12 @@ and returns a failing command status. See
 The checked-in Nuis token materializer now enters this path as a real
 `stage1-candidate` leaf and reaches repository-native `13/13` equivalence. The
 path frontdoor verifies its execution and production proofs, including exact
-adapter bytes, all stage folds, independently reproduced token summary, and
-canonical first-page identity before writing the report. Two local clean,
+adapter bytes, all stage folds, independently reproduced token summary,
+canonical token identity, and AST continuation identity before writing the
+report. Two local clean,
 cache-bypassed runs now retain stable reproducible identities and 13/13
-verdicts; root or aggregate tampering fails closed. Token pagination, AST/NIR
-body decoding, independent-machine trust, and separate reversible replacement
+verdicts; root or aggregate tampering fails closed. Page continuation, a NIR
+page, independent-machine trust, and separate reversible replacement
 authorization remain open.
 
 ## Migration Rule

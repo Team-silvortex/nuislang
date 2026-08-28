@@ -2,24 +2,33 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use sha2::{Digest, Sha256};
 
+#[path = "compiler_candidate_production_identity.rs"]
+mod identity;
+
+use identity::production_identity;
+
 use crate::{
-    compiler_token_first_page_identity, decode_compiler_token_stream,
+    compiler_projection_first_page_identity, compiler_token_first_page_identity,
+    decode_compiler_token_stream,
     toml::{
         escape_toml_string, parse_optional_map_usize, parse_required_map_string_in_block,
         parse_required_toml_bool, parse_required_toml_string, parse_required_toml_usize,
     },
-    ArtifactError, CompilerCandidateExecution, CompilerComponentBuild, CompilerStageHandoff,
-    CompilerStageKind, CompilerTokenDecodeSummary, CompilerTokenPageIdentity,
-    VerifiedCompilerStagePayload, COMPILER_COMPONENT_STAGE0_ROLE,
-    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_TOKEN_DECODER_CONTRACT,
-    COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_RECORDS,
-    COMPILER_TOKEN_PAGE_CANONICAL_BYTES, COMPILER_TOKEN_PAGE_IDENTITY_RADIX,
-    COMPILER_TOKEN_PAGE_PAYLOAD_BYTES, COMPILER_TOKEN_PAGE_RECORDS,
+    ArtifactError, CompilerCandidateExecution, CompilerComponentBuild, CompilerProjectionKind,
+    CompilerProjectionPageIdentity, CompilerStageHandoff, CompilerStageKind,
+    CompilerTokenDecodeSummary, CompilerTokenPageIdentity, VerifiedCompilerStagePayload,
+    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    COMPILER_PROJECTION_PAGE_BYTES, COMPILER_PROJECTION_PAGE_CONTRACT,
+    COMPILER_PROJECTION_PAGE_HASH_MODULUS, COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,
+    COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_DECODER_FOLD_MODULUS,
+    COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_PAGE_CANONICAL_BYTES,
+    COMPILER_TOKEN_PAGE_IDENTITY_RADIX, COMPILER_TOKEN_PAGE_PAYLOAD_BYTES,
+    COMPILER_TOKEN_PAGE_RECORDS,
 };
 
-pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v3";
+pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v4";
 pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str =
-    "nuis-stage1-materialized-token-page-producer-v3";
+    "nuis-stage1-materialized-token-ast-page-producer-v4";
 pub const COMPILER_CANDIDATE_PRODUCTION_AUTHORITY: &str =
     "stage1-candidate-component-production-no-replacement";
 pub const COMPILER_CANDIDATE_PRODUCTION_FILE: &str = "nuis.compiler-candidate-production.toml";
@@ -39,6 +48,7 @@ pub struct CompilerCandidateProductionInput<'a> {
     pub bundle_fold: usize,
     pub token_decode: &'a CompilerTokenDecodeSummary,
     pub token_page: &'a CompilerTokenPageIdentity,
+    pub ast_page: &'a CompilerProjectionPageIdentity,
     pub adapter_file: &'a str,
     pub adapter: &'a [u8],
 }
@@ -76,6 +86,15 @@ pub struct CompilerCandidateProduction {
     pub token_page_canonical_bytes: usize,
     pub token_page_canonical_hash: usize,
     pub token_page_identity: usize,
+    pub ast_page_contract: String,
+    pub ast_page_record_count: usize,
+    pub ast_page_bytes: usize,
+    pub ast_page_projection_hash: usize,
+    pub ast_page_continuation_indentation: usize,
+    pub ast_page_continuation_body_bytes: usize,
+    pub ast_page_continuation_body_hash: usize,
+    pub ast_page_state_hash: usize,
+    pub ast_page_identity: usize,
     pub replacement_authorized: bool,
     pub proof_sha256: String,
     pub records: Vec<CompilerCandidateProductionRecord>,
@@ -140,6 +159,15 @@ pub fn build_compiler_candidate_production(
         token_page_canonical_bytes: input.token_page.canonical_bytes,
         token_page_canonical_hash: input.token_page.canonical_hash,
         token_page_identity: input.token_page.identity,
+        ast_page_contract: COMPILER_PROJECTION_PAGE_CONTRACT.to_owned(),
+        ast_page_record_count: input.ast_page.record_count,
+        ast_page_bytes: input.ast_page.page_bytes,
+        ast_page_projection_hash: input.ast_page.projection_hash,
+        ast_page_continuation_indentation: input.ast_page.continuation_indentation,
+        ast_page_continuation_body_bytes: input.ast_page.continuation_body_bytes,
+        ast_page_continuation_body_hash: input.ast_page.continuation_body_hash,
+        ast_page_state_hash: input.ast_page.state_hash,
+        ast_page_identity: input.ast_page.identity,
         replacement_authorized: false,
         proof_sha256: String::new(),
         records,
@@ -151,7 +179,7 @@ pub fn build_compiler_candidate_production(
 
 pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction) -> String {
     let mut out = format!(
-        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
+        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
         proof.protocol,
         proof.producer_contract,
         proof.authority,
@@ -174,6 +202,15 @@ pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction)
         proof.token_page_canonical_bytes,
         proof.token_page_canonical_hash,
         proof.token_page_identity,
+        proof.ast_page_contract,
+        proof.ast_page_record_count,
+        proof.ast_page_bytes,
+        proof.ast_page_projection_hash,
+        proof.ast_page_continuation_indentation,
+        proof.ast_page_continuation_body_bytes,
+        proof.ast_page_continuation_body_hash,
+        proof.ast_page_state_hash,
+        proof.ast_page_identity,
         proof.replacement_authorized,
         proof.proof_sha256,
     );
@@ -266,6 +303,31 @@ pub fn parse_compiler_candidate_production_from_source(
             path,
         )?,
         token_page_identity: parse_required_toml_usize(source, "token_page_identity", path)?,
+        ast_page_contract: parse_required_toml_string(source, "ast_page_contract", path)?,
+        ast_page_record_count: parse_required_toml_usize(source, "ast_page_record_count", path)?,
+        ast_page_bytes: parse_required_toml_usize(source, "ast_page_bytes", path)?,
+        ast_page_projection_hash: parse_required_toml_usize(
+            source,
+            "ast_page_projection_hash",
+            path,
+        )?,
+        ast_page_continuation_indentation: parse_required_toml_usize(
+            source,
+            "ast_page_continuation_indentation",
+            path,
+        )?,
+        ast_page_continuation_body_bytes: parse_required_toml_usize(
+            source,
+            "ast_page_continuation_body_bytes",
+            path,
+        )?,
+        ast_page_continuation_body_hash: parse_required_toml_usize(
+            source,
+            "ast_page_continuation_body_hash",
+            path,
+        )?,
+        ast_page_state_hash: parse_required_toml_usize(source, "ast_page_state_hash", path)?,
+        ast_page_identity: parse_required_toml_usize(source, "ast_page_identity", path)?,
         replacement_authorized: parse_required_toml_bool(source, "replacement_authorized", path)?,
         proof_sha256: parse_required_toml_string(source, "proof_sha256", path)?,
         records: parse_record_blocks(source, path)?,
@@ -317,6 +379,16 @@ pub fn read_compiler_candidate_production(
         canonical_hash: proof.token_page_canonical_hash,
         identity: proof.token_page_identity,
     };
+    let ast_page = CompilerProjectionPageIdentity {
+        record_count: proof.ast_page_record_count,
+        page_bytes: proof.ast_page_bytes,
+        projection_hash: proof.ast_page_projection_hash,
+        continuation_indentation: proof.ast_page_continuation_indentation,
+        continuation_body_bytes: proof.ast_page_continuation_body_bytes,
+        continuation_body_hash: proof.ast_page_continuation_body_hash,
+        state_hash: proof.ast_page_state_hash,
+        identity: proof.ast_page_identity,
+    };
     validate_evidence(&CompilerCandidateProductionInput {
         stage0,
         execution,
@@ -327,6 +399,7 @@ pub fn read_compiler_candidate_production(
         bundle_fold: proof.bundle_fold,
         token_decode: &token_decode,
         token_page: &token_page,
+        ast_page: &ast_page,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     })?;
@@ -340,6 +413,7 @@ pub fn read_compiler_candidate_production(
         bundle_fold: proof.bundle_fold,
         token_decode: &token_decode,
         token_page: &token_page,
+        ast_page: &ast_page,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     })?;
@@ -441,6 +515,18 @@ fn validate_evidence(input: &CompilerCandidateProductionInput<'_>) -> Result<(),
             "compiler candidate production canonical token page identity mismatch",
         ));
     }
+    let ast_payload = input
+        .payloads
+        .iter()
+        .find(|payload| payload.stage == CompilerStageKind::Ast)
+        .ok_or_else(|| ArtifactError::new("compiler candidate AST payload is missing"))?;
+    let expected_ast_page =
+        compiler_projection_first_page_identity(CompilerProjectionKind::Ast, &ast_payload.bytes)?;
+    if *input.ast_page != expected_ast_page {
+        return Err(ArtifactError::new(
+            "compiler candidate production AST structural page identity mismatch",
+        ));
+    }
     validate_file_name(input.adapter_file, "candidate adapter")?;
     if input.adapter.is_empty() {
         return Err(ArtifactError::new(
@@ -455,6 +541,7 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
         || proof.producer_contract != COMPILER_CANDIDATE_PRODUCER_CONTRACT
         || proof.authority != COMPILER_CANDIDATE_PRODUCTION_AUTHORITY
         || proof.token_decoder_contract != COMPILER_TOKEN_DECODER_CONTRACT
+        || proof.ast_page_contract != COMPILER_PROJECTION_PAGE_CONTRACT
         || proof.replacement_authorized
     {
         return Err(ArtifactError::new(
@@ -511,6 +598,25 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
     {
         return Err(ArtifactError::new(
             "compiler candidate production canonical token page summary is invalid",
+        ));
+    }
+    if proof.ast_page_record_count == 0
+        || proof.ast_page_record_count > proof.ast_page_bytes
+        || proof.ast_page_bytes == 0
+        || proof.ast_page_bytes > COMPILER_PROJECTION_PAGE_BYTES
+        || proof.ast_page_projection_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || proof.ast_page_continuation_indentation > proof.ast_page_bytes
+        || proof.ast_page_continuation_body_bytes > proof.ast_page_bytes
+        || proof.ast_page_continuation_indentation + proof.ast_page_continuation_body_bytes
+            > proof.ast_page_bytes
+        || proof.ast_page_continuation_body_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || proof.ast_page_state_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || proof.ast_page_identity
+            != proof.ast_page_state_hash * COMPILER_PROJECTION_PAGE_IDENTITY_RADIX
+                + proof.ast_page_bytes
+    {
+        return Err(ArtifactError::new(
+            "compiler candidate production AST structural page summary is invalid",
         ));
     }
     for (ordinal, record) in proof.records.iter().enumerate() {
@@ -611,49 +717,6 @@ fn required_block_usize(
     })
 }
 
-fn production_identity(proof: &CompilerCandidateProduction) -> String {
-    let mut hash = Sha256::new();
-    for value in [
-        proof.protocol.as_bytes(),
-        proof.producer_contract.as_bytes(),
-        proof.authority.as_bytes(),
-        proof.stage0_component_sha256.as_bytes(),
-        proof.stage0_execution_sha256.as_bytes(),
-        proof.candidate_component_sha256.as_bytes(),
-        proof.candidate_producer_id.as_bytes(),
-        proof.candidate_compiler_image_sha256.as_bytes(),
-        proof.stage_handoff_bundle_sha256.as_bytes(),
-        proof.adapter_file.as_bytes(),
-        proof.adapter_sha256.as_bytes(),
-        proof.token_decoder_contract.as_bytes(),
-    ] {
-        hash_field(&mut hash, value);
-    }
-    for value in [
-        proof.adapter_bytes,
-        proof.record_count,
-        proof.bundle_fold,
-        proof.token_record_count,
-        proof.token_semantic_fold,
-        proof.token_page_record_count,
-        proof.token_page_payload_bytes,
-        proof.token_page_canonical_bytes,
-        proof.token_page_canonical_hash,
-        proof.token_page_identity,
-        usize::from(proof.replacement_authorized),
-    ] {
-        hash_field(&mut hash, &(value as u64).to_le_bytes());
-    }
-    for record in &proof.records {
-        hash_field(&mut hash, &(record.ordinal as u64).to_le_bytes());
-        hash_field(&mut hash, record.stage.as_bytes());
-        hash_field(&mut hash, &(record.payload_bytes as u64).to_le_bytes());
-        hash_field(&mut hash, record.payload_sha256.as_bytes());
-        hash_field(&mut hash, &(record.fold as u64).to_le_bytes());
-    }
-    format!("{:x}", hash.finalize())
-}
-
 fn validate_text(source: &str, path: &Path) -> Result<(), ArtifactError> {
     if source.is_empty()
         || !source.ends_with('\n')
@@ -707,11 +770,6 @@ fn validate_sha256(value: &str, label: &str) -> Result<(), ArtifactError> {
     Err(ArtifactError::new(format!(
         "compiler candidate production {label} must be lowercase SHA-256"
     )))
-}
-
-fn hash_field(hash: &mut Sha256, value: &[u8]) {
-    hash.update((value.len() as u64).to_le_bytes());
-    hash.update(value);
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

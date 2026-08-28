@@ -10,7 +10,7 @@ candidate_role = "stage1-candidate"
 producer_policy = "distinct-producer-identities"
 digest = "sha256-lowercase"
 replacement_authorized = false
-candidate_production_protocol = "nuis-compiler-candidate-production-v3"
+candidate_production_protocol = "nuis-compiler-candidate-production-v4"
 candidate_production_required_by_path_frontdoor = true
 reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
 reproducibility_frontdoor = "nuis bootstrap-reproducibility"
@@ -40,6 +40,7 @@ invariants = [
   "both-component-records-and-payloads-verify-before-comparison",
   "both-diagnostic-reports-bind-their-exact-component-records",
   "candidate-production-proof-binds-stage0-execution-and-all-five-stage-folds",
+  "candidate-production-proof-binds-token-and-ast-first-page-identities",
   "all-thirteen-comparisons-are-required-and-canonically-ordered",
   "valid-drift-writes-an-audit-report-and-exits-failure",
   "report-output-cannot-overwrite-an-input-record",

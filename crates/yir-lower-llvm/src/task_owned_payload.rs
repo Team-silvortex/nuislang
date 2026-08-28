@@ -77,6 +77,39 @@ pub(crate) fn emit_owned_struct_data(
     Some(finalized)
 }
 
+pub(crate) fn emit_owned_struct_return(
+    value: &StructLlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> bool {
+    if scalar_leaf_count(&LlvmValueRef::Struct(value.clone())).is_none() {
+        return false;
+    }
+    let mut state = LlvmLoweringState {
+        body: std::mem::take(body),
+        globals: Vec::new(),
+        registers: std::collections::BTreeMap::new(),
+        delayed_registers: std::collections::BTreeMap::new(),
+        facts: super::KnownFacts::new(),
+        buffer_lengths: std::collections::BTreeMap::new(),
+        next_reg: *next_reg,
+        next_global: 0,
+        next_block: 0,
+        last_cpu_value: None,
+        ends_with_terminal_return: false,
+    };
+    let data = emit_owned_struct_data(value, &mut state)
+        .expect("prevalidated owned struct should remain packable");
+    let pointer_bits = fresh_reg(&mut state.next_reg);
+    state
+        .body
+        .push(format!("  {pointer_bits} = ptrtoint ptr {data} to i64"));
+    state.body.push(format!("  ret i64 {pointer_bits}"));
+    *body = state.body;
+    *next_reg = state.next_reg;
+    true
+}
+
 pub(crate) fn materialize_owned_variant_storage(
     value: &LlvmValueRef,
     template: &StructLlvmValueRef,
@@ -108,11 +141,12 @@ pub(crate) fn materialize_owned_variant_storage(
             if name == "tag" {
                 return Some((name.clone(), LlvmValueRef::I64(tag_i64.clone())));
             }
-            let value = variants
-                .get(name)
-                .cloned()
-                .map(LlvmValueRef::Struct)
-                .unwrap_or_else(|| zero_owned_value(field));
+            let value = match variants.get(name) {
+                Some(variant) => {
+                    materialize_owned_value(&LlvmValueRef::Struct(variant.clone()), field)?
+                }
+                None => zero_owned_value(field),
+            };
             Some((name.clone(), value))
         })
         .collect::<Option<Vec<_>>>()?;
@@ -120,6 +154,65 @@ pub(crate) fn materialize_owned_variant_storage(
         type_name: template.type_name.clone(),
         fields,
     })
+}
+
+fn materialize_owned_value(value: &LlvmValueRef, template: &LlvmValueRef) -> Option<LlvmValueRef> {
+    match template {
+        LlvmValueRef::Struct(template)
+            if template.type_name.starts_with(OWNED_VARIANT_UNION_PREFIX) =>
+        {
+            Some(LlvmValueRef::Struct(materialize_owned_variant_storage(
+                value, template,
+            )?))
+        }
+        LlvmValueRef::Struct(template) => {
+            let LlvmValueRef::Struct(value) = value else {
+                return None;
+            };
+            if value.type_name != template.type_name {
+                return None;
+            }
+            let fields = template
+                .fields
+                .iter()
+                .map(|(name, field_template)| {
+                    let (_, field_value) = value
+                        .fields
+                        .iter()
+                        .find(|(field_name, _)| field_name == name)?;
+                    Some((
+                        name.clone(),
+                        materialize_owned_value(field_value, field_template)?,
+                    ))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(LlvmValueRef::Struct(StructLlvmValueRef {
+                type_name: template.type_name.clone(),
+                fields,
+            }))
+        }
+        _ if same_owned_scalar_kind(value, template) => Some(value.clone()),
+        _ => None,
+    }
+}
+
+fn same_owned_scalar_kind(value: &LlvmValueRef, template: &LlvmValueRef) -> bool {
+    matches!(
+        (value, template),
+        (LlvmValueRef::Bool { .. }, LlvmValueRef::Bool { .. })
+            | (LlvmValueRef::I32(_), LlvmValueRef::I32(_))
+            | (LlvmValueRef::I64(_), LlvmValueRef::I64(_))
+            | (LlvmValueRef::F32(_), LlvmValueRef::F32(_))
+            | (LlvmValueRef::F64(_), LlvmValueRef::F64(_))
+            | (
+                LlvmValueRef::TextHandle { .. },
+                LlvmValueRef::TextHandle { .. }
+            )
+            | (
+                LlvmValueRef::OwnedBytes { .. },
+                LlvmValueRef::OwnedBytes { .. }
+            )
+    )
 }
 
 pub(crate) fn decode_owned_variant_storage(storage: StructLlvmValueRef) -> Option<LlvmValueRef> {
@@ -238,11 +331,10 @@ pub(crate) fn emit_owned_struct_take(
 fn scalar_leaf_count(value: &LlvmValueRef) -> Option<usize> {
     match value {
         value if is_scalar(value) => Some(1),
-        LlvmValueRef::Struct(value) if !value.fields.is_empty() => {
-            value.fields.iter().try_fold(0usize, |count, (_, field)| {
-                count.checked_add(scalar_leaf_count(field)?)
-            })
-        }
+        LlvmValueRef::Struct(value) if value.fields.is_empty() => Some(1),
+        LlvmValueRef::Struct(value) => value.fields.iter().try_fold(0usize, |count, (_, field)| {
+            count.checked_add(scalar_leaf_count(field)?)
+        }),
         _ => None,
     }
 }
@@ -286,6 +378,15 @@ fn pack_value(
     let LlvmValueRef::Struct(value) = value else {
         return None;
     };
+    if value.fields.is_empty() {
+        let stored = fresh_reg(&mut state.next_reg);
+        state.body.push(format!(
+            "  {stored} = call i64 @nuis_scheduler_owned_aggregate_set_scalar_v1(ptr {data}, i64 {leaf_index}, i64 {})",
+            stable_struct_type_id(value)
+        ));
+        *leaf_index += 1;
+        return Some(());
+    }
     for (_, field) in &value.fields {
         pack_value(field, data, leaf_index, glm_token_base, state)?;
     }
@@ -317,6 +418,14 @@ fn unpack_value(
     let LlvmValueRef::Struct(template) = template else {
         return None;
     };
+    if template.fields.is_empty() {
+        let marker = fresh_reg(&mut state.next_reg);
+        state.body.push(format!(
+            "  {marker} = call i64 @nuis_scheduler_owned_aggregate_get_v1(ptr {data}, i64 {leaf_index})"
+        ));
+        *leaf_index += 1;
+        return Some(LlvmValueRef::Struct(template.clone()));
+    }
     let fields = template
         .fields
         .iter()
