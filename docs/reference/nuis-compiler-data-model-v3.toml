@@ -12,7 +12,7 @@ source_modules = [
   "stdlib/std/lib/compiler_tokens.ns",
 ]
 std_surface = "surface.std.compiler-data-model.v3"
-bootstrap_subset = "nuis-bootstrap-language-subset-v3"
+bootstrap_subset = "nuis-bootstrap-language-subset-v4"
 host_layout_identity = false
 host_ffi_required = false
 record_layout = "columnar-four-i64-vectors"
@@ -32,6 +32,7 @@ expected_emitted_bytes = 59
 expected_emitted_hash = 2002147233
 candidate_prefix_emitted_bytes = 91
 candidate_prefix_emitted_hash = 1277127995
+candidate_prefix_identity = 164749511446
 emitted_hash_validation = "independent-reference-vector"
 bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --test bootstrap_cli command_bootstrap_cli_accepts_the_compiler_data_model_project -j 1"
 native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
@@ -59,6 +60,7 @@ operations = [
   "compiler_token_buffer_push",
   "compiler_token_buffer_get",
   "compiler_token_buffer_hash",
+  "compiler_token_buffer_from_packed_raw",
   "compiler_token_store_empty",
   "compiler_token_store_shape_valid",
   "compiler_token_store_begin",
@@ -69,6 +71,7 @@ operations = [
   "compiler_token_emit_hex_byte",
   "compiler_token_emit_decimal",
   "compiler_token_materializer_decode_first_page",
+  "compiler_token_materializer_decode_first_page_raw",
 ]
 
 invariants = [
@@ -89,6 +92,7 @@ invariants = [
   "packed-words-use-arithmetic-little-endian-byte-order-independent-of-host-endianness",
   "bootstrap-emission-window-is-four-records-and-sixty-four-payload-bytes",
   "first-complete-token-page-decodes-to-owned-records-and-reemits-canonically",
+  "production-candidate-page-identity-is-independently-recomputed",
   "token-layout-is-not-a-public-or-host-abi",
 ]
 
@@ -130,15 +134,14 @@ boundary_checks = [
 
 [growth_boundary]
 status = "open"
-next_contract = "stream-decoder-to-owned-record-integration"
+next_contract = "multi-page-token-or-structural-body-integration"
 remaining = [
-  "production-candidate-adapter-does-not-yet-feed-handoff-bytes-into-CompilerTokenStore",
   "token-store-is-bounded-to-four-records-and-sixty-four-payload-bytes",
   "canonical-emission-is-bounded-to-four-records-sixty-four-payload-bytes-and-128-output-bytes",
   "CompilerMap-remains-four-entry-and-i64-specific",
   "CompilerArena-still-does-not-own-general-object-storage",
   "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
-  "large-pure-aggregate-loop-carries-need-compile-time-optimization",
+  "general-aggregate-loop-backedges-and-nested-result-guard-returns-need-lowering",
 ]
 preserve = [
   "owned-value-semantics",
@@ -147,5 +150,5 @@ preserve = [
   "stable-record-indices",
   "fail-closed-errors",
   "host-layout-independence",
-  "frozen-bootstrap-v3-import-ceiling",
+  "frozen-bootstrap-v4-import-ceiling",
 ]

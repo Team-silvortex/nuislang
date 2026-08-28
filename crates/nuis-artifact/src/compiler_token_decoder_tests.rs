@@ -53,3 +53,44 @@ fn decoder_enforces_byte_and_record_bounds_without_an_off_by_one() {
         decode_compiler_token_stream(&vec![b'x'; COMPILER_TOKEN_DECODER_MAX_BYTES + 1]).is_err()
     );
 }
+
+#[test]
+fn first_page_identity_canonicalizes_a_real_candidate_prefix() {
+    let source = b"nuis-token-stream-v1\nword\t757365\nword\t637075\nword\t5374644c616e6775616765436f7265\nsymbol\t59\narrow\n";
+    let page = compiler_token_first_page_identity(source).expect("materialize first token page");
+    assert_eq!(
+        page,
+        CompilerTokenPageIdentity {
+            record_count: 4,
+            payload_bytes: 21,
+            canonical_bytes: 91,
+            canonical_hash: 1_277_127_995,
+            identity: 164_749_511_446,
+        }
+    );
+}
+
+#[test]
+fn first_page_identity_reemits_numeric_payloads_and_enforces_capacity() {
+    let source = b"nuis-token-stream-v1\ninteger\t00012\nsymbol\t00059\narrow\nstring\t\n";
+    let page = compiler_token_first_page_identity(source).expect("canonicalize numeric page");
+    let canonical = b"nuis-token-stream-v1\ninteger\t12\nsymbol\t59\narrow\nstring\t\n";
+    let expected_hash = canonical
+        .iter()
+        .fold(COMPILER_TOKEN_DECODER_SEMANTIC_SEED, |state, byte| {
+            fold_unit(state, usize::from(*byte) + 1)
+        });
+    assert_eq!(page.canonical_bytes, canonical.len());
+    assert_eq!(page.canonical_hash, expected_hash);
+    assert_eq!(page.payload_bytes, 0);
+
+    assert!(compiler_token_first_page_identity(
+        b"nuis-token-stream-v1\nword\t61\nword\t62\nword\t63\n"
+    )
+    .is_err());
+    let oversized = format!(
+        "nuis-token-stream-v1\nword\t{}\narrow\narrow\narrow\n",
+        "61".repeat(COMPILER_TOKEN_PAGE_PAYLOAD_BYTES + 1)
+    );
+    assert!(compiler_token_first_page_identity(oversized.as_bytes()).is_err());
+}

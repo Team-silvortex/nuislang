@@ -9,7 +9,7 @@ original four-slot proof remains frozen in
 [nuis-compiler-data-model-v1.toml](nuis-compiler-data-model-v1.toml).
 
 The implementation is split across `StdLanguageCore`, `StdCompilerData`,
-`StdCompilerTokenEmit`, and `StdCompilerTokens`, all inside bootstrap subset v3. It proves that a
+`StdCompilerTokenEmit`, and `StdCompilerTokens`, all inside bootstrap subset v4. It proves that a
 compiler component can own text, token records, canonical token serialization,
 paths, source identity, allocation indices, maps, and diagnostics without
 borrowing Rust, C, libc, FFI, or host-language layouts.
@@ -94,9 +94,11 @@ candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 `1277127995`. The `StdCompilerTokenEmit` materializer drives the standalone
 `StdCompilerTokens` DFA over those exact bytes into a fresh
 `CompilerTokenStore`, and the canonical emitter reproduces the same length
-and hash. This proves an owned decode/re-emit round trip across the fifth and
-sixth former 16-byte boundaries on a real compiler prefix rather than only a
-synthetic capacity test.
+and hash. Production additionally packs the actual handoff prefix through the
+thirteen-export scalar ABI, and the artifact layer independently verifies page
+identity `164749511446`. This proves an owned decode/re-emit round trip across
+the fifth and sixth former 16-byte boundaries on a real compiler prefix rather
+than only a synthetic capacity test.
 
 The acceptance chain is:
 
@@ -108,10 +110,12 @@ nuisc bootstrap-check
   -> deterministic exit score 122
 ```
 
-The emitted LLVM contains no deferred lowering. Nested aggregate parameters
-use the generic scalar-leaf direct-call ABI, and `Result<CompilerTokenStore,
-i64>` crosses the owned variant-union return ABI. The native regression also
-pins the open-record versus completed-record validation boundary.
+The production path contains no deferred LLVM lowering. Nested aggregate
+parameters use the generic scalar-leaf direct-call ABI. Because arbitrary
+aggregate loop-carried values and nested `Result<aggregate, i64>` guard returns
+remain incomplete, the page materializer uses eight deterministic sixteen-byte
+chunks and the scalar export validates raw aggregate state explicitly. The
+native regression also pins the open-record versus completed-record boundary.
 
 `StdCompilerProjection` remains a separate consumer over this foundation. It
 does not claim that the bounded v3 model can parse a complete source file.
@@ -121,8 +125,8 @@ does not claim that the bounded v3 model can parse a complete source file.
 V3 proves owned token materialization and canonical re-emission, but it is not
 yet an unbounded compiler heap:
 
-- The production candidate adapter still reports scalar DFA count/fold values;
-  it does not yet feed its actual handoff bytes into the owned materializer.
+- Production binds only the first complete page; the rest of the token stream
+  remains represented by the complete-stream scalar DFA summary.
 - Token storage is limited to four records and 64 payload bytes.
 - The canonical bootstrap emitter is limited to four records, 64 input payload
   bytes, and 128 output bytes.
@@ -130,11 +134,11 @@ yet an unbounded compiler heap:
 - `CompilerMap` remains limited to four integer entries.
 - `CompilerArena` allocates indices but does not own general object storage.
 - Generic helper specialization still needs defining-module provenance.
-- Whole-value aggregate compilation is still nontrivial, although packed words
-  avoid the discarded eight-vector representation's compile-time blow-up.
+- Arbitrary aggregate loop-carried state and nested aggregate `Result` guard
+  returns remain lowering gaps; fixed chunks avoid pretending otherwise.
 
-The readiness gate is therefore `usable/88`, not `stable/100`. The next mainline
-step is to bind the stage1 candidate's actual token bytes and page identity to
-this store and emitter through the producer-neutral handoff. Broader paging and aggregate compile-time
-optimization follow without weakening canonical UTF-8, stable indices,
-fail-closed errors, host-layout independence, or the frozen v3 import ceiling.
+The readiness gate is therefore `usable/90`, not `stable/100`. The next
+mainline step is token pagination or one bounded AST/NIR structural-body page.
+Broader paging and aggregate backedge lowering follow without weakening
+canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
+or the frozen v4 import ceiling.

@@ -133,11 +133,12 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
         id: "nuis-compiler-token-decoder-production-binding",
         path: "crates/nuis-artifact/src/compiler_candidate_production.rs",
         required_patterns: &[
-            "nuis-compiler-candidate-production-v2",
+            "nuis-compiler-candidate-production-v3",
             "token_decoder_contract",
             "token_record_count",
             "token_semantic_fold",
-            "token decode summary mismatch",
+            "token_page_identity",
+            "canonical token page identity mismatch",
         ],
     },
 ];

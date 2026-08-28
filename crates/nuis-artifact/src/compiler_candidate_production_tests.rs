@@ -22,11 +22,12 @@ struct Evidence {
     payloads: Vec<VerifiedCompilerStagePayload>,
     folds: Vec<usize>,
     token_decode: CompilerTokenDecodeSummary,
+    token_page: CompilerTokenPageIdentity,
 }
 
 fn evidence() -> Evidence {
     let source = b"mod cpu Main { fn main() -> i64 { return 0; } }\n";
-    let tokens = b"nuis-token-stream-v1\nword\t6d6f64\n";
+    let tokens = b"nuis-token-stream-v1\nword\t757365\nword\t637075\nword\t5374644c616e6775616765436f7265\nsymbol\t59\narrow\n";
     let ast = b"ast mod cpu unit Main\n";
     let nir = b"nir mod cpu unit Main\n";
     let yir = b"yir 0.1\nmodule cpu Main\n";
@@ -65,7 +66,7 @@ fn evidence() -> Evidence {
     }];
     let stage0 = build_compiler_component_build(&CompilerComponentBuildInput {
         stage_role: COMPILER_COMPONENT_STAGE0_ROLE,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v4",
         component_id: "projection_relay",
         component_domain: "cpu",
         component_unit: "Main",
@@ -90,7 +91,7 @@ fn evidence() -> Evidence {
     })
     .expect("build execution proof");
     let candidate_handoff = build_compiler_stage_handoff(
-        "nuis-stage1-token-decoder-v2",
+        "nuis-stage1-token-materializer-v3",
         "cpu",
         "Main",
         &stage0_inputs,
@@ -99,7 +100,7 @@ fn evidence() -> Evidence {
     let candidate =
         promote_compiler_component_candidate(&CompilerComponentCandidatePromotionInput {
             stage0: &stage0,
-            producer_id: "nuis-stage1-token-decoder-v2",
+            producer_id: "nuis-stage1-token-materializer-v3",
             compiler_image: b"nuis-candidate-image",
             stage_handoff_bundle_sha256: &candidate_handoff.bundle_sha256,
         })
@@ -118,6 +119,8 @@ fn evidence() -> Evidence {
         .map(|(ordinal, payload)| compiler_candidate_stage_fold(ordinal, &payload.bytes))
         .collect();
     let token_decode = decode_compiler_token_stream(tokens).expect("decode fixture tokens");
+    let token_page =
+        compiler_token_first_page_identity(tokens).expect("materialize fixture token page");
     Evidence {
         stage0,
         execution,
@@ -126,6 +129,7 @@ fn evidence() -> Evidence {
         payloads,
         folds,
         token_decode,
+        token_page,
     }
 }
 
@@ -139,6 +143,7 @@ fn build(evidence: &Evidence) -> CompilerCandidateProduction {
         stage_folds: &evidence.folds,
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &evidence.token_decode,
+        token_page: &evidence.token_page,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -150,11 +155,16 @@ fn candidate_production_round_trips_and_never_authorizes_replacement() {
     let evidence = evidence();
     let proof = build(&evidence);
     assert_eq!(proof.record_count, 5);
-    assert_eq!(proof.token_record_count, 1);
+    assert_eq!(proof.token_record_count, 5);
     assert_eq!(
         proof.token_semantic_fold,
         evidence.token_decode.semantic_fold
     );
+    assert_eq!(proof.token_page_record_count, 4);
+    assert_eq!(proof.token_page_payload_bytes, 21);
+    assert_eq!(proof.token_page_canonical_bytes, 91);
+    assert_eq!(proof.token_page_canonical_hash, 1_277_127_995);
+    assert_eq!(proof.token_page_identity, 164_749_511_446);
     assert!(!proof.replacement_authorized);
     assert_eq!(proof.authority, COMPILER_CANDIDATE_PRODUCTION_AUTHORITY);
     assert_eq!(
@@ -186,6 +196,7 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         stage_folds: &folds,
         bundle_fold: compiler_candidate_bundle_fold(&folds),
         token_decode: &evidence.token_decode,
+        token_page: &evidence.token_page,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -203,11 +214,30 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         stage_folds: &evidence.folds,
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &token_decode,
+        token_page: &evidence.token_page,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
     .expect_err("Nuis token decode drift must fail");
     assert!(error.to_string().contains("token decode summary"));
+
+    let mut token_page = evidence.token_page;
+    token_page.identity += 1;
+    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
+        stage0: &evidence.stage0,
+        execution: &evidence.execution,
+        candidate: &evidence.candidate,
+        handoff: &evidence.handoff,
+        payloads: &evidence.payloads,
+        stage_folds: &evidence.folds,
+        bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
+        token_decode: &evidence.token_decode,
+        token_page: &token_page,
+        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
+        adapter: b"adapter-image",
+    })
+    .expect_err("Nuis canonical page identity drift must fail");
+    assert!(error.to_string().contains("canonical token page identity"));
 
     let source = render_compiler_candidate_production(&build(&evidence));
     let tampered = source.replacen(

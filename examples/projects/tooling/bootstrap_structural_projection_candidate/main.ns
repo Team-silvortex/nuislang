@@ -1,4 +1,6 @@
 use cpu StdLanguageCore;
+use cpu StdCompilerData;
+use cpu StdCompilerTokenEmit;
 use cpu StdCompilerTokens;
 use cpu StdCompilerProjection;
 
@@ -62,6 +64,105 @@ mod cpu Main {
   @export(name = "nuis_bootstrap_candidate_token_finish_v1")
   fn compiler_candidate_token_finish(mode: i64, count: i64) -> i64 {
     return compiler_token_decoder_finish(mode, count);
+  }
+
+  fn compiler_candidate_token_page_identity_raw(
+    length: i64,
+    word0: i64,
+    word1: i64,
+    word2: i64,
+    word3: i64,
+    word4: i64,
+    word5: i64,
+    word6: i64,
+    word7: i64,
+    word8: i64,
+    word9: i64,
+    word10: i64,
+    word11: i64,
+    word12: i64,
+    word13: i64,
+    word14: i64,
+    word15: i64,
+    word16: i64,
+    word17: i64,
+    word18: i64
+  ) -> i64 {
+    let input: CompilerTokenBuffer = compiler_token_buffer_from_packed_raw(
+      length,
+      word0, word1, word2, word3, word4, word5, word6, word7, word8,
+      word9, word10, word11, word12, word13, word14, word15, word16,
+      word17, word18
+    );
+    if compiler_token_buffer_shape_valid(input) == false {
+      return -3;
+    }
+    let materialized: CompilerTokenMaterializer = compiler_token_materializer_decode_first_page_raw(
+      input
+    );
+    if materialized.error != 0 { return -materialized.error; }
+    if materialized.complete == false { return -2; }
+    let store: CompilerTokenStore = materialized.store;
+    if compiler_token_store_shape_valid(store) == false || store.record_open {
+      return -2;
+    }
+    if store.record_count > 4 || store.payload.length > 64 { return -1; }
+    let size0: i64 = 21 + compiler_token_emit_record_size(store, 0);
+    let size1: i64 = size0 + compiler_token_emit_record_size(store, 1);
+    let size2: i64 = size1 + compiler_token_emit_record_size(store, 2);
+    let size3: i64 = size2 + compiler_token_emit_record_size(store, 3);
+    if size3 > 128 { return -1; }
+    let emitted_header: CompilerTokenBuffer = compiler_token_emit_header_raw(
+      compiler_token_buffer_empty()
+    );
+    let emitted0: CompilerTokenBuffer = compiler_token_emit_record_raw(emitted_header, store, 0);
+    let emitted1: CompilerTokenBuffer = compiler_token_emit_record_raw(emitted0, store, 1);
+    let emitted2: CompilerTokenBuffer = compiler_token_emit_record_raw(emitted1, store, 2);
+    let emitted: CompilerTokenBuffer = compiler_token_emit_record_raw(emitted2, store, 3);
+    if compiler_token_buffer_shape_valid(emitted) == false { return -3; }
+    let hash0: i64 = compiler_token_buffer_hash_chunk(emitted, 0, emitted.length, 313);
+    let hash1: i64 = compiler_token_buffer_hash_chunk(emitted, 16, emitted.length, hash0);
+    let hash2: i64 = compiler_token_buffer_hash_chunk(emitted, 32, emitted.length, hash1);
+    let hash3: i64 = compiler_token_buffer_hash_chunk(emitted, 48, emitted.length, hash2);
+    let hash4: i64 = compiler_token_buffer_hash_chunk(emitted, 64, emitted.length, hash3);
+    let hash5: i64 = compiler_token_buffer_hash_chunk(emitted, 80, emitted.length, hash4);
+    let hash6: i64 = compiler_token_buffer_hash_chunk(emitted, 96, emitted.length, hash5);
+    let hash: i64 = compiler_token_buffer_hash_chunk(emitted, 112, emitted.length, hash6);
+    return (hash * 129) + emitted.length;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_page_identity_v1")
+  fn compiler_candidate_token_page_identity(
+    length: i64,
+    word0: i64,
+    word1: i64,
+    word2: i64,
+    word3: i64,
+    word4: i64,
+    word5: i64,
+    word6: i64,
+    word7: i64,
+    word8: i64,
+    word9: i64,
+    word10: i64,
+    word11: i64,
+    word12: i64,
+    word13: i64,
+    word14: i64,
+    word15: i64,
+    word16: i64,
+    word17: i64,
+    word18: i64
+  ) -> i64 {
+    if length <= 0 || length > 128 {
+      return -3;
+    }
+    return compiler_candidate_token_page_identity_raw(
+      length,
+      word0, word1, word2, word3, word4, word5, word6, word7, word8,
+      word9, word10, word11, word12, word13, word14, word15, word16,
+      word17, word18
+    );
   }
 
   fn ast_projection() -> CompilerProjectionState {
@@ -214,6 +315,18 @@ mod cpu Main {
     }
     if compiler_candidate_token_step(token_start, 120) != compiler_candidate_token_error_mode() {
       return 76;
+    }
+    if compiler_candidate_token_page_identity(
+      0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ) >= 0 {
+      return 77;
+    }
+    if compiler_candidate_token_page_identity(
+      1,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ) >= 0 {
+      return 78;
     }
     let ast: CompilerProjectionState = ast_projection();
     if ast.error != 0 || ast.record_count != 6 {

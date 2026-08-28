@@ -105,10 +105,12 @@ pub use compiler_structural_projection::{
     COMPILER_NIR_PROJECTION_ENCODING, COMPILER_STRUCTURAL_PROJECTION_CONTRACT,
 };
 pub use compiler_token_decoder::{
-    decode_compiler_token_stream, CompilerTokenDecodeSummary, COMPILER_TOKEN_DECODER_CONTRACT,
+    compiler_token_first_page_identity, decode_compiler_token_stream, CompilerTokenDecodeSummary,
+    CompilerTokenPageIdentity, COMPILER_TOKEN_DECODER_CONTRACT,
     COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_BYTES,
     COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_DECODER_SEMANTIC_SEED,
-    COMPILER_TOKEN_STREAM_PROTOCOL,
+    COMPILER_TOKEN_PAGE_CANONICAL_BYTES, COMPILER_TOKEN_PAGE_IDENTITY_RADIX,
+    COMPILER_TOKEN_PAGE_PAYLOAD_BYTES, COMPILER_TOKEN_PAGE_RECORDS, COMPILER_TOKEN_STREAM_PROTOCOL,
 };
 pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{

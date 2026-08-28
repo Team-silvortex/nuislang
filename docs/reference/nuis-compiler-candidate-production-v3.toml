@@ -1,0 +1,110 @@
+protocol = "nuis-compiler-candidate-production-v3"
+version = 3
+predecessor = "nuis-compiler-candidate-production-v2"
+status = "usable-materialized-token-page-leaf"
+scope = "nuis-written-stage1-candidate-leaf-production"
+manifest_name = "nuis.compiler-candidate-production.toml"
+producer_contract = "nuis-stage1-materialized-token-page-producer-v3"
+authority = "stage1-candidate-component-production-no-replacement"
+frontdoor = "nuis bootstrap-candidate-build"
+stage0_directory = "stage0"
+candidate_directory = "stage1-candidate"
+candidate_role = "stage1-candidate"
+candidate_producer = "nuis-stage1-token-materializer-v3"
+adapter_file = "nuis.compiler-candidate-adapter"
+adapter_role = "host-byte-transport-packing-and-state-orchestration-without-token-semantics"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+record_count = 5
+replacement_authorized = false
+reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
+reproducibility_frontdoor = "nuis bootstrap-reproducibility"
+
+scalar_exports = [
+  "nuis_bootstrap_candidate_stage_seed_v1(i64)->i64",
+  "nuis_bootstrap_candidate_stage_fold_v1(i64,i64,i64)->i64",
+  "nuis_bootstrap_candidate_bundle_seed_v1()->i64",
+  "nuis_bootstrap_candidate_bundle_fold_v1(i64,i64,i64)->i64",
+  "nuis_bootstrap_candidate_token_start_v1()->i64",
+  "nuis_bootstrap_candidate_token_error_mode_v1()->i64",
+  "nuis_bootstrap_candidate_token_max_bytes_v1()->i64",
+  "nuis_bootstrap_candidate_token_semantic_seed_v1()->i64",
+  "nuis_bootstrap_candidate_token_step_v1(i64,i64)->i64",
+  "nuis_bootstrap_candidate_token_count_step_v1(i64,i64,i64)->i64",
+  "nuis_bootstrap_candidate_token_semantic_step_v1(i64,i64,i64)->i64",
+  "nuis_bootstrap_candidate_token_finish_v1(i64,i64)->i64",
+  "nuis_bootstrap_candidate_token_page_identity_v1(i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64)->i64",
+]
+
+ordered_stages = ["source", "tokens", "ast", "nir", "yir"]
+fold_modulus = 2147483629
+stage_seed = "97 + ((ordinal + 1) * 17)"
+stage_fold = "((state * 257) + byte + ordinal + 1) mod fold_modulus"
+bundle_seed = 193
+bundle_fold = "((state * 65537) + stage_fold + ordinal + 1) mod fold_modulus"
+token_decoder_contract = "nuis-compiler-token-decoder-v1"
+token_stream_protocol = "nuis-token-stream-v1"
+token_decoder_max_bytes = 4194304
+token_decoder_max_records = 65535
+token_semantic_seed = 313
+token_semantic_fold = "decoded-nibble-or-decimal-unit-and-record-kind-fold-mod-2147483629"
+token_page_records = 4
+token_page_payload_bytes = 64
+token_page_canonical_bytes = 128
+token_page_packed_words = 19
+token_page_packed_word_bytes = 7
+token_page_hash_seed = 313
+token_page_hash = "fold((state * 257) + byte + 1) mod 2147483629"
+token_page_identity_radix = 129
+token_page_identity = "canonical_hash * 129 + canonical_bytes"
+reference_page_record_count = 4
+reference_page_payload_bytes = 21
+reference_page_canonical_bytes = 91
+reference_page_canonical_hash = 1277127995
+reference_page_identity = 164749511446
+
+bound_inputs = [
+  "verified-stage0-component-and-candidate-execution",
+  "verified-stage1-candidate-component-and-five-stage-handoff",
+  "candidate-image-equals-executed-nuis-native-image",
+  "every-stage-byte-length-sha256-and-nuis-fold",
+  "independently-recomputed-host-fold",
+  "nuis-decoded-token-record-count-and-semantic-fold",
+  "independently-recomputed-host-token-decode",
+  "nuis-materialized-first-page-record-payload-length-hash-and-identity",
+  "independently-recomputed-host-canonical-first-page-identity",
+  "exact-adapter-file-length-and-sha256",
+  "candidate-producer-and-stage-bundle-identities",
+  "no-replacement-authority",
+]
+
+invariants = [
+  "bootstrap-v4-allows-only-the-thirteen-exact-scalar-export-signatures",
+  "nuis-functions-consume-every-stage-byte-in-order",
+  "nuis-token-dfa-validates-header-record-kind-payload-shape-and-line-boundaries",
+  "adapter-packs-at-most-128-opaque-token-bytes-without-token-classification",
+  "nuis-materializes-four-complete-token-records-and-canonically-re-emits-them",
+  "host-independently-recomputes-all-stage-and-bundle-folds",
+  "host-independently-recomputes-token-summary-and-canonical-page-identity",
+  "candidate-handoff-preserves-stage0-semantic-bundle-identity",
+  "candidate-component-has-a-distinct-producer-and-explicit-stage1-candidate-role",
+  "bootstrap-diff-requires-the-production-proof-before-writing-a-report",
+  "component-payload-adapter-token-page-or-proof-tampering-fails-closed",
+  "thirteen-of-thirteen-equivalence-never-authorizes-replacement",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_token_decoder -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1",
+]
+
+[open_boundary]
+missing = [
+  "token-pagination-beyond-one-four-record-page",
+  "nuis-owned-ast-and-nir-body-decoding",
+  "general-aggregate-loop-backedge-lowering",
+  "independent-machine-or-attester-reproducibility-proof",
+  "independent-reversible-component-replacement-authorization",
+]

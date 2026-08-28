@@ -67,6 +67,86 @@ mod cpu StdCompilerData {
     };
   }
 
+  pub fn compiler_token_packed_page_length(
+    word_count: i64,
+    start: i64
+  ) -> i64 {
+    let remaining: i64 = word_count - start;
+    if remaining <= 0 { return 0; }
+    if remaining >= 4 { return 4; }
+    return remaining;
+  }
+
+  pub fn compiler_token_buffer_from_packed_raw(
+    length: i64,
+    word0: i64,
+    word1: i64,
+    word2: i64,
+    word3: i64,
+    word4: i64,
+    word5: i64,
+    word6: i64,
+    word7: i64,
+    word8: i64,
+    word9: i64,
+    word10: i64,
+    word11: i64,
+    word12: i64,
+    word13: i64,
+    word14: i64,
+    word15: i64,
+    word16: i64,
+    word17: i64,
+    word18: i64
+  ) -> CompilerTokenBuffer {
+    let word_count: i64 = if length == 0 { 0 } else { (length + 6) / 7 };
+    let words0_length: i64 = if word_count < 16 { word_count } else { 16 };
+    let words1_length: i64 = if word_count > 16 { word_count - 16 } else { 0 };
+    let words0: CompilerVector = CompilerVector {
+      length: words0_length,
+      page_count: if words0_length == 0 { 0 } else { (words0_length + 3) / 4 },
+      page0: CompilerVectorPage {
+        length: compiler_token_packed_page_length(word_count, 0),
+        slot0: word0, slot1: word1, slot2: word2, slot3: word3
+      },
+      page1: CompilerVectorPage {
+        length: compiler_token_packed_page_length(word_count, 4),
+        slot0: word4, slot1: word5, slot2: word6, slot3: word7
+      },
+      page2: CompilerVectorPage {
+        length: compiler_token_packed_page_length(word_count, 8),
+        slot0: word8, slot1: word9, slot2: word10, slot3: word11
+      },
+      page3: CompilerVectorPage {
+        length: compiler_token_packed_page_length(word_count, 12),
+        slot0: word12, slot1: word13, slot2: word14, slot3: word15
+      }
+    };
+    let words1: CompilerVector = CompilerVector {
+      length: words1_length,
+      page_count: if words1_length == 0 { 0 } else { 1 },
+      page0: CompilerVectorPage {
+        length: words1_length,
+        slot0: word16, slot1: word17, slot2: word18, slot3: 0
+      },
+      page1: CompilerVectorPage {
+        length: 0, slot0: 0, slot1: 0, slot2: 0, slot3: 0
+      },
+      page2: CompilerVectorPage {
+        length: 0, slot0: 0, slot1: 0, slot2: 0, slot3: 0
+      },
+      page3: CompilerVectorPage {
+        length: 0, slot0: 0, slot1: 0, slot2: 0, slot3: 0
+      }
+    };
+    return CompilerTokenBuffer {
+      length: length,
+      word_count: word_count,
+      words0: words0,
+      words1: words1
+    };
+  }
+
   pub fn compiler_token_buffer_power(exponent: i64) -> i64 {
     if exponent == 0 { return 1; }
     if exponent == 1 { return 256; }

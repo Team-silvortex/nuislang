@@ -748,22 +748,46 @@ mod cpu StdCompilerTokenEmit {
       state.numeric_negative
     );
   }
-
+  pub fn compiler_token_materializer_step_at(state: CompilerTokenMaterializer, input: CompilerTokenBuffer, index: i64) -> CompilerTokenMaterializer {
+    if index >= input.length { return state; }
+    return compiler_token_materializer_step(state, compiler_token_buffer_value(input, index));
+  }
+  pub fn compiler_token_materializer_step_chunk(state: CompilerTokenMaterializer, input: CompilerTokenBuffer, offset: i64) -> CompilerTokenMaterializer {
+    let state0: CompilerTokenMaterializer = compiler_token_materializer_step_at(state, input, offset);
+    let state1: CompilerTokenMaterializer = compiler_token_materializer_step_at(state0, input, offset + 1);
+    let state2: CompilerTokenMaterializer = compiler_token_materializer_step_at(state1, input, offset + 2);
+    let state3: CompilerTokenMaterializer = compiler_token_materializer_step_at(state2, input, offset + 3);
+    let state4: CompilerTokenMaterializer = compiler_token_materializer_step_at(state3, input, offset + 4);
+    let state5: CompilerTokenMaterializer = compiler_token_materializer_step_at(state4, input, offset + 5);
+    let state6: CompilerTokenMaterializer = compiler_token_materializer_step_at(state5, input, offset + 6);
+    let state7: CompilerTokenMaterializer = compiler_token_materializer_step_at(state6, input, offset + 7);
+    let state8: CompilerTokenMaterializer = compiler_token_materializer_step_at(state7, input, offset + 8);
+    let state9: CompilerTokenMaterializer = compiler_token_materializer_step_at(state8, input, offset + 9);
+    let state10: CompilerTokenMaterializer = compiler_token_materializer_step_at(state9, input, offset + 10);
+    let state11: CompilerTokenMaterializer = compiler_token_materializer_step_at(state10, input, offset + 11);
+    let state12: CompilerTokenMaterializer = compiler_token_materializer_step_at(state11, input, offset + 12);
+    let state13: CompilerTokenMaterializer = compiler_token_materializer_step_at(state12, input, offset + 13);
+    let state14: CompilerTokenMaterializer = compiler_token_materializer_step_at(state13, input, offset + 14);
+    return compiler_token_materializer_step_at(state14, input, offset + 15);
+  }
+  pub fn compiler_token_materializer_decode_first_page_raw(input: CompilerTokenBuffer) -> CompilerTokenMaterializer {
+    let state0: CompilerTokenMaterializer = compiler_token_materializer_start();
+    let state1: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state0, input, 0);
+    let state2: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state1, input, 16);
+    let state3: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state2, input, 32);
+    let state4: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state3, input, 48);
+    let state5: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state4, input, 64);
+    let state6: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state5, input, 80);
+    let state7: CompilerTokenMaterializer = compiler_token_materializer_step_chunk(state6, input, 96);
+    return compiler_token_materializer_step_chunk(state7, input, 112);
+  }
   pub fn compiler_token_materializer_decode_first_page(
     input: CompilerTokenBuffer
   ) -> Result<CompilerTokenStore, i64> {
     if compiler_token_buffer_shape_valid(input) == false {
       return Result.Err(3);
     }
-    let state: CompilerTokenMaterializer = compiler_token_materializer_start();
-    let index: i64 = 0;
-    while index < input.length {
-      let state: CompilerTokenMaterializer = compiler_token_materializer_step(
-        state,
-        compiler_token_buffer_value(input, index)
-      );
-      let index: i64 = index + 1;
-    }
+    let state: CompilerTokenMaterializer = compiler_token_materializer_decode_first_page_raw(input);
     if state.error != 0 {
       return Result.Err(state.error);
     }

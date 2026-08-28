@@ -7,7 +7,7 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v2.toml](nuis-compiler-candidate-production-v2.toml)
+* [nuis-compiler-candidate-production-v3.toml](nuis-compiler-candidate-production-v3.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not

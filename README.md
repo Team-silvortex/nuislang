@@ -34,9 +34,9 @@ The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and `694/694` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
 bootstrap-critical average honest at `97/100`; the weakest coordinate is now
-`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `86/100`. The
-compiler data model is `usable/88`, while the stage driver and differential
-gate are both `usable/87`. The dedicated
+`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `88/100`. The
+compiler data model is `usable/90`, while the stage driver and differential
+gate are both `usable/89`. The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
 audit record, and component-bound diagnostic proof for one project-form
@@ -54,12 +54,15 @@ and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
 image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
-then feeds all five serialized payloads through twelve exact Nuis scalar
-exports, independently verifies their folds, and drives the token payload
-through a bounded Nuis-native DFA. The artifact layer independently decodes
-the same token stream before production v2 emits a distinct attested
-stage1-candidate and reaches repository-native `13/13` differential equivalence
-while retaining `replacement_authorized = false`. `nuis
+then feeds all five serialized payloads through thirteen exact Nuis scalar
+exports, independently verifies their folds, drives the complete token payload
+through a bounded Nuis-native DFA, and transports the first 128 opaque bytes
+into a Nuis-owned four-record materializer. Nuis canonically re-emits the real
+91-byte page with hash `1277127995`; the artifact layer independently decodes
+and verifies identity `164749511446` before production v3 emits the distinct
+`nuis-stage1-token-materializer-v3` candidate and reaches repository-native
+`13/13` differential equivalence while retaining
+`replacement_authorized = false`. `nuis
 bootstrap-reproducibility` now performs
 two cache-bypassed clean candidate builds, rereads both evidence roots, requires
 stable compiler-image, native-output, and differential identities, and emits a

@@ -6,11 +6,24 @@ pub const COMPILER_TOKEN_DECODER_MAX_BYTES: usize = 4 * 1024 * 1024;
 pub const COMPILER_TOKEN_DECODER_MAX_RECORDS: usize = 65_535;
 pub const COMPILER_TOKEN_DECODER_SEMANTIC_SEED: usize = 313;
 pub const COMPILER_TOKEN_DECODER_FOLD_MODULUS: usize = 2_147_483_629;
+pub const COMPILER_TOKEN_PAGE_RECORDS: usize = 4;
+pub const COMPILER_TOKEN_PAGE_PAYLOAD_BYTES: usize = 64;
+pub const COMPILER_TOKEN_PAGE_CANONICAL_BYTES: usize = 128;
+pub const COMPILER_TOKEN_PAGE_IDENTITY_RADIX: usize = 129;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompilerTokenDecodeSummary {
     pub record_count: usize,
     pub semantic_fold: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompilerTokenPageIdentity {
+    pub record_count: usize,
+    pub payload_bytes: usize,
+    pub canonical_bytes: usize,
+    pub canonical_hash: usize,
+    pub identity: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -77,6 +90,113 @@ pub fn decode_compiler_token_stream(
         summary.record_count += 1;
     }
     Ok(summary)
+}
+
+pub fn compiler_token_first_page_identity(
+    bytes: &[u8],
+) -> Result<CompilerTokenPageIdentity, ArtifactError> {
+    let summary = decode_compiler_token_stream(bytes)?;
+    if summary.record_count < COMPILER_TOKEN_PAGE_RECORDS {
+        return Err(ArtifactError::new(format!(
+            "compiler token page requires at least {COMPILER_TOKEN_PAGE_RECORDS} records"
+        )));
+    }
+    let source = std::str::from_utf8(bytes).map_err(|error| {
+        ArtifactError::new(format!("compiler token stream is not UTF-8: {error}"))
+    })?;
+    let mut lines = source.split_terminator('\n');
+    let header = lines
+        .next()
+        .ok_or_else(|| ArtifactError::new("compiler token page is missing its protocol header"))?;
+    let mut canonical = Vec::from(header.as_bytes());
+    canonical.push(b'\n');
+    let mut payload_bytes = 0;
+    for _ in 0..COMPILER_TOKEN_PAGE_RECORDS {
+        let line = lines
+            .next()
+            .ok_or_else(|| ArtifactError::new("compiler token page ended before four records"))?;
+        canonicalize_page_record(line, &mut canonical, &mut payload_bytes)?;
+    }
+    let raw_page_bytes = bytes
+        .iter()
+        .enumerate()
+        .filter(|(_, byte)| **byte == b'\n')
+        .nth(COMPILER_TOKEN_PAGE_RECORDS)
+        .map(|(index, _)| index + 1)
+        .ok_or_else(|| ArtifactError::new("compiler token page has no fourth record boundary"))?;
+    if raw_page_bytes > COMPILER_TOKEN_PAGE_CANONICAL_BYTES
+        || payload_bytes > COMPILER_TOKEN_PAGE_PAYLOAD_BYTES
+        || canonical.len() > COMPILER_TOKEN_PAGE_CANONICAL_BYTES
+    {
+        return Err(ArtifactError::new(
+            "compiler token page exceeds the bounded materializer capacity",
+        ));
+    }
+    let canonical_hash = canonical
+        .iter()
+        .fold(COMPILER_TOKEN_DECODER_SEMANTIC_SEED, |state, byte| {
+            fold_unit(state, usize::from(*byte) + 1)
+        });
+    let identity = canonical_hash * COMPILER_TOKEN_PAGE_IDENTITY_RADIX + canonical.len();
+    Ok(CompilerTokenPageIdentity {
+        record_count: COMPILER_TOKEN_PAGE_RECORDS,
+        payload_bytes,
+        canonical_bytes: canonical.len(),
+        canonical_hash,
+        identity,
+    })
+}
+
+fn canonicalize_page_record(
+    line: &str,
+    output: &mut Vec<u8>,
+    payload_bytes: &mut usize,
+) -> Result<(), ArtifactError> {
+    let (kind, payload) = parse_record(line)?;
+    match kind {
+        TokenKind::Word | TokenKind::Float | TokenKind::String | TokenKind::DocComment => {
+            fold_hex_payload(
+                0,
+                payload,
+                matches!(kind, TokenKind::String | TokenKind::DocComment),
+            )?;
+            *payload_bytes += payload.len() / 2;
+            output.extend_from_slice(match kind {
+                TokenKind::Word => b"word\t",
+                TokenKind::Float => b"float\t",
+                TokenKind::String => b"string\t",
+                TokenKind::DocComment => b"doc-comment\t",
+                _ => unreachable!(),
+            });
+            output.extend_from_slice(payload.as_bytes());
+        }
+        TokenKind::Integer => {
+            let value = payload.parse::<i64>().map_err(|error| {
+                ArtifactError::new(format!(
+                    "invalid compiler integer token `{payload}`: {error}"
+                ))
+            })?;
+            output.extend_from_slice(b"integer\t");
+            output.extend_from_slice(value.to_string().as_bytes());
+        }
+        TokenKind::Symbol => {
+            let scalar = payload.parse::<usize>().map_err(|error| {
+                ArtifactError::new(format!(
+                    "invalid compiler symbol token `{payload}`: {error}"
+                ))
+            })?;
+            if scalar > 0x10ffff || (0xd800..=0xdfff).contains(&scalar) {
+                return Err(ArtifactError::new(format!(
+                    "compiler symbol token `{payload}` is not a Unicode scalar"
+                )));
+            }
+            output.extend_from_slice(b"symbol\t");
+            output.extend_from_slice(scalar.to_string().as_bytes());
+        }
+        TokenKind::Arrow => output.extend_from_slice(b"arrow"),
+    }
+    output.push(b'\n');
+    Ok(())
 }
 
 fn parse_record(line: &str) -> Result<(TokenKind, &str), ArtifactError> {
