@@ -235,7 +235,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "std-readme-host-io-text-lane",
         path: "stdlib/std/README.md",
         required_patterns: &[
-            "beta-0.7.*",
+            "beta-0.8.*",
             "host I/O and text",
             "filesystem/path/location",
             "worker lease",
@@ -420,10 +420,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.7-mainline-router",
+        id: "beta-0.8-mainline-router",
         path: "docs/current-mainline-map.md",
         required_patterns: &[
-            "current `beta-0.7.*` reading route",
+            "current `beta-0.8.*` reading route",
             "nuis-beta-0.6.0-mainline-entry.md",
             "previous curated `beta-0.3.*` entry",
             "recorded predecessor `beta-0.0.1` entry",
@@ -435,10 +435,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.7-repository-frontdoor",
+        id: "beta-0.8-repository-frontdoor",
         path: "README.md",
         required_patterns: &[
-            "repository is on `beta-0.7.*`",
+            "repository is on `beta-0.8.*`",
             "nuis-beta-0.6.0-mainline-entry.md",
             "registered execution domains",
             "nuis-nsld-final-output-selection-evidence-file-v1",

@@ -33,7 +33,9 @@ refetch protocol.
 ## Identity Layers
 
 Each run retains its exact stage0 record, candidate record, production proof,
-and thirteen-comparison differential report identities. These exact audit
+stage-transformation manifest, and thirteen-comparison differential report
+identities. Candidate production v7 binds the transformation file SHA-256, so
+the aggregate covers it transitively. These exact audit
 identities may differ because build manifests record their physical output
 locations.
 
@@ -59,8 +61,8 @@ it is deliberately labelled as having no independent attester trust.
 The artifact reader canonicalizes both supplied roots, rejects aliases, reads
 their complete component payloads, checks the cache-bypass manifests, rebuilds
 both differential reports, and then rebuilds the aggregate. Component,
-adapter, production proof, report, native binary, witness, stable identity, or
-aggregate mutation fails closed.
+adapter, transformation word or file, production proof, report, native binary,
+witness, stable identity, or aggregate mutation fails closed.
 
 The first real run exposed a process-global `?` expansion counter: a second
 compile generated different NIR temporary names even though its source and YIR
@@ -69,10 +71,12 @@ lowering boundary, with a same-thread repeated-lowering regression test.
 
 ## Honest Boundary
 
-V1 proves two fresh compiler productions under one local frontdoor. It does
-not prove independent-machine diversity, trusted remote attestation, or a
-non-identity Nuis transformation. Those remain separate upgrades, followed by
-an independently versioned reversible replacement protocol.
+V1 proves two fresh compiler productions under one local frontdoor and includes
+the Nuis-produced non-identity NIR checkpoint. It does not prove a changed
+handoff stage payload, transformation-aware semantic equivalence,
+independent-machine diversity, or trusted remote attestation. Those remain
+separate upgrades, followed by an independently versioned reversible
+replacement protocol.
 
 ## Validation
 

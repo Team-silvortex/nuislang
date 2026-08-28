@@ -418,7 +418,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "nuis_nir_first_page_materializer = true",
             "nuis-compiler-structural-cursor-v1",
             "production_bound_structural_pages_per_projection = 2",
-            "nuis-compiler-candidate-production-v6",
+            "nuis-compiler-candidate-production-v7",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -554,7 +554,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "stage1-candidate-probe",
             "execution-only-no-component-production",
             "nuis bootstrap-candidate-probe",
-            "nuis-compiler-candidate-production-v6",
+            "nuis-compiler-candidate-production-v7",
             "nuis bootstrap-candidate-build",
         ],
     },

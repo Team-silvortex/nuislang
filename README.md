@@ -10,7 +10,7 @@ backends, but they do not define the language model.
 
 ## Current Line
 
-The repository is on `beta-0.7.*`. Git history is the authoritative source for
+The repository is on `beta-0.8.*`. Git history is the authoritative source for
 the exact patch checkpoint; the independent Cargo package versions are not the
 project release number yet.
 
@@ -32,9 +32,10 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`696/696` passing drift checks. The weakest bootstrap-readiness coordinate is
-`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `92/100`. The
-compiler data model, stage driver, and differential gate are all `usable/93`.
+`699/699` passing drift checks. The weakest bootstrap-readiness coordinate is
+`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `93/100`. The
+compiler data model is also `usable/93`; the stage driver and differential gate
+are both `usable/94`.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -48,7 +49,7 @@ fixture plus the real candidate's 91-byte `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
 store, canonically re-emits the same bytes and hash, and executes natively at
 deterministic score `122`; the producer-neutral five-stage handoff is now
-`usable`, `92/100`. Its shared structural codec independently parses
+`usable`, `93/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
@@ -61,8 +62,11 @@ with hash `1277127995`, then serializes eight-lane cursors and resumes both
 structural projections. The artifact layer independently verifies token
 identity `164749511446`, first AST/NIR identities `174028320749` and
 `132469386887`, and second-page identities `149528711957` and `146705724977`
-before production v6 emits the distinct
-`nuis-stage1-token-ast-nir-continuation-materializer-v6` candidate and reaches repository-native
+before production v7 emits the distinct
+`nuis-stage1-nir-checkpoint-materializer-v7` candidate. Nuis also emits both
+NIR cursor arrays as a non-identity 22-word structural checkpoint;
+`nuis-compiler-stage-transformation-v1` independently replays and binds every
+word before the candidate reaches repository-native
 `13/13` differential equivalence while retaining `replacement_authorized =
 false`. `nuis
 bootstrap-reproducibility` now performs
@@ -88,9 +92,9 @@ while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, paged compiler data, first attested stage1 leaf, and
-two-clean-build aggregate in place, the tensor now routes mainline work to the
-deterministic page-continuation boundary. Broader compiler-data
-paging, a changed stage payload, reversible replacement authorization, Galaxy
+two-clean-build aggregate in place, the tensor now routes mainline work to a
+changed stage payload and transformation-aware semantic differential. Broader
+compiler-data paging, reversible replacement authorization, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 
@@ -102,6 +106,7 @@ Start with these documents:
 * [Self-hosting readiness](docs/reference/nuis-self-hosting-readiness.md)
 * [Compiler data model](docs/reference/nuis-compiler-data-model.md)
 * [Compiler stage handoff](docs/reference/nuis-compiler-stage-handoff.md)
+* [Compiler stage transformation](docs/reference/nuis-compiler-stage-transformation.md)
 * [Compiler component build](docs/reference/nuis-compiler-component-build.md)
 * [Compiler candidate execution](docs/reference/nuis-compiler-candidate-execution.md)
 * [Compiler candidate production](docs/reference/nuis-compiler-candidate-production.md)

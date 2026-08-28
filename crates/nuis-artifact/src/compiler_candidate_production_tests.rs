@@ -6,10 +6,16 @@ use std::{
 
 use crate::{
     build_compiler_candidate_execution, build_compiler_component_build,
-    build_compiler_stage_handoff, promote_compiler_component_candidate,
-    CompilerCandidateExecutionInput, CompilerComponentBuildInput,
-    CompilerComponentCandidatePromotionInput, CompilerComponentDependencyInput, CompilerStageKind,
-    CompilerStagePayloadInput, VerifiedCompilerStagePayload, COMPILER_COMPONENT_STAGE0_ROLE,
+    build_compiler_stage_handoff, build_compiler_stage_transformations,
+    compiler_stage_structural_checkpoint_words, compiler_token_first_page_identity,
+    decode_compiler_token_stream, promote_compiler_component_candidate,
+    render_compiler_stage_transformations, CompilerCandidateExecutionInput,
+    CompilerComponentBuildInput, CompilerComponentCandidatePromotionInput,
+    CompilerComponentDependencyInput, CompilerStageKind, CompilerStagePayloadInput,
+    CompilerStageTransformationRecordInput, CompilerStageTransformations,
+    CompilerStageTransformationsInput, VerifiedCompilerStagePayload,
+    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 use super::*;
@@ -25,6 +31,7 @@ struct Evidence {
     token_page: CompilerTokenPageIdentity,
     ast_pages: CompilerProjectionTwoPageIdentity,
     nir_pages: CompilerProjectionTwoPageIdentity,
+    stage_transformations: CompilerStageTransformations,
 }
 
 fn evidence() -> Evidence {
@@ -114,7 +121,7 @@ fn evidence() -> Evidence {
     })
     .expect("build execution proof");
     let candidate_handoff = build_compiler_stage_handoff(
-        "nuis-stage1-token-ast-nir-continuation-materializer-v6",
+        "nuis-stage1-nir-checkpoint-materializer-v7",
         "cpu",
         "Main",
         &stage0_inputs,
@@ -123,7 +130,7 @@ fn evidence() -> Evidence {
     let candidate =
         promote_compiler_component_candidate(&CompilerComponentCandidatePromotionInput {
             stage0: &stage0,
-            producer_id: "nuis-stage1-token-ast-nir-continuation-materializer-v6",
+            producer_id: "nuis-stage1-nir-checkpoint-materializer-v7",
             compiler_image: b"nuis-candidate-image",
             stage_handoff_bundle_sha256: &candidate_handoff.bundle_sha256,
         })
@@ -148,6 +155,22 @@ fn evidence() -> Evidence {
         .expect("materialize fixture AST pages");
     let nir_pages = compiler_projection_two_page_identity(CompilerProjectionKind::Nir, nir)
         .expect("materialize fixture NIR pages");
+    let nir_words =
+        compiler_stage_structural_checkpoint_words(CompilerProjectionKind::Nir, nir_pages);
+    let transformation_records = [CompilerStageTransformationRecordInput {
+        source_stage: CompilerStageKind::Nir,
+        transform_contract: COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+        output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+        output_words: &nir_words,
+    }];
+    let stage_transformations =
+        build_compiler_stage_transformations(&CompilerStageTransformationsInput {
+            producer_id: &candidate_handoff.producer_id,
+            handoff: &candidate_handoff,
+            payloads: &payloads,
+            records: &transformation_records,
+        })
+        .expect("build fixture stage transformations");
     Evidence {
         stage0,
         execution,
@@ -159,6 +182,7 @@ fn evidence() -> Evidence {
         token_page,
         ast_pages,
         nir_pages,
+        stage_transformations,
     }
 }
 
@@ -175,6 +199,8 @@ fn build(evidence: &Evidence) -> CompilerCandidateProduction {
         token_page: &evidence.token_page,
         ast_pages: &evidence.ast_pages,
         nir_pages: &evidence.nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &evidence.stage_transformations,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -186,6 +212,11 @@ fn candidate_production_round_trips_and_never_authorizes_replacement() {
     let evidence = evidence();
     let proof = build(&evidence);
     assert_eq!(proof.record_count, 5);
+    assert_eq!(
+        proof.stage_transformations_file,
+        COMPILER_STAGE_TRANSFORMATION_FILE
+    );
+    assert!(proof.stage_transformations_bytes > 0);
     assert_eq!(proof.token_record_count, 5);
     assert_eq!(
         proof.token_semantic_fold,
@@ -272,6 +303,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         token_page: &evidence.token_page,
         ast_pages: &evidence.ast_pages,
         nir_pages: &evidence.nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &evidence.stage_transformations,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -292,6 +325,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         token_page: &evidence.token_page,
         ast_pages: &evidence.ast_pages,
         nir_pages: &evidence.nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &evidence.stage_transformations,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -312,6 +347,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         token_page: &token_page,
         ast_pages: &evidence.ast_pages,
         nir_pages: &evidence.nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &evidence.stage_transformations,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -332,6 +369,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         token_page: &evidence.token_page,
         ast_pages: &ast_pages,
         nir_pages: &evidence.nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &evidence.stage_transformations,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -352,6 +391,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         token_page: &evidence.token_page,
         ast_pages: &evidence.ast_pages,
         nir_pages: &nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &evidence.stage_transformations,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -384,6 +425,11 @@ fn candidate_production_reader_binds_adapter_bytes_and_all_evidence() {
     fs::create_dir_all(&root).expect("create proof directory");
     let path = root.join(COMPILER_CANDIDATE_PRODUCTION_FILE);
     fs::write(&path, render_compiler_candidate_production(&proof)).expect("write proof");
+    fs::write(
+        root.join(COMPILER_STAGE_TRANSFORMATION_FILE),
+        render_compiler_stage_transformations(&evidence.stage_transformations),
+    )
+    .expect("write stage transformations");
     fs::write(root.join(COMPILER_CANDIDATE_ADAPTER_FILE), b"adapter-image").expect("write adapter");
 
     let verified = read_compiler_candidate_production(
@@ -412,5 +458,25 @@ fn candidate_production_reader_binds_adapter_bytes_and_all_evidence() {
     )
     .expect_err("adapter tampering must fail");
     assert!(error.to_string().contains("adapter length or SHA-256"));
+
+    fs::write(root.join(COMPILER_CANDIDATE_ADAPTER_FILE), b"adapter-image")
+        .expect("restore adapter");
+    fs::write(
+        root.join(COMPILER_STAGE_TRANSFORMATION_FILE),
+        b"tampered-transformations",
+    )
+    .expect("tamper stage transformations");
+    let error = read_compiler_candidate_production(
+        &path,
+        &evidence.stage0,
+        &evidence.execution,
+        &evidence.candidate,
+        &evidence.handoff,
+        &evidence.payloads,
+    )
+    .expect_err("stage transformation tampering must fail");
+    assert!(error
+        .to_string()
+        .contains("stage transformations length or SHA-256"));
     fs::remove_dir_all(root).expect("remove proof directory");
 }

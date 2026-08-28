@@ -1,11 +1,12 @@
 # Nuis Compiler Candidate Production
 
-`nuis-compiler-candidate-production-v6` is the attested path from an executed
+`nuis-compiler-candidate-production-v7` is the attested path from an executed
 Nuis compiler-shaped program to a separately identified `stage1-candidate`
-leaf. V6 retains the canonical token page and independently resumes both AST
-and NIR into a second structural page through serialized opaque cursors.
+leaf. V7 retains the canonical token page and independently resumes both AST
+and NIR into a second structural page through serialized opaque cursors, then
+binds the first Nuis-produced non-identity NIR checkpoint transformation.
 The machine-readable contract is
-[nuis-compiler-candidate-production-v6.toml](nuis-compiler-candidate-production-v6.toml).
+[nuis-compiler-candidate-production-v7.toml](nuis-compiler-candidate-production-v7.toml).
 
 This closes one real compiler-data production loop. It does not mean that
 `nuisc` is self-hosted, and it never authorizes replacing stage0.
@@ -23,7 +24,7 @@ The output root contains:
 * `stage0/`, including the ordinary component, execution, handoff, diagnostic,
   and native-image evidence
 * `stage1-candidate/`, including the candidate component, handoff, diagnostics,
-  scalar adapter, and production proof
+  scalar adapter, stage-transformation manifest, and production proof
 * `nuis.compiler-component-diff.toml`, which must report all thirteen
   comparisons equivalent while retaining `replacement_authorized = false`
 
@@ -45,8 +46,10 @@ nineteen seven-byte little-endian words. It packs the first two AST and NIR
 pages through the same generic byte transport, without recognizing
 documentation, imports, module headers, indentation, or record kinds. For each
 call it only supplies raw words and transports eight returned cursor lanes into
-the next call. It does not decode payloads, canonicalize values, compute any
-page or cursor identity, or make authority decisions.
+the next call. V7 also prints both NIR cursor lane arrays in exact order so the
+Nuis output can become transformation evidence. It does not decode payloads,
+canonicalize values, compute any page or cursor identity, or make authority
+decisions.
 
 Inside the Nuis image, `StdCompilerTokens` validates the stream grammar and
 `CompilerTokenMaterializer` reconstructs four records into
@@ -126,6 +129,20 @@ can attest them. AST and NIR therefore share one Nuis implementation, one
 producer-neutral page contract, and one resumable cursor contract while
 remaining separate projection domains.
 
+## Stage Transformation
+
+The Nuis-produced NIR identities and both eight-lane cursors are encoded as a
+22-word `nuis-compiler-structural-checkpoint-v1` record. This is a genuine
+non-identity representation under `ordered-u64-le-v1`, not a copy of the NIR
+text. The versioned
+[stage-transformation protocol](nuis-compiler-stage-transformation.md) binds
+the source payload and all output words.
+
+The artifact layer independently reconstructs the same NIR pages and cursor
+lanes from the original payload. Candidate production then binds the canonical
+transformation manifest file length and SHA-256. Manifest word, order, payload,
+hash, producer, handoff, or proof drift fails closed.
+
 ```text
 host adapter = opaque token/AST/NIR byte and cursor transport
 Nuis image = folds, token materialization/emission, resumable AST/NIR scanning
@@ -140,7 +157,7 @@ are part of the production proof.
 
 The candidate handoff preserves the producer-neutral semantic bundle while
 changing the auditable producer identity to
-`nuis-stage1-token-ast-nir-continuation-materializer-v6`. The promoted
+`nuis-stage1-nir-checkpoint-materializer-v7`. The promoted
 component keeps the same component identity, native output, dependency closure,
 and five stage payloads, but declares the explicit `stage1-candidate` role and
 uses the executed Nuis image as its compiler image.
@@ -149,19 +166,22 @@ The production proof binds both components, the earlier execution proof, the
 candidate image, all five byte lengths/SHA-256/folds, the bundle fold, token
 count and semantic fold, canonical token-page fields, every AST and NIR page
 and first-page field, both cursor identities, both second-page identities, and
-the adapter.
+the adapter, plus the independently replayed stage-transformation manifest.
 `bootstrap-diff` verifies this proof before writing its report. Changing the
 adapter, token page, AST/NIR page or cursor, stage payload, role, producer, component
 record, or proof therefore fails closed.
 
 ## Current Limit
 
-V6 materializes one fixed-capacity token page and binds exactly two fixed-size
+V7 materializes one fixed-capacity token page and binds exactly two fixed-size
 structural pages for both AST and NIR. The generic Nuis resume function can
-continue again with the resulting cursor, but production does not yet attest a
-third page or transform stage bytes. The scalar boundary remains intentional
-until arbitrary aggregate loop-carried backedges have native lowering; this
-contract does not claim that general loop capability.
+continue again with the resulting cursor. Production now attests a non-identity
+checkpoint representation, but the producer-neutral five-stage handoff still
+contains unchanged NIR/YIR bytes. A future semantic differential must admit a
+changed stage encoding without weakening equivalence. Production also does not
+yet attest a third page. The scalar boundary remains intentional until
+arbitrary aggregate loop-carried backedges have native lowering; this contract
+does not claim that general loop capability.
 
 Local reproducibility remains proven across two empty,
 compile-cache-bypassed roots by `nuis bootstrap-reproducibility`. Independent
@@ -174,6 +194,7 @@ permission to switch the active compiler.
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_token_decoder -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_transformation -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1

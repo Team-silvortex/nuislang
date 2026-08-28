@@ -9,6 +9,7 @@ mod compiler_component_diff;
 mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
+mod compiler_stage_transformation;
 mod compiler_structural_projection;
 mod compiler_structural_projection_page;
 mod compiler_token_decoder;
@@ -98,6 +99,18 @@ pub use compiler_stage_handoff::{
     CompilerStageHandoffRecord, CompilerStageKind, CompilerStagePayloadInput,
     VerifiedCompilerStagePayload, COMPILER_STAGE_HANDOFF_PROTOCOL,
     COMPILER_STAGE_PRODUCER_CONTRACT,
+};
+pub use compiler_stage_transformation::{
+    build_compiler_stage_transformations, compiler_projection_checkpoint_kind_tag,
+    compiler_stage_structural_checkpoint_words, parse_compiler_stage_transformations,
+    parse_compiler_stage_transformations_from_source, read_compiler_stage_transformations,
+    render_compiler_stage_transformations, verify_compiler_stage_transformations,
+    CompilerStageTransformationRecord, CompilerStageTransformationRecordInput,
+    CompilerStageTransformations, CompilerStageTransformationsInput,
+    COMPILER_STAGE_CHECKPOINT_PAGE_COUNT, COMPILER_STAGE_CHECKPOINT_WORD_COUNT,
+    COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT, COMPILER_STAGE_TRANSFORMATION_AUTHORITY,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+    COMPILER_STAGE_TRANSFORMATION_PRODUCER_CONTRACT, COMPILER_STAGE_TRANSFORMATION_PROTOCOL,
 };
 pub use compiler_structural_projection::{
     parse_compiler_structural_projection, render_compiler_structural_projection,

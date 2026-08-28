@@ -1,0 +1,67 @@
+protocol = "nuis-compiler-stage-transformation-v1"
+version = 1
+status = "usable-producer-neutral-non-identity-evidence"
+scope = "versioned-stage-transformation-registry"
+manifest_name = "nuis.compiler-stage-transformations.toml"
+producer_contract = "nuis-compiler-stage-transformation-producer-v1"
+authority = "stage1-transformation-evidence-no-replacement"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+record_order = "ordinal-then-unique-source-stage"
+replacement_authorized = false
+
+current_transform_contract = "nuis-compiler-structural-checkpoint-v1"
+current_source_stage = "nir"
+output_encoding = "ordered-u64-le-v1"
+output_word_count = 22
+projection_kind_tag = 2
+page_count = 2
+
+ordered_words = [
+  "projection-kind-tag",
+  "page-count",
+  "first-page-identity",
+  "first-cursor-identity",
+  "first-cursor-lane-0-through-7",
+  "continuation-page-identity",
+  "continuation-cursor-identity",
+  "continuation-cursor-lane-0-through-7",
+]
+
+bound_inputs = [
+  "candidate-producer-id",
+  "producer-neutral-stage-handoff-bundle-sha256",
+  "source-stage-payload-length-and-sha256",
+  "transform-contract-and-output-encoding",
+  "ordered-output-word-count-and-sha256",
+  "all-ordered-output-words",
+  "manifest-proof-sha256",
+  "no-replacement-authority",
+]
+
+verification = [
+  "parse-canonical-manifest",
+  "rebind-producer-and-stage-handoff",
+  "rebind-every-source-payload",
+  "independently-replay-the-two-page-structural-state",
+  "compare-all-twenty-two-ordered-words",
+  "reject-word-order-hash-payload-or-proof-drift",
+]
+
+[current_nir_checkpoint]
+first_page_identity = 132469386887
+first_cursor_identity = 754343074
+continuation_page_identity = 146705724977
+continuation_cursor_identity = 38998897
+producer = "nuis-stage1-nir-checkpoint-materializer-v7"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v7"
+production_protocol = "nuis-compiler-candidate-production-v7"
+
+[open_boundary]
+missing = [
+  "changed-stage-handoff-payload-produced-from-the-checkpoint",
+  "semantic-equivalence-differential-for-non-byte-identical-stages",
+  "third-and-later-structural-pages",
+  "independent-machine-or-attester-proof",
+  "reversible-replacement-authorization",
+]

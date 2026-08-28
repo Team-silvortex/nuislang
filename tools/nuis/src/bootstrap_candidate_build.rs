@@ -5,16 +5,20 @@ use std::{
 
 use nuis_artifact::{
     build_compiler_candidate_production, build_compiler_diagnostic_report,
-    build_compiler_stage_handoff, parse_compiler_component_differential,
-    promote_compiler_component_candidate, read_compiler_candidate_execution,
-    read_compiler_candidate_production, read_compiler_component_build,
-    read_compiler_diagnostic_report, read_compiler_stage_handoff,
-    render_compiler_candidate_production, render_compiler_component_build,
-    render_compiler_diagnostic_report, render_compiler_stage_handoff,
+    build_compiler_stage_handoff, build_compiler_stage_transformations,
+    parse_compiler_component_differential, promote_compiler_component_candidate,
+    read_compiler_candidate_execution, read_compiler_candidate_production,
+    read_compiler_component_build, read_compiler_diagnostic_report, read_compiler_stage_handoff,
+    read_compiler_stage_transformations, render_compiler_candidate_production,
+    render_compiler_component_build, render_compiler_diagnostic_report,
+    render_compiler_stage_handoff, render_compiler_stage_transformations,
     CompilerCandidateProductionInput, CompilerComponentCandidatePromotionInput,
-    CompilerDiagnosticReportInput, CompilerStagePayloadInput, COMPILER_CANDIDATE_EXECUTION_FILE,
-    COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
+    CompilerDiagnosticReportInput, CompilerStageKind, CompilerStagePayloadInput,
+    CompilerStageTransformationRecordInput, CompilerStageTransformationsInput,
+    COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_PRODUCTION_FILE,
+    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
+    COMPILER_DIAGNOSTIC_REPORT_FILE, COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 use crate::{
@@ -27,7 +31,7 @@ use crate::{
 const STAGE0_DIR: &str = "stage0";
 const CANDIDATE_DIR: &str = "stage1-candidate";
 const STAGE_HANDOFF_FILE: &str = "nuis.compiler-stage-handoff.toml";
-const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-token-ast-nir-continuation-materializer-v6";
+const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-nir-checkpoint-materializer-v7";
 
 pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
@@ -131,6 +135,37 @@ fn handle_bootstrap_candidate_build_with_cache(
     let (verified_handoff, verified_payloads) =
         read_compiler_stage_handoff(&candidate_dir.join(STAGE_HANDOFF_FILE))
             .map_err(|error| format!("failed to verify candidate handoff: {error}"))?;
+    let transformation_records = [CompilerStageTransformationRecordInput {
+        source_stage: CompilerStageKind::Nir,
+        transform_contract: COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+        output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+        output_words: &adapter.nir_transformation_words,
+    }];
+    let stage_transformations =
+        build_compiler_stage_transformations(&CompilerStageTransformationsInput {
+            producer_id: &verified_candidate.producer_id,
+            handoff: &verified_handoff,
+            payloads: &verified_payloads,
+            records: &transformation_records,
+        })
+        .map_err(|error| format!("failed to attest candidate stage transformation: {error}"))?;
+    let stage_transformations_path = candidate_dir.join(COMPILER_STAGE_TRANSFORMATION_FILE);
+    fs::write(
+        &stage_transformations_path,
+        render_compiler_stage_transformations(&stage_transformations),
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write candidate stage transformations `{}`: {error}",
+            stage_transformations_path.display()
+        )
+    })?;
+    let verified_stage_transformations = read_compiler_stage_transformations(
+        &stage_transformations_path,
+        &verified_handoff,
+        &verified_payloads,
+    )
+    .map_err(|error| format!("failed to verify candidate stage transformations: {error}"))?;
     let production = build_compiler_candidate_production(&CompilerCandidateProductionInput {
         stage0: &stage0,
         execution: &execution,
@@ -143,6 +178,8 @@ fn handle_bootstrap_candidate_build_with_cache(
         token_page: &adapter.token_page,
         ast_pages: &adapter.ast_pages,
         nir_pages: &adapter.nir_pages,
+        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
+        stage_transformations: &verified_stage_transformations,
         adapter_file: adapter.adapter_file,
         adapter: &adapter.adapter,
     })
@@ -214,6 +251,10 @@ fn handle_bootstrap_candidate_build_with_cache(
     println!(
         "  nir_continuation_page_identity: {}",
         verified_production.nir_continuation_page_identity
+    );
+    println!(
+        "  stage_transformation_sha256: {}",
+        verified_production.stage_transformations_sha256
     );
     println!("  production_sha256: {}", verified_production.proof_sha256);
     println!("  differential: {}", differential.verdict);

@@ -14,6 +14,8 @@ pub(super) fn production_identity(proof: &CompilerCandidateProduction) -> String
         proof.candidate_producer_id.as_bytes(),
         proof.candidate_compiler_image_sha256.as_bytes(),
         proof.stage_handoff_bundle_sha256.as_bytes(),
+        proof.stage_transformations_file.as_bytes(),
+        proof.stage_transformations_sha256.as_bytes(),
         proof.adapter_file.as_bytes(),
         proof.adapter_sha256.as_bytes(),
         proof.token_decoder_contract.as_bytes(),
@@ -25,6 +27,7 @@ pub(super) fn production_identity(proof: &CompilerCandidateProduction) -> String
     }
     for value in [
         proof.adapter_bytes,
+        proof.stage_transformations_bytes,
         proof.record_count,
         proof.bundle_fold,
         proof.token_record_count,

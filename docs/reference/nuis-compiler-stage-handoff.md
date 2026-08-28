@@ -93,12 +93,13 @@ The first identity-projection path is now stage1-candidate ready:
   payloads and computes a Nuis-owned deterministic stage/bundle fold.
 * `nuis bootstrap-candidate-build` materializes a separately identified
   candidate handoff and binds it through
-  `nuis-compiler-candidate-production-v6`.
+  `nuis-compiler-candidate-production-v7`.
 * The adapter blindly transports one token page and two AST/NIR pages. Nuis
   owns the token records plus canonical emission, serializes an opaque
   eight-lane structural cursor, and resumes both projections into page two.
-* The Nuis consumer can resume repeatedly, but production still binds only two
-  structural pages and does not emit a non-identity transformation.
+* The Nuis consumer can resume repeatedly; production binds two structural
+  pages plus one non-identity NIR checkpoint, but has not yet replaced handoff
+  stage bytes with that representation.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
@@ -106,10 +107,12 @@ The first identity-projection path is now stage1-candidate ready:
 
 The independent codec, native Nuis consumer, bounded token page, resumable AST
 and NIR pages, production proof, and `13/13` differential advance this
-coordinate to `usable/92`. The next closure task binds a non-identity stage
-transformation behind the same producer-neutral boundary. See
+coordinate to `usable/93`. The next closure task materializes changed stage
+bytes and defines semantic comparison behind the same producer-neutral
+boundary. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
+[Nuis Compiler Stage Transformation](nuis-compiler-stage-transformation.md),
 and [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 ## Validation

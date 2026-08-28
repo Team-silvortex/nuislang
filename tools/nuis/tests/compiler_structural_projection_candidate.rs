@@ -15,6 +15,7 @@ use nuis_artifact::{
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    COMPILER_STAGE_TRANSFORMATION_FILE,
 };
 
 fn temp_dir() -> PathBuf {
@@ -57,7 +58,7 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     );
     assert_eq!(
         candidate.producer_id,
-        "nuis-stage1-token-ast-nir-continuation-materializer-v6"
+        "nuis-stage1-nir-checkpoint-materializer-v7"
     );
     assert_ne!(candidate.producer_id, stage0.producer_id);
     assert_eq!(candidate.compiler_image_sha256, stage0.native_binary_sha256);
@@ -104,6 +105,28 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert_eq!(production.nir_page_cursor_identity, 754_343_074);
     assert_eq!(production.nir_continuation_page_identity, 146_705_724_977);
     assert_eq!(production.nir_continuation_cursor_identity, 38_998_897);
+    assert_eq!(
+        production.stage_transformations_file,
+        COMPILER_STAGE_TRANSFORMATION_FILE
+    );
+    let transformations = nuis_artifact::read_compiler_stage_transformations(
+        &candidate_dir.join(COMPILER_STAGE_TRANSFORMATION_FILE),
+        &handoff,
+        &payloads,
+    )
+    .expect("verify Nuis stage transformation");
+    assert_eq!(transformations.record_count, 1);
+    assert_eq!(
+        transformations.records[0].source_stage,
+        CompilerStageKind::Nir
+    );
+    assert_eq!(transformations.records[0].output_word_count, 22);
+    assert_eq!(transformations.records[0].output_words[0], 2);
+    assert_eq!(transformations.records[0].output_words[1], 2);
+    assert_eq!(transformations.records[0].output_words[2], 132_469_386_887);
+    assert_eq!(transformations.records[0].output_words[3], 754_343_074);
+    assert_eq!(transformations.records[0].output_words[12], 146_705_724_977);
+    assert_eq!(transformations.records[0].output_words[13], 38_998_897);
     assert!(!production.replacement_authorized);
 
     let differential = parse_compiler_component_differential(
@@ -114,6 +137,26 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert!(differential.deterministic_artifact_equivalent);
     assert_eq!(differential.verdict, "equivalent-awaiting-authorization");
     assert!(!differential.replacement_authorized);
+
+    let transformations_path = candidate_dir.join(COMPILER_STAGE_TRANSFORMATION_FILE);
+    let transformation_source = fs::read(&transformations_path).expect("read transformations");
+    let mut tampered_transformations = transformation_source.clone();
+    tampered_transformations.push(0);
+    fs::write(&transformations_path, tampered_transformations)
+        .expect("tamper stage transformations");
+    let error = read_compiler_candidate_production(
+        &candidate_dir.join(COMPILER_CANDIDATE_PRODUCTION_FILE),
+        &stage0,
+        &execution,
+        &candidate,
+        &handoff,
+        &payloads,
+    )
+    .expect_err("stage transformation tampering must invalidate production proof");
+    assert!(error
+        .to_string()
+        .contains("stage transformations length or SHA-256 mismatch"));
+    fs::write(&transformations_path, transformation_source).expect("restore transformations");
 
     let adapter_path = candidate_dir.join(COMPILER_CANDIDATE_ADAPTER_FILE);
     let mut tampered = fs::read(&adapter_path).expect("read candidate adapter");

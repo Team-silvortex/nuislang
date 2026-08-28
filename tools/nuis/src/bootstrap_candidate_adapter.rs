@@ -2,13 +2,14 @@ use std::{fs, path::Path, process::Command};
 
 use nuis_artifact::{
     compiler_candidate_bundle_fold, compiler_candidate_stage_fold,
-    compiler_projection_two_page_identity, compiler_token_first_page_identity,
-    decode_compiler_token_stream, parse_build_manifest, CompilerProjectionKind,
-    CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerTokenDecodeSummary,
-    CompilerTokenPageIdentity, COMPILER_CANDIDATE_ADAPTER_FILE,
+    compiler_projection_checkpoint_kind_tag, compiler_projection_two_page_identity,
+    compiler_token_first_page_identity, decode_compiler_token_stream, parse_build_manifest,
+    CompilerProjectionKind, CompilerProjectionTwoPageIdentity, CompilerStageHandoff,
+    CompilerTokenDecodeSummary, CompilerTokenPageIdentity, COMPILER_CANDIDATE_ADAPTER_FILE,
+    COMPILER_STAGE_CHECKPOINT_PAGE_COUNT,
 };
 
-const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v6";
+const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v7";
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
 const ADAPTER_RUNTIME_OBJECT_FILE: &str = "nuis.compiler-candidate-runtime.o";
 
@@ -21,6 +22,38 @@ pub(crate) struct CandidateAdapterOutput {
     pub(crate) token_page: CompilerTokenPageIdentity,
     pub(crate) ast_pages: CompilerProjectionTwoPageIdentity,
     pub(crate) nir_pages: CompilerProjectionTwoPageIdentity,
+    pub(crate) nir_transformation_words: Vec<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AdapterNirOutput {
+    projection: AdapterProjectionOutput,
+    first_cursor_lanes: [usize; 8],
+    continuation_cursor_lanes: [usize; 8],
+}
+
+impl AdapterNirOutput {
+    fn from_pages(pages: CompilerProjectionTwoPageIdentity) -> Self {
+        Self {
+            projection: AdapterProjectionOutput::from_pages(pages),
+            first_cursor_lanes: pages.first.cursor.lanes(),
+            continuation_cursor_lanes: pages.second.cursor.lanes(),
+        }
+    }
+
+    fn checkpoint_words(self) -> Vec<usize> {
+        let mut words = vec![
+            compiler_projection_checkpoint_kind_tag(CompilerProjectionKind::Nir),
+            COMPILER_STAGE_CHECKPOINT_PAGE_COUNT,
+            self.projection.first_page_identity,
+            self.projection.first_cursor_identity,
+        ];
+        words.extend(self.first_cursor_lanes);
+        words.push(self.projection.continuation_page_identity);
+        words.push(self.projection.continuation_cursor_identity);
+        words.extend(self.continuation_cursor_lanes);
+        words
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,7 +230,7 @@ pub(crate) fn run_candidate_adapter(
         || token_decode != expected_token_decode
         || token_page_identity != expected_token_page.identity
         || ast_output != AdapterProjectionOutput::from_pages(expected_ast_pages)
-        || nir_output != AdapterProjectionOutput::from_pages(expected_nir_pages)
+        || nir_output != AdapterNirOutput::from_pages(expected_nir_pages)
     {
         return Err(
             "Nuis candidate scalar output disagrees with the independent host fold, token decode, token page, AST page chain, or NIR page chain".to_owned(),
@@ -219,6 +252,7 @@ pub(crate) fn run_candidate_adapter(
         token_page: expected_token_page,
         ast_pages: expected_ast_pages,
         nir_pages: expected_nir_pages,
+        nir_transformation_words: nir_output.checkpoint_words(),
     })
 }
 
@@ -231,7 +265,7 @@ fn parse_adapter_output(
         CompilerTokenDecodeSummary,
         usize,
         AdapterProjectionOutput,
-        AdapterProjectionOutput,
+        AdapterNirOutput,
     ),
     String,
 > {
@@ -241,7 +275,7 @@ fn parse_adapter_output(
         return Err("candidate scalar output must use canonical UTF-8/LF text".to_owned());
     }
     let lines = source.lines().collect::<Vec<_>>();
-    if lines.len() != 18 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
+    if lines.len() != 34 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
         return Err("candidate scalar output has an invalid protocol or line count".to_owned());
     }
     let stage_folds = (0..5)
@@ -265,17 +299,21 @@ fn parse_adapter_output(
             "ast.continuation_cursor_identity",
         )?,
     };
-    let nir_output = AdapterProjectionOutput {
-        first_page_identity: parse_output_usize(lines[14], "nir.page_identity")?,
-        first_cursor_identity: parse_output_usize(lines[15], "nir.page_cursor_identity")?,
-        continuation_page_identity: parse_output_usize(
-            lines[16],
-            "nir.continuation_page_identity",
-        )?,
-        continuation_cursor_identity: parse_output_usize(
-            lines[17],
-            "nir.continuation_cursor_identity",
-        )?,
+    let nir_output = AdapterNirOutput {
+        projection: AdapterProjectionOutput {
+            first_page_identity: parse_output_usize(lines[14], "nir.page_identity")?,
+            first_cursor_identity: parse_output_usize(lines[15], "nir.page_cursor_identity")?,
+            continuation_page_identity: parse_output_usize(
+                lines[16],
+                "nir.continuation_page_identity",
+            )?,
+            continuation_cursor_identity: parse_output_usize(
+                lines[17],
+                "nir.continuation_cursor_identity",
+            )?,
+        },
+        first_cursor_lanes: parse_output_lanes(&lines, 18, "nir.first_cursor_lane")?,
+        continuation_cursor_lanes: parse_output_lanes(&lines, 26, "nir.continuation_cursor_lane")?,
     };
     Ok((
         stage_folds,
@@ -285,6 +323,18 @@ fn parse_adapter_output(
         ast_output,
         nir_output,
     ))
+}
+
+fn parse_output_lanes(
+    lines: &[&str],
+    start: usize,
+    key_prefix: &str,
+) -> Result<[usize; 8], String> {
+    let mut lanes = [0; 8];
+    for (index, lane) in lanes.iter_mut().enumerate() {
+        *lane = parse_output_usize(lines[start + index], &format!("{key_prefix}.{index}"))?;
+    }
+    Ok(lanes)
 }
 
 fn parse_output_usize(line: &str, expected_key: &str) -> Result<usize, String> {
@@ -518,13 +568,14 @@ static int projection_continuation(
     int64_t expected_first_identity,
     int64_t* first_cursor_identity,
     int64_t* second_identity,
-    int64_t* second_cursor_identity
+    int64_t* second_cursor_identity,
+    int64_t first_cursor[8],
+    int64_t second_cursor[8]
 ) {
     if (second_length <= 0) return 0;
     int64_t fresh[8] = {-1, 0, 0, 0, 0, 0, 0, 0};
     if (projection_resume_value(0, projection, fresh, first_length, first_words)
         != expected_first_identity) return 0;
-    int64_t first_cursor[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int selector = 1; selector <= 8; ++selector) {
         first_cursor[selector - 1] = projection_resume_value(
             selector,
@@ -549,7 +600,6 @@ static int projection_continuation(
         second_length,
         second_words
     );
-    int64_t second_cursor[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int selector = 1; selector <= 8; ++selector) {
         second_cursor[selector - 1] = projection_resume_value(
             selector,
@@ -645,6 +695,8 @@ int main(int argc, char** argv) {
     int64_t ast_page_cursor_identity = 0;
     int64_t ast_continuation_page_identity = 0;
     int64_t ast_continuation_cursor_identity = 0;
+    int64_t ast_page_cursor[8] = {0};
+    int64_t ast_continuation_cursor[8] = {0};
     if (!projection_continuation(
         1,
         ast_page_length,
@@ -654,11 +706,15 @@ int main(int argc, char** argv) {
         ast_page_identity,
         &ast_page_cursor_identity,
         &ast_continuation_page_identity,
-        &ast_continuation_cursor_identity
+        &ast_continuation_cursor_identity,
+        ast_page_cursor,
+        ast_continuation_cursor
     )) return 74;
     int64_t nir_page_cursor_identity = 0;
     int64_t nir_continuation_page_identity = 0;
     int64_t nir_continuation_cursor_identity = 0;
+    int64_t nir_page_cursor[8] = {0};
+    int64_t nir_continuation_cursor[8] = {0};
     if (!projection_continuation(
         2,
         nir_page_length,
@@ -668,9 +724,11 @@ int main(int argc, char** argv) {
         nir_page_identity,
         &nir_page_cursor_identity,
         &nir_continuation_page_identity,
-        &nir_continuation_cursor_identity
+        &nir_continuation_cursor_identity,
+        nir_page_cursor,
+        nir_continuation_cursor
     )) return 75;
-    puts("protocol=nuis-bootstrap-candidate-scalar-output-v6");
+    puts("protocol=nuis-bootstrap-candidate-scalar-output-v7");
     for (int ordinal = 0; ordinal < 5; ++ordinal) {
         printf("stage.%d=%lld\n", ordinal, (long long)folds[ordinal]);
     }
@@ -686,45 +744,17 @@ int main(int argc, char** argv) {
     printf("nir.page_cursor_identity=%lld\n", (long long)nir_page_cursor_identity);
     printf("nir.continuation_page_identity=%lld\n", (long long)nir_continuation_page_identity);
     printf("nir.continuation_cursor_identity=%lld\n", (long long)nir_continuation_cursor_identity);
+    for (int index = 0; index < 8; ++index) {
+        printf("nir.first_cursor_lane.%d=%lld\n", index, (long long)nir_page_cursor[index]);
+    }
+    for (int index = 0; index < 8; ++index) {
+        printf("nir.continuation_cursor_lane.%d=%lld\n", index, (long long)nir_continuation_cursor[index]);
+    }
     return 0;
 }
 "#
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn adapter_output_parser_requires_exact_order_and_utf8_lf() {
-        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v6\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nast.page_cursor_identity=11\nast.continuation_page_identity=12\nast.continuation_cursor_identity=13\nnir.page_identity=14\nnir.page_cursor_identity=15\nnir.continuation_page_identity=16\nnir.continuation_cursor_identity=17\n";
-        assert_eq!(
-            parse_adapter_output(source).unwrap(),
-            (
-                vec![1, 2, 3, 4, 5],
-                6,
-                CompilerTokenDecodeSummary {
-                    record_count: 7,
-                    semantic_fold: 8,
-                },
-                9,
-                AdapterProjectionOutput {
-                    first_page_identity: 10,
-                    first_cursor_identity: 11,
-                    continuation_page_identity: 12,
-                    continuation_cursor_identity: 13,
-                },
-                AdapterProjectionOutput {
-                    first_page_identity: 14,
-                    first_cursor_identity: 15,
-                    continuation_page_identity: 16,
-                    continuation_cursor_identity: 17,
-                },
-            )
-        );
-
-        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v6\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nast.page_cursor_identity=11\nast.continuation_page_identity=12\nast.continuation_cursor_identity=13\nnir.page_identity=14\nnir.page_cursor_identity=15\nnir.continuation_page_identity=16\nnir.continuation_cursor_identity=17\n";
-        assert!(parse_adapter_output(reordered).is_err());
-        assert!(parse_adapter_output(&source[..source.len() - 1]).is_err());
-    }
-}
+#[path = "bootstrap_candidate_adapter_tests.rs"]
+mod tests;

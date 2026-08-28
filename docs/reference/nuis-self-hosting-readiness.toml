@@ -31,31 +31,31 @@ blocker = "v3 resumes structural pages, but token pagination, map growth, arena 
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "usable"
-progress = 92
+progress = 93
 required_before = "beta-0.10.0"
-next_action = "produce one deterministic non-identity stage1 transformation while retaining token identity 164749511446 and both AST/NIR page chains"
+next_action = "materialize a changed stage payload from the NIR checkpoint and define semantic equivalence for non-byte-identical stage encodings"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "a non-identity Nuis stage transformation whose producer-neutral five-stage bundle remains differentially comparable beside canonical token and two-page AST/NIR identities"
-blocker = "Nuis production owns token data and two AST/NIR pages; changed stage bytes and general aggregate loop backedges remain open"
+expected_artifact = "a transformation-aware handoff whose changed stage bytes remain semantically comparable beside canonical token and two-page AST/NIR identities"
+blocker = "Nuis now emits and production binds a non-identity 22-word NIR checkpoint, but the five-stage handoff still carries unchanged NIR/YIR bytes and the differential remains byte-identity based"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 93
+progress = 94
 required_before = "beta-0.10.0"
-next_action = "carry one non-identity stage1 transformation through candidate production while retaining the clean-build aggregate"
+next_action = "promote the bound NIR checkpoint into a changed stage payload without coupling the driver to one transform contract"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "production-bound Nuis token and two-page AST/NIR chains retaining stable identity across two clean builds without replacement authority"
-blocker = "the production candidate carries token data and two AST/NIR pages, while changed stage bytes, independent attester trust, and reversible authorization remain open"
+expected_artifact = "a registry-driven changed stage payload retaining stable production identity across two clean builds without replacement authority"
+blocker = "the driver binds the generic transformation manifest and exact NIR checkpoint, while changed stage bytes, independent attester trust, and reversible authorization remain open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 93
+progress = 94
 required_before = "beta-0.10.0"
-next_action = "carry a non-identity stage1 transformation through the clean-build aggregate, then add independent attester evidence"
+next_action = "define a transformation-aware semantic differential before adding independent attester evidence"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "canonical token and two-page AST/NIR chains retaining the path-free two-clean-build aggregate without replacement authority"
-blocker = "local repeated clean-build evidence covers production-bound token data and two AST/NIR pages; changed stage bytes, independent attester trust, and reversible authorization remain open"
+expected_artifact = "non-byte-identical stage encodings retaining the path-free two-clean-build aggregate without replacement authority"
+blocker = "local repeated clean-build evidence now transitively binds the NIR transformation manifest, but the 13 comparisons still require byte-identical stage payloads; independent attester trust and reversible authorization remain open"

@@ -60,7 +60,7 @@ impl CompilerStageKind {
         }
     }
 
-    fn parse(value: &str) -> Option<Self> {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
         match value {
             "source" => Some(Self::Source),
             "tokens" => Some(Self::Tokens),

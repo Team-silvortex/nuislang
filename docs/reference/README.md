@@ -55,6 +55,8 @@ Start in this order:
   - [nuis-bootstrap-language-subset.md](nuis-bootstrap-language-subset.md)
   - [nuis-compiler-data-model.md](nuis-compiler-data-model.md)
   - [nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md)
+  - [nuis-compiler-stage-transformation.md](nuis-compiler-stage-transformation.md)
+  - [nuis-compiler-candidate-production.md](nuis-compiler-candidate-production.md)
   - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
   - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
   - [nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md)

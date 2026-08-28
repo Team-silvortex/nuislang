@@ -1750,11 +1750,10 @@ The five required coordinates are:
 
 Subset v7 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the roadmap score, and readiness waits for all five to reach `stable/100`.
 
-Production-bound token data and two AST/NIR pages move the stage-neutral boundary to `usable/92`;
-the attested candidate and two cache-bypassed clean builds move both driver and
-reproducibility gate to `usable/93`. Data model v3 is `usable/93` through owned
-token identity `164749511446` plus second-page identities `149528711957` and `146705724977`.
-A deterministic non-identity stage1 transformation is now the shared weakest boundary.
+Production-bound token data, two AST/NIR pages, and the independently replayed 22-word NIR checkpoint move the stage-neutral boundary to `usable/93`.
+The attested candidate and two cache-bypassed clean builds move both driver and reproducibility gate to `usable/94`.
+Data model v3 remains `usable/93` through owned token identity `164749511446` plus second-page identities `149528711957` and `146705724977`.
+Materializing changed stage bytes and defining semantic equivalence for non-byte-identical encodings are now the shared weakest boundary.
 
 ## Runtime Lifecycle Loader Bootstrap
 

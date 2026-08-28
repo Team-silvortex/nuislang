@@ -7,7 +7,7 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `beta-0.7.*` reading route, use this order:
+If you only need the shortest current `beta-0.8.*` reading route, use this order:
 
 1. [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
@@ -16,21 +16,22 @@ If you only need the shortest current `beta-0.7.*` reading route, use this order
 5. [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
 6. [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
 7. [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
-8. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-9. [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
-10. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-11. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-12. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-13. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-14. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-15. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-16. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-17. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-18. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-19. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-20. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-21. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-22. [versioning/README.md](versioning/README.md)
+8. [reference/nuis-compiler-stage-transformation.md](reference/nuis-compiler-stage-transformation.md)
+9. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
+10. [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
+11. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+12. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+13. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+14. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+15. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+16. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+17. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+18. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+19. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+20. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+21. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+22. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+23. [versioning/README.md](versioning/README.md)
 
 Short rule:
 

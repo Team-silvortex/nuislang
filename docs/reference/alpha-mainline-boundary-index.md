@@ -3,7 +3,7 @@
 This file is the shortest historical index for the boundaries established
 during the alpha closeout line.
 
-For present-tense `beta-0.7.*` work, start with:
+For present-tense `beta-0.8.*` work, start with:
 
 * [../versioning/nuis-beta-0.6.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
 
