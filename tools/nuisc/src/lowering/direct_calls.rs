@@ -13,17 +13,21 @@ enum DirectCallScalarKind {
     OwnedExternalBuffer,
 }
 
+#[path = "direct_calls/aggregate_params.rs"]
+mod aggregate_params;
 #[path = "direct_calls/control_boundaries.rs"]
 mod control_boundaries;
 #[path = "direct_calls/kinds.rs"]
 mod kinds;
+pub(super) use aggregate_params::collect_aggregate_param_direct_call_functions;
+use aggregate_params::{flatten_direct_call_arguments, lower_direct_call_parameters};
 pub(super) use control_boundaries::collect_guarded_loop_direct_call_functions;
 pub(super) use kinds::{
     collect_owned_external_buffer_return_helpers, owned_external_buffer_helper_lowering_order,
     supports_direct_call_signature,
 };
 use kinds::{
-    direct_call_scalar_kind, direct_call_signature_kind, is_scheduler_scalar_kind,
+    direct_call_return_kind, direct_call_scalar_kind, is_scheduler_scalar_kind,
     owned_external_buffer_metadata_for_helper, owned_external_buffer_metadata_for_node,
 };
 
@@ -595,54 +599,21 @@ pub(super) fn lower_direct_call_helper_function(
     let lane = format!("fn:{}", function.name);
     let mut bindings = BTreeMap::<String, String>::new();
     let mut function_parameters = Vec::new();
-    for (index, param) in function.params.iter().enumerate() {
-        let node_name = format!("__fn_{}_param_{}", function.name, index);
-        let instruction = match direct_call_scalar_kind(&param.ty).ok_or_else(|| {
-            format!(
-                "ordinary direct-call lowering only supports bool/i32/i64/f32/f64 params, found `{}` in `{}`",
-                param.ty.render(),
-                function.name
-            )
-        })? {
-            DirectCallScalarKind::Bool => "param_bool",
-            DirectCallScalarKind::I32 => "param_i32",
-            DirectCallScalarKind::I64 => "param_i64",
-            DirectCallScalarKind::F32 => "param_f32",
-            DirectCallScalarKind::F64 => "param_f64",
-            DirectCallScalarKind::BorrowedBuffer => "param_buffer_ref",
-            DirectCallScalarKind::TraversalPointer => "param_node_ref",
-            DirectCallScalarKind::OwnedBytes => "param_owned_bytes",
-            DirectCallScalarKind::OwnedExternalBuffer => {
-                unreachable!("owned external buffers cannot be helper parameters")
-            }
-        };
-        state.yir.nodes.push(Node {
-            name: node_name.clone(),
-            resource: "cpu0".to_owned(),
-            op: Operation {
-                module: "cpu".to_owned(),
-                instruction: instruction.to_owned(),
-                args: vec![index.to_string()],
-            },
-        });
-        function_parameters.push(YirFunctionParameter {
-            name: param.name.clone(),
-            ty: param.ty.render(),
-            ownership: yir_value_ownership(&param.ty),
-            node: node_name.clone(),
-        });
-        bindings.insert(param.name.clone(), node_name);
-    }
+    lower_direct_call_parameters(function, state, &mut bindings, &mut function_parameters)?;
     let saved_effect_anchor = state.last_effect_anchor.take();
-    let returned = lower_function_body(function, state, &mut bindings, false)?
-        .ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
+    state.call_stack.push(function.name.clone());
+    let lowered = lower_function_body(function, state, &mut bindings, false);
+    state.call_stack.pop();
+    let returned =
+        lowered?.ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
     state.last_effect_anchor = saved_effect_anchor;
     let return_name = format!("__fn_{}_return", function.name);
-    let struct_return = function_owned_struct_layout(function, state).is_some();
+    let owned_layout = function_owned_struct_layout(function, state);
+    let struct_return = owned_layout.is_some();
     let return_kind = if struct_return {
         None
     } else {
-        Some(direct_call_signature_kind(function).ok_or_else(|| {
+        Some(direct_call_return_kind(function).ok_or_else(|| {
             format!(
                 "ordinary direct-call lowering does not support the return type in `{}`",
                 function.name
@@ -650,7 +621,14 @@ pub(super) fn lower_direct_call_helper_function(
         })?)
     };
     let (return_instruction, mut return_args) = if struct_return {
-        ("return_owned_struct", vec![returned.clone()])
+        let mut args = vec![returned.clone()];
+        if owned_layout
+            .as_deref()
+            .is_some_and(owned_layout_is_variant_union)
+        {
+            args.push(owned_layout.expect("owned return layout"));
+        }
+        ("return_owned_struct", args)
     } else {
         let instruction = match return_kind.expect("non-struct return kind") {
             DirectCallScalarKind::Bool => "return_bool",
@@ -730,7 +708,7 @@ pub(super) fn push_direct_call_node(
     let return_kind = if struct_layout.is_some() {
         None
     } else {
-        Some(direct_call_signature_kind(function).ok_or_else(|| {
+        Some(direct_call_return_kind(function).ok_or_else(|| {
             format!(
                 "ordinary direct-call lowering does not support the return type in `{}`",
                 function.name
@@ -764,7 +742,8 @@ pub(super) fn push_direct_call_node(
             &function.name,
         )?);
     }
-    op_args.extend(args.iter().cloned());
+    let flattened_args = flatten_direct_call_arguments(function, args, state)?;
+    op_args.extend(flattened_args.iter().cloned());
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
@@ -774,7 +753,7 @@ pub(super) fn push_direct_call_node(
             args: op_args,
         },
     });
-    for arg in args {
+    for arg in &flattened_args {
         push_dep_edges(state, arg, &name);
     }
     Ok(name)

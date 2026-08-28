@@ -29,7 +29,7 @@ mod invariant_pattern_gate;
 use invariant_pattern_gate::lower_false_invariant_post_flow_loop;
 
 pub(super) fn emit_cpu_function(
-    module: &YirModule,
+    nodes: &BTreeMap<&str, &Node>,
     resources: &BTreeMap<String, &Resource>,
     ordered_node_names: &[String],
     param_bindings: &BTreeMap<String, LlvmValueRef>,
@@ -39,17 +39,19 @@ pub(super) fn emit_cpu_function(
     function_return_kind: CpuCallScalarKind,
     global_counter: &mut usize,
 ) -> Result<EmittedCpuFunction, String> {
-    let ordered_names = ordered_node_names.iter().collect::<BTreeSet<_>>();
+    let ordered_names = ordered_node_names
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let deferred_task_calls = ordered_node_names
         .iter()
-        .filter_map(|node_name| module.nodes.iter().find(|node| &node.name == node_name))
+        .filter_map(|node_name| nodes.get(node_name.as_str()).copied())
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
         .filter_map(|node| node.op.args.get(1))
-        .filter(|call_name| ordered_names.contains(call_name))
+        .filter(|call_name| ordered_names.contains(call_name.as_str()))
         .filter(|call_name| {
-            module.nodes.iter().any(|candidate| {
-                &candidate.name == *call_name
-                    && candidate.op.module == "cpu"
+            nodes.get(call_name.as_str()).is_some_and(|candidate| {
+                candidate.op.module == "cpu"
                     && matches!(
                         candidate.op.instruction.as_str(),
                         "call_bool"
@@ -98,10 +100,9 @@ pub(super) fn emit_cpu_function(
     }
 
     for node_name in ordered_node_names {
-        let node = module
-            .nodes
-            .iter()
-            .find(|node| &node.name == node_name)
+        let node = nodes
+            .get(node_name.as_str())
+            .copied()
             .ok_or_else(|| format!("lowering references unknown node `{node_name}`"))?;
         let resource = resources
             .get(&node.resource)

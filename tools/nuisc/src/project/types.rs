@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 
-use nuis_semantics::model::{
-    AstModule, NirAttributeValue, NirDataFlowState, NirResultStage, NirTypeRef,
-};
+use nuis_semantics::model::{AstModule, NirDataFlowState, NirResultStage, NirTypeRef};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NuisProjectManifest {
@@ -130,36 +128,10 @@ pub fn summarize_project_text_handle_rewrites(
 ) -> Result<ProjectTextHandleRewriteSummary, String> {
     let mut summary = ProjectTextHandleRewriteSummary::default();
     for module in &project.modules {
-        let helper_modules = project
-            .modules
-            .iter()
-            .filter(|candidate| candidate.path != module.path)
-            .map(|candidate| candidate.ast.clone())
-            .collect::<Vec<_>>();
-        let nir = crate::frontend::lower_project_ast_to_nir(&module.ast, &helper_modules)?;
-        for function in &nir.functions {
-            for annotation in &function.annotations {
-                if annotation.name != "__nuisc_text_handle_rewrite" {
-                    continue;
-                }
-                for arg in &annotation.args {
-                    let Some(name) = arg.name.as_deref() else {
-                        continue;
-                    };
-                    let NirAttributeValue::Int(value) = arg.value else {
-                        continue;
-                    };
-                    if value <= 0 {
-                        continue;
-                    }
-                    match name {
-                        "helper" => summary.helper_hits += value as usize,
-                        "local" => summary.local_hits += value as usize,
-                        _ => {}
-                    }
-                }
-            }
-        }
+        let (helper_hits, local_hits) =
+            crate::frontend::summarize_ast_text_handle_rewrites(&module.ast);
+        summary.helper_hits += helper_hits;
+        summary.local_hits += local_hits;
     }
     Ok(summary)
 }

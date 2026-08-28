@@ -173,6 +173,8 @@ mod tests {
     mod shader_nova_contracts;
     #[path = "test_support.rs"]
     mod test_support;
+    #[path = "text_handle_rewrite.rs"]
+    mod text_handle_rewrite;
 
     fn project_with_modules(modules: Vec<(&str, &str)>) -> LoadedProject {
         LoadedProject {

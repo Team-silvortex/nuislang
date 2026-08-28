@@ -1,4 +1,8 @@
-use super::{fresh_reg, LlvmLoweringState, LlvmValueRef, StructLlvmValueRef};
+use super::{
+    fresh_reg, LlvmLoweringState, LlvmValueRef, StructLlvmValueRef, VariantUnionLlvmValueRef,
+};
+
+const OWNED_VARIANT_UNION_PREFIX: &str = "__nuis_variant_union__";
 
 const OWNED_DESCRIPTOR_SIZE: usize = 48;
 const OWNED_AGGREGATE_HEADER_SIZE: usize = 24;
@@ -71,6 +75,110 @@ pub(crate) fn emit_owned_struct_data(
         "  {finalized} = call ptr @nuis_scheduler_owned_aggregate_finish_v1(ptr {data})"
     ));
     Some(finalized)
+}
+
+pub(crate) fn materialize_owned_variant_storage(
+    value: &LlvmValueRef,
+    template: &StructLlvmValueRef,
+) -> Option<StructLlvmValueRef> {
+    let parent_type_name = template
+        .type_name
+        .strip_prefix(OWNED_VARIANT_UNION_PREFIX)?;
+    let (tag_i64, variants) = match value {
+        LlvmValueRef::Struct(variant)
+            if variant
+                .type_name
+                .rsplit_once('.')
+                .is_some_and(|(parent, _)| parent == parent_type_name) =>
+        {
+            (
+                super::variant_select::variant_tag_value(&variant.type_name).to_string(),
+                std::collections::BTreeMap::from([(variant.type_name.clone(), variant.clone())]),
+            )
+        }
+        LlvmValueRef::VariantUnion(union) if union.parent_type_name == parent_type_name => {
+            (union.tag_i64.clone(), union.variants.clone())
+        }
+        _ => return None,
+    };
+    let fields = template
+        .fields
+        .iter()
+        .map(|(name, field)| {
+            if name == "tag" {
+                return Some((name.clone(), LlvmValueRef::I64(tag_i64.clone())));
+            }
+            let value = variants
+                .get(name)
+                .cloned()
+                .map(LlvmValueRef::Struct)
+                .unwrap_or_else(|| zero_owned_value(field));
+            Some((name.clone(), value))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Some(StructLlvmValueRef {
+        type_name: template.type_name.clone(),
+        fields,
+    })
+}
+
+pub(crate) fn decode_owned_variant_storage(storage: StructLlvmValueRef) -> Option<LlvmValueRef> {
+    let parent_type_name = storage
+        .type_name
+        .strip_prefix(OWNED_VARIANT_UNION_PREFIX)?
+        .to_owned();
+    let mut tag_i64 = None;
+    let mut variants = std::collections::BTreeMap::new();
+    for (name, value) in storage.fields {
+        if name == "tag" {
+            let LlvmValueRef::I64(tag) = value else {
+                return None;
+            };
+            tag_i64 = Some(tag);
+            continue;
+        }
+        let LlvmValueRef::Struct(variant) = value else {
+            return None;
+        };
+        if variant.type_name != name {
+            return None;
+        }
+        variants.insert(name, variant);
+    }
+    Some(LlvmValueRef::VariantUnion(VariantUnionLlvmValueRef {
+        parent_type_name,
+        tag_i64: tag_i64?,
+        variants,
+    }))
+}
+
+fn zero_owned_value(template: &LlvmValueRef) -> LlvmValueRef {
+    match template {
+        LlvmValueRef::Bool { .. } => LlvmValueRef::Bool {
+            i1: "false".to_owned(),
+            i64: "0".to_owned(),
+        },
+        LlvmValueRef::I32(_) => LlvmValueRef::I32("0".to_owned()),
+        LlvmValueRef::I64(_) => LlvmValueRef::I64("0".to_owned()),
+        LlvmValueRef::F32(_) => LlvmValueRef::F32("0.0".to_owned()),
+        LlvmValueRef::F64(_) => LlvmValueRef::F64("0.0".to_owned()),
+        LlvmValueRef::TextHandle { .. } => LlvmValueRef::TextHandle {
+            ptr: "null".to_owned(),
+            handle: "0".to_owned(),
+        },
+        LlvmValueRef::OwnedBytes { .. } => LlvmValueRef::OwnedBytes {
+            blob: "null".to_owned(),
+        },
+        LlvmValueRef::Struct(value) => LlvmValueRef::Struct(StructLlvmValueRef {
+            type_name: value.type_name.clone(),
+            fields: value
+                .fields
+                .iter()
+                .map(|(name, field)| (name.clone(), zero_owned_value(field)))
+                .collect(),
+        }),
+        _ => template.clone(),
+    }
 }
 
 pub(crate) fn emit_owned_struct_invoker_spawn(

@@ -5,7 +5,8 @@ use crate::lowering::direct_calls::collect_recursive_async_helper_functions;
 use crate::lowering::direct_calls::collect_scheduler_async_thunk_functions;
 use crate::lowering::direct_calls::owned_external_buffer_helper_lowering_order;
 use crate::lowering::direct_calls::{
-    collect_guarded_loop_direct_call_functions, collect_recursive_direct_call_functions,
+    collect_aggregate_param_direct_call_functions, collect_guarded_loop_direct_call_functions,
+    collect_recursive_direct_call_functions,
 };
 
 pub(super) trait BootstrapLoweringProvider {
@@ -176,6 +177,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .union(&collect_conditional_owned_return_helpers(module))
         .cloned()
         .collect::<BTreeSet<_>>()
+        .union(&collect_aggregate_param_direct_call_functions(module))
+        .cloned()
+        .collect::<BTreeSet<_>>()
         .union(&owned_external_buffer_return_helpers)
         .cloned()
         .collect::<BTreeSet<_>>()
@@ -218,10 +222,19 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
     });
     let mut state = LoweringState {
         yir: &mut yir,
+        node_resources: BTreeMap::new(),
+        indexed_node_count: 0,
+        edge_index: BTreeSet::new(),
+        indexed_edge_count: 0,
         branch_action_registry,
         function_map,
         struct_defs: module
             .structs
+            .iter()
+            .map(|definition| (definition.name.as_str(), definition))
+            .collect(),
+        enum_defs: module
+            .enums
             .iter()
             .map(|definition| (definition.name.as_str(), definition))
             .collect(),
@@ -280,7 +293,10 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         entry_return
     } else {
         let mut bindings = BTreeMap::<String, String>::new();
-        let returned = lower_function_body(main, &mut state, &mut bindings, true)?;
+        state.call_stack.push(main.name.clone());
+        let lowered = lower_function_body(main, &mut state, &mut bindings, true);
+        state.call_stack.pop();
+        let returned = lowered?;
         if let Some(returned) = returned {
             returned
         } else if main

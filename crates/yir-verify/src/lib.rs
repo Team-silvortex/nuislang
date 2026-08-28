@@ -21,7 +21,7 @@ mod scheduler_observer_contracts;
 
 use cpu_heap::verify_cpu_heap_protocol;
 use function_contracts::verify_function_table;
-use graph::{ensure_acyclic, path_exists, topological_order};
+use graph::{ensure_acyclic, topological_order};
 use project_contracts::{verify_lowering_contract_nodes, verify_project_type_contract_nodes};
 use result_state::verify_result_state_nodes;
 use scheduler_contracts::verify_scheduler_contract_nodes;
@@ -180,6 +180,25 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
         .iter()
         .map(|node| (node.name.as_str(), node))
         .collect::<BTreeMap<_, _>>();
+    let dependency_edges = module
+        .edges
+        .iter()
+        .filter(|edge| matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange))
+        .map(|edge| (edge.from.as_str(), edge.to.as_str()))
+        .collect::<BTreeSet<_>>();
+    let lifetime_edges = module
+        .edges
+        .iter()
+        .filter(|edge| matches!(edge.kind, EdgeKind::Lifetime))
+        .map(|edge| (edge.from.as_str(), edge.to.as_str()))
+        .collect::<BTreeSet<_>>();
+    let mut reverse_edges = BTreeMap::<&str, Vec<&str>>::new();
+    for edge in &module.edges {
+        reverse_edges
+            .entry(edge.to.as_str())
+            .or_default()
+            .push(edge.from.as_str());
+    }
     let mut consumers =
         BTreeMap::<String, Vec<(String, yir_core::GlmValueClass, GlmUseMode)>>::new();
 
@@ -194,11 +213,7 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
                 access.class,
                 access.mode,
             ));
-            let has_dep = module.edges.iter().any(|edge| {
-                edge.from == access.input
-                    && edge.to == node.name
-                    && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
-            });
+            let has_dep = dependency_edges.contains(&(access.input.as_str(), node.name.as_str()));
             if !has_dep {
                 return Err(format!(
                     "GLM: node `{}` uses `{}` as {} {} without dep/xfer edge",
@@ -208,11 +223,8 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             if matches!(access.class, yir_core::GlmValueClass::Res)
                 && matches!(access.mode, GlmUseMode::Own | GlmUseMode::Write)
             {
-                let has_lifetime = module.edges.iter().any(|edge| {
-                    edge.from == access.input
-                        && edge.to == node.name
-                        && matches!(edge.kind, EdgeKind::Lifetime)
-                });
+                let has_lifetime =
+                    lifetime_edges.contains(&(access.input.as_str(), node.name.as_str()));
                 if !has_lifetime {
                     return Err(format!(
                         "GLM: node `{}` requires lifetime edge from `{}` for {} {} access",
@@ -226,16 +238,7 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             GlmEffect::DomainMove | GlmEffect::LifetimeEnd => {
                 if let Some(primary) = profile.accesses.first() {
                     if matches!(primary.class, yir_core::GlmValueClass::Res) {
-                        let lifetime_count = module
-                            .edges
-                            .iter()
-                            .filter(|edge| {
-                                edge.from == primary.input
-                                    && edge.to == node.name
-                                    && matches!(edge.kind, EdgeKind::Lifetime)
-                            })
-                            .count();
-                        if lifetime_count == 0 {
+                        if !lifetime_edges.contains(&(primary.input.as_str(), node.name.as_str())) {
                             return Err(format!(
                                 "GLM: node `{}` must be ordered by lifetime from `{}`",
                                 node.name, primary.input
@@ -253,11 +256,12 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             if !matches!(mode, GlmUseMode::Own) {
                 continue;
             }
+            let ordered_before_owner = reverse_reachable_nodes(&reverse_edges, owner_node);
             for (other_node, _, _) in consumers_for_source {
                 if other_node == owner_node {
                     continue;
                 }
-                if !path_exists(module, other_node, owner_node) {
+                if !ordered_before_owner.contains(other_node.as_str()) {
                     return Err(format!(
                         "GLM: node `{}` consumes {} `{}` with Own, but `{}` is not ordered before that consume",
                         owner_node, class, source, other_node
@@ -268,6 +272,23 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn reverse_reachable_nodes<'a>(
+    reverse_edges: &BTreeMap<&'a str, Vec<&'a str>>,
+    target: &str,
+) -> BTreeSet<&'a str> {
+    let mut stack = reverse_edges.get(target).cloned().unwrap_or_default();
+    let mut reachable = BTreeSet::new();
+    while let Some(current) = stack.pop() {
+        if !reachable.insert(current) {
+            continue;
+        }
+        if let Some(predecessors) = reverse_edges.get(current) {
+            stack.extend(predecessors.iter().copied());
+        }
+    }
+    reachable
 }
 
 fn required_dependency_edge_kind(source: &ResourceKind, target: &ResourceKind) -> EdgeKind {

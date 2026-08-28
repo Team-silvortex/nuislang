@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use yir_core::Node;
 
 use super::{
+    call_lowering::parse_owned_struct_layout,
     fresh_reg,
-    task_owned_payload::emit_owned_struct_data,
+    task_owned_payload::{emit_owned_struct_data, materialize_owned_variant_storage},
     value_ref::{coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64},
     LlvmValueRef,
 };
@@ -152,12 +153,32 @@ pub(crate) fn lower_cpu_return_node(
             body.push(format!("  ret {{ ptr, i64 }} {aggregate}"));
         }
         "return_owned_struct" => {
-            let Some(LlvmValueRef::Struct(value)) = registers.get(&node.op.args[0]) else {
+            let Some(value) = registers.get(&node.op.args[0]) else {
                 body.push(format!(
                     "  ; deferred lowering for cpu.return_owned_struct `{}` because its input is not a recursively owned scalar struct",
                     node.name
                 ));
                 return Ok(ReturnLoweringOutcome::Deferred);
+            };
+            let value = if let Some(layout) = node.op.args.get(1) {
+                let template = parse_owned_struct_layout(layout)?;
+                let Some(storage) = materialize_owned_variant_storage(value, &template) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.return_owned_struct `{}` because its variant value does not match `{layout}`",
+                        node.name
+                    ));
+                    return Ok(ReturnLoweringOutcome::Deferred);
+                };
+                storage
+            } else {
+                let LlvmValueRef::Struct(value) = value else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.return_owned_struct `{}` because its input is not a recursively owned scalar struct",
+                        node.name
+                    ));
+                    return Ok(ReturnLoweringOutcome::Deferred);
+                };
+                value.clone()
             };
             let mut state = super::LlvmLoweringState {
                 body: std::mem::take(body),
@@ -172,7 +193,7 @@ pub(crate) fn lower_cpu_return_node(
                 last_cpu_value: None,
                 ends_with_terminal_return: false,
             };
-            let Some(data) = emit_owned_struct_data(value, &mut state) else {
+            let Some(data) = emit_owned_struct_data(&value, &mut state) else {
                 *body = state.body;
                 return Ok(ReturnLoweringOutcome::Deferred);
             };

@@ -1,0 +1,151 @@
+protocol = "nuis-compiler-data-model-v3"
+version = 3
+predecessor = "nuis-compiler-data-model-v2"
+status = "usable-materialized-token-records"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+emitter_helper_visibility = "bootstrap-public-transitional-not-stable-api"
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v3"
+bootstrap_subset = "nuis-bootstrap-language-subset-v3"
+host_layout_identity = false
+host_ffi_required = false
+record_layout = "columnar-four-i64-vectors"
+buffer_layout = "little-endian-seven-byte-i64-words-in-two-sixteen-slot-vectors"
+packed_word_bytes = 7
+maximum_packed_words = 19
+maximum_records = 4
+payload_capacity_bytes = 64
+emission_capacity_bytes = 128
+maximum_emitted_records = 4
+maximum_emitted_payload_bytes = 64
+utf8_policy = "canonical-unicode-scalar-encoding"
+token_stream_protocol = "nuis-token-stream-v1"
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+expected_native_exit = 122
+expected_emitted_bytes = 59
+expected_emitted_hash = 2002147233
+candidate_prefix_emitted_bytes = 91
+candidate_prefix_emitted_hash = 1277127995
+emitted_hash_validation = "independent-reference-vector"
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --test bootstrap_cli command_bootstrap_cli_accepts_the_compiler_data_model_project -j 1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+
+types = [
+  "Option<T>",
+  "CompilerVectorPage",
+  "CompilerVector",
+  "CompilerText",
+  "CompilerMap",
+  "CompilerArena",
+  "CompilerSourceSpan",
+  "CompilerPath",
+  "CompilerDiagnostic",
+  "CompilerDecimalState",
+  "CompilerTokenBuffer",
+  "CompilerTokenRecord",
+  "CompilerTokenStore",
+  "CompilerTokenMaterializer",
+]
+
+operations = [
+  "compiler_token_buffer_empty",
+  "compiler_token_buffer_shape_valid",
+  "compiler_token_buffer_push",
+  "compiler_token_buffer_get",
+  "compiler_token_buffer_hash",
+  "compiler_token_store_empty",
+  "compiler_token_store_shape_valid",
+  "compiler_token_store_begin",
+  "compiler_token_store_get",
+  "compiler_token_store_push_scalar",
+  "compiler_token_store_finish",
+  "compiler_token_store_emit",
+  "compiler_token_emit_hex_byte",
+  "compiler_token_emit_decimal",
+  "compiler_token_materializer_decode_first_page",
+]
+
+invariants = [
+  "record-columns-have-one-shared-length-between-zero-and-four",
+  "payload-ranges-are-contiguous-ordered-and-contained",
+  "one-open-record-must-finish-before-the-next-record-begins",
+  "open-records-enforce-structural-invariants-until-finish",
+  "finish-enforces-kind-specific-semantic-invariants",
+  "word-and-float-records-require-nonempty-text",
+  "string-and-doc-comment-records-may-own-empty-text",
+  "integer-records-own-complete-signed-i64-values",
+  "symbol-records-own-valid-unicode-scalar-values",
+  "text-records-own-canonical-utf8-produced-from-unicode-scalars",
+  "canonical-emission-reconstructs-the-exact-v1-header-record-prefixes-and-lf",
+  "hexadecimal-emission-is-lowercase-and-even-length",
+  "decimal-emission-covers-the-complete-i64-domain-without-negating-i64-min",
+  "payload-and-emission-capacity-fail-closed",
+  "packed-words-use-arithmetic-little-endian-byte-order-independent-of-host-endianness",
+  "bootstrap-emission-window-is-four-records-and-sixty-four-payload-bytes",
+  "first-complete-token-page-decodes-to-owned-records-and-reemits-canonically",
+  "token-layout-is-not-a-public-or-host-abi",
+]
+
+[[errors]]
+code = 1
+name = "capacity-exhausted"
+
+[[errors]]
+code = 2
+name = "invalid-state-or-index"
+
+[[errors]]
+code = 3
+name = "invalid-input-or-shape"
+
+[executable_fixture]
+records = [
+  "word:ns",
+  "integer:-12",
+  "symbol:+",
+  "arrow",
+]
+canonical_stream = "nuis-token-stream-v1\\nword\\t6e73\\ninteger\\t-12\\nsymbol\\t43\\narrow\\n"
+candidate_prefix_records = [
+  "word:use",
+  "word:cpu",
+  "word:StdLanguageCore",
+  "symbol:semicolon",
+]
+boundary_checks = [
+  "closed-record-rejects-text-append",
+  "empty-word-rejects-finish",
+  "surrogate-symbol-rejects-finish",
+  "open-store-rejects-emission",
+  "fifth-record-rejects-capacity",
+  "record-and-byte-lookups-fail-closed",
+  "candidate-prefix-decodes-and-reemits-with-identical-length-and-hash",
+]
+
+[growth_boundary]
+status = "open"
+next_contract = "stream-decoder-to-owned-record-integration"
+remaining = [
+  "production-candidate-adapter-does-not-yet-feed-handoff-bytes-into-CompilerTokenStore",
+  "token-store-is-bounded-to-four-records-and-sixty-four-payload-bytes",
+  "canonical-emission-is-bounded-to-four-records-sixty-four-payload-bytes-and-128-output-bytes",
+  "CompilerMap-remains-four-entry-and-i64-specific",
+  "CompilerArena-still-does-not-own-general-object-storage",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "large-pure-aggregate-loop-carries-need-compile-time-optimization",
+]
+preserve = [
+  "owned-value-semantics",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "stable-record-indices",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v3-import-ceiling",
+]

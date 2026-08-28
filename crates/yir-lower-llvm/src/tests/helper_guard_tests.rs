@@ -642,11 +642,16 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         .iter()
         .map(|resource| (resource.name.clone(), resource))
         .collect::<BTreeMap<_, _>>();
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
     let mut global_counter = 0;
     let branch_effect_emitters = crate::default_branch_effect_llvm_emitters();
 
     let emitted = emit_cpu_function(
-        &module,
+        &nodes,
         &resources,
         &ordered_node_names,
         &param_bindings,

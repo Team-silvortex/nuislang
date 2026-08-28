@@ -1,8 +1,8 @@
 # Nuis Bootstrap Language Subset
 
 This reference freezes the first compiler-authoring source boundary as
-`nuis-bootstrap-language-subset-v2`. Its machine-readable inventory is
-[nuis-bootstrap-language-subset-v2.toml](nuis-bootstrap-language-subset-v2.toml),
+`nuis-bootstrap-language-subset-v3`. Its machine-readable inventory is
+[nuis-bootstrap-language-subset-v3.toml](nuis-bootstrap-language-subset-v3.toml),
 and the executable policy lives in `nuis-semantics`.
 
 This is not a promise to keep the public Nuis language frozen. It is a narrow,
@@ -25,7 +25,7 @@ cargo run -q -p nuisc -- bootstrap-check tests/fixtures/bootstrap/accepted/compi
 
 An accepted report means two independent conditions hold:
 
-1. Every project-local AST module obeys the v2 allowlist.
+1. Every project-local AST module obeys the v3 allowlist.
 2. The same input crosses the normal semantic, NIR, YIR, and LLVM emission
    checks without an error.
 
@@ -35,9 +35,11 @@ obeys the allowlist but fails normal compilation also exits nonzero with
 
 ## Frozen Surface
 
-V2 permits only `mod cpu` compiler modules. Local CPU modules may import each
+V3 permits only `mod cpu` compiler modules. Local CPU modules may import each
 other; external imports are limited to `CorePrelude`, `StdLanguageCore`,
-`StdCompilerTokens`, `StdCompilerProjection`, and `StdTextContracts`.
+`StdCompilerData`, `StdCompilerTokenEmit`, `StdCompilerTokens`,
+`StdCompilerProjection`, and
+`StdTextContracts`.
 
 The executable type allowlist contains:
 
@@ -54,7 +56,7 @@ calls, struct literals, field access, integer/Boolean operators, `if`, `match`,
 
 The source spellings `loop { ... }`, `else if`, and `if let` are also accepted.
 They normalize before subset validation to `while true`, nested `if`, and a
-two-arm `match` respectively, so subset v2 gains no new AST capability or
+two-arm `match` respectively, so subset v3 gains no new AST capability or
 policy bypass.
 
 Documentation attributes are generally the only metadata dependency. Twelve
@@ -62,12 +64,15 @@ exact all-`i64` `@export` signatures are additionally reserved for the stage1
 candidate's scalar fold and token-decoder ABI. Function name, symbol name,
 parameter count, and return type must all match the machine-readable allowlist;
 every other export remains `NBS004`. Diagnostics must be returned as data
-rather than printed by a compiler component. V2 changes only this registered
-library/ABI boundary; it does not admit a new language capability class.
+rather than printed by a compiler component. V3 adds only the registered
+`StdCompilerData`/`StdCompilerTokenEmit` import pair and its
+`CompilerDecimalState`, `CompilerTokenBuffer`, `CompilerTokenRecord`, and
+`CompilerTokenStore` owned types. It preserves the v2 scalar export ABI and
+does not admit a new language capability class.
 
 ## Deliberate Exclusions
 
-V2 rejects these capabilities even when the wider language supports them:
+V3 rejects these capabilities even when the wider language supports them:
 
 - shader, kernel, network, data, CFFI, and other non-CPU domains
 - arbitrary library imports, extern declarations, and FFI interfaces

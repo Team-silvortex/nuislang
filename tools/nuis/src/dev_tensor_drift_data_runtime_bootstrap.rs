@@ -266,9 +266,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
     },
     DevTensorDriftCheckSpec {
         id: "nuis-bootstrap-language-subset-contract",
-        path: "docs/reference/nuis-bootstrap-language-subset-v2.toml",
+        path: "docs/reference/nuis-bootstrap-language-subset-v3.toml",
         required_patterns: &[
-            "nuis-bootstrap-language-subset-v2",
+            "nuis-bootstrap-language-subset-v3",
             "nuisc bootstrap-check",
             "NBS001",
             "NBS017",
@@ -343,9 +343,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         id: "nuis-compiler-data-model-registration",
         path: "stdlib/std/module.toml",
         required_patterns: &[
-            "surface.std.compiler-data-model.v1",
-            "surface.std.compiler-data-model.v2",
-            "lib/language_core.ns",
+            "surface.std.compiler-data-model.v3",
+            "lib/compiler_data.ns",
+            "lib/compiler_token_emit.ns",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -353,11 +353,15 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         path: "examples/projects/tooling/bootstrap_compiler_data_model_demo/main.ns",
         required_patterns: &[
             "use cpu StdLanguageCore",
+            "use cpu StdCompilerData",
+            "use cpu StdCompilerTokenEmit",
             "fn compile_component() -> Result<i64, i64>",
-            "fn boundaries_fail_closed",
-            "full_tokens.page_count != 4",
-            "compiler_vector_shape_valid(-1, 2, 4, -5, 0, 0)",
-            "compiler_diagnostic_score",
+            "fn build_materialized_tokens",
+            "fn build_candidate_prefix_tokens",
+            "compiler_token_materializer_decode_first_page",
+            "1277127995",
+            "fn token_model_fail_closed",
+            "compiler_token_store_emit",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -366,7 +370,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         required_patterns: &[
             "compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis",
             "deferred lowering",
-            "Some(59)",
+            "Some(122)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -515,7 +519,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "reproducible_build_sha256",
             "bootstrap-diff",
             "tampered native binary must invalidate component build",
-            "Some(59)",
+            "Some(122)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -608,11 +612,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         id: "nuis-development-tensor-candidate-production-baseline",
         path: "docs/reference/nuis-development-tensor.md",
         required_patterns: &[
-            "stage-neutral boundary to `usable/84`",
+            "stage-neutral boundary to `usable/86`",
             "cache-bypassed clean builds move both driver and\nreproducibility gate to `usable/87`",
-            "Data model v2 remains `usable/80`",
-            "four pages and native score `59`",
-            "compiler data model is now weakest",
+            "Data model v3 is `usable/88`",
+            "canonical 91-byte token stream and native score `122`",
+            "stage-neutral IR boundary is now weakest",
         ],
     },
     DevTensorDriftCheckSpec {

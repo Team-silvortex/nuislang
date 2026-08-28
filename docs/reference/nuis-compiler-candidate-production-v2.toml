@@ -61,7 +61,7 @@ bound_inputs = [
 ]
 
 invariants = [
-  "bootstrap-v2-allows-only-the-twelve-exact-scalar-export-signatures",
+  "bootstrap-v3-allows-only-the-twelve-exact-scalar-export-signatures",
   "nuis-functions-consume-every-stage-byte-in-order",
   "nuis-token-dfa-validates-header-record-kind-payload-shape-and-line-boundaries",
   "adapter-performs-only-file-transport-state-orchestration-and-canonical-number-rendering",

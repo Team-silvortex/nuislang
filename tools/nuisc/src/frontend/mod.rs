@@ -251,6 +251,10 @@ pub fn parse_nuis_ast(input: &str) -> Result<AstModule, String> {
     parser.parse_module()
 }
 
+pub(crate) fn summarize_ast_text_handle_rewrites(module: &AstModule) -> (usize, usize) {
+    text_handle_rewrite::summarize_text_handle_rewrites(module)
+}
+
 pub(crate) fn render_stage_neutral_token_stream(input: &str) -> Result<String, String> {
     lexer::render_stage_neutral_token_stream(input)
 }

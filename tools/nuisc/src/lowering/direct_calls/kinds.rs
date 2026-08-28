@@ -49,6 +49,14 @@ pub(in crate::lowering) fn supports_direct_call_signature(function: &NirFunction
 }
 
 pub(super) fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
+    let return_kind = direct_call_return_kind(function)?;
+    for param in &function.params {
+        direct_call_scalar_kind(&param.ty)?;
+    }
+    Some(return_kind)
+}
+
+pub(super) fn direct_call_return_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
     if function
         .return_type
         .as_ref()
@@ -67,9 +75,6 @@ pub(super) fn direct_call_signature_kind(function: &NirFunction) -> Option<Direc
         DirectCallScalarKind::BorrowedBuffer | DirectCallScalarKind::TraversalPointer
     ) {
         return None;
-    }
-    for param in &function.params {
-        direct_call_scalar_kind(&param.ty)?;
     }
     Some(return_kind)
 }

@@ -5,6 +5,7 @@ use yir_core::{parse_branch_owned_call_args, Node};
 use super::{
     call_return::cpu_scalar_kind_llvm_type,
     fresh_block, fresh_reg,
+    task_owned_payload::decode_owned_variant_storage,
     value_ref::{
         borrowed_buffer_parts, coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64,
         get_mutex_permit, get_ptr,
@@ -405,7 +406,9 @@ pub(crate) fn lower_cpu_call_node(
     if node.op.instruction == "call_owned_struct" {
         let template = parse_owned_struct_layout(&node.op.args[1])?;
         let value = unpack_immediate_owned_struct(&reg, &template, body, next_reg);
-        registers.insert(node.name.clone(), LlvmValueRef::Struct(value));
+        let value =
+            decode_owned_variant_storage(value.clone()).unwrap_or(LlvmValueRef::Struct(value));
+        registers.insert(node.name.clone(), value);
         return Ok(true);
     }
 
@@ -584,7 +587,7 @@ fn unpack_immediate_scalar(
     }
 }
 
-fn parse_owned_struct_layout(layout: &str) -> Result<super::StructLlvmValueRef, String> {
+pub(crate) fn parse_owned_struct_layout(layout: &str) -> Result<super::StructLlvmValueRef, String> {
     let mut parser = OwnedStructLayoutParser::new(layout);
     let parsed = parser.parse_struct()?;
     if parser.position != parser.source.len() {

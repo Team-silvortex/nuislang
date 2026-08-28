@@ -265,13 +265,18 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
         | "return_f64"
         | "return_owned_bytes"
         | "return_owned_struct" => {
-            if node.op.args.len() != 1 {
+            let valid_arg_count = if node.op.instruction == "return_owned_struct" {
+                (1..=2).contains(&node.op.args.len())
+            } else {
+                node.op.args.len() == 1
+            };
+            if !valid_arg_count {
                 return Err(format!(
-                    "node `{}` expects `cpu.{} <name> <resource> <value>`",
+                    "node `{}` expects `cpu.{} <name> <resource> <value> [owned-layout]`",
                     node.name, node.op.instruction
                 ));
             }
-            Ok(InstructionSemantics::effect(node.op.args.clone()))
+            Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
         }
         "return_owned_external_buffer" => {
             if node.op.args.len() != 5 {

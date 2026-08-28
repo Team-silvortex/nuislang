@@ -65,7 +65,7 @@ fn evidence() -> Evidence {
     }];
     let stage0 = build_compiler_component_build(&CompilerComponentBuildInput {
         stage_role: COMPILER_COMPONENT_STAGE0_ROLE,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         component_id: "projection_relay",
         component_domain: "cpu",
         component_unit: "Main",

@@ -8,11 +8,13 @@ use crate::model::{
 #[path = "bootstrap_subset_walk.rs"]
 mod walk;
 
-pub const BOOTSTRAP_SUBSET_PROTOCOL: &str = "nuis-bootstrap-language-subset-v2";
+pub const BOOTSTRAP_SUBSET_PROTOCOL: &str = "nuis-bootstrap-language-subset-v3";
 
 pub const BOOTSTRAP_APPROVED_IMPORTS: &[(&str, &str)] = &[
     ("cpu", "CorePrelude"),
     ("cpu", "StdLanguageCore"),
+    ("cpu", "StdCompilerData"),
+    ("cpu", "StdCompilerTokenEmit"),
     ("cpu", "StdCompilerTokens"),
     ("cpu", "StdCompilerProjection"),
     ("cpu", "StdTextContracts"),
@@ -23,6 +25,7 @@ pub const BOOTSTRAP_PRIMITIVE_TYPES: &[&str] = &["bool", "i64", "text"];
 pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerArena",
     "CompilerDiagnostic",
+    "CompilerDecimalState",
     "CompilerMap",
     "CompilerPath",
     "CompilerProjectionKind",
@@ -30,6 +33,9 @@ pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerProjectionState",
     "CompilerSourceSpan",
     "CompilerText",
+    "CompilerTokenBuffer",
+    "CompilerTokenRecord",
+    "CompilerTokenStore",
     "CompilerVector",
     "Option",
     "Result",

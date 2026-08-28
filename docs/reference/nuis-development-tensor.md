@@ -1748,13 +1748,13 @@ The five required coordinates are:
 * `compiler-toolchain/bootstrap/stage0-stage1-driver`
 * `developer-system/bootstrap/differential-reproducibility-gate`
 
-Subset v2 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the
+Subset v3 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the
 roadmap score, and readiness waits for all five to reach `stable/100`.
 
-The bounded Nuis token decoder moves the stage-neutral boundary to `usable/84`;
+The Emit-owned bounded Nuis token materializer moves the stage-neutral boundary to `usable/86`;
 its attested candidate and two cache-bypassed clean builds move both driver and
-reproducibility gate to `usable/87`. Data model v2 remains `usable/80` through
-four pages and native score `59`; the compiler data model is now weakest.
+reproducibility gate to `usable/87`. Data model v3 is `usable/88` through owned four-record materialization, the canonical 59-byte fixture, and the real candidate prefix's canonical 91-byte token stream and native score `122`;
+the `usable/86` stage-neutral IR boundary is now weakest.
 
 ## Runtime Lifecycle Loader Bootstrap
 

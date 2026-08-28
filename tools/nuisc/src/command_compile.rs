@@ -161,11 +161,13 @@ pub(crate) fn run_compile_resolved(
     };
     let compile_fresh = || -> Result<(aot::CompileArtifacts, Vec<String>), String> {
         let source = resolved.source_text()?;
-        let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
-            lowering_target: Some(lowering::LoweringTargetConfig::from_cpu_build_target(
-                &cpu_target,
-            )),
-        })?;
+        let artifacts = resolved
+            .compile_with_options(&pipeline::PipelineCompileOptions {
+                lowering_target: Some(lowering::LoweringTargetConfig::from_cpu_build_target(
+                    &cpu_target,
+                )),
+            })
+            .map_err(|error| format!("targeted project compilation failed: {error}"))?;
         let mut written = aot::write_and_link_with_source(
             &resolved.effective_input_path,
             &output_dir,
@@ -177,7 +179,8 @@ pub(crate) fn run_compile_resolved(
                 llvm_ir: &artifacts.llvm_ir,
             },
             &cpu_target,
-        )?;
+        )
+        .map_err(|error| format!("AOT write/link failed: {error}"))?;
         if let Some(packaging_mode) = requested_packaging_mode {
             written.packaging_mode = packaging_mode.to_owned();
         }
@@ -217,7 +220,8 @@ pub(crate) fn run_compile_resolved(
         .project
         .as_ref()
         .map(project::summarize_project_text_handle_rewrites)
-        .transpose()?;
+        .transpose()
+        .map_err(|error| format!("project text-handle rewrite summary failed: {error}"))?;
     let doc_index = write_compile_doc_index(&input, &output_dir)?;
     let build_manifest = aot::write_build_manifest(
         &output_dir,

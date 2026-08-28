@@ -1,4 +1,7 @@
 use cpu StdLanguageCore;
+use cpu StdCompilerData;
+use cpu StdCompilerTokenEmit;
+use cpu StdCompilerTokens;
 
 /// First compiler component written inside the frozen bootstrap subset.
 mod cpu Main {
@@ -37,6 +40,175 @@ mod cpu Main {
     let root: CompilerPath = compiler_path_empty(false);
     let source: CompilerPath = compiler_path_push(root, 41)?;
     return compiler_path_push(source, 42);
+  }
+
+  fn build_materialized_tokens() -> Result<CompilerTokenStore, i64> {
+    let word0: CompilerTokenStore = compiler_token_store_begin(
+      compiler_token_store_empty(),
+      1,
+      0
+    )?;
+    let word1: CompilerTokenStore = compiler_token_store_push_scalar(word0, 110)?;
+    let word2: CompilerTokenStore = compiler_token_store_push_scalar(word1, 115)?;
+    let word_store: CompilerTokenStore = compiler_token_store_finish(word2)?;
+    let integer0: CompilerTokenStore = compiler_token_store_begin(word_store, 2, -12)?;
+    let integer: CompilerTokenStore = compiler_token_store_finish(integer0)?;
+    let symbol0: CompilerTokenStore = compiler_token_store_begin(integer, 4, 43)?;
+    let symbol: CompilerTokenStore = compiler_token_store_finish(symbol0)?;
+    let arrow0: CompilerTokenStore = compiler_token_store_begin(symbol, 5, 0)?;
+    return compiler_token_store_finish(arrow0);
+  }
+
+  fn build_candidate_prefix_tokens() -> Result<CompilerTokenStore, i64> {
+    let use0: CompilerTokenStore = compiler_token_store_begin(
+      compiler_token_store_empty(),
+      1,
+      0
+    )?;
+    let use1: CompilerTokenStore = compiler_token_store_push_scalar(use0, 117)?;
+    let use2: CompilerTokenStore = compiler_token_store_push_scalar(use1, 115)?;
+    let use3: CompilerTokenStore = compiler_token_store_push_scalar(use2, 101)?;
+    let use_word: CompilerTokenStore = compiler_token_store_finish(use3)?;
+
+    let cpu0: CompilerTokenStore = compiler_token_store_begin(use_word, 1, 0)?;
+    let cpu1: CompilerTokenStore = compiler_token_store_push_scalar(cpu0, 99)?;
+    let cpu2: CompilerTokenStore = compiler_token_store_push_scalar(cpu1, 112)?;
+    let cpu3: CompilerTokenStore = compiler_token_store_push_scalar(cpu2, 117)?;
+    let cpu_word: CompilerTokenStore = compiler_token_store_finish(cpu3)?;
+
+    let core0: CompilerTokenStore = compiler_token_store_begin(cpu_word, 1, 0)?;
+    let core1: CompilerTokenStore = compiler_token_store_push_scalar(core0, 83)?;
+    let core2: CompilerTokenStore = compiler_token_store_push_scalar(core1, 116)?;
+    let core3: CompilerTokenStore = compiler_token_store_push_scalar(core2, 100)?;
+    let core4: CompilerTokenStore = compiler_token_store_push_scalar(core3, 76)?;
+    let core5: CompilerTokenStore = compiler_token_store_push_scalar(core4, 97)?;
+    let core6: CompilerTokenStore = compiler_token_store_push_scalar(core5, 110)?;
+    let core7: CompilerTokenStore = compiler_token_store_push_scalar(core6, 103)?;
+    let core8: CompilerTokenStore = compiler_token_store_push_scalar(core7, 117)?;
+    let core9: CompilerTokenStore = compiler_token_store_push_scalar(core8, 97)?;
+    let core10: CompilerTokenStore = compiler_token_store_push_scalar(core9, 103)?;
+    let core11: CompilerTokenStore = compiler_token_store_push_scalar(core10, 101)?;
+    let core12: CompilerTokenStore = compiler_token_store_push_scalar(core11, 67)?;
+    let core13: CompilerTokenStore = compiler_token_store_push_scalar(core12, 111)?;
+    let core14: CompilerTokenStore = compiler_token_store_push_scalar(core13, 114)?;
+    let core15: CompilerTokenStore = compiler_token_store_push_scalar(core14, 101)?;
+    let core_word: CompilerTokenStore = compiler_token_store_finish(core15)?;
+
+    let symbol0: CompilerTokenStore = compiler_token_store_begin(core_word, 4, 59)?;
+    return compiler_token_store_finish(symbol0);
+  }
+
+  fn candidate_prefix_page_check() -> Result<i64, i64> {
+    let store: CompilerTokenStore = build_candidate_prefix_tokens()?;
+    let emitted: CompilerTokenBuffer = compiler_token_store_emit(store)?;
+    if store.record_count != 4 || store.payload.length != 21 {
+      return Result.Err(44);
+    }
+    if emitted.length != 91 || emitted.word_count != 13
+      || emitted.words0.length != 13 || emitted.words1.length != 0 {
+      return Result.Err(45);
+    }
+    let emitted_hash: i64 = compiler_token_buffer_hash(emitted)?;
+    if emitted_hash != 1277127995 {
+      return Result.Err(46);
+    }
+    let decoded: CompilerTokenStore = compiler_token_materializer_decode_first_page(
+      emitted
+    )?;
+    let reemitted: CompilerTokenBuffer = compiler_token_store_emit(decoded)?;
+    let reemitted_hash: i64 = compiler_token_buffer_hash(reemitted)?;
+    if decoded.record_count != 4 || decoded.payload.length != 21
+      || reemitted.length != 91
+      || reemitted_hash != emitted_hash {
+      return Result.Err(50);
+    }
+    if compiler_token_buffer_value(emitted, 90) != 10 {
+      return Result.Err(47);
+    }
+    return Result.Ok(0);
+  }
+
+  fn token_model_fail_closed(
+    store: CompilerTokenStore,
+    emitted: CompilerTokenBuffer
+  ) -> i64 {
+    if store.record_count != 4 || store.record_open {
+      return 19;
+    }
+    match compiler_token_store_get(store, 0) {
+      Option.Some(record) => {
+        if record.kind != 1
+          || record.payload_start != 0
+          || record.payload_length != 2 {
+          return 21;
+        }
+      }
+      Option.None => { return 20; }
+    }
+    match compiler_token_store_get(store, 1) {
+      Option.Some(record) => {
+        if record.kind != 2 || record.numeric_value != -12 {
+          return 23;
+        }
+      }
+      Option.None => { return 22; }
+    }
+    if emitted.length != 59 || emitted.word_count != 9
+      || emitted.words0.length != 9 || emitted.words1.length != 0 {
+      return 24;
+    }
+    match compiler_token_buffer_get(emitted, 0) {
+      Option.Some(byte) => { if byte != 110 { return 25; } }
+      Option.None => { return 26; }
+    }
+    match compiler_token_buffer_get(emitted, 58) {
+      Option.Some(byte) => { if byte != 10 { return 27; } }
+      Option.None => { return 28; }
+    }
+    match compiler_token_store_push_scalar(store, 97) {
+      Result.Ok(_) => { return 30; }
+      Result.Err(code) => { if code != 3 { return 31; } }
+    }
+    match compiler_token_store_begin(
+      compiler_token_store_empty(),
+      1,
+      0
+    ) {
+      Result.Ok(empty_word) => {
+        match compiler_token_store_finish(empty_word) {
+          Result.Ok(_) => { return 32; }
+          Result.Err(code) => { if code != 3 { return 33; } }
+        }
+      }
+      Result.Err(_) => { return 39; }
+    }
+    match compiler_token_store_begin(
+      compiler_token_store_empty(),
+      4,
+      55296
+    ) {
+      Result.Ok(bad_symbol) => {
+        match compiler_token_store_finish(bad_symbol) {
+          Result.Ok(_) => { return 34; }
+          Result.Err(code) => { if code != 3 { return 35; } }
+        }
+      }
+      Result.Err(_) => { return 40; }
+    }
+    match compiler_token_store_begin(store, 5, 0) {
+      Result.Ok(_) => { return 42; }
+      Result.Err(code) => { if code != 1 { return 43; } }
+    }
+    match compiler_token_store_begin(compiler_token_store_empty(), 5, 0) {
+      Result.Ok(open_arrow) => {
+        match compiler_token_store_emit(open_arrow) {
+          Result.Ok(_) => { return 36; }
+          Result.Err(code) => { if code != 2 { return 37; } }
+        }
+      }
+      Result.Err(_) => { return 41; }
+    }
+    return 0;
   }
 
   fn boundaries_fail_closed(
@@ -117,6 +289,10 @@ mod cpu Main {
   }
 
   fn compile_component() -> Result<i64, i64> {
+    let prefix_page_check: i64 = candidate_prefix_page_check()?;
+    if prefix_page_check != 0 {
+      return Result.Err(49);
+    }
     let text: CompilerText = build_source_text()?;
     let tokens: CompilerVector = build_token_stream()?;
     let full_tokens: CompilerVector = fill_token_capacity()?;
@@ -151,6 +327,10 @@ mod cpu Main {
       span,
       path
     )?;
+    let materialized_tokens: CompilerTokenStore = build_materialized_tokens()?;
+    let emitted_tokens: CompilerTokenBuffer = compiler_token_store_emit(
+      materialized_tokens
+    )?;
 
     let boundary_error: i64 = boundaries_fail_closed(
       text,
@@ -162,12 +342,21 @@ mod cpu Main {
     if boundary_error != 0 {
       return Result.Err(boundary_error);
     }
+    let token_model_error: i64 = token_model_fail_closed(
+      materialized_tokens,
+      emitted_tokens
+    );
+    if token_model_error != 0 {
+      return Result.Err(token_model_error);
+    }
     return Result.Ok(
       compiler_diagnostic_score(diagnostic)
         + token_kind
         + node_index
         + arena2.next_index
         + text.scalar_length
+        + materialized_tokens.record_count
+        + emitted_tokens.length
     );
   }
 

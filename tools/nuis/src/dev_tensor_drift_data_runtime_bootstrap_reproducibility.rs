@@ -3,6 +3,24 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
     &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-v3-contract",
+        path: "docs/reference/nuis-compiler-data-model-v3.toml",
+        required_patterns: &[
+            "nuis-compiler-data-model-v3",
+            "surface.std.compiler-data-model.v3",
+            "stdlib/std/lib/compiler_data.ns",
+            "stdlib/std/lib/compiler_token_emit.ns",
+            "maximum_records = 4",
+            "packed_word_bytes = 7",
+            "emission_capacity_bytes = 128",
+            "expected_native_exit = 122",
+            "expected_emitted_bytes = 59",
+            "candidate_prefix_emitted_bytes = 91",
+            "candidate_prefix_emitted_hash = 1277127995",
+            "compiler_token_materializer_decode_first_page",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-compiler-component-reproducibility-contract",
         path: "docs/reference/nuis-compiler-component-reproducibility-v1.toml",
         required_patterns: &[
@@ -97,7 +115,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "compiler_token_decoder_count_step",
             "compiler_token_decoder_semantic_step",
             "compiler_token_decoder_finish",
-            "2147483629",
+            "compiler_token_decoder_max_bytes",
         ],
     },
     DevTensorDriftCheckSpec {

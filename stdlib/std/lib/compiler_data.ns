@@ -1,0 +1,539 @@
+use cpu StdLanguageCore;
+
+/// Bounded owned token records and canonical stream rendering for bootstrap compilers.
+mod cpu StdCompilerData {
+  pub struct CompilerTokenBuffer {
+    pub length: i64,
+    pub word_count: i64,
+    pub words0: CompilerVector,
+    pub words1: CompilerVector
+  }
+
+  pub struct CompilerTokenRecord {
+    pub kind: i64,
+    pub payload_start: i64,
+    pub payload_length: i64,
+    pub numeric_value: i64
+  }
+
+  /// Token metadata is columnar so record identity is independent of host layout.
+  pub struct CompilerTokenStore {
+    pub record_count: i64,
+    pub record_open: bool,
+    pub kinds: CompilerVector,
+    pub payload_starts: CompilerVector,
+    pub payload_lengths: CompilerVector,
+    pub numeric_values: CompilerVector,
+    pub payload: CompilerTokenBuffer
+  }
+
+  pub fn compiler_token_kind_valid(kind: i64) -> bool {
+    return kind >= 1 && kind <= 7;
+  }
+
+  pub fn compiler_token_kind_has_text(kind: i64) -> bool {
+    return kind == 1 || kind == 3 || kind == 6 || kind == 7;
+  }
+
+  pub fn compiler_token_scalar_valid(scalar: i64) -> bool {
+    return scalar >= 0 && scalar <= 1114111
+      && (scalar < 55296 || scalar > 57343);
+  }
+
+  pub fn compiler_token_vector_valid(vector: CompilerVector) -> bool {
+    return compiler_vector_shape_valid(
+      vector.length,
+      vector.page_count,
+      vector.page0.length,
+      vector.page1.length,
+      vector.page2.length,
+      vector.page3.length
+    );
+  }
+
+  pub fn compiler_token_vector_value(vector: CompilerVector, index: i64) -> i64 {
+    match compiler_vector_get(vector, index) {
+      Option.Some(item) => { return item; }
+      Option.None => { return 0; }
+    }
+  }
+
+  pub fn compiler_token_buffer_empty() -> CompilerTokenBuffer {
+    return CompilerTokenBuffer {
+      length: 0,
+      word_count: 0,
+      words0: compiler_vector_empty(0),
+      words1: compiler_vector_empty(0)
+    };
+  }
+
+  pub fn compiler_token_buffer_power(exponent: i64) -> i64 {
+    if exponent == 0 { return 1; }
+    if exponent == 1 { return 256; }
+    if exponent == 2 { return 65536; }
+    if exponent == 3 { return 16777216; }
+    if exponent == 4 { return 4294967296; }
+    if exponent == 5 { return 1099511627776; }
+    if exponent == 6 { return 281474976710656; }
+    if exponent == 7 { return 72057594037927936; }
+    return 0;
+  }
+
+  pub fn compiler_token_buffer_word(value: CompilerTokenBuffer, index: i64) -> i64 {
+    if index < 16 {
+      return compiler_token_vector_value(value.words0, index);
+    }
+    return compiler_token_vector_value(value.words1, index - 16);
+  }
+
+  pub fn compiler_token_buffer_word_valid(
+    value: CompilerTokenBuffer,
+    index: i64
+  ) -> bool {
+    if index >= value.word_count {
+      return true;
+    }
+    let width: i64 = if index + 1 < value.word_count {
+      7
+    } else {
+      value.length - (index * 7)
+    };
+    let word: i64 = compiler_token_buffer_word(value, index);
+    if width <= 0 || width > 7 || word < 0 {
+      return false;
+    }
+    if word < compiler_token_buffer_power(width) {
+      return true;
+    }
+    return false;
+  }
+
+  pub fn compiler_token_buffer_shape_valid(value: CompilerTokenBuffer) -> bool {
+    if value.length < 0 || value.length > 128
+      || value.word_count < 0 || value.word_count > 19
+      || compiler_token_vector_valid(value.words0) == false
+      || compiler_token_vector_valid(value.words1) == false {
+      return false;
+    }
+    let expected_words: i64 = if value.length == 0 {
+      0
+    } else {
+      (value.length + 6) / 7
+    };
+    if value.word_count != expected_words {
+      return false;
+    }
+    if value.word_count <= 16
+      && (value.words0.length != value.word_count || value.words1.length != 0) {
+      return false;
+    }
+    if value.word_count > 16
+      && (value.words0.length != 16 || value.words1.length != value.word_count - 16) {
+      return false;
+    }
+    if compiler_token_buffer_word_valid(value, 0) == false
+      || compiler_token_buffer_word_valid(value, 1) == false
+      || compiler_token_buffer_word_valid(value, 2) == false
+      || compiler_token_buffer_word_valid(value, 3) == false
+      || compiler_token_buffer_word_valid(value, 4) == false
+      || compiler_token_buffer_word_valid(value, 5) == false
+      || compiler_token_buffer_word_valid(value, 6) == false
+      || compiler_token_buffer_word_valid(value, 7) == false
+      || compiler_token_buffer_word_valid(value, 8) == false
+      || compiler_token_buffer_word_valid(value, 9) == false
+      || compiler_token_buffer_word_valid(value, 10) == false
+      || compiler_token_buffer_word_valid(value, 11) == false
+      || compiler_token_buffer_word_valid(value, 12) == false
+      || compiler_token_buffer_word_valid(value, 13) == false
+      || compiler_token_buffer_word_valid(value, 14) == false
+      || compiler_token_buffer_word_valid(value, 15) == false
+      || compiler_token_buffer_word_valid(value, 16) == false
+      || compiler_token_buffer_word_valid(value, 17) == false
+      || compiler_token_buffer_word_valid(value, 18) == false {
+      return false;
+    }
+    return true;
+  }
+
+  pub fn compiler_token_buffer_push(
+    value: CompilerTokenBuffer,
+    byte: i64
+  ) -> Result<CompilerTokenBuffer, i64> {
+    if compiler_token_buffer_shape_valid(value) == false || byte < 0 || byte > 255 {
+      return Result.Err(3);
+    }
+    if value.length >= 128 {
+      return Result.Err(1);
+    }
+    let word_index: i64 = value.length / 7;
+    let offset: i64 = value.length % 7;
+    let packed: i64 = byte * compiler_token_buffer_power(offset);
+    if word_index < 16 && offset == 0 {
+      let words: CompilerVector = compiler_vector_push(value.words0, packed)?;
+      return Result.Ok(CompilerTokenBuffer {
+        length: value.length + 1,
+        word_count: value.word_count + 1,
+        words0: words,
+        words1: value.words1
+      });
+    }
+    if word_index < 16 {
+      let word: i64 = compiler_token_vector_value(value.words0, word_index);
+      let words: CompilerVector = compiler_vector_set(
+        value.words0,
+        word_index,
+        word + packed
+      )?;
+      return Result.Ok(CompilerTokenBuffer {
+        length: value.length + 1,
+        word_count: value.word_count,
+        words0: words,
+        words1: value.words1
+      });
+    }
+    let local_index: i64 = word_index - 16;
+    if offset == 0 {
+      let words: CompilerVector = compiler_vector_push(value.words1, packed)?;
+      return Result.Ok(CompilerTokenBuffer {
+        length: value.length + 1,
+        word_count: value.word_count + 1,
+        words0: value.words0,
+        words1: words
+      });
+    }
+    let word: i64 = compiler_token_vector_value(value.words1, local_index);
+    let words: CompilerVector = compiler_vector_set(
+      value.words1,
+      local_index,
+      word + packed
+    )?;
+    return Result.Ok(CompilerTokenBuffer {
+      length: value.length + 1,
+      word_count: value.word_count,
+      words0: value.words0,
+      words1: words
+    });
+  }
+
+  pub fn compiler_token_buffer_get(
+    value: CompilerTokenBuffer,
+    index: i64
+  ) -> Option<i64> {
+    if compiler_token_buffer_shape_valid(value) == false
+      || index < 0 || index >= value.length {
+      return Option.None;
+    }
+    let word_index: i64 = index / 7;
+    let offset: i64 = index % 7;
+    let word: i64 = compiler_token_buffer_word(value, word_index);
+    return Option.Some((word / compiler_token_buffer_power(offset)) % 256);
+  }
+
+  pub fn compiler_token_buffer_value(value: CompilerTokenBuffer, index: i64) -> i64 {
+    match compiler_token_buffer_get(value, index) {
+      Option.Some(item) => { return item; }
+      Option.None => { return 0; }
+    }
+  }
+
+  pub fn compiler_token_buffer_hash_byte(
+    byte: i64,
+    index: i64,
+    length: i64,
+    state: i64
+  ) -> i64 {
+    if index >= length {
+      return state;
+    }
+    return ((state * 257) + byte + 1) % 2147483629;
+  }
+
+  pub fn compiler_token_buffer_byte_raw(
+    value: CompilerTokenBuffer,
+    index: i64
+  ) -> i64 {
+    let word: i64 = compiler_token_buffer_word(value, index / 7);
+    return (word / compiler_token_buffer_power(index % 7)) % 256;
+  }
+
+  pub fn compiler_token_buffer_hash_chunk(
+    value: CompilerTokenBuffer,
+    offset: i64,
+    length: i64,
+    state: i64
+  ) -> i64 {
+    let h0: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset), offset, length, state);
+    let h1: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 1), offset + 1, length, h0);
+    let h2: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 2), offset + 2, length, h1);
+    let h3: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 3), offset + 3, length, h2);
+    let h4: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 4), offset + 4, length, h3);
+    let h5: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 5), offset + 5, length, h4);
+    let h6: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 6), offset + 6, length, h5);
+    let h7: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 7), offset + 7, length, h6);
+    let h8: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 8), offset + 8, length, h7);
+    let h9: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 9), offset + 9, length, h8);
+    let h10: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 10), offset + 10, length, h9);
+    let h11: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 11), offset + 11, length, h10);
+    let h12: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 12), offset + 12, length, h11);
+    let h13: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 13), offset + 13, length, h12);
+    let h14: i64 = compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 14), offset + 14, length, h13);
+    return compiler_token_buffer_hash_byte(compiler_token_buffer_byte_raw(value, offset + 15), offset + 15, length, h14);
+  }
+
+  pub fn compiler_token_buffer_hash(
+    value: CompilerTokenBuffer
+  ) -> Result<i64, i64> {
+    if compiler_token_buffer_shape_valid(value) == false {
+      return Result.Err(3);
+    }
+    let page0: i64 = compiler_token_buffer_hash_chunk(value, 0, value.length, 313);
+    let page1: i64 = compiler_token_buffer_hash_chunk(value, 16, value.length, page0);
+    let page2: i64 = compiler_token_buffer_hash_chunk(value, 32, value.length, page1);
+    let page3: i64 = compiler_token_buffer_hash_chunk(value, 48, value.length, page2);
+    let page4: i64 = compiler_token_buffer_hash_chunk(value, 64, value.length, page3);
+    let page5: i64 = compiler_token_buffer_hash_chunk(value, 80, value.length, page4);
+    let page6: i64 = compiler_token_buffer_hash_chunk(value, 96, value.length, page5);
+    return Result.Ok(compiler_token_buffer_hash_chunk(value, 112, value.length, page6));
+  }
+
+  pub fn compiler_token_store_empty() -> CompilerTokenStore {
+    return CompilerTokenStore {
+      record_count: 0,
+      record_open: false,
+      kinds: compiler_vector_empty(0),
+      payload_starts: compiler_vector_empty(0),
+      payload_lengths: compiler_vector_empty(0),
+      numeric_values: compiler_vector_empty(0),
+      payload: compiler_token_buffer_empty()
+    };
+  }
+
+  pub fn compiler_token_store_record_end(
+    kind: i64,
+    start: i64,
+    length: i64,
+    numeric_value: i64,
+    payload_length: i64,
+    expected_start: i64,
+    active: bool,
+    complete: bool
+  ) -> i64 {
+    if expected_start < 0 {
+      return -1;
+    }
+    if active == false {
+      return expected_start;
+    }
+    if compiler_token_kind_valid(kind) == false
+      || start != expected_start || length < 0
+      || start > payload_length || length > payload_length - start {
+      return -1;
+    }
+    if complete && (kind == 1 || kind == 3) && length == 0 {
+      return -1;
+    }
+    // Open records may be semantically incomplete until finish validates the kind.
+    if complete && compiler_token_kind_has_text(kind) && numeric_value != 0 {
+      return -1;
+    }
+    if complete && compiler_token_kind_has_text(kind) == false && length != 0 {
+      return -1;
+    }
+    if complete && kind == 4 && compiler_token_scalar_valid(numeric_value) == false {
+      return -1;
+    }
+    if complete && kind == 5 && numeric_value != 0 {
+      return -1;
+    }
+    return start + length;
+  }
+
+  pub fn compiler_token_store_records_valid(store: CompilerTokenStore) -> bool {
+    let e0: i64 = compiler_token_store_record_end(store.kinds.page0.slot0, store.payload_starts.page0.slot0, store.payload_lengths.page0.slot0, store.numeric_values.page0.slot0, store.payload.length, 0, store.record_count > 0, store.record_open == false || store.record_count != 1);
+    let e1: i64 = compiler_token_store_record_end(store.kinds.page0.slot1, store.payload_starts.page0.slot1, store.payload_lengths.page0.slot1, store.numeric_values.page0.slot1, store.payload.length, e0, store.record_count > 1, store.record_open == false || store.record_count != 2);
+    let e2: i64 = compiler_token_store_record_end(store.kinds.page0.slot2, store.payload_starts.page0.slot2, store.payload_lengths.page0.slot2, store.numeric_values.page0.slot2, store.payload.length, e1, store.record_count > 2, store.record_open == false || store.record_count != 3);
+    let e3: i64 = compiler_token_store_record_end(store.kinds.page0.slot3, store.payload_starts.page0.slot3, store.payload_lengths.page0.slot3, store.numeric_values.page0.slot3, store.payload.length, e2, store.record_count > 3, store.record_open == false || store.record_count != 4);
+    return e3 == store.payload.length;
+  }
+
+  pub fn compiler_token_store_shape_valid(store: CompilerTokenStore) -> bool {
+    if store.record_count < 0 || store.record_count > 4
+      || compiler_token_vector_valid(store.kinds) == false
+      || compiler_token_vector_valid(store.payload_starts) == false
+      || compiler_token_vector_valid(store.payload_lengths) == false
+      || compiler_token_vector_valid(store.numeric_values) == false
+      || compiler_token_buffer_shape_valid(store.payload) == false {
+      return false;
+    }
+    if store.kinds.length != store.record_count
+      || store.payload_starts.length != store.record_count
+      || store.payload_lengths.length != store.record_count
+      || store.numeric_values.length != store.record_count {
+      return false;
+    }
+    return compiler_token_store_records_valid(store);
+  }
+
+  pub fn compiler_token_store_begin(
+    store: CompilerTokenStore,
+    kind: i64,
+    numeric_value: i64
+  ) -> Result<CompilerTokenStore, i64> {
+    if compiler_token_store_shape_valid(store) == false
+      || store.record_open || compiler_token_kind_valid(kind) == false {
+      return Result.Err(3);
+    }
+    if store.record_count >= 4 {
+      return Result.Err(1);
+    }
+    let kinds: CompilerVector = compiler_vector_push(store.kinds, kind)?;
+    let starts: CompilerVector = compiler_vector_push(
+      store.payload_starts,
+      store.payload.length
+    )?;
+    let lengths: CompilerVector = compiler_vector_push(store.payload_lengths, 0)?;
+    let values: CompilerVector = compiler_vector_push(store.numeric_values, numeric_value)?;
+    return Result.Ok(CompilerTokenStore {
+      record_count: store.record_count + 1,
+      record_open: true,
+      kinds: kinds,
+      payload_starts: starts,
+      payload_lengths: lengths,
+      numeric_values: values,
+      payload: store.payload
+    });
+  }
+
+  pub fn compiler_token_store_get(
+    store: CompilerTokenStore,
+    index: i64
+  ) -> Option<CompilerTokenRecord> {
+    if compiler_token_store_shape_valid(store) == false
+      || index < 0 || index >= store.record_count {
+      return Option.None;
+    }
+    let kind: i64 = compiler_token_vector_value(store.kinds, index);
+    let start: i64 = compiler_token_vector_value(store.payload_starts, index);
+    let length: i64 = compiler_token_vector_value(store.payload_lengths, index);
+    let numeric: i64 = compiler_token_vector_value(store.numeric_values, index);
+    return Option.Some(CompilerTokenRecord {
+      kind: kind,
+      payload_start: start,
+      payload_length: length,
+      numeric_value: numeric
+    });
+  }
+
+  pub fn compiler_token_store_append_byte(
+    store: CompilerTokenStore,
+    byte: i64
+  ) -> Result<CompilerTokenStore, i64> {
+    if compiler_token_store_shape_valid(store) == false
+      || store.record_open == false || store.record_count == 0 {
+      return Result.Err(2);
+    }
+    let index: i64 = store.record_count - 1;
+    let length: i64 = compiler_token_vector_value(store.payload_lengths, index);
+    let payload: CompilerTokenBuffer = compiler_token_buffer_push(store.payload, byte)?;
+    let lengths: CompilerVector = compiler_vector_set(
+      store.payload_lengths,
+      index,
+      length + 1
+    )?;
+    return Result.Ok(CompilerTokenStore {
+      record_count: store.record_count,
+      record_open: store.record_open,
+      kinds: store.kinds,
+      payload_starts: store.payload_starts,
+      payload_lengths: lengths,
+      numeric_values: store.numeric_values,
+      payload: payload
+    });
+  }
+
+  pub fn compiler_token_store_push_scalar(
+    store: CompilerTokenStore,
+    scalar: i64
+  ) -> Result<CompilerTokenStore, i64> {
+    if store.record_open == false || store.record_count == 0
+      || compiler_token_scalar_valid(scalar) == false {
+      return Result.Err(3);
+    }
+    let kind: i64 = compiler_token_vector_value(store.kinds, store.record_count - 1);
+    if compiler_token_kind_has_text(kind) == false {
+      return Result.Err(3);
+    }
+    if scalar <= 127 {
+      return compiler_token_store_append_byte(store, scalar);
+    }
+    if scalar <= 2047 {
+      let first: CompilerTokenStore = compiler_token_store_append_byte(
+        store,
+        192 + scalar / 64
+      )?;
+      return compiler_token_store_append_byte(first, 128 + scalar % 64);
+    }
+    if scalar <= 65535 {
+      let first: CompilerTokenStore = compiler_token_store_append_byte(
+        store,
+        224 + scalar / 4096
+      )?;
+      let second: CompilerTokenStore = compiler_token_store_append_byte(
+        first,
+        128 + (scalar / 64) % 64
+      )?;
+      return compiler_token_store_append_byte(second, 128 + scalar % 64);
+    }
+    let first: CompilerTokenStore = compiler_token_store_append_byte(
+      store,
+      240 + scalar / 262144
+    )?;
+    let second: CompilerTokenStore = compiler_token_store_append_byte(
+      first,
+      128 + (scalar / 4096) % 64
+    )?;
+    let third: CompilerTokenStore = compiler_token_store_append_byte(
+      second,
+      128 + (scalar / 64) % 64
+    )?;
+    return compiler_token_store_append_byte(third, 128 + scalar % 64);
+  }
+
+  pub fn compiler_token_store_finish(
+    store: CompilerTokenStore
+  ) -> Result<CompilerTokenStore, i64> {
+    if compiler_token_store_shape_valid(store) == false
+      || store.record_open == false || store.record_count == 0 {
+      return Result.Err(2);
+    }
+    let index: i64 = store.record_count - 1;
+    let kind: i64 = compiler_token_vector_value(store.kinds, index);
+    let payload_length: i64 = compiler_token_vector_value(store.payload_lengths, index);
+    let numeric_value: i64 = compiler_token_vector_value(store.numeric_values, index);
+    if (kind == 1 || kind == 3) && payload_length == 0 {
+      return Result.Err(3);
+    }
+    if compiler_token_kind_has_text(kind) && numeric_value != 0 {
+      return Result.Err(3);
+    }
+    if compiler_token_kind_has_text(kind) == false && payload_length != 0 {
+      return Result.Err(3);
+    }
+    if kind == 4 && compiler_token_scalar_valid(numeric_value) == false {
+      return Result.Err(3);
+    }
+    if kind == 5 && numeric_value != 0 {
+      return Result.Err(3);
+    }
+    return Result.Ok(CompilerTokenStore {
+      record_count: store.record_count,
+      record_open: false,
+      kinds: store.kinds,
+      payload_starts: store.payload_starts,
+      payload_lengths: store.payload_lengths,
+      numeric_values: store.numeric_values,
+      payload: store.payload
+    });
+  }
+
+}

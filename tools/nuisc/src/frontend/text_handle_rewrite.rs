@@ -23,6 +23,32 @@ pub(super) fn rewrite_text_handle_helpers(module: &AstModule) -> AstModule {
     rewritten
 }
 
+pub(super) fn summarize_text_handle_rewrites(module: &AstModule) -> (usize, usize) {
+    let rewritten = rewrite_text_handle_helpers(module);
+    let mut stats = RewriteStats::default();
+    for function in &rewritten.functions {
+        for attribute in &function.attributes {
+            if attribute.name != "__nuisc_text_handle_rewrite" {
+                continue;
+            }
+            for arg in &attribute.args {
+                let AstAttributeValue::Int(value) = arg.value else {
+                    continue;
+                };
+                if value <= 0 {
+                    continue;
+                }
+                match arg.name.as_deref() {
+                    Some("helper") => stats.helper_rewrites += value as usize,
+                    Some("local") => stats.local_rewrites += value as usize,
+                    _ => {}
+                }
+            }
+        }
+    }
+    (stats.helper_rewrites, stats.local_rewrites)
+}
+
 fn rewrite_text_handle_helper_function(function: &AstFunction) -> AstFunction {
     let Some(text_value) = match_text_handle_helper_body(&function.body) else {
         let mut rewritten = function.clone();

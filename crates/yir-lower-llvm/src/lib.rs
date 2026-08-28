@@ -8,7 +8,7 @@
     clippy::obfuscated_if_else
 )]
 use std::collections::{BTreeMap, BTreeSet};
-use yir_core::{CpuLlvmLoweringClass, ModRegistry, Resource, YirModule};
+use yir_core::{CpuLlvmLoweringClass, ModRegistry, Node, Resource, YirModule};
 use yir_verify::{default_registry, verify_module_with_registry};
 mod async_resource_lowering;
 mod bitwise_lowering;
@@ -141,6 +141,11 @@ pub fn emit_module_with_registries(
         .iter()
         .map(|resource| (resource.name.clone(), resource))
         .collect::<BTreeMap<String, &Resource>>();
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<&str, &Node>>();
     let order = topological_order(module)?;
     let helper_lanes = module
         .node_lanes
@@ -295,7 +300,7 @@ pub fn emit_module_with_registries(
             .map(|(index, name, _)| (name.clone(), format!("%arg{index}_len")))
             .collect::<BTreeMap<_, _>>();
         let emitted = emit_cpu_function(
-            module,
+            &nodes,
             &resources,
             &lane_nodes,
             &param_bindings,
@@ -351,7 +356,7 @@ pub fn emit_module_with_registries(
         .cloned()
         .collect::<Vec<_>>();
     let entry_emitted = emit_cpu_function(
-        module,
+        &nodes,
         &resources,
         &entry_nodes,
         &BTreeMap::new(),

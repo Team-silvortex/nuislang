@@ -30,7 +30,7 @@ The output root contains:
 ## Producer Boundary
 
 The Nuis source exports twelve exact scalar functions: four for stage and
-bundle folds, plus eight for a bounded token-stream DFA. Bootstrap subset v2
+bundle folds, plus eight for a bounded token-stream DFA. Bootstrap subset v3
 accepts only those exact function names, symbol names, parameter counts, and
 all-`i64` signatures. Arbitrary exports continue to fail as `NBS004`.
 

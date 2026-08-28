@@ -175,7 +175,7 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
         .expect("run compiler data model binary");
     assert_eq!(
         run.status.code(),
-        Some(59),
+        Some(122),
         "compiler data model binary should return its deterministic compiler score"
     );
 

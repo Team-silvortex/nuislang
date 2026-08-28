@@ -51,6 +51,7 @@ impl GuardReturnAttemptCheckpoint {
         state.yir.functions.truncate(self.functions_len);
         state.yir.nodes.truncate(self.nodes_len);
         state.yir.edges.truncate(self.edges_len);
+        crate::lowering::edge_helpers::invalidate_graph_indexes(state);
         state.value_counter = self.value_counter;
         state.print_counter = self.print_counter;
         state.await_counter = self.await_counter;

@@ -53,7 +53,7 @@ Coordinate: `language-core/nuisc/bootstrap-language-subset`.
 Freeze the syntax, type, effect, control-flow, generic, pointer, FFI, and
 library surface permitted in compiler-authoring sources. Both accepted and
 rejected fixtures are required so stage1 cannot acquire accidental dependency
-on an unstable language feature. V2 is now executable through
+on an unstable language feature. V3 is now executable through
 `nuisc bootstrap-check`; see
 [Nuis Bootstrap Language Subset](nuis-bootstrap-language-subset.md).
 This gate is `stable/100`; widening it requires a new protocol version.
@@ -63,21 +63,28 @@ This gate is `stable/100`; widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. The paged v2 model is
-now `usable/80`: `StdLanguageCore` owns the representation, the frozen
-bootstrap subset accepts it, and `bootstrap_compiler_data_model_demo` crosses
-bootstrap-check, NIR/YIR/LLVM, native build, and deterministic execution
-without FFI or host collections. Its text and token streams cross the first
-four-value page boundary, while a capacity witness validates all sixteen slots
-and rejects a seventeenth push.
+and path contracts needed by a real compiler component. Data model v3 is now
+`usable/88`: `StdLanguageCore` owns the foundational representation,
+`StdCompilerData` owns materialized token records and payloads,
+`StdCompilerTokens` owns the standalone token DFA, and
+`StdCompilerTokenEmit` reconstructs canonical `nuis-token-stream-v1` bytes
+while materializing a complete bounded page into the owned store. The frozen
+subset accepts all four modules, and
+`bootstrap_compiler_data_model_demo` crosses bootstrap-check, NIR/YIR/LLVM,
+native build, and deterministic exit `122` without FFI or host collections. It
+materializes four records, emits 59 canonical bytes, then materializes the
+real `use cpu StdLanguageCore;` token prefix and emits its exact 91-byte
+canonical page with pinned hash `1277127995`. It decodes those bytes into a
+fresh store and re-emits the identical length and hash. A two-vector, seven-byte-word
+packing keeps the 128-byte output buffer near the old compile-time baseline.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
-This is deliberately not `stable/100`. V2 proves deterministic four-page
-vector growth but remains `i64`-specific and bounded to sixteen values. Maps
-remain four-entry, arenas do not yet hold object storage, generic nested-page
-specialization still lacks defining-module provenance, and large pure
-aggregate expansion remains expensive. Those constraints still prevent a
-realistic tokenizer or parser workload.
+This is deliberately not `stable/100`. V3 is bounded to four token records and
+64 payload bytes and 128 output bytes, while the production candidate adapter
+does not yet feed its actual handoff into the owned store. Vectors remain `i64`-specific, maps remain
+four-entry, arenas do not yet hold object storage, generic nested-page
+specialization still lacks defining-module provenance. The stage-neutral IR boundary is now
+the weakest readiness gate.
 
 ### `stage-neutral-ir-boundary`
 
@@ -87,7 +94,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `usable/84`. Normal AOT builds emit the ordered five-stage
+This gate is now `usable/86`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -100,8 +107,10 @@ proof. The exact scalar producer ABI now consumes every serialized stage byte,
 emits a Nuis-owned bundle fold, and drives `StdCompilerTokens` across the exact
 token header, seven record kinds, payload shape, and LF boundaries. Candidate
 production v2 binds its record count and decoded semantic fold to an independent
-artifact-layer result. Complete token values, canonical re-emission, and
-structural-body decoding in Nuis remain open. See
+artifact-layer result. Separately, the pure Nuis materializer decodes the exact
+91-byte candidate prefix into owned records and canonically re-emits the same
+hash. Production-bound page identity, changed stage bytes, and structural-body
+decoding in Nuis remain open. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`

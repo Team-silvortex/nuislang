@@ -24,7 +24,7 @@ fn rejected_report() -> CompilerDiagnosticReport {
     build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: "nuisc-stage0-reference",
         component_record_sha256: component_identity(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         accepted: false,
         semantic_pipeline: "skipped",
         semantic_error: None,
@@ -54,7 +54,7 @@ fn accepted_report_must_be_clean_and_checked() {
     let report = build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: "nuisc-stage0-reference",
         component_record_sha256: component_identity(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         accepted: true,
         semantic_pipeline: "checked",
         semantic_error: None,
@@ -73,7 +73,7 @@ fn accepted_report_must_be_clean_and_checked() {
     let error = build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: "nuisc-stage0-reference",
         component_record_sha256: component_identity(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         accepted: true,
         semantic_pipeline: "checked",
         semantic_error: None,
@@ -114,7 +114,7 @@ fn diagnostic_modules_accept_utf8_but_paths_reject_host_locations() {
     build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: "nuisc-stage0-reference",
         component_record_sha256: component_identity(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         accepted: false,
         semantic_pipeline: "skipped",
         semantic_error: None,
@@ -129,7 +129,7 @@ fn diagnostic_modules_accept_utf8_but_paths_reject_host_locations() {
     let error = build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: "nuisc-stage0-reference",
         component_record_sha256: component_identity(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         accepted: false,
         semantic_pipeline: "skipped",
         semantic_error: None,
@@ -145,7 +145,7 @@ fn diagnostic_modules_accept_utf8_but_paths_reject_host_locations() {
     let error = build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
         producer_id: "nuisc-stage0-reference",
         component_record_sha256: component_identity(),
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v2",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v3",
         accepted: false,
         semantic_pipeline: "skipped",
         semantic_error: None,

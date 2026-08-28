@@ -4,8 +4,9 @@ use std::{
 };
 
 use nuis_semantics::model::{
-    nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirKernelMapOp,
-    NirModule, NirMutexCapabilityOp, NirScalarKind, NirStmt, NirStructDef, NirTypeRef,
+    nir_expr_effect_class, NirBinaryOp, NirEnumDef, NirExpr, NirExprEffectClass, NirFunction,
+    NirKernelMapOp, NirModule, NirMutexCapabilityOp, NirScalarKind, NirStmt, NirStructDef,
+    NirTypeRef,
 };
 use yir_core::{
     encode_dynamic_pattern_payload_carry_trailer, DynamicPatternPayloadCarryContract,
@@ -148,7 +149,9 @@ use loop_purity::{
 use loop_types::*;
 use nested_owned_returns::lower_nested_owned_return_tree;
 use network_exprs::lower_network_expr;
-use owned_struct_layout::{function_owned_struct_layout, module_owned_struct_layout};
+use owned_struct_layout::{
+    function_owned_struct_layout, module_owned_struct_layout, owned_layout_is_variant_union,
+};
 use result_nodes::{
     lower_result_observe_node, lower_result_unary_value_effect, lower_task_result_entry_node,
     lower_task_result_observer_node, push_await_node,
@@ -480,6 +483,9 @@ mod tests_branch_host_calls;
 #[cfg(test)]
 #[path = "lowering/tests_branch_summaries.rs"]
 mod tests_branch_summaries;
+#[cfg(test)]
+#[path = "lowering/tests_direct_call_struct_params.rs"]
+mod tests_direct_call_struct_params;
 #[cfg(test)]
 #[path = "lowering/tests_direct_calls.rs"]
 mod tests_direct_calls;

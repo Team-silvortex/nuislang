@@ -1,0 +1,775 @@
+use cpu StdLanguageCore;
+use cpu StdCompilerData;
+use cpu StdCompilerTokens;
+
+/// Canonical bounded token-stream rendering and materialization.
+mod cpu StdCompilerTokenEmit {
+  pub struct CompilerTokenMaterializer {
+    pub mode: i64,
+    pub high_nibble: i64,
+    pub numeric_value: i64,
+    pub numeric_negative: bool,
+    pub error: i64,
+    pub complete: bool,
+    pub store: CompilerTokenStore
+  }
+
+  pub struct CompilerDecimalState {
+    pub output: CompilerTokenBuffer,
+    pub remaining: i64,
+    pub started: bool
+  }
+
+  pub fn compiler_token_emit_push(
+    output: CompilerTokenBuffer,
+    byte: i64
+  ) -> CompilerTokenBuffer {
+    match compiler_token_buffer_push(output, byte) {
+      Result.Ok(next) => { return next; }
+      Result.Err(_) => { return output; }
+    }
+  }
+
+  pub fn compiler_token_emit_hex_raw(
+    output: CompilerTokenBuffer,
+    byte: i64
+  ) -> CompilerTokenBuffer {
+    let high: i64 = byte / 16;
+    let low: i64 = byte % 16;
+    let high_ascii: i64 = if high < 10 { 48 + high } else { 87 + high };
+    let low_ascii: i64 = if low < 10 { 48 + low } else { 87 + low };
+    let hex_high: CompilerTokenBuffer = compiler_token_emit_push(output, high_ascii);
+    return compiler_token_emit_push(hex_high, low_ascii);
+  }
+
+  pub fn compiler_token_emit_hex_byte(
+    output: CompilerTokenBuffer,
+    byte: i64
+  ) -> Result<CompilerTokenBuffer, i64> {
+    if compiler_token_buffer_shape_valid(output) == false || byte < 0 || byte > 255 {
+      return Result.Err(3);
+    }
+    if output.length > 126 {
+      return Result.Err(1);
+    }
+    return Result.Ok(compiler_token_emit_hex_raw(output, byte));
+  }
+
+  pub fn compiler_token_emit_header_raw(
+    output: CompilerTokenBuffer
+  ) -> CompilerTokenBuffer {
+    let header0: CompilerTokenBuffer = compiler_token_emit_push(output, 110);
+    let header1: CompilerTokenBuffer = compiler_token_emit_push(header0, 117);
+    let header2: CompilerTokenBuffer = compiler_token_emit_push(header1, 105);
+    let header3: CompilerTokenBuffer = compiler_token_emit_push(header2, 115);
+    let header4: CompilerTokenBuffer = compiler_token_emit_push(header3, 45);
+    let header5: CompilerTokenBuffer = compiler_token_emit_push(header4, 116);
+    let header6: CompilerTokenBuffer = compiler_token_emit_push(header5, 111);
+    let header7: CompilerTokenBuffer = compiler_token_emit_push(header6, 107);
+    let header8: CompilerTokenBuffer = compiler_token_emit_push(header7, 101);
+    let header9: CompilerTokenBuffer = compiler_token_emit_push(header8, 110);
+    let header10: CompilerTokenBuffer = compiler_token_emit_push(header9, 45);
+    let header11: CompilerTokenBuffer = compiler_token_emit_push(header10, 115);
+    let header12: CompilerTokenBuffer = compiler_token_emit_push(header11, 116);
+    let header13: CompilerTokenBuffer = compiler_token_emit_push(header12, 114);
+    let header14: CompilerTokenBuffer = compiler_token_emit_push(header13, 101);
+    let header15: CompilerTokenBuffer = compiler_token_emit_push(header14, 97);
+    let header16: CompilerTokenBuffer = compiler_token_emit_push(header15, 109);
+    let header17: CompilerTokenBuffer = compiler_token_emit_push(header16, 45);
+    let header18: CompilerTokenBuffer = compiler_token_emit_push(header17, 118);
+    let header19: CompilerTokenBuffer = compiler_token_emit_push(header18, 49);
+    return compiler_token_emit_push(header19, 10);
+  }
+
+  pub fn compiler_token_emit_prefix_length(kind: i64) -> i64 {
+    if kind == 1 { return 5; }
+    if kind == 2 { return 8; }
+    if kind == 3 { return 6; }
+    if kind == 4 { return 7; }
+    if kind == 5 { return 5; }
+    if kind == 6 { return 7; }
+    if kind == 7 { return 12; }
+    return 0;
+  }
+
+  pub fn compiler_token_emit_word_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let word0: CompilerTokenBuffer = compiler_token_emit_push(output, 119);
+    let word1: CompilerTokenBuffer = compiler_token_emit_push(word0, 111);
+    let word2: CompilerTokenBuffer = compiler_token_emit_push(word1, 114);
+    let word3: CompilerTokenBuffer = compiler_token_emit_push(word2, 100);
+    return compiler_token_emit_push(word3, 9);
+  }
+
+  pub fn compiler_token_emit_integer_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let integer0: CompilerTokenBuffer = compiler_token_emit_push(output, 105);
+    let integer1: CompilerTokenBuffer = compiler_token_emit_push(integer0, 110);
+    let integer2: CompilerTokenBuffer = compiler_token_emit_push(integer1, 116);
+    let integer3: CompilerTokenBuffer = compiler_token_emit_push(integer2, 101);
+    let integer4: CompilerTokenBuffer = compiler_token_emit_push(integer3, 103);
+    let integer5: CompilerTokenBuffer = compiler_token_emit_push(integer4, 101);
+    let integer6: CompilerTokenBuffer = compiler_token_emit_push(integer5, 114);
+    return compiler_token_emit_push(integer6, 9);
+  }
+
+  pub fn compiler_token_emit_float_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let float0: CompilerTokenBuffer = compiler_token_emit_push(output, 102);
+    let float1: CompilerTokenBuffer = compiler_token_emit_push(float0, 108);
+    let float2: CompilerTokenBuffer = compiler_token_emit_push(float1, 111);
+    let float3: CompilerTokenBuffer = compiler_token_emit_push(float2, 97);
+    let float4: CompilerTokenBuffer = compiler_token_emit_push(float3, 116);
+    return compiler_token_emit_push(float4, 9);
+  }
+
+  pub fn compiler_token_emit_symbol_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let symbol0: CompilerTokenBuffer = compiler_token_emit_push(output, 115);
+    let symbol1: CompilerTokenBuffer = compiler_token_emit_push(symbol0, 121);
+    let symbol2: CompilerTokenBuffer = compiler_token_emit_push(symbol1, 109);
+    let symbol3: CompilerTokenBuffer = compiler_token_emit_push(symbol2, 98);
+    let symbol4: CompilerTokenBuffer = compiler_token_emit_push(symbol3, 111);
+    let symbol5: CompilerTokenBuffer = compiler_token_emit_push(symbol4, 108);
+    return compiler_token_emit_push(symbol5, 9);
+  }
+
+  pub fn compiler_token_emit_arrow_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let arrow0: CompilerTokenBuffer = compiler_token_emit_push(output, 97);
+    let arrow1: CompilerTokenBuffer = compiler_token_emit_push(arrow0, 114);
+    let arrow2: CompilerTokenBuffer = compiler_token_emit_push(arrow1, 114);
+    let arrow3: CompilerTokenBuffer = compiler_token_emit_push(arrow2, 111);
+    return compiler_token_emit_push(arrow3, 119);
+  }
+
+  pub fn compiler_token_emit_string_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let string0: CompilerTokenBuffer = compiler_token_emit_push(output, 115);
+    let string1: CompilerTokenBuffer = compiler_token_emit_push(string0, 116);
+    let string2: CompilerTokenBuffer = compiler_token_emit_push(string1, 114);
+    let string3: CompilerTokenBuffer = compiler_token_emit_push(string2, 105);
+    let string4: CompilerTokenBuffer = compiler_token_emit_push(string3, 110);
+    let string5: CompilerTokenBuffer = compiler_token_emit_push(string4, 103);
+    return compiler_token_emit_push(string5, 9);
+  }
+
+  pub fn compiler_token_emit_doc_raw(output: CompilerTokenBuffer) -> CompilerTokenBuffer {
+    let doc0: CompilerTokenBuffer = compiler_token_emit_push(output, 100);
+    let doc1: CompilerTokenBuffer = compiler_token_emit_push(doc0, 111);
+    let doc2: CompilerTokenBuffer = compiler_token_emit_push(doc1, 99);
+    let doc3: CompilerTokenBuffer = compiler_token_emit_push(doc2, 45);
+    let doc4: CompilerTokenBuffer = compiler_token_emit_push(doc3, 99);
+    let doc5: CompilerTokenBuffer = compiler_token_emit_push(doc4, 111);
+    let doc6: CompilerTokenBuffer = compiler_token_emit_push(doc5, 109);
+    let doc7: CompilerTokenBuffer = compiler_token_emit_push(doc6, 109);
+    let doc8: CompilerTokenBuffer = compiler_token_emit_push(doc7, 101);
+    let doc9: CompilerTokenBuffer = compiler_token_emit_push(doc8, 110);
+    let doc10: CompilerTokenBuffer = compiler_token_emit_push(doc9, 116);
+    return compiler_token_emit_push(doc10, 9);
+  }
+
+  pub fn compiler_token_emit_prefix_raw(
+    output: CompilerTokenBuffer,
+    kind: i64
+  ) -> CompilerTokenBuffer {
+    if kind == 1 { return compiler_token_emit_word_raw(output); }
+    if kind == 2 { return compiler_token_emit_integer_raw(output); }
+    if kind == 3 { return compiler_token_emit_float_raw(output); }
+    if kind == 4 { return compiler_token_emit_symbol_raw(output); }
+    if kind == 5 { return compiler_token_emit_arrow_raw(output); }
+    if kind == 6 { return compiler_token_emit_string_raw(output); }
+    return compiler_token_emit_doc_raw(output);
+  }
+
+  pub fn compiler_token_decimal_width(value: i64) -> i64 {
+    let remaining: i64 = if value > 0 { -value } else { value };
+    let sign: i64 = if value < 0 { 1 } else { 0 };
+    if remaining <= -1000000000000000000 { return sign + 19; }
+    if remaining <= -100000000000000000 { return sign + 18; }
+    if remaining <= -10000000000000000 { return sign + 17; }
+    if remaining <= -1000000000000000 { return sign + 16; }
+    if remaining <= -100000000000000 { return sign + 15; }
+    if remaining <= -10000000000000 { return sign + 14; }
+    if remaining <= -1000000000000 { return sign + 13; }
+    if remaining <= -100000000000 { return sign + 12; }
+    if remaining <= -10000000000 { return sign + 11; }
+    if remaining <= -1000000000 { return sign + 10; }
+    if remaining <= -100000000 { return sign + 9; }
+    if remaining <= -10000000 { return sign + 8; }
+    if remaining <= -1000000 { return sign + 7; }
+    if remaining <= -100000 { return sign + 6; }
+    if remaining <= -10000 { return sign + 5; }
+    if remaining <= -1000 { return sign + 4; }
+    if remaining <= -100 { return sign + 3; }
+    if remaining <= -10 { return sign + 2; }
+    return sign + 1;
+  }
+
+  pub fn compiler_token_decimal_step(
+    state: CompilerDecimalState,
+    divisor: i64,
+    force: bool
+  ) -> CompilerDecimalState {
+    let digit: i64 = -(state.remaining / divisor);
+    let decimal_remaining: i64 = state.remaining % divisor;
+    if state.started || digit != 0 || force {
+      return CompilerDecimalState {
+        output: compiler_token_emit_push(state.output, 48 + digit),
+        remaining: decimal_remaining,
+        started: true
+      };
+    }
+    return CompilerDecimalState {
+      output: state.output,
+      remaining: decimal_remaining,
+      started: false
+    };
+  }
+
+  pub fn compiler_token_emit_decimal_raw(
+    output: CompilerTokenBuffer,
+    value: i64
+  ) -> CompilerTokenBuffer {
+    let decimal_output: CompilerTokenBuffer = compiler_token_emit_sign_raw(
+      output,
+      value
+    );
+    let decimal_remaining: i64 = if value > 0 { -value } else { value };
+    let decimal_initial: CompilerDecimalState = CompilerDecimalState {
+      output: decimal_output,
+      remaining: decimal_remaining,
+      started: false
+    };
+    let decimal0: CompilerDecimalState = compiler_token_decimal_step(decimal_initial, 1000000000000000000, false);
+    let decimal1: CompilerDecimalState = compiler_token_decimal_step(decimal0, 100000000000000000, false);
+    let decimal2: CompilerDecimalState = compiler_token_decimal_step(decimal1, 10000000000000000, false);
+    let decimal3: CompilerDecimalState = compiler_token_decimal_step(decimal2, 1000000000000000, false);
+    let decimal4: CompilerDecimalState = compiler_token_decimal_step(decimal3, 100000000000000, false);
+    let decimal5: CompilerDecimalState = compiler_token_decimal_step(decimal4, 10000000000000, false);
+    let decimal6: CompilerDecimalState = compiler_token_decimal_step(decimal5, 1000000000000, false);
+    let decimal7: CompilerDecimalState = compiler_token_decimal_step(decimal6, 100000000000, false);
+    let decimal8: CompilerDecimalState = compiler_token_decimal_step(decimal7, 10000000000, false);
+    let decimal9: CompilerDecimalState = compiler_token_decimal_step(decimal8, 1000000000, false);
+    let decimal10: CompilerDecimalState = compiler_token_decimal_step(decimal9, 100000000, false);
+    let decimal11: CompilerDecimalState = compiler_token_decimal_step(decimal10, 10000000, false);
+    let decimal12: CompilerDecimalState = compiler_token_decimal_step(decimal11, 1000000, false);
+    let decimal13: CompilerDecimalState = compiler_token_decimal_step(decimal12, 100000, false);
+    let decimal14: CompilerDecimalState = compiler_token_decimal_step(decimal13, 10000, false);
+    let decimal15: CompilerDecimalState = compiler_token_decimal_step(decimal14, 1000, false);
+    let decimal16: CompilerDecimalState = compiler_token_decimal_step(decimal15, 100, false);
+    let decimal17: CompilerDecimalState = compiler_token_decimal_step(decimal16, 10, false);
+    let decimal18: CompilerDecimalState = compiler_token_decimal_step(decimal17, 1, true);
+    return decimal18.output;
+  }
+
+  pub fn compiler_token_emit_sign_raw(
+    output: CompilerTokenBuffer,
+    value: i64
+  ) -> CompilerTokenBuffer {
+    if value < 0 {
+      return compiler_token_emit_push(output, 45);
+    }
+    return output;
+  }
+
+  pub fn compiler_token_emit_decimal(
+    output: CompilerTokenBuffer,
+    value: i64,
+    signed: bool
+  ) -> Result<CompilerTokenBuffer, i64> {
+    if compiler_token_buffer_shape_valid(output) == false
+      || (signed == false && value < 0) {
+      return Result.Err(3);
+    }
+    let decimal_length: i64 = compiler_token_decimal_width(value);
+    if decimal_length > 128 - output.length {
+      return Result.Err(1);
+    }
+    return Result.Ok(compiler_token_emit_decimal_raw(output, value));
+  }
+
+  pub fn compiler_token_emit_payload_byte_raw(
+    output: CompilerTokenBuffer,
+    payload: CompilerTokenBuffer,
+    start: i64,
+    length: i64,
+    index: i64
+  ) -> CompilerTokenBuffer {
+    if index >= length {
+      return output;
+    }
+    return compiler_token_emit_hex_raw(
+      output,
+      compiler_token_buffer_value(payload, start + index)
+    );
+  }
+
+  pub fn compiler_token_emit_payload_chunk_raw(
+    output: CompilerTokenBuffer,
+    payload: CompilerTokenBuffer,
+    start: i64,
+    length: i64,
+    base: i64
+  ) -> CompilerTokenBuffer {
+    let p0: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(output, payload, start, length, base);
+    let p1: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p0, payload, start, length, base + 1);
+    let p2: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p1, payload, start, length, base + 2);
+    let p3: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p2, payload, start, length, base + 3);
+    let p4: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p3, payload, start, length, base + 4);
+    let p5: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p4, payload, start, length, base + 5);
+    let p6: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p5, payload, start, length, base + 6);
+    let p7: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p6, payload, start, length, base + 7);
+    let p8: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p7, payload, start, length, base + 8);
+    let p9: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p8, payload, start, length, base + 9);
+    let p10: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p9, payload, start, length, base + 10);
+    let p11: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p10, payload, start, length, base + 11);
+    let p12: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p11, payload, start, length, base + 12);
+    let p13: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p12, payload, start, length, base + 13);
+    let p14: CompilerTokenBuffer = compiler_token_emit_payload_byte_raw(p13, payload, start, length, base + 14);
+    return compiler_token_emit_payload_byte_raw(p14, payload, start, length, base + 15);
+  }
+
+  pub fn compiler_token_emit_payload_raw(
+    output: CompilerTokenBuffer,
+    payload: CompilerTokenBuffer,
+    start: i64,
+    length: i64
+  ) -> CompilerTokenBuffer {
+    let p0: CompilerTokenBuffer = compiler_token_emit_payload_chunk_raw(output, payload, start, length, 0);
+    let p1: CompilerTokenBuffer = compiler_token_emit_payload_chunk_raw(p0, payload, start, length, 16);
+    let p2: CompilerTokenBuffer = compiler_token_emit_payload_chunk_raw(p1, payload, start, length, 32);
+    return compiler_token_emit_payload_chunk_raw(p2, payload, start, length, 48);
+  }
+
+  pub fn compiler_token_emit_record_size(
+    store: CompilerTokenStore,
+    record_index: i64
+  ) -> i64 {
+    if record_index >= store.record_count {
+      return 0;
+    }
+    let size_kind: i64 = compiler_token_vector_value(store.kinds, record_index);
+    let size_payload: i64 = compiler_token_vector_value(
+      store.payload_lengths,
+      record_index
+    );
+    let size_numeric: i64 = compiler_token_vector_value(
+      store.numeric_values,
+      record_index
+    );
+    let size_body: i64 = compiler_token_emit_record_body_size(
+      size_kind,
+      size_payload,
+      size_numeric
+    );
+    return compiler_token_emit_prefix_length(size_kind) + size_body + 1;
+  }
+
+  pub fn compiler_token_emit_record_body_size(
+    kind: i64,
+    payload_length: i64,
+    numeric_value: i64
+  ) -> i64 {
+    if compiler_token_kind_has_text(kind) {
+      return payload_length * 2;
+    }
+    if kind == 2 || kind == 4 {
+      return compiler_token_decimal_width(numeric_value);
+    }
+    return 0;
+  }
+
+  pub fn compiler_token_emit_record_body_raw(
+    output: CompilerTokenBuffer,
+    store: CompilerTokenStore,
+    kind: i64,
+    payload_start: i64,
+    payload_length: i64,
+    numeric_value: i64
+  ) -> CompilerTokenBuffer {
+    if compiler_token_kind_has_text(kind) {
+      return compiler_token_emit_payload_raw(
+        output,
+        store.payload,
+        payload_start,
+        payload_length
+      );
+    }
+    if kind == 2 || kind == 4 {
+      return compiler_token_emit_decimal_raw(output, numeric_value);
+    }
+    return output;
+  }
+
+  pub fn compiler_token_emit_record_raw(
+    output: CompilerTokenBuffer,
+    store: CompilerTokenStore,
+    record_index: i64
+  ) -> CompilerTokenBuffer {
+    if record_index >= store.record_count {
+      return output;
+    }
+    let record_kind: i64 = compiler_token_vector_value(store.kinds, record_index);
+    let record_start: i64 = compiler_token_vector_value(
+      store.payload_starts,
+      record_index
+    );
+    let record_length: i64 = compiler_token_vector_value(
+      store.payload_lengths,
+      record_index
+    );
+    let record_numeric: i64 = compiler_token_vector_value(
+      store.numeric_values,
+      record_index
+    );
+    let record_prefix: CompilerTokenBuffer = compiler_token_emit_prefix_raw(
+      output,
+      record_kind
+    );
+    let record_body: CompilerTokenBuffer = compiler_token_emit_record_body_raw(
+      record_prefix,
+      store,
+      record_kind,
+      record_start,
+      record_length,
+      record_numeric
+    );
+    return compiler_token_emit_push(record_body, 10);
+  }
+
+  pub fn compiler_token_store_emit(
+    store: CompilerTokenStore
+  ) -> Result<CompilerTokenBuffer, i64> {
+    if compiler_token_store_shape_valid(store) == false || store.record_open {
+      return Result.Err(2);
+    }
+    if store.record_count > 4 || store.payload.length > 64 {
+      return Result.Err(1);
+    }
+    let size0: i64 = 21 + compiler_token_emit_record_size(store, 0);
+    let size1: i64 = size0 + compiler_token_emit_record_size(store, 1);
+    let size2: i64 = size1 + compiler_token_emit_record_size(store, 2);
+    let size3: i64 = size2 + compiler_token_emit_record_size(store, 3);
+    if size3 > 128 {
+      return Result.Err(1);
+    }
+    let emitted_header: CompilerTokenBuffer = compiler_token_emit_header_raw(
+      compiler_token_buffer_empty()
+    );
+    let emitted0: CompilerTokenBuffer = compiler_token_emit_record_raw(
+      emitted_header,
+      store,
+      0
+    );
+    let emitted1: CompilerTokenBuffer = compiler_token_emit_record_raw(
+      emitted0,
+      store,
+      1
+    );
+    let emitted2: CompilerTokenBuffer = compiler_token_emit_record_raw(
+      emitted1,
+      store,
+      2
+    );
+    let emitted3: CompilerTokenBuffer = compiler_token_emit_record_raw(
+      emitted2,
+      store,
+      3
+    );
+    return Result.Ok(emitted3);
+  }
+
+  pub fn compiler_token_materializer_state(
+    mode: i64,
+    high_nibble: i64,
+    numeric_value: i64,
+    numeric_negative: bool,
+    error: i64,
+    complete: bool,
+    store: CompilerTokenStore
+  ) -> CompilerTokenMaterializer {
+    return CompilerTokenMaterializer {
+      mode: mode,
+      high_nibble: high_nibble,
+      numeric_value: numeric_value,
+      numeric_negative: numeric_negative,
+      error: error,
+      complete: complete,
+      store: store
+    };
+  }
+
+  pub fn compiler_token_materializer_start() -> CompilerTokenMaterializer {
+    return compiler_token_materializer_state(
+      compiler_token_decoder_start(),
+      0,
+      0,
+      false,
+      0,
+      false,
+      compiler_token_store_empty()
+    );
+  }
+
+  pub fn compiler_token_materializer_advance(
+    state: CompilerTokenMaterializer,
+    mode: i64,
+    high_nibble: i64,
+    numeric_value: i64,
+    numeric_negative: bool
+  ) -> CompilerTokenMaterializer {
+    return compiler_token_materializer_state(
+      mode,
+      high_nibble,
+      numeric_value,
+      numeric_negative,
+      state.error,
+      state.complete,
+      state.store
+    );
+  }
+
+  pub fn compiler_token_materializer_fail(
+    state: CompilerTokenMaterializer,
+    error: i64
+  ) -> CompilerTokenMaterializer {
+    return compiler_token_materializer_state(
+      compiler_token_decoder_error_mode(),
+      state.high_nibble,
+      state.numeric_value,
+      state.numeric_negative,
+      error,
+      false,
+      state.store
+    );
+  }
+
+  pub fn compiler_token_materializer_begin_record(
+    state: CompilerTokenMaterializer,
+    mode: i64,
+    kind: i64,
+    numeric_value: i64
+  ) -> CompilerTokenMaterializer {
+    match compiler_token_store_begin(state.store, kind, numeric_value) {
+      Result.Ok(store) => {
+        return compiler_token_materializer_state(
+          mode, 0, 0, false, 0, false, store
+        );
+      }
+      Result.Err(error) => {
+        return compiler_token_materializer_fail(state, error);
+      }
+      _ => { return compiler_token_materializer_fail(state, 3); }
+    }
+  }
+
+  pub fn compiler_token_materializer_append_byte(
+    state: CompilerTokenMaterializer,
+    mode: i64,
+    byte: i64
+  ) -> CompilerTokenMaterializer {
+    match compiler_token_store_append_byte(state.store, byte) {
+      Result.Ok(store) => {
+        return compiler_token_materializer_state(
+          mode, 0, state.numeric_value, state.numeric_negative, 0, false, store
+        );
+      }
+      Result.Err(error) => {
+        return compiler_token_materializer_fail(state, error);
+      }
+      _ => { return compiler_token_materializer_fail(state, 3); }
+    }
+  }
+
+  pub fn compiler_token_materializer_finish_open(
+    state: CompilerTokenMaterializer,
+    mode: i64
+  ) -> CompilerTokenMaterializer {
+    match compiler_token_store_finish(state.store) {
+      Result.Ok(store) => {
+        return compiler_token_materializer_state(
+          mode,
+          0,
+          0,
+          false,
+          0,
+          store.record_count == 4,
+          store
+        );
+      }
+      Result.Err(error) => {
+        return compiler_token_materializer_fail(state, error);
+      }
+      _ => { return compiler_token_materializer_fail(state, 3); }
+    }
+  }
+
+  pub fn compiler_token_materializer_finish_numeric(
+    state: CompilerTokenMaterializer,
+    mode: i64,
+    kind: i64,
+    numeric_value: i64
+  ) -> CompilerTokenMaterializer {
+    let begun: CompilerTokenMaterializer = compiler_token_materializer_begin_record(
+      state,
+      mode,
+      kind,
+      numeric_value
+    );
+    if begun.error != 0 {
+      return begun;
+    }
+    return compiler_token_materializer_finish_open(begun, mode);
+  }
+
+  pub fn compiler_token_materializer_integer_digit(
+    state: CompilerTokenMaterializer,
+    mode: i64,
+    byte: i64
+  ) -> CompilerTokenMaterializer {
+    let digit: i64 = byte - 48;
+    let minimum: i64 = -9223372036854775807 - 1;
+    if state.numeric_value < (minimum + digit) / 10 {
+      return compiler_token_materializer_fail(state, 3);
+    }
+    return compiler_token_materializer_advance(
+      state,
+      mode,
+      state.high_nibble,
+      (state.numeric_value * 10) - digit,
+      state.numeric_negative
+    );
+  }
+
+  pub fn compiler_token_materializer_symbol_digit(
+    state: CompilerTokenMaterializer,
+    mode: i64,
+    byte: i64
+  ) -> CompilerTokenMaterializer {
+    let digit: i64 = byte - 48;
+    if state.numeric_value > (1114111 - digit) / 10 {
+      return compiler_token_materializer_fail(state, 3);
+    }
+    return compiler_token_materializer_advance(
+      state,
+      mode,
+      state.high_nibble,
+      (state.numeric_value * 10) + digit,
+      false
+    );
+  }
+
+  pub fn compiler_token_materializer_step(
+    state: CompilerTokenMaterializer,
+    byte: i64
+  ) -> CompilerTokenMaterializer {
+    if state.error != 0 || state.complete {
+      return state;
+    }
+    let next_mode: i64 = compiler_token_decoder_step(state.mode, byte);
+    if next_mode == compiler_token_decoder_error_mode() {
+      return compiler_token_materializer_fail(state, 3);
+    }
+
+    if state.mode == 34 && byte == 9 {
+      return compiler_token_materializer_begin_record(state, next_mode, 1, 0);
+    }
+    if state.mode == 46 && byte == 9 {
+      return compiler_token_materializer_begin_record(state, next_mode, 3, 0);
+    }
+    if state.mode == 58 && byte == 9 {
+      return compiler_token_materializer_begin_record(state, next_mode, 6, 0);
+    }
+    if state.mode == 90 && byte == 9 {
+      return compiler_token_materializer_begin_record(state, next_mode, 7, 0);
+    }
+    if (state.mode == 41 || state.mode == 52) && byte == 9 {
+      return compiler_token_materializer_advance(state, next_mode, 0, 0, false);
+    }
+
+    if (state.mode == 100 || state.mode == 102 || state.mode == 103
+      || state.mode == 105 || state.mode == 106 || state.mode == 108)
+      && compiler_token_decoder_is_hex(byte) {
+      return compiler_token_materializer_advance(
+        state,
+        next_mode,
+        compiler_token_decoder_hex_value(byte),
+        state.numeric_value,
+        state.numeric_negative
+      );
+    }
+    if state.mode == 101 || state.mode == 104
+      || state.mode == 107 || state.mode == 109 {
+      return compiler_token_materializer_append_byte(
+        state,
+        next_mode,
+        (state.high_nibble * 16) + compiler_token_decoder_hex_value(byte)
+      );
+    }
+    if (state.mode == 102 || state.mode == 105
+      || state.mode == 106 || state.mode == 108) && byte == 10 {
+      return compiler_token_materializer_finish_open(state, next_mode);
+    }
+
+    if state.mode == 68 && byte == 45 {
+      return compiler_token_materializer_advance(state, next_mode, 0, 0, true);
+    }
+    if (state.mode == 68 || state.mode == 69 || state.mode == 70)
+      && compiler_token_decoder_is_digit(byte) {
+      return compiler_token_materializer_integer_digit(state, next_mode, byte);
+    }
+    if state.mode == 70 && byte == 10 && state.numeric_negative {
+      return compiler_token_materializer_finish_numeric(
+        state, next_mode, 2, state.numeric_value
+      );
+    }
+    if state.mode == 70 && byte == 10
+      && state.numeric_value == -9223372036854775807 - 1 {
+      return compiler_token_materializer_fail(state, 3);
+    }
+    if state.mode == 70 && byte == 10 {
+      return compiler_token_materializer_finish_numeric(
+        state, next_mode, 2, -state.numeric_value
+      );
+    }
+
+    if (state.mode == 72 || state.mode == 73)
+      && compiler_token_decoder_is_digit(byte) {
+      return compiler_token_materializer_symbol_digit(state, next_mode, byte);
+    }
+    if state.mode == 73 && byte == 10 {
+      return compiler_token_materializer_finish_numeric(
+        state, next_mode, 4, state.numeric_value
+      );
+    }
+    if state.mode == 63 && byte == 10 {
+      return compiler_token_materializer_finish_numeric(state, next_mode, 5, 0);
+    }
+    return compiler_token_materializer_advance(
+      state,
+      next_mode,
+      state.high_nibble,
+      state.numeric_value,
+      state.numeric_negative
+    );
+  }
+
+  pub fn compiler_token_materializer_decode_first_page(
+    input: CompilerTokenBuffer
+  ) -> Result<CompilerTokenStore, i64> {
+    if compiler_token_buffer_shape_valid(input) == false {
+      return Result.Err(3);
+    }
+    let state: CompilerTokenMaterializer = compiler_token_materializer_start();
+    let index: i64 = 0;
+    while index < input.length {
+      let state: CompilerTokenMaterializer = compiler_token_materializer_step(
+        state,
+        compiler_token_buffer_value(input, index)
+      );
+      let index: i64 = index + 1;
+    }
+    if state.error != 0 {
+      return Result.Err(state.error);
+    }
+    if state.complete == false {
+      return Result.Err(2);
+    }
+    return Result.Ok(state.store);
+  }
+}
