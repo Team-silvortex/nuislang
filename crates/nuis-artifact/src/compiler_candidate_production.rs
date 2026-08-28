@@ -1,18 +1,22 @@
-use std::{collections::BTreeMap, fs, path::Path};
-
-use sha2::{Digest, Sha256};
+use std::{fs, path::Path};
 
 #[path = "compiler_candidate_production_identity.rs"]
 mod identity;
+#[path = "compiler_candidate_production_support.rs"]
+mod support;
 
 use identity::production_identity;
+use support::{
+    parse_record_blocks, sha256_hex, validate_file_name, validate_sha256, validate_text,
+    validate_token,
+};
 
 use crate::{
     compiler_projection_first_page_identity, compiler_token_first_page_identity,
     decode_compiler_token_stream,
     toml::{
-        escape_toml_string, parse_optional_map_usize, parse_required_map_string_in_block,
-        parse_required_toml_bool, parse_required_toml_string, parse_required_toml_usize,
+        escape_toml_string, parse_required_toml_bool, parse_required_toml_string,
+        parse_required_toml_usize,
     },
     ArtifactError, CompilerCandidateExecution, CompilerComponentBuild, CompilerProjectionKind,
     CompilerProjectionPageIdentity, CompilerStageHandoff, CompilerStageKind,
@@ -26,9 +30,9 @@ use crate::{
     COMPILER_TOKEN_PAGE_RECORDS,
 };
 
-pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v4";
+pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v5";
 pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str =
-    "nuis-stage1-materialized-token-ast-page-producer-v4";
+    "nuis-stage1-materialized-token-ast-nir-page-producer-v5";
 pub const COMPILER_CANDIDATE_PRODUCTION_AUTHORITY: &str =
     "stage1-candidate-component-production-no-replacement";
 pub const COMPILER_CANDIDATE_PRODUCTION_FILE: &str = "nuis.compiler-candidate-production.toml";
@@ -49,6 +53,7 @@ pub struct CompilerCandidateProductionInput<'a> {
     pub token_decode: &'a CompilerTokenDecodeSummary,
     pub token_page: &'a CompilerTokenPageIdentity,
     pub ast_page: &'a CompilerProjectionPageIdentity,
+    pub nir_page: &'a CompilerProjectionPageIdentity,
     pub adapter_file: &'a str,
     pub adapter: &'a [u8],
 }
@@ -95,6 +100,15 @@ pub struct CompilerCandidateProduction {
     pub ast_page_continuation_body_hash: usize,
     pub ast_page_state_hash: usize,
     pub ast_page_identity: usize,
+    pub nir_page_contract: String,
+    pub nir_page_record_count: usize,
+    pub nir_page_bytes: usize,
+    pub nir_page_projection_hash: usize,
+    pub nir_page_continuation_indentation: usize,
+    pub nir_page_continuation_body_bytes: usize,
+    pub nir_page_continuation_body_hash: usize,
+    pub nir_page_state_hash: usize,
+    pub nir_page_identity: usize,
     pub replacement_authorized: bool,
     pub proof_sha256: String,
     pub records: Vec<CompilerCandidateProductionRecord>,
@@ -168,6 +182,15 @@ pub fn build_compiler_candidate_production(
         ast_page_continuation_body_hash: input.ast_page.continuation_body_hash,
         ast_page_state_hash: input.ast_page.state_hash,
         ast_page_identity: input.ast_page.identity,
+        nir_page_contract: COMPILER_PROJECTION_PAGE_CONTRACT.to_owned(),
+        nir_page_record_count: input.nir_page.record_count,
+        nir_page_bytes: input.nir_page.page_bytes,
+        nir_page_projection_hash: input.nir_page.projection_hash,
+        nir_page_continuation_indentation: input.nir_page.continuation_indentation,
+        nir_page_continuation_body_bytes: input.nir_page.continuation_body_bytes,
+        nir_page_continuation_body_hash: input.nir_page.continuation_body_hash,
+        nir_page_state_hash: input.nir_page.state_hash,
+        nir_page_identity: input.nir_page.identity,
         replacement_authorized: false,
         proof_sha256: String::new(),
         records,
@@ -179,7 +202,7 @@ pub fn build_compiler_candidate_production(
 
 pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction) -> String {
     let mut out = format!(
-        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
+        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nnir_page_contract = \"{}\"\nnir_page_record_count = {}\nnir_page_bytes = {}\nnir_page_projection_hash = {}\nnir_page_continuation_indentation = {}\nnir_page_continuation_body_bytes = {}\nnir_page_continuation_body_hash = {}\nnir_page_state_hash = {}\nnir_page_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
         proof.protocol,
         proof.producer_contract,
         proof.authority,
@@ -211,6 +234,15 @@ pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction)
         proof.ast_page_continuation_body_hash,
         proof.ast_page_state_hash,
         proof.ast_page_identity,
+        proof.nir_page_contract,
+        proof.nir_page_record_count,
+        proof.nir_page_bytes,
+        proof.nir_page_projection_hash,
+        proof.nir_page_continuation_indentation,
+        proof.nir_page_continuation_body_bytes,
+        proof.nir_page_continuation_body_hash,
+        proof.nir_page_state_hash,
+        proof.nir_page_identity,
         proof.replacement_authorized,
         proof.proof_sha256,
     );
@@ -328,6 +360,31 @@ pub fn parse_compiler_candidate_production_from_source(
         )?,
         ast_page_state_hash: parse_required_toml_usize(source, "ast_page_state_hash", path)?,
         ast_page_identity: parse_required_toml_usize(source, "ast_page_identity", path)?,
+        nir_page_contract: parse_required_toml_string(source, "nir_page_contract", path)?,
+        nir_page_record_count: parse_required_toml_usize(source, "nir_page_record_count", path)?,
+        nir_page_bytes: parse_required_toml_usize(source, "nir_page_bytes", path)?,
+        nir_page_projection_hash: parse_required_toml_usize(
+            source,
+            "nir_page_projection_hash",
+            path,
+        )?,
+        nir_page_continuation_indentation: parse_required_toml_usize(
+            source,
+            "nir_page_continuation_indentation",
+            path,
+        )?,
+        nir_page_continuation_body_bytes: parse_required_toml_usize(
+            source,
+            "nir_page_continuation_body_bytes",
+            path,
+        )?,
+        nir_page_continuation_body_hash: parse_required_toml_usize(
+            source,
+            "nir_page_continuation_body_hash",
+            path,
+        )?,
+        nir_page_state_hash: parse_required_toml_usize(source, "nir_page_state_hash", path)?,
+        nir_page_identity: parse_required_toml_usize(source, "nir_page_identity", path)?,
         replacement_authorized: parse_required_toml_bool(source, "replacement_authorized", path)?,
         proof_sha256: parse_required_toml_string(source, "proof_sha256", path)?,
         records: parse_record_blocks(source, path)?,
@@ -389,6 +446,16 @@ pub fn read_compiler_candidate_production(
         state_hash: proof.ast_page_state_hash,
         identity: proof.ast_page_identity,
     };
+    let nir_page = CompilerProjectionPageIdentity {
+        record_count: proof.nir_page_record_count,
+        page_bytes: proof.nir_page_bytes,
+        projection_hash: proof.nir_page_projection_hash,
+        continuation_indentation: proof.nir_page_continuation_indentation,
+        continuation_body_bytes: proof.nir_page_continuation_body_bytes,
+        continuation_body_hash: proof.nir_page_continuation_body_hash,
+        state_hash: proof.nir_page_state_hash,
+        identity: proof.nir_page_identity,
+    };
     validate_evidence(&CompilerCandidateProductionInput {
         stage0,
         execution,
@@ -400,6 +467,7 @@ pub fn read_compiler_candidate_production(
         token_decode: &token_decode,
         token_page: &token_page,
         ast_page: &ast_page,
+        nir_page: &nir_page,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     })?;
@@ -414,6 +482,7 @@ pub fn read_compiler_candidate_production(
         token_decode: &token_decode,
         token_page: &token_page,
         ast_page: &ast_page,
+        nir_page: &nir_page,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     })?;
@@ -527,6 +596,18 @@ fn validate_evidence(input: &CompilerCandidateProductionInput<'_>) -> Result<(),
             "compiler candidate production AST structural page identity mismatch",
         ));
     }
+    let nir_payload = input
+        .payloads
+        .iter()
+        .find(|payload| payload.stage == CompilerStageKind::Nir)
+        .ok_or_else(|| ArtifactError::new("compiler candidate NIR payload is missing"))?;
+    let expected_nir_page =
+        compiler_projection_first_page_identity(CompilerProjectionKind::Nir, &nir_payload.bytes)?;
+    if *input.nir_page != expected_nir_page {
+        return Err(ArtifactError::new(
+            "compiler candidate production NIR structural page identity mismatch",
+        ));
+    }
     validate_file_name(input.adapter_file, "candidate adapter")?;
     if input.adapter.is_empty() {
         return Err(ArtifactError::new(
@@ -541,7 +622,6 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
         || proof.producer_contract != COMPILER_CANDIDATE_PRODUCER_CONTRACT
         || proof.authority != COMPILER_CANDIDATE_PRODUCTION_AUTHORITY
         || proof.token_decoder_contract != COMPILER_TOKEN_DECODER_CONTRACT
-        || proof.ast_page_contract != COMPILER_PROJECTION_PAGE_CONTRACT
         || proof.replacement_authorized
     {
         return Err(ArtifactError::new(
@@ -600,25 +680,34 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
             "compiler candidate production canonical token page summary is invalid",
         ));
     }
-    if proof.ast_page_record_count == 0
-        || proof.ast_page_record_count > proof.ast_page_bytes
-        || proof.ast_page_bytes == 0
-        || proof.ast_page_bytes > COMPILER_PROJECTION_PAGE_BYTES
-        || proof.ast_page_projection_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
-        || proof.ast_page_continuation_indentation > proof.ast_page_bytes
-        || proof.ast_page_continuation_body_bytes > proof.ast_page_bytes
-        || proof.ast_page_continuation_indentation + proof.ast_page_continuation_body_bytes
-            > proof.ast_page_bytes
-        || proof.ast_page_continuation_body_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
-        || proof.ast_page_state_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
-        || proof.ast_page_identity
-            != proof.ast_page_state_hash * COMPILER_PROJECTION_PAGE_IDENTITY_RADIX
-                + proof.ast_page_bytes
-    {
-        return Err(ArtifactError::new(
-            "compiler candidate production AST structural page summary is invalid",
-        ));
-    }
+    validate_projection_page_summary(
+        "AST",
+        &proof.ast_page_contract,
+        CompilerProjectionPageIdentity {
+            record_count: proof.ast_page_record_count,
+            page_bytes: proof.ast_page_bytes,
+            projection_hash: proof.ast_page_projection_hash,
+            continuation_indentation: proof.ast_page_continuation_indentation,
+            continuation_body_bytes: proof.ast_page_continuation_body_bytes,
+            continuation_body_hash: proof.ast_page_continuation_body_hash,
+            state_hash: proof.ast_page_state_hash,
+            identity: proof.ast_page_identity,
+        },
+    )?;
+    validate_projection_page_summary(
+        "NIR",
+        &proof.nir_page_contract,
+        CompilerProjectionPageIdentity {
+            record_count: proof.nir_page_record_count,
+            page_bytes: proof.nir_page_bytes,
+            projection_hash: proof.nir_page_projection_hash,
+            continuation_indentation: proof.nir_page_continuation_indentation,
+            continuation_body_bytes: proof.nir_page_continuation_body_bytes,
+            continuation_body_hash: proof.nir_page_continuation_body_hash,
+            state_hash: proof.nir_page_state_hash,
+            identity: proof.nir_page_identity,
+        },
+    )?;
     for (ordinal, record) in proof.records.iter().enumerate() {
         let expected_stage = ["source", "tokens", "ast", "nir", "yir"][ordinal];
         if record.ordinal != ordinal
@@ -640,140 +729,30 @@ fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), ArtifactErr
     Ok(())
 }
 
-fn parse_record_blocks(
-    source: &str,
-    path: &Path,
-) -> Result<Vec<CompilerCandidateProductionRecord>, ArtifactError> {
-    let mut records = Vec::new();
-    let mut values = BTreeMap::new();
-    let mut in_block = false;
-    for raw in source.lines() {
-        let line = raw.trim();
-        if line == "[[record]]" {
-            if in_block {
-                records.push(parse_record(&values, path)?);
-                values.clear();
-            }
-            in_block = true;
-            continue;
-        }
-        if line.starts_with('[') {
-            if in_block {
-                records.push(parse_record(&values, path)?);
-                values.clear();
-                in_block = false;
-            }
-            continue;
-        }
-        if in_block && !line.is_empty() && !line.starts_with('#') {
-            if let Some((key, value)) = line.split_once('=') {
-                let key = key.trim().to_owned();
-                if values
-                    .insert(key.clone(), value.trim().to_owned())
-                    .is_some()
-                {
-                    return Err(ArtifactError::new(format!(
-                        "`{}` candidate production record repeats key `{key}`",
-                        path.display()
-                    )));
-                }
-            }
-        }
-    }
-    if in_block {
-        records.push(parse_record(&values, path)?);
-    }
-    Ok(records)
-}
-
-fn parse_record(
-    values: &BTreeMap<String, String>,
-    path: &Path,
-) -> Result<CompilerCandidateProductionRecord, ArtifactError> {
-    Ok(CompilerCandidateProductionRecord {
-        ordinal: required_block_usize(values, "ordinal", path)?,
-        stage: parse_required_map_string_in_block(values, "stage", path, "record")?,
-        payload_bytes: required_block_usize(values, "payload_bytes", path)?,
-        payload_sha256: parse_required_map_string_in_block(
-            values,
-            "payload_sha256",
-            path,
-            "record",
-        )?,
-        fold: required_block_usize(values, "fold", path)?,
-    })
-}
-
-fn required_block_usize(
-    values: &BTreeMap<String, String>,
-    key: &str,
-    path: &Path,
-) -> Result<usize, ArtifactError> {
-    parse_optional_map_usize(values, key, path, "record")?.ok_or_else(|| {
-        ArtifactError::new(format!(
-            "`{}` candidate production record is missing `{key}`",
-            path.display()
-        ))
-    })
-}
-
-fn validate_text(source: &str, path: &Path) -> Result<(), ArtifactError> {
-    if source.is_empty()
-        || !source.ends_with('\n')
-        || source.contains('\r')
-        || source.contains('\0')
+fn validate_projection_page_summary(
+    label: &str,
+    contract: &str,
+    page: CompilerProjectionPageIdentity,
+) -> Result<(), ArtifactError> {
+    if contract != COMPILER_PROJECTION_PAGE_CONTRACT
+        || page.record_count == 0
+        || page.record_count > page.page_bytes
+        || page.page_bytes == 0
+        || page.page_bytes > COMPILER_PROJECTION_PAGE_BYTES
+        || page.projection_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || page.continuation_indentation > page.page_bytes
+        || page.continuation_body_bytes > page.page_bytes
+        || page.continuation_indentation + page.continuation_body_bytes > page.page_bytes
+        || page.continuation_body_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || page.state_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || page.identity
+            != page.state_hash * COMPILER_PROJECTION_PAGE_IDENTITY_RADIX + page.page_bytes
     {
         return Err(ArtifactError::new(format!(
-            "compiler candidate production `{}` must be canonical UTF-8/LF text",
-            path.display()
+            "compiler candidate production {label} structural page summary is invalid"
         )));
     }
     Ok(())
-}
-
-fn validate_token(value: &str, label: &str) -> Result<(), ArtifactError> {
-    if !value.is_empty()
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    {
-        return Ok(());
-    }
-    Err(ArtifactError::new(format!(
-        "compiler candidate production {label} is not a stable token"
-    )))
-}
-
-fn validate_file_name(value: &str, label: &str) -> Result<(), ArtifactError> {
-    let path = Path::new(value);
-    if !value.is_empty()
-        && !value.contains('/')
-        && !value.contains('\\')
-        && path.components().count() == 1
-        && path.file_name().and_then(|item| item.to_str()) == Some(value)
-    {
-        return Ok(());
-    }
-    Err(ArtifactError::new(format!(
-        "compiler candidate production {label} must be a sibling file"
-    )))
-}
-
-fn validate_sha256(value: &str, label: &str) -> Result<(), ArtifactError> {
-    if value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Ok(());
-    }
-    Err(ArtifactError::new(format!(
-        "compiler candidate production {label} must be lowercase SHA-256"
-    )))
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
 }
 
 #[cfg(test)]

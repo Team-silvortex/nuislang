@@ -19,7 +19,7 @@ const REJECTED_TRAIT_HARNESS: &str =
 const REJECTED_INSTANTIATE: &str =
     include_str!("../../../tests/fixtures/bootstrap/rejected/instantiate_effect.ns");
 const SUBSET_CONTRACT: &str =
-    include_str!("../../../docs/reference/nuis-bootstrap-language-subset-v5.toml");
+    include_str!("../../../docs/reference/nuis-bootstrap-language-subset-v6.toml");
 
 #[test]
 fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
@@ -35,7 +35,7 @@ fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
     assert!(report.checked_nodes() >= 80);
 
     let json = render_bootstrap_check_json(&report);
-    assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v5\""));
+    assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v6\""));
     assert!(json.contains("\"accepted\":true"));
     assert!(json.contains("\"semantic_pipeline\":\"checked\""));
 }
@@ -107,6 +107,32 @@ fn exact_scalar_candidate_export_is_allowed_but_symbol_spoofing_is_rejected() {
             return length + word0 + word18;
           }
 
+          @export(name = "nuis_bootstrap_candidate_nir_page_identity_v1")
+          fn compiler_candidate_nir_page_identity(
+            length: i64,
+            word0: i64,
+            word1: i64,
+            word2: i64,
+            word3: i64,
+            word4: i64,
+            word5: i64,
+            word6: i64,
+            word7: i64,
+            word8: i64,
+            word9: i64,
+            word10: i64,
+            word11: i64,
+            word12: i64,
+            word13: i64,
+            word14: i64,
+            word15: i64,
+            word16: i64,
+            word17: i64,
+            word18: i64
+          ) -> i64 {
+            return length + word0 + word18;
+          }
+
           fn main() -> i64 {
             return compiler_candidate_stage_seed(0) - 97
               + compiler_candidate_token_step(0, 0)
@@ -115,6 +141,10 @@ fn exact_scalar_candidate_export_is_allowed_but_symbol_spoofing_is_rejected() {
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
               )
               + compiler_candidate_ast_page_identity(
+                0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+              )
+              + compiler_candidate_nir_page_identity(
                 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
               );
@@ -296,7 +326,7 @@ fn rejected_json_is_structured_and_fail_closed() {
 #[test]
 fn machine_readable_contract_tracks_the_executable_policy() {
     for required in [
-        "nuis-bootstrap-language-subset-v5",
+        "nuis-bootstrap-language-subset-v6",
         "cpu/CorePrelude",
         "cpu/StdLanguageCore",
         "cpu/StdCompilerData",
@@ -307,6 +337,7 @@ fn machine_readable_contract_tracks_the_executable_policy() {
         "CompilerTokenStore",
         "nuis_bootstrap_candidate_token_page_identity_v1",
         "nuis_bootstrap_candidate_ast_page_identity_v1",
+        "nuis_bootstrap_candidate_nir_page_identity_v1",
         "cpu/StdTextContracts",
         "NBS001",
         "NBS017",

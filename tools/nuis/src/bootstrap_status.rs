@@ -73,11 +73,26 @@ impl BootstrapReadinessReport {
     }
 
     fn next_gate(&self) -> Option<&BootstrapReadinessGate> {
-        REQUIRED_GATES.iter().find_map(|(id, _)| {
-            self.gates
-                .iter()
-                .find(|gate| gate.id == *id && !gate.is_closed())
-        })
+        self.gates
+            .iter()
+            .filter(|gate| !gate.is_closed())
+            .min_by_key(|gate| {
+                (
+                    readiness_status_rank(&gate.status),
+                    gate.progress,
+                    gate.coordinate.as_str(),
+                )
+            })
+    }
+}
+
+fn readiness_status_rank(status: &str) -> usize {
+    match status {
+        "early" => 0,
+        "active" => 1,
+        "usable" => 2,
+        "stable" => 3,
+        _ => usize::MAX,
     }
 }
 
@@ -462,7 +477,7 @@ mod tests {
         include_str!("../../../docs/reference/nuis-self-hosting-readiness.toml");
 
     #[test]
-    fn checked_in_manifest_is_valid_and_names_the_first_real_gate() {
+    fn checked_in_manifest_is_valid_and_names_the_weakest_real_gate() {
         let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         assert_eq!(report.gates.len(), REQUIRED_GATES.len());
         assert_eq!(report.closed_gate_count(), 1);
@@ -472,7 +487,7 @@ mod tests {
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("compiler-data-model")
+            Some("stage-neutral-ir-boundary")
         );
     }
 
@@ -505,8 +520,8 @@ mod tests {
     #[test]
     fn stable_status_requires_exactly_one_hundred_progress() {
         let invalid = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 88",
-            "status = \"stable\"\nprogress = 88",
+            "status = \"usable\"\nprogress = 92",
+            "status = \"stable\"\nprogress = 92",
             1,
         );
         let error = parse_bootstrap_readiness(&invalid).expect_err("status drift must fail");
@@ -514,34 +529,21 @@ mod tests {
     }
 
     #[test]
-    fn next_gate_follows_bootstrap_dependency_order() {
-        let after_data_model = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 88",
-            "status = \"stable\"\nprogress = 100",
-            1,
-        );
-        let report = parse_bootstrap_readiness(&after_data_model).expect("manifest parses");
+    fn next_gate_follows_status_progress_coordinate_order() {
+        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 91", "progress = 93", 1);
+        let report = parse_bootstrap_readiness(&adjusted).expect("manifest parses");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage-neutral-ir-boundary")
+            Some("stage0-stage1-driver")
         );
     }
 
     #[test]
     fn completed_manifest_has_stable_null_next_gate_shape() {
         let complete = CHECKED_IN_MANIFEST
-            .replace(
-                "status = \"usable\"\nprogress = 88",
-                "status = \"stable\"\nprogress = 100",
-            )
-            .replace(
-                "status = \"usable\"\nprogress = 86",
-                "status = \"stable\"\nprogress = 100",
-            )
-            .replace(
-                "status = \"usable\"\nprogress = 87",
-                "status = \"stable\"\nprogress = 100",
-            );
+            .replace("status = \"usable\"", "status = \"stable\"")
+            .replace("progress = 91", "progress = 100")
+            .replace("progress = 92", "progress = 100");
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);
         assert!(report.ready());

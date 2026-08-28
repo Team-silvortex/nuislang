@@ -54,15 +54,16 @@ and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
 image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
-then feeds all five serialized payloads through fourteen exact Nuis scalar
+then feeds all five serialized payloads through fifteen exact Nuis scalar
 exports, independently verifies their folds, drives the complete token payload
 through a bounded Nuis-native DFA, and transports the first 128 opaque bytes
-from both token and AST payloads. Nuis canonically re-emits the real 91-byte
+from the token, AST, and NIR payloads. Nuis canonically re-emits the real 91-byte
 token page with hash `1277127995`, then scans three complete AST records and
-retains the unfinished line in a deterministic continuation state. The
-artifact layer independently verifies token identity `164749511446` and AST
-identity `174028320749` before production v4 emits the distinct
-`nuis-stage1-token-ast-materializer-v4` candidate and reaches repository-native
+four complete NIR records while retaining each unfinished line in a
+deterministic continuation state. The artifact layer independently verifies
+token identity `164749511446`, AST identity `174028320749`, and NIR identity
+`132469386887` before production v5 emits the distinct
+`nuis-stage1-token-ast-nir-materializer-v5` candidate and reaches repository-native
 `13/13` differential equivalence while retaining `replacement_authorized =
 false`. `nuis
 bootstrap-reproducibility` now performs
@@ -86,10 +87,10 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
-structural codec, typed Nuis consumer, bounded token and AST pages, candidate
+structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, paged compiler data, first attested stage1 leaf, and
 two-clean-build aggregate in place, the tensor now routes mainline work to the
-first NIR page or deterministic page continuation. Broader compiler-data
+deterministic page-continuation boundary. Broader compiler-data
 paging, a changed stage payload, reversible replacement authorization, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.

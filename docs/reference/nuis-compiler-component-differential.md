@@ -7,7 +7,7 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v4.toml](nuis-compiler-candidate-production-v4.toml)
+* [nuis-compiler-candidate-production-v5.toml](nuis-compiler-candidate-production-v5.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not
@@ -112,11 +112,11 @@ identity and canonical parser reject any such mutation.
 ## Current Boundary
 
 The comparison engine, diagnostic sidecar, CLI, canonical readers, identity
-recomputation, and drift tests are implemented. The checked-in token and AST
-page materializer is now the first Nuis-written leaf producer: it consumes all
-five serialized payloads through the exact scalar ABI, emits a bound candidate
-bundle fold, receives a distinct `stage1-candidate` component record, and
-reaches repository-native `13/13` equivalence.
+recomputation, and drift tests are implemented. The checked-in token, AST, and
+NIR page materializer is now the first Nuis-written leaf producer: it consumes
+all five serialized payloads through the exact scalar ABI, emits a bound
+candidate bundle fold, receives a distinct `stage1-candidate` component record,
+and reaches repository-native `13/13` equivalence.
 
 `nuis bootstrap-reproducibility` now repeats this complete path in two empty,
 compile-cache-bypassed roots and binds both reports plus stable component
@@ -124,7 +124,7 @@ identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
 This is not replacement authority or full compiler self-hosting. The next
-closures are page continuation or a NIR page, a non-identity transformation,
+closures are page continuation, a non-identity transformation,
 independent machine/attester evidence, and a separate reversible authorization
 protocol.
 

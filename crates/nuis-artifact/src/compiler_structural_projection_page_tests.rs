@@ -9,6 +9,17 @@ const AST_PAGE_FIXTURE: &str = concat!(
     "    return 0\n",
 );
 
+const NIR_PAGE_FIXTURE: &str = concat!(
+    "use cpu StdLanguageCore\n",
+    "use cpu StdCompilerData\n",
+    "use cpu StdCompilerTokenEmit\n",
+    "use cpu StdCompilerTokens\n",
+    "use cpu StdCompilerProjection\n",
+    "nir mod cpu unit Main\n",
+    "  fn main() -> i64\n",
+    "    return 0\n",
+);
+
 #[test]
 fn ast_first_page_binds_complete_records_and_partial_continuation() {
     let page = compiler_projection_first_page_identity(
@@ -28,6 +39,29 @@ fn ast_first_page_binds_complete_records_and_partial_continuation() {
             continuation_body_hash: 28_492_679,
             state_hash: 1_935_945_723,
             identity: 249_736_998_395,
+        }
+    );
+}
+
+#[test]
+fn nir_first_page_binds_import_records_and_partial_continuation() {
+    let page = compiler_projection_first_page_identity(
+        CompilerProjectionKind::Nir,
+        NIR_PAGE_FIXTURE.as_bytes(),
+    )
+    .expect("materialize NIR structural page");
+
+    assert_eq!(
+        page,
+        CompilerProjectionPageIdentity {
+            record_count: 4,
+            page_bytes: COMPILER_PROJECTION_PAGE_BYTES,
+            projection_hash: 568_515_310,
+            continuation_indentation: 0,
+            continuation_body_bytes: 25,
+            continuation_body_hash: 671_013_644,
+            state_hash: 1_026_894_471,
+            identity: 132_469_386_887,
         }
     );
 }

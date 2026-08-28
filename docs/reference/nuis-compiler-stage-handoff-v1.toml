@@ -31,7 +31,9 @@ serialized_five_stage_input_consumption_by_nuis = true
 nuis_candidate_bundle_fold_producer = true
 nuis_ast_first_page_materializer = true
 nuis_ast_page_contract = "nuis-compiler-structural-page-v1"
-candidate_production_protocol = "nuis-compiler-candidate-production-v4"
+nuis_nir_first_page_materializer = true
+nuis_nir_page_contract = "nuis-compiler-structural-page-v1"
+candidate_production_protocol = "nuis-compiler-candidate-production-v5"
 source_reparse_required_for_ast_verification = false
 
 [[stages]]
@@ -74,6 +76,7 @@ invariants = [
   "normal-build-manifest-hashes-source-tokens-and-handoff",
   "cache-hit-preserves-bundle-identity",
   "nuis-and-artifact-layer-independently-agree-on-ast-page-continuation-state",
+  "nuis-and-artifact-layer-independently-agree-on-nir-page-continuation-state",
 ]
 
 validation_commands = [
@@ -86,10 +89,9 @@ validation_commands = [
 ]
 
 [open_boundary]
-status = "first-stage1-token-and-ast-page-ready"
+status = "first-stage1-token-ast-and-nir-pages-ready"
 missing = [
   "token-and-structural-page-continuation",
-  "nuis-owned-nir-structural-page",
   "non-identity-stage1-transformation",
   "stage0-stage1-replacement-authorization",
 ]

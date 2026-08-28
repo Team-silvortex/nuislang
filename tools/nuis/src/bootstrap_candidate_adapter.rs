@@ -8,7 +8,7 @@ use nuis_artifact::{
     CompilerTokenPageIdentity, COMPILER_CANDIDATE_ADAPTER_FILE,
 };
 
-const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v4";
+const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v5";
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
 const ADAPTER_RUNTIME_OBJECT_FILE: &str = "nuis.compiler-candidate-runtime.o";
 
@@ -20,6 +20,7 @@ pub(crate) struct CandidateAdapterOutput {
     pub(crate) token_decode: CompilerTokenDecodeSummary,
     pub(crate) token_page: CompilerTokenPageIdentity,
     pub(crate) ast_page: CompilerProjectionPageIdentity,
+    pub(crate) nir_page: CompilerProjectionPageIdentity,
 }
 
 pub(crate) fn run_candidate_adapter(
@@ -125,8 +126,14 @@ pub(crate) fn run_candidate_adapter(
             String::from_utf8_lossy(&output.stderr),
         ));
     }
-    let (stage_folds, bundle_fold, token_decode, token_page_identity, ast_page_identity) =
-        parse_adapter_output(&output.stdout)?;
+    let (
+        stage_folds,
+        bundle_fold,
+        token_decode,
+        token_page_identity,
+        ast_page_identity,
+        nir_page_identity,
+    ) = parse_adapter_output(&output.stdout)?;
     let expected_folds = payload_paths
         .iter()
         .enumerate()
@@ -162,14 +169,25 @@ pub(crate) fn run_candidate_adapter(
         compiler_projection_first_page_identity(CompilerProjectionKind::Ast, &ast_bytes).map_err(
             |error| format!("failed to independently materialize AST structural page: {error}"),
         )?;
+    let nir_bytes = fs::read(&payload_paths[3]).map_err(|error| {
+        format!(
+            "failed to read candidate NIR payload `{}`: {error}",
+            payload_paths[3].display()
+        )
+    })?;
+    let expected_nir_page =
+        compiler_projection_first_page_identity(CompilerProjectionKind::Nir, &nir_bytes).map_err(
+            |error| format!("failed to independently materialize NIR structural page: {error}"),
+        )?;
     if stage_folds != expected_folds
         || bundle_fold != expected_bundle
         || token_decode != expected_token_decode
         || token_page_identity != expected_token_page.identity
         || ast_page_identity != expected_ast_page.identity
+        || nir_page_identity != expected_nir_page.identity
     {
         return Err(
-            "Nuis candidate scalar output disagrees with the independent host fold, token decode, token page, or AST structural page identity".to_owned(),
+            "Nuis candidate scalar output disagrees with the independent host fold, token decode, token page, AST page, or NIR page identity".to_owned(),
         );
     }
 
@@ -187,19 +205,30 @@ pub(crate) fn run_candidate_adapter(
         token_decode,
         token_page: expected_token_page,
         ast_page: expected_ast_page,
+        nir_page: expected_nir_page,
     })
 }
 
 fn parse_adapter_output(
     bytes: &[u8],
-) -> Result<(Vec<usize>, usize, CompilerTokenDecodeSummary, usize, usize), String> {
+) -> Result<
+    (
+        Vec<usize>,
+        usize,
+        CompilerTokenDecodeSummary,
+        usize,
+        usize,
+        usize,
+    ),
+    String,
+> {
     let source = std::str::from_utf8(bytes)
         .map_err(|error| format!("candidate scalar output is not UTF-8: {error}"))?;
     if source.contains('\r') || source.contains('\0') || !source.ends_with('\n') {
         return Err("candidate scalar output must use canonical UTF-8/LF text".to_owned());
     }
     let lines = source.lines().collect::<Vec<_>>();
-    if lines.len() != 11 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
+    if lines.len() != 12 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
         return Err("candidate scalar output has an invalid protocol or line count".to_owned());
     }
     let stage_folds = (0..5)
@@ -212,12 +241,14 @@ fn parse_adapter_output(
     };
     let token_page_identity = parse_output_usize(lines[9], "tokens.page_identity")?;
     let ast_page_identity = parse_output_usize(lines[10], "ast.page_identity")?;
+    let nir_page_identity = parse_output_usize(lines[11], "nir.page_identity")?;
     Ok((
         stage_folds,
         bundle_fold,
         token_decode,
         token_page_identity,
         ast_page_identity,
+        nir_page_identity,
     ))
 }
 
@@ -279,6 +310,13 @@ extern int64_t nuis_bootstrap_candidate_ast_page_identity_v1(
     int64_t word10, int64_t word11, int64_t word12, int64_t word13, int64_t word14,
     int64_t word15, int64_t word16, int64_t word17, int64_t word18
 );
+extern int64_t nuis_bootstrap_candidate_nir_page_identity_v1(
+    int64_t length,
+    int64_t word0, int64_t word1, int64_t word2, int64_t word3, int64_t word4,
+    int64_t word5, int64_t word6, int64_t word7, int64_t word8, int64_t word9,
+    int64_t word10, int64_t word11, int64_t word12, int64_t word13, int64_t word14,
+    int64_t word15, int64_t word16, int64_t word17, int64_t word18
+);
 
 static void pack_page_byte(
     int64_t* length,
@@ -300,7 +338,9 @@ static int fold_file(
     int64_t* token_page_length,
     int64_t token_page_words[19],
     int64_t* ast_page_length,
-    int64_t ast_page_words[19]
+    int64_t ast_page_words[19],
+    int64_t* nir_page_length,
+    int64_t nir_page_words[19]
 ) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) return 65;
@@ -322,6 +362,10 @@ static int fold_file(
     if (ordinal == 2) {
         *ast_page_length = 0;
         for (int index = 0; index < 19; ++index) ast_page_words[index] = 0;
+    }
+    if (ordinal == 3) {
+        *nir_page_length = 0;
+        for (int index = 0; index < 19; ++index) nir_page_words[index] = 0;
     }
     for (;;) {
         int byte = fgetc(file);
@@ -351,6 +395,7 @@ static int fold_file(
             }
         }
         if (ordinal == 2) pack_page_byte(ast_page_length, ast_page_words, byte);
+        if (ordinal == 3) pack_page_byte(nir_page_length, nir_page_words, byte);
     }
     if (ferror(file) != 0) {
         fclose(file);
@@ -375,6 +420,8 @@ int main(int argc, char** argv) {
     int64_t token_page_words[19] = {0};
     int64_t ast_page_length = 0;
     int64_t ast_page_words[19] = {0};
+    int64_t nir_page_length = 0;
+    int64_t nir_page_words[19] = {0};
     for (int64_t ordinal = 0; ordinal < 5; ++ordinal) {
         int status = fold_file(
             argv[ordinal + 1],
@@ -385,7 +432,9 @@ int main(int argc, char** argv) {
             &token_page_length,
             token_page_words,
             &ast_page_length,
-            ast_page_words
+            ast_page_words,
+            &nir_page_length,
+            nir_page_words
         );
         if (status != 0) return status;
         bundle = nuis_bootstrap_candidate_bundle_fold_v1(bundle, ordinal, folds[ordinal]);
@@ -412,7 +461,18 @@ int main(int argc, char** argv) {
         ast_page_words[18]
     );
     if (ast_page_identity <= 0) return 72;
-    puts("protocol=nuis-bootstrap-candidate-scalar-output-v4");
+    int64_t nir_page_identity = nuis_bootstrap_candidate_nir_page_identity_v1(
+        nir_page_length,
+        nir_page_words[0], nir_page_words[1], nir_page_words[2],
+        nir_page_words[3], nir_page_words[4], nir_page_words[5],
+        nir_page_words[6], nir_page_words[7], nir_page_words[8],
+        nir_page_words[9], nir_page_words[10], nir_page_words[11],
+        nir_page_words[12], nir_page_words[13], nir_page_words[14],
+        nir_page_words[15], nir_page_words[16], nir_page_words[17],
+        nir_page_words[18]
+    );
+    if (nir_page_identity <= 0) return 73;
+    puts("protocol=nuis-bootstrap-candidate-scalar-output-v5");
     for (int ordinal = 0; ordinal < 5; ++ordinal) {
         printf("stage.%d=%lld\n", ordinal, (long long)folds[ordinal]);
     }
@@ -421,6 +481,7 @@ int main(int argc, char** argv) {
     printf("tokens.semantic_fold=%lld\n", (long long)token_semantic);
     printf("tokens.page_identity=%lld\n", (long long)token_page_identity);
     printf("ast.page_identity=%lld\n", (long long)ast_page_identity);
+    printf("nir.page_identity=%lld\n", (long long)nir_page_identity);
     return 0;
 }
 "#
@@ -432,7 +493,7 @@ mod tests {
 
     #[test]
     fn adapter_output_parser_requires_exact_order_and_utf8_lf() {
-        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v4\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\n";
+        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v5\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nnir.page_identity=11\n";
         assert_eq!(
             parse_adapter_output(source).unwrap(),
             (
@@ -444,10 +505,11 @@ mod tests {
                 },
                 9,
                 10,
+                11,
             )
         );
 
-        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v4\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\n";
+        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v5\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nnir.page_identity=11\n";
         assert!(parse_adapter_output(reordered).is_err());
         assert!(parse_adapter_output(&source[..source.len() - 1]).is_err());
     }

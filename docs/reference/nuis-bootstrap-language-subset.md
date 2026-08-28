@@ -1,8 +1,8 @@
 # Nuis Bootstrap Language Subset
 
 This reference freezes the first compiler-authoring source boundary as
-`nuis-bootstrap-language-subset-v5`. Its machine-readable inventory is
-[nuis-bootstrap-language-subset-v5.toml](nuis-bootstrap-language-subset-v5.toml),
+`nuis-bootstrap-language-subset-v6`. Its machine-readable inventory is
+[nuis-bootstrap-language-subset-v6.toml](nuis-bootstrap-language-subset-v6.toml),
 and the executable policy lives in `nuis-semantics`.
 
 This is not a promise to keep the public Nuis language frozen. It is a narrow,
@@ -25,7 +25,7 @@ cargo run -q -p nuisc -- bootstrap-check tests/fixtures/bootstrap/accepted/compi
 
 An accepted report means two independent conditions hold:
 
-1. Every project-local AST module obeys the v5 allowlist.
+1. Every project-local AST module obeys the v6 allowlist.
 2. The same input crosses the normal semantic, NIR, YIR, and LLVM emission
    checks without an error.
 
@@ -35,7 +35,7 @@ obeys the allowlist but fails normal compilation also exits nonzero with
 
 ## Frozen Surface
 
-V5 permits only `mod cpu` compiler modules. Local CPU modules may import each
+V6 permits only `mod cpu` compiler modules. Local CPU modules may import each
 other; external imports are limited to `CorePrelude`, `StdLanguageCore`,
 `StdCompilerData`, `StdCompilerTokenEmit`, `StdCompilerTokens`,
 `StdCompilerProjection`, and
@@ -56,22 +56,24 @@ calls, struct literals, field access, integer/Boolean operators, `if`, `match`,
 
 The source spellings `loop { ... }`, `else if`, and `if let` are also accepted.
 They normalize before subset validation to `while true`, nested `if`, and a
-two-arm `match` respectively, so subset v5 gains no new AST capability or
+two-arm `match` respectively, so subset v6 gains no new AST capability or
 policy bypass.
 
-Documentation attributes are generally the only metadata dependency. Fourteen
+Documentation attributes are generally the only metadata dependency. Fifteen
 exact all-`i64` `@export` signatures are additionally reserved for the stage1
-candidate's scalar fold, token-decoder, token-page, and AST-page identity ABI.
+candidate's scalar fold, token-decoder, token-page, AST-page, and NIR-page
+identity ABI.
 Function name, symbol name, parameter count, and return type must all match the
 machine-readable allowlist; every other export remains `NBS004`. Diagnostics
-must be returned as data rather than printed by a compiler component. V5
-preserves the v4 imports and capabilities, adds `CompilerProjectionPageState`,
-and adds only the exact twenty-parameter AST-page export. It does not admit a
-new language capability class.
+must be returned as data rather than printed by a compiler component. V6
+preserves the v5 imports, types, and capabilities and adds only the exact
+twenty-parameter NIR-page export. The AST and NIR exports share the same
+`CompilerProjectionPageState` scanner; no new language capability class is
+admitted.
 
 ## Deliberate Exclusions
 
-V5 rejects these capabilities even when the wider language supports them:
+V6 rejects these capabilities even when the wider language supports them:
 
 - shader, kernel, network, data, CFFI, and other non-CPU domains
 - arbitrary library imports, extern declarations, and FFI interfaces

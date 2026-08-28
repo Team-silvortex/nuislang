@@ -285,11 +285,21 @@ mod cpu StdCompilerProjection {
     };
   }
 
-  pub fn compiler_projection_page_start_ast() -> CompilerProjectionPageState {
+  pub fn compiler_projection_page_start(
+    projection: CompilerProjectionKind
+  ) -> CompilerProjectionPageState {
     return compiler_projection_page_state(
-      compiler_projection_start(compiler_projection_ast_kind()),
+      compiler_projection_start(projection),
       0, 0, 431, 0, 0, false, 0, 0
     );
+  }
+
+  pub fn compiler_projection_page_start_ast() -> CompilerProjectionPageState {
+    return compiler_projection_page_start(compiler_projection_ast_kind());
+  }
+
+  pub fn compiler_projection_page_start_nir() -> CompilerProjectionPageState {
+    return compiler_projection_page_start(compiler_projection_nir_kind());
   }
 
   pub fn compiler_projection_page_fail(
@@ -446,10 +456,11 @@ mod cpu StdCompilerProjection {
     return compiler_projection_page_step_at(s14, input, offset + 15);
   }
 
-  pub fn compiler_projection_page_decode_ast_raw(
-    input: CompilerTokenBuffer
+  pub fn compiler_projection_page_decode_raw(
+    input: CompilerTokenBuffer,
+    projection: CompilerProjectionKind
   ) -> CompilerProjectionPageState {
-    let s0: CompilerProjectionPageState = compiler_projection_page_start_ast();
+    let s0: CompilerProjectionPageState = compiler_projection_page_start(projection);
     let s1: CompilerProjectionPageState = compiler_projection_page_step_chunk(s0, input, 0);
     let s2: CompilerProjectionPageState = compiler_projection_page_step_chunk(s1, input, 16);
     let s3: CompilerProjectionPageState = compiler_projection_page_step_chunk(s2, input, 32);
@@ -458,6 +469,18 @@ mod cpu StdCompilerProjection {
     let s6: CompilerProjectionPageState = compiler_projection_page_step_chunk(s5, input, 80);
     let s7: CompilerProjectionPageState = compiler_projection_page_step_chunk(s6, input, 96);
     return compiler_projection_page_step_chunk(s7, input, 112);
+  }
+
+  pub fn compiler_projection_page_decode_ast_raw(
+    input: CompilerTokenBuffer
+  ) -> CompilerProjectionPageState {
+    return compiler_projection_page_decode_raw(input, compiler_projection_ast_kind());
+  }
+
+  pub fn compiler_projection_page_decode_nir_raw(
+    input: CompilerTokenBuffer
+  ) -> CompilerProjectionPageState {
+    return compiler_projection_page_decode_raw(input, compiler_projection_nir_kind());
   }
 
   pub fn compiler_projection_page_bool(value: bool) -> i64 {
@@ -487,16 +510,32 @@ mod cpu StdCompilerProjection {
     return compiler_projection_page_fold(h12, state.input_bytes);
   }
 
-  pub fn compiler_projection_ast_page_identity_raw(
-    input: CompilerTokenBuffer
+  pub fn compiler_projection_page_identity_raw(
+    input: CompilerTokenBuffer,
+    projection: CompilerProjectionKind
   ) -> i64 {
     if compiler_token_buffer_shape_valid(input) == false {
       return -3;
     }
-    let state: CompilerProjectionPageState = compiler_projection_page_decode_ast_raw(input);
+    let state: CompilerProjectionPageState = compiler_projection_page_decode_raw(
+      input,
+      projection
+    );
     if state.error != 0 { return -state.error; }
     if state.projection.record_count == 0 { return -2; }
     let hash: i64 = compiler_projection_page_state_hash(state);
     return (hash * 129) + input.length;
+  }
+
+  pub fn compiler_projection_ast_page_identity_raw(
+    input: CompilerTokenBuffer
+  ) -> i64 {
+    return compiler_projection_page_identity_raw(input, compiler_projection_ast_kind());
+  }
+
+  pub fn compiler_projection_nir_page_identity_raw(
+    input: CompilerTokenBuffer
+  ) -> i64 {
+    return compiler_projection_page_identity_raw(input, compiler_projection_nir_kind());
   }
 }

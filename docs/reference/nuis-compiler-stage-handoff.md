@@ -93,21 +93,21 @@ The first identity-projection path is now stage1-candidate ready:
   payloads and computes a Nuis-owned deterministic stage/bundle fold.
 * `nuis bootstrap-candidate-build` materializes a separately identified
   candidate handoff and binds it through
-  `nuis-compiler-candidate-production-v4`.
-* The adapter blindly transports both token and AST 128-byte prefixes. Nuis
+  `nuis-compiler-candidate-production-v5`.
+* The adapter blindly transports token, AST, and NIR 128-byte prefixes. Nuis
   owns the token records plus canonical emission and independently scans
-  complete AST records plus unfinished-line continuation state.
-* The Nuis consumer still does not paginate either stream, produce a NIR page,
-  or emit a non-identity transformation.
+  complete AST/NIR records plus their unfinished-line continuation states.
+* The Nuis consumer still does not paginate these streams or emit a
+  non-identity transformation.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
   contracts; matching payload hashes alone never authorize it.
 
-The independent codec, native Nuis consumer, bounded token and AST pages,
+The independent codec, native Nuis consumer, bounded token, AST, and NIR pages,
 production proof, and `13/13` differential advance this coordinate to
-`usable/90`. The next closure task carries a NIR structural page or a
-continuation-linked second page behind the same producer-neutral boundary. See
+`usable/91`. The next closure task carries a continuation-linked second page
+behind the same producer-neutral boundary. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
 and [Nuis Compiler Component Build](nuis-compiler-component-build.md).
@@ -129,5 +129,5 @@ tampering after a recomputed SHA/parent/bundle chain, invalid order and paths,
 explicit YIR parsing, empty and escaped YIR arguments, normal AOT artifact
 hashing, cache reuse, native execution of the pure Nuis compiler-data
 component, native execution plus tamper rejection for the first typed Nuis
-structural consumer, and independent agreement on the AST first-page
-continuation state.
+structural consumer, and independent agreement on the AST and NIR first-page
+continuation states.
