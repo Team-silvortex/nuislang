@@ -32,10 +32,9 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`696/696` passing drift checks. The bootstrap-critical surface averages
-`98/100`; the weakest coordinate remains
-`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `90/100`. The
-compiler data model, stage driver, and differential gate are all `usable/91`.
+`696/696` passing drift checks. The weakest bootstrap-readiness coordinate is
+`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `92/100`. The
+compiler data model, stage driver, and differential gate are all `usable/93`.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -49,21 +48,21 @@ fixture plus the real candidate's 91-byte `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
 store, canonically re-emits the same bytes and hash, and executes natively at
 deterministic score `122`; the producer-neutral five-stage handoff is now
-`usable`, `90/100`. Its shared structural codec independently parses
+`usable`, `92/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
 image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
-then feeds all five serialized payloads through fifteen exact Nuis scalar
+then feeds all five serialized payloads through sixteen exact Nuis scalar
 exports, independently verifies their folds, drives the complete token payload
-through a bounded Nuis-native DFA, and transports the first 128 opaque bytes
-from the token, AST, and NIR payloads. Nuis canonically re-emits the real 91-byte
-token page with hash `1277127995`, then scans three complete AST records and
-four complete NIR records while retaining each unfinished line in a
-deterministic continuation state. The artifact layer independently verifies
-token identity `164749511446`, AST identity `174028320749`, and NIR identity
-`132469386887` before production v5 emits the distinct
-`nuis-stage1-token-ast-nir-materializer-v5` candidate and reaches repository-native
+through a bounded Nuis-native DFA, and transports one token page plus two
+opaque AST and NIR pages. Nuis canonically re-emits the real 91-byte token page
+with hash `1277127995`, then serializes eight-lane cursors and resumes both
+structural projections. The artifact layer independently verifies token
+identity `164749511446`, first AST/NIR identities `174028320749` and
+`132469386887`, and second-page identities `149528711957` and `146705724977`
+before production v6 emits the distinct
+`nuis-stage1-token-ast-nir-continuation-materializer-v6` candidate and reaches repository-native
 `13/13` differential equivalence while retaining `replacement_authorized =
 false`. `nuis
 bootstrap-reproducibility` now performs

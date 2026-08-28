@@ -5,7 +5,9 @@ use sha2::{Digest, Sha256};
 use super::CompilerCandidateProductionRecord;
 use crate::{
     toml::{parse_optional_map_usize, parse_required_map_string_in_block},
-    ArtifactError,
+    ArtifactError, CompilerProjectionPageIdentity, COMPILER_PROJECTION_CURSOR_CONTRACT,
+    COMPILER_PROJECTION_PAGE_BYTES, COMPILER_PROJECTION_PAGE_CONTRACT,
+    COMPILER_PROJECTION_PAGE_HASH_MODULUS, COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,
 };
 
 pub(super) fn parse_record_blocks(
@@ -138,6 +140,57 @@ pub(super) fn validate_sha256(value: &str, label: &str) -> Result<(), ArtifactEr
     Err(ArtifactError::new(format!(
         "compiler candidate production {label} must be lowercase SHA-256"
     )))
+}
+
+pub(super) fn validate_projection_page_summary(
+    label: &str,
+    contract: &str,
+    page: CompilerProjectionPageIdentity,
+) -> Result<(), ArtifactError> {
+    if contract != COMPILER_PROJECTION_PAGE_CONTRACT
+        || page.record_count == 0
+        || page.record_count > page.page_bytes
+        || page.page_bytes == 0
+        || page.page_bytes > COMPILER_PROJECTION_PAGE_BYTES
+        || page.projection_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || page.continuation_indentation > page.page_bytes
+        || page.continuation_body_bytes > page.page_bytes
+        || page.continuation_indentation + page.continuation_body_bytes > page.page_bytes
+        || page.continuation_body_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || page.state_hash >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || page.identity
+            != page.state_hash * COMPILER_PROJECTION_PAGE_IDENTITY_RADIX + page.page_bytes
+    {
+        return Err(ArtifactError::new(format!(
+            "compiler candidate production {label} structural page summary is invalid"
+        )));
+    }
+    Ok(())
+}
+
+pub(super) fn validate_projection_chain_summary(
+    label: &str,
+    cursor_contract: &str,
+    first_cursor_identity: usize,
+    continuation_page_identity: usize,
+    continuation_cursor_identity: usize,
+) -> Result<(), ArtifactError> {
+    let continuation_bytes = continuation_page_identity % COMPILER_PROJECTION_PAGE_IDENTITY_RADIX;
+    let continuation_state = continuation_page_identity / COMPILER_PROJECTION_PAGE_IDENTITY_RADIX;
+    if cursor_contract != COMPILER_PROJECTION_CURSOR_CONTRACT
+        || first_cursor_identity == 0
+        || first_cursor_identity >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || continuation_cursor_identity == 0
+        || continuation_cursor_identity >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+        || continuation_bytes == 0
+        || continuation_bytes > COMPILER_PROJECTION_PAGE_BYTES
+        || continuation_state >= COMPILER_PROJECTION_PAGE_HASH_MODULUS
+    {
+        return Err(ArtifactError::new(format!(
+            "compiler candidate production {label} structural page chain is invalid"
+        )));
+    }
+    Ok(())
 }
 
 pub(super) fn sha256_hex(bytes: &[u8]) -> String {

@@ -460,8 +460,17 @@ mod cpu StdCompilerProjection {
     input: CompilerTokenBuffer,
     projection: CompilerProjectionKind
   ) -> CompilerProjectionPageState {
-    let s0: CompilerProjectionPageState = compiler_projection_page_start(projection);
-    let s1: CompilerProjectionPageState = compiler_projection_page_step_chunk(s0, input, 0);
+    return compiler_projection_page_decode_from_raw(
+      compiler_projection_page_start(projection),
+      input
+    );
+  }
+
+  pub fn compiler_projection_page_decode_from_raw(
+    state: CompilerProjectionPageState,
+    input: CompilerTokenBuffer
+  ) -> CompilerProjectionPageState {
+    let s1: CompilerProjectionPageState = compiler_projection_page_step_chunk(state, input, 0);
     let s2: CompilerProjectionPageState = compiler_projection_page_step_chunk(s1, input, 16);
     let s3: CompilerProjectionPageState = compiler_projection_page_step_chunk(s2, input, 32);
     let s4: CompilerProjectionPageState = compiler_projection_page_step_chunk(s3, input, 48);
@@ -537,5 +546,175 @@ mod cpu StdCompilerProjection {
     input: CompilerTokenBuffer
   ) -> i64 {
     return compiler_projection_page_identity_raw(input, compiler_projection_nir_kind());
+  }
+
+  pub fn compiler_projection_page_cursor_state(
+    projection: CompilerProjectionKind,
+    cursor0: i64,
+    cursor1: i64,
+    cursor2: i64,
+    cursor3: i64,
+    cursor4: i64,
+    cursor5: i64,
+    cursor6: i64,
+    cursor7: i64
+  ) -> CompilerProjectionPageState {
+    let start: CompilerProjectionPageState = compiler_projection_page_start(projection);
+    if start.projection.error != 0 { return start; }
+    if cursor0 == -1 {
+      if cursor1 == 0 && cursor2 == 0 && cursor3 == 0 && cursor4 == 0
+        && cursor5 == 0 && cursor6 == 0 && cursor7 == 0 {
+        return start;
+      }
+      return compiler_projection_page_fail(start, 5);
+    }
+    if cursor0 < 0 || cursor1 < 0 || cursor2 <= 0 || cursor3 < 0
+      || cursor4 < 0 || cursor5 < 0 || cursor6 < 0 || cursor7 < 0 {
+      return compiler_projection_page_fail(start, 5);
+    }
+    let flags: i64 = cursor0 % 32;
+    let input_bytes: i64 = cursor0 / 32;
+    let is_ast: i64 = flags % 2;
+    let module_seen: i64 = (flags / 2) % 2;
+    let imports_started: i64 = (flags / 4) % 2;
+    let opaque_leaf_open: i64 = (flags / 8) % 2;
+    let line_open_code: i64 = (flags / 16) % 2;
+    let expected_is_ast: i64 = if projection == 1 { 1 } else { 0 };
+    let prefix: i64 = cursor7 / 257;
+    let last_byte: i64 = cursor7 % 257;
+    if is_ast != expected_is_ast || opaque_leaf_open != 0 || input_bytes <= 0
+      || cursor3 >= 2147483647 || cursor6 >= 2147483647
+      || prefix > 4294967295 || last_byte > 255
+      || (module_seen == 0 && cursor1 != 0) {
+      return compiler_projection_page_fail(start, 5);
+    }
+    let line_open: bool = line_open_code == 1;
+    if line_open == false && (
+      cursor5 != 0 || cursor6 != 431 || prefix != 0 || last_byte != 0
+    ) {
+      return compiler_projection_page_fail(start, 5);
+    }
+    if line_open && (
+      cursor5 == 0 || last_byte < 32 || last_byte == 127 || last_byte > 255
+    ) {
+      return compiler_projection_page_fail(start, 5);
+    }
+    let resumed: CompilerProjectionState = CompilerProjectionState {
+      is_ast: is_ast,
+      module_seen: module_seen,
+      imports_started: imports_started,
+      previous_depth: cursor1,
+      opaque_leaf_open: opaque_leaf_open,
+      record_count: cursor2,
+      hash: cursor3,
+      error: 0
+    };
+    return compiler_projection_page_state(
+      resumed,
+      cursor4,
+      cursor5,
+      cursor6,
+      prefix,
+      last_byte,
+      line_open,
+      input_bytes,
+      0
+    );
+  }
+
+  pub fn compiler_projection_page_cursor_lane(
+    state: CompilerProjectionPageState,
+    selector: i64
+  ) -> i64 {
+    let flags: i64 = state.projection.is_ast
+      + state.projection.module_seen * 2
+      + state.projection.imports_started * 4
+      + state.projection.opaque_leaf_open * 8
+      + compiler_projection_page_bool(state.line_open) * 16;
+    if selector == 1 { return state.input_bytes * 32 + flags; }
+    if selector == 2 { return state.projection.previous_depth; }
+    if selector == 3 { return state.projection.record_count; }
+    if selector == 4 { return state.projection.hash; }
+    if selector == 5 { return state.indentation; }
+    if selector == 6 { return state.body_length; }
+    if selector == 7 { return state.body_hash; }
+    if selector == 8 { return state.prefix * 257 + state.last_byte; }
+    return -5;
+  }
+
+  pub fn compiler_projection_page_cursor_identity(
+    state: CompilerProjectionPageState
+  ) -> i64 {
+    let h0: i64 = compiler_projection_page_fold(
+      443,
+      compiler_projection_page_cursor_lane(state, 1)
+    );
+    let h1: i64 = compiler_projection_page_fold(
+      h0,
+      compiler_projection_page_cursor_lane(state, 2)
+    );
+    let h2: i64 = compiler_projection_page_fold(
+      h1,
+      compiler_projection_page_cursor_lane(state, 3)
+    );
+    let h3: i64 = compiler_projection_page_fold(
+      h2,
+      compiler_projection_page_cursor_lane(state, 4)
+    );
+    let h4: i64 = compiler_projection_page_fold(
+      h3,
+      compiler_projection_page_cursor_lane(state, 5)
+    );
+    let h5: i64 = compiler_projection_page_fold(
+      h4,
+      compiler_projection_page_cursor_lane(state, 6)
+    );
+    let h6: i64 = compiler_projection_page_fold(
+      h5,
+      compiler_projection_page_cursor_lane(state, 7)
+    );
+    return compiler_projection_page_fold(
+      h6,
+      compiler_projection_page_cursor_lane(state, 8)
+    );
+  }
+
+  pub fn compiler_projection_page_resume_value_raw(
+    selector: i64,
+    projection: CompilerProjectionKind,
+    cursor0: i64,
+    cursor1: i64,
+    cursor2: i64,
+    cursor3: i64,
+    cursor4: i64,
+    cursor5: i64,
+    cursor6: i64,
+    cursor7: i64,
+    input: CompilerTokenBuffer
+  ) -> i64 {
+    if compiler_token_buffer_shape_valid(input) == false {
+      return -3;
+    }
+    let initial: CompilerProjectionPageState = compiler_projection_page_cursor_state(
+      projection,
+      cursor0, cursor1, cursor2, cursor3, cursor4, cursor5, cursor6, cursor7
+    );
+    if initial.error != 0 { return -initial.error; }
+    let state: CompilerProjectionPageState = compiler_projection_page_decode_from_raw(
+      initial,
+      input
+    );
+    if state.error != 0 { return -state.error; }
+    if state.projection.record_count == 0 { return -2; }
+    if selector == 0 {
+      return compiler_projection_page_state_hash(state) * 129 + input.length;
+    }
+    if selector >= 1 && selector <= 8 {
+      return compiler_projection_page_cursor_lane(state, selector);
+    }
+    if selector == 9 {
+      return compiler_projection_page_cursor_identity(state);
+    }
+    return -5;
   }
 }

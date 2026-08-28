@@ -1,12 +1,11 @@
 # Nuis Compiler Candidate Production
 
-`nuis-compiler-candidate-production-v5` is the attested path from an executed
+`nuis-compiler-candidate-production-v6` is the attested path from an executed
 Nuis compiler-shaped program to a separately identified `stage1-candidate`
-leaf. V5 retains the materialized canonical token and AST pages and adds the
-first Nuis-owned NIR structural page, including its partial-line continuation
-state.
+leaf. V6 retains the canonical token page and independently resumes both AST
+and NIR into a second structural page through serialized opaque cursors.
 The machine-readable contract is
-[nuis-compiler-candidate-production-v5.toml](nuis-compiler-candidate-production-v5.toml).
+[nuis-compiler-candidate-production-v6.toml](nuis-compiler-candidate-production-v6.toml).
 
 This closes one real compiler-data production loop. It does not mean that
 `nuisc` is self-hosted, and it never authorizes replacing stage0.
@@ -30,22 +29,24 @@ The output root contains:
 
 ## Producer Boundary
 
-The Nuis source exports fifteen exact scalar functions. Thirteen preserve the
-stage, bundle, complete-token-stream DFA, and canonical token-page ABI from v3.
-The fourteenth accepts an AST byte length plus nineteen `i64` words and returns
-the identity of its first 128-byte structural page. The fifteenth accepts the
-same scalar shape for the NIR page. Bootstrap subset v6 accepts only these exact
+The Nuis source exports sixteen exact scalar functions. The first fifteen
+preserve the stage, bundle, complete-token-stream DFA, canonical token page,
+and first AST/NIR page ABI from v5. The sixteenth is projection-generic: it
+accepts a selector, projection kind, eight opaque cursor lanes, a byte length,
+and nineteen packed `i64` words. It returns the page identity, one resulting
+cursor lane, or cursor identity. Bootstrap subset v7 accepts only these exact
 function names, symbols, parameter counts, and all-`i64` signatures. Arbitrary
 exports continue to fail as `NBS004`.
 
 The generated host adapter opens the five verified payload files and passes
 every byte, in order, through the Nuis fold functions. For the token payload it
 also maintains scalar DFA state and blindly packs at most 128 bytes into
-nineteen seven-byte little-endian words. It packs the AST and NIR prefixes
-through the same generic byte transport, without recognizing documentation,
-imports, module headers, indentation, or record kinds. It does not decode
-payloads, canonicalize values, compute any page identity, or make authority
-decisions.
+nineteen seven-byte little-endian words. It packs the first two AST and NIR
+pages through the same generic byte transport, without recognizing
+documentation, imports, module headers, indentation, or record kinds. For each
+call it only supplies raw words and transports eight returned cursor lanes into
+the next call. It does not decode payloads, canonicalize values, compute any
+page or cursor identity, or make authority decisions.
 
 Inside the Nuis image, `StdCompilerTokens` validates the stream grammar and
 `CompilerTokenMaterializer` reconstructs four records into
@@ -100,15 +101,35 @@ state hash = 1026894471
 identity = 1026894471 * 129 + 128 = 132469386887
 ```
 
-The artifact layer independently reconstructs this page from ordinal-three
-stage bytes before the producer can attest it. AST and NIR therefore share one
-Nuis implementation and one producer-neutral page contract while remaining
-separate projection domains.
+After the first page, Nuis serializes eight state lanes under
+`nuis-compiler-structural-cursor-v1`. The lanes retain only the generic scanner
+state needed to resume: consumed-byte metadata and flags, previous depth,
+cumulative record count and hash, indentation, unfinished body length/hash,
+and bounded line-prefix state. The adapter cannot interpret them. It sends the
+same lanes back with the next 128 raw bytes, and Nuis validates the cursor
+before scanning the continuation.
+
+The real candidate pins both page chains:
 
 ```text
-host adapter = opaque token/AST/NIR byte transport and scalar orchestration
-Nuis image = folds, token materialization/emission, AST/NIR page identities
-artifact layer = independent token/AST/NIR decoding, verification, and authority
+AST first cursor identity = 1136712771
+AST second page identity = 149528711957
+AST second cursor identity = 1472919348
+NIR first cursor identity = 754343074
+NIR second page identity = 146705724977
+NIR second cursor identity = 38998897
+```
+
+The artifact layer independently reconstructs both pages and both cursors from
+the complete ordinal-two and ordinal-three payload bytes before the producer
+can attest them. AST and NIR therefore share one Nuis implementation, one
+producer-neutral page contract, and one resumable cursor contract while
+remaining separate projection domains.
+
+```text
+host adapter = opaque token/AST/NIR byte and cursor transport
+Nuis image = folds, token materialization/emission, resumable AST/NIR scanning
+artifact layer = independent page-chain replay, verification, and authority
 ```
 
 The adapter is rebuilt without the ordinary process `main`; the normal Nuis
@@ -119,26 +140,28 @@ are part of the production proof.
 
 The candidate handoff preserves the producer-neutral semantic bundle while
 changing the auditable producer identity to
-`nuis-stage1-token-ast-nir-materializer-v5`. The promoted component keeps the same
-component identity, native output, dependency closure, and five stage payloads,
-but declares the explicit `stage1-candidate` role and uses the executed Nuis
-image as its compiler image.
+`nuis-stage1-token-ast-nir-continuation-materializer-v6`. The promoted
+component keeps the same component identity, native output, dependency closure,
+and five stage payloads, but declares the explicit `stage1-candidate` role and
+uses the executed Nuis image as its compiler image.
 
 The production proof binds both components, the earlier execution proof, the
 candidate image, all five byte lengths/SHA-256/folds, the bundle fold, token
 count and semantic fold, canonical token-page fields, every AST and NIR page
-and continuation field, and the adapter.
+and first-page field, both cursor identities, both second-page identities, and
+the adapter.
 `bootstrap-diff` verifies this proof before writing its report. Changing the
-adapter, token page, AST/NIR page, stage payload, role, producer, component
+adapter, token page, AST/NIR page or cursor, stage payload, role, producer, component
 record, or proof therefore fails closed.
 
 ## Current Limit
 
-V5 materializes one fixed-capacity token page and one fixed-size structural page
-for both AST and NIR. It does not paginate the rest of these streams or
-transform stage bytes. The fixed eight-by-sixteen-byte execution shape remains
-intentional until arbitrary aggregate loop-carried backedges have native
-lowering; this contract does not claim that general loop capability.
+V6 materializes one fixed-capacity token page and binds exactly two fixed-size
+structural pages for both AST and NIR. The generic Nuis resume function can
+continue again with the resulting cursor, but production does not yet attest a
+third page or transform stage bytes. The scalar boundary remains intentional
+until arbitrary aggregate loop-carried backedges have native lowering; this
+contract does not claim that general loop capability.
 
 Local reproducibility remains proven across two empty,
 compile-cache-bypassed roots by `nuis bootstrap-reproducibility`. Independent

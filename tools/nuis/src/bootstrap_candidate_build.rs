@@ -27,7 +27,7 @@ use crate::{
 const STAGE0_DIR: &str = "stage0";
 const CANDIDATE_DIR: &str = "stage1-candidate";
 const STAGE_HANDOFF_FILE: &str = "nuis.compiler-stage-handoff.toml";
-const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-token-ast-nir-materializer-v5";
+const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-token-ast-nir-continuation-materializer-v6";
 
 pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
@@ -141,8 +141,8 @@ fn handle_bootstrap_candidate_build_with_cache(
         bundle_fold: adapter.bundle_fold,
         token_decode: &adapter.token_decode,
         token_page: &adapter.token_page,
-        ast_page: &adapter.ast_page,
-        nir_page: &adapter.nir_page,
+        ast_pages: &adapter.ast_pages,
+        nir_pages: &adapter.nir_pages,
         adapter_file: adapter.adapter_file,
         adapter: &adapter.adapter,
     })
@@ -204,8 +204,16 @@ fn handle_bootstrap_candidate_build_with_cache(
         verified_production.ast_page_identity
     );
     println!(
+        "  ast_continuation_page_identity: {}",
+        verified_production.ast_continuation_page_identity
+    );
+    println!(
         "  nir_page_identity: {}",
         verified_production.nir_page_identity
+    );
+    println!(
+        "  nir_continuation_page_identity: {}",
+        verified_production.nir_continuation_page_identity
     );
     println!("  production_sha256: {}", verified_production.proof_sha256);
     println!("  differential: {}", differential.verdict);

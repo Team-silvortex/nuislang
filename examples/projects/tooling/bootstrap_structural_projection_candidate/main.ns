@@ -264,6 +264,56 @@ mod cpu Main {
     );
   }
 
+  @export(name = "nuis_bootstrap_candidate_projection_page_resume_value_v1")
+  fn compiler_candidate_projection_page_resume_value(
+    selector: i64,
+    projection: i64,
+    cursor0: i64,
+    cursor1: i64,
+    cursor2: i64,
+    cursor3: i64,
+    cursor4: i64,
+    cursor5: i64,
+    cursor6: i64,
+    cursor7: i64,
+    length: i64,
+    word0: i64,
+    word1: i64,
+    word2: i64,
+    word3: i64,
+    word4: i64,
+    word5: i64,
+    word6: i64,
+    word7: i64,
+    word8: i64,
+    word9: i64,
+    word10: i64,
+    word11: i64,
+    word12: i64,
+    word13: i64,
+    word14: i64,
+    word15: i64,
+    word16: i64,
+    word17: i64,
+    word18: i64
+  ) -> i64 {
+    if length <= 0 || length > 128 {
+      return -3;
+    }
+    let input: CompilerTokenBuffer = compiler_token_buffer_from_packed_raw(
+      length,
+      word0, word1, word2, word3, word4, word5, word6, word7, word8,
+      word9, word10, word11, word12, word13, word14, word15, word16,
+      word17, word18
+    );
+    return compiler_projection_page_resume_value_raw(
+      selector,
+      projection,
+      cursor0, cursor1, cursor2, cursor3, cursor4, cursor5, cursor6, cursor7,
+      input
+    );
+  }
+
   fn ast_projection() -> CompilerProjectionState {
     let state0: CompilerProjectionState = compiler_projection_start(
       compiler_projection_ast_kind()
@@ -450,6 +500,14 @@ mod cpu Main {
       97, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     ) >= 0 {
       return 82;
+    }
+    if compiler_candidate_projection_page_resume_value(
+      0, 2,
+      -1, 0, 0, 0, 0, 0, 0, 0,
+      0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ) >= 0 {
+      return 83;
     }
     let ast: CompilerProjectionState = ast_projection();
     if ast.error != 0 || ast.record_count != 6 {

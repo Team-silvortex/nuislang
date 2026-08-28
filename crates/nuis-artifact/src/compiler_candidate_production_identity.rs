@@ -17,6 +17,7 @@ pub(super) fn production_identity(proof: &CompilerCandidateProduction) -> String
         proof.adapter_file.as_bytes(),
         proof.adapter_sha256.as_bytes(),
         proof.token_decoder_contract.as_bytes(),
+        proof.projection_cursor_contract.as_bytes(),
         proof.ast_page_contract.as_bytes(),
         proof.nir_page_contract.as_bytes(),
     ] {
@@ -41,6 +42,9 @@ pub(super) fn production_identity(proof: &CompilerCandidateProduction) -> String
         proof.ast_page_continuation_body_hash,
         proof.ast_page_state_hash,
         proof.ast_page_identity,
+        proof.ast_page_cursor_identity,
+        proof.ast_continuation_page_identity,
+        proof.ast_continuation_cursor_identity,
         proof.nir_page_record_count,
         proof.nir_page_bytes,
         proof.nir_page_projection_hash,
@@ -49,6 +53,9 @@ pub(super) fn production_identity(proof: &CompilerCandidateProduction) -> String
         proof.nir_page_continuation_body_hash,
         proof.nir_page_state_hash,
         proof.nir_page_identity,
+        proof.nir_page_cursor_identity,
+        proof.nir_continuation_page_identity,
+        proof.nir_continuation_cursor_identity,
         usize::from(proof.replacement_authorized),
     ] {
         hash_field(&mut hash, &(value as u64).to_le_bytes());

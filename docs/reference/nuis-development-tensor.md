@@ -1748,13 +1748,13 @@ The five required coordinates are:
 * `compiler-toolchain/bootstrap/stage0-stage1-driver`
 * `developer-system/bootstrap/differential-reproducibility-gate`
 
-Subset v6 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the roadmap score, and readiness waits for all five to reach `stable/100`.
+Subset v7 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the roadmap score, and readiness waits for all five to reach `stable/100`.
 
-Production-bound token, AST, and NIR first pages move the stage-neutral boundary to `usable/91`;
-the attested candidate and two cache-bypassed clean builds keep both driver and
-reproducibility gate at `usable/92`. Data model v3 is `usable/92` through owned
-four-record token materialization, token identity `164749511446`, AST identity `174028320749`, and NIR identity `132469386887`.
-Deterministic page continuation is now the shared weakest boundary.
+Production-bound token data and two AST/NIR pages move the stage-neutral boundary to `usable/92`;
+the attested candidate and two cache-bypassed clean builds move both driver and
+reproducibility gate to `usable/93`. Data model v3 is `usable/93` through owned
+token identity `164749511446` plus second-page identities `149528711957` and `146705724977`.
+A deterministic non-identity stage1 transformation is now the shared weakest boundary.
 
 ## Runtime Lifecycle Loader Bootstrap
 

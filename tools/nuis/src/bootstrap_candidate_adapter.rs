@@ -2,13 +2,13 @@ use std::{fs, path::Path, process::Command};
 
 use nuis_artifact::{
     compiler_candidate_bundle_fold, compiler_candidate_stage_fold,
-    compiler_projection_first_page_identity, compiler_token_first_page_identity,
+    compiler_projection_two_page_identity, compiler_token_first_page_identity,
     decode_compiler_token_stream, parse_build_manifest, CompilerProjectionKind,
-    CompilerProjectionPageIdentity, CompilerStageHandoff, CompilerTokenDecodeSummary,
+    CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerTokenDecodeSummary,
     CompilerTokenPageIdentity, COMPILER_CANDIDATE_ADAPTER_FILE,
 };
 
-const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v5";
+const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v6";
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
 const ADAPTER_RUNTIME_OBJECT_FILE: &str = "nuis.compiler-candidate-runtime.o";
 
@@ -19,8 +19,27 @@ pub(crate) struct CandidateAdapterOutput {
     pub(crate) bundle_fold: usize,
     pub(crate) token_decode: CompilerTokenDecodeSummary,
     pub(crate) token_page: CompilerTokenPageIdentity,
-    pub(crate) ast_page: CompilerProjectionPageIdentity,
-    pub(crate) nir_page: CompilerProjectionPageIdentity,
+    pub(crate) ast_pages: CompilerProjectionTwoPageIdentity,
+    pub(crate) nir_pages: CompilerProjectionTwoPageIdentity,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AdapterProjectionOutput {
+    first_page_identity: usize,
+    first_cursor_identity: usize,
+    continuation_page_identity: usize,
+    continuation_cursor_identity: usize,
+}
+
+impl AdapterProjectionOutput {
+    fn from_pages(pages: CompilerProjectionTwoPageIdentity) -> Self {
+        Self {
+            first_page_identity: pages.first.page.identity,
+            first_cursor_identity: pages.first.cursor_identity,
+            continuation_page_identity: pages.second.page.identity,
+            continuation_cursor_identity: pages.second.cursor_identity,
+        }
+    }
 }
 
 pub(crate) fn run_candidate_adapter(
@@ -126,14 +145,8 @@ pub(crate) fn run_candidate_adapter(
             String::from_utf8_lossy(&output.stderr),
         ));
     }
-    let (
-        stage_folds,
-        bundle_fold,
-        token_decode,
-        token_page_identity,
-        ast_page_identity,
-        nir_page_identity,
-    ) = parse_adapter_output(&output.stdout)?;
+    let (stage_folds, bundle_fold, token_decode, token_page_identity, ast_output, nir_output) =
+        parse_adapter_output(&output.stdout)?;
     let expected_folds = payload_paths
         .iter()
         .enumerate()
@@ -165,9 +178,9 @@ pub(crate) fn run_candidate_adapter(
             payload_paths[2].display()
         )
     })?;
-    let expected_ast_page =
-        compiler_projection_first_page_identity(CompilerProjectionKind::Ast, &ast_bytes).map_err(
-            |error| format!("failed to independently materialize AST structural page: {error}"),
+    let expected_ast_pages =
+        compiler_projection_two_page_identity(CompilerProjectionKind::Ast, &ast_bytes).map_err(
+            |error| format!("failed to independently materialize AST structural pages: {error}"),
         )?;
     let nir_bytes = fs::read(&payload_paths[3]).map_err(|error| {
         format!(
@@ -175,19 +188,19 @@ pub(crate) fn run_candidate_adapter(
             payload_paths[3].display()
         )
     })?;
-    let expected_nir_page =
-        compiler_projection_first_page_identity(CompilerProjectionKind::Nir, &nir_bytes).map_err(
-            |error| format!("failed to independently materialize NIR structural page: {error}"),
+    let expected_nir_pages =
+        compiler_projection_two_page_identity(CompilerProjectionKind::Nir, &nir_bytes).map_err(
+            |error| format!("failed to independently materialize NIR structural pages: {error}"),
         )?;
     if stage_folds != expected_folds
         || bundle_fold != expected_bundle
         || token_decode != expected_token_decode
         || token_page_identity != expected_token_page.identity
-        || ast_page_identity != expected_ast_page.identity
-        || nir_page_identity != expected_nir_page.identity
+        || ast_output != AdapterProjectionOutput::from_pages(expected_ast_pages)
+        || nir_output != AdapterProjectionOutput::from_pages(expected_nir_pages)
     {
         return Err(
-            "Nuis candidate scalar output disagrees with the independent host fold, token decode, token page, AST page, or NIR page identity".to_owned(),
+            "Nuis candidate scalar output disagrees with the independent host fold, token decode, token page, AST page chain, or NIR page chain".to_owned(),
         );
     }
 
@@ -204,8 +217,8 @@ pub(crate) fn run_candidate_adapter(
         bundle_fold,
         token_decode,
         token_page: expected_token_page,
-        ast_page: expected_ast_page,
-        nir_page: expected_nir_page,
+        ast_pages: expected_ast_pages,
+        nir_pages: expected_nir_pages,
     })
 }
 
@@ -217,8 +230,8 @@ fn parse_adapter_output(
         usize,
         CompilerTokenDecodeSummary,
         usize,
-        usize,
-        usize,
+        AdapterProjectionOutput,
+        AdapterProjectionOutput,
     ),
     String,
 > {
@@ -228,7 +241,7 @@ fn parse_adapter_output(
         return Err("candidate scalar output must use canonical UTF-8/LF text".to_owned());
     }
     let lines = source.lines().collect::<Vec<_>>();
-    if lines.len() != 12 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
+    if lines.len() != 18 || lines[0] != format!("protocol={ADAPTER_OUTPUT_PROTOCOL}") {
         return Err("candidate scalar output has an invalid protocol or line count".to_owned());
     }
     let stage_folds = (0..5)
@@ -240,15 +253,37 @@ fn parse_adapter_output(
         semantic_fold: parse_output_usize(lines[8], "tokens.semantic_fold")?,
     };
     let token_page_identity = parse_output_usize(lines[9], "tokens.page_identity")?;
-    let ast_page_identity = parse_output_usize(lines[10], "ast.page_identity")?;
-    let nir_page_identity = parse_output_usize(lines[11], "nir.page_identity")?;
+    let ast_output = AdapterProjectionOutput {
+        first_page_identity: parse_output_usize(lines[10], "ast.page_identity")?,
+        first_cursor_identity: parse_output_usize(lines[11], "ast.page_cursor_identity")?,
+        continuation_page_identity: parse_output_usize(
+            lines[12],
+            "ast.continuation_page_identity",
+        )?,
+        continuation_cursor_identity: parse_output_usize(
+            lines[13],
+            "ast.continuation_cursor_identity",
+        )?,
+    };
+    let nir_output = AdapterProjectionOutput {
+        first_page_identity: parse_output_usize(lines[14], "nir.page_identity")?,
+        first_cursor_identity: parse_output_usize(lines[15], "nir.page_cursor_identity")?,
+        continuation_page_identity: parse_output_usize(
+            lines[16],
+            "nir.continuation_page_identity",
+        )?,
+        continuation_cursor_identity: parse_output_usize(
+            lines[17],
+            "nir.continuation_cursor_identity",
+        )?,
+    };
     Ok((
         stage_folds,
         bundle_fold,
         token_decode,
         token_page_identity,
-        ast_page_identity,
-        nir_page_identity,
+        ast_output,
+        nir_output,
     ))
 }
 
@@ -317,6 +352,16 @@ extern int64_t nuis_bootstrap_candidate_nir_page_identity_v1(
     int64_t word10, int64_t word11, int64_t word12, int64_t word13, int64_t word14,
     int64_t word15, int64_t word16, int64_t word17, int64_t word18
 );
+extern int64_t nuis_bootstrap_candidate_projection_page_resume_value_v1(
+    int64_t selector, int64_t projection,
+    int64_t cursor0, int64_t cursor1, int64_t cursor2, int64_t cursor3,
+    int64_t cursor4, int64_t cursor5, int64_t cursor6, int64_t cursor7,
+    int64_t length,
+    int64_t word0, int64_t word1, int64_t word2, int64_t word3, int64_t word4,
+    int64_t word5, int64_t word6, int64_t word7, int64_t word8, int64_t word9,
+    int64_t word10, int64_t word11, int64_t word12, int64_t word13, int64_t word14,
+    int64_t word15, int64_t word16, int64_t word17, int64_t word18
+);
 
 static void pack_page_byte(
     int64_t* length,
@@ -329,6 +374,20 @@ static void pack_page_byte(
     *length = page_index + 1;
 }
 
+static void pack_projection_byte(
+    int64_t* first_length,
+    int64_t first_words[19],
+    int64_t* second_length,
+    int64_t second_words[19],
+    int byte
+) {
+    if (*first_length < 128) {
+        pack_page_byte(first_length, first_words, byte);
+        return;
+    }
+    pack_page_byte(second_length, second_words, byte);
+}
+
 static int fold_file(
     const char* path,
     int64_t ordinal,
@@ -339,8 +398,12 @@ static int fold_file(
     int64_t token_page_words[19],
     int64_t* ast_page_length,
     int64_t ast_page_words[19],
+    int64_t* ast_second_page_length,
+    int64_t ast_second_page_words[19],
     int64_t* nir_page_length,
-    int64_t nir_page_words[19]
+    int64_t nir_page_words[19],
+    int64_t* nir_second_page_length,
+    int64_t nir_second_page_words[19]
 ) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) return 65;
@@ -361,11 +424,15 @@ static int fold_file(
     }
     if (ordinal == 2) {
         *ast_page_length = 0;
+        *ast_second_page_length = 0;
         for (int index = 0; index < 19; ++index) ast_page_words[index] = 0;
+        for (int index = 0; index < 19; ++index) ast_second_page_words[index] = 0;
     }
     if (ordinal == 3) {
         *nir_page_length = 0;
+        *nir_second_page_length = 0;
         for (int index = 0; index < 19; ++index) nir_page_words[index] = 0;
+        for (int index = 0; index < 19; ++index) nir_second_page_words[index] = 0;
     }
     for (;;) {
         int byte = fgetc(file);
@@ -394,8 +461,20 @@ static int fold_file(
                 return 69;
             }
         }
-        if (ordinal == 2) pack_page_byte(ast_page_length, ast_page_words, byte);
-        if (ordinal == 3) pack_page_byte(nir_page_length, nir_page_words, byte);
+        if (ordinal == 2) pack_projection_byte(
+            ast_page_length,
+            ast_page_words,
+            ast_second_page_length,
+            ast_second_page_words,
+            byte
+        );
+        if (ordinal == 3) pack_projection_byte(
+            nir_page_length,
+            nir_page_words,
+            nir_second_page_length,
+            nir_second_page_words,
+            byte
+        );
     }
     if (ferror(file) != 0) {
         fclose(file);
@@ -410,6 +489,89 @@ static int fold_file(
     return 0;
 }
 
+static int64_t projection_resume_value(
+    int64_t selector,
+    int64_t projection,
+    int64_t cursor[8],
+    int64_t length,
+    int64_t words[19]
+) {
+    return nuis_bootstrap_candidate_projection_page_resume_value_v1(
+        selector,
+        projection,
+        cursor[0], cursor[1], cursor[2], cursor[3],
+        cursor[4], cursor[5], cursor[6], cursor[7],
+        length,
+        words[0], words[1], words[2], words[3], words[4],
+        words[5], words[6], words[7], words[8], words[9],
+        words[10], words[11], words[12], words[13], words[14],
+        words[15], words[16], words[17], words[18]
+    );
+}
+
+static int projection_continuation(
+    int64_t projection,
+    int64_t first_length,
+    int64_t first_words[19],
+    int64_t second_length,
+    int64_t second_words[19],
+    int64_t expected_first_identity,
+    int64_t* first_cursor_identity,
+    int64_t* second_identity,
+    int64_t* second_cursor_identity
+) {
+    if (second_length <= 0) return 0;
+    int64_t fresh[8] = {-1, 0, 0, 0, 0, 0, 0, 0};
+    if (projection_resume_value(0, projection, fresh, first_length, first_words)
+        != expected_first_identity) return 0;
+    int64_t first_cursor[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int selector = 1; selector <= 8; ++selector) {
+        first_cursor[selector - 1] = projection_resume_value(
+            selector,
+            projection,
+            fresh,
+            first_length,
+            first_words
+        );
+        if (first_cursor[selector - 1] < 0) return 0;
+    }
+    *first_cursor_identity = projection_resume_value(
+        9,
+        projection,
+        fresh,
+        first_length,
+        first_words
+    );
+    *second_identity = projection_resume_value(
+        0,
+        projection,
+        first_cursor,
+        second_length,
+        second_words
+    );
+    int64_t second_cursor[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int selector = 1; selector <= 8; ++selector) {
+        second_cursor[selector - 1] = projection_resume_value(
+            selector,
+            projection,
+            first_cursor,
+            second_length,
+            second_words
+        );
+        if (second_cursor[selector - 1] < 0) return 0;
+    }
+    *second_cursor_identity = projection_resume_value(
+        9,
+        projection,
+        first_cursor,
+        second_length,
+        second_words
+    );
+    return *first_cursor_identity >= 0
+        && *second_identity > 0
+        && *second_cursor_identity >= 0;
+}
+
 int main(int argc, char** argv) {
     if (argc != 6) return 64;
     int64_t folds[5] = {0, 0, 0, 0, 0};
@@ -420,8 +582,12 @@ int main(int argc, char** argv) {
     int64_t token_page_words[19] = {0};
     int64_t ast_page_length = 0;
     int64_t ast_page_words[19] = {0};
+    int64_t ast_second_page_length = 0;
+    int64_t ast_second_page_words[19] = {0};
     int64_t nir_page_length = 0;
     int64_t nir_page_words[19] = {0};
+    int64_t nir_second_page_length = 0;
+    int64_t nir_second_page_words[19] = {0};
     for (int64_t ordinal = 0; ordinal < 5; ++ordinal) {
         int status = fold_file(
             argv[ordinal + 1],
@@ -433,8 +599,12 @@ int main(int argc, char** argv) {
             token_page_words,
             &ast_page_length,
             ast_page_words,
+            &ast_second_page_length,
+            ast_second_page_words,
             &nir_page_length,
-            nir_page_words
+            nir_page_words,
+            &nir_second_page_length,
+            nir_second_page_words
         );
         if (status != 0) return status;
         bundle = nuis_bootstrap_candidate_bundle_fold_v1(bundle, ordinal, folds[ordinal]);
@@ -472,7 +642,35 @@ int main(int argc, char** argv) {
         nir_page_words[18]
     );
     if (nir_page_identity <= 0) return 73;
-    puts("protocol=nuis-bootstrap-candidate-scalar-output-v5");
+    int64_t ast_page_cursor_identity = 0;
+    int64_t ast_continuation_page_identity = 0;
+    int64_t ast_continuation_cursor_identity = 0;
+    if (!projection_continuation(
+        1,
+        ast_page_length,
+        ast_page_words,
+        ast_second_page_length,
+        ast_second_page_words,
+        ast_page_identity,
+        &ast_page_cursor_identity,
+        &ast_continuation_page_identity,
+        &ast_continuation_cursor_identity
+    )) return 74;
+    int64_t nir_page_cursor_identity = 0;
+    int64_t nir_continuation_page_identity = 0;
+    int64_t nir_continuation_cursor_identity = 0;
+    if (!projection_continuation(
+        2,
+        nir_page_length,
+        nir_page_words,
+        nir_second_page_length,
+        nir_second_page_words,
+        nir_page_identity,
+        &nir_page_cursor_identity,
+        &nir_continuation_page_identity,
+        &nir_continuation_cursor_identity
+    )) return 75;
+    puts("protocol=nuis-bootstrap-candidate-scalar-output-v6");
     for (int ordinal = 0; ordinal < 5; ++ordinal) {
         printf("stage.%d=%lld\n", ordinal, (long long)folds[ordinal]);
     }
@@ -481,7 +679,13 @@ int main(int argc, char** argv) {
     printf("tokens.semantic_fold=%lld\n", (long long)token_semantic);
     printf("tokens.page_identity=%lld\n", (long long)token_page_identity);
     printf("ast.page_identity=%lld\n", (long long)ast_page_identity);
+    printf("ast.page_cursor_identity=%lld\n", (long long)ast_page_cursor_identity);
+    printf("ast.continuation_page_identity=%lld\n", (long long)ast_continuation_page_identity);
+    printf("ast.continuation_cursor_identity=%lld\n", (long long)ast_continuation_cursor_identity);
     printf("nir.page_identity=%lld\n", (long long)nir_page_identity);
+    printf("nir.page_cursor_identity=%lld\n", (long long)nir_page_cursor_identity);
+    printf("nir.continuation_page_identity=%lld\n", (long long)nir_continuation_page_identity);
+    printf("nir.continuation_cursor_identity=%lld\n", (long long)nir_continuation_cursor_identity);
     return 0;
 }
 "#
@@ -493,7 +697,7 @@ mod tests {
 
     #[test]
     fn adapter_output_parser_requires_exact_order_and_utf8_lf() {
-        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v5\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nnir.page_identity=11\n";
+        let source = b"protocol=nuis-bootstrap-candidate-scalar-output-v6\nstage.0=1\nstage.1=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nast.page_cursor_identity=11\nast.continuation_page_identity=12\nast.continuation_cursor_identity=13\nnir.page_identity=14\nnir.page_cursor_identity=15\nnir.continuation_page_identity=16\nnir.continuation_cursor_identity=17\n";
         assert_eq!(
             parse_adapter_output(source).unwrap(),
             (
@@ -504,12 +708,22 @@ mod tests {
                     semantic_fold: 8,
                 },
                 9,
-                10,
-                11,
+                AdapterProjectionOutput {
+                    first_page_identity: 10,
+                    first_cursor_identity: 11,
+                    continuation_page_identity: 12,
+                    continuation_cursor_identity: 13,
+                },
+                AdapterProjectionOutput {
+                    first_page_identity: 14,
+                    first_cursor_identity: 15,
+                    continuation_page_identity: 16,
+                    continuation_cursor_identity: 17,
+                },
             )
         );
 
-        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v5\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nnir.page_identity=11\n";
+        let reordered = b"protocol=nuis-bootstrap-candidate-scalar-output-v6\nstage.1=1\nstage.0=2\nstage.2=3\nstage.3=4\nstage.4=5\nbundle=6\ntokens.record_count=7\ntokens.semantic_fold=8\ntokens.page_identity=9\nast.page_identity=10\nast.page_cursor_identity=11\nast.continuation_page_identity=12\nast.continuation_cursor_identity=13\nnir.page_identity=14\nnir.page_cursor_identity=15\nnir.continuation_page_identity=16\nnir.continuation_cursor_identity=17\n";
         assert!(parse_adapter_output(reordered).is_err());
         assert!(parse_adapter_output(&source[..source.len() - 1]).is_err());
     }

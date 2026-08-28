@@ -10,7 +10,7 @@ original four-slot proof remains frozen in
 
 The implementation is split across `StdLanguageCore`, `StdCompilerData`,
 `StdCompilerTokenEmit`, `StdCompilerTokens`, and `StdCompilerProjection`, all
-inside bootstrap subset v6. It proves that a compiler component can own text,
+inside bootstrap subset v7. It proves that a compiler component can own text,
 token records, canonical token serialization, structural page state, paths,
 source identity, allocation indices, maps, and diagnostics without borrowing
 Rust, C, libc, FFI, or host-language layouts.
@@ -96,7 +96,7 @@ candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 `StdCompilerTokens` DFA over those exact bytes into a fresh
 `CompilerTokenStore`, and the canonical emitter reproduces the same length
 and hash. Production additionally packs the actual handoff prefix through the
-fifteen-export scalar ABI, and the artifact layer independently verifies page
+sixteen-export scalar ABI, and the artifact layer independently verifies page
 identity `164749511446`. This proves an owned decode/re-emit round trip across
 the fifth and sixth former 16-byte boundaries on a real compiler prefix rather
 than only a synthetic capacity test.
@@ -122,17 +122,18 @@ materializers use eight deterministic sixteen-byte chunks and the scalar
 exports validate raw aggregate state explicitly. The native regression also
 pins open-record versus completed-record and partial structural-line boundaries.
 
-`StdCompilerProjection` now consumes the first AST and NIR structural pages
-over this foundation. It does not claim that the bounded v3 model can parse a
-complete source file or follow a second page.
+`StdCompilerProjection` now consumes the first AST and NIR structural pages,
+serializes an opaque eight-lane scanner cursor, and resumes both into a second
+page over this foundation. It does not claim that the bounded v3 model parses a
+complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
 V3 proves owned token materialization and canonical re-emission, but it is not
 yet an unbounded compiler heap:
 
-- Production binds only the first complete page; the rest of the token stream
-  remains represented by the complete-stream scalar DFA summary.
+- Production binds only the first complete token page; the rest of the token
+  stream remains represented by the complete-stream scalar DFA summary.
 - Token storage is limited to four records and 64 payload bytes.
 - The canonical bootstrap emitter is limited to four records, 64 input payload
   bytes, and 128 output bytes.
@@ -143,8 +144,8 @@ yet an unbounded compiler heap:
 - Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
   avoid pretending otherwise.
 
-The readiness gate is therefore `usable/92`, not `stable/100`. The next
-mainline step is deterministic token/AST/NIR page continuation.
+The readiness gate is therefore `usable/93`, not `stable/100`. The next
+mainline step is deterministic token pagination and then map/arena growth.
 Broader paging and aggregate backedge lowering follow without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
-or the frozen v6 import ceiling.
+or the frozen v7 import ceiling.

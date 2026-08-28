@@ -23,15 +23,36 @@ struct Evidence {
     folds: Vec<usize>,
     token_decode: CompilerTokenDecodeSummary,
     token_page: CompilerTokenPageIdentity,
-    ast_page: CompilerProjectionPageIdentity,
-    nir_page: CompilerProjectionPageIdentity,
+    ast_pages: CompilerProjectionTwoPageIdentity,
+    nir_pages: CompilerProjectionTwoPageIdentity,
 }
 
 fn evidence() -> Evidence {
     let source = b"mod cpu Main { fn main() -> i64 { return 0; } }\n";
     let tokens = b"nuis-token-stream-v1\nword\t757365\nword\t637075\nword\t5374644c616e6775616765436f7265\nsymbol\t59\narrow\n";
-    let ast = b"ast mod cpu unit Main\n";
-    let nir = b"nir mod cpu unit Main\n";
+    let ast = concat!(
+        "/// Candidate production continuation fixture.\n",
+        "use cpu StdLanguageCore\n",
+        "use cpu StdCompilerData\n",
+        "ast mod cpu unit Main\n",
+        "  fn main() -> i64\n",
+        "    let value = 40\n",
+        "    let delta = 2\n",
+        "    return value + delta\n",
+    )
+    .as_bytes();
+    let nir = concat!(
+        "use cpu StdLanguageCore\n",
+        "use cpu StdCompilerData\n",
+        "use cpu StdCompilerTokenEmit\n",
+        "use cpu StdCompilerTokens\n",
+        "use cpu StdCompilerProjection\n",
+        "nir mod cpu unit Main\n",
+        "  fn main() -> i64\n",
+        "    let value = 40\n",
+        "    return value + 2\n",
+    )
+    .as_bytes();
     let yir = b"yir 0.1\nmodule cpu Main\n";
     let payload_bytes = [source.as_slice(), tokens, ast, nir, yir];
     let payload_files = [
@@ -68,7 +89,7 @@ fn evidence() -> Evidence {
     }];
     let stage0 = build_compiler_component_build(&CompilerComponentBuildInput {
         stage_role: COMPILER_COMPONENT_STAGE0_ROLE,
-        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v6",
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v7",
         component_id: "projection_relay",
         component_domain: "cpu",
         component_unit: "Main",
@@ -93,7 +114,7 @@ fn evidence() -> Evidence {
     })
     .expect("build execution proof");
     let candidate_handoff = build_compiler_stage_handoff(
-        "nuis-stage1-token-ast-nir-materializer-v5",
+        "nuis-stage1-token-ast-nir-continuation-materializer-v6",
         "cpu",
         "Main",
         &stage0_inputs,
@@ -102,7 +123,7 @@ fn evidence() -> Evidence {
     let candidate =
         promote_compiler_component_candidate(&CompilerComponentCandidatePromotionInput {
             stage0: &stage0,
-            producer_id: "nuis-stage1-token-ast-nir-materializer-v5",
+            producer_id: "nuis-stage1-token-ast-nir-continuation-materializer-v6",
             compiler_image: b"nuis-candidate-image",
             stage_handoff_bundle_sha256: &candidate_handoff.bundle_sha256,
         })
@@ -123,10 +144,10 @@ fn evidence() -> Evidence {
     let token_decode = decode_compiler_token_stream(tokens).expect("decode fixture tokens");
     let token_page =
         compiler_token_first_page_identity(tokens).expect("materialize fixture token page");
-    let ast_page = compiler_projection_first_page_identity(CompilerProjectionKind::Ast, ast)
-        .expect("materialize fixture AST page");
-    let nir_page = compiler_projection_first_page_identity(CompilerProjectionKind::Nir, nir)
-        .expect("materialize fixture NIR page");
+    let ast_pages = compiler_projection_two_page_identity(CompilerProjectionKind::Ast, ast)
+        .expect("materialize fixture AST pages");
+    let nir_pages = compiler_projection_two_page_identity(CompilerProjectionKind::Nir, nir)
+        .expect("materialize fixture NIR pages");
     Evidence {
         stage0,
         execution,
@@ -136,8 +157,8 @@ fn evidence() -> Evidence {
         folds,
         token_decode,
         token_page,
-        ast_page,
-        nir_page,
+        ast_pages,
+        nir_pages,
     }
 }
 
@@ -152,8 +173,8 @@ fn build(evidence: &Evidence) -> CompilerCandidateProduction {
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &evidence.token_decode,
         token_page: &evidence.token_page,
-        ast_page: &evidence.ast_page,
-        nir_page: &evidence.nir_page,
+        ast_pages: &evidence.ast_pages,
+        nir_pages: &evidence.nir_pages,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -175,12 +196,48 @@ fn candidate_production_round_trips_and_never_authorizes_replacement() {
     assert_eq!(proof.token_page_canonical_bytes, 91);
     assert_eq!(proof.token_page_canonical_hash, 1_277_127_995);
     assert_eq!(proof.token_page_identity, 164_749_511_446);
-    assert_eq!(proof.ast_page_record_count, 1);
-    assert_eq!(proof.ast_page_bytes, 22);
-    assert_eq!(proof.ast_page_identity, evidence.ast_page.identity);
-    assert_eq!(proof.nir_page_record_count, 1);
-    assert_eq!(proof.nir_page_bytes, 22);
-    assert_eq!(proof.nir_page_identity, evidence.nir_page.identity);
+    assert_eq!(
+        proof.ast_page_record_count,
+        evidence.ast_pages.first.page.record_count
+    );
+    assert_eq!(proof.ast_page_bytes, 128);
+    assert_eq!(
+        proof.ast_page_identity,
+        evidence.ast_pages.first.page.identity
+    );
+    assert_eq!(
+        proof.ast_page_cursor_identity,
+        evidence.ast_pages.first.cursor_identity
+    );
+    assert_eq!(
+        proof.ast_continuation_page_identity,
+        evidence.ast_pages.second.page.identity
+    );
+    assert_eq!(
+        proof.ast_continuation_cursor_identity,
+        evidence.ast_pages.second.cursor_identity
+    );
+    assert_eq!(
+        proof.nir_page_record_count,
+        evidence.nir_pages.first.page.record_count
+    );
+    assert_eq!(proof.nir_page_bytes, 128);
+    assert_eq!(
+        proof.nir_page_identity,
+        evidence.nir_pages.first.page.identity
+    );
+    assert_eq!(
+        proof.nir_page_cursor_identity,
+        evidence.nir_pages.first.cursor_identity
+    );
+    assert_eq!(
+        proof.nir_continuation_page_identity,
+        evidence.nir_pages.second.page.identity
+    );
+    assert_eq!(
+        proof.nir_continuation_cursor_identity,
+        evidence.nir_pages.second.cursor_identity
+    );
     assert!(!proof.replacement_authorized);
     assert_eq!(proof.authority, COMPILER_CANDIDATE_PRODUCTION_AUTHORITY);
     assert_eq!(
@@ -213,8 +270,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         bundle_fold: compiler_candidate_bundle_fold(&folds),
         token_decode: &evidence.token_decode,
         token_page: &evidence.token_page,
-        ast_page: &evidence.ast_page,
-        nir_page: &evidence.nir_page,
+        ast_pages: &evidence.ast_pages,
+        nir_pages: &evidence.nir_pages,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -233,8 +290,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &token_decode,
         token_page: &evidence.token_page,
-        ast_page: &evidence.ast_page,
-        nir_page: &evidence.nir_page,
+        ast_pages: &evidence.ast_pages,
+        nir_pages: &evidence.nir_pages,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -253,16 +310,16 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &evidence.token_decode,
         token_page: &token_page,
-        ast_page: &evidence.ast_page,
-        nir_page: &evidence.nir_page,
+        ast_pages: &evidence.ast_pages,
+        nir_pages: &evidence.nir_pages,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
     .expect_err("Nuis canonical page identity drift must fail");
     assert!(error.to_string().contains("canonical token page identity"));
 
-    let mut ast_page = evidence.ast_page;
-    ast_page.identity += 1;
+    let mut ast_pages = evidence.ast_pages;
+    ast_pages.second.page.identity += 1;
     let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
         stage0: &evidence.stage0,
         execution: &evidence.execution,
@@ -273,16 +330,16 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &evidence.token_decode,
         token_page: &evidence.token_page,
-        ast_page: &ast_page,
-        nir_page: &evidence.nir_page,
+        ast_pages: &ast_pages,
+        nir_pages: &evidence.nir_pages,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
-    .expect_err("Nuis AST structural page identity drift must fail");
-    assert!(error.to_string().contains("AST structural page identity"));
+    .expect_err("Nuis AST continuation page identity drift must fail");
+    assert!(error.to_string().contains("AST structural page chain"));
 
-    let mut nir_page = evidence.nir_page;
-    nir_page.identity += 1;
+    let mut nir_pages = evidence.nir_pages;
+    nir_pages.first.cursor_identity += 1;
     let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
         stage0: &evidence.stage0,
         execution: &evidence.execution,
@@ -293,13 +350,13 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
         token_decode: &evidence.token_decode,
         token_page: &evidence.token_page,
-        ast_page: &evidence.ast_page,
-        nir_page: &nir_page,
+        ast_pages: &evidence.ast_pages,
+        nir_pages: &nir_pages,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
-    .expect_err("Nuis NIR structural page identity drift must fail");
-    assert!(error.to_string().contains("NIR structural page identity"));
+    .expect_err("Nuis NIR structural cursor identity drift must fail");
+    assert!(error.to_string().contains("NIR structural page chain"));
 
     let source = render_compiler_candidate_production(&build(&evidence));
     let tampered = source.replacen(

@@ -106,7 +106,11 @@ pub use compiler_structural_projection::{
     COMPILER_NIR_PROJECTION_ENCODING, COMPILER_STRUCTURAL_PROJECTION_CONTRACT,
 };
 pub use compiler_structural_projection_page::{
-    compiler_projection_first_page_identity, CompilerProjectionPageIdentity,
+    compiler_projection_first_page_identity, compiler_projection_resume_page_identity,
+    compiler_projection_two_page_identity, CompilerProjectionPageAdvance,
+    CompilerProjectionPageCursor, CompilerProjectionPageIdentity,
+    CompilerProjectionTwoPageIdentity, COMPILER_PROJECTION_CURSOR_CONTRACT,
+    COMPILER_PROJECTION_CURSOR_HASH_SEED, COMPILER_PROJECTION_CURSOR_LANES,
     COMPILER_PROJECTION_PAGE_BODY_HASH_SEED, COMPILER_PROJECTION_PAGE_BYTES,
     COMPILER_PROJECTION_PAGE_CONTRACT, COMPILER_PROJECTION_PAGE_HASH_MODULUS,
     COMPILER_PROJECTION_PAGE_HASH_SEED, COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,

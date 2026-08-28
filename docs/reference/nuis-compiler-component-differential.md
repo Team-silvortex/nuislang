@@ -7,7 +7,7 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v5.toml](nuis-compiler-candidate-production-v5.toml)
+* [nuis-compiler-candidate-production-v6.toml](nuis-compiler-candidate-production-v6.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not
@@ -124,9 +124,8 @@ identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
 This is not replacement authority or full compiler self-hosting. The next
-closures are page continuation, a non-identity transformation,
-independent machine/attester evidence, and a separate reversible authorization
-protocol.
+closures are a non-identity transformation, independent machine/attester
+evidence, and a separate reversible authorization protocol.
 
 ## Validation
 

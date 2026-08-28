@@ -79,3 +79,93 @@ fn structural_page_requires_a_canonical_complete_projection() {
     )
     .is_ok());
 }
+
+#[test]
+fn structural_cursor_resumes_ast_and_nir_second_pages() {
+    for (kind, fixture, first_cursor_identity, second_page, second_cursor_identity) in [
+        (
+            CompilerProjectionKind::Ast,
+            AST_PAGE_FIXTURE,
+            1_135_386_651,
+            CompilerProjectionPageIdentity {
+                record_count: 6,
+                page_bytes: 52,
+                projection_hash: 1_591_775_767,
+                continuation_indentation: 0,
+                continuation_body_bytes: 0,
+                continuation_body_hash: 431,
+                state_hash: 495_232_673,
+                identity: 63_885_014_869,
+            },
+            1_561_305_309,
+        ),
+        (
+            CompilerProjectionKind::Nir,
+            NIR_PAGE_FIXTURE,
+            754_343_074,
+            CompilerProjectionPageIdentity {
+                record_count: 8,
+                page_bytes: 59,
+                projection_hash: 843_587_668,
+                continuation_indentation: 0,
+                continuation_body_bytes: 0,
+                continuation_body_hash: 431,
+                state_hash: 138_607_295,
+                identity: 17_880_341_114,
+            },
+            725_769_899,
+        ),
+    ] {
+        let chain = compiler_projection_two_page_identity(kind, fixture.as_bytes())
+            .expect("materialize two structural pages");
+        let resumed = compiler_projection_resume_page_identity(
+            kind,
+            chain.first.cursor,
+            &fixture.as_bytes()[COMPILER_PROJECTION_PAGE_BYTES..],
+        )
+        .expect("resume second structural page");
+
+        assert_eq!(
+            chain.first.page,
+            compiler_projection_first_page_identity(kind, fixture.as_bytes()).unwrap()
+        );
+        assert_eq!(chain.second, resumed);
+        assert_eq!(chain.first.cursor_identity, first_cursor_identity);
+        assert_eq!(chain.second.page, second_page);
+        assert_eq!(chain.second.cursor_identity, second_cursor_identity);
+        assert_eq!(
+            chain.first.cursor.lanes()[0] / 32,
+            COMPILER_PROJECTION_PAGE_BYTES
+        );
+        assert_eq!(chain.second.cursor.lanes()[0] / 32, fixture.len());
+        assert!(chain.second.page.record_count >= chain.first.page.record_count);
+    }
+}
+
+#[test]
+fn structural_cursor_tampering_and_missing_second_page_fail_closed() {
+    let chain = compiler_projection_two_page_identity(
+        CompilerProjectionKind::Nir,
+        NIR_PAGE_FIXTURE.as_bytes(),
+    )
+    .expect("materialize NIR pages");
+    let mut lanes = chain.first.cursor.lanes();
+    lanes[3] = COMPILER_PROJECTION_PAGE_HASH_MODULUS;
+    assert!(compiler_projection_resume_page_identity(
+        CompilerProjectionKind::Nir,
+        CompilerProjectionPageCursor::from_lanes(lanes),
+        &NIR_PAGE_FIXTURE.as_bytes()[COMPILER_PROJECTION_PAGE_BYTES..],
+    )
+    .is_err());
+    assert!(compiler_projection_resume_page_identity(
+        CompilerProjectionKind::Ast,
+        chain.first.cursor,
+        &NIR_PAGE_FIXTURE.as_bytes()[COMPILER_PROJECTION_PAGE_BYTES..],
+    )
+    .is_err());
+    assert!(compiler_projection_two_page_identity(
+        CompilerProjectionKind::Nir,
+        b"nir mod cpu unit Main\n",
+    )
+    .is_err());
+}
