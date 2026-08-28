@@ -32,10 +32,10 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`699/699` passing drift checks. The weakest bootstrap-readiness coordinate is
-`language-core/nuisc/stage-neutral-ir-boundary` at `usable`, `93/100`. The
-compiler data model is also `usable/93`; the stage driver and differential gate
-are both `usable/94`.
+`702/702` passing drift checks. The weakest bootstrap-readiness coordinate is
+`standard-library/std/compiler-data-model` at `usable`, `93/100`. The
+stage-neutral IR boundary, stage driver, and differential gate are now all
+`usable/95`.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -62,11 +62,13 @@ with hash `1277127995`, then serializes eight-lane cursors and resumes both
 structural projections. The artifact layer independently verifies token
 identity `164749511446`, first AST/NIR identities `174028320749` and
 `132469386887`, and second-page identities `149528711957` and `146705724977`
-before production v7 emits the distinct
-`nuis-stage1-nir-checkpoint-materializer-v7` candidate. Nuis also emits both
-NIR cursor arrays as a non-identity 22-word structural checkpoint;
-`nuis-compiler-stage-transformation-v1` independently replays and binds every
-word before the candidate reaches repository-native
+before production v8 emits the distinct
+`nuis-stage1-lossless-nir-payload-materializer-v8` candidate. Nuis also emits
+both NIR cursor arrays as a non-identity 22-word structural checkpoint;
+`nuis-compiler-stage-transformation-v2` independently replays every word and
+materializes a real byte-different binary that losslessly recovers the complete
+NIR payload. `nuis-compiler-stage-semantic-differential-v1` then records 1/1
+representation equivalence before the candidate reaches repository-native
 `13/13` differential equivalence while retaining `replacement_authorized =
 false`. `nuis
 bootstrap-reproducibility` now performs
@@ -93,8 +95,9 @@ existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, paged compiler data, first attested stage1 leaf, and
 two-clean-build aggregate in place, the tensor now routes mainline work to a
-changed stage payload and transformation-aware semantic differential. Broader
-compiler-data paging, reversible replacement authorization, Galaxy
+compact structured NIR-derived encoding that no longer embeds source text,
+then a producer-neutral handoff v2 selection protocol. Broader compiler-data
+paging, reversible replacement authorization, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 

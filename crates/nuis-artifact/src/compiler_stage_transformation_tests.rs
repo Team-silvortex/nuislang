@@ -69,7 +69,7 @@ fn fixture() -> Fixture {
         })
         .collect::<Vec<_>>();
     let handoff = build_compiler_stage_handoff(
-        "nuis-stage1-nir-checkpoint-materializer-v7",
+        "nuis-stage1-lossless-nir-payload-materializer-v8",
         "cpu",
         "Main",
         &inputs,
@@ -119,6 +119,24 @@ fn structural_checkpoint_round_trips_and_preserves_ordered_cursor_words() {
     assert_eq!(manifest.records[0].output_words[0], 2);
     assert_eq!(manifest.records[0].output_words[1], 2);
     assert_eq!(manifest.records[0].output_words.len(), 22);
+    assert_eq!(
+        manifest.records[0].output_payload_file,
+        compiler_stage_transformation_payload_file(0)
+    );
+    assert!(manifest.records[0].output_payload_bytes > fixture.payloads[3].bytes.len());
+
+    let derived = encode_compiler_stage_transformation_payload(
+        CompilerStageKind::Nir,
+        &fixture.payloads[3].bytes,
+        &fixture.nir_words,
+    )
+    .expect("encode derived NIR payload");
+    assert_ne!(derived, fixture.payloads[3].bytes);
+    let (checkpoint, recovered) =
+        decode_compiler_stage_transformation_payload(CompilerStageKind::Nir, &derived)
+            .expect("decode derived NIR payload");
+    assert_eq!(checkpoint, fixture.nir_words);
+    assert_eq!(recovered, fixture.payloads[3].bytes);
 
     let source = render_compiler_stage_transformations(&manifest);
     let parsed = parse_compiler_stage_transformations_from_source(
@@ -164,9 +182,31 @@ fn stage_transformation_reader_binds_payload_and_rejects_word_tampering() {
     fs::create_dir_all(&root).expect("create transformation root");
     let path = root.join(COMPILER_STAGE_TRANSFORMATION_FILE);
     fs::write(&path, &source).expect("write transformation manifest");
+    materialize_compiler_stage_transformation_payloads(
+        &root,
+        &manifest,
+        &fixture.handoff,
+        &fixture.payloads,
+    )
+    .expect("materialize derived stage payload");
     let verified = read_compiler_stage_transformations(&path, &fixture.handoff, &fixture.payloads)
         .expect("verify transformation manifest");
     assert_eq!(verified, manifest);
+
+    let payload_path = root.join(&manifest.records[0].output_payload_file);
+    let mut payload_bytes = fs::read(&payload_path).expect("read derived payload");
+    payload_bytes[0] ^= 0xff;
+    fs::write(&payload_path, payload_bytes).expect("tamper derived payload");
+    let error = read_compiler_stage_transformations(&path, &fixture.handoff, &fixture.payloads)
+        .expect_err("derived payload tampering must fail");
+    assert!(error.to_string().contains("length or SHA-256 mismatch"));
+    materialize_compiler_stage_transformation_payloads(
+        &root,
+        &manifest,
+        &fixture.handoff,
+        &fixture.payloads,
+    )
+    .expect("restore derived stage payload");
 
     let needle = format!("output_word_21 = {}", fixture.nir_words[21]);
     let tampered = source.replacen(

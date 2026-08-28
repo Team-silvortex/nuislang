@@ -100,7 +100,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `usable/93`. Normal AOT builds emit the ordered five-stage
+This gate is now `usable/95`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -112,7 +112,7 @@ AOT execution, malformed-sequence rejection, and tamper-checked execution
 proof. The exact scalar producer ABI now consumes every serialized stage byte,
 emits a Nuis-owned bundle fold, and drives `StdCompilerTokens` across the exact
 token header, seven record kinds, payload shape, and LF boundaries. Candidate
-production v7 now binds its record count, decoded semantic fold, four owned
+production v8 now binds its record count, decoded semantic fold, four owned
 records, 21 payload bytes, 91 canonical bytes, hash `1277127995`, and identity
 `164749511446` to an independent artifact-layer result. It also binds three
 completed AST records, unfinished-line continuation, state hash `1349056749`,
@@ -123,17 +123,18 @@ second independent result. Nuis then serializes opaque cursors and resumes the
 AST and NIR streams into second-page identities `149528711957` and
 `146705724977`, both independently replayed by the artifact layer. Nuis now
 also emits both NIR cursor arrays as one ordered 22-word non-identity
-checkpoint. `nuis-compiler-stage-transformation-v1` binds that checkpoint to
-the original NIR payload and independently replays every word before
-production can attest it. Changed handoff stage bytes and a semantic
-differential for non-byte-identical encodings remain open. See
+checkpoint. `nuis-compiler-stage-transformation-v2` binds that checkpoint to
+an actual lossless derived binary and independently replays every word and
+source byte before production can attest it. The semantic differential now
+passes 1/1 for the byte-different representation; compact structured encoding
+and selecting it in a future handoff v2 remain open. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `usable/94`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `usable/95`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -152,13 +153,14 @@ The probe authority remains explicitly execution-only. The separate
 `nuis bootstrap-candidate-build` frontdoor feeds all five payloads through the
 candidate's exact scalar exports, independently verifies the folds, token
 decode summary, canonical token page, AST/NIR continuation identities, and
-NIR checkpoint words, emits a candidate handoff/component/diagnostic set plus
-`nuis-compiler-candidate-production-v7`, and then runs the differential gate.
+NIR checkpoint words, materializes a lossless byte-different NIR-derived
+payload, emits its semantic differential and
+`nuis-compiler-candidate-production-v8`, and then runs the differential gate.
 See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 The first producer is now the bounded
-`nuis-stage1-nir-checkpoint-materializer-v7` leaf; it preserves canonical stage
-bytes, emits a separate non-identity transformation, and grants no replacement
-authority.
+`nuis-stage1-lossless-nir-payload-materializer-v8` leaf; it preserves canonical
+handoff bytes, emits a separate reversible binary plus 1/1 semantic comparison,
+and grants no replacement authority.
 
 `nuis bootstrap-reproducibility` now runs that complete production chain in
 two initially empty roots with compile-cache read/write bypass. Its path-free
@@ -170,7 +172,7 @@ The local witness intentionally carries no independent attester authority.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/94`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/95`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep

@@ -1,0 +1,87 @@
+protocol = "nuis-compiler-candidate-production-v8"
+version = 8
+predecessor = "nuis-compiler-candidate-production-v7"
+status = "usable-lossless-derived-nir-payload-leaf"
+scope = "nuis-written-stage1-candidate-leaf-production"
+manifest_name = "nuis.compiler-candidate-production.toml"
+producer_contract = "nuis-stage1-lossless-derived-nir-payload-producer-v8"
+authority = "stage1-candidate-component-production-no-replacement"
+frontdoor = "nuis bootstrap-candidate-build"
+stage0_directory = "stage0"
+candidate_directory = "stage1-candidate"
+candidate_role = "stage1-candidate"
+candidate_producer = "nuis-stage1-lossless-nir-payload-materializer-v8"
+adapter_file = "nuis.compiler-candidate-adapter"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v7"
+adapter_role = "host-byte-and-opaque-cursor-transport-without-token-ast-or-nir-semantics"
+stage_transformations_file = "nuis.compiler-stage-transformations.toml"
+stage_transformations_protocol = "nuis-compiler-stage-transformation-v2"
+stage_transformations_output_encoding = "nuis-derived-structural-stage-payload-v1"
+stage_semantic_differential_file = "nuis.compiler-stage-semantic-diff.toml"
+stage_semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+record_count = 5
+semantic_comparison_count = 1
+component_comparison_count = 13
+replacement_authorized = false
+reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
+
+bootstrap_subset_protocol = "nuis-bootstrap-language-subset-v7"
+scalar_export_count = 16
+ordered_stages = ["source", "tokens", "ast", "nir", "yir"]
+projection_page_contract = "nuis-compiler-structural-page-v1"
+projection_cursor_contract = "nuis-compiler-structural-cursor-v1"
+projection_cursor_lanes = 8
+projection_page_bytes = 128
+production_bound_structural_pages_per_projection = 2
+
+reference_token_page_identity = 164749511446
+reference_ast_page_identity = 174028320749
+reference_ast_continuation_page_identity = 149528711957
+reference_nir_page_identity = 132469386887
+reference_nir_continuation_page_identity = 146705724977
+
+bound_inputs = [
+  "verified-stage0-component-and-candidate-execution",
+  "verified-stage1-candidate-component-and-five-stage-handoff",
+  "candidate-image-equals-executed-nuis-native-image",
+  "every-stage-byte-length-sha256-and-nuis-fold",
+  "complete-token-decode-and-canonical-token-page",
+  "independently-recomputed-ast-and-nir-two-page-chains",
+  "nuis-produced-nir-structural-checkpoint",
+  "exact-stage-transformation-manifest-length-and-sha256",
+  "exact-lossless-derived-stage-payload-length-and-sha256",
+  "exact-stage-semantic-differential-length-sha256-and-proof-sha256",
+  "exact-adapter-file-length-and-sha256",
+  "candidate-producer-and-stage-bundle-identities",
+  "no-replacement-authority",
+]
+
+invariants = [
+  "adapter-does-not-classify-token-ast-or-nir-records",
+  "nuis-emits-both-eight-lane-nir-cursors-in-canonical-order",
+  "artifact-independently-replays-all-twenty-two-checkpoint-words",
+  "derived-payload-recovers-the-complete-source-nir-bytes",
+  "derived-and-source-payloads-are-not-byte-identical",
+  "bootstrap-diff-requires-production-proof-before-writing-a-report",
+  "payload-adapter-transformation-semantic-proof-or-production-tampering-fails-closed",
+  "thirteen-of-thirteen-component-equivalence-never-authorizes-replacement",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1",
+]
+
+[open_boundary]
+missing = [
+  "compact-structured-derived-nir-without-embedded-source-text",
+  "producer-neutral-stage-handoff-v2-derived-stage-selection",
+  "token-pagination-beyond-one-four-record-page",
+  "production-binding-for-third-and-later-structural-pages",
+  "general-aggregate-loop-backedge-lowering",
+  "independent-machine-or-attester-reproducibility-proof",
+  "independent-reversible-component-replacement-authorization",
+]

@@ -6,16 +6,19 @@ use std::{
 
 use crate::{
     build_compiler_candidate_execution, build_compiler_component_build,
-    build_compiler_stage_handoff, build_compiler_stage_transformations,
-    compiler_stage_structural_checkpoint_words, compiler_token_first_page_identity,
-    decode_compiler_token_stream, promote_compiler_component_candidate,
-    render_compiler_stage_transformations, CompilerCandidateExecutionInput,
-    CompilerComponentBuildInput, CompilerComponentCandidatePromotionInput,
-    CompilerComponentDependencyInput, CompilerStageKind, CompilerStagePayloadInput,
-    CompilerStageTransformationRecordInput, CompilerStageTransformations,
-    CompilerStageTransformationsInput, VerifiedCompilerStagePayload,
-    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
-    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+    build_compiler_stage_handoff, build_compiler_stage_semantic_differential,
+    build_compiler_stage_transformations, compiler_stage_structural_checkpoint_words,
+    compiler_token_first_page_identity, decode_compiler_token_stream,
+    materialize_compiler_stage_transformation_payloads, promote_compiler_component_candidate,
+    render_compiler_stage_semantic_differential, render_compiler_stage_transformations,
+    CompilerCandidateExecutionInput, CompilerComponentBuildInput,
+    CompilerComponentCandidatePromotionInput, CompilerComponentDependencyInput, CompilerStageKind,
+    CompilerStagePayloadInput, CompilerStageSemanticDifferential,
+    CompilerStageSemanticDifferentialInput, CompilerStageTransformationRecordInput,
+    CompilerStageTransformations, CompilerStageTransformationsInput, VerifiedCompilerStagePayload,
+    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 use super::*;
@@ -32,6 +35,7 @@ struct Evidence {
     ast_pages: CompilerProjectionTwoPageIdentity,
     nir_pages: CompilerProjectionTwoPageIdentity,
     stage_transformations: CompilerStageTransformations,
+    stage_semantic_differential: CompilerStageSemanticDifferential,
 }
 
 fn evidence() -> Evidence {
@@ -121,7 +125,7 @@ fn evidence() -> Evidence {
     })
     .expect("build execution proof");
     let candidate_handoff = build_compiler_stage_handoff(
-        "nuis-stage1-nir-checkpoint-materializer-v7",
+        "nuis-stage1-lossless-nir-payload-materializer-v8",
         "cpu",
         "Main",
         &stage0_inputs,
@@ -130,7 +134,7 @@ fn evidence() -> Evidence {
     let candidate =
         promote_compiler_component_candidate(&CompilerComponentCandidatePromotionInput {
             stage0: &stage0,
-            producer_id: "nuis-stage1-nir-checkpoint-materializer-v7",
+            producer_id: "nuis-stage1-lossless-nir-payload-materializer-v8",
             compiler_image: b"nuis-candidate-image",
             stage_handoff_bundle_sha256: &candidate_handoff.bundle_sha256,
         })
@@ -171,6 +175,14 @@ fn evidence() -> Evidence {
             records: &transformation_records,
         })
         .expect("build fixture stage transformations");
+    let stage_semantic_differential =
+        build_compiler_stage_semantic_differential(&CompilerStageSemanticDifferentialInput {
+            producer_id: &candidate_handoff.producer_id,
+            handoff: &candidate_handoff,
+            payloads: &payloads,
+            transformations: &stage_transformations,
+        })
+        .expect("build fixture stage semantic differential");
     Evidence {
         stage0,
         execution,
@@ -183,6 +195,7 @@ fn evidence() -> Evidence {
         ast_pages,
         nir_pages,
         stage_transformations,
+        stage_semantic_differential,
     }
 }
 
@@ -201,6 +214,8 @@ fn build(evidence: &Evidence) -> CompilerCandidateProduction {
         nir_pages: &evidence.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &evidence.stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &evidence.stage_semantic_differential,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -217,6 +232,15 @@ fn candidate_production_round_trips_and_never_authorizes_replacement() {
         COMPILER_STAGE_TRANSFORMATION_FILE
     );
     assert!(proof.stage_transformations_bytes > 0);
+    assert_eq!(
+        proof.stage_semantic_differential_file,
+        COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE
+    );
+    assert!(proof.stage_semantic_differential_bytes > 0);
+    assert_eq!(
+        proof.stage_semantic_differential_proof_sha256,
+        evidence.stage_semantic_differential.proof_sha256
+    );
     assert_eq!(proof.token_record_count, 5);
     assert_eq!(
         proof.token_semantic_fold,
@@ -305,6 +329,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         nir_pages: &evidence.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &evidence.stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &evidence.stage_semantic_differential,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -327,6 +353,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         nir_pages: &evidence.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &evidence.stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &evidence.stage_semantic_differential,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -349,6 +377,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         nir_pages: &evidence.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &evidence.stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &evidence.stage_semantic_differential,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -371,6 +401,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         nir_pages: &evidence.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &evidence.stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &evidence.stage_semantic_differential,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -393,6 +425,8 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
         nir_pages: &nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &evidence.stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &evidence.stage_semantic_differential,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
     })
@@ -430,6 +464,18 @@ fn candidate_production_reader_binds_adapter_bytes_and_all_evidence() {
         render_compiler_stage_transformations(&evidence.stage_transformations),
     )
     .expect("write stage transformations");
+    materialize_compiler_stage_transformation_payloads(
+        &root,
+        &evidence.stage_transformations,
+        &evidence.handoff,
+        &evidence.payloads,
+    )
+    .expect("materialize derived stage payload");
+    fs::write(
+        root.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE),
+        render_compiler_stage_semantic_differential(&evidence.stage_semantic_differential),
+    )
+    .expect("write stage semantic differential");
     fs::write(root.join(COMPILER_CANDIDATE_ADAPTER_FILE), b"adapter-image").expect("write adapter");
 
     let verified = read_compiler_candidate_production(
@@ -461,6 +507,28 @@ fn candidate_production_reader_binds_adapter_bytes_and_all_evidence() {
 
     fs::write(root.join(COMPILER_CANDIDATE_ADAPTER_FILE), b"adapter-image")
         .expect("restore adapter");
+    fs::write(
+        root.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE),
+        b"tampered-semantic-differential",
+    )
+    .expect("tamper stage semantic differential");
+    let error = read_compiler_candidate_production(
+        &path,
+        &evidence.stage0,
+        &evidence.execution,
+        &evidence.candidate,
+        &evidence.handoff,
+        &evidence.payloads,
+    )
+    .expect_err("stage semantic differential tampering must fail");
+    assert!(error
+        .to_string()
+        .contains("stage semantic differential length or SHA-256"));
+    fs::write(
+        root.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE),
+        render_compiler_stage_semantic_differential(&evidence.stage_semantic_differential),
+    )
+    .expect("restore stage semantic differential");
     fs::write(
         root.join(COMPILER_STAGE_TRANSFORMATION_FILE),
         b"tampered-transformations",

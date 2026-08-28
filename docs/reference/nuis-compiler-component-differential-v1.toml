@@ -10,7 +10,8 @@ candidate_role = "stage1-candidate"
 producer_policy = "distinct-producer-identities"
 digest = "sha256-lowercase"
 replacement_authorized = false
-candidate_production_protocol = "nuis-compiler-candidate-production-v7"
+candidate_production_protocol = "nuis-compiler-candidate-production-v8"
+stage_semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
 candidate_production_required_by_path_frontdoor = true
 reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
 reproducibility_frontdoor = "nuis bootstrap-reproducibility"
@@ -41,6 +42,7 @@ invariants = [
   "both-diagnostic-reports-bind-their-exact-component-records",
   "candidate-production-proof-binds-stage0-execution-and-all-five-stage-folds",
   "candidate-production-proof-binds-token-ast-and-nir-first-page-identities",
+  "candidate-production-proof-binds-lossless-derived-payload-and-semantic-differential",
   "all-thirteen-comparisons-are-required-and-canonically-ordered",
   "valid-drift-writes-an-audit-report-and-exits-failure",
   "report-output-cannot-overwrite-an-input-record",

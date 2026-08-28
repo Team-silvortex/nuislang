@@ -24,38 +24,38 @@ progress = 93
 required_before = "beta-0.10.0"
 next_action = "paginate tokens, then page CompilerMap and arena storage while preserving v3 ownership and layout invariants"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-data-model-v3 plus a production candidate that owns canonical token data and two independently verified AST/NIR pages"
+expected_artifact = "nuis-compiler-data-model-v3 plus a production candidate that owns canonical token data, two independently verified AST/NIR pages, and a lossless derived NIR payload"
 blocker = "v3 resumes structural pages, but token pagination, map growth, arena object storage, defining-module provenance, and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "usable"
-progress = 93
+progress = 95
 required_before = "beta-0.10.0"
-next_action = "materialize a changed stage payload from the NIR checkpoint and define semantic equivalence for non-byte-identical stage encodings"
+next_action = "replace embedded NIR text with compact structured derived records, then define producer-neutral handoff v2 selection"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "a transformation-aware handoff whose changed stage bytes remain semantically comparable beside canonical token and two-page AST/NIR identities"
-blocker = "Nuis now emits and production binds a non-identity 22-word NIR checkpoint, but the five-stage handoff still carries unchanged NIR/YIR bytes and the differential remains byte-identity based"
+expected_artifact = "a compact NIR-derived payload whose independent semantic replay remains comparable beside canonical token and two-page AST/NIR identities"
+blocker = "production now binds a real lossless byte-different payload and 1/1 semantic differential, but the payload embeds source text and the v1 handoff still selects canonical NIR/YIR bytes"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 94
+progress = 95
 required_before = "beta-0.10.0"
-next_action = "promote the bound NIR checkpoint into a changed stage payload without coupling the driver to one transform contract"
+next_action = "register compact structured NIR-derived records without coupling the driver to one transform contract"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "a registry-driven changed stage payload retaining stable production identity across two clean builds without replacement authority"
-blocker = "the driver binds the generic transformation manifest and exact NIR checkpoint, while changed stage bytes, independent attester trust, and reversible authorization remain open"
+expected_artifact = "a compact registry-driven stage payload retaining semantic and production identity across two clean builds without replacement authority"
+blocker = "the driver binds a real derived payload and semantic proof, while handoff v2 selection, independent attester trust, and reversible authorization remain open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 94
+progress = 95
 required_before = "beta-0.10.0"
-next_action = "define a transformation-aware semantic differential before adding independent attester evidence"
+next_action = "extend semantic comparison to compact structured records before adding independent attester evidence"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "non-byte-identical stage encodings retaining the path-free two-clean-build aggregate without replacement authority"
-blocker = "local repeated clean-build evidence now transitively binds the NIR transformation manifest, but the 13 comparisons still require byte-identical stage payloads; independent attester trust and reversible authorization remain open"
+expected_artifact = "compact non-byte-identical stage records retaining semantic proof and the path-free two-clean-build aggregate without replacement authority"
+blocker = "the gate proves one lossless non-byte-identical representation while the 13 component comparisons still inspect the canonical v1 handoff; independent attester trust and reversible authorization remain open"

@@ -11,14 +11,15 @@ use super::{
 };
 use crate::{
     compiler_projection_two_page_identity, compiler_token_first_page_identity,
-    decode_compiler_token_stream, verify_compiler_stage_transformations, ArtifactError,
-    CompilerProjectionKind, CompilerProjectionPageIdentity, CompilerStageKind,
+    decode_compiler_token_stream, verify_compiler_stage_semantic_differential,
+    verify_compiler_stage_transformations, ArtifactError, CompilerProjectionKind,
+    CompilerProjectionPageIdentity, CompilerStageKind, CompilerStageSemanticDifferentialInput,
     COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
-    COMPILER_PROJECTION_CURSOR_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
-    COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_DECODER_FOLD_MODULUS,
-    COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_PAGE_CANONICAL_BYTES,
-    COMPILER_TOKEN_PAGE_IDENTITY_RADIX, COMPILER_TOKEN_PAGE_PAYLOAD_BYTES,
-    COMPILER_TOKEN_PAGE_RECORDS,
+    COMPILER_PROJECTION_CURSOR_CONTRACT, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_TOKEN_DECODER_CONTRACT,
+    COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_RECORDS,
+    COMPILER_TOKEN_PAGE_CANONICAL_BYTES, COMPILER_TOKEN_PAGE_IDENTITY_RADIX,
+    COMPILER_TOKEN_PAGE_PAYLOAD_BYTES, COMPILER_TOKEN_PAGE_RECORDS,
 };
 
 pub(super) fn validate_evidence(
@@ -129,6 +130,24 @@ pub(super) fn validate_evidence(
             "compiler candidate production stage transformations do not bind its candidate producer",
         ));
     }
+    validate_file_name(
+        input.stage_semantic_differential_file,
+        "stage semantic differential",
+    )?;
+    if input.stage_semantic_differential_file != COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE {
+        return Err(ArtifactError::new(
+            "compiler candidate production requires the canonical stage semantic differential file",
+        ));
+    }
+    verify_compiler_stage_semantic_differential(
+        input.stage_semantic_differential,
+        &CompilerStageSemanticDifferentialInput {
+            producer_id: &input.candidate.producer_id,
+            handoff: input.handoff,
+            payloads: input.payloads,
+            transformations: input.stage_transformations,
+        },
+    )?;
     validate_file_name(input.adapter_file, "candidate adapter")?;
     if input.adapter.is_empty() {
         return Err(ArtifactError::new(
@@ -203,6 +222,14 @@ pub(super) fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), 
             "stage transformations",
             proof.stage_transformations_sha256.as_str(),
         ),
+        (
+            "stage semantic differential",
+            proof.stage_semantic_differential_sha256.as_str(),
+        ),
+        (
+            "stage semantic differential proof",
+            proof.stage_semantic_differential_proof_sha256.as_str(),
+        ),
         ("candidate adapter", proof.adapter_sha256.as_str()),
         ("production proof", proof.proof_sha256.as_str()),
     ] {
@@ -210,9 +237,15 @@ pub(super) fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), 
     }
     validate_token(&proof.candidate_producer_id, "candidate producer id")?;
     validate_file_name(&proof.stage_transformations_file, "stage transformations")?;
+    validate_file_name(
+        &proof.stage_semantic_differential_file,
+        "stage semantic differential",
+    )?;
     validate_file_name(&proof.adapter_file, "candidate adapter")?;
     if proof.stage_transformations_file != COMPILER_STAGE_TRANSFORMATION_FILE
         || proof.stage_transformations_bytes == 0
+        || proof.stage_semantic_differential_file != COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE
+        || proof.stage_semantic_differential_bytes == 0
         || proof.adapter_bytes == 0
         || proof.bundle_fold >= FOLD_MODULUS as usize
     {

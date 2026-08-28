@@ -1,12 +1,12 @@
 # Nuis Compiler Candidate Production
 
-`nuis-compiler-candidate-production-v7` is the attested path from an executed
+`nuis-compiler-candidate-production-v8` is the attested path from an executed
 Nuis compiler-shaped program to a separately identified `stage1-candidate`
-leaf. V7 retains the canonical token page and independently resumes both AST
-and NIR into a second structural page through serialized opaque cursors, then
-binds the first Nuis-produced non-identity NIR checkpoint transformation.
+leaf. V8 retains the canonical token and structural page chain, then turns the
+Nuis-produced NIR checkpoint into a real lossless derived binary payload and
+attests its non-byte-identical semantic differential.
 The machine-readable contract is
-[nuis-compiler-candidate-production-v7.toml](nuis-compiler-candidate-production-v7.toml).
+[nuis-compiler-candidate-production-v8.toml](nuis-compiler-candidate-production-v8.toml).
 
 This closes one real compiler-data production loop. It does not mean that
 `nuisc` is self-hosted, and it never authorizes replacing stage0.
@@ -24,7 +24,8 @@ The output root contains:
 * `stage0/`, including the ordinary component, execution, handoff, diagnostic,
   and native-image evidence
 * `stage1-candidate/`, including the candidate component, handoff, diagnostics,
-  scalar adapter, stage-transformation manifest, and production proof
+  scalar adapter, stage-transformation manifest, derived binary payload,
+  stage-semantic differential, and production proof
 * `nuis.compiler-component-diff.toml`, which must report all thirteen
   comparisons equivalent while retaining `replacement_authorized = false`
 
@@ -46,7 +47,7 @@ nineteen seven-byte little-endian words. It packs the first two AST and NIR
 pages through the same generic byte transport, without recognizing
 documentation, imports, module headers, indentation, or record kinds. For each
 call it only supplies raw words and transports eight returned cursor lanes into
-the next call. V7 also prints both NIR cursor lane arrays in exact order so the
+the next call. Adapter protocol v7 also prints both NIR cursor lane arrays in exact order so the
 Nuis output can become transformation evidence. It does not decode payloads,
 canonicalize values, compute any page or cursor identity, or make authority
 decisions.
@@ -129,19 +130,22 @@ can attest them. AST and NIR therefore share one Nuis implementation, one
 producer-neutral page contract, and one resumable cursor contract while
 remaining separate projection domains.
 
-## Stage Transformation
+## Derived Stage Transformation
 
 The Nuis-produced NIR identities and both eight-lane cursors are encoded as a
-22-word `nuis-compiler-structural-checkpoint-v1` record. This is a genuine
-non-identity representation under `ordered-u64-le-v1`, not a copy of the NIR
-text. The versioned
+22-word `nuis-compiler-structural-checkpoint-v1` record. V8 places those words
+and the complete original NIR bytes into a canonical
+`nuis-derived-structural-stage-payload-v1` binary. The versioned
 [stage-transformation protocol](nuis-compiler-stage-transformation.md) binds
-the source payload and all output words.
+the source payload, all output words, and the actual binary file.
 
 The artifact layer independently reconstructs the same NIR pages and cursor
-lanes from the original payload. Candidate production then binds the canonical
-transformation manifest file length and SHA-256. Manifest word, order, payload,
-hash, producer, handoff, or proof drift fails closed.
+lanes, decodes the binary, and requires it to recover the complete original
+NIR bytes. A separate `nuis-compiler-stage-semantic-differential-v1` record
+proves that source and derived bytes differ while their losslessly recovered
+source semantics match. Candidate production binds the exact transformation,
+binary and semantic proof identities. Word, order, payload, hash, producer,
+handoff, semantic comparison, or proof drift fails closed.
 
 ```text
 host adapter = opaque token/AST/NIR byte and cursor transport
@@ -157,7 +161,7 @@ are part of the production proof.
 
 The candidate handoff preserves the producer-neutral semantic bundle while
 changing the auditable producer identity to
-`nuis-stage1-nir-checkpoint-materializer-v7`. The promoted
+`nuis-stage1-lossless-nir-payload-materializer-v8`. The promoted
 component keeps the same component identity, native output, dependency closure,
 and five stage payloads, but declares the explicit `stage1-candidate` role and
 uses the executed Nuis image as its compiler image.
@@ -169,17 +173,18 @@ and first-page field, both cursor identities, both second-page identities, and
 the adapter, plus the independently replayed stage-transformation manifest.
 `bootstrap-diff` verifies this proof before writing its report. Changing the
 adapter, token page, AST/NIR page or cursor, stage payload, role, producer, component
-record, or proof therefore fails closed.
+record, derived payload, semantic differential, or proof therefore fails closed.
 
 ## Current Limit
 
-V7 materializes one fixed-capacity token page and binds exactly two fixed-size
+V8 materializes one fixed-capacity token page and binds exactly two fixed-size
 structural pages for both AST and NIR. The generic Nuis resume function can
-continue again with the resulting cursor. Production now attests a non-identity
-checkpoint representation, but the producer-neutral five-stage handoff still
-contains unchanged NIR/YIR bytes. A future semantic differential must admit a
-changed stage encoding without weakening equivalence. Production also does not
-yet attest a third page. The scalar boundary remains intentional until
+continue again with the resulting cursor. Production now attests a real
+byte-different, losslessly recoverable NIR-derived payload and a 1/1 semantic
+comparison, but the producer-neutral five-stage handoff still contains the
+unchanged canonical NIR/YIR records. The next step is a compact structured
+codec that does not embed source text, followed by a handoff v2 selection
+protocol. Production also does not yet attest a third page. The scalar boundary remains intentional until
 arbitrary aggregate loop-carried backedges have native lowering; this contract
 does not claim that general loop capability.
 

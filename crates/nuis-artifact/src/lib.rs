@@ -9,6 +9,7 @@ mod compiler_component_diff;
 mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
+mod compiler_stage_semantic_differential;
 mod compiler_stage_transformation;
 mod compiler_structural_projection;
 mod compiler_structural_projection_page;
@@ -100,9 +101,22 @@ pub use compiler_stage_handoff::{
     VerifiedCompilerStagePayload, COMPILER_STAGE_HANDOFF_PROTOCOL,
     COMPILER_STAGE_PRODUCER_CONTRACT,
 };
+pub use compiler_stage_semantic_differential::{
+    build_compiler_stage_semantic_differential, parse_compiler_stage_semantic_differential,
+    parse_compiler_stage_semantic_differential_from_source,
+    read_compiler_stage_semantic_differential, render_compiler_stage_semantic_differential,
+    verify_compiler_stage_semantic_differential, CompilerStageSemanticComparison,
+    CompilerStageSemanticDifferential, CompilerStageSemanticDifferentialInput,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_AUTHORITY, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_PRODUCER_CONTRACT,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_PROTOCOL, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_VERDICT,
+    COMPILER_STAGE_SEMANTIC_EQUIVALENCE_CONTRACT,
+};
 pub use compiler_stage_transformation::{
     build_compiler_stage_transformations, compiler_projection_checkpoint_kind_tag,
-    compiler_stage_structural_checkpoint_words, parse_compiler_stage_transformations,
+    compiler_stage_structural_checkpoint_words, compiler_stage_transformation_payload_file,
+    encode_compiler_stage_transformation_payload,
+    materialize_compiler_stage_transformation_payloads, parse_compiler_stage_transformations,
     parse_compiler_stage_transformations_from_source, read_compiler_stage_transformations,
     render_compiler_stage_transformations, verify_compiler_stage_transformations,
     CompilerStageTransformationRecord, CompilerStageTransformationRecordInput,

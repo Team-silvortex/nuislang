@@ -1,0 +1,42 @@
+protocol = "nuis-compiler-stage-semantic-differential-v1"
+version = 1
+status = "usable-lossless-derived-stage-equivalence"
+scope = "non-byte-identical-stage-representation-comparison"
+manifest_name = "nuis.compiler-stage-semantic-diff.toml"
+producer_contract = "nuis-compiler-stage-semantic-differential-producer-v1"
+authority = "lossless-derived-stage-equivalence-no-replacement"
+equivalence_contract = "nuis-lossless-derived-stage-equivalence-v1"
+verdict = "semantic-equivalent-derived-representation-awaiting-authorization"
+replacement_authorized = false
+
+comparison_inputs = [
+  "source-stage-kind-encoding-length-and-sha256",
+  "derived-stage-encoding-file-length-and-sha256",
+  "nuis-produced-checkpoint-sha256",
+  "recovered-source-payload-sha256",
+  "stage-handoff-bundle-sha256",
+  "stage-transformation-proof-sha256",
+]
+
+required_results = [
+  "source-and-derived-bytes-are-different",
+  "derived-payload-decodes-canonically",
+  "all-checkpoint-words-match-independent-structural-replay",
+  "recovered-source-bytes-equal-the-complete-source-payload",
+  "semantic-equivalence-count-equals-comparison-count",
+  "replacement-authority-remains-false",
+]
+
+current_comparison_count = 1
+current_source_stage = "nir"
+current_source_encoding = "nuis-nir-canonical-projection-v1"
+current_derived_encoding = "nuis-derived-structural-stage-payload-v1"
+production_protocol = "nuis-compiler-candidate-production-v8"
+
+[non_claims]
+items = [
+  "does-not-authorize-switching-the-active-compiler",
+  "does-not-yet-replace-the-five-stage-handoff-nir-record",
+  "does-not-claim-a-compact-structured-nir-codec",
+  "does-not-prove-independent-machine-reproducibility",
+]

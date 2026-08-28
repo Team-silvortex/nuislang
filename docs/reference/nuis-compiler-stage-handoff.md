@@ -93,23 +93,23 @@ The first identity-projection path is now stage1-candidate ready:
   payloads and computes a Nuis-owned deterministic stage/bundle fold.
 * `nuis bootstrap-candidate-build` materializes a separately identified
   candidate handoff and binds it through
-  `nuis-compiler-candidate-production-v7`.
+  `nuis-compiler-candidate-production-v8`.
 * The adapter blindly transports one token page and two AST/NIR pages. Nuis
   owns the token records plus canonical emission, serializes an opaque
   eight-lane structural cursor, and resumes both projections into page two.
 * The Nuis consumer can resume repeatedly; production binds two structural
-  pages plus one non-identity NIR checkpoint, but has not yet replaced handoff
-  stage bytes with that representation.
+  pages, a lossless byte-different NIR-derived payload, and its 1/1 semantic
+  differential, but has not yet selected that payload in the v1 handoff.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
   contracts; matching payload hashes alone never authorize it.
 
 The independent codec, native Nuis consumer, bounded token page, resumable AST
-and NIR pages, production proof, and `13/13` differential advance this
-coordinate to `usable/93`. The next closure task materializes changed stage
-bytes and defines semantic comparison behind the same producer-neutral
-boundary. See
+and NIR pages, lossless derived payload, semantic proof, production proof, and
+`13/13` differential advance this coordinate to `usable/95`. The next closure
+task replaces embedded source text with compact structured records, then
+defines handoff v2 selection behind the same producer-neutral boundary. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
 [Nuis Compiler Stage Transformation](nuis-compiler-stage-transformation.md),

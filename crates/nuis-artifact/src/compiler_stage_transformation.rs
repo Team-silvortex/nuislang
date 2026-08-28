@@ -6,6 +6,9 @@ use std::{
 
 use sha2::{Digest, Sha256};
 
+#[path = "compiler_stage_transformation_payload.rs"]
+mod payload;
+
 use crate::{
     compiler_projection_two_page_identity,
     toml::{
@@ -16,15 +19,16 @@ use crate::{
     CompilerStageKind, VerifiedCompilerStagePayload,
 };
 
-pub const COMPILER_STAGE_TRANSFORMATION_PROTOCOL: &str = "nuis-compiler-stage-transformation-v1";
+pub const COMPILER_STAGE_TRANSFORMATION_PROTOCOL: &str = "nuis-compiler-stage-transformation-v2";
 pub const COMPILER_STAGE_TRANSFORMATION_PRODUCER_CONTRACT: &str =
-    "nuis-compiler-stage-transformation-producer-v1";
+    "nuis-compiler-stage-transformation-producer-v2";
 pub const COMPILER_STAGE_TRANSFORMATION_AUTHORITY: &str =
-    "stage1-transformation-evidence-no-replacement";
+    "stage1-lossless-derived-transformation-evidence-no-replacement";
 pub const COMPILER_STAGE_TRANSFORMATION_FILE: &str = "nuis.compiler-stage-transformations.toml";
 pub const COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT: &str =
     "nuis-compiler-structural-checkpoint-v1";
-pub const COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING: &str = "ordered-u64-le-v1";
+pub const COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING: &str =
+    "nuis-derived-structural-stage-payload-v1";
 pub const COMPILER_STAGE_CHECKPOINT_PAGE_COUNT: usize = 2;
 pub const COMPILER_STAGE_CHECKPOINT_WORD_COUNT: usize = 22;
 
@@ -53,7 +57,10 @@ pub struct CompilerStageTransformationRecord {
     pub transform_contract: String,
     pub output_encoding: String,
     pub output_word_count: usize,
-    pub output_sha256: String,
+    pub output_checkpoint_sha256: String,
+    pub output_payload_file: String,
+    pub output_payload_bytes: usize,
+    pub output_payload_sha256: String,
     pub output_words: Vec<usize>,
 }
 
@@ -95,6 +102,44 @@ pub fn compiler_stage_structural_checkpoint_words(
     words
 }
 
+pub fn compiler_stage_transformation_payload_file(ordinal: usize) -> String {
+    payload::payload_file(ordinal)
+}
+
+pub fn encode_compiler_stage_transformation_payload(
+    stage: CompilerStageKind,
+    source_payload: &[u8],
+    checkpoint_words: &[usize],
+) -> Result<Vec<u8>, ArtifactError> {
+    payload::encode_payload(stage, source_payload, checkpoint_words)
+}
+
+pub(crate) fn decode_compiler_stage_transformation_payload(
+    stage: CompilerStageKind,
+    bytes: &[u8],
+) -> Result<(Vec<usize>, Vec<u8>), ArtifactError> {
+    let decoded = payload::decode_payload(stage, bytes)?;
+    Ok((decoded.checkpoint_words, decoded.source_payload))
+}
+
+pub fn materialize_compiler_stage_transformation_payloads(
+    root: &Path,
+    manifest: &CompilerStageTransformations,
+    handoff: &CompilerStageHandoff,
+    payloads: &[VerifiedCompilerStagePayload],
+) -> Result<(), ArtifactError> {
+    verify_compiler_stage_transformations(manifest, handoff, payloads)?;
+    payload::materialize_payloads(root, manifest, payloads)
+}
+
+pub(crate) fn verify_compiler_stage_transformation_payloads(
+    root: &Path,
+    manifest: &CompilerStageTransformations,
+    payloads: &[VerifiedCompilerStagePayload],
+) -> Result<(), ArtifactError> {
+    payload::validate_materialized_payloads(root, manifest, payloads)
+}
+
 pub fn build_compiler_stage_transformations(
     input: &CompilerStageTransformationsInput<'_>,
 ) -> Result<CompilerStageTransformations, ArtifactError> {
@@ -102,6 +147,8 @@ pub fn build_compiler_stage_transformations(
     let mut records = Vec::with_capacity(input.records.len());
     for (ordinal, record) in input.records.iter().enumerate() {
         let payload = payload_for_stage(input.payloads, record.source_stage)?;
+        let output_payload =
+            payload::encode_payload(record.source_stage, &payload.bytes, record.output_words)?;
         records.push(CompilerStageTransformationRecord {
             ordinal,
             source_stage: record.source_stage,
@@ -110,7 +157,10 @@ pub fn build_compiler_stage_transformations(
             transform_contract: record.transform_contract.to_owned(),
             output_encoding: record.output_encoding.to_owned(),
             output_word_count: record.output_words.len(),
-            output_sha256: words_sha256(record.output_words),
+            output_checkpoint_sha256: words_sha256(record.output_words),
+            output_payload_file: payload::payload_file(ordinal),
+            output_payload_bytes: output_payload.len(),
+            output_payload_sha256: sha256_hex(&output_payload),
             output_words: record.output_words.to_vec(),
         });
     }
@@ -144,7 +194,7 @@ pub fn render_compiler_stage_transformations(manifest: &CompilerStageTransformat
     );
     for record in &manifest.records {
         out.push_str(&format!(
-            "\n[[record]]\nordinal = {}\nsource_stage = \"{}\"\ninput_payload_bytes = {}\ninput_payload_sha256 = \"{}\"\ntransform_contract = \"{}\"\noutput_encoding = \"{}\"\noutput_word_count = {}\noutput_sha256 = \"{}\"\n",
+            "\n[[record]]\nordinal = {}\nsource_stage = \"{}\"\ninput_payload_bytes = {}\ninput_payload_sha256 = \"{}\"\ntransform_contract = \"{}\"\noutput_encoding = \"{}\"\noutput_word_count = {}\noutput_checkpoint_sha256 = \"{}\"\noutput_payload_file = \"{}\"\noutput_payload_bytes = {}\noutput_payload_sha256 = \"{}\"\n",
             record.ordinal,
             record.source_stage.as_str(),
             record.input_payload_bytes,
@@ -152,7 +202,10 @@ pub fn render_compiler_stage_transformations(manifest: &CompilerStageTransformat
             record.transform_contract,
             record.output_encoding,
             record.output_word_count,
-            record.output_sha256,
+            record.output_checkpoint_sha256,
+            escape_toml_string(&record.output_payload_file),
+            record.output_payload_bytes,
+            record.output_payload_sha256,
         ));
         for (index, word) in record.output_words.iter().enumerate() {
             out.push_str(&format!("output_word_{index} = {word}\n"));
@@ -214,6 +267,8 @@ pub fn read_compiler_stage_transformations(
 ) -> Result<CompilerStageTransformations, ArtifactError> {
     let manifest = parse_compiler_stage_transformations(path)?;
     validate_bound_evidence(&manifest, handoff, payloads)?;
+    let root = path.parent().unwrap_or_else(|| Path::new("."));
+    verify_compiler_stage_transformation_payloads(root, &manifest, payloads)?;
     Ok(manifest)
 }
 
@@ -299,6 +354,9 @@ fn validate_bound_evidence(
                 record.source_stage.as_str()
             )));
         }
+        let output =
+            payload::encode_payload(record.source_stage, &payload.bytes, &record.output_words)?;
+        payload::validate_output_identity(record, &output)?;
     }
     Ok(())
 }
@@ -362,7 +420,9 @@ fn validate_manifest(manifest: &CompilerStageTransformations) -> Result<(), Arti
         )?;
         if record.input_payload_bytes == 0
             || record.output_word_count != record.output_words.len()
-            || record.output_sha256 != words_sha256(&record.output_words)
+            || record.output_checkpoint_sha256 != words_sha256(&record.output_words)
+            || record.output_payload_file != payload::payload_file(record.ordinal)
+            || record.output_payload_bytes == 0
         {
             return Err(ArtifactError::new(format!(
                 "compiler stage `{}` transformation record identity is invalid",
@@ -370,7 +430,14 @@ fn validate_manifest(manifest: &CompilerStageTransformations) -> Result<(), Arti
             )));
         }
         validate_sha256(&record.input_payload_sha256, "transformation input payload")?;
-        validate_sha256(&record.output_sha256, "transformation output")?;
+        validate_sha256(
+            &record.output_checkpoint_sha256,
+            "transformation output checkpoint",
+        )?;
+        validate_sha256(
+            &record.output_payload_sha256,
+            "transformation output payload",
+        )?;
     }
     if manifest.proof_sha256 != manifest_identity(manifest) {
         return Err(ArtifactError::new(
@@ -449,7 +516,7 @@ fn parse_record(
             path,
         )?);
     }
-    if values.len() != 8 + output_word_count {
+    if values.len() != 11 + output_word_count {
         return Err(ArtifactError::new(format!(
             "`{}` transformation record {ordinal} contains unknown or missing keys",
             path.display()
@@ -478,9 +545,22 @@ fn parse_record(
             "transformation record",
         )?,
         output_word_count,
-        output_sha256: parse_required_map_string_in_block(
+        output_checkpoint_sha256: parse_required_map_string_in_block(
             &values,
-            "output_sha256",
+            "output_checkpoint_sha256",
+            path,
+            "transformation record",
+        )?,
+        output_payload_file: parse_required_map_string_in_block(
+            &values,
+            "output_payload_file",
+            path,
+            "transformation record",
+        )?,
+        output_payload_bytes: required_map_usize(&values, "output_payload_bytes", path)?,
+        output_payload_sha256: parse_required_map_string_in_block(
+            &values,
+            "output_payload_sha256",
             path,
             "transformation record",
         )?,
@@ -617,6 +697,7 @@ fn manifest_identity(manifest: &CompilerStageTransformations) -> String {
             (record.ordinal as u64).to_le_bytes(),
             (record.input_payload_bytes as u64).to_le_bytes(),
             (record.output_word_count as u64).to_le_bytes(),
+            (record.output_payload_bytes as u64).to_le_bytes(),
         ] {
             hash_field(&mut hash, &value);
         }
@@ -625,7 +706,9 @@ fn manifest_identity(manifest: &CompilerStageTransformations) -> String {
             record.input_payload_sha256.as_bytes(),
             record.transform_contract.as_bytes(),
             record.output_encoding.as_bytes(),
-            record.output_sha256.as_bytes(),
+            record.output_checkpoint_sha256.as_bytes(),
+            record.output_payload_file.as_bytes(),
+            record.output_payload_sha256.as_bytes(),
         ] {
             hash_field(&mut hash, value);
         }

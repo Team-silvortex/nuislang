@@ -5,19 +5,22 @@ use std::{
 
 use nuis_artifact::{
     build_compiler_candidate_production, build_compiler_diagnostic_report,
-    build_compiler_stage_handoff, build_compiler_stage_transformations,
+    build_compiler_stage_handoff, build_compiler_stage_semantic_differential,
+    build_compiler_stage_transformations, materialize_compiler_stage_transformation_payloads,
     parse_compiler_component_differential, promote_compiler_component_candidate,
     read_compiler_candidate_execution, read_compiler_candidate_production,
     read_compiler_component_build, read_compiler_diagnostic_report, read_compiler_stage_handoff,
-    read_compiler_stage_transformations, render_compiler_candidate_production,
-    render_compiler_component_build, render_compiler_diagnostic_report,
-    render_compiler_stage_handoff, render_compiler_stage_transformations,
+    read_compiler_stage_semantic_differential, read_compiler_stage_transformations,
+    render_compiler_candidate_production, render_compiler_component_build,
+    render_compiler_diagnostic_report, render_compiler_stage_handoff,
+    render_compiler_stage_semantic_differential, render_compiler_stage_transformations,
     CompilerCandidateProductionInput, CompilerComponentCandidatePromotionInput,
     CompilerDiagnosticReportInput, CompilerStageKind, CompilerStagePayloadInput,
-    CompilerStageTransformationRecordInput, CompilerStageTransformationsInput,
-    COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_PRODUCTION_FILE,
-    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
-    COMPILER_DIAGNOSTIC_REPORT_FILE, COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+    CompilerStageSemanticDifferentialInput, CompilerStageTransformationRecordInput,
+    CompilerStageTransformationsInput, COMPILER_CANDIDATE_EXECUTION_FILE,
+    COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_BUILD_FILE,
+    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
     COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
@@ -31,7 +34,7 @@ use crate::{
 const STAGE0_DIR: &str = "stage0";
 const CANDIDATE_DIR: &str = "stage1-candidate";
 const STAGE_HANDOFF_FILE: &str = "nuis.compiler-stage-handoff.toml";
-const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-nir-checkpoint-materializer-v7";
+const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-lossless-nir-payload-materializer-v8";
 
 pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
@@ -160,12 +163,45 @@ fn handle_bootstrap_candidate_build_with_cache(
             stage_transformations_path.display()
         )
     })?;
+    materialize_compiler_stage_transformation_payloads(
+        &candidate_dir,
+        &stage_transformations,
+        &verified_handoff,
+        &verified_payloads,
+    )
+    .map_err(|error| format!("failed to materialize candidate stage payload: {error}"))?;
     let verified_stage_transformations = read_compiler_stage_transformations(
         &stage_transformations_path,
         &verified_handoff,
         &verified_payloads,
     )
     .map_err(|error| format!("failed to verify candidate stage transformations: {error}"))?;
+    let stage_semantic_input = CompilerStageSemanticDifferentialInput {
+        producer_id: &verified_candidate.producer_id,
+        handoff: &verified_handoff,
+        payloads: &verified_payloads,
+        transformations: &verified_stage_transformations,
+    };
+    let stage_semantic_differential =
+        build_compiler_stage_semantic_differential(&stage_semantic_input)
+            .map_err(|error| format!("failed to compare candidate stage semantics: {error}"))?;
+    let stage_semantic_differential_path =
+        candidate_dir.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE);
+    fs::write(
+        &stage_semantic_differential_path,
+        render_compiler_stage_semantic_differential(&stage_semantic_differential),
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write candidate stage semantic differential `{}`: {error}",
+            stage_semantic_differential_path.display()
+        )
+    })?;
+    let verified_stage_semantic_differential = read_compiler_stage_semantic_differential(
+        &stage_semantic_differential_path,
+        &stage_semantic_input,
+    )
+    .map_err(|error| format!("failed to verify candidate stage semantics: {error}"))?;
     let production = build_compiler_candidate_production(&CompilerCandidateProductionInput {
         stage0: &stage0,
         execution: &execution,
@@ -180,6 +216,8 @@ fn handle_bootstrap_candidate_build_with_cache(
         nir_pages: &adapter.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
         stage_transformations: &verified_stage_transformations,
+        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+        stage_semantic_differential: &verified_stage_semantic_differential,
         adapter_file: adapter.adapter_file,
         adapter: &adapter.adapter,
     })
@@ -255,6 +293,14 @@ fn handle_bootstrap_candidate_build_with_cache(
     println!(
         "  stage_transformation_sha256: {}",
         verified_production.stage_transformations_sha256
+    );
+    println!(
+        "  stage_semantic_differential_sha256: {}",
+        verified_production.stage_semantic_differential_proof_sha256
+    );
+    println!(
+        "  derived_stage_payload: {}",
+        verified_stage_transformations.records[0].output_payload_file
     );
     println!("  production_sha256: {}", verified_production.proof_sha256);
     println!("  differential: {}", differential.verdict);

@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage-neutral-ir-boundary")
+            Some("compiler-data-model")
         );
     }
 
@@ -530,9 +530,7 @@ mod tests {
 
     #[test]
     fn next_gate_follows_status_progress_coordinate_order() {
-        let adjusted = CHECKED_IN_MANIFEST
-            .replacen("progress = 93", "progress = 95", 1)
-            .replacen("progress = 93", "progress = 95", 1);
+        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 93", "progress = 95", 1);
         let report = parse_bootstrap_readiness(&adjusted).expect("manifest parses");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
@@ -545,7 +543,7 @@ mod tests {
         let complete = CHECKED_IN_MANIFEST
             .replace("status = \"usable\"", "status = \"stable\"")
             .replace("progress = 93", "progress = 100")
-            .replace("progress = 94", "progress = 100");
+            .replace("progress = 95", "progress = 100");
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);
         assert!(report.ready());

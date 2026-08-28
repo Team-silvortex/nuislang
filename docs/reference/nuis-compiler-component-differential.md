@@ -7,8 +7,9 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v7.toml](nuis-compiler-candidate-production-v7.toml)
-* [nuis-compiler-stage-transformation-v1.toml](nuis-compiler-stage-transformation-v1.toml)
+* [nuis-compiler-candidate-production-v8.toml](nuis-compiler-candidate-production-v8.toml)
+* [nuis-compiler-stage-transformation-v2.toml](nuis-compiler-stage-transformation-v2.toml)
+* [nuis-compiler-stage-semantic-differential-v1.toml](nuis-compiler-stage-semantic-differential-v1.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not
@@ -117,10 +118,12 @@ recomputation, and drift tests are implemented. The checked-in token, AST, and
 NIR page materializer is now the first Nuis-written leaf producer: it consumes
 all five serialized payloads through the exact scalar ABI, emits a bound
 candidate bundle fold, receives a distinct `stage1-candidate` component record,
-emits a separately bound non-identity NIR checkpoint, and reaches
-repository-native `13/13` equivalence. The current thirteen comparisons still
-compare unchanged handoff payload bytes; the checkpoint is validated as a
-production prerequisite rather than counted as a fourteenth symmetric stage.
+emits a separately bound non-identity NIR checkpoint plus a lossless derived
+binary, proves 1/1 semantic equivalence for the byte-different representation,
+and reaches repository-native `13/13` equivalence. The current thirteen
+comparisons still compare canonical v1 handoff payloads; the derived payload
+and semantic proof are production prerequisites rather than a fourteenth
+symmetric stage.
 
 `nuis bootstrap-reproducibility` now repeats this complete path in two empty,
 compile-cache-bypassed roots and binds both reports plus stable component
@@ -128,8 +131,8 @@ identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
 This is not replacement authority or full compiler self-hosting. The next
-closures are a changed stage payload plus transformation-aware semantic
-comparison, independent machine/attester evidence, and a separate reversible
+closures are compact structured derived NIR records, a handoff v2 selection
+contract, independent machine/attester evidence, and a separate reversible
 authorization protocol.
 
 ## Validation
