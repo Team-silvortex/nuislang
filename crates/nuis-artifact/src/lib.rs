@@ -14,6 +14,7 @@ mod compiler_stage_transformation;
 mod compiler_structural_projection;
 mod compiler_structural_projection_page;
 mod compiler_token_decoder;
+mod compiler_token_pagination;
 mod domain_unit;
 mod envelope;
 mod error;
@@ -143,12 +144,19 @@ pub use compiler_structural_projection_page::{
     COMPILER_PROJECTION_PAGE_HASH_SEED, COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,
 };
 pub use compiler_token_decoder::{
-    compiler_token_first_page_identity, decode_compiler_token_stream, CompilerTokenDecodeSummary,
-    CompilerTokenPageIdentity, COMPILER_TOKEN_DECODER_CONTRACT,
+    compiler_token_first_page_identity, compiler_token_page_identity, decode_compiler_token_stream,
+    CompilerTokenDecodeSummary, CompilerTokenPageIdentity, COMPILER_TOKEN_DECODER_CONTRACT,
     COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_BYTES,
     COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_DECODER_SEMANTIC_SEED,
     COMPILER_TOKEN_PAGE_CANONICAL_BYTES, COMPILER_TOKEN_PAGE_IDENTITY_RADIX,
     COMPILER_TOKEN_PAGE_PAYLOAD_BYTES, COMPILER_TOKEN_PAGE_RECORDS, COMPILER_TOKEN_STREAM_PROTOCOL,
+};
+pub use compiler_token_pagination::{
+    compiler_token_page_chain_fold, compiler_token_page_hash_step,
+    compiler_token_pagination_identity, CompilerTokenPaginationIdentity,
+    CompilerTokenPaginationPage, COMPILER_TOKEN_PAGE_CHAIN_RADIX, COMPILER_TOKEN_PAGE_CHAIN_SEED,
+    COMPILER_TOKEN_PAGE_HASH_RADIX, COMPILER_TOKEN_PAGE_HASH_SEED,
+    COMPILER_TOKEN_PAGINATION_CONTRACT, COMPILER_TOKEN_PAGINATION_PAGE_BYTES,
 };
 pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{

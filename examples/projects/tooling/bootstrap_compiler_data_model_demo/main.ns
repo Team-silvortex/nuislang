@@ -32,8 +32,40 @@ mod cpu Main {
   }
 
   fn build_symbol_map(node_index: i64) -> Result<CompilerMap, i64> {
-    let source_symbol: CompilerMap = compiler_map_insert(compiler_map_empty(), 11, 0)?;
-    return compiler_map_insert(source_symbol, 13, node_index);
+    let symbol0: CompilerMap = compiler_map_insert(compiler_map_empty(), 11, 0)?;
+    let symbol1: CompilerMap = compiler_map_insert(symbol0, 13, -1)?;
+    let symbol2: CompilerMap = compiler_map_insert(symbol1, 17, 2)?;
+    let symbol3: CompilerMap = compiler_map_insert(symbol2, 19, 3)?;
+    let symbol4: CompilerMap = compiler_map_insert(symbol3, 23, 4)?;
+    let symbol5: CompilerMap = compiler_map_insert(symbol4, 29, 5)?;
+    let symbol6: CompilerMap = compiler_map_insert(symbol5, 31, 6)?;
+    let symbol7: CompilerMap = compiler_map_insert(symbol6, 37, 7)?;
+    return compiler_map_insert(symbol7, 13, node_index);
+  }
+
+  fn fill_symbol_map(symbols: CompilerMap) -> Result<CompilerMap, i64> {
+    let symbol8: CompilerMap = compiler_map_insert(symbols, 41, 8)?;
+    let symbol9: CompilerMap = compiler_map_insert(symbol8, 43, 9)?;
+    let symbol10: CompilerMap = compiler_map_insert(symbol9, 47, 10)?;
+    let symbol11: CompilerMap = compiler_map_insert(symbol10, 53, 11)?;
+    let symbol12: CompilerMap = compiler_map_insert(symbol11, 59, 12)?;
+    let symbol13: CompilerMap = compiler_map_insert(symbol12, 61, 13)?;
+    let symbol14: CompilerMap = compiler_map_insert(symbol13, 67, 14)?;
+    return compiler_map_insert(symbol14, 71, 15);
+  }
+
+  fn full_map_insert_error(symbols: CompilerMap) -> i64 {
+    match compiler_map_insert(symbols, 73, 16) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  fn map_identity_error(symbols: CompilerMap) -> i64 {
+    match compiler_map_identity(symbols) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
   }
 
   fn build_path() -> Result<CompilerPath, i64> {
@@ -211,11 +243,56 @@ mod cpu Main {
     return 0;
   }
 
+  fn map_boundaries_fail_closed(
+    symbols: CompilerMap,
+    symbol_identity: i64,
+    full_symbols: CompilerMap
+  ) -> i64 {
+    if compiler_map_shape_valid(symbols) == false
+      || symbols.length != 8
+      || symbols.keys.page_count != 2
+      || symbols.values.page_count != 2 {
+      return 51;
+    }
+    if symbols.keys.page1.slot0 != 23
+      || symbols.keys.page0.slot1 != 13
+      || symbols.values.page0.slot1 != 1
+      || symbols.values.page1.slot3 != 7 {
+      return 52;
+    }
+    if symbol_identity != 415394959 {
+      return 63;
+    }
+    if compiler_map_shape_valid(full_symbols) == false
+      || full_symbols.length != 16
+      || full_symbols.keys.page_count != 4
+      || full_symbols.values.page_count != 4 {
+      return 58;
+    }
+    if full_map_insert_error(full_symbols) != 1 {
+      return 59;
+    }
+    let malformed: CompilerMap = CompilerMap {
+      length: 1,
+      keys: compiler_vector_empty(0),
+      values: compiler_vector_empty(0)
+    };
+    if compiler_map_shape_valid(malformed) {
+      return 67;
+    }
+    if map_identity_error(malformed) != 3 {
+      return 68;
+    }
+    if compiler_map_contains(symbols, 99) {
+      return 15;
+    }
+    return 0;
+  }
+
   fn boundaries_fail_closed(
     text: CompilerText,
     tokens: CompilerVector,
     full_tokens: CompilerVector,
-    symbols: CompilerMap,
     arena: CompilerArena
   ) -> i64 {
     if text.bytes.length != 8 || text.bytes.page_count != 2 {
@@ -266,12 +343,6 @@ mod cpu Main {
     if compiler_vector_shape_valid(-1, 2, 4, -5, 0, 0) {
       return 18;
     }
-    match compiler_map_get(symbols, 99) {
-      Option.Some(_) => {
-        return 15;
-      }
-      Option.None => {}
-    }
     match compiler_arena_allocate(arena) {
       Result.Ok(_) => {
         return 16;
@@ -309,6 +380,8 @@ mod cpu Main {
     let arena1: CompilerArena = compiler_arena_allocate(arena0)?;
     let arena2: CompilerArena = compiler_arena_allocate(arena1)?;
     let symbols: CompilerMap = build_symbol_map(arena2.last_index)?;
+    let full_symbols: CompilerMap = fill_symbol_map(symbols)?;
+    let symbol_identity: i64 = compiler_map_identity(symbols)?;
     let node_index: i64 = match compiler_map_get(symbols, 13) {
       Option.Some(value) => {
         value
@@ -336,11 +409,18 @@ mod cpu Main {
       text,
       tokens,
       full_tokens,
-      symbols,
       arena2
     );
     if boundary_error != 0 {
       return Result.Err(boundary_error);
+    }
+    let map_boundary_error: i64 = map_boundaries_fail_closed(
+      symbols,
+      symbol_identity,
+      full_symbols
+    );
+    if map_boundary_error != 0 {
+      return Result.Err(map_boundary_error);
     }
     let token_model_error: i64 = token_model_fail_closed(
       materialized_tokens,
@@ -353,6 +433,7 @@ mod cpu Main {
       compiler_diagnostic_score(diagnostic)
         + token_kind
         + node_index
+        + symbols.length
         + arena2.next_index
         + text.scalar_length
         + materialized_tokens.record_count

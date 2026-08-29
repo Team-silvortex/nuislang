@@ -23,13 +23,14 @@ use crate::{
     CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerStageKind,
     CompilerStageSemanticDifferential, CompilerStageSemanticDifferentialInput,
     CompilerStageTransformations, CompilerTokenDecodeSummary, CompilerTokenPageIdentity,
-    VerifiedCompilerStagePayload, COMPILER_PROJECTION_CURSOR_CONTRACT,
-    COMPILER_PROJECTION_PAGE_CONTRACT, COMPILER_TOKEN_DECODER_CONTRACT,
+    CompilerTokenPaginationIdentity, VerifiedCompilerStagePayload,
+    COMPILER_PROJECTION_CURSOR_CONTRACT, COMPILER_PROJECTION_PAGE_CONTRACT,
+    COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_PAGINATION_CONTRACT,
 };
 
-pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v8";
+pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v9";
 pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str =
-    "nuis-stage1-lossless-derived-nir-payload-producer-v8";
+    "nuis-stage1-paginated-token-derived-nir-producer-v9";
 pub const COMPILER_CANDIDATE_PRODUCTION_AUTHORITY: &str =
     "stage1-candidate-component-production-no-replacement";
 pub const COMPILER_CANDIDATE_PRODUCTION_FILE: &str = "nuis.compiler-candidate-production.toml";
@@ -49,6 +50,7 @@ pub struct CompilerCandidateProductionInput<'a> {
     pub bundle_fold: usize,
     pub token_decode: &'a CompilerTokenDecodeSummary,
     pub token_page: &'a CompilerTokenPageIdentity,
+    pub token_pagination: &'a CompilerTokenPaginationIdentity,
     pub ast_pages: &'a CompilerProjectionTwoPageIdentity,
     pub nir_pages: &'a CompilerProjectionTwoPageIdentity,
     pub stage_transformations_file: &'a str,
@@ -99,6 +101,10 @@ pub struct CompilerCandidateProduction {
     pub token_page_canonical_bytes: usize,
     pub token_page_canonical_hash: usize,
     pub token_page_identity: usize,
+    pub token_pagination_contract: String,
+    pub token_page_count: usize,
+    pub token_terminal_page_hash: usize,
+    pub token_page_chain_identity: usize,
     pub projection_cursor_contract: String,
     pub ast_page_contract: String,
     pub ast_page_record_count: usize,
@@ -204,6 +210,10 @@ pub fn build_compiler_candidate_production(
         token_page_canonical_bytes: input.token_page.canonical_bytes,
         token_page_canonical_hash: input.token_page.canonical_hash,
         token_page_identity: input.token_page.identity,
+        token_pagination_contract: COMPILER_TOKEN_PAGINATION_CONTRACT.to_owned(),
+        token_page_count: input.token_pagination.page_count,
+        token_terminal_page_hash: input.token_pagination.terminal_page_hash,
+        token_page_chain_identity: input.token_pagination.chain_identity,
         projection_cursor_contract: COMPILER_PROJECTION_CURSOR_CONTRACT.to_owned(),
         ast_page_contract: COMPILER_PROJECTION_PAGE_CONTRACT.to_owned(),
         ast_page_record_count: input.ast_pages.first.page.record_count,
@@ -240,7 +250,7 @@ pub fn build_compiler_candidate_production(
 
 pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction) -> String {
     let mut out = format!(
-        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nstage_transformations_file = \"{}\"\nstage_transformations_bytes = {}\nstage_transformations_sha256 = \"{}\"\nstage_semantic_differential_file = \"{}\"\nstage_semantic_differential_bytes = {}\nstage_semantic_differential_sha256 = \"{}\"\nstage_semantic_differential_proof_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\nprojection_cursor_contract = \"{}\"\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nast_page_cursor_identity = {}\nast_continuation_page_identity = {}\nast_continuation_cursor_identity = {}\nnir_page_contract = \"{}\"\nnir_page_record_count = {}\nnir_page_bytes = {}\nnir_page_projection_hash = {}\nnir_page_continuation_indentation = {}\nnir_page_continuation_body_bytes = {}\nnir_page_continuation_body_hash = {}\nnir_page_state_hash = {}\nnir_page_identity = {}\nnir_page_cursor_identity = {}\nnir_continuation_page_identity = {}\nnir_continuation_cursor_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
+        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nstage_transformations_file = \"{}\"\nstage_transformations_bytes = {}\nstage_transformations_sha256 = \"{}\"\nstage_semantic_differential_file = \"{}\"\nstage_semantic_differential_bytes = {}\nstage_semantic_differential_sha256 = \"{}\"\nstage_semantic_differential_proof_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\ntoken_pagination_contract = \"{}\"\ntoken_page_count = {}\ntoken_terminal_page_hash = {}\ntoken_page_chain_identity = {}\nprojection_cursor_contract = \"{}\"\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nast_page_cursor_identity = {}\nast_continuation_page_identity = {}\nast_continuation_cursor_identity = {}\nnir_page_contract = \"{}\"\nnir_page_record_count = {}\nnir_page_bytes = {}\nnir_page_projection_hash = {}\nnir_page_continuation_indentation = {}\nnir_page_continuation_body_bytes = {}\nnir_page_continuation_body_hash = {}\nnir_page_state_hash = {}\nnir_page_identity = {}\nnir_page_cursor_identity = {}\nnir_continuation_page_identity = {}\nnir_continuation_cursor_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
         proof.protocol,
         proof.producer_contract,
         proof.authority,
@@ -270,6 +280,10 @@ pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction)
         proof.token_page_canonical_bytes,
         proof.token_page_canonical_hash,
         proof.token_page_identity,
+        proof.token_pagination_contract,
+        proof.token_page_count,
+        proof.token_terminal_page_hash,
+        proof.token_page_chain_identity,
         proof.projection_cursor_contract,
         proof.ast_page_contract,
         proof.ast_page_record_count,
@@ -422,6 +436,22 @@ pub fn parse_compiler_candidate_production_from_source(
             path,
         )?,
         token_page_identity: parse_required_toml_usize(source, "token_page_identity", path)?,
+        token_pagination_contract: parse_required_toml_string(
+            source,
+            "token_pagination_contract",
+            path,
+        )?,
+        token_page_count: parse_required_toml_usize(source, "token_page_count", path)?,
+        token_terminal_page_hash: parse_required_toml_usize(
+            source,
+            "token_terminal_page_hash",
+            path,
+        )?,
+        token_page_chain_identity: parse_required_toml_usize(
+            source,
+            "token_page_chain_identity",
+            path,
+        )?,
         projection_cursor_contract: parse_required_toml_string(
             source,
             "projection_cursor_contract",
@@ -600,6 +630,11 @@ pub fn read_compiler_candidate_production(
         canonical_hash: proof.token_page_canonical_hash,
         identity: proof.token_page_identity,
     };
+    let token_payload = payloads
+        .iter()
+        .find(|payload| payload.stage == CompilerStageKind::Tokens)
+        .ok_or_else(|| ArtifactError::new("compiler candidate token payload is missing"))?;
+    let token_pagination = crate::compiler_token_pagination_identity(&token_payload.bytes)?;
     let ast_payload = payloads
         .iter()
         .find(|payload| payload.stage == CompilerStageKind::Ast)
@@ -622,6 +657,7 @@ pub fn read_compiler_candidate_production(
         bundle_fold: proof.bundle_fold,
         token_decode: &token_decode,
         token_page: &token_page,
+        token_pagination: &token_pagination,
         ast_pages: &ast_pages,
         nir_pages: &nir_pages,
         stage_transformations_file: &proof.stage_transformations_file,

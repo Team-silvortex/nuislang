@@ -66,7 +66,7 @@ active NIR handoff record.
 
 ## Trust Chain
 
-Candidate production v8 binds the exact transformation manifest, derived
+Candidate production v9 binds the exact transformation manifest, derived
 payload metadata, semantic differential file and semantic proof identity.
 `bootstrap-diff` rereads that chain before producing the existing 13/13
 component report. The two-clean-build reproducibility aggregate then binds the

@@ -34,7 +34,7 @@ use crate::{
 const STAGE0_DIR: &str = "stage0";
 const CANDIDATE_DIR: &str = "stage1-candidate";
 const STAGE_HANDOFF_FILE: &str = "nuis.compiler-stage-handoff.toml";
-const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-lossless-nir-payload-materializer-v8";
+const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-paginated-token-derived-nir-producer-v9";
 
 pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
@@ -212,6 +212,7 @@ fn handle_bootstrap_candidate_build_with_cache(
         bundle_fold: adapter.bundle_fold,
         token_decode: &adapter.token_decode,
         token_page: &adapter.token_page,
+        token_pagination: &adapter.token_pagination,
         ast_pages: &adapter.ast_pages,
         nir_pages: &adapter.nir_pages,
         stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
@@ -273,6 +274,18 @@ fn handle_bootstrap_candidate_build_with_cache(
     println!(
         "  token_page_identity: {}",
         verified_production.token_page_identity
+    );
+    println!(
+        "  token_page_count: {}",
+        verified_production.token_page_count
+    );
+    println!(
+        "  token_terminal_page_hash: {}",
+        verified_production.token_terminal_page_hash
+    );
+    println!(
+        "  token_page_chain_identity: {}",
+        verified_production.token_page_chain_identity
     );
     println!(
         "  ast_page_identity: {}",

@@ -11,15 +11,17 @@ use super::{
 };
 use crate::{
     compiler_projection_two_page_identity, compiler_token_first_page_identity,
-    decode_compiler_token_stream, verify_compiler_stage_semantic_differential,
-    verify_compiler_stage_transformations, ArtifactError, CompilerProjectionKind,
-    CompilerProjectionPageIdentity, CompilerStageKind, CompilerStageSemanticDifferentialInput,
-    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
-    COMPILER_PROJECTION_CURSOR_CONTRACT, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_TOKEN_DECODER_CONTRACT,
-    COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_RECORDS,
-    COMPILER_TOKEN_PAGE_CANONICAL_BYTES, COMPILER_TOKEN_PAGE_IDENTITY_RADIX,
-    COMPILER_TOKEN_PAGE_PAYLOAD_BYTES, COMPILER_TOKEN_PAGE_RECORDS,
+    compiler_token_pagination_identity, decode_compiler_token_stream,
+    verify_compiler_stage_semantic_differential, verify_compiler_stage_transformations,
+    ArtifactError, CompilerProjectionKind, CompilerProjectionPageIdentity, CompilerStageKind,
+    CompilerStageSemanticDifferentialInput, COMPILER_COMPONENT_STAGE0_ROLE,
+    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_PROJECTION_CURSOR_CONTRACT,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_DECODER_FOLD_MODULUS,
+    COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_PAGE_CANONICAL_BYTES,
+    COMPILER_TOKEN_PAGE_IDENTITY_RADIX, COMPILER_TOKEN_PAGE_PAYLOAD_BYTES,
+    COMPILER_TOKEN_PAGE_RECORDS, COMPILER_TOKEN_PAGINATION_CONTRACT,
+    COMPILER_TOKEN_PAGINATION_PAGE_BYTES,
 };
 
 pub(super) fn validate_evidence(
@@ -107,9 +109,13 @@ pub(super) fn validate_evidence(
             "compiler candidate production token decode summary mismatch",
         ));
     }
-    if *input.token_page != compiler_token_first_page_identity(&token_payload.bytes)? {
+    let expected_token_pagination = compiler_token_pagination_identity(&token_payload.bytes)?;
+    if *input.token_pagination != expected_token_pagination
+        || input.token_pagination.record_count != input.token_decode.record_count
+        || *input.token_page != compiler_token_first_page_identity(&token_payload.bytes)?
+    {
         return Err(ArtifactError::new(
-            "compiler candidate production canonical token page identity mismatch",
+            "compiler candidate production canonical token pagination identity mismatch",
         ));
     }
     validate_projection_evidence(input, CompilerStageKind::Ast, CompilerProjectionKind::Ast)?;
@@ -191,6 +197,7 @@ pub(super) fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), 
         || proof.producer_contract != COMPILER_CANDIDATE_PRODUCER_CONTRACT
         || proof.authority != COMPILER_CANDIDATE_PRODUCTION_AUTHORITY
         || proof.token_decoder_contract != COMPILER_TOKEN_DECODER_CONTRACT
+        || proof.token_pagination_contract != COMPILER_TOKEN_PAGINATION_CONTRACT
         || proof.projection_cursor_contract != COMPILER_PROJECTION_CURSOR_CONTRACT
         || proof.replacement_authorized
     {
@@ -271,6 +278,18 @@ pub(super) fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), 
     {
         return Err(ArtifactError::new(
             "compiler candidate production canonical token page summary is invalid",
+        ));
+    }
+    let expected_page_count = proof.records[1]
+        .payload_bytes
+        .div_ceil(COMPILER_TOKEN_PAGINATION_PAGE_BYTES);
+    if proof.token_page_count == 0
+        || proof.token_page_count != expected_page_count
+        || proof.token_terminal_page_hash >= COMPILER_TOKEN_DECODER_FOLD_MODULUS
+        || proof.token_page_chain_identity >= COMPILER_TOKEN_DECODER_FOLD_MODULUS
+    {
+        return Err(ArtifactError::new(
+            "compiler candidate production token pagination summary is invalid",
         ));
     }
     validate_projection_summaries(proof)?;

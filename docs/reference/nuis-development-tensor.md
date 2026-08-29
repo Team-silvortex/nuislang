@@ -1748,12 +1748,12 @@ The five required coordinates are:
 * `compiler-toolchain/bootstrap/stage0-stage1-driver`
 * `developer-system/bootstrap/differential-reproducibility-gate`
 
-Subset v7 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the roadmap score, and readiness waits for all five to reach `stable/100`.
+Subset v8 is `stable/100` through `nuisc bootstrap-check`; its twenty-one exact scalar exports add complete token pagination without widening the language surface, and readiness still waits for all five gates to reach `stable/100`.
 
 Production-bound token data, two AST/NIR pages, a real lossless derived NIR binary, and its 1/1 non-byte-identical semantic differential move the stage-neutral boundary to `usable/95`.
-The v8 candidate trust chain and two cache-bypassed clean builds move both driver and reproducibility gate to `usable/95`.
-Data model v3 remains `usable/93` through owned token identity `164749511446` plus second-page identities `149528711957` and `146705724977`.
-Token pagination, then map and arena growth, are now the weakest bootstrap boundary; compact structured NIR-derived records remain the next IR-boundary step.
+The v9 candidate trust chain and two cache-bypassed clean builds keep both driver and reproducibility gate at `usable/95`.
+Data model v5 is `usable/94`: every token page remains independently replayed while the sixteen-entry stable-order map executes natively with ordered identity `415394959` and exit `130`.
+Compiler-arena-owned object storage is now the unique weakest bootstrap boundary; compact structured NIR-derived records remain the next IR-boundary step.
 
 ## Runtime Lifecycle Loader Bootstrap
 

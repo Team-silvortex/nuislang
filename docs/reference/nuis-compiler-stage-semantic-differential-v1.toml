@@ -31,7 +31,7 @@ current_comparison_count = 1
 current_source_stage = "nir"
 current_source_encoding = "nuis-nir-canonical-projection-v1"
 current_derived_encoding = "nuis-derived-structural-stage-payload-v1"
-production_protocol = "nuis-compiler-candidate-production-v8"
+production_protocol = "nuis-compiler-candidate-production-v9"
 
 [non_claims]
 items = [

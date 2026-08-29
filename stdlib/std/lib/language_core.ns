@@ -51,17 +51,11 @@ mod cpu StdLanguageCore {
     pub hash: i64
   }
 
-  /// Four-entry integer map for symbol, token, and node identities.
+  /// Ordered integer map backed by two deterministic four-page vectors.
   pub struct CompilerMap {
     pub length: i64,
-    pub key0: i64,
-    pub value0: i64,
-    pub key1: i64,
-    pub value1: i64,
-    pub key2: i64,
-    pub value2: i64,
-    pub key3: i64,
-    pub value3: i64
+    pub keys: CompilerVector,
+    pub values: CompilerVector
   }
 
   /// Monotonic compiler arena represented by stable integer indices.
@@ -522,145 +516,143 @@ mod cpu StdLanguageCore {
   pub fn compiler_map_empty() -> CompilerMap {
     return CompilerMap {
       length: 0,
-      key0: 0,
-      value0: 0,
-      key1: 0,
-      value1: 0,
-      key2: 0,
-      value2: 0,
-      key3: 0,
-      value3: 0
+      keys: compiler_vector_empty(0),
+      values: compiler_vector_empty(0)
     };
   }
 
-  /// Inserts or replaces one map entry, reporting full capacity as error code 1.
+  /// Rejects mismatched key/value columns and malformed vector pages.
+  pub fn compiler_map_shape_valid(map: CompilerMap) -> bool {
+    if map.length != map.keys.length || map.length != map.values.length {
+      return false;
+    }
+    return compiler_vector_shape_valid(
+      map.keys.length,
+      map.keys.page_count,
+      map.keys.page0.length,
+      map.keys.page1.length,
+      map.keys.page2.length,
+      map.keys.page3.length
+    ) && compiler_vector_shape_valid(
+      map.values.length,
+      map.values.page_count,
+      map.values.page0.length,
+      map.values.page1.length,
+      map.values.page2.length,
+      map.values.page3.length
+    );
+  }
+
+  pub fn compiler_map_vector_value(vector: CompilerVector, index: i64) -> i64 {
+    match compiler_vector_get(vector, index) {
+      Option.Some(value) => { return value; }
+      Option.None => { return 0; }
+    }
+  }
+
+  pub fn compiler_map_replace_value(
+    map: CompilerMap,
+    index: i64,
+    value: i64
+  ) -> Result<CompilerMap, i64> {
+    let updated: CompilerVector = compiler_vector_set(map.values, index, value)?;
+    return Result.Ok(CompilerMap {
+      length: map.length,
+      keys: map.keys,
+      values: updated
+    });
+  }
+
+  pub fn compiler_map_find_index(
+    map: CompilerMap,
+    key: i64,
+    index: i64
+  ) -> i64 {
+    if index < 0 || index >= map.length {
+      return -1;
+    }
+    if compiler_map_vector_value(map.keys, index) == key {
+      return index;
+    }
+    return compiler_map_find_index(map, key, index + 1);
+  }
+
+  /// Inserts in stable order or replaces the value at an existing key index.
   pub fn compiler_map_insert(
     map: CompilerMap,
     key: i64,
     value: i64
   ) -> Result<CompilerMap, i64> {
-    if map.length > 0 && map.key0 == key {
-      return Result.Ok(CompilerMap {
-        length: map.length,
-        key0: key,
-        value0: value,
-        key1: map.key1,
-        value1: map.value1,
-        key2: map.key2,
-        value2: map.value2,
-        key3: map.key3,
-        value3: map.value3
-      });
+    if compiler_map_shape_valid(map) == false {
+      return Result.Err(3);
     }
-    if map.length > 1 && map.key1 == key {
-      return Result.Ok(CompilerMap {
-        length: map.length,
-        key0: map.key0,
-        value0: map.value0,
-        key1: key,
-        value1: value,
-        key2: map.key2,
-        value2: map.value2,
-        key3: map.key3,
-        value3: map.value3
-      });
+    let index: i64 = compiler_map_find_index(map, key, 0);
+    if index >= 0 {
+      return compiler_map_replace_value(map, index, value);
     }
-    if map.length > 2 && map.key2 == key {
-      return Result.Ok(CompilerMap {
-        length: map.length,
-        key0: map.key0,
-        value0: map.value0,
-        key1: map.key1,
-        value1: map.value1,
-        key2: key,
-        value2: value,
-        key3: map.key3,
-        value3: map.value3
-      });
-    }
-    if map.length > 3 && map.key3 == key {
-      return Result.Ok(CompilerMap {
-        length: map.length,
-        key0: map.key0,
-        value0: map.value0,
-        key1: map.key1,
-        value1: map.value1,
-        key2: map.key2,
-        value2: map.value2,
-        key3: key,
-        value3: value
-      });
-    }
-    if map.length == 0 {
-      return Result.Ok(CompilerMap {
-        length: 1,
-        key0: key,
-        value0: value,
-        key1: map.key1,
-        value1: map.value1,
-        key2: map.key2,
-        value2: map.value2,
-        key3: map.key3,
-        value3: map.value3
-      });
-    }
-    if map.length == 1 {
-      return Result.Ok(CompilerMap {
-        length: 2,
-        key0: map.key0,
-        value0: map.value0,
-        key1: key,
-        value1: value,
-        key2: map.key2,
-        value2: map.value2,
-        key3: map.key3,
-        value3: map.value3
-      });
-    }
-    if map.length == 2 {
-      return Result.Ok(CompilerMap {
-        length: 3,
-        key0: map.key0,
-        value0: map.value0,
-        key1: map.key1,
-        value1: map.value1,
-        key2: key,
-        value2: value,
-        key3: map.key3,
-        value3: map.value3
-      });
-    }
-    if map.length == 3 {
-      return Result.Ok(CompilerMap {
-        length: 4,
-        key0: map.key0,
-        value0: map.value0,
-        key1: map.key1,
-        value1: map.value1,
-        key2: map.key2,
-        value2: map.value2,
-        key3: key,
-        value3: value
-      });
-    }
-    return Result.Err(1);
+    let keys: CompilerVector = compiler_vector_push(map.keys, key)?;
+    let values: CompilerVector = compiler_vector_push(map.values, value)?;
+    return Result.Ok(CompilerMap {
+      length: map.length + 1,
+      keys: keys,
+      values: values
+    });
   }
 
   /// Looks up one compiler map value without exposing storage layout.
   pub fn compiler_map_get(map: CompilerMap, key: i64) -> Option<i64> {
-    if map.length > 0 && map.key0 == key {
-      return Option.Some(map.value0);
+    if compiler_map_shape_valid(map) == false {
+      return Option.None;
     }
-    if map.length > 1 && map.key1 == key {
-      return Option.Some(map.value1);
-    }
-    if map.length > 2 && map.key2 == key {
-      return Option.Some(map.value2);
-    }
-    if map.length > 3 && map.key3 == key {
-      return Option.Some(map.value3);
+    let index: i64 = compiler_map_find_index(map, key, 0);
+    if index >= 0 {
+      return Option.Some(compiler_map_vector_value(map.values, index));
     }
     return Option.None;
+  }
+
+  /// Reports key presence without exposing Option lowering to callers.
+  pub fn compiler_map_contains(map: CompilerMap, key: i64) -> bool {
+    match compiler_map_get(map, key) {
+      Option.Some(_) => { return true; }
+      Option.None => { return false; }
+    }
+  }
+
+  pub fn compiler_map_identity_fold(state: i64, value: i64) -> i64 {
+    let normalized: i64 = value % 2147483629;
+    if normalized < 0 {
+      return ((state * 257) + normalized + 2147483630) % 2147483629;
+    }
+    return ((state * 257) + normalized + 1) % 2147483629;
+  }
+
+  pub fn compiler_map_identity_from(
+    map: CompilerMap,
+    index: i64,
+    identity: i64
+  ) -> i64 {
+    if index >= map.length {
+      return identity;
+    }
+    let key_identity: i64 = compiler_map_identity_fold(
+      identity,
+      compiler_map_vector_value(map.keys, index)
+    );
+    let value_identity: i64 = compiler_map_identity_fold(
+      key_identity,
+      compiler_map_vector_value(map.values, index)
+    );
+    return compiler_map_identity_from(map, index + 1, value_identity);
+  }
+
+  /// Hashes length plus every key/value pair in insertion order.
+  pub fn compiler_map_identity(map: CompilerMap) -> Result<i64, i64> {
+    if compiler_map_shape_valid(map) == false {
+      return Result.Err(3);
+    }
+    let identity: i64 = compiler_map_identity_fold(211, map.length);
+    return Result.Ok(compiler_map_identity_from(map, 0, identity));
   }
 
   /// Builds an empty monotonic arena with an explicit capacity.

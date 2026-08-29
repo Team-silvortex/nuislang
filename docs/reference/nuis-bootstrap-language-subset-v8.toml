@@ -1,0 +1,173 @@
+protocol = "nuis-bootstrap-language-subset-v8"
+version = 8
+predecessor = "nuis-bootstrap-language-subset-v7"
+status = "frozen-token-pagination-exports"
+scope = "compiler-authoring-source"
+public_language_compatibility = false
+module_domains = ["cpu"]
+primitive_types = ["bool", "i64", "text"]
+approved_imports = [
+  "cpu/CorePrelude",
+  "cpu/StdLanguageCore",
+  "cpu/StdCompilerData",
+  "cpu/StdCompilerTokenEmit",
+  "cpu/StdCompilerTokens",
+  "cpu/StdCompilerProjection",
+  "cpu/StdTextContracts",
+  "project-local-cpu-unit",
+]
+approved_external_types = [
+  "Option",
+  "Result",
+  "CompilerText",
+  "CompilerDecimalState",
+  "CompilerTokenBuffer",
+  "CompilerTokenMaterializer",
+  "CompilerTokenRecord",
+  "CompilerTokenStore",
+  "CompilerVector",
+  "CompilerMap",
+  "CompilerArena",
+  "CompilerSourceSpan",
+  "CompilerDiagnostic",
+  "CompilerPath",
+  "CompilerProjectionKind",
+  "CompilerProjectionRecordKind",
+  "CompilerProjectionPageState",
+  "CompilerProjectionState",
+]
+allowed_items = ["const", "type-alias", "struct", "enum", "function"]
+allowed_function_attributes = [
+  "doc",
+  "exact-stage1-candidate-scalar-export-abi",
+]
+approved_scalar_exports = [
+  "compiler_candidate_stage_seed=nuis_bootstrap_candidate_stage_seed_v1(i64)->i64",
+  "compiler_candidate_stage_fold=nuis_bootstrap_candidate_stage_fold_v1(i64,i64,i64)->i64",
+  "compiler_candidate_bundle_seed=nuis_bootstrap_candidate_bundle_seed_v1()->i64",
+  "compiler_candidate_bundle_fold=nuis_bootstrap_candidate_bundle_fold_v1(i64,i64,i64)->i64",
+  "compiler_candidate_token_start=nuis_bootstrap_candidate_token_start_v1()->i64",
+  "compiler_candidate_token_error_mode=nuis_bootstrap_candidate_token_error_mode_v1()->i64",
+  "compiler_candidate_token_max_bytes=nuis_bootstrap_candidate_token_max_bytes_v1()->i64",
+  "compiler_candidate_token_semantic_seed=nuis_bootstrap_candidate_token_semantic_seed_v1()->i64",
+  "compiler_candidate_token_step=nuis_bootstrap_candidate_token_step_v1(i64,i64)->i64",
+  "compiler_candidate_token_count_step=nuis_bootstrap_candidate_token_count_step_v1(i64,i64,i64)->i64",
+  "compiler_candidate_token_semantic_step=nuis_bootstrap_candidate_token_semantic_step_v1(i64,i64,i64)->i64",
+  "compiler_candidate_token_finish=nuis_bootstrap_candidate_token_finish_v1(i64,i64)->i64",
+  "compiler_candidate_token_page_identity=nuis_bootstrap_candidate_token_page_identity_v1(i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64)->i64",
+  "compiler_candidate_token_pagination_page_bytes=nuis_bootstrap_candidate_token_pagination_page_bytes_v1()->i64",
+  "compiler_candidate_token_page_hash_seed=nuis_bootstrap_candidate_token_page_hash_seed_v1()->i64",
+  "compiler_candidate_token_page_hash_step=nuis_bootstrap_candidate_token_page_hash_step_v1(i64,i64)->i64",
+  "compiler_candidate_token_page_chain_seed=nuis_bootstrap_candidate_token_page_chain_seed_v1()->i64",
+  "compiler_candidate_token_page_chain_fold=nuis_bootstrap_candidate_token_page_chain_fold_v1(i64,i64,i64,i64,i64,i64)->i64",
+  "compiler_candidate_ast_page_identity=nuis_bootstrap_candidate_ast_page_identity_v1(i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64)->i64",
+  "compiler_candidate_nir_page_identity=nuis_bootstrap_candidate_nir_page_identity_v1(i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64)->i64",
+  "compiler_candidate_projection_page_resume_value=nuis_bootstrap_candidate_projection_page_resume_value_v1(i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64,i64)->i64",
+]
+allowed_generics = ["unbounded-type-parameters"]
+allowed_control_flow = ["if", "match", "while", "break", "continue", "return", "try"]
+allowed_expressions = [
+  "bool-literal",
+  "text-literal",
+  "i64-literal",
+  "local-variable",
+  "direct-call",
+  "method-call",
+  "struct-literal",
+  "field-access",
+  "not",
+  "negate",
+  "binary-operator",
+]
+rejected_capabilities = [
+  "non-cpu-domain",
+  "unapproved-import",
+  "extern-or-ffi",
+  "unapproved-attribute-or-export",
+  "trait-or-impl",
+  "bounded-generic",
+  "unapproved-type",
+  "reference-or-optional-address-type",
+  "async-function",
+  "test-or-benchmark-harness",
+  "host-effect",
+  "floating-point",
+  "lambda-or-dynamic-invoke",
+  "await",
+  "heterogeneous-instantiation",
+  "raw-dereference",
+  "reserved-runtime-intrinsic",
+]
+accepted_fixture = "tests/fixtures/bootstrap/accepted/compiler_scanner.ns"
+rejected_fixture_root = "tests/fixtures/bootstrap/rejected"
+candidate_fixture = "examples/projects/tooling/bootstrap_structural_projection_candidate"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
+frontdoor = "nuisc bootstrap-check [--json] <input.ns|project-dir|nuis.toml>"
+
+[[diagnostics]]
+code = "NBS001"
+capability = "non-cpu-domain"
+
+[[diagnostics]]
+code = "NBS002"
+capability = "unapproved-import"
+
+[[diagnostics]]
+code = "NBS003"
+capability = "extern-or-ffi"
+
+[[diagnostics]]
+code = "NBS004"
+capability = "unapproved-attribute-or-export"
+
+[[diagnostics]]
+code = "NBS005"
+capability = "trait-or-impl"
+
+[[diagnostics]]
+code = "NBS006"
+capability = "bounded-generic"
+
+[[diagnostics]]
+code = "NBS007"
+capability = "unapproved-type"
+
+[[diagnostics]]
+code = "NBS008"
+capability = "reference-or-optional-address-type"
+
+[[diagnostics]]
+code = "NBS009"
+capability = "async-function"
+
+[[diagnostics]]
+code = "NBS010"
+capability = "test-or-benchmark-harness"
+
+[[diagnostics]]
+code = "NBS011"
+capability = "host-effect"
+
+[[diagnostics]]
+code = "NBS012"
+capability = "floating-point"
+
+[[diagnostics]]
+code = "NBS013"
+capability = "lambda-or-dynamic-invoke"
+
+[[diagnostics]]
+code = "NBS014"
+capability = "await"
+
+[[diagnostics]]
+code = "NBS015"
+capability = "heterogeneous-instantiation"
+
+[[diagnostics]]
+code = "NBS016"
+capability = "raw-dereference"
+
+[[diagnostics]]
+code = "NBS017"
+capability = "reserved-runtime-intrinsic"

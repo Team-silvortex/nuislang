@@ -66,9 +66,9 @@ first_cursor_identity = 754343074
 continuation_page_identity = 146705724977
 continuation_cursor_identity = 38998897
 producer = "nuis-stage1-lossless-nir-payload-materializer-v8"
-adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v7"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v8"
 semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
-production_protocol = "nuis-compiler-candidate-production-v8"
+production_protocol = "nuis-compiler-candidate-production-v9"
 
 [open_boundary]
 missing = [

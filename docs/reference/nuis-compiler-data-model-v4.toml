@@ -1,0 +1,120 @@
+protocol = "nuis-compiler-data-model-v4"
+version = 4
+predecessor = "nuis-compiler-data-model-v3"
+status = "usable-complete-token-stream-pagination"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+emitter_helper_visibility = "bootstrap-public-transitional-not-stable-api"
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v4"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+candidate_production = "nuis-compiler-candidate-production-v9"
+host_layout_identity = false
+host_ffi_required = false
+record_layout = "columnar-four-i64-vectors"
+buffer_layout = "little-endian-seven-byte-i64-words-in-two-sixteen-slot-vectors"
+packed_word_bytes = 7
+maximum_packed_words = 19
+maximum_records_per_materialized_window = 4
+payload_capacity_bytes_per_materialized_window = 64
+emission_capacity_bytes_per_materialized_window = 128
+utf8_policy = "canonical-unicode-scalar-encoding"
+token_stream_protocol = "nuis-token-stream-v1"
+token_pagination_contract = "nuis-compiler-token-pagination-v1"
+token_pagination_page_bytes = 128
+token_page_hash_seed = 313
+token_page_hash_radix = 257
+token_page_chain_seed = 419
+token_page_chain_radix = 65537
+token_page_fold_modulus = 2147483629
+pagination_state_owner = "adapter-counters-with-nuis-owned-hash-and-chain-transitions"
+legacy_first_page_identity = 164749511446
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+candidate_project = "examples/projects/tooling/bootstrap_structural_projection_candidate"
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate pure_nuis_candidate_produces_an_attested_equivalent_stage1_component -j 1 -- --test-threads=1"
+
+types = [
+  "Option<T>",
+  "CompilerVectorPage",
+  "CompilerVector",
+  "CompilerText",
+  "CompilerMap",
+  "CompilerArena",
+  "CompilerSourceSpan",
+  "CompilerPath",
+  "CompilerDiagnostic",
+  "CompilerDecimalState",
+  "CompilerTokenBuffer",
+  "CompilerTokenRecord",
+  "CompilerTokenStore",
+  "CompilerTokenMaterializer",
+]
+
+operations = [
+  "compiler_token_buffer_empty",
+  "compiler_token_buffer_shape_valid",
+  "compiler_token_buffer_push",
+  "compiler_token_buffer_get",
+  "compiler_token_buffer_hash",
+  "compiler_token_buffer_from_packed_raw",
+  "compiler_token_store_empty",
+  "compiler_token_store_shape_valid",
+  "compiler_token_store_begin",
+  "compiler_token_store_get",
+  "compiler_token_store_push_scalar",
+  "compiler_token_store_finish",
+  "compiler_token_store_emit",
+  "compiler_token_materializer_decode_first_page",
+  "compiler_candidate_token_pagination_page_bytes",
+  "compiler_candidate_token_page_hash_seed",
+  "compiler_candidate_token_page_hash_step",
+  "compiler_candidate_token_page_chain_seed",
+  "compiler_candidate_token_page_chain_fold",
+]
+
+invariants = [
+  "complete-token-stream-is-validated-before-pagination",
+  "pages-cover-the-exact-token-payload-in-contiguous-128-byte-windows",
+  "only-the-terminal-page-may-contain-fewer-than-128-bytes",
+  "page-boundaries-may-cross-records-without-changing-token-bytes",
+  "each-page-binds-ordinal-byte-start-byte-count-record-end-and-page-hash",
+  "page-chain-fold-binds-every-page-in-order",
+  "terminal-record-end-equals-the-complete-decoder-record-count",
+  "nuis-and-artifact-independently-recompute-page-and-chain-hashes",
+  "legacy-four-record-page-remains-canonically-reemitted-and-independently-verified",
+  "long-string-and-doc-comment-records-do-not-require-one-record-per-page",
+  "packed-words-remain-host-endianness-and-host-layout-independent",
+  "pagination-does-not-grant-component-replacement-authority",
+]
+
+preserved_v3_boundaries = [
+  "materialized-token-store-is-four-records-and-sixty-four-payload-bytes",
+  "canonical-bootstrap-emitter-is-128-output-bytes",
+  "CompilerVector-is-i64-specific-and-bounded-to-sixteen-values",
+]
+
+[growth_boundary]
+status = "open"
+next_contract = "deterministic-map-and-arena-growth"
+remaining = [
+  "CompilerMap-remains-four-entry-and-i64-specific",
+  "CompilerArena-still-does-not-own-general-object-storage",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+]
+preserve = [
+  "owned-value-semantics",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "stable-byte-and-record-progress",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-export-ceiling",
+]

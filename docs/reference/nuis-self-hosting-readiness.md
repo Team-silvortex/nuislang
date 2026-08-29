@@ -54,41 +54,46 @@ Coordinate: `language-core/nuisc/bootstrap-language-subset`.
 Freeze the syntax, type, effect, control-flow, generic, pointer, FFI, and
 library surface permitted in compiler-authoring sources. Both accepted and
 rejected fixtures are required so stage1 cannot acquire accidental dependency
-on an unstable language feature. V7 is now executable through
+on an unstable language feature. V8 is now executable through
 `nuisc bootstrap-check`; see
 [Nuis Bootstrap Language Subset](nuis-bootstrap-language-subset.md).
-This gate is `stable/100`; its sixteen exact scalar exports include generic
-AST/NIR page continuation without admitting a new language capability. Widening it
-requires a new protocol version.
+This gate is `stable/100`; its twenty-one exact scalar exports include generic
+AST/NIR page continuation and complete token-page hashing without admitting a
+new language capability. Widening it requires a new protocol version.
 
 ### `compiler-data-model`
 
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. Data model v3 is now
-`usable/93`: `StdLanguageCore` owns the foundational representation,
+and path contracts needed by a real compiler component. Data model v5 is now
+`usable/94`: `StdLanguageCore` owns the foundational representation,
 `StdCompilerData` owns materialized token records and payloads,
 `StdCompilerTokens` owns the standalone token DFA, and
 `StdCompilerTokenEmit` reconstructs canonical `nuis-token-stream-v1` bytes
 while materializing a complete bounded page into the owned store. The frozen
 subset accepts all four modules, and
 `bootstrap_compiler_data_model_demo` crosses bootstrap-check, NIR/YIR/LLVM,
-native build, and deterministic exit `122` without FFI or host collections. It
+native build, and deterministic exit `130` without FFI or host collections. It
 materializes four records, emits 59 canonical bytes, then materializes the
 real `use cpu StdLanguageCore;` token prefix and emits its exact 91-byte
 canonical page with pinned hash `1277127995`. It decodes those bytes into a
 fresh store and re-emits the identical length and hash. A two-vector, seven-byte-word
 packing keeps the 128-byte output buffer near the old compile-time baseline.
+The same native program builds an eight-entry map across two vector pages,
+updates a key without reordering it, pins ordered identity `415394959`, fills
+all sixteen entries, and rejects both overflow and malformed column shapes.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
-This is deliberately not `stable/100`. V3 is bounded to four token records,
-64 payload bytes, and 128 output bytes. Production now feeds the actual handoff
-prefix into the owned store and independently verifies canonical page identity.
-`StdCompilerProjection` also owns and resumes the first two AST and NIR
-structural pages through opaque cursors, but token pagination remains open. Vectors remain
-`i64`-specific, maps remain
-four-entry, arenas do not yet hold object storage, generic nested-page
+This is deliberately not `stable/100`. Each v5 materialization window remains
+bounded to four token records, 64 payload bytes, and 128 output bytes, but
+production now covers the complete token stream with contiguous 128-byte pages
+whose boundaries may cross records. Nuis and the artifact layer independently
+recompute every page hash and chain link while preserving the canonical legacy
+page identity. `StdCompilerProjection` also owns and resumes the first two AST
+and NIR structural pages through opaque cursors. Vectors and maps remain
+`i64`-specific and bounded to sixteen entries, arenas do not yet hold object
+storage, generic nested-page
 specialization lacks defining-module provenance, and arbitrary aggregate
 loop-carried state still requires general backedge lowering.
 
@@ -112,9 +117,10 @@ AOT execution, malformed-sequence rejection, and tamper-checked execution
 proof. The exact scalar producer ABI now consumes every serialized stage byte,
 emits a Nuis-owned bundle fold, and drives `StdCompilerTokens` across the exact
 token header, seven record kinds, payload shape, and LF boundaries. Candidate
-production v8 now binds its record count, decoded semantic fold, four owned
-records, 21 payload bytes, 91 canonical bytes, hash `1277127995`, and identity
-`164749511446` to an independent artifact-layer result. It also binds three
+production v9 now binds its record count, decoded semantic fold, every raw
+token page and page-chain identity, plus the preserved four-record canonical
+prefix identity `164749511446`, to an independent artifact-layer result. It
+also binds three
 completed AST records, unfinished-line continuation, state hash `1349056749`,
 and identity `174028320749`, all recomputed independently by the artifact
 layer. The same scanner binds four completed NIR records, its 25-byte
@@ -155,7 +161,7 @@ candidate's exact scalar exports, independently verifies the folds, token
 decode summary, canonical token page, AST/NIR continuation identities, and
 NIR checkpoint words, materializes a lossless byte-different NIR-derived
 payload, emits its semantic differential and
-`nuis-compiler-candidate-production-v8`, and then runs the differential gate.
+`nuis-compiler-candidate-production-v9`, and then runs the differential gate.
 See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 The first producer is now the bounded
 `nuis-stage1-lossless-nir-payload-materializer-v8` leaf; it preserves canonical
@@ -184,7 +190,7 @@ The checked-in Nuis token materializer now enters this path as a real
 `stage1-candidate` leaf and reaches repository-native `13/13` equivalence. The
 path frontdoor verifies its execution and production proofs, including exact
 adapter bytes, all stage folds, independently reproduced token summary,
-canonical token identity, AST/NIR continuation identities, and the exact
+canonical token identity, complete token pagination, AST/NIR continuation identities, and the exact
 independently replayed transformation manifest before writing the report. Two local clean,
 cache-bypassed runs now retain stable reproducible identities and 13/13
 verdicts; production proof identity transitively binds the transformation in

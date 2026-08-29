@@ -20,6 +20,8 @@ surfaces = [
   "surface.std.compiler-data-model.v1",
   "surface.std.compiler-data-model.v2",
   "surface.std.compiler-data-model.v3",
+  "surface.std.compiler-data-model.v4",
+  "surface.std.compiler-data-model.v5",
   "surface.std.compiler-token-emitter.v1",
   "surface.std.compiler-token-decoder.v1",
   "surface.std.compiler-structural-projection.v1",

@@ -1,16 +1,20 @@
 # Nuis Compiler Data Model
 
-`nuis-compiler-data-model-v3` is the current compiler-owned data boundary
+`nuis-compiler-data-model-v5` is the current compiler-owned data boundary
 written in Nuis itself. Its machine-readable contract is
-[nuis-compiler-data-model-v3.toml](nuis-compiler-data-model-v3.toml). The
-deterministic paging proof remains frozen in
+[nuis-compiler-data-model-v5.toml](nuis-compiler-data-model-v5.toml). The
+complete-token-pagination predecessor remains frozen in
+[nuis-compiler-data-model-v4.toml](nuis-compiler-data-model-v4.toml), the
+materialized-token predecessor remains frozen in
+[nuis-compiler-data-model-v3.toml](nuis-compiler-data-model-v3.toml), the
+deterministic vector paging proof remains frozen in
 [nuis-compiler-data-model-v2.toml](nuis-compiler-data-model-v2.toml), and the
 original four-slot proof remains frozen in
 [nuis-compiler-data-model-v1.toml](nuis-compiler-data-model-v1.toml).
 
 The implementation is split across `StdLanguageCore`, `StdCompilerData`,
 `StdCompilerTokenEmit`, `StdCompilerTokens`, and `StdCompilerProjection`, all
-inside bootstrap subset v7. It proves that a compiler component can own text,
+inside bootstrap subset v8. It proves that a compiler component can own text,
 token records, canonical token serialization, structural page state, paths,
 source identity, allocation indices, maps, and diagnostics without borrowing
 Rust, C, libc, FFI, or host-language layouts.
@@ -18,9 +22,9 @@ Rust, C, libc, FFI, or host-language layouts.
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
 
-## V3 Surface
+## V5 Surface
 
-V3 retains the v2 compiler foundation:
+V5 retains the v4 compiler foundation:
 
 - `CompilerVector` stores up to sixteen `i64` values in four ordered pages.
 - `CompilerText` owns canonical UTF-8 bytes, scalar length, and a deterministic
@@ -29,7 +33,21 @@ V3 retains the v2 compiler foundation:
   `CompilerDiagnostic` retain stable-index and fail-closed behavior.
 - Generic `Option<T>` and `Result<T, E>` remain the absence and error channels.
 
-It adds a materialized token boundary:
+V5 replaces the original four-slot map proof with a deterministic columnar
+map suitable for bootstrap symbol tables:
+
+- `CompilerMap` stores keys and values in two shape-checked
+  `CompilerVector` columns, for a bounded capacity of sixteen entries.
+- New keys append in stable insertion order. Replacing an existing key updates
+  its value at the same index without changing length or order.
+- Lookup and replacement use bounded Nuis recursion rather than host
+  collections or host iteration state.
+- `nuis-compiler-map-ordered-identity-v1` binds length and every ordered
+  key/value pair with a canonical non-negative modular fold.
+- A seventeenth distinct key returns capacity error `1`; malformed column
+  shapes return error `3` before lookup, mutation, or identity production.
+
+V3 added the materialized token boundary:
 
 - `CompilerTokenStore` holds four records in deterministic columnar vectors.
 - Each record owns kind, payload start, payload length, and numeric value.
@@ -48,6 +66,22 @@ It adds a materialized token boundary:
   stops mutating state after its first complete four-record page.
 - `CompilerDecimalState` and the emitter cover the complete signed `i64`
   domain without negating `i64::MIN`.
+
+V4 adds complete-stream token pagination without pretending every record fits
+inside the materialized window:
+
+- `nuis-compiler-token-pagination-v1` divides the exact verified token payload
+  into contiguous 128-byte pages; only the terminal page may be shorter.
+- Page boundaries may cross records. Long strings and documentation comments
+  therefore require no oversized token store or record truncation.
+- Every page binds ordinal, byte start, byte count, cumulative completed-record
+  count, page hash, and cumulative chain identity.
+- Five exact subset-v8 scalar exports let Nuis compute the page hash and chain;
+  the host adapter only transports bytes and counters.
+- `nuis-artifact` independently decodes the complete stream and recomputes
+  every page and chain identity before candidate production succeeds.
+- The original four-record canonical page and identity `164749511446` remain
+  as a stronger materialization/re-emission compatibility proof.
 
 Open records enforce structural invariants but may be semantically incomplete.
 `finish` owns final kind-specific checks such as required word text, symbol
@@ -89,17 +123,25 @@ surrogate-symbol completion, open-store emission, fifth-record capacity,
 legacy vector capacity, malformed paging, map absence, arena exhaustion, and
 UTF-8 scalar rejection.
 
-The same executable also constructs the first complete page from the real
+The same executable builds an eight-entry symbol map across two pages, updates
+key `13` in place, and pins ordered identity `415394959`. It then fills all
+sixteen entries, rejects a seventeenth distinct key with error `1`, and rejects
+a malformed column shape with error `3`. These checks execute in the native
+binary through ordinary Nuis calls.
+
+The same executable also constructs the first complete materialized page from the real
 candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 21 payload bytes and canonically emits 91 bytes with independently pinned hash
 `1277127995`. The `StdCompilerTokenEmit` materializer drives the standalone
 `StdCompilerTokens` DFA over those exact bytes into a fresh
 `CompilerTokenStore`, and the canonical emitter reproduces the same length
 and hash. Production additionally packs the actual handoff prefix through the
-sixteen-export scalar ABI, and the artifact layer independently verifies page
+twenty-one-export subset-v8 scalar ABI, and the artifact layer independently verifies page
 identity `164749511446`. This proves an owned decode/re-emit round trip across
 the fifth and sixth former 16-byte boundaries on a real compiler prefix rather
-than only a synthetic capacity test.
+than only a synthetic capacity test. Candidate production v9 additionally
+pages the complete real token stream, including records longer than one page,
+and binds its terminal page hash and ordered chain identity.
 
 The acceptance chain is:
 
@@ -108,7 +150,7 @@ nuisc bootstrap-check
   -> normal semantic / NIR / YIR / LLVM pipeline
   -> nuis bootstrap-build
   -> host-native executable
-  -> deterministic exit score 122
+  -> deterministic exit score 130
 ```
 
 The production path contains no deferred LLVM lowering. Nested aggregate
@@ -122,30 +164,30 @@ materializers use eight deterministic sixteen-byte chunks and the scalar
 exports validate raw aggregate state explicitly. The native regression also
 pins open-record versus completed-record and partial structural-line boundaries.
 
-`StdCompilerProjection` now consumes the first AST and NIR structural pages,
+`StdCompilerProjection` consumes the first AST and NIR structural pages,
 serializes an opaque eight-lane scanner cursor, and resumes both into a second
-page over this foundation. It does not claim that the bounded v3 model parses a
+page over this foundation. It does not claim that the bounded v5 model parses a
 complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
-V3 proves owned token materialization and canonical re-emission, but it is not
+V5 proves owned token materialization, canonical re-emission, complete
+token-stream pagination, and deterministic multi-page map behavior, but it is not
 yet an unbounded compiler heap:
 
-- Production binds only the first complete token page; the rest of the token
-  stream remains represented by the complete-stream scalar DFA summary.
 - Token storage is limited to four records and 64 payload bytes.
 - The canonical bootstrap emitter is limited to four records, 64 input payload
   bytes, and 128 output bytes.
 - `CompilerVector` remains `i64`-specific and bounded to sixteen values.
-- `CompilerMap` remains limited to four integer entries.
+- `CompilerMap` remains `i64`-specific and bounded to sixteen entries.
 - `CompilerArena` allocates indices but does not own general object storage.
 - Generic helper specialization still needs defining-module provenance.
 - Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
   avoid pretending otherwise.
 
-The readiness gate is therefore `usable/93`, not `stable/100`. The next
-mainline step is deterministic token pagination and then map/arena growth.
-Broader paging and aggregate backedge lowering follow without weakening
+The readiness gate is therefore not yet `stable/100`. The next mainline step
+is compiler-arena-owned object storage while preserving stable map indices.
+Broader structural paging and aggregate
+backedge lowering follow without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
-or the frozen v7 import ceiling.
+or the frozen v8 import ceiling.

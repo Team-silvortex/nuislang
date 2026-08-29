@@ -67,6 +67,7 @@ mod cpu Main {
   }
 
   fn compiler_candidate_token_page_identity_raw(
+    expected_records: i64,
     length: i64,
     word0: i64,
     word1: i64,
@@ -88,6 +89,9 @@ mod cpu Main {
     word17: i64,
     word18: i64
   ) -> i64 {
+    if expected_records <= 0 || expected_records > 4 {
+      return -3;
+    }
     let input: CompilerTokenBuffer = compiler_token_buffer_from_packed_raw(
       length,
       word0, word1, word2, word3, word4, word5, word6, word7, word8,
@@ -101,9 +105,12 @@ mod cpu Main {
       input
     );
     if materialized.error != 0 { return -materialized.error; }
-    if materialized.complete == false { return -2; }
     let store: CompilerTokenStore = materialized.store;
     if compiler_token_store_shape_valid(store) == false || store.record_open {
+      return -2;
+    }
+    if store.record_count != expected_records
+      || compiler_token_decoder_finish(materialized.mode, store.record_count) != 0 {
       return -2;
     }
     if store.record_count > 4 || store.payload.length > 64 { return -1; }
@@ -129,6 +136,58 @@ mod cpu Main {
     let hash6: i64 = compiler_token_buffer_hash_chunk(emitted, 96, emitted.length, hash5);
     let hash: i64 = compiler_token_buffer_hash_chunk(emitted, 112, emitted.length, hash6);
     return (hash * 129) + emitted.length;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_pagination_page_bytes_v1")
+  fn compiler_candidate_token_pagination_page_bytes() -> i64 {
+    return 128;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_page_hash_seed_v1")
+  fn compiler_candidate_token_page_hash_seed() -> i64 {
+    return 313;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_page_hash_step_v1")
+  fn compiler_candidate_token_page_hash_step(state: i64, byte: i64) -> i64 {
+    return ((state * 257) + byte + 1) % 2147483629;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_page_chain_seed_v1")
+  fn compiler_candidate_token_page_chain_seed() -> i64 {
+    return 419;
+  }
+
+  fn compiler_candidate_token_page_chain_fold_unit(state: i64, value: i64) -> i64 {
+    return ((state * 65537) + value + 1) % 2147483629;
+  }
+
+  @export(name = "nuis_bootstrap_candidate_token_page_chain_fold_v1")
+  fn compiler_candidate_token_page_chain_fold(
+    state: i64,
+    ordinal: i64,
+    byte_start: i64,
+    byte_count: i64,
+    record_end: i64,
+    page_hash: i64
+  ) -> i64 {
+    let ordinal_fold: i64 = compiler_candidate_token_page_chain_fold_unit(
+      state,
+      ordinal
+    );
+    let start_fold: i64 = compiler_candidate_token_page_chain_fold_unit(
+      ordinal_fold,
+      byte_start
+    );
+    let bytes_fold: i64 = compiler_candidate_token_page_chain_fold_unit(
+      start_fold,
+      byte_count
+    );
+    let records_fold: i64 = compiler_candidate_token_page_chain_fold_unit(
+      bytes_fold,
+      record_end
+    );
+    return compiler_candidate_token_page_chain_fold_unit(records_fold, page_hash);
   }
 
   @export(name = "nuis_bootstrap_candidate_token_page_identity_v1")
@@ -158,6 +217,7 @@ mod cpu Main {
       return -3;
     }
     return compiler_candidate_token_page_identity_raw(
+      4,
       length,
       word0, word1, word2, word3, word4, word5, word6, word7, word8,
       word9, word10, word11, word12, word13, word14, word15, word16,

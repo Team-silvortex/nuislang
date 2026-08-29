@@ -1,8 +1,8 @@
 # Nuis Bootstrap Language Subset
 
 This reference freezes the first compiler-authoring source boundary as
-`nuis-bootstrap-language-subset-v7`. Its machine-readable inventory is
-[nuis-bootstrap-language-subset-v7.toml](nuis-bootstrap-language-subset-v7.toml),
+`nuis-bootstrap-language-subset-v8`. Its machine-readable inventory is
+[nuis-bootstrap-language-subset-v8.toml](nuis-bootstrap-language-subset-v8.toml),
 and the executable policy lives in `nuis-semantics`.
 
 This is not a promise to keep the public Nuis language frozen. It is a narrow,
@@ -25,7 +25,7 @@ cargo run -q -p nuisc -- bootstrap-check tests/fixtures/bootstrap/accepted/compi
 
 An accepted report means two independent conditions hold:
 
-1. Every project-local AST module obeys the v7 allowlist.
+1. Every project-local AST module obeys the v8 allowlist.
 2. The same input crosses the normal semantic, NIR, YIR, and LLVM emission
    checks without an error.
 
@@ -35,7 +35,7 @@ obeys the allowlist but fails normal compilation also exits nonzero with
 
 ## Frozen Surface
 
-V7 permits only `mod cpu` compiler modules. Local CPU modules may import each
+V8 permits only `mod cpu` compiler modules. Local CPU modules may import each
 other; external imports are limited to `CorePrelude`, `StdLanguageCore`,
 `StdCompilerData`, `StdCompilerTokenEmit`, `StdCompilerTokens`,
 `StdCompilerProjection`, and
@@ -59,15 +59,19 @@ They normalize before subset validation to `while true`, nested `if`, and a
 two-arm `match` respectively, so subset v6 gains no new AST capability or
 policy bypass.
 
-Documentation attributes are generally the only metadata dependency. Sixteen
+Documentation attributes are generally the only metadata dependency. Twenty-one
 exact all-`i64` `@export` signatures are additionally reserved for the stage1
 candidate's scalar fold, token-decoder, token-page, AST-page, and NIR-page
 identity ABI plus generic structural-page continuation.
 Function name, symbol name, parameter count, and return type must all match the
 machine-readable allowlist; every other export remains `NBS004`. Diagnostics
-must be returned as data rather than printed by a compiler component. V7
-preserves the v6 imports, types, and capabilities and adds only the exact
-thirty-parameter structural resume export. It transports projection kind,
+must be returned as data rather than printed by a compiler component. V8
+preserves the v7 imports, types, capabilities, and sixteen exports, then adds
+five exact token-pagination scalar exports. They define the 128-byte page
+size, page-hash seed and step, and ordered page-chain seed and fold. The host
+adapter transports bytes and counters but does not classify token records.
+
+The v7 thirty-parameter structural resume export transports projection kind,
 eight opaque cursor lanes, byte length, and nineteen packed words, then exposes
 page identity, resulting cursor lanes, or cursor identity through a selector.
 AST and NIR share the same `CompilerProjectionPageState` scanner; no new
@@ -75,7 +79,7 @@ language capability class is admitted.
 
 ## Deliberate Exclusions
 
-V7 rejects these capabilities even when the wider language supports them:
+V8 rejects these capabilities even when the wider language supports them:
 
 - shader, kernel, network, data, CFFI, and other non-CPU domains
 - arbitrary library imports, extern declarations, and FFI interfaces

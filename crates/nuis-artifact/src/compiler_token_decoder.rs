@@ -108,22 +108,50 @@ pub fn compiler_token_first_page_identity(
     let header = lines
         .next()
         .ok_or_else(|| ArtifactError::new("compiler token page is missing its protocol header"))?;
+    let records = lines.take(COMPILER_TOKEN_PAGE_RECORDS).collect::<Vec<_>>();
+    compiler_token_page_identity_from_records(header, &records)
+}
+
+pub fn compiler_token_page_identity(
+    bytes: &[u8],
+) -> Result<CompilerTokenPageIdentity, ArtifactError> {
+    let summary = decode_compiler_token_stream(bytes)?;
+    if summary.record_count == 0 || summary.record_count > COMPILER_TOKEN_PAGE_RECORDS {
+        return Err(ArtifactError::new(format!(
+            "compiler token page must contain 1..={COMPILER_TOKEN_PAGE_RECORDS} records"
+        )));
+    }
+    let source = std::str::from_utf8(bytes).map_err(|error| {
+        ArtifactError::new(format!("compiler token stream is not UTF-8: {error}"))
+    })?;
+    let mut lines = source.split_terminator('\n');
+    let header = lines
+        .next()
+        .ok_or_else(|| ArtifactError::new("compiler token page is missing its protocol header"))?;
+    let records = lines.collect::<Vec<_>>();
+    compiler_token_page_identity_from_records(header, &records)
+}
+
+fn compiler_token_page_identity_from_records(
+    header: &str,
+    records: &[&str],
+) -> Result<CompilerTokenPageIdentity, ArtifactError> {
+    if header != COMPILER_TOKEN_STREAM_PROTOCOL
+        || records.is_empty()
+        || records.len() > COMPILER_TOKEN_PAGE_RECORDS
+    {
+        return Err(ArtifactError::new(
+            "compiler token page has an invalid header or record count",
+        ));
+    }
     let mut canonical = Vec::from(header.as_bytes());
     canonical.push(b'\n');
     let mut payload_bytes = 0;
-    for _ in 0..COMPILER_TOKEN_PAGE_RECORDS {
-        let line = lines
-            .next()
-            .ok_or_else(|| ArtifactError::new("compiler token page ended before four records"))?;
+    let mut raw_page_bytes = header.len() + 1;
+    for line in records {
+        raw_page_bytes += line.len() + 1;
         canonicalize_page_record(line, &mut canonical, &mut payload_bytes)?;
     }
-    let raw_page_bytes = bytes
-        .iter()
-        .enumerate()
-        .filter(|(_, byte)| **byte == b'\n')
-        .nth(COMPILER_TOKEN_PAGE_RECORDS)
-        .map(|(index, _)| index + 1)
-        .ok_or_else(|| ArtifactError::new("compiler token page has no fourth record boundary"))?;
     if raw_page_bytes > COMPILER_TOKEN_PAGE_CANONICAL_BYTES
         || payload_bytes > COMPILER_TOKEN_PAGE_PAYLOAD_BYTES
         || canonical.len() > COMPILER_TOKEN_PAGE_CANONICAL_BYTES
@@ -139,7 +167,7 @@ pub fn compiler_token_first_page_identity(
         });
     let identity = canonical_hash * COMPILER_TOKEN_PAGE_IDENTITY_RADIX + canonical.len();
     Ok(CompilerTokenPageIdentity {
-        record_count: COMPILER_TOKEN_PAGE_RECORDS,
+        record_count: records.len(),
         payload_bytes,
         canonical_bytes: canonical.len(),
         canonical_hash,

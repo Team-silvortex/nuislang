@@ -19,7 +19,7 @@ const REJECTED_TRAIT_HARNESS: &str =
 const REJECTED_INSTANTIATE: &str =
     include_str!("../../../tests/fixtures/bootstrap/rejected/instantiate_effect.ns");
 const SUBSET_CONTRACT: &str =
-    include_str!("../../../docs/reference/nuis-bootstrap-language-subset-v7.toml");
+    include_str!("../../../docs/reference/nuis-bootstrap-language-subset-v8.toml");
 
 #[test]
 fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
@@ -35,7 +35,7 @@ fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
     assert!(report.checked_nodes() >= 80);
 
     let json = render_bootstrap_check_json(&report);
-    assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v7\""));
+    assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v8\""));
     assert!(json.contains("\"accepted\":true"));
     assert!(json.contains("\"semantic_pipeline\":\"checked\""));
 }
@@ -368,7 +368,7 @@ fn rejected_json_is_structured_and_fail_closed() {
 #[test]
 fn machine_readable_contract_tracks_the_executable_policy() {
     for required in [
-        "nuis-bootstrap-language-subset-v7",
+        "nuis-bootstrap-language-subset-v8",
         "cpu/CorePrelude",
         "cpu/StdLanguageCore",
         "cpu/StdCompilerData",
@@ -378,6 +378,11 @@ fn machine_readable_contract_tracks_the_executable_policy() {
         "CompilerProjectionPageState",
         "CompilerTokenStore",
         "nuis_bootstrap_candidate_token_page_identity_v1",
+        "nuis_bootstrap_candidate_token_pagination_page_bytes_v1",
+        "nuis_bootstrap_candidate_token_page_hash_seed_v1",
+        "nuis_bootstrap_candidate_token_page_hash_step_v1",
+        "nuis_bootstrap_candidate_token_page_chain_seed_v1",
+        "nuis_bootstrap_candidate_token_page_chain_fold_v1",
         "nuis_bootstrap_candidate_ast_page_identity_v1",
         "nuis_bootstrap_candidate_nir_page_identity_v1",
         "nuis_bootstrap_candidate_projection_page_resume_value_v1",

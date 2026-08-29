@@ -11,21 +11,21 @@ coordinate = "language-core/nuisc/bootstrap-language-subset"
 status = "stable"
 progress = 100
 required_before = "beta-0.10.0"
-next_action = "preserve v7 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
+next_action = "preserve v8 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
-expected_artifact = "nuis-bootstrap-language-subset-v7, nuisc bootstrap-check, sixteen exact scalar exports, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
-blocker = "none for subset v7; broader compiler-owned paging, arena storage, and aggregate backedge lowering remain independent readiness gates"
+expected_artifact = "nuis-bootstrap-language-subset-v8, nuisc bootstrap-check, twenty-one exact scalar exports, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
+blocker = "none for subset v8; arena storage and aggregate backedge lowering remain independent readiness gates"
 
 [[gates]]
 id = "compiler-data-model"
 coordinate = "standard-library/std/compiler-data-model"
 status = "usable"
-progress = 93
+progress = 94
 required_before = "beta-0.10.0"
-next_action = "paginate tokens, then page CompilerMap and arena storage while preserving v3 ownership and layout invariants"
+next_action = "add compiler-arena-owned object storage while preserving v5 map order, ownership, and layout invariants"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-data-model-v3 plus a production candidate that owns canonical token data, two independently verified AST/NIR pages, and a lossless derived NIR payload"
-blocker = "v3 resumes structural pages, but token pagination, map growth, arena object storage, defining-module provenance, and general aggregate loop backedges remain open"
+expected_artifact = "nuis-compiler-data-model-v5 with a stable-order sixteen-entry CompilerMap plus a production candidate that independently binds every token byte, two AST/NIR pages, and a lossless derived NIR payload"
+blocker = "v5 closes deterministic multi-page map growth, replacement, lookup, and ordered identity, but CompilerMap remains i64-specific and bounded, arena object storage is absent, defining-module provenance is incomplete, and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"

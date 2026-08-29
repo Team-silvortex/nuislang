@@ -1,0 +1,110 @@
+protocol = "nuis-compiler-data-model-v5"
+version = 5
+predecessor = "nuis-compiler-data-model-v4"
+status = "usable-deterministic-multi-page-map"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v5"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+candidate_production = "nuis-compiler-candidate-production-v9"
+host_layout_identity = false
+host_ffi_required = false
+utf8_policy = "canonical-unicode-scalar-encoding"
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[map]
+layout = "ordered-columnar-two-CompilerVector"
+key_type = "i64"
+value_type = "i64"
+page_capacity = 4
+page_count = 4
+maximum_entries = 16
+lookup = "bounded-recursive-first-match"
+insertion = "append-new-key-in-stable-order"
+replacement = "update-value-at-original-key-index"
+shape_validation = "length-equals-valid-key-and-value-vector-lengths"
+capacity_error = 1
+invalid_index_error = 2
+invalid_shape_error = 3
+identity_contract = "nuis-compiler-map-ordered-identity-v1"
+identity_seed = 211
+identity_radix = 257
+identity_modulus = 2147483629
+reference_entry_count = 8
+reference_identity = 415394959
+
+map_operations = [
+  "compiler_map_empty",
+  "compiler_map_shape_valid",
+  "compiler_map_vector_value",
+  "compiler_map_replace_value",
+  "compiler_map_find_index",
+  "compiler_map_insert",
+  "compiler_map_get",
+  "compiler_map_contains",
+  "compiler_map_identity_fold",
+  "compiler_map_identity_from",
+  "compiler_map_identity",
+]
+
+map_invariants = [
+  "key-and-value-columns-have-identical-length-and-page-shape",
+  "new-keys-append-without-reordering-existing-entries",
+  "existing-keys-replace-values-without-changing-length-or-index",
+  "lookup-returns-the-first-and-only-key-position",
+  "identity-binds-length-and-every-key-value-pair-in-insertion-order",
+  "negative-i64-values-have-one-canonical-modular-identity-encoding",
+  "seventeenth-distinct-key-fails-with-capacity-error-one",
+  "malformed-column-shape-fails-before-lookup-update-or-identity",
+  "implementation-uses-bounded-Nuis-recursion-without-host-collections",
+]
+
+[token_pagination]
+contract = "nuis-compiler-token-pagination-v1"
+page_bytes = 128
+page_hash_seed = 313
+page_hash_radix = 257
+page_chain_seed = 419
+page_chain_radix = 65537
+fold_modulus = 2147483629
+legacy_first_page_identity = 164749511446
+
+preserved_v4_boundaries = [
+  "complete-token-stream-is-validated-before-pagination",
+  "token-pages-cover-exact-payload-in-contiguous-128-byte-windows",
+  "page-boundaries-may-cross-records",
+  "nuis-and-artifact-independently-recompute-page-and-chain-hashes",
+  "materialized-token-store-remains-four-records-and-sixty-four-payload-bytes",
+  "canonical-bootstrap-emitter-remains-128-output-bytes",
+  "CompilerVector-remains-i64-specific-and-bounded-to-sixteen-values",
+]
+
+[growth_boundary]
+status = "open"
+next_contract = "compiler-arena-owned-object-storage"
+remaining = [
+  "CompilerMap-remains-i64-specific-and-bounded-to-sixteen-entries",
+  "CompilerArena-still-does-not-own-general-object-storage",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+]
+preserve = [
+  "owned-value-semantics",
+  "stable-map-insertion-order",
+  "canonical-map-identity",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-export-ceiling",
+]
