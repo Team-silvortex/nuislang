@@ -32,11 +32,11 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`736/736` passing drift checks. The stage0/stage1 driver is `usable/99`; the
-stage-neutral boundary, reproducibility gate, and compiler data model v9 remain
-`usable/98`. The independently signed genesis replacement boundary closes the
-previous driver task, so deterministic coordinate ordering advances to the
-differential/reproducibility gate.
+`740/740` passing drift checks. The stage0/stage1 driver and
+differential/reproducibility gate are `usable/99`; the stage-neutral boundary
+and compiler data model v9 remain `usable/98`. The selected-representation gate
+closes the previous differential task, so deterministic coordinate ordering
+advances to the stage-neutral IR boundary.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -85,9 +85,11 @@ representation equivalence. `nuis-compiler-stage-handoff-v2` selects every
 registered reversible derived stage in registration order and binds its source,
 transform, payload, checkpoint, recovery, and semantic identities without an
 NIR-specific driver branch. Candidate production v11 binds that selection
-before the candidate reaches repository-native
-`13/13` differential equivalence while retaining `replacement_authorized =
-false`. `nuis
+before the candidate reaches repository-native `13/13` differential
+equivalence. The sibling component representation report now consumes the
+actually selected byte-different NIR payload, recovered canonical anchor, and
+handoff-v2 proof at 1/1 equivalence without a stage-specific comparison branch;
+both reports retain `replacement_authorized = false`. `nuis
 bootstrap-reproducibility` now performs
 two cache-bypassed clean candidate builds, rereads both evidence roots, requires
 stable compiler-image, native-output, and differential identities, and emits a

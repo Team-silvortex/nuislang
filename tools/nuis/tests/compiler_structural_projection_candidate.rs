@@ -12,17 +12,18 @@ use nuis_artifact::{
     parse_compiler_component_differential, parse_compiler_structural_projection,
     read_compiler_candidate_execution, read_compiler_candidate_production,
     read_compiler_component_attestation, read_compiler_component_build,
-    read_compiler_component_reproducibility, read_compiler_stage_handoff,
-    read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
-    render_compiler_component_attester_trust_registry, CompilerComponentAttesterTrustEntryInput,
-    CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
-    CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
+    read_compiler_component_representation_differential, read_compiler_component_reproducibility,
+    read_compiler_stage_handoff, read_compiler_stage_handoff_v2,
+    read_compiler_stage_semantic_differential, render_compiler_component_attester_trust_registry,
+    CompilerComponentAttesterTrustEntryInput, CompilerProjectionKind, CompilerProjectionRecordKind,
+    CompilerStageKind, CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
     COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_COMPONENT_ATTESTATION_FILE, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_FILE,
-    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_STAGE_HANDOFF_V2_FILE,
-    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    COMPILER_STAGE_TRANSFORMATION_FILE,
 };
 
 fn temp_dir() -> PathBuf {
@@ -197,6 +198,30 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert!(differential.deterministic_artifact_equivalent);
     assert_eq!(differential.verdict, "equivalent-awaiting-authorization");
     assert!(!differential.replacement_authorized);
+    let representation_differential = read_compiler_component_representation_differential(
+        &output_dir.join(COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE),
+        &stage0_record_path,
+        &candidate_record_path,
+    )
+    .expect("verify candidate representation differential");
+    assert_eq!(representation_differential.comparison_count, 1);
+    assert_eq!(representation_differential.equivalent_count, 1);
+    assert!(representation_differential.all_representations_equivalent);
+    assert!(!representation_differential.replacement_authorized);
+    let representation = &representation_differential.comparisons[0];
+    assert_eq!(representation.source_stage, CompilerStageKind::Nir);
+    assert!(!representation.byte_identical);
+    assert!(representation.reversible);
+    assert!(representation.semantically_equivalent);
+    assert!(representation.equivalent);
+    assert_eq!(
+        representation.stage0_payload_sha256,
+        representation.candidate_recovered_payload_sha256
+    );
+    assert_ne!(
+        representation.stage0_payload_sha256,
+        representation.candidate_selected_payload_sha256
+    );
 
     let transformations_path = candidate_dir.join(COMPILER_STAGE_TRANSFORMATION_FILE);
     let transformation_source = fs::read(&transformations_path).expect("read transformations");

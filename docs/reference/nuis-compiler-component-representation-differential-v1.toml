@@ -1,0 +1,66 @@
+protocol = "nuis-compiler-component-representation-differential-v1"
+version = 1
+status = "early-implemented"
+manifest_name = "nuis.compiler-component-representation-diff.toml"
+comparison_contract = "nuis-compiler-selected-reversible-representation-comparison-v1"
+authority = "semantic-equivalence-evidence-no-replacement"
+frontdoor = "nuis bootstrap-diff"
+base_differential_protocol = "nuis-compiler-component-differential-v1"
+base_differential_file = "nuis.compiler-component-diff.toml"
+candidate_handoff_protocol = "nuis-compiler-stage-handoff-v2"
+selection_policy = "every-registered-v2-selection-in-registration-order"
+digest = "sha256-lowercase"
+replacement_authorized = false
+
+comparison_fields = [
+  "selection-ordinal",
+  "transformation-ordinal",
+  "semantic-comparison-ordinal",
+  "base-comparison-ordinal",
+  "generated-stage-subject",
+  "stage0-canonical-record-and-payload",
+  "candidate-canonical-record-and-payload",
+  "candidate-selected-encoding-file-length-and-payload",
+  "candidate-recovered-canonical-payload",
+  "transform-contract",
+  "checkpoint-identity",
+  "byte-identical",
+  "reversible",
+  "semantically-equivalent",
+  "equivalent",
+]
+
+verdicts = [
+  "blocked-representation-drift",
+  "selected-representations-equivalent-awaiting-authorization",
+]
+
+invariants = [
+  "base-thirteen-comparison-report-verifies-before-representation-comparison",
+  "candidate-production-v11-and-handoff-v2-sibling-evidence-verify-before-emission",
+  "comparison-subject-is-generated-from-the-registered-source-stage",
+  "no-stage-specific-selection-branch-is-permitted",
+  "candidate-selected-bytes-differ-from-the-stage0-canonical-payload",
+  "candidate-recovered-payload-equals-the-candidate-canonical-payload",
+  "base-canonical-comparison-binds-stage0-to-candidate-source-payloads",
+  "equivalence-requires-stage0-equals-recovered-and-reversible-semantic-evidence",
+  "every-registered-selection-produces-one-canonical-comparison",
+  "the-frontdoor-emits-both-base-and-representation-reports",
+  "representation-equivalence-never-implies-component-replacement-authorization",
+  "report-identity-binds-every-selected-and-recovered-identity",
+  "tampering-fails-closed",
+]
+
+[compatibility]
+generation_one_component_differential = "unchanged-v1"
+generation_one_reproducibility_aggregate = "unchanged-v1"
+generation_one_remote_attestation = "remains-verifiable"
+representation_report_bound_by_generation_one_aggregate = false
+
+[open_boundary]
+missing = [
+  "versioned-reproducibility-successor-binding-each-representation-report-hash",
+  "checked-in-remote-representation-report-generation",
+  "cryptographic-proof-of-physical-machine-independence",
+  "verified-authorization-consumer-and-signed-rollback-chain",
+]

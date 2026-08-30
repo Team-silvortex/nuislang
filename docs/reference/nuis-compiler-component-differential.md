@@ -12,6 +12,7 @@ Its machine-readable contracts are:
 * [nuis-compiler-stage-transformation-v3.toml](nuis-compiler-stage-transformation-v3.toml)
 * [nuis-compiler-stage-semantic-differential-v1.toml](nuis-compiler-stage-semantic-differential-v1.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
+* [nuis-compiler-component-representation-differential-v1.toml](nuis-compiler-component-representation-differential-v1.toml)
 
 This is an `early` preparation capability. It compares evidence; it does not
 create a stage1 compiler and it never authorizes replacing stage0.
@@ -65,6 +66,12 @@ differential report is emitted.
 The report path must also differ from both input records, preventing the audit
 write from destroying either side of the evidence pair.
 
+The frontdoor also emits the fixed sibling
+`nuis.compiler-component-representation-diff.toml`. This sidecar keeps the
+original v1 report byte-compatible for generation-one verification while
+requiring every registered handoff-v2 selection to enter the live differential
+gate. A failure in either report fails the command.
+
 Valid but non-equivalent evidence writes a canonical audit report and exits
 with failure. This preserves the exact mismatch without allowing a build or
 replacement workflow to accidentally treat drift as success.
@@ -90,6 +97,16 @@ The report contains a fixed ordered comparison set:
 Header values are compared through domain-separated SHA-256 identities. Stage,
 diagnostic, dependency, and native records reuse their already verified
 lowercase SHA-256 identities.
+
+The representation sidecar walks the candidate's registered v2 selections
+without switching on AST, NIR, or another stage name. For each selection it
+generates the matching `stage-<source-stage>` subject and binds the base
+comparison ordinal, both canonical records, the actually selected payload,
+the recovered canonical payload, transformation/checkpoint identities, and the
+complete handoff-v2 proof. Current NIR production therefore proves that the
+selected bytes differ from stage0, recovery returns the candidate canonical
+payload, the base report equates that payload with stage0, and the selection is
+reversible and semantically equivalent while replacement authority stays false.
 
 The exact build manifest and outer compiled container are intentionally not
 cross-producer equality requirements because cache bookkeeping may change them.
@@ -123,25 +140,30 @@ all five serialized payloads through the exact scalar ABI, emits a bound
 candidate bundle fold, receives a distinct `stage1-candidate` component record,
 emits a separately bound non-identity NIR checkpoint plus a lossless derived
 binary, proves 1/1 semantic equivalence for the byte-different representation,
-and reaches repository-native `13/13` equivalence. The current thirteen
-comparisons still compare canonical v1 handoff payloads; the derived payload
-and semantic proof are production prerequisites rather than a fourteenth
-symmetric stage.
+and reaches repository-native `13/13` equivalence. Those thirteen comparisons
+remain canonical v1 so checked-in generation-one aggregates and signatures
+remain verifiable. The new sidecar is the symmetric representation layer: the
+real frontdoor consumes the selected byte-different payload and its recovery
+proof rather than merely treating them as production prerequisites.
 
 `nuis bootstrap-reproducibility` now repeats this complete path in two empty,
 compile-cache-bypassed roots and binds both reports plus stable component
 identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
-This report is not replacement authority or full compiler self-hosting. The
-compact structured NIR record now crosses a producer-neutral handoff v2
-selection contract. The remaining closures are independent machine/attester
-evidence, authorization consumption, and a signed rollback transition chain.
+Neither report is replacement authority or full compiler self-hosting. The
+compact structured NIR record now crosses both a producer-neutral handoff-v2
+selection and the component representation gate. The sidecar's exact hash is
+not yet a field of generation-one reproducibility aggregates; that requires a
+versioned successor rather than rewriting signed v1 evidence. Independent
+remote sidecar evidence, authorization consumption, and a signed rollback
+transition chain also remain open.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_representation_diff -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_diagnostic_report -j 1

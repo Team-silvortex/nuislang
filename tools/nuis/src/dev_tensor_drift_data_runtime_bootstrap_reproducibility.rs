@@ -478,9 +478,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
         required_patterns: &[
             "stage-neutral boundary to `usable/98`",
             "stage0/stage1 driver to `usable/99`",
+            "differential/reproducibility gate to `usable/99`",
             "Data model v9 reaches `usable/98`",
             "twenty-byte `CompilerAggregateArena`",
-            "deterministic coordinate ordering advances to `developer-system/bootstrap/differential-reproducibility-gate`",
+            "deterministic coordinate ordering advances to `language-core/nuisc/stage-neutral-ir-boundary`",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -626,6 +627,52 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-representation-differential-contract",
+        path: "docs/reference/nuis-compiler-component-representation-differential-v1.toml",
+        required_patterns: &[
+            "nuis-compiler-component-representation-differential-v1",
+            "nuis-compiler-selected-reversible-representation-comparison-v1",
+            "every-registered-v2-selection-in-registration-order",
+            "no-stage-specific-selection-branch-is-permitted",
+            "representation_report_bound_by_generation_one_aggregate = false",
+            "replacement_authorized = false",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-representation-differential-artifact",
+        path: "crates/nuis-artifact/src/compiler_component_representation_diff.rs",
+        required_patterns: &[
+            "CompilerComponentRepresentationDifferential",
+            "build_compiler_component_representation_differential",
+            "compare_compiler_component_representation_paths",
+            "candidate_selected_payload_sha256",
+            "candidate_recovered_payload_sha256",
+            "replacement_authorized: false",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-representation-differential-regression",
+        path: "crates/nuis-artifact/src/compiler_component_representation_diff_tests.rs",
+        required_patterns: &[
+            "registered_representations_are_compared_without_stage_specific_branches",
+            "CompilerStageKind::Ast",
+            "CompilerStageKind::Nir",
+            "canonical_drift_remains_blocked_even_when_candidate_representation_is_reversible",
+            "representation_report_tampering_fails_closed",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-representation-differential-frontdoor",
+        path: "tools/nuisc/src/bootstrap_differential.rs",
+        required_patterns: &[
+            "compare_compiler_component_representation_paths",
+            "COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE",
+            "selected_representations_equivalent",
+            "representation_report_sha256",
+            "all_representations_equivalent",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-compiler-stage-semantic-differential-artifact",
         path: "crates/nuis-artifact/src/compiler_stage_semantic_differential.rs",
         required_patterns: &[
@@ -673,6 +720,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "nir_continuation_page_identity, 146_705_724_977",
             "output_word_count, 22",
             "equivalent_count, 13",
+            "read_compiler_component_representation_differential",
+            "representation_differential.equivalent_count, 1",
+            "representation.byte_identical",
+            "representation.candidate_recovered_payload_sha256",
             "stage transformation tampering must invalidate production proof",
             "derived stage payload tampering must invalidate production proof",
             "stage handoff v2 tampering must invalidate production proof",

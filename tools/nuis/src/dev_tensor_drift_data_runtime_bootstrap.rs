@@ -779,11 +779,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         path: "tools/nuisc/src/bootstrap_differential.rs",
         required_patterns: &[
             "run_bootstrap_diff",
-            "compare_compiler_component_paths",
+            "compare_compiler_component_representation_paths",
             "render_compiler_component_differential",
             "replacement_authorized",
             "report must not overwrite an input component record",
-            "compiler component drift blocked replacement",
+            "compiler component or selected representation drift blocked replacement",
         ],
     },
     DevTensorDriftCheckSpec {

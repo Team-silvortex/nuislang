@@ -246,7 +246,7 @@ or YIR verification, or advance the gate beyond `usable/99`.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/98`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/99`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -268,13 +268,16 @@ aggregate tampering fails closed. A separately versioned signed attestation
 binds both runs to a challenge and a pinned environment-scoped key; the real
 generation-one Linux amd64 claim is checked in and verified without its private
 key. Claim, signature, registry, challenge, or lineage tampering fails closed.
-The thirteen current
-comparisons still require byte-identical canonical v1 stage payloads even
-though v2 selects the derived record beside them. Widening comparison semantics,
-consuming the separately signed genesis authorization, and producing a signed
-rollback transition chain remain open. Cryptography
-does not prove physical-machine independence; that remains an operational
-provisioning fact.
+The thirteen canonical comparisons remain byte-stable for generation-one
+verification. A second canonical sidecar now walks every registered v2
+selection without stage-specific branches and binds the actual selected bytes,
+recovered payload, transform, checkpoint, base comparison, and handoff proof.
+The real NIR path therefore reaches 1/1 selected-representation equivalence
+despite non-identical bytes while retaining false replacement authority. The
+sidecar's exact hash is not yet carried by the generation-one reproducibility
+aggregate; a versioned successor, remote sidecar evidence, authorization
+consumption, and a signed rollback chain remain open. Cryptography does not
+prove physical-machine independence; that remains an operational fact.
 
 ## Migration Rule
 

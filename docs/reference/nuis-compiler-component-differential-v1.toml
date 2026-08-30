@@ -16,6 +16,9 @@ candidate_production_required_by_path_frontdoor = true
 reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
 reproducibility_frontdoor = "nuis bootstrap-reproducibility"
 authorization_successor_protocol = "nuis-compiler-component-replacement-authorization-v1"
+representation_successor_protocol = "nuis-compiler-component-representation-differential-v1"
+representation_manifest_name = "nuis.compiler-component-representation-diff.toml"
+representation_successor_required_by_path_frontdoor = true
 
 ordered_comparisons = [
   "component-id",
@@ -51,11 +54,14 @@ invariants = [
   "report-and-aggregate-verdicts-are-sha256-bound",
   "tampering-fails-closed",
   "two-cache-bypassed-clean-runs-can-be-bound-by-the-successor-aggregate",
+  "path-frontdoor-also-emits-and-verifies-every-registered-v2-representation-selection",
+  "legacy-v1-report-remains-byte-stable-for-generation-one-attestation-verification",
 ]
 
 [open_boundary]
 missing = [
-  "symmetric-comparison-consuming-selected-reversible-v2-evidence",
+  "versioned-reproducibility-successor-binding-the-representation-sidecar",
+  "checked-in-remote-representation-sidecar-generation",
   "second-independent-attester-or-higher-generation-rotation-evidence",
   "verified-authorization-consumer-and-signed-rollback-chain",
 ]

@@ -10,6 +10,7 @@ mod compiler_component_build;
 mod compiler_component_diff;
 mod compiler_component_replacement;
 mod compiler_component_replacement_registry;
+mod compiler_component_representation_diff;
 mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
@@ -128,6 +129,20 @@ pub use compiler_component_replacement_registry::{
     COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_REGISTRY_FILE,
     COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_REGISTRY_PROTOCOL,
     COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_TRUST_SCOPE,
+};
+pub use compiler_component_representation_diff::{
+    build_compiler_component_representation_differential,
+    compare_compiler_component_representation_paths,
+    parse_compiler_component_representation_differential,
+    parse_compiler_component_representation_differential_from_source,
+    read_compiler_component_representation_differential,
+    render_compiler_component_representation_differential,
+    CompilerComponentRepresentationComparison, CompilerComponentRepresentationDifferential,
+    CompilerComponentRepresentationDifferentialInput,
+    COMPILER_COMPONENT_REPRESENTATION_COMPARISON_CONTRACT,
+    COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_AUTHORITY,
+    COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_PROTOCOL,
 };
 pub use compiler_component_reproducibility::{
     build_compiler_component_reproducibility, build_compiler_component_reproducibility_from_paths,

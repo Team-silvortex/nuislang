@@ -8,20 +8,21 @@ use nuis_artifact::{
     build_compiler_stage_handoff, build_compiler_stage_handoff_v2,
     build_compiler_stage_semantic_differential, build_compiler_stage_transformations,
     materialize_compiler_stage_transformation_payloads, parse_compiler_component_differential,
-    promote_compiler_component_candidate, read_compiler_candidate_execution,
-    read_compiler_candidate_production, read_compiler_component_build,
-    read_compiler_diagnostic_report, read_compiler_stage_handoff, read_compiler_stage_handoff_v2,
-    read_compiler_stage_semantic_differential, read_compiler_stage_transformations,
-    render_compiler_candidate_production, render_compiler_component_build,
-    render_compiler_diagnostic_report, render_compiler_stage_handoff,
-    render_compiler_stage_handoff_v2, render_compiler_stage_semantic_differential,
-    render_compiler_stage_transformations, CompilerCandidateProductionInput,
-    CompilerComponentCandidatePromotionInput, CompilerDiagnosticReportInput,
-    CompilerStageHandoffV2Input, CompilerStageKind, CompilerStagePayloadInput,
-    CompilerStageSemanticDifferentialInput, CompilerStageTransformationRecordInput,
-    CompilerStageTransformationsInput, COMPILER_CANDIDATE_EXECUTION_FILE,
-    COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
+    parse_compiler_component_representation_differential, promote_compiler_component_candidate,
+    read_compiler_candidate_execution, read_compiler_candidate_production,
+    read_compiler_component_build, read_compiler_diagnostic_report, read_compiler_stage_handoff,
+    read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
+    read_compiler_stage_transformations, render_compiler_candidate_production,
+    render_compiler_component_build, render_compiler_diagnostic_report,
+    render_compiler_stage_handoff, render_compiler_stage_handoff_v2,
+    render_compiler_stage_semantic_differential, render_compiler_stage_transformations,
+    CompilerCandidateProductionInput, CompilerComponentCandidatePromotionInput,
+    CompilerDiagnosticReportInput, CompilerStageHandoffV2Input, CompilerStageKind,
+    CompilerStagePayloadInput, CompilerStageSemanticDifferentialInput,
+    CompilerStageTransformationRecordInput, CompilerStageTransformationsInput,
+    COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_PRODUCTION_FILE,
+    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
     COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
     COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
     COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
@@ -284,6 +285,18 @@ fn handle_bootstrap_candidate_build_with_cache(
     if !differential.deterministic_artifact_equivalent || differential.replacement_authorized {
         return Err(
             "candidate production did not reach equivalent-awaiting-authorization".to_owned(),
+        );
+    }
+    let representation_differential = parse_compiler_component_representation_differential(
+        &output_dir.join(COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE),
+    )
+    .map_err(|error| format!("failed to verify candidate representation differential: {error}"))?;
+    if !representation_differential.all_representations_equivalent
+        || representation_differential.replacement_authorized
+    {
+        return Err(
+            "candidate selected representation did not reach equivalent-awaiting-authorization"
+                .to_owned(),
         );
     }
 

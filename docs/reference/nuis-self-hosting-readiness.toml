@@ -53,9 +53,9 @@ blocker = "genesis authorization is cryptographically separate from attester tru
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 98
+progress = 99
 required_before = "beta-0.10.0"
-next_action = "generalize at least one component comparison to consume selected reversible v2 evidence without stage-specific branches or replacement authority"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "checked-in remote v2 semantic proof and exact reproducibility aggregate under a fresh challenge, strict signature, environment-scoped key, pinned registry, replay rejection, and false replacement authority"
-blocker = "one remote attestation generation and a separate genesis authorization protocol exist, but the 13 component comparisons still inspect canonical v1 payloads, physical independence is operational rather than cryptographically measurable, and authorization is not consumed"
+next_action = "define a versioned reproducibility successor that binds the exact representation report hash for each clean root while leaving signed v1 aggregates verifiable"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_representation_diff -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate pure_nuis_candidate_produces_an_attested_equivalent_stage1_component -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
+expected_artifact = "two clean roots whose next-version aggregate binds both canonical 13/13 reports and exact selected-representation sidecar hashes without invalidating the checked-in generation-one signature"
+blocker = "the live differential frontdoor consumes selected reversible v2 bytes, but generation-one reproducibility only binds that lineage transitively through production v11 and carries no sidecar report hash; no remote sidecar generation is checked in, and physical independence remains operational rather than cryptographically measurable"
