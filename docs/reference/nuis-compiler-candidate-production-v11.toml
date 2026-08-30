@@ -12,7 +12,7 @@ candidate_directory = "stage1-candidate"
 candidate_role = "stage1-candidate"
 candidate_producer = "nuis-stage1-compact-structured-nir-producer-v10"
 adapter_file = "nuis.compiler-candidate-adapter"
-adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v8"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v9"
 stage_transformations_file = "nuis.compiler-stage-transformations.toml"
 stage_transformations_protocol = "nuis-compiler-stage-transformation-v3"
 stage_semantic_differential_file = "nuis.compiler-stage-semantic-diff.toml"
@@ -23,8 +23,8 @@ stage_handoff_v2_selection_contract = "nuis-compiler-derived-stage-selection-v1"
 text_policy = "utf8-lf-without-nul"
 digest = "sha256-lowercase"
 record_count = 5
-current_selection_count = 1
-semantic_comparison_count = 1
+current_selection_count = 2
+semantic_comparison_count = 2
 component_comparison_count = 13
 replacement_authorized = false
 reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
@@ -32,6 +32,7 @@ reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1
 bootstrap_subset_protocol = "nuis-bootstrap-language-subset-v8"
 scalar_export_count = 21
 ordered_stages = ["source", "tokens", "ast", "nir", "yir"]
+registered_derived_stages = ["ast", "nir"]
 token_pagination_contract = "nuis-compiler-token-pagination-v1"
 token_pagination_page_bytes = 128
 projection_page_contract = "nuis-compiler-structural-page-v1"
@@ -56,6 +57,8 @@ bound_inputs = [
 invariants = [
   "v11-upgrades-the-proof-protocol-without-renaming-the-unchanged-v10-producer",
   "candidate-driver-consumes-every-registered-selection-without-nir-index-special-casing",
+  "adapter-v9-emits-complete-ast-and-nir-cursor-pairs",
+  "current-production-registers-ast-then-nir-through-one-generic-path",
   "handoff-v2-binds-source-record-transform-derived-payload-checkpoint-and-semantic-recovery",
   "every-selection-is-reversible-and-semantically-equivalent",
   "bootstrap-diff-requires-production-proof-before-writing-a-report",

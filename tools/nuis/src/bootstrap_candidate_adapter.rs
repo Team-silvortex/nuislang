@@ -4,7 +4,7 @@ use std::{fs, path::Path, process::Command};
 mod output;
 
 use output::{
-    parse_adapter_output, AdapterNirOutput, AdapterProjectionOutput, AdapterTokenPaginationOutput,
+    parse_adapter_output, AdapterProjectionCheckpointOutput, AdapterTokenPaginationOutput,
 };
 
 use nuis_artifact::{
@@ -16,7 +16,7 @@ use nuis_artifact::{
     COMPILER_CANDIDATE_ADAPTER_FILE,
 };
 
-const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v8";
+const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v9";
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
 const ADAPTER_RUNTIME_OBJECT_FILE: &str = "nuis.compiler-candidate-runtime.o";
 
@@ -30,6 +30,7 @@ pub(crate) struct CandidateAdapterOutput {
     pub(crate) token_pagination: CompilerTokenPaginationIdentity,
     pub(crate) ast_pages: CompilerProjectionTwoPageIdentity,
     pub(crate) nir_pages: CompilerProjectionTwoPageIdentity,
+    pub(crate) ast_transformation_words: Vec<usize>,
     pub(crate) nir_transformation_words: Vec<usize>,
 }
 
@@ -193,8 +194,8 @@ pub(crate) fn run_candidate_adapter(
                 expected_token_page.identity,
                 &expected_token_pagination,
             )
-        || ast_output != AdapterProjectionOutput::from_pages(expected_ast_pages)
-        || nir_output != AdapterNirOutput::from_pages(expected_nir_pages)
+        || ast_output != AdapterProjectionCheckpointOutput::from_pages(expected_ast_pages)
+        || nir_output != AdapterProjectionCheckpointOutput::from_pages(expected_nir_pages)
     {
         return Err(
             "Nuis candidate scalar output disagrees with the independent host fold, token decode, token pagination, AST page chain, or NIR page chain".to_owned(),
@@ -217,7 +218,8 @@ pub(crate) fn run_candidate_adapter(
         token_pagination: expected_token_pagination,
         ast_pages: expected_ast_pages,
         nir_pages: expected_nir_pages,
-        nir_transformation_words: nir_output.checkpoint_words(),
+        ast_transformation_words: ast_output.checkpoint_words(CompilerProjectionKind::Ast),
+        nir_transformation_words: nir_output.checkpoint_words(CompilerProjectionKind::Nir),
     })
 }
 
@@ -682,7 +684,7 @@ int main(int argc, char** argv) {
         nir_page_cursor,
         nir_continuation_cursor
     )) return 75;
-    puts("protocol=nuis-bootstrap-candidate-scalar-output-v8");
+    puts("protocol=nuis-bootstrap-candidate-scalar-output-v9");
     for (int ordinal = 0; ordinal < 5; ++ordinal) {
         printf("stage.%d=%lld\n", ordinal, (long long)folds[ordinal]);
     }
@@ -697,6 +699,12 @@ int main(int argc, char** argv) {
     printf("ast.page_cursor_identity=%lld\n", (long long)ast_page_cursor_identity);
     printf("ast.continuation_page_identity=%lld\n", (long long)ast_continuation_page_identity);
     printf("ast.continuation_cursor_identity=%lld\n", (long long)ast_continuation_cursor_identity);
+    for (int index = 0; index < 8; ++index) {
+        printf("ast.first_cursor_lane.%d=%lld\n", index, (long long)ast_page_cursor[index]);
+    }
+    for (int index = 0; index < 8; ++index) {
+        printf("ast.continuation_cursor_lane.%d=%lld\n", index, (long long)ast_continuation_cursor[index]);
+    }
     printf("nir.page_identity=%lld\n", (long long)nir_page_identity);
     printf("nir.page_cursor_identity=%lld\n", (long long)nir_page_cursor_identity);
     printf("nir.continuation_page_identity=%lld\n", (long long)nir_continuation_page_identity);

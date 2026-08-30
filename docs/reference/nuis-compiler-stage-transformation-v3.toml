@@ -12,11 +12,11 @@ record_order = "ordinal-then-unique-source-stage"
 replacement_authorized = false
 
 current_transform_contract = "nuis-compiler-structured-record-codec-v1"
-current_source_stage = "nir"
+current_source_stages = ["ast", "nir"]
 output_encoding = "nuis-derived-structural-records-v2"
 output_file_pattern = "nuis.compiler-stage-transformation.<ordinal>.bin"
 output_word_count = 22
-projection_kind_tag = 2
+projection_kind_tags = [1, 2]
 page_count = 2
 integer_encoding = "canonical-unsigned-leb128"
 
@@ -91,7 +91,13 @@ verification = [
 legacy_v2_fixed_header_and_checkpoint_bytes = 208
 v3_complete_source_blob_is_not_contiguous = true
 v3_fixture_is_smaller_than_v2_fixture = true
-semantic_comparison_count = 1
+semantic_comparison_count = 2
+
+[current_ast_payload]
+first_page_identity = 174028320749
+first_cursor_identity = 1136712771
+continuation_page_identity = 149528711957
+continuation_cursor_identity = 1472919348
 
 [current_nir_payload]
 first_page_identity = 132469386887
@@ -99,7 +105,7 @@ first_cursor_identity = 754343074
 continuation_page_identity = 146705724977
 continuation_cursor_identity = 38998897
 candidate_producer = "nuis-stage1-compact-structured-nir-producer-v10"
-adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v8"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v9"
 semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
 selection_successor_protocol = "nuis-compiler-stage-handoff-v2"
 production_protocol = "nuis-compiler-candidate-production-v11"
@@ -107,7 +113,7 @@ production_protocol = "nuis-compiler-candidate-production-v11"
 [open_boundary]
 missing = [
   "third-and-later-structural-pages",
-  "additional-registered-derived-stage-encodings",
+  "third-registered-derived-stage-encoding",
   "independent-machine-or-attester-proof",
   "reversible-replacement-authorization",
 ]

@@ -28,9 +28,12 @@ required_results = [
 ]
 
 derived_encoding_policy = "exact-bound-stage-transformation-record"
-current_comparison_count = 1
-current_source_stage = "nir"
-current_source_encoding = "nuis-nir-canonical-projection-v1"
+current_comparison_count = 2
+current_source_stages = ["ast", "nir"]
+current_source_encodings = [
+  "nuis-ast-canonical-projection-v1",
+  "nuis-nir-canonical-projection-v1",
+]
 predecessor_reference_derived_encoding = "nuis-derived-structural-stage-payload-v1"
 current_derived_encoding = "nuis-derived-structural-records-v2"
 selection_successor_protocol = "nuis-compiler-stage-handoff-v2"
@@ -39,7 +42,7 @@ production_protocol = "nuis-compiler-candidate-production-v11"
 [non_claims]
 items = [
   "does-not-authorize-switching-the-active-compiler",
-  "does-not-yet-replace-the-five-stage-handoff-nir-record",
+  "does-not-replace-the-five-stage-canonical-handoff-records",
   "does-not-select-the-derived-record-in-the-v1-stage-handoff",
   "does-not-prove-independent-machine-reproducibility",
 ]

@@ -142,12 +142,20 @@ fn handle_bootstrap_candidate_build_with_cache(
     let (verified_handoff, verified_payloads) =
         read_compiler_stage_handoff(&candidate_dir.join(STAGE_HANDOFF_FILE))
             .map_err(|error| format!("failed to verify candidate handoff: {error}"))?;
-    let transformation_records = [CompilerStageTransformationRecordInput {
-        source_stage: CompilerStageKind::Nir,
-        transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
-        output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
-        output_words: &adapter.nir_transformation_words,
-    }];
+    let transformation_records = [
+        CompilerStageTransformationRecordInput {
+            source_stage: CompilerStageKind::Ast,
+            transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
+            output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+            output_words: &adapter.ast_transformation_words,
+        },
+        CompilerStageTransformationRecordInput {
+            source_stage: CompilerStageKind::Nir,
+            transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
+            output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+            output_words: &adapter.nir_transformation_words,
+        },
+    ];
     let stage_transformations =
         build_compiler_stage_transformations(&CompilerStageTransformationsInput {
             producer_id: &verified_candidate.producer_id,

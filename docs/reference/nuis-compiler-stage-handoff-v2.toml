@@ -39,9 +39,10 @@ invariants = [
 ]
 
 current_candidate = [
+  "registered-ast-structured-record-codec-v1",
   "registered-nir-structured-record-codec-v1",
   "nuis-derived-structural-records-v2",
-  "one-of-one-reversible-semantic-equivalence",
+  "two-of-two-reversible-semantic-equivalence",
 ]
 
 validation_commands = [
@@ -55,5 +56,5 @@ missing = [
   "independent-machine-or-attester-trust",
   "reversible-component-replacement-authorization",
   "production-binding-for-third-and-later-structural-pages",
-  "additional-registered-derived-encodings-and-stages",
+  "third-registered-derived-encoding-or-stage",
 ]

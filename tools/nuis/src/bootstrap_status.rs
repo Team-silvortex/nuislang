@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage-neutral-ir-boundary")
+            Some("compiler-data-model")
         );
     }
 

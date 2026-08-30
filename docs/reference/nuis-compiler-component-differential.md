@@ -138,8 +138,8 @@ recomputation, and drift tests are implemented. The checked-in token, AST, and
 NIR page materializer is now the first Nuis-written leaf producer: it consumes
 all five serialized payloads through the exact scalar ABI, emits a bound
 candidate bundle fold, receives a distinct `stage1-candidate` component record,
-emits a separately bound non-identity NIR checkpoint plus a lossless derived
-binary, proves 1/1 semantic equivalence for the byte-different representation,
+emits separately bound non-identity AST and NIR checkpoints plus two lossless
+derived binaries, proves `2/2` semantic equivalence for the byte-different representations,
 and reaches repository-native `13/13` equivalence. Those thirteen comparisons
 remain canonical v1 so checked-in generation-one aggregates and signatures
 remain verifiable. The new sidecar is the symmetric representation layer: the
@@ -152,8 +152,8 @@ identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
 Neither report is replacement authority or full compiler self-hosting. The
-compact structured NIR record now crosses both a producer-neutral handoff-v2
-selection and the component representation gate. The sidecar's exact hash is
+compact structured AST and NIR records now cross both a producer-neutral
+handoff-v2 selection and the component representation gate. The sidecar's exact hash is
 not yet a field of generation-one reproducibility aggregates; that requires a
 versioned successor rather than rewriting signed v1 evidence. Independent
 remote sidecar evidence, authorization consumption, and a signed rollback

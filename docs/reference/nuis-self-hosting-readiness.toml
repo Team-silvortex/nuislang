@@ -31,12 +31,12 @@ blocker = "v9 registers text and source-span codecs over eight canonical pages, 
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "usable"
-progress = 98
+progress = 99
 required_before = "beta-0.10.0"
-next_action = "preserve producer-neutral v2 selection while registering additional reversible derived encodings without stage-specific driver branches"
+next_action = "preserve dual AST/NIR production selection while extending structural pagination or a third registered derived encoding without changing the canonical v1 bundle"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "registered derived stages selected in source order with exact source, transform, payload, checkpoint, recovery, and semantic identities beside the canonical v1 bundle"
-blocker = "v2 selection is closed for registered reversible transforms and one remote attestation generation binds its production lineage, but current production exercises one NIR encoding and the new authorization record is not yet consumed by a stage selector"
+expected_artifact = "AST and NIR derived stages selected in source order with exact source, transform, payload, checkpoint, recovery, and 2/2 semantic identities beside the canonical v1 bundle"
+blocker = "the real candidate closes generic two-encoding production selection, but production still binds only two structural pages per projection and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage0-stage1-driver"

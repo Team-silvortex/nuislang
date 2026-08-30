@@ -27,13 +27,13 @@ impl AdapterTokenPaginationOutput {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct AdapterNirOutput {
+pub(super) struct AdapterProjectionCheckpointOutput {
     pub(super) projection: AdapterProjectionOutput,
     pub(super) first_cursor_lanes: [usize; 8],
     pub(super) continuation_cursor_lanes: [usize; 8],
 }
 
-impl AdapterNirOutput {
+impl AdapterProjectionCheckpointOutput {
     pub(super) fn from_pages(pages: CompilerProjectionTwoPageIdentity) -> Self {
         Self {
             projection: AdapterProjectionOutput::from_pages(pages),
@@ -42,9 +42,9 @@ impl AdapterNirOutput {
         }
     }
 
-    pub(super) fn checkpoint_words(self) -> Vec<usize> {
+    pub(super) fn checkpoint_words(self, kind: CompilerProjectionKind) -> Vec<usize> {
         let mut words = vec![
-            compiler_projection_checkpoint_kind_tag(CompilerProjectionKind::Nir),
+            compiler_projection_checkpoint_kind_tag(kind),
             COMPILER_STAGE_CHECKPOINT_PAGE_COUNT,
             self.projection.first_page_identity,
             self.projection.first_cursor_identity,
@@ -85,8 +85,8 @@ pub(super) fn parse_adapter_output(
         usize,
         CompilerTokenDecodeSummary,
         AdapterTokenPaginationOutput,
-        AdapterProjectionOutput,
-        AdapterNirOutput,
+        AdapterProjectionCheckpointOutput,
+        AdapterProjectionCheckpointOutput,
     ),
     String,
 > {
@@ -96,7 +96,7 @@ pub(super) fn parse_adapter_output(
         return Err("candidate scalar output must use canonical UTF-8/LF text".to_owned());
     }
     let lines = source.lines().collect::<Vec<_>>();
-    if lines.len() != 37 || lines[0] != format!("protocol={protocol}") {
+    if lines.len() != 53 || lines[0] != format!("protocol={protocol}") {
         return Err("candidate scalar output has an invalid protocol or line count".to_owned());
     }
     let stage_folds = (0..5)
@@ -113,33 +113,37 @@ pub(super) fn parse_adapter_output(
         terminal_page_hash: parse_output_usize(lines[11], "tokens.terminal_page_hash")?,
         chain_identity: parse_output_usize(lines[12], "tokens.page_chain_identity")?,
     };
-    let ast_output = AdapterProjectionOutput {
-        first_page_identity: parse_output_usize(lines[13], "ast.page_identity")?,
-        first_cursor_identity: parse_output_usize(lines[14], "ast.page_cursor_identity")?,
-        continuation_page_identity: parse_output_usize(
-            lines[15],
-            "ast.continuation_page_identity",
-        )?,
-        continuation_cursor_identity: parse_output_usize(
-            lines[16],
-            "ast.continuation_cursor_identity",
-        )?,
-    };
-    let nir_output = AdapterNirOutput {
+    let ast_output = AdapterProjectionCheckpointOutput {
         projection: AdapterProjectionOutput {
-            first_page_identity: parse_output_usize(lines[17], "nir.page_identity")?,
-            first_cursor_identity: parse_output_usize(lines[18], "nir.page_cursor_identity")?,
+            first_page_identity: parse_output_usize(lines[13], "ast.page_identity")?,
+            first_cursor_identity: parse_output_usize(lines[14], "ast.page_cursor_identity")?,
             continuation_page_identity: parse_output_usize(
-                lines[19],
+                lines[15],
+                "ast.continuation_page_identity",
+            )?,
+            continuation_cursor_identity: parse_output_usize(
+                lines[16],
+                "ast.continuation_cursor_identity",
+            )?,
+        },
+        first_cursor_lanes: parse_output_lanes(&lines, 17, "ast.first_cursor_lane")?,
+        continuation_cursor_lanes: parse_output_lanes(&lines, 25, "ast.continuation_cursor_lane")?,
+    };
+    let nir_output = AdapterProjectionCheckpointOutput {
+        projection: AdapterProjectionOutput {
+            first_page_identity: parse_output_usize(lines[33], "nir.page_identity")?,
+            first_cursor_identity: parse_output_usize(lines[34], "nir.page_cursor_identity")?,
+            continuation_page_identity: parse_output_usize(
+                lines[35],
                 "nir.continuation_page_identity",
             )?,
             continuation_cursor_identity: parse_output_usize(
-                lines[20],
+                lines[36],
                 "nir.continuation_cursor_identity",
             )?,
         },
-        first_cursor_lanes: parse_output_lanes(&lines, 21, "nir.first_cursor_lane")?,
-        continuation_cursor_lanes: parse_output_lanes(&lines, 29, "nir.continuation_cursor_lane")?,
+        first_cursor_lanes: parse_output_lanes(&lines, 37, "nir.first_cursor_lane")?,
+        continuation_cursor_lanes: parse_output_lanes(&lines, 45, "nir.continuation_cursor_lane")?,
     };
     Ok((
         stage_folds,

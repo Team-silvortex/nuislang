@@ -131,7 +131,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `usable/98`. Normal AOT builds emit the ordered five-stage
+This gate is now `usable/99`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -153,14 +153,14 @@ layer. The same scanner binds four completed NIR records, its 25-byte
 continuation body, state hash `1026894471`, and identity `132469386887` to a
 second independent result. Nuis then serializes opaque cursors and resumes the
 AST and NIR streams into second-page identities `149528711957` and
-`146705724977`, both independently replayed by the artifact layer. Nuis now
-also emits both NIR cursor arrays as one ordered 22-word non-identity
-checkpoint. `nuis-compiler-stage-transformation-v3` binds that checkpoint to
-canonical ULEB128 structural records without appending one complete source
+`146705724977`, both independently replayed by the artifact layer. Adapter
+protocol v9 now emits both complete AST and NIR cursor pairs as two ordered
+22-word non-identity checkpoints. `nuis-compiler-stage-transformation-v3`
+binds each checkpoint to canonical ULEB128 structural records without appending one complete source
 blob. Its decoder reconstructs indentation and LF boundaries, reparses every
 ordinal, depth, kind, and body, and independently replays every word and source
-byte before production can attest it. The semantic differential passes 1/1
-for the byte-different representation. `nuis-compiler-stage-handoff-v2` now
+byte before production can attest it. The semantic differential passes `2/2`
+for the byte-different representations. `nuis-compiler-stage-handoff-v2` now
 selects every registered transform in order and binds its canonical source
 record, derived payload, checkpoint, recovery hash, and semantic verdict
 without stage-specific selection logic or replacement authority. See
@@ -189,14 +189,14 @@ The probe authority remains explicitly execution-only. The separate
 `nuis bootstrap-candidate-build` frontdoor feeds all five payloads through the
 candidate's exact scalar exports, independently verifies the folds, token
 decode summary, canonical token page, AST/NIR continuation identities, and
-NIR checkpoint words, materializes a lossless byte-different NIR-derived
-payload, emits its semantic differential and producer-neutral handoff v2,
+both checkpoint sets, materializes lossless byte-different AST- and NIR-derived
+payloads, emits their semantic differential and producer-neutral handoff v2,
 binds both through `nuis-compiler-candidate-production-v11`, and then runs the
 differential gate.
 See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 The current producer is the bounded
 `nuis-stage1-compact-structured-nir-producer-v10` leaf; it preserves canonical
-handoff bytes, emits a separate reversible compact-record binary plus 1/1
+handoff bytes, emits two reversible compact-record binaries plus `2/2`
 semantic comparison, and grants no replacement authority.
 
 `nuis bootstrap-reproducibility` now runs that complete production chain in
@@ -272,8 +272,8 @@ The thirteen canonical comparisons remain byte-stable for generation-one
 verification. A second canonical sidecar now walks every registered v2
 selection without stage-specific branches and binds the actual selected bytes,
 recovered payload, transform, checkpoint, base comparison, and handoff proof.
-The real NIR path therefore reaches 1/1 selected-representation equivalence
-despite non-identical bytes while retaining false replacement authority. The
+The real AST and NIR paths therefore reach `2/2` selected-representation
+equivalence despite non-identical bytes while retaining false replacement authority. The
 sidecar's exact hash is not yet carried by the generation-one reproducibility
 aggregate; a versioned successor, remote sidecar evidence, authorization
 consumption, and a signed rollback chain remain open. Cryptography does not

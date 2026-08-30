@@ -126,33 +126,67 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
         &payloads,
     )
     .expect("verify Nuis stage transformation");
-    assert_eq!(transformations.record_count, 1);
+    assert_eq!(transformations.record_count, 2);
     assert_eq!(
         transformations.records[0].source_stage,
+        CompilerStageKind::Ast
+    );
+    assert_eq!(
+        transformations.records[1].source_stage,
         CompilerStageKind::Nir
     );
-    assert_eq!(transformations.records[0].output_word_count, 22);
-    assert_eq!(transformations.records[0].output_words[0], 2);
-    assert_eq!(transformations.records[0].output_words[1], 2);
-    assert_eq!(transformations.records[0].output_words[2], 132_469_386_887);
-    assert_eq!(transformations.records[0].output_words[3], 754_343_074);
-    assert_eq!(transformations.records[0].output_words[12], 146_705_724_977);
-    assert_eq!(transformations.records[0].output_words[13], 38_998_897);
-    let derived_payload_path = candidate_dir.join(&transformations.records[0].output_payload_file);
-    let derived_payload = fs::read(&derived_payload_path).expect("read compact derived payload");
-    let legacy_v2_bytes = 8
-        + 3 * std::mem::size_of::<u64>()
-        + 22 * std::mem::size_of::<u64>()
-        + payloads[3].bytes.len();
-    assert_eq!(
-        transformations.records[0].output_payload_bytes,
-        derived_payload.len()
-    );
-    assert!(derived_payload.len() < payloads[3].bytes.len());
-    assert!(derived_payload.len() < legacy_v2_bytes);
-    assert!(!derived_payload
-        .windows(payloads[3].bytes.len())
-        .any(|window| window == payloads[3].bytes));
+    let ast_transformation = transformations
+        .records
+        .iter()
+        .find(|record| record.source_stage == CompilerStageKind::Ast)
+        .expect("AST stage transformation");
+    let nir_transformation = transformations
+        .records
+        .iter()
+        .find(|record| record.source_stage == CompilerStageKind::Nir)
+        .expect("NIR stage transformation");
+    for (record, kind_tag, first_page, first_cursor, second_page, second_cursor) in [
+        (
+            ast_transformation,
+            1,
+            174_028_320_749,
+            1_136_712_771,
+            149_528_711_957,
+            1_472_919_348,
+        ),
+        (
+            nir_transformation,
+            2,
+            132_469_386_887,
+            754_343_074,
+            146_705_724_977,
+            38_998_897,
+        ),
+    ] {
+        assert_eq!(record.output_word_count, 22);
+        assert_eq!(record.output_words[0], kind_tag);
+        assert_eq!(record.output_words[1], 2);
+        assert_eq!(record.output_words[2], first_page);
+        assert_eq!(record.output_words[3], first_cursor);
+        assert_eq!(record.output_words[12], second_page);
+        assert_eq!(record.output_words[13], second_cursor);
+        let source_payload = payloads
+            .iter()
+            .find(|payload| payload.stage == record.source_stage)
+            .expect("transformed source payload");
+        let derived_payload = fs::read(candidate_dir.join(&record.output_payload_file))
+            .expect("read compact derived payload");
+        let legacy_v2_bytes = 8
+            + 3 * std::mem::size_of::<u64>()
+            + 22 * std::mem::size_of::<u64>()
+            + source_payload.bytes.len();
+        assert_eq!(record.output_payload_bytes, derived_payload.len());
+        assert!(derived_payload.len() < source_payload.bytes.len());
+        assert!(derived_payload.len() < legacy_v2_bytes);
+        assert!(!derived_payload
+            .windows(source_payload.bytes.len())
+            .any(|window| window == source_payload.bytes));
+    }
     let semantic_differential = read_compiler_stage_semantic_differential(
         &candidate_dir.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE),
         &CompilerStageSemanticDifferentialInput {
@@ -163,23 +197,40 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
         },
     )
     .expect("verify stage semantic differential");
-    assert_eq!(semantic_differential.equivalent_count, 1);
+    assert_eq!(semantic_differential.comparison_count, 2);
+    assert_eq!(semantic_differential.equivalent_count, 2);
     assert!(semantic_differential.deterministic_semantic_equivalent);
-    assert!(!semantic_differential.comparisons[0].byte_identical);
-    assert!(semantic_differential.comparisons[0].semantically_equivalent);
+    for stage in [CompilerStageKind::Ast, CompilerStageKind::Nir] {
+        let comparison = semantic_differential
+            .comparisons
+            .iter()
+            .find(|comparison| comparison.source_stage == stage)
+            .expect("semantic comparison for registered stage");
+        assert!(!comparison.byte_identical);
+        assert!(comparison.semantically_equivalent);
+    }
     let stage_handoff_v2 = read_compiler_stage_handoff_v2(
         &candidate_dir.join(COMPILER_STAGE_HANDOFF_V2_FILE),
         &handoff,
         &payloads,
     )
     .expect("verify stage handoff v2");
-    assert_eq!(stage_handoff_v2.selection_count, 1);
+    assert_eq!(stage_handoff_v2.selection_count, 2);
     assert_eq!(
         stage_handoff_v2.selections[0].source_stage,
+        CompilerStageKind::Ast
+    );
+    assert_eq!(
+        stage_handoff_v2.selections[1].source_stage,
         CompilerStageKind::Nir
     );
-    assert!(stage_handoff_v2.selections[0].reversible);
-    assert!(stage_handoff_v2.selections[0].semantically_equivalent);
+    for stage in [CompilerStageKind::Ast, CompilerStageKind::Nir] {
+        let selection = stage_handoff_v2
+            .selection_for_stage(stage)
+            .expect("handoff v2 selection for registered stage");
+        assert!(selection.reversible);
+        assert!(selection.semantically_equivalent);
+    }
     assert_eq!(
         production.stage_handoff_v2_file,
         COMPILER_STAGE_HANDOFF_V2_FILE
@@ -204,24 +255,29 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
         &candidate_record_path,
     )
     .expect("verify candidate representation differential");
-    assert_eq!(representation_differential.comparison_count, 1);
-    assert_eq!(representation_differential.equivalent_count, 1);
+    assert_eq!(representation_differential.comparison_count, 2);
+    assert_eq!(representation_differential.equivalent_count, 2);
     assert!(representation_differential.all_representations_equivalent);
     assert!(!representation_differential.replacement_authorized);
-    let representation = &representation_differential.comparisons[0];
-    assert_eq!(representation.source_stage, CompilerStageKind::Nir);
-    assert!(!representation.byte_identical);
-    assert!(representation.reversible);
-    assert!(representation.semantically_equivalent);
-    assert!(representation.equivalent);
-    assert_eq!(
-        representation.stage0_payload_sha256,
-        representation.candidate_recovered_payload_sha256
-    );
-    assert_ne!(
-        representation.stage0_payload_sha256,
-        representation.candidate_selected_payload_sha256
-    );
+    for stage in [CompilerStageKind::Ast, CompilerStageKind::Nir] {
+        let representation = representation_differential
+            .comparisons
+            .iter()
+            .find(|comparison| comparison.source_stage == stage)
+            .expect("representation comparison for registered stage");
+        assert!(!representation.byte_identical);
+        assert!(representation.reversible);
+        assert!(representation.semantically_equivalent);
+        assert!(representation.equivalent);
+        assert_eq!(
+            representation.stage0_payload_sha256,
+            representation.candidate_recovered_payload_sha256
+        );
+        assert_ne!(
+            representation.stage0_payload_sha256,
+            representation.candidate_selected_payload_sha256
+        );
+    }
 
     let transformations_path = candidate_dir.join(COMPILER_STAGE_TRANSFORMATION_FILE);
     let transformation_source = fs::read(&transformations_path).expect("read transformations");

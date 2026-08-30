@@ -9,6 +9,8 @@ base_differential_protocol = "nuis-compiler-component-differential-v1"
 base_differential_file = "nuis.compiler-component-diff.toml"
 candidate_handoff_protocol = "nuis-compiler-stage-handoff-v2"
 selection_policy = "every-registered-v2-selection-in-registration-order"
+current_production_stages = ["ast", "nir"]
+current_comparison_count = 2
 digest = "sha256-lowercase"
 replacement_authorized = false
 

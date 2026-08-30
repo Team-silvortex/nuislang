@@ -108,10 +108,10 @@ The first identity-projection path is now stage1-candidate ready:
 * The adapter blindly transports one token page and two AST/NIR pages. Nuis
   owns the token records plus canonical emission, serializes an opaque
   eight-lane structural cursor, and resumes both projections into page two.
-* The Nuis consumer can resume repeatedly; production binds two structural
-  pages, compact byte-different NIR records, and their 1/1 semantic
-  differential. Handoff v2 selects the registered NIR-derived record without
-  embedding NIR or transform-specific logic in the selection protocol.
+* The Nuis consumer can resume repeatedly; production binds two pages for each
+  projection, compact byte-different AST and NIR records, and their `2/2`
+  semantic differential. Handoff v2 selects both registered derived records
+  without embedding AST, NIR, or transform-specific logic in the protocol.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
@@ -120,7 +120,7 @@ The first identity-projection path is now stage1-candidate ready:
 The independent codec, native Nuis consumer, bounded token page, resumable AST
 and NIR pages, compact derived records, semantic proof, v2 selection,
 production proof, and `13/13` differential advance this coordinate to
-`usable/98`. Independent attester trust and reversible replacement
+`usable/99`. Independent attester trust and reversible replacement
 authorization remain separate closure work. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),

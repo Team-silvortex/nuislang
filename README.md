@@ -34,9 +34,10 @@ The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
 `740/740` passing drift checks. The stage0/stage1 driver and
 differential/reproducibility gate are `usable/99`; the stage-neutral boundary
-and compiler data model v9 remain `usable/98`. The selected-representation gate
-closes the previous differential task, so deterministic coordinate ordering
-advances to the stage-neutral IR boundary.
+now joins them at `usable/99`, while compiler data model v9 remains
+`usable/98`. Real AST plus NIR derived-stage selection closes the previous
+stage-neutral task, so deterministic coordinate ordering advances to the
+compiler data model.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -76,19 +77,21 @@ AST/NIR identities `174028320749` and
 `132469386887`, and second-page identities `149528711957` and `146705724977`
 before production v11 emits the distinct
 `nuis-stage1-compact-structured-nir-producer-v10` candidate. Nuis also emits
-both NIR cursor arrays as a non-identity 22-word structural checkpoint;
+both AST and NIR cursor pairs as two non-identity 22-word structural
+checkpoints through adapter protocol v9;
 `nuis-compiler-stage-transformation-v3` independently replays every word and
-materializes canonical ULEB128 structural records without appending a complete
-source blob. It reparses every record and still losslessly recovers the NIR
-payload. `nuis-compiler-stage-semantic-differential-v1` then records 1/1
-representation equivalence. `nuis-compiler-stage-handoff-v2` selects every
+materializes two canonical ULEB128 structural payloads without appending a
+complete source blob. It reparses every record and losslessly recovers both
+canonical payloads. `nuis-compiler-stage-semantic-differential-v1` then records
+`2/2` representation equivalence. `nuis-compiler-stage-handoff-v2` selects every
 registered reversible derived stage in registration order and binds its source,
 transform, payload, checkpoint, recovery, and semantic identities without an
 NIR-specific driver branch. Candidate production v11 binds that selection
 before the candidate reaches repository-native `13/13` differential
 equivalence. The sibling component representation report now consumes the
-actually selected byte-different NIR payload, recovered canonical anchor, and
-handoff-v2 proof at 1/1 equivalence without a stage-specific comparison branch;
+actually selected byte-different AST and NIR payloads, recovered canonical
+anchors, and handoff-v2 proof at `2/2` equivalence without a stage-specific
+comparison branch;
 both reports retain `replacement_authorized = false`. `nuis
 bootstrap-reproducibility` now performs
 two cache-bypassed clean candidate builds, rereads both evidence roots, requires

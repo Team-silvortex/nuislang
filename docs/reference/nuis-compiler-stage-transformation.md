@@ -9,11 +9,11 @@ embedding the complete source bytes. V3 replaces that conservative envelope
 with ordered structural records and keeps v2 frozen as historical evidence.
 
 The current transform is `nuis-compiler-structured-record-codec-v1`. The Nuis
-stage1 candidate still consumes the NIR projection through two 128-byte pages
-and emits this ordered 22-word checkpoint:
+stage1 candidate consumes both AST and NIR projections through two 128-byte
+pages and emits one ordered 22-word checkpoint per projection:
 
 ```text
-0       projection kind tag (NIR = 2)
+0       projection kind tag (AST = 1, NIR = 2)
 1       page count (2)
 2       first page identity
 3       first cursor identity
@@ -45,16 +45,16 @@ kind vocabulary. Ordinals are implicit in record order; depth reconstructs
 two-space indentation for ordinary records; opaque WGSL body records retain
 their framing in the body at depth zero. Every record reconstructs exactly one
 LF. The payload therefore carries the body bytes needed for lossless replay,
-but it does not append or contain one contiguous complete NIR source blob. The
-reference fixture is smaller than the equivalent v2 envelope.
+but it does not append or contain one contiguous complete source blob. Both
+real AST and NIR payloads are smaller than their equivalent v2 envelopes.
 
 The decoder rejects truncated, overflowing, and noncanonical varints, unknown
 record kinds, impossible lengths, invalid UTF-8, and trailing bytes. It then
 reconstructs the source, reparses it through
 `nuis-compiler-structural-projection-v1`, and compares every ordinal, depth,
 kind, and body before returning any bytes. The host adapter still transports
-only source bytes and opaque Nuis-produced cursor words; it has no NIR
-instruction classifier.
+only source bytes and opaque Nuis-produced cursor words; it has no AST or NIR
+classifier.
 
 ## Semantic Differential
 
@@ -66,7 +66,7 @@ structural metadata replay, independent checkpoint replay, and complete source
 recovery while `replacement_authorized = false`.
 
 This proves lossless representation equivalence, not permission to replace the
-active NIR handoff record.
+active canonical handoff records.
 
 ## Trust Chain
 
@@ -82,9 +82,10 @@ integers, symlink payloads, malformed headers, length/hash drift, record
 metadata drift, source recovery drift, proof drift, and replacement authority
 all fail closed.
 
-The canonical five-stage handoff remains unchanged in v1 form. Handoff v2 now
-selects every registered reversible derived record beside that canonical
-bundle, but does not replace it or authorize compiler replacement. Third and
+The canonical five-stage handoff remains unchanged in v1 form. Current
+production registers AST then NIR and handoff v2 selects both reversible
+derived records beside that canonical bundle, but does not replace it or
+authorize compiler replacement. Third and
 later structural pages, independent attester trust, and reversible replacement
 authorization remain open.
 
