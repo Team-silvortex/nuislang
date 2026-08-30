@@ -1,8 +1,14 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Command};
 
+use ed25519_dalek::SigningKey;
 use nuis_artifact::{
+    build_compiler_component_replacement_authorizer_registry,
     compiler_component_attester_trust_registry_sha256,
-    parse_compiler_component_attester_trust_registry, read_compiler_component_attestation,
+    compiler_component_replacement_authorizer_registry_sha256,
+    parse_compiler_component_attester_trust_registry,
+    parse_compiler_component_replacement_authorization, read_compiler_component_attestation,
+    render_compiler_component_replacement_authorizer_registry,
+    CompilerComponentReplacementAuthorizerEntryInput,
 };
 
 const CHALLENGE_SHA256: &str = "d5aeef8c1d33a5b473f11142197fd361df26dc0f2ec1c0188362f9ece139338c";
@@ -65,4 +71,119 @@ fn checked_in_remote_attestation_verifies_and_fails_closed() {
     )
     .expect_err("unpinned registry bytes must fail closed");
     assert!(error.to_string().contains("pinned SHA-256"));
+}
+
+#[test]
+fn remote_attestation_requires_a_distinct_pinned_replacement_authorizer() {
+    let evidence = evidence_dir();
+    let aggregate = evidence.join("nuis.compiler-component-reproducibility.toml");
+    let attestation = evidence.join("nuis.compiler-component-attestation.toml");
+    let attester_registry = evidence.join("nuis.compiler-component-attester-trust-registry.toml");
+    let scratch =
+        std::env::temp_dir().join(format!("nuis_component_replacement_{}", std::process::id()));
+    if scratch.exists() {
+        std::fs::remove_dir_all(&scratch).expect("clear stale replacement scratch");
+    }
+    std::fs::create_dir_all(&scratch).expect("create replacement scratch");
+    let authorizer_registry_path = scratch.join("authorizers.toml");
+    let authorization_path = scratch.join("authorization.toml");
+
+    let signing_key = SigningKey::from_bytes(&[9; 32]);
+    let public_key_hex: String = signing_key
+        .verifying_key()
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let authorizer_registry = build_compiler_component_replacement_authorizer_registry(
+        1,
+        &[CompilerComponentReplacementAuthorizerEntryInput {
+            authorizer_id: "compiler-owner-1",
+            environment_id: "release-control",
+            component_id: "bootstrap_structural_projection_candidate",
+            public_key_hex: &public_key_hex,
+            status: "active",
+        }],
+    )
+    .expect("build authorizer registry");
+    let authorizer_registry_source =
+        render_compiler_component_replacement_authorizer_registry(&authorizer_registry);
+    let authorizer_registry_sha256 =
+        compiler_component_replacement_authorizer_registry_sha256(&authorizer_registry_source);
+    std::fs::write(&authorizer_registry_path, authorizer_registry_source)
+        .expect("write authorizer registry");
+    let authorization_challenge = "e".repeat(64);
+
+    let authorize = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-authorize-component-replacement")
+        .arg(&aggregate)
+        .arg(&attestation)
+        .arg(&attester_registry)
+        .arg(REGISTRY_SHA256)
+        .arg(CHALLENGE_SHA256)
+        .arg(&authorizer_registry_path)
+        .arg(&authorizer_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg("compiler-owner-1")
+        .arg("release-control")
+        .arg("projection-relay-genesis")
+        .arg(&authorization_path)
+        .env("NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX", "09".repeat(32))
+        .output()
+        .expect("run replacement authorization frontdoor");
+    assert!(
+        authorize.status.success(),
+        "authorization failed: {}",
+        String::from_utf8_lossy(&authorize.stderr)
+    );
+    assert!(String::from_utf8_lossy(&authorize.stdout)
+        .contains("bootstrap component replacement: authorized"));
+    let authorization = parse_compiler_component_replacement_authorization(&authorization_path)
+        .expect("parse emitted replacement authorization");
+    assert!(authorization.replacement_authorized);
+    assert!(authorization.reversible);
+    assert!(!authorization.attestation_replacement_authorized);
+    assert_ne!(
+        authorization.authorizer_public_key_id,
+        authorization.attester_public_key_id
+    );
+
+    let verify = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-verify-component-replacement")
+        .arg(&aggregate)
+        .arg(&attestation)
+        .arg(&attester_registry)
+        .arg(REGISTRY_SHA256)
+        .arg(CHALLENGE_SHA256)
+        .arg(&authorization_path)
+        .arg(&authorizer_registry_path)
+        .arg(&authorizer_registry_sha256)
+        .arg(&authorization_challenge)
+        .output()
+        .expect("run replacement verification frontdoor");
+    assert!(
+        verify.status.success(),
+        "verification failed: {}",
+        String::from_utf8_lossy(&verify.stderr)
+    );
+    assert!(String::from_utf8_lossy(&verify.stdout)
+        .contains("bootstrap component replacement: verified"));
+
+    let replay = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-verify-component-replacement")
+        .arg(&aggregate)
+        .arg(&attestation)
+        .arg(&attester_registry)
+        .arg(REGISTRY_SHA256)
+        .arg(CHALLENGE_SHA256)
+        .arg(&authorization_path)
+        .arg(&authorizer_registry_path)
+        .arg(&authorizer_registry_sha256)
+        .arg("0".repeat(64))
+        .output()
+        .expect("run replacement replay rejection");
+    assert!(!replay.status.success());
+    assert!(String::from_utf8_lossy(&replay.stderr).contains("verifier request"));
+
+    std::fs::remove_dir_all(&scratch).expect("remove replacement scratch");
 }

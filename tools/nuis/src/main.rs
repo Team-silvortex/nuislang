@@ -41,6 +41,7 @@ mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_probe;
+mod bootstrap_component_replacement;
 mod bootstrap_reproducibility;
 mod bootstrap_reproducibility_attestation;
 mod bootstrap_status;
@@ -427,6 +428,14 @@ fn run() -> Result<(), String> {
                 challenge_sha256,
             },
         )?,
+        cli::CommandKind::BootstrapAuthorizeComponentReplacement(input) => {
+            bootstrap_component_replacement::handle_bootstrap_authorize_component_replacement(
+                input,
+            )?
+        }
+        cli::CommandKind::BootstrapVerifyComponentReplacement(input) => {
+            bootstrap_component_replacement::handle_bootstrap_verify_component_replacement(input)?
+        }
         cli::CommandKind::BootstrapDiff {
             stage0_record,
             candidate_record,

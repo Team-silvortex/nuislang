@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage0-stage1-driver")
+            Some("differential-reproducibility-gate")
         );
     }
 
@@ -547,6 +547,7 @@ mod tests {
             .replace("progress = 96", "progress = 100")
             .replace("progress = 97", "progress = 100")
             .replace("progress = 98", "progress = 100");
+        let complete = complete.replace("progress = 99", "progress = 100");
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);
         assert!(report.ready());

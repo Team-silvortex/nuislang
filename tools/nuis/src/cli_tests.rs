@@ -1,4 +1,7 @@
-use super::{parse_args, CommandKind, GalaxyCommand};
+use super::{
+    parse_args, BootstrapComponentReplacementInput, BootstrapComponentReplacementVerificationInput,
+    CommandKind, GalaxyCommand,
+};
 use std::path::PathBuf;
 
 #[test]
@@ -216,6 +219,79 @@ fn parses_bootstrap_attestation_commands() {
             registry_sha256: "a".repeat(64),
             challenge_sha256: "f".repeat(64),
         }
+    );
+}
+
+#[test]
+fn parses_bootstrap_component_replacement_commands() {
+    let command = parse_args(
+        [
+            "bootstrap-authorize-component-replacement".to_owned(),
+            "aggregate.toml".to_owned(),
+            "attestation.toml".to_owned(),
+            "attesters.toml".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "authorizers.toml".to_owned(),
+            "c".repeat(64),
+            "d".repeat(64),
+            "compiler-owner-1".to_owned(),
+            "release-control".to_owned(),
+            "projection-relay-genesis".to_owned(),
+            "authorization.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap replacement authorization parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapAuthorizeComponentReplacement(BootstrapComponentReplacementInput {
+            aggregate: PathBuf::from("aggregate.toml"),
+            attestation: PathBuf::from("attestation.toml"),
+            attester_registry: PathBuf::from("attesters.toml"),
+            attester_registry_sha256: "a".repeat(64),
+            attestation_challenge_sha256: "b".repeat(64),
+            authorizer_registry: PathBuf::from("authorizers.toml"),
+            authorizer_registry_sha256: "c".repeat(64),
+            authorization_challenge_sha256: "d".repeat(64),
+            authorizer_id: "compiler-owner-1".to_owned(),
+            environment_id: "release-control".to_owned(),
+            authorization_id: "projection-relay-genesis".to_owned(),
+            output: PathBuf::from("authorization.toml"),
+        },)
+    );
+
+    let command = parse_args(
+        [
+            "bootstrap-verify-component-replacement".to_owned(),
+            "aggregate.toml".to_owned(),
+            "attestation.toml".to_owned(),
+            "attesters.toml".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "authorization.toml".to_owned(),
+            "authorizers.toml".to_owned(),
+            "c".repeat(64),
+            "d".repeat(64),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap replacement verification parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapVerifyComponentReplacement(
+            BootstrapComponentReplacementVerificationInput {
+                aggregate: PathBuf::from("aggregate.toml"),
+                attestation: PathBuf::from("attestation.toml"),
+                attester_registry: PathBuf::from("attesters.toml"),
+                attester_registry_sha256: "a".repeat(64),
+                attestation_challenge_sha256: "b".repeat(64),
+                authorization: PathBuf::from("authorization.toml"),
+                authorizer_registry: PathBuf::from("authorizers.toml"),
+                authorizer_registry_sha256: "c".repeat(64),
+                authorization_challenge_sha256: "d".repeat(64),
+            },
+        )
     );
 }
 

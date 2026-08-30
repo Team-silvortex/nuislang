@@ -107,8 +107,10 @@ replacement_authorized = false
 replacement_authority_contract = "nuis-compiler-replacement-authorization-separate-v1"
 ```
 
-This separation is deliberate. A future reversible replacement record must be
-an independent protocol with rollback and repeated-build evidence. A
+This separation is deliberate. The independent
+[replacement authorization v1](nuis-compiler-component-replacement-authorization.md)
+record now binds rollback and repeated-build evidence through a separate key
+and registry, while leaving this report unchanged. A
 differential report cannot be edited into an authorization because its report
 identity and canonical parser reject any such mutation.
 
@@ -131,10 +133,10 @@ compile-cache-bypassed roots and binds both reports plus stable component
 identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
-This is not replacement authority or full compiler self-hosting. The next
-The compact structured NIR record now crosses a producer-neutral handoff v2
+This report is not replacement authority or full compiler self-hosting. The
+compact structured NIR record now crosses a producer-neutral handoff v2
 selection contract. The remaining closures are independent machine/attester
-evidence and a separate reversible authorization protocol.
+evidence, authorization consumption, and a signed rollback transition chain.
 
 ## Validation
 

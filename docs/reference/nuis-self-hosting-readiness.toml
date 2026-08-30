@@ -36,18 +36,18 @@ required_before = "beta-0.10.0"
 next_action = "preserve producer-neutral v2 selection while registering additional reversible derived encodings without stage-specific driver branches"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
 expected_artifact = "registered derived stages selected in source order with exact source, transform, payload, checkpoint, recovery, and semantic identities beside the canonical v1 bundle"
-blocker = "v2 selection is closed for registered reversible transforms and one remote attestation generation binds its production lineage, but current production exercises one NIR encoding and replacement authorization remains open"
+blocker = "v2 selection is closed for registered reversible transforms and one remote attestation generation binds its production lineage, but current production exercises one NIR encoding and the new authorization record is not yet consumed by a stage selector"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 98
 required_before = "beta-0.10.0"
-next_action = "design an explicit reversible component replacement authorization protocol that cannot be inferred from attester trust"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "candidate production v11 and two clean roots beneath a checked-in challenge-bound claim verified by exact registry pin while replacement authority remains false"
-blocker = "one independently operated Linux amd64 attestation generation is checked in, but physical independence remains operational rather than cryptographically proven and reversible authorization remains open"
+progress = 99
+next_action = "consume one verified genesis authorization through a reversible active-component selector without mutating its attestation or losing the stage0 rollback target"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
+expected_artifact = "candidate production v11 and two clean roots beneath a checked-in attestation plus a separately pinned component-owner authorization that binds stage0 to candidate and retains stage0 as rollback"
+blocker = "genesis authorization is cryptographically separate from attester trust and verifies end to end, but no active-component state record consumes it and no signed generation-two rollback transition exists"
 
 [[gates]]
 id = "differential-reproducibility-gate"
@@ -58,4 +58,4 @@ required_before = "beta-0.10.0"
 next_action = "generalize at least one component comparison to consume selected reversible v2 evidence without stage-specific branches or replacement authority"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
 expected_artifact = "checked-in remote v2 semantic proof and exact reproducibility aggregate under a fresh challenge, strict signature, environment-scoped key, pinned registry, replay rejection, and false replacement authority"
-blocker = "one remote attestation generation is checked in, but the 13 component comparisons still inspect canonical v1 payloads, physical independence is operational rather than cryptographically measurable, and reversible authorization remains open"
+blocker = "one remote attestation generation and a separate genesis authorization protocol exist, but the 13 component comparisons still inspect canonical v1 payloads, physical independence is operational rather than cryptographically measurable, and authorization is not consumed"

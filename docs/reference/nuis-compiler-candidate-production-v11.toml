@@ -74,6 +74,6 @@ missing = [
   "production-binding-for-third-and-later-structural-pages",
   "typed-owned-arena-payloads-and-unbounded-growth",
   "general-aggregate-loop-backedge-lowering",
-  "independent-machine-or-attester-reproducibility-proof",
-  "independent-reversible-component-replacement-authorization",
+  "second-independent-attester-or-higher-generation-rotation-evidence",
+  "verified-replacement-authorization-consumer-and-signed-rollback-chain",
 ]

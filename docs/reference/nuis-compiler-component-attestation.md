@@ -74,6 +74,13 @@ separately operated machine, not cryptographic proof of physical independence.
 The next evidence step is a second attester or an explicit higher-generation
 key-rotation ceremony.
 
+Replacement permission now has a separate
+[component replacement authorization](nuis-compiler-component-replacement-authorization.md)
+protocol, registry pin, trust scope, identity, and Ed25519 key. Verification
+rejects reuse of the attester identity or key. This does not change the
+attestation claim: its `replacement_authorized` field remains false, and the
+new authorization record does not yet apply a component transition.
+
 ## Validation
 
 ```bash

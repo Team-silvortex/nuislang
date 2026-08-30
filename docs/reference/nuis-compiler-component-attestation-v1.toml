@@ -54,6 +54,14 @@ checked_in_evidence = "docs/evidence/compiler-attestation/linux-amd64-cleanroom/
 checked_in_registry_sha256 = "90b8f7f4c9d336c72caa7dc4dc9a91c41ec263a7bfffa282ee8211088b164f01"
 next_evidence = "second-independent-attester-or-explicit-higher-generation-key-rotation-ceremony"
 
+[downstream_authorization]
+protocol = "nuis-compiler-component-replacement-authorization-v1"
+authority_is_separate = true
+separate_registry_pin = true
+same_identity_rejected = true
+same_public_key_rejected = true
+attestation_replacement_authorized = false
+
 validation_commands = [
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_attestation_commands -j 1 -- --test-threads=1",
@@ -65,5 +73,5 @@ validation_commands = [
 missing = [
   "second-independent-attester-or-higher-generation-key-rotation-evidence",
   "registry-rotation-ceremony-beyond-explicit-new-pin",
-  "reversible-component-replacement-authorization",
+  "verified-authorization-consumer-and-signed-rollback-transition-chain",
 ]

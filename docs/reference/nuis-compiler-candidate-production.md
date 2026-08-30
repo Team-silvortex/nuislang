@@ -220,9 +220,11 @@ compile-cache-bypassed roots by `nuis bootstrap-reproducibility`. The separate
 component-attestation v1 protocol can now bind both v11 proof hashes and the
 exact aggregate to an environment-scoped Ed25519 key under an externally
 pinned trust registry. Repository coverage uses a same-machine test key, so a
-real independently provisioned attester run and reversible replacement
-authorization remain open. A `13/13` report or verified witness is evidence,
-not permission to switch the active compiler.
+real independently provisioned attester run is now checked in. The separate
+replacement-authorization v1 frontdoor composes that evidence with a distinct
+component-owner key and rollback target, but no consumer switches the active
+compiler yet. A `13/13` report or verified witness remains evidence, not
+permission by itself.
 
 ## Validation
 

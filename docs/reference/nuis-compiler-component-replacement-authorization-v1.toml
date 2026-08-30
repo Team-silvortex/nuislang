@@ -1,0 +1,90 @@
+protocol = "nuis-compiler-component-replacement-authorization-v1"
+version = 1
+status = "usable-genesis-transition-authorization"
+scope = "one-attested-compiler-component-candidate-activation"
+manifest_name = "nuis.compiler-component-replacement-authorization.toml"
+authority = "independent-ed25519-component-owner-transition"
+signature_contract = "nuis-compiler-component-replacement-authorization-ed25519-v1"
+authorizer_registry_protocol = "nuis-compiler-component-replacement-authorizer-registry-v1"
+authorizer_trust_scope = "compiler-component-replacement-owner-v1"
+private_key_input = "NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX"
+digest = "sha256-lowercase"
+signature = "ed25519-strict"
+path_policy = "no-physical-paths-or-timestamps-in-authorization"
+action = "activate-candidate"
+generation = 1
+predecessor_authorization_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+reversible = true
+attestation_replacement_authorized = false
+replacement_authorized = true
+verdict = "candidate-activation-authorized-reversible"
+
+frontdoors = [
+  "nuis bootstrap-authorize-component-replacement",
+  "nuis bootstrap-verify-component-replacement",
+]
+
+signed_lineage = [
+  "fresh-replacement-authorization-challenge-sha256",
+  "component-and-authorization-id",
+  "generation-and-genesis-predecessor",
+  "canonical-reproducibility-file-bytes-sha256-and-aggregate",
+  "canonical-attestation-file-bytes-proof-and-challenge",
+  "attester-id-environment-and-public-key-id",
+  "stage0-from-build-candidate-to-build-and-stage0-rollback-build",
+  "candidate-compiler-image-and-native-output",
+  "authorizer-id-environment-and-public-key-id",
+  "attestation-replacement-authorized-false",
+  "replacement-authorized-true",
+]
+
+[authority_separation]
+attester_registry = "nuis-compiler-component-attester-trust-registry-v1"
+attester_scope = "independent-machine-compiler-reproducibility-v1"
+authorizer_registry = "nuis-compiler-component-replacement-authorizer-registry-v1"
+authorizer_scope = "compiler-component-replacement-owner-v1"
+separate_registry_pins = true
+same_identity_rejected = true
+same_public_key_rejected = true
+attester_trust_implies_replacement_authority = false
+component_exact_registry_scope = true
+
+[transition]
+from = "stage0-reproducible-build-sha256"
+to = "candidate-reproducible-build-sha256"
+rollback = "stage0-reproducible-build-sha256"
+from_must_differ_from_to = true
+authorization_applies_transition = false
+authorization_mutates_stage0 = false
+output_creation = "create-new-without-overwrite"
+
+verification_invariants = [
+  "attestation-is-verified-against-its-own-caller-pinned-registry-and-challenge",
+  "authorization-is-verified-against-a-separate-caller-pinned-registry-and-challenge",
+  "both-canonical-source-files-and-all-bound-identities-are-recomputed",
+  "revoked-missing-malformed-or-component-mismatched-authorizer-keys-fail-closed",
+  "challenge-pin-lineage-transition-proof-or-signature-tampering-fails-closed",
+  "the-authorizer-key-and-identity-cannot-equal-the-attester-key-or-identity",
+  "a-valid-record-grants-only-the-signed-genesis-transition-not-general-replacement-power",
+]
+
+[honest_boundary]
+cryptographic_claim = "a-separate-pinned-component-owner-key-authorized-one-exact-reversible-transition"
+does_not_claim = "the-candidate-has-been-activated-or-that-stage0-has-been-mutated"
+repository_test_scope = "real-linux-amd64-attestation-lineage-plus-temporary-local-authorizer-key"
+operational_authorizer_evidence = "not-yet-checked-in"
+next_step = "consume-one-verified-authorization-through-a-reversible-stage-driver-selector"
+
+[open_boundary]
+missing = [
+  "authorization-consumer-and-active-component-state-record",
+  "signed-generation-two-rollback-or-forward-transition-chain",
+  "checked-in-independent-component-owner-authorization-evidence",
+  "multi-component-and-threshold-authorizer-policy",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_replacement_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1",
+]

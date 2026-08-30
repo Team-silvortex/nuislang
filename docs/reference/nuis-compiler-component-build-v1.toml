@@ -99,6 +99,6 @@ validation_commands = [
 status = "first-stage1-leaf-produced"
 missing = [
   "general-stage1-component-production-beyond-identity-projection",
-  "repeated-clean-build-reproducibility-proof",
-  "reversible-component-replacement-authorization",
+  "verified-replacement-authorization-consumer",
+  "active-component-state-and-signed-rollback-transition-chain",
 ]

@@ -32,10 +32,11 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`732/732` passing drift checks. The stage-neutral boundary, stage0/stage1
-driver, reproducibility gate, and compiler data model v9 are all `usable/98`.
-Data model v9 now closes the second registered typed payload proof, so
-deterministic coordinate ordering advances to the stage0/stage1 driver.
+`736/736` passing drift checks. The stage0/stage1 driver is `usable/99`; the
+stage-neutral boundary, reproducibility gate, and compiler data model v9 remain
+`usable/98`. The independently signed genesis replacement boundary closes the
+previous driver task, so deterministic coordinate ordering advances to the
+differential/reproducibility gate.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -104,6 +105,13 @@ challenge or pin. This closes one real Nuis leaf production and remote
 reproducibility loop; physical independence remains an operational fact and
 the compiler is not yet self-hosted.
 
+The separate `bootstrap-authorize-component-replacement` and
+`bootstrap-verify-component-replacement` frontdoors require a second
+component-scoped registry pin, challenge, identity, and Ed25519 key. They reject
+attester identity or key reuse and bind one generation-one stage0-to-candidate
+transition with stage0 retained as rollback. The signed record grants exact
+permission but does not yet switch active compiler state.
+
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
 admission replay, atomic publication, and ordinary final-output selection. The
@@ -122,10 +130,9 @@ structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candid
 execution proof, paged compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
 routes mainline work to paged compiler payload storage. The v11 production
-lineage now has a challenge-bound Ed25519 attester protocol; one separately
-provisioned machine still needs to exercise it.
-Broader compiler-data paging,
-reversible replacement authorization, Galaxy
+lineage now has checked-in challenge-bound Ed25519 attester evidence and a
+separate genesis replacement-authorization protocol. Authorization consumption,
+a signed rollback chain, broader compiler-data paging, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 
@@ -144,6 +151,7 @@ Start with these documents:
 * [Compiler candidate production](docs/reference/nuis-compiler-candidate-production.md)
 * [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
 * [Compiler component reproducibility](docs/reference/nuis-compiler-component-reproducibility.md)
+* [Compiler component replacement authorization](docs/reference/nuis-compiler-component-replacement-authorization.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
 * [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)

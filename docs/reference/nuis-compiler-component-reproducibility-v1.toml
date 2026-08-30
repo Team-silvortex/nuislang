@@ -17,6 +17,8 @@ aggregate_verdict = "reproducible-equivalent-awaiting-authorization"
 digest = "sha256-lowercase"
 path_policy = "no-physical-paths-or-timestamps-in-aggregate"
 replacement_authorized = false
+attestation_successor_protocol = "nuis-compiler-component-attestation-v1"
+authorization_successor_protocol = "nuis-compiler-component-replacement-authorization-v1"
 
 stable_cross_run_identities = [
   "stage0-reproducible-build-sha256",
@@ -56,7 +58,7 @@ validation_commands = [
 
 [open_boundary]
 missing = [
-  "independent-machine-or-attester-trust",
-  "non-identity-nuis-stage-transformation",
-  "reversible-component-replacement-authorization",
+  "second-independent-attester-or-higher-generation-rotation-evidence",
+  "verified-authorization-consumer-and-active-component-state",
+  "signed-generation-two-rollback-transition-chain",
 ]

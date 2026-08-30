@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 
+use crate::bootstrap_component_replacement::{
+    BootstrapComponentReplacementInput, BootstrapComponentReplacementVerificationInput,
+};
+
 mod galaxy;
 mod support;
 
@@ -55,6 +59,8 @@ pub enum CommandKind {
         registry_sha256: String,
         challenge_sha256: String,
     },
+    BootstrapAuthorizeComponentReplacement(BootstrapComponentReplacementInput),
+    BootstrapVerifyComponentReplacement(BootstrapComponentReplacementVerificationInput),
     BootstrapDiff {
         stage0_record: PathBuf,
         candidate_record: PathBuf,
@@ -341,6 +347,68 @@ where
                 challenge_sha256,
             })
         }
+        "bootstrap-authorize-component-replacement" => {
+            let usage = "usage: nuis bootstrap-authorize-component-replacement <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <authorizer-id> <environment-id> <authorization-id> <output>";
+            let aggregate = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attestation = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attester_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attester_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let attestation_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorizer_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let authorizer_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorization_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorizer_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let environment_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorization_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let output = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapAuthorizeComponentReplacement(
+                BootstrapComponentReplacementInput {
+                aggregate,
+                attestation,
+                attester_registry,
+                attester_registry_sha256,
+                attestation_challenge_sha256,
+                authorizer_registry,
+                authorizer_registry_sha256,
+                authorization_challenge_sha256,
+                authorizer_id,
+                environment_id,
+                authorization_id,
+                output,
+                },
+            ))
+        }
+        "bootstrap-verify-component-replacement" => {
+            let usage = "usage: nuis bootstrap-verify-component-replacement <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256>";
+            let aggregate = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attestation = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attester_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attester_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let attestation_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorization = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let authorizer_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let authorizer_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorization_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapVerifyComponentReplacement(
+                BootstrapComponentReplacementVerificationInput {
+                aggregate,
+                attestation,
+                attester_registry,
+                attester_registry_sha256,
+                attestation_challenge_sha256,
+                authorization,
+                authorizer_registry,
+                authorizer_registry_sha256,
+                authorization_challenge_sha256,
+                },
+            ))
+        }
         "bootstrap-diff" => {
             let usage = "usage: nuis bootstrap-diff <stage0-record> <candidate-record> <report>";
             let stage0_record = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
@@ -614,7 +682,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

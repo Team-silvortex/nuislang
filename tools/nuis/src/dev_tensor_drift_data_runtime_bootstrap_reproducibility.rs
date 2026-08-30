@@ -270,6 +270,57 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-replacement-authorization-contract",
+        path: "docs/reference/nuis-compiler-component-replacement-authorization-v1.toml",
+        required_patterns: &[
+            "nuis-compiler-component-replacement-authorization-v1",
+            "independent-ed25519-component-owner-transition",
+            "nuis-compiler-component-replacement-authorizer-registry-v1",
+            "same_identity_rejected = true",
+            "same_public_key_rejected = true",
+            "authorization_applies_transition = false",
+            "replacement_authorized = true",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-replacement-authorization-artifact",
+        path: "crates/nuis-artifact/src/compiler_component_replacement.rs",
+        required_patterns: &[
+            "COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_PROTOCOL",
+            "build_compiler_component_replacement_authorization",
+            "verify_compiler_component_replacement_authorization",
+            "rollback_reproducible_build_sha256",
+            "authorizer_public_key_id == authorization.attester_public_key_id",
+            "resolve_replacement_authorizer_key",
+            "replacement_authorized: true",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-replacement-authorizer-registry-artifact",
+        path: "crates/nuis-artifact/src/compiler_component_replacement_registry.rs",
+        required_patterns: &[
+            "COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_REGISTRY_PROTOCOL",
+            "compiler-component-replacement-owner-v1",
+            "build_compiler_component_replacement_authorizer_registry",
+            "compiler_component_replacement_authorizer_registry_sha256",
+            "resolve_replacement_authorizer_key",
+            "revoked in the pinned registry",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-replacement-frontdoor-regression",
+        path: "tools/nuis/tests/compiler_remote_attestation_evidence.rs",
+        required_patterns: &[
+            "bootstrap-authorize-component-replacement",
+            "NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX",
+            "bootstrap component replacement: authorized",
+            "bootstrap-verify-component-replacement",
+            "bootstrap component replacement: verified",
+            "attestation_replacement_authorized",
+            "verifier request",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-try-expansion-compilation-local-counter",
         path: "tools/nuisc/src/frontend/stmt_lowering_try.rs",
         required_patterns: &[
@@ -426,10 +477,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
         path: "docs/reference/nuis-development-tensor.md",
         required_patterns: &[
             "stage-neutral boundary to `usable/98`",
-            "stage0/stage1 driver at `usable/98`",
+            "stage0/stage1 driver to `usable/99`",
             "Data model v9 reaches `usable/98`",
             "twenty-byte `CompilerAggregateArena`",
-            "deterministic coordinate ordering advances to `compiler-toolchain/bootstrap/stage0-stage1-driver`",
+            "deterministic coordinate ordering advances to `developer-system/bootstrap/differential-reproducibility-gate`",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -10,11 +10,12 @@ candidate_role = "stage1-candidate"
 producer_policy = "distinct-producer-identities"
 digest = "sha256-lowercase"
 replacement_authorized = false
-candidate_production_protocol = "nuis-compiler-candidate-production-v9"
+candidate_production_protocol = "nuis-compiler-candidate-production-v11"
 stage_semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
 candidate_production_required_by_path_frontdoor = true
 reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
 reproducibility_frontdoor = "nuis bootstrap-reproducibility"
+authorization_successor_protocol = "nuis-compiler-component-replacement-authorization-v1"
 
 ordered_comparisons = [
   "component-id",
@@ -54,7 +55,7 @@ invariants = [
 
 [open_boundary]
 missing = [
-  "non-identity-nuis-stage-transformation",
-  "independent-machine-or-attester-reproducibility-proof",
-  "reversible-component-replacement-authorization",
+  "symmetric-comparison-consuming-selected-reversible-v2-evidence",
+  "second-independent-attester-or-higher-generation-rotation-evidence",
+  "verified-authorization-consumer-and-signed-rollback-chain",
 ]

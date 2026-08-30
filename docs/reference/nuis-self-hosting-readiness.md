@@ -170,7 +170,7 @@ without stage-specific selection logic or replacement authority. See
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `usable/98`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `usable/99`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -214,6 +214,15 @@ the exact signed aggregate, and registry pin `90b8f7f4c9d336c72caa7dc4dc9a91c41e
 Its private key remained on the attester; repository tests verify the real
 claim and reject a wrong challenge or registry pin.
 
+`nuis-compiler-component-replacement-authorization-v1` now adds a deliberately
+separate component-owner authority. Its two frontdoors re-verify that false-
+authority attestation, require another caller-pinned component-scoped registry
+and fresh challenge, reject reuse of the attester identity or public key, and
+sign one generation-one stage0-to-candidate transition with stage0 retained as
+the rollback target. The authorization is written without replacement and
+does not itself switch the active compiler. See
+[Nuis Compiler Component Replacement Authorization](nuis-compiler-component-replacement-authorization.md).
+
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
 node/resource and edge membership indexes, and compiles SHA-256 proof hashing
@@ -231,7 +240,7 @@ and shim outputs remained byte-identical and native exit remained `130`.
 Recursive async helpers now enter their precompiled direct-call path before
 unsupported inline recursion is rejected. This is implementation evidence only:
 it does not freeze the aggregate ABI, relax semantic, canonical, hash, disk-read,
-or YIR verification, or advance the gate beyond `usable/98`.
+or YIR verification, or advance the gate beyond `usable/99`.
 
 ### `differential-reproducibility-gate`
 
@@ -261,8 +270,9 @@ generation-one Linux amd64 claim is checked in and verified without its private
 key. Claim, signature, registry, challenge, or lineage tampering fails closed.
 The thirteen current
 comparisons still require byte-identical canonical v1 stage payloads even
-though v2 selects the derived record beside them. Widening comparison semantics
-and separate reversible replacement authorization remain open. Cryptography
+though v2 selects the derived record beside them. Widening comparison semantics,
+consuming the separately signed genesis authorization, and producing a signed
+rollback transition chain remain open. Cryptography
 does not prove physical-machine independence; that remains an operational
 provisioning fact.
 

@@ -8,6 +8,8 @@ mod compiler_component_attestation;
 mod compiler_component_attestation_registry;
 mod compiler_component_build;
 mod compiler_component_diff;
+mod compiler_component_replacement;
+mod compiler_component_replacement_registry;
 mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
@@ -99,6 +101,33 @@ pub use compiler_component_diff::{
     CompilerComponentDifferential, CompilerComponentEvidence, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_DIFFERENTIAL_GATE_CONTRACT, COMPILER_COMPONENT_DIFFERENTIAL_PROTOCOL,
     COMPILER_COMPONENT_REPLACEMENT_AUTHORITY_CONTRACT,
+};
+pub use compiler_component_replacement::{
+    build_compiler_component_replacement_authorization,
+    parse_compiler_component_replacement_authorization,
+    parse_compiler_component_replacement_authorization_from_source,
+    render_compiler_component_replacement_authorization,
+    verify_compiler_component_replacement_authorization, CompilerComponentReplacementAuthorization,
+    CompilerComponentReplacementAuthorizationInput, CompilerComponentReplacementVerificationInput,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_ACTION,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_AUTHORITY,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_FILE,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_PROTOCOL,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_SIGNATURE_CONTRACT,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZATION_VERDICT,
+};
+pub use compiler_component_replacement_registry::{
+    build_compiler_component_replacement_authorizer_registry,
+    compiler_component_replacement_authorizer_public_key_id,
+    compiler_component_replacement_authorizer_registry_sha256,
+    parse_compiler_component_replacement_authorizer_registry,
+    parse_compiler_component_replacement_authorizer_registry_from_source,
+    render_compiler_component_replacement_authorizer_registry,
+    CompilerComponentReplacementAuthorizerEntry, CompilerComponentReplacementAuthorizerEntryInput,
+    CompilerComponentReplacementAuthorizerRegistry,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_REGISTRY_FILE,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_REGISTRY_PROTOCOL,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORIZER_TRUST_SCOPE,
 };
 pub use compiler_component_reproducibility::{
     build_compiler_component_reproducibility, build_compiler_component_reproducibility_from_paths,

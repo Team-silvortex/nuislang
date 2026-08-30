@@ -79,6 +79,12 @@ a fresh challenge, strict Ed25519 signature, environment-scoped attester key,
 and caller-owned trust-registry SHA-256 pin. The attestation remains a separate
 artifact and preserves `replacement_authorized = false`.
 
+The downstream
+[replacement authorization v1](nuis-compiler-component-replacement-authorization.md)
+frontdoors now consume this unchanged aggregate and attestation through a
+second pinned registry and distinct component-owner key. Authorization does
+not mutate this report or retroactively grant authority to its attester.
+
 ## Honest Boundary
 
 V1 proves two fresh compiler productions under one local frontdoor. Handoff v2
@@ -88,13 +94,14 @@ boundary. The repository now retains one separately operated Linux amd64
 attester generation with two cache-bypassed `13/13` runs, an exact registry
 pin, and a no-private-key verification regression. Cryptography still cannot
 prove physical-machine independence, and reversible replacement authorization
-remains open.
+consumption plus a signed rollback chain remain open.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1
