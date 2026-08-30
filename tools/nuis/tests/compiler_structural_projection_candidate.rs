@@ -60,7 +60,7 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     );
     assert_eq!(
         candidate.producer_id,
-        "nuis-stage1-paginated-token-derived-nir-producer-v9"
+        "nuis-stage1-compact-structured-nir-producer-v10"
     );
     assert_ne!(candidate.producer_id, stage0.producer_id);
     assert_eq!(candidate.compiler_image_sha256, stage0.native_binary_sha256);
@@ -132,10 +132,21 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert_eq!(transformations.records[0].output_words[3], 754_343_074);
     assert_eq!(transformations.records[0].output_words[12], 146_705_724_977);
     assert_eq!(transformations.records[0].output_words[13], 38_998_897);
-    assert!(transformations.records[0].output_payload_bytes > payloads[3].bytes.len());
-    assert!(candidate_dir
-        .join(&transformations.records[0].output_payload_file)
-        .is_file());
+    let derived_payload_path = candidate_dir.join(&transformations.records[0].output_payload_file);
+    let derived_payload = fs::read(&derived_payload_path).expect("read compact derived payload");
+    let legacy_v2_bytes = 8
+        + 3 * std::mem::size_of::<u64>()
+        + 22 * std::mem::size_of::<u64>()
+        + payloads[3].bytes.len();
+    assert_eq!(
+        transformations.records[0].output_payload_bytes,
+        derived_payload.len()
+    );
+    assert!(derived_payload.len() < payloads[3].bytes.len());
+    assert!(derived_payload.len() < legacy_v2_bytes);
+    assert!(!derived_payload
+        .windows(payloads[3].bytes.len())
+        .any(|window| window == payloads[3].bytes));
     let semantic_differential = read_compiler_stage_semantic_differential(
         &candidate_dir.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE),
         &CompilerStageSemanticDifferentialInput {

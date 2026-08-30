@@ -1,0 +1,112 @@
+protocol = "nuis-compiler-stage-transformation-v3"
+version = 3
+predecessor = "nuis-compiler-stage-transformation-v2"
+status = "usable-compact-structured-derived-stage-payload"
+scope = "versioned-stage-transformation-registry"
+manifest_name = "nuis.compiler-stage-transformations.toml"
+producer_contract = "nuis-compiler-stage-transformation-producer-v3"
+authority = "stage1-compact-structured-transformation-evidence-no-replacement"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+record_order = "ordinal-then-unique-source-stage"
+replacement_authorized = false
+
+current_transform_contract = "nuis-compiler-structured-record-codec-v1"
+current_source_stage = "nir"
+output_encoding = "nuis-derived-structural-records-v2"
+output_file_pattern = "nuis.compiler-stage-transformation.<ordinal>.bin"
+output_word_count = 22
+projection_kind_tag = 2
+page_count = 2
+integer_encoding = "canonical-unsigned-leb128"
+
+binary_layout = [
+  "magic:NSCSTG02:8-bytes",
+  "projection-kind-tag:canonical-uleb128",
+  "reconstructed-source-byte-count:canonical-uleb128",
+  "checkpoint-word-count:canonical-uleb128",
+  "structural-record-count:canonical-uleb128",
+  "ordered-checkpoint-words:22*canonical-uleb128",
+  "ordered-structural-records:variable",
+]
+
+structural_record_layout = [
+  "packed-depth-and-kind:canonical-uleb128",
+  "body-byte-count:canonical-uleb128",
+  "body:utf8-record-body-bytes-without-line-feed",
+]
+record_kind_bits = 4
+record_kind_tags = [
+  "0:module-documentation",
+  "1:import",
+  "2:module-header",
+  "3:item",
+  "4:member",
+  "5:nested",
+  "6:documentation",
+  "7:opaque-body",
+  "8:opaque-terminator",
+]
+complete_source_blob_embedded = false
+ordinary_record_indentation = "reconstructed-from-depth-as-two-space-levels"
+opaque_record_framing = "retained-in-body-with-depth-zero"
+
+ordered_checkpoint_words = [
+  "projection-kind-tag",
+  "page-count",
+  "first-page-identity",
+  "first-cursor-identity",
+  "first-cursor-lane-0-through-7",
+  "continuation-page-identity",
+  "continuation-cursor-identity",
+  "continuation-cursor-lane-0-through-7",
+]
+
+bound_inputs = [
+  "candidate-producer-id",
+  "producer-neutral-stage-handoff-bundle-sha256",
+  "source-stage-payload-length-and-sha256",
+  "transform-contract-and-output-encoding",
+  "ordered-checkpoint-word-count-and-sha256",
+  "canonical-derived-payload-file-length-and-sha256",
+  "all-ordered-checkpoint-words",
+  "manifest-proof-sha256",
+  "no-replacement-authority",
+]
+
+verification = [
+  "parse-canonical-manifest",
+  "rebind-producer-stage-handoff-and-source-payload",
+  "reject-truncated-overflowing-or-noncanonical-uleb128",
+  "reject-unknown-record-kind-or-trailing-bytes",
+  "reconstruct-two-space-indentation-and-one-lf-per-record",
+  "reparse-and-compare-every-record-ordinal-depth-kind-and-body",
+  "independently-replay-the-two-page-structural-state",
+  "decode-and-compare-all-twenty-two-checkpoint-words",
+  "recover-and-compare-the-complete-source-payload",
+  "reject-symlink-header-length-hash-record-word-payload-or-proof-drift",
+]
+
+[compaction_evidence]
+legacy_v2_fixed_header_and_checkpoint_bytes = 208
+v3_complete_source_blob_is_not_contiguous = true
+v3_fixture_is_smaller_than_v2_fixture = true
+semantic_comparison_count = 1
+
+[current_nir_payload]
+first_page_identity = 132469386887
+first_cursor_identity = 754343074
+continuation_page_identity = 146705724977
+continuation_cursor_identity = 38998897
+candidate_producer = "nuis-stage1-compact-structured-nir-producer-v10"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v8"
+semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
+production_protocol = "nuis-compiler-candidate-production-v10"
+
+[open_boundary]
+missing = [
+  "third-and-later-structural-pages",
+  "producer-neutral-stage-handoff-v2-with-derived-stage-selection",
+  "independent-machine-or-attester-proof",
+  "reversible-replacement-authorization",
+]

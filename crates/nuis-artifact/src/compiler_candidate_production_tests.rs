@@ -18,7 +18,7 @@ use crate::{
     CompilerStageTransformationRecordInput, CompilerStageTransformations,
     CompilerStageTransformationsInput, VerifiedCompilerStagePayload,
     COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-    COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
     COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
@@ -127,7 +127,7 @@ fn evidence() -> Evidence {
     })
     .expect("build execution proof");
     let candidate_handoff = build_compiler_stage_handoff(
-        "nuis-stage1-paginated-token-derived-nir-producer-v9",
+        "nuis-stage1-compact-structured-nir-producer-v10",
         "cpu",
         "Main",
         &stage0_inputs,
@@ -136,7 +136,7 @@ fn evidence() -> Evidence {
     let candidate =
         promote_compiler_component_candidate(&CompilerComponentCandidatePromotionInput {
             stage0: &stage0,
-            producer_id: "nuis-stage1-paginated-token-derived-nir-producer-v9",
+            producer_id: "nuis-stage1-compact-structured-nir-producer-v10",
             compiler_image: b"nuis-candidate-image",
             stage_handoff_bundle_sha256: &candidate_handoff.bundle_sha256,
         })
@@ -167,7 +167,7 @@ fn evidence() -> Evidence {
         compiler_stage_structural_checkpoint_words(CompilerProjectionKind::Nir, nir_pages);
     let transformation_records = [CompilerStageTransformationRecordInput {
         source_stage: CompilerStageKind::Nir,
-        transform_contract: COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+        transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
         output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
         output_words: &nir_words,
     }];

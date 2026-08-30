@@ -10,13 +10,14 @@ use super::{
     CompilerStageTransformations, COMPILER_STAGE_CHECKPOINT_WORD_COUNT,
 };
 use crate::{
-    ArtifactError, CompilerProjectionKind, CompilerStageKind, VerifiedCompilerStagePayload,
+    parse_compiler_structural_projection, render_compiler_structural_projection, ArtifactError,
+    CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
+    VerifiedCompilerStagePayload,
 };
 
-const DERIVED_PAYLOAD_MAGIC: &[u8; 8] = b"NSCSTG01";
-const DERIVED_PAYLOAD_HEADER_WORDS: usize = 3;
-const DERIVED_PAYLOAD_HEADER_BYTES: usize =
-    DERIVED_PAYLOAD_MAGIC.len() + DERIVED_PAYLOAD_HEADER_WORDS * size_of::<u64>();
+const DERIVED_PAYLOAD_MAGIC: &[u8; 8] = b"NSCSTG02";
+const RECORD_KIND_BITS: usize = 4;
+const RECORD_KIND_MASK: usize = (1 << RECORD_KIND_BITS) - 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DecodedCompilerStageTransformationPayload {
@@ -33,7 +34,8 @@ pub(crate) fn encode_payload(
     source_payload: &[u8],
     checkpoint_words: &[usize],
 ) -> Result<Vec<u8>, ArtifactError> {
-    let kind_tag = projection_kind_tag(stage)?;
+    let kind = projection_kind(stage)?;
+    let kind_tag = compiler_projection_checkpoint_kind_tag(kind);
     if checkpoint_words.len() != COMPILER_STAGE_CHECKPOINT_WORD_COUNT
         || checkpoint_words.first().copied() != Some(kind_tag)
     {
@@ -42,27 +44,28 @@ pub(crate) fn encode_payload(
             stage.as_str()
         )));
     }
-    let source_len = u64::try_from(source_payload.len()).map_err(|_| {
-        ArtifactError::new("compiler stage derived source payload length exceeds u64")
-    })?;
-    let word_count = u64::try_from(checkpoint_words.len())
-        .map_err(|_| ArtifactError::new("compiler stage derived checkpoint length exceeds u64"))?;
-    let capacity = DERIVED_PAYLOAD_HEADER_BYTES
-        .checked_add(checkpoint_words.len() * size_of::<u64>())
-        .and_then(|bytes| bytes.checked_add(source_payload.len()))
-        .ok_or_else(|| ArtifactError::new("compiler stage derived payload length overflow"))?;
-    let mut out = Vec::with_capacity(capacity);
+    let source = std::str::from_utf8(source_payload)
+        .map_err(|_| ArtifactError::new("compiler stage derived source payload is not UTF-8"))?;
+    let projection = parse_compiler_structural_projection(kind, source)?;
+    let mut out = Vec::with_capacity(source_payload.len());
     out.extend_from_slice(DERIVED_PAYLOAD_MAGIC);
-    out.extend_from_slice(&(kind_tag as u64).to_le_bytes());
-    out.extend_from_slice(&source_len.to_le_bytes());
-    out.extend_from_slice(&word_count.to_le_bytes());
+    push_varint(&mut out, kind_tag);
+    push_varint(&mut out, source_payload.len());
+    push_varint(&mut out, checkpoint_words.len());
+    push_varint(&mut out, projection.records.len());
     for word in checkpoint_words {
-        let word = u64::try_from(*word).map_err(|_| {
-            ArtifactError::new("compiler stage derived checkpoint word exceeds u64")
-        })?;
-        out.extend_from_slice(&word.to_le_bytes());
+        push_varint(&mut out, *word);
     }
-    out.extend_from_slice(source_payload);
+    for record in &projection.records {
+        let packed = record
+            .depth
+            .checked_mul(1 << RECORD_KIND_BITS)
+            .and_then(|value| value.checked_add(record_kind_tag(record.kind)))
+            .ok_or_else(|| ArtifactError::new("compiler stage derived record depth overflow"))?;
+        push_varint(&mut out, packed);
+        push_varint(&mut out, record.body.len());
+        out.extend_from_slice(record.body.as_bytes());
+    }
     Ok(out)
 }
 
@@ -70,7 +73,7 @@ pub(crate) fn decode_payload(
     stage: CompilerStageKind,
     bytes: &[u8],
 ) -> Result<DecodedCompilerStageTransformationPayload, ArtifactError> {
-    if bytes.len() < DERIVED_PAYLOAD_HEADER_BYTES
+    if bytes.len() < DERIVED_PAYLOAD_MAGIC.len()
         || &bytes[..DERIVED_PAYLOAD_MAGIC.len()] != DERIVED_PAYLOAD_MAGIC
     {
         return Err(ArtifactError::new(format!(
@@ -78,48 +81,114 @@ pub(crate) fn decode_payload(
             stage.as_str()
         )));
     }
-    let kind_tag = read_u64(bytes, DERIVED_PAYLOAD_MAGIC.len())?;
-    if kind_tag != projection_kind_tag(stage)? as u64 {
+    let kind = projection_kind(stage)?;
+    let mut cursor = DERIVED_PAYLOAD_MAGIC.len();
+    let kind_tag = read_varint(bytes, &mut cursor, "projection kind")?;
+    if kind_tag != compiler_projection_checkpoint_kind_tag(kind) {
         return Err(ArtifactError::new(format!(
             "compiler stage `{}` derived payload kind tag mismatch",
             stage.as_str()
         )));
     }
-    let source_len = usize::try_from(read_u64(bytes, DERIVED_PAYLOAD_MAGIC.len() + 8)?)
-        .map_err(|_| ArtifactError::new("compiler stage derived source length exceeds usize"))?;
-    let word_count = usize::try_from(read_u64(bytes, DERIVED_PAYLOAD_MAGIC.len() + 16)?)
-        .map_err(|_| ArtifactError::new("compiler stage derived word count exceeds usize"))?;
+    let source_len = read_varint(bytes, &mut cursor, "source length")?;
+    let word_count = read_varint(bytes, &mut cursor, "checkpoint count")?;
     if word_count != COMPILER_STAGE_CHECKPOINT_WORD_COUNT {
         return Err(ArtifactError::new(format!(
             "compiler stage `{}` derived payload checkpoint count mismatch",
             stage.as_str()
         )));
     }
-    let checkpoint_bytes = word_count
-        .checked_mul(size_of::<u64>())
-        .ok_or_else(|| ArtifactError::new("compiler stage derived checkpoint length overflow"))?;
-    let payload_offset = DERIVED_PAYLOAD_HEADER_BYTES
-        .checked_add(checkpoint_bytes)
-        .ok_or_else(|| ArtifactError::new("compiler stage derived payload offset overflow"))?;
-    let expected_len = payload_offset
-        .checked_add(source_len)
-        .ok_or_else(|| ArtifactError::new("compiler stage derived payload length overflow"))?;
-    if bytes.len() != expected_len {
+    let record_count = read_varint(bytes, &mut cursor, "record count")?;
+    if source_len == 0 || record_count == 0 {
+        return Err(ArtifactError::new(
+            "compiler stage derived record count is invalid",
+        ));
+    }
+    let mut checkpoint_words = Vec::with_capacity(word_count);
+    for _ in 0..word_count {
+        checkpoint_words.push(read_varint(bytes, &mut cursor, "checkpoint word")?);
+    }
+    if checkpoint_words.first().copied() != Some(kind_tag) {
+        return Err(ArtifactError::new(
+            "compiler stage derived checkpoint kind mismatch",
+        ));
+    }
+    let minimum_source_bytes = record_count
+        .checked_mul(2)
+        .ok_or_else(|| ArtifactError::new("compiler stage derived record count overflow"))?;
+    let minimum_encoded_bytes = record_count
+        .checked_mul(3)
+        .ok_or_else(|| ArtifactError::new("compiler stage derived record count overflow"))?;
+    if minimum_source_bytes > source_len
+        || minimum_encoded_bytes > bytes.len().saturating_sub(cursor)
+    {
+        return Err(ArtifactError::new(
+            "compiler stage derived record count is invalid",
+        ));
+    }
+    let mut encoded_records = Vec::with_capacity(record_count);
+    let mut source_payload = String::new();
+    for ordinal in 0..record_count {
+        let packed = read_varint(bytes, &mut cursor, "record shape")?;
+        let depth = packed >> RECORD_KIND_BITS;
+        let record_kind = parse_record_kind(packed & RECORD_KIND_MASK)?;
+        let body_len = read_varint(bytes, &mut cursor, "record body length")?;
+        let body_start = cursor;
+        let body_end = cursor
+            .checked_add(body_len)
+            .ok_or_else(|| ArtifactError::new("compiler stage derived body length overflow"))?;
+        let body_bytes = bytes
+            .get(cursor..body_end)
+            .ok_or_else(|| ArtifactError::new("compiler stage derived record body is truncated"))?;
+        let body = std::str::from_utf8(body_bytes)
+            .map_err(|_| ArtifactError::new("compiler stage derived record body is not UTF-8"))?;
+        cursor = body_end;
+        let indentation = depth
+            .checked_mul(2)
+            .ok_or_else(|| ArtifactError::new("compiler stage derived indentation overflow"))?;
+        let reconstructed_len = source_payload
+            .len()
+            .checked_add(indentation)
+            .and_then(|value| value.checked_add(body_len))
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| ArtifactError::new("compiler stage derived source length overflow"))?;
+        if reconstructed_len > source_len {
+            return Err(ArtifactError::new(
+                "compiler stage derived source length mismatch",
+            ));
+        }
+        for _ in 0..indentation {
+            source_payload.push(' ');
+        }
+        source_payload.push_str(body);
+        source_payload.push('\n');
+        encoded_records.push((ordinal, depth, record_kind, body_start, body_end));
+    }
+    if cursor != bytes.len() || source_payload.len() != source_len {
         return Err(ArtifactError::new(format!(
             "compiler stage `{}` derived payload length mismatch",
             stage.as_str()
         )));
     }
-    let mut checkpoint_words = Vec::with_capacity(word_count);
-    for index in 0..word_count {
-        let offset = DERIVED_PAYLOAD_HEADER_BYTES + index * size_of::<u64>();
-        checkpoint_words.push(usize::try_from(read_u64(bytes, offset)?).map_err(|_| {
-            ArtifactError::new("compiler stage derived checkpoint word exceeds usize")
-        })?);
+    let projection = parse_compiler_structural_projection(kind, &source_payload)?;
+    if render_compiler_structural_projection(&projection) != source_payload
+        || projection.records.len() != encoded_records.len()
+        || projection.records.iter().zip(&encoded_records).any(
+            |(record, (ordinal, depth, record_kind, body_start, body_end))| {
+                record.ordinal != *ordinal
+                    || record.depth != *depth
+                    || record.kind != *record_kind
+                    || record.body.as_bytes() != &bytes[*body_start..*body_end]
+            },
+        )
+    {
+        return Err(ArtifactError::new(
+            "compiler stage derived structural record metadata mismatch",
+        ));
     }
     Ok(DecodedCompilerStageTransformationPayload {
         checkpoint_words,
-        source_payload: bytes[payload_offset..].to_vec(),
+        source_payload: source_payload.into_bytes(),
     })
 }
 
@@ -198,8 +267,8 @@ pub(crate) fn validate_output_identity(
     Ok(())
 }
 
-fn projection_kind_tag(stage: CompilerStageKind) -> Result<usize, ArtifactError> {
-    let kind = match stage {
+fn projection_kind(stage: CompilerStageKind) -> Result<CompilerProjectionKind, ArtifactError> {
+    Ok(match stage {
         CompilerStageKind::Ast => CompilerProjectionKind::Ast,
         CompilerStageKind::Nir => CompilerProjectionKind::Nir,
         _ => {
@@ -208,20 +277,84 @@ fn projection_kind_tag(stage: CompilerStageKind) -> Result<usize, ArtifactError>
                 stage.as_str()
             )))
         }
-    };
-    Ok(compiler_projection_checkpoint_kind_tag(kind))
+    })
 }
 
-fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, ArtifactError> {
-    let end = offset
-        .checked_add(size_of::<u64>())
-        .ok_or_else(|| ArtifactError::new("compiler stage derived payload offset overflow"))?;
-    let word = bytes
-        .get(offset..end)
-        .ok_or_else(|| ArtifactError::new("compiler stage derived payload is truncated"))?;
-    Ok(u64::from_le_bytes(
-        word.try_into().expect("u64 slice length is checked"),
-    ))
+fn record_kind_tag(kind: CompilerProjectionRecordKind) -> usize {
+    match kind {
+        CompilerProjectionRecordKind::ModuleDocumentation => 0,
+        CompilerProjectionRecordKind::Import => 1,
+        CompilerProjectionRecordKind::ModuleHeader => 2,
+        CompilerProjectionRecordKind::Item => 3,
+        CompilerProjectionRecordKind::Member => 4,
+        CompilerProjectionRecordKind::Nested => 5,
+        CompilerProjectionRecordKind::Documentation => 6,
+        CompilerProjectionRecordKind::OpaqueBody => 7,
+        CompilerProjectionRecordKind::OpaqueTerminator => 8,
+    }
+}
+
+fn parse_record_kind(tag: usize) -> Result<CompilerProjectionRecordKind, ArtifactError> {
+    match tag {
+        0 => Ok(CompilerProjectionRecordKind::ModuleDocumentation),
+        1 => Ok(CompilerProjectionRecordKind::Import),
+        2 => Ok(CompilerProjectionRecordKind::ModuleHeader),
+        3 => Ok(CompilerProjectionRecordKind::Item),
+        4 => Ok(CompilerProjectionRecordKind::Member),
+        5 => Ok(CompilerProjectionRecordKind::Nested),
+        6 => Ok(CompilerProjectionRecordKind::Documentation),
+        7 => Ok(CompilerProjectionRecordKind::OpaqueBody),
+        8 => Ok(CompilerProjectionRecordKind::OpaqueTerminator),
+        _ => Err(ArtifactError::new(
+            "compiler stage derived record kind is unsupported",
+        )),
+    }
+}
+
+fn push_varint(out: &mut Vec<u8>, value: usize) {
+    let mut value = value as u64;
+    loop {
+        let byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if value == 0 {
+            out.push(byte);
+            return;
+        }
+        out.push(byte | 0x80);
+    }
+}
+
+fn read_varint(bytes: &[u8], cursor: &mut usize, label: &str) -> Result<usize, ArtifactError> {
+    let start = *cursor;
+    let mut value = 0u64;
+    for index in 0..10 {
+        let byte = *bytes
+            .get(*cursor)
+            .ok_or_else(|| ArtifactError::new("compiler stage derived varint is truncated"))?;
+        *cursor += 1;
+        if index == 9 && byte > 1 {
+            return Err(ArtifactError::new(format!(
+                "compiler stage derived {label} exceeds u64"
+            )));
+        }
+        value |= u64::from(byte & 0x7f) << (index * 7);
+        if byte & 0x80 == 0 {
+            let decoded = usize::try_from(value).map_err(|_| {
+                ArtifactError::new(format!("compiler stage derived {label} exceeds usize"))
+            })?;
+            let mut canonical = Vec::new();
+            push_varint(&mut canonical, decoded);
+            if canonical.len() != *cursor - start {
+                return Err(ArtifactError::new(format!(
+                    "compiler stage derived {label} is not canonically encoded"
+                )));
+            }
+            return Ok(decoded);
+        }
+    }
+    Err(ArtifactError::new(format!(
+        "compiler stage derived {label} varint is unterminated"
+    )))
 }
 
 fn source_payload(

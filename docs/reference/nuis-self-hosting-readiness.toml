@@ -14,48 +14,48 @@ required_before = "beta-0.10.0"
 next_action = "preserve v8 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
 expected_artifact = "nuis-bootstrap-language-subset-v8, nuisc bootstrap-check, twenty-one exact scalar exports, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
-blocker = "none for subset v8; arena storage and aggregate backedge lowering remain independent readiness gates"
+blocker = "none for subset v8; typed arena payloads and aggregate backedge lowering remain independent readiness gates"
 
 [[gates]]
 id = "compiler-data-model"
 coordinate = "standard-library/std/compiler-data-model"
 status = "usable"
-progress = 94
+progress = 95
 required_before = "beta-0.10.0"
-next_action = "add compiler-arena-owned object storage while preserving v5 map order, ownership, and layout invariants"
+next_action = "add typed owned-payload projection over the v6 arena envelope while preserving stable indices and identities"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-data-model-v5 with a stable-order sixteen-entry CompilerMap plus a production candidate that independently binds every token byte, two AST/NIR pages, and a lossless derived NIR payload"
-blocker = "v5 closes deterministic multi-page map growth, replacement, lookup, and ordered identity, but CompilerMap remains i64-specific and bounded, arena object storage is absent, defining-module provenance is incomplete, and general aggregate loop backedges remain open"
+expected_artifact = "nuis-compiler-data-model-v6 with a stable-order sixteen-entry CompilerMap, stable-index sixteen-object arena envelope, and independently bound token and structural pages"
+blocker = "v6 closes bounded arena object storage, checked projection, capacity failure, and ordered identity, but arena payloads remain four i64 slots, collections remain bounded to sixteen, defining-module provenance is incomplete, and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "usable"
-progress = 95
+progress = 96
 required_before = "beta-0.10.0"
-next_action = "replace embedded NIR text with compact structured derived records, then define producer-neutral handoff v2 selection"
+next_action = "define producer-neutral handoff v2 selection for the compact structured derived NIR while preserving reversible authority"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
 expected_artifact = "a compact NIR-derived payload whose independent semantic replay remains comparable beside canonical token and two-page AST/NIR identities"
-blocker = "production now binds a real lossless byte-different payload and 1/1 semantic differential, but the payload embeds source text and the v1 handoff still selects canonical NIR/YIR bytes"
+blocker = "production now binds compact structured records without one complete source blob and proves 1/1 semantic replay, but the v1 handoff still selects canonical NIR/YIR bytes"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
-progress = 95
+progress = 96
 required_before = "beta-0.10.0"
-next_action = "register compact structured NIR-derived records without coupling the driver to one transform contract"
+next_action = "teach a producer-neutral handoff v2 to select a registered derived stage without coupling the driver to one transform contract"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
 expected_artifact = "a compact registry-driven stage payload retaining semantic and production identity across two clean builds without replacement authority"
-blocker = "the driver binds a real derived payload and semantic proof, while handoff v2 selection, independent attester trust, and reversible authorization remain open"
+blocker = "the driver now binds compact derived records and semantic proof across clean builds, while handoff v2 selection, independent attester trust, and reversible authorization remain open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 95
+progress = 96
 required_before = "beta-0.10.0"
-next_action = "extend semantic comparison to compact structured records before adding independent attester evidence"
+next_action = "preserve compact-record semantic replay while adding independent-machine or attester evidence"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
 expected_artifact = "compact non-byte-identical stage records retaining semantic proof and the path-free two-clean-build aggregate without replacement authority"
-blocker = "the gate proves one lossless non-byte-identical representation while the 13 component comparisons still inspect the canonical v1 handoff; independent attester trust and reversible authorization remain open"
+blocker = "the gate proves one compact lossless non-byte-identical representation while the 13 component comparisons still inspect the canonical v1 handoff; independent attester trust and reversible authorization remain open"

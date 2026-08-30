@@ -1,8 +1,10 @@
 # Nuis Compiler Data Model
 
-`nuis-compiler-data-model-v5` is the current compiler-owned data boundary
+`nuis-compiler-data-model-v6` is the current compiler-owned data boundary
 written in Nuis itself. Its machine-readable contract is
-[nuis-compiler-data-model-v5.toml](nuis-compiler-data-model-v5.toml). The
+[nuis-compiler-data-model-v6.toml](nuis-compiler-data-model-v6.toml). The
+deterministic-map predecessor remains frozen in
+[nuis-compiler-data-model-v5.toml](nuis-compiler-data-model-v5.toml), the
 complete-token-pagination predecessor remains frozen in
 [nuis-compiler-data-model-v4.toml](nuis-compiler-data-model-v4.toml), the
 materialized-token predecessor remains frozen in
@@ -22,9 +24,9 @@ Rust, C, libc, FFI, or host-language layouts.
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
 
-## V5 Surface
+## V6 Surface
 
-V5 retains the v4 compiler foundation:
+V6 retains the v5 compiler foundation:
 
 - `CompilerVector` stores up to sixteen `i64` values in four ordered pages.
 - `CompilerText` owns canonical UTF-8 bytes, scalar length, and a deterministic
@@ -46,6 +48,19 @@ map suitable for bootstrap symbol tables:
   key/value pair with a canonical non-negative modular fold.
 - A seventeenth distinct key returns capacity error `1`; malformed column
   shapes return error `3` before lookup, mutation, or identity production.
+
+V6 turns the arena's stable indices into owned compiler object storage:
+
+- `CompilerArena` stores `kind`, `field0`, `field1`, and `field2` in four
+  shape-checked `CompilerVector` columns for up to sixteen objects.
+- A successful store appends all four fields atomically and returns the same
+  index forever; `last_index` is always object count minus one.
+- Kind `0` is reserved for the compatibility allocator. Negative kinds,
+  oversized capacities, malformed columns, and identity requests fail closed.
+- `compiler_arena_object_value` projects one checked index/slot and returns
+  `Option.None` for an absent index or invalid slot.
+- `nuis-compiler-arena-ordered-identity-v1` binds object count and every slot
+  in stable index order using Nuis recursion and canonical signed folding.
 
 V3 added the materialized token boundary:
 
@@ -129,6 +144,12 @@ sixteen entries, rejects a seventeenth distinct key with error `1`, and rejects
 a malformed column shape with error `3`. These checks execute in the native
 binary through ordinary Nuis calls.
 
+It also stores two compiler objects with indices `0` and `1`, reads positive
+and negative fields back through checked projections, and pins ordered arena
+identity `1064756829`. Full capacity, negative kind, invalid index/slot,
+oversized capacity, malformed columns, and malformed identity all fail before
+observable mutation.
+
 The same executable also constructs the first complete materialized page from the real
 candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 21 payload bytes and canonically emits 91 bytes with independently pinned hash
@@ -139,9 +160,10 @@ and hash. Production additionally packs the actual handoff prefix through the
 twenty-one-export subset-v8 scalar ABI, and the artifact layer independently verifies page
 identity `164749511446`. This proves an owned decode/re-emit round trip across
 the fifth and sixth former 16-byte boundaries on a real compiler prefix rather
-than only a synthetic capacity test. Candidate production v9 additionally
-pages the complete real token stream, including records longer than one page,
-and binds its terminal page hash and ordered chain identity.
+than only a synthetic capacity test. Candidate production v10 additionally
+pages the complete real token stream, binds its terminal page hash and ordered
+chain identity, and attests compact structured NIR records beside the data
+model without making host layout part of their identity.
 
 The acceptance chain is:
 
@@ -166,13 +188,14 @@ pins open-record versus completed-record and partial structural-line boundaries.
 
 `StdCompilerProjection` consumes the first AST and NIR structural pages,
 serializes an opaque eight-lane scanner cursor, and resumes both into a second
-page over this foundation. It does not claim that the bounded v5 model parses a
+page over this foundation. It does not claim that the bounded v6 model parses a
 complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
-V5 proves owned token materialization, canonical re-emission, complete
-token-stream pagination, and deterministic multi-page map behavior, but it is not
+V6 proves owned token materialization, canonical re-emission, complete token
+pagination, deterministic multi-page maps, and bounded arena object storage,
+but it is not
 yet an unbounded compiler heap:
 
 - Token storage is limited to four records and 64 payload bytes.
@@ -180,13 +203,14 @@ yet an unbounded compiler heap:
   bytes, and 128 output bytes.
 - `CompilerVector` remains `i64`-specific and bounded to sixteen values.
 - `CompilerMap` remains `i64`-specific and bounded to sixteen entries.
-- `CompilerArena` allocates indices but does not own general object storage.
+- `CompilerArena` remains a sixteen-object, four-`i64` envelope and does not
+  yet own nested `CompilerText` or arbitrary aggregate payloads.
 - Generic helper specialization still needs defining-module provenance.
 - Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
   avoid pretending otherwise.
 
 The readiness gate is therefore not yet `stable/100`. The next mainline step
-is compiler-arena-owned object storage while preserving stable map indices.
+is a typed owned-payload projection over the stable arena envelope.
 Broader structural paging and aggregate
 backedge lowering follow without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,

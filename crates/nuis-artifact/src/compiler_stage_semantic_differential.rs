@@ -18,7 +18,6 @@ use crate::{
     },
     verify_compiler_stage_transformations, ArtifactError, CompilerStageHandoff, CompilerStageKind,
     CompilerStageTransformations, VerifiedCompilerStagePayload,
-    COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 pub const COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_PROTOCOL: &str =
@@ -314,6 +313,7 @@ fn validate_differential(
     }
     let mut stages = BTreeSet::new();
     for (ordinal, comparison) in differential.comparisons.iter().enumerate() {
+        validate_token(&comparison.derived_encoding, "derived encoding")?;
         if comparison.ordinal != ordinal
             || !stages.insert(comparison.source_stage.as_str())
             || !matches!(
@@ -321,11 +321,10 @@ fn validate_differential(
                 CompilerStageKind::Ast | CompilerStageKind::Nir
             )
             || comparison.source_encoding != comparison.source_stage.encoding()
-            || comparison.derived_encoding != COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING
             || comparison.derived_payload_file
                 != compiler_stage_transformation_payload_file(ordinal)
             || comparison.source_payload_bytes == 0
-            || comparison.derived_payload_bytes <= comparison.source_payload_bytes
+            || comparison.derived_payload_bytes == 0
             || comparison.source_payload_sha256 == comparison.derived_payload_sha256
             || comparison.source_payload_sha256 != comparison.recovered_source_payload_sha256
             || comparison.byte_identical

@@ -1,0 +1,101 @@
+protocol = "nuis-compiler-data-model-v6"
+version = 6
+predecessor = "nuis-compiler-data-model-v5"
+status = "usable-owned-arena-object-envelope"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v6"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+candidate_production = "nuis-compiler-candidate-production-v10"
+host_layout_identity = false
+host_ffi_required = false
+utf8_policy = "canonical-unicode-scalar-encoding"
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[arena]
+layout = "stable-index-columnar-four-CompilerVector"
+maximum_objects = 16
+capacity_range = "zero-through-sixteen"
+object_slot_count = 4
+object_slots = ["kind", "field0", "field1", "field2"]
+object_slot_type = "i64"
+reserved_kind = 0
+reserved_kind_semantics = "compatibility-allocation-with-zero-fields"
+storage = "append-object-at-next-stable-index"
+lookup = "shape-checked-index-and-slot-projection"
+shape_validation = "count-capacity-last-index-and-all-column-shapes-agree"
+capacity_error = 1
+invalid_index_or_slot = "Option.None"
+invalid_input_or_shape_error = 3
+identity_contract = "nuis-compiler-arena-ordered-identity-v1"
+identity_seed = 307
+identity_radix = 257
+identity_modulus = 2147483629
+reference_object_count = 2
+reference_identity = 1064756829
+
+arena_operations = [
+  "compiler_arena_shape_valid",
+  "compiler_arena_new",
+  "compiler_arena_store",
+  "compiler_arena_allocate",
+  "compiler_arena_object_value",
+  "compiler_arena_identity_from",
+  "compiler_arena_identity",
+]
+
+arena_invariants = [
+  "capacity-is-explicit-and-does-not-exceed-column-storage",
+  "every-successful-store-appends-one-complete-object-atomically",
+  "indices-never-move-and-last-index-is-count-minus-one",
+  "all-four-columns-have-identical-count-and-page-shape",
+  "kind-zero-is-the-only-compatibility-reservation-shape",
+  "negative-object-kind-fails-before-capacity-or-mutation",
+  "invalid-index-or-slot-returns-Option-None",
+  "identity-binds-count-and-every-object-slot-in-index-order",
+  "negative-i64-fields-have-one-canonical-modular-identity-encoding",
+  "implementation-uses-only-Nuis-vectors-recursion-and-owned-values",
+]
+
+[preserved_map]
+contract = "nuis-compiler-map-ordered-identity-v1"
+maximum_entries = 16
+reference_identity = 415394959
+insertion = "append-new-key-in-stable-order"
+replacement = "update-value-at-original-key-index"
+
+[preserved_token_pagination]
+contract = "nuis-compiler-token-pagination-v1"
+page_bytes = 128
+legacy_first_page_identity = 164749511446
+
+[growth_boundary]
+status = "open"
+next_contract = "compiler-arena-typed-owned-payload-projection"
+remaining = [
+  "CompilerArena-object-envelope-remains-four-i64-slots-and-sixteen-objects",
+  "CompilerArena-does-not-yet-own-nested-CompilerText-or-aggregate-payloads",
+  "CompilerMap-remains-i64-specific-and-bounded-to-sixteen-entries",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+]
+preserve = [
+  "stable-arena-indices",
+  "atomic-columnar-object-storage",
+  "canonical-arena-and-map-identities",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-export-ceiling",
+]

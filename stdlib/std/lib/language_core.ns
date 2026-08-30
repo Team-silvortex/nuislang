@@ -10,82 +10,60 @@ mod cpu StdLanguageCore {
     }
   }
 
-  pub enum Error {
-    InvalidInput,
-  }
+  pub enum Error { InvalidInput, }
 
   pub enum Result<T, E> {
-    Ok(T),
-    Err(E),
+    Ok(T), Err(E),
   }
 
   /// Optional value used by bootstrap-safe compiler collections.
-  pub enum Option<T> {
-    Some(T),
-    None,
-  }
+  pub enum Option<T> { Some(T), None, }
 
   /// Internal four-value page used by the deterministic compiler vector.
   pub struct CompilerVectorPage {
     pub length: i64,
-    pub slot0: i64,
-    pub slot1: i64,
-    pub slot2: i64,
-    pub slot3: i64
+    pub slot0: i64, pub slot1: i64,
+    pub slot2: i64, pub slot3: i64
   }
 
   /// Owned compiler vector with four deterministic four-value pages.
   pub struct CompilerVector {
-    pub length: i64,
-    pub page_count: i64,
-    pub page0: CompilerVectorPage,
-    pub page1: CompilerVectorPage,
-    pub page2: CompilerVectorPage,
-    pub page3: CompilerVectorPage
+    pub length: i64, pub page_count: i64,
+    pub page0: CompilerVectorPage, pub page1: CompilerVectorPage,
+    pub page2: CompilerVectorPage, pub page3: CompilerVectorPage
   }
 
   /// UTF-8 bytes and deterministic identity owned by the compiler component.
   pub struct CompilerText {
-    pub bytes: CompilerVector,
-    pub scalar_length: i64,
-    pub hash: i64
+    pub bytes: CompilerVector, pub scalar_length: i64, pub hash: i64
   }
 
   /// Ordered integer map backed by two deterministic four-page vectors.
   pub struct CompilerMap {
-    pub length: i64,
-    pub keys: CompilerVector,
-    pub values: CompilerVector
+    pub length: i64, pub keys: CompilerVector, pub values: CompilerVector
   }
 
-  /// Monotonic compiler arena represented by stable integer indices.
+  /// Stable-index compiler objects stored in four deterministic columns.
   pub struct CompilerArena {
-    pub capacity: i64,
-    pub next_index: i64,
-    pub last_index: i64
+    pub capacity: i64, pub next_index: i64, pub last_index: i64,
+    pub kinds: CompilerVector, pub field0s: CompilerVector,
+    pub field1s: CompilerVector, pub field2s: CompilerVector
   }
 
   /// Half-open byte range within one compiler-owned source.
   pub struct CompilerSourceSpan {
-    pub source_id: i64,
-    pub start: i64,
-    pub end: i64
+    pub source_id: i64, pub start: i64, pub end: i64
   }
 
   /// Bounded path represented by interned segment identities.
   pub struct CompilerPath {
-    pub absolute: bool,
-    pub segments: CompilerVector,
-    pub hash: i64
+    pub absolute: bool, pub segments: CompilerVector, pub hash: i64
   }
 
   /// Owned compiler diagnostic with no host-language layout in its contract.
   pub struct CompilerDiagnostic {
-    pub code: i64,
-    pub severity: i64,
-    pub message: CompilerText,
-    pub span: CompilerSourceSpan,
-    pub path: CompilerPath
+    pub code: i64, pub severity: i64, pub message: CompilerText,
+    pub span: CompilerSourceSpan, pub path: CompilerPath
   }
 
   pub type Alias<T> = T;
@@ -261,6 +239,14 @@ mod cpu StdLanguageCore {
         && page2_length == 4 && page3_length == length - 12;
     }
     return false;
+  }
+
+  pub fn compiler_vector_valid(vector: CompilerVector) -> bool {
+    return compiler_vector_shape_valid(
+      vector.length, vector.page_count,
+      vector.page0.length, vector.page1.length,
+      vector.page2.length, vector.page3.length
+    );
   }
 
   /// Builds an empty four-page vector using an explicit filler value.
@@ -515,102 +501,49 @@ mod cpu StdLanguageCore {
   /// Builds an empty deterministic compiler map.
   pub fn compiler_map_empty() -> CompilerMap {
     return CompilerMap {
-      length: 0,
-      keys: compiler_vector_empty(0),
-      values: compiler_vector_empty(0)
+      length: 0, keys: compiler_vector_empty(0), values: compiler_vector_empty(0)
     };
   }
-
   /// Rejects mismatched key/value columns and malformed vector pages.
   pub fn compiler_map_shape_valid(map: CompilerMap) -> bool {
-    if map.length != map.keys.length || map.length != map.values.length {
-      return false;
-    }
-    return compiler_vector_shape_valid(
-      map.keys.length,
-      map.keys.page_count,
-      map.keys.page0.length,
-      map.keys.page1.length,
-      map.keys.page2.length,
-      map.keys.page3.length
-    ) && compiler_vector_shape_valid(
-      map.values.length,
-      map.values.page_count,
-      map.values.page0.length,
-      map.values.page1.length,
-      map.values.page2.length,
-      map.values.page3.length
-    );
+    if map.length != map.keys.length || map.length != map.values.length { return false; }
+    return compiler_vector_valid(map.keys) && compiler_vector_valid(map.values);
   }
-
   pub fn compiler_map_vector_value(vector: CompilerVector, index: i64) -> i64 {
     match compiler_vector_get(vector, index) {
       Option.Some(value) => { return value; }
       Option.None => { return 0; }
     }
   }
-
-  pub fn compiler_map_replace_value(
-    map: CompilerMap,
-    index: i64,
-    value: i64
-  ) -> Result<CompilerMap, i64> {
+  pub fn compiler_map_replace_value(map: CompilerMap, index: i64, value: i64) -> Result<CompilerMap, i64> {
     let updated: CompilerVector = compiler_vector_set(map.values, index, value)?;
     return Result.Ok(CompilerMap {
-      length: map.length,
-      keys: map.keys,
-      values: updated
+      length: map.length, keys: map.keys, values: updated
     });
   }
-
-  pub fn compiler_map_find_index(
-    map: CompilerMap,
-    key: i64,
-    index: i64
-  ) -> i64 {
-    if index < 0 || index >= map.length {
-      return -1;
-    }
-    if compiler_map_vector_value(map.keys, index) == key {
-      return index;
-    }
+  pub fn compiler_map_find_index(map: CompilerMap, key: i64, index: i64) -> i64 {
+    if index < 0 || index >= map.length { return -1; }
+    if compiler_map_vector_value(map.keys, index) == key { return index; }
     return compiler_map_find_index(map, key, index + 1);
   }
-
   /// Inserts in stable order or replaces the value at an existing key index.
-  pub fn compiler_map_insert(
-    map: CompilerMap,
-    key: i64,
-    value: i64
-  ) -> Result<CompilerMap, i64> {
-    if compiler_map_shape_valid(map) == false {
-      return Result.Err(3);
-    }
+  pub fn compiler_map_insert(map: CompilerMap, key: i64, value: i64) -> Result<CompilerMap, i64> {
+    if compiler_map_shape_valid(map) == false { return Result.Err(3); }
     let index: i64 = compiler_map_find_index(map, key, 0);
-    if index >= 0 {
-      return compiler_map_replace_value(map, index, value);
-    }
+    if index >= 0 { return compiler_map_replace_value(map, index, value); }
     let keys: CompilerVector = compiler_vector_push(map.keys, key)?;
     let values: CompilerVector = compiler_vector_push(map.values, value)?;
     return Result.Ok(CompilerMap {
-      length: map.length + 1,
-      keys: keys,
-      values: values
+      length: map.length + 1, keys: keys, values: values
     });
   }
-
   /// Looks up one compiler map value without exposing storage layout.
   pub fn compiler_map_get(map: CompilerMap, key: i64) -> Option<i64> {
-    if compiler_map_shape_valid(map) == false {
-      return Option.None;
-    }
+    if compiler_map_shape_valid(map) == false { return Option.None; }
     let index: i64 = compiler_map_find_index(map, key, 0);
-    if index >= 0 {
-      return Option.Some(compiler_map_vector_value(map.values, index));
-    }
+    if index >= 0 { return Option.Some(compiler_map_vector_value(map.values, index)); }
     return Option.None;
   }
-
   /// Reports key presence without exposing Option lowering to callers.
   pub fn compiler_map_contains(map: CompilerMap, key: i64) -> bool {
     match compiler_map_get(map, key) {
@@ -618,7 +551,6 @@ mod cpu StdLanguageCore {
       Option.None => { return false; }
     }
   }
-
   pub fn compiler_map_identity_fold(state: i64, value: i64) -> i64 {
     let normalized: i64 = value % 2147483629;
     if normalized < 0 {
@@ -626,15 +558,8 @@ mod cpu StdLanguageCore {
     }
     return ((state * 257) + normalized + 1) % 2147483629;
   }
-
-  pub fn compiler_map_identity_from(
-    map: CompilerMap,
-    index: i64,
-    identity: i64
-  ) -> i64 {
-    if index >= map.length {
-      return identity;
-    }
+  pub fn compiler_map_identity_from(map: CompilerMap, index: i64, identity: i64) -> i64 {
+    if index >= map.length { return identity; }
     let key_identity: i64 = compiler_map_identity_fold(
       identity,
       compiler_map_vector_value(map.keys, index)
@@ -645,38 +570,121 @@ mod cpu StdLanguageCore {
     );
     return compiler_map_identity_from(map, index + 1, value_identity);
   }
-
   /// Hashes length plus every key/value pair in insertion order.
   pub fn compiler_map_identity(map: CompilerMap) -> Result<i64, i64> {
-    if compiler_map_shape_valid(map) == false {
-      return Result.Err(3);
-    }
+    if compiler_map_shape_valid(map) == false { return Result.Err(3); }
     let identity: i64 = compiler_map_identity_fold(211, map.length);
     return Result.Ok(compiler_map_identity_from(map, 0, identity));
   }
 
-  /// Builds an empty monotonic arena with an explicit capacity.
-  pub fn compiler_arena_new(capacity: i64) -> Result<CompilerArena, i64> {
-    if capacity < 0 {
-      return Result.Err(3);
+  pub fn compiler_arena_shape_valid(arena: CompilerArena) -> bool {
+    if arena.capacity < 0 || arena.capacity > 16
+      || arena.next_index < 0 || arena.next_index > arena.capacity {
+      return false;
     }
+    if arena.next_index != arena.kinds.length
+      || arena.next_index != arena.field0s.length
+      || arena.next_index != arena.field1s.length
+      || arena.next_index != arena.field2s.length {
+      return false;
+    }
+    if arena.next_index == 0 && arena.last_index != -1 { return false; }
+    if arena.next_index > 0 && arena.last_index != arena.next_index - 1 {
+      return false;
+    }
+    return compiler_vector_valid(arena.kinds)
+      && compiler_vector_valid(arena.field0s)
+      && compiler_vector_valid(arena.field1s)
+      && compiler_vector_valid(arena.field2s);
+  }
+
+  /// Builds an empty bounded arena with an explicit capacity.
+  pub fn compiler_arena_new(capacity: i64) -> Result<CompilerArena, i64> {
+    if capacity < 0 || capacity > 16 { return Result.Err(3); }
     return Result.Ok(CompilerArena {
       capacity: capacity,
       next_index: 0,
-      last_index: -1
+      last_index: -1,
+      kinds: compiler_vector_empty(0),
+      field0s: compiler_vector_empty(0),
+      field1s: compiler_vector_empty(0),
+      field2s: compiler_vector_empty(0)
     });
   }
 
-  /// Allocates the next stable arena index or reports capacity exhaustion.
-  pub fn compiler_arena_allocate(arena: CompilerArena) -> Result<CompilerArena, i64> {
-    if arena.next_index >= arena.capacity {
-      return Result.Err(1);
+  /// Stores one four-scalar object envelope at the next stable index.
+  pub fn compiler_arena_store(
+    arena: CompilerArena,
+    kind: i64,
+    field0: i64,
+    field1: i64,
+    field2: i64
+  ) -> Result<CompilerArena, i64> {
+    if compiler_arena_shape_valid(arena) == false || kind < 0
+      || (kind == 0 && (field0 != 0 || field1 != 0 || field2 != 0)) {
+      return Result.Err(3);
     }
+    if arena.next_index >= arena.capacity { return Result.Err(1); }
+    let kinds: CompilerVector = compiler_vector_push(arena.kinds, kind)?;
+    let field0s: CompilerVector = compiler_vector_push(arena.field0s, field0)?;
+    let field1s: CompilerVector = compiler_vector_push(arena.field1s, field1)?;
+    let field2s: CompilerVector = compiler_vector_push(arena.field2s, field2)?;
     return Result.Ok(CompilerArena {
       capacity: arena.capacity,
       next_index: arena.next_index + 1,
-      last_index: arena.next_index
+      last_index: arena.next_index,
+      kinds: kinds, field0s: field0s, field1s: field1s, field2s: field2s
     });
+  }
+
+  /// Allocates a reserved kind-zero object for the compatibility surface.
+  pub fn compiler_arena_allocate(arena: CompilerArena) -> Result<CompilerArena, i64> {
+    return compiler_arena_store(arena, 0, 0, 0, 0);
+  }
+
+  /// Reads kind at slot zero or one of three object fields at slots one to three.
+  pub fn compiler_arena_object_value(
+    arena: CompilerArena,
+    index: i64,
+    slot: i64
+  ) -> Option<i64> {
+    if compiler_arena_shape_valid(arena) == false
+      || index < 0 || index >= arena.next_index {
+      return Option.None;
+    }
+    if slot == 0 { return compiler_vector_get(arena.kinds, index); }
+    if slot == 1 { return compiler_vector_get(arena.field0s, index); }
+    if slot == 2 { return compiler_vector_get(arena.field1s, index); }
+    if slot == 3 { return compiler_vector_get(arena.field2s, index); }
+    return Option.None;
+  }
+
+  pub fn compiler_arena_identity_from(
+    arena: CompilerArena,
+    index: i64,
+    identity: i64
+  ) -> i64 {
+    if index >= arena.next_index { return identity; }
+    let kind: i64 = compiler_map_identity_fold(
+      identity, compiler_map_vector_value(arena.kinds, index)
+    );
+    let field0: i64 = compiler_map_identity_fold(
+      kind, compiler_map_vector_value(arena.field0s, index)
+    );
+    let field1: i64 = compiler_map_identity_fold(
+      field0, compiler_map_vector_value(arena.field1s, index)
+    );
+    let field2: i64 = compiler_map_identity_fold(
+      field1, compiler_map_vector_value(arena.field2s, index)
+    );
+    return compiler_arena_identity_from(arena, index + 1, field2);
+  }
+
+  /// Hashes object count and every object field in stable index order.
+  pub fn compiler_arena_identity(arena: CompilerArena) -> Result<i64, i64> {
+    if compiler_arena_shape_valid(arena) == false { return Result.Err(3); }
+    let identity: i64 = compiler_map_identity_fold(307, arena.next_index);
+    return Result.Ok(compiler_arena_identity_from(arena, 0, identity));
   }
 
   /// Validates and builds one half-open source span.

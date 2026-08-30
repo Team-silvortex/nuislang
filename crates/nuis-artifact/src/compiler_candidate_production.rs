@@ -28,9 +28,9 @@ use crate::{
     COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_PAGINATION_CONTRACT,
 };
 
-pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v9";
+pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v10";
 pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str =
-    "nuis-stage1-paginated-token-derived-nir-producer-v9";
+    "nuis-stage1-compact-structured-nir-producer-v10";
 pub const COMPILER_CANDIDATE_PRODUCTION_AUTHORITY: &str =
     "stage1-candidate-component-production-no-replacement";
 pub const COMPILER_CANDIDATE_PRODUCTION_FILE: &str = "nuis.compiler-candidate-production.toml";

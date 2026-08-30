@@ -1,6 +1,6 @@
 protocol = "nuis-compiler-stage-semantic-differential-v1"
 version = 1
-status = "usable-lossless-derived-stage-equivalence"
+status = "usable-transformation-bound-lossless-stage-equivalence"
 scope = "non-byte-identical-stage-representation-comparison"
 manifest_name = "nuis.compiler-stage-semantic-diff.toml"
 producer_contract = "nuis-compiler-stage-semantic-differential-producer-v1"
@@ -27,16 +27,18 @@ required_results = [
   "replacement-authority-remains-false",
 ]
 
+derived_encoding_policy = "exact-bound-stage-transformation-record"
 current_comparison_count = 1
 current_source_stage = "nir"
 current_source_encoding = "nuis-nir-canonical-projection-v1"
-current_derived_encoding = "nuis-derived-structural-stage-payload-v1"
-production_protocol = "nuis-compiler-candidate-production-v9"
+predecessor_reference_derived_encoding = "nuis-derived-structural-stage-payload-v1"
+current_derived_encoding = "nuis-derived-structural-records-v2"
+production_protocol = "nuis-compiler-candidate-production-v10"
 
 [non_claims]
 items = [
   "does-not-authorize-switching-the-active-compiler",
   "does-not-yet-replace-the-five-stage-handoff-nir-record",
-  "does-not-claim-a-compact-structured-nir-codec",
+  "does-not-select-the-derived-record-in-the-v1-stage-handoff",
   "does-not-prove-independent-machine-reproducibility",
 ]

@@ -19,16 +19,16 @@ use crate::{
     CompilerStageKind, VerifiedCompilerStagePayload,
 };
 
-pub const COMPILER_STAGE_TRANSFORMATION_PROTOCOL: &str = "nuis-compiler-stage-transformation-v2";
+pub const COMPILER_STAGE_TRANSFORMATION_PROTOCOL: &str = "nuis-compiler-stage-transformation-v3";
 pub const COMPILER_STAGE_TRANSFORMATION_PRODUCER_CONTRACT: &str =
-    "nuis-compiler-stage-transformation-producer-v2";
+    "nuis-compiler-stage-transformation-producer-v3";
 pub const COMPILER_STAGE_TRANSFORMATION_AUTHORITY: &str =
-    "stage1-lossless-derived-transformation-evidence-no-replacement";
+    "stage1-compact-structured-transformation-evidence-no-replacement";
 pub const COMPILER_STAGE_TRANSFORMATION_FILE: &str = "nuis.compiler-stage-transformations.toml";
-pub const COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT: &str =
-    "nuis-compiler-structural-checkpoint-v1";
+pub const COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT: &str =
+    "nuis-compiler-structured-record-codec-v1";
 pub const COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING: &str =
-    "nuis-derived-structural-stage-payload-v1";
+    "nuis-derived-structural-records-v2";
 pub const COMPILER_STAGE_CHECKPOINT_PAGE_COUNT: usize = 2;
 pub const COMPILER_STAGE_CHECKPOINT_WORD_COUNT: usize = 22;
 
@@ -454,7 +454,7 @@ fn validate_record_contract(
     output_words: &[usize],
 ) -> Result<(), ArtifactError> {
     projection_kind(stage)?;
-    if transform_contract != COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT
+    if transform_contract != COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT
         || output_encoding != COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING
         || output_words.len() != COMPILER_STAGE_CHECKPOINT_WORD_COUNT
         || output_words[0] != compiler_projection_checkpoint_kind_tag(projection_kind(stage)?)

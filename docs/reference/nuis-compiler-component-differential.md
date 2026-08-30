@@ -7,8 +7,8 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v9.toml](nuis-compiler-candidate-production-v9.toml)
-* [nuis-compiler-stage-transformation-v2.toml](nuis-compiler-stage-transformation-v2.toml)
+* [nuis-compiler-candidate-production-v10.toml](nuis-compiler-candidate-production-v10.toml)
+* [nuis-compiler-stage-transformation-v3.toml](nuis-compiler-stage-transformation-v3.toml)
 * [nuis-compiler-stage-semantic-differential-v1.toml](nuis-compiler-stage-semantic-differential-v1.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
 

@@ -1750,10 +1750,10 @@ The five required coordinates are:
 
 Subset v8 is `stable/100` through `nuisc bootstrap-check`; its twenty-one exact scalar exports add complete token pagination without widening the language surface, and readiness still waits for all five gates to reach `stable/100`.
 
-Production-bound token data, two AST/NIR pages, a real lossless derived NIR binary, and its 1/1 non-byte-identical semantic differential move the stage-neutral boundary to `usable/95`.
-The v9 candidate trust chain and two cache-bypassed clean builds keep both driver and reproducibility gate at `usable/95`.
-Data model v5 is `usable/94`: every token page remains independently replayed while the sixteen-entry stable-order map executes natively with ordered identity `415394959` and exit `130`.
-Compiler-arena-owned object storage is now the unique weakest bootstrap boundary; compact structured NIR-derived records remain the next IR-boundary step.
+Production-bound token data, two AST/NIR pages, canonical ULEB128 structural records without one complete source blob, and 1/1 semantic replay move the stage-neutral boundary to `usable/96`.
+The v10 candidate trust chain and two cache-bypassed clean builds keep both driver and reproducibility gate at `usable/96`.
+Data model v6 remains `usable/95`: the stable-order map retains identity `415394959`, while two native arena objects bind stable indices and ordered identity `1064756829` at exit `130`.
+Typed owned arena payloads are therefore the deterministic next bootstrap boundary; handoff v2 selection follows the completed compact record codec.
 
 ## Runtime Lifecycle Loader Bootstrap
 

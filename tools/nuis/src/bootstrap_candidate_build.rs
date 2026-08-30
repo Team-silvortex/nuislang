@@ -20,7 +20,7 @@ use nuis_artifact::{
     CompilerStageTransformationsInput, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_BUILD_FILE,
     COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
-    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
     COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
@@ -34,7 +34,7 @@ use crate::{
 const STAGE0_DIR: &str = "stage0";
 const CANDIDATE_DIR: &str = "stage1-candidate";
 const STAGE_HANDOFF_FILE: &str = "nuis.compiler-stage-handoff.toml";
-const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-paginated-token-derived-nir-producer-v9";
+const CANDIDATE_PRODUCER_ID: &str = "nuis-stage1-compact-structured-nir-producer-v10";
 
 pub(crate) fn handle_bootstrap_candidate_build(
     input: PathBuf,
@@ -140,7 +140,7 @@ fn handle_bootstrap_candidate_build_with_cache(
             .map_err(|error| format!("failed to verify candidate handoff: {error}"))?;
     let transformation_records = [CompilerStageTransformationRecordInput {
         source_stage: CompilerStageKind::Nir,
-        transform_contract: COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+        transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
         output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
         output_words: &adapter.nir_transformation_words,
     }];

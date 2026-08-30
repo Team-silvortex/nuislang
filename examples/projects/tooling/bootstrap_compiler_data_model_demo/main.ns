@@ -68,6 +68,53 @@ mod cpu Main {
     }
   }
 
+  fn arena_identity_error(arena: CompilerArena) -> i64 {
+    match compiler_arena_identity(arena) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  fn arena_allocate_error(arena: CompilerArena) -> i64 {
+    match compiler_arena_allocate(arena) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  fn arena_store_error(arena: CompilerArena, kind: i64) -> i64 {
+    match compiler_arena_store(arena, kind, 0, 0, 0) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  fn arena_reserved_shape_error(arena: CompilerArena) -> i64 {
+    match compiler_arena_store(arena, 0, 1, 0, 0) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  fn arena_new_error(capacity: i64) -> i64 {
+    match compiler_arena_new(capacity) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  fn arena_value_or(
+    arena: CompilerArena,
+    index: i64,
+    slot: i64,
+    fallback: i64
+  ) -> i64 {
+    match compiler_arena_object_value(arena, index, slot) {
+      Option.Some(value) => { return value; }
+      Option.None => { return fallback; }
+    }
+  }
+
   fn build_path() -> Result<CompilerPath, i64> {
     let root: CompilerPath = compiler_path_empty(false);
     let source: CompilerPath = compiler_path_push(root, 41)?;
@@ -289,11 +336,47 @@ mod cpu Main {
     return 0;
   }
 
+  fn arena_boundaries_fail_closed(
+    arena: CompilerArena,
+    arena_identity: i64
+  ) -> i64 {
+    if compiler_arena_shape_valid(arena) == false
+      || arena.capacity != 2 || arena.next_index != 2 || arena.last_index != 1 {
+      return 69;
+    }
+    if arena_value_or(arena, 0, 0, -1) != 1
+      || arena_value_or(arena, 0, 2, -1) != 2
+      || arena_value_or(arena, 1, 0, -1) != 2
+      || arena_value_or(arena, 1, 3, 0) != -12 {
+      return 70;
+    }
+    if arena_identity != 1064756829 { return 71; }
+    if arena_allocate_error(arena) != 1 { return 72; }
+    if arena_store_error(arena, -1) != 3 { return 73; }
+    if arena_reserved_shape_error(arena) != 3 { return 78; }
+    if arena_value_or(arena, 2, 0, -7) != -7
+      || arena_value_or(arena, 0, 4, -7) != -7 {
+      return 74;
+    }
+    let malformed: CompilerArena = CompilerArena {
+      capacity: 2,
+      next_index: 1,
+      last_index: 0,
+      kinds: compiler_vector_empty(0),
+      field0s: compiler_vector_empty(0),
+      field1s: compiler_vector_empty(0),
+      field2s: compiler_vector_empty(0)
+    };
+    if compiler_arena_shape_valid(malformed) { return 75; }
+    if arena_identity_error(malformed) != 3 { return 76; }
+    if arena_new_error(17) != 3 { return 77; }
+    return 0;
+  }
+
   fn boundaries_fail_closed(
     text: CompilerText,
     tokens: CompilerVector,
-    full_tokens: CompilerVector,
-    arena: CompilerArena
+    full_tokens: CompilerVector
   ) -> i64 {
     if text.bytes.length != 8 || text.bytes.page_count != 2 {
       return 5;
@@ -343,12 +426,6 @@ mod cpu Main {
     if compiler_vector_shape_valid(-1, 2, 4, -5, 0, 0) {
       return 18;
     }
-    match compiler_arena_allocate(arena) {
-      Result.Ok(_) => {
-        return 16;
-      }
-      Result.Err(_) => {}
-    }
     match compiler_text_push_scalar(text, 55296) {
       Result.Ok(_) => {
         return 17;
@@ -377,8 +454,9 @@ mod cpu Main {
     };
 
     let arena0: CompilerArena = compiler_arena_new(2)?;
-    let arena1: CompilerArena = compiler_arena_allocate(arena0)?;
-    let arena2: CompilerArena = compiler_arena_allocate(arena1)?;
+    let arena1: CompilerArena = compiler_arena_store(arena0, 1, 0, 2, 11)?;
+    let arena2: CompilerArena = compiler_arena_store(arena1, 2, 2, 0, -12)?;
+    let arena_identity: i64 = compiler_arena_identity(arena2)?;
     let symbols: CompilerMap = build_symbol_map(arena2.last_index)?;
     let full_symbols: CompilerMap = fill_symbol_map(symbols)?;
     let symbol_identity: i64 = compiler_map_identity(symbols)?;
@@ -408,8 +486,7 @@ mod cpu Main {
     let boundary_error: i64 = boundaries_fail_closed(
       text,
       tokens,
-      full_tokens,
-      arena2
+      full_tokens
     );
     if boundary_error != 0 {
       return Result.Err(boundary_error);
@@ -421,6 +498,13 @@ mod cpu Main {
     );
     if map_boundary_error != 0 {
       return Result.Err(map_boundary_error);
+    }
+    let arena_boundary_error: i64 = arena_boundaries_fail_closed(
+      arena2,
+      arena_identity
+    );
+    if arena_boundary_error != 0 {
+      return Result.Err(arena_boundary_error);
     }
     let token_model_error: i64 = token_model_fail_closed(
       materialized_tokens,

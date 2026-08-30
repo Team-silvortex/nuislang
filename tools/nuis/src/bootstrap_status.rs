@@ -520,8 +520,8 @@ mod tests {
     #[test]
     fn stable_status_requires_exactly_one_hundred_progress() {
         let invalid = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 94",
-            "status = \"stable\"\nprogress = 94",
+            "status = \"usable\"\nprogress = 95",
+            "status = \"stable\"\nprogress = 95",
             1,
         );
         let error = parse_bootstrap_readiness(&invalid).expect_err("status drift must fail");
@@ -530,11 +530,11 @@ mod tests {
 
     #[test]
     fn next_gate_follows_status_progress_coordinate_order() {
-        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 94", "progress = 95", 1);
+        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 95", "progress = 94", 1);
         let report = parse_bootstrap_readiness(&adjusted).expect("manifest parses");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage0-stage1-driver")
+            Some("compiler-data-model")
         );
     }
 
@@ -543,7 +543,8 @@ mod tests {
         let complete = CHECKED_IN_MANIFEST
             .replace("status = \"usable\"", "status = \"stable\"")
             .replace("progress = 94", "progress = 100")
-            .replace("progress = 95", "progress = 100");
+            .replace("progress = 95", "progress = 100")
+            .replace("progress = 96", "progress = 100");
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);
         assert!(report.ready());

@@ -69,7 +69,7 @@ fn fixture() -> Fixture {
         })
         .collect::<Vec<_>>();
     let handoff = build_compiler_stage_handoff(
-        "nuis-stage1-lossless-nir-payload-materializer-v8",
+        "nuis-stage1-compact-structured-nir-producer-v10",
         "cpu",
         "Main",
         &inputs,
@@ -95,7 +95,7 @@ fn fixture() -> Fixture {
 fn build(fixture: &Fixture) -> CompilerStageTransformations {
     let records = [CompilerStageTransformationRecordInput {
         source_stage: CompilerStageKind::Nir,
-        transform_contract: COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+        transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
         output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
         output_words: &fixture.nir_words,
     }];
@@ -123,7 +123,9 @@ fn structural_checkpoint_round_trips_and_preserves_ordered_cursor_words() {
         manifest.records[0].output_payload_file,
         compiler_stage_transformation_payload_file(0)
     );
-    assert!(manifest.records[0].output_payload_bytes > fixture.payloads[3].bytes.len());
+    let legacy_v2_bytes =
+        8 + 3 * size_of::<u64>() + 22 * size_of::<u64>() + fixture.payloads[3].bytes.len();
+    assert!(manifest.records[0].output_payload_bytes < legacy_v2_bytes);
 
     let derived = encode_compiler_stage_transformation_payload(
         CompilerStageKind::Nir,
@@ -132,6 +134,9 @@ fn structural_checkpoint_round_trips_and_preserves_ordered_cursor_words() {
     )
     .expect("encode derived NIR payload");
     assert_ne!(derived, fixture.payloads[3].bytes);
+    assert!(!derived
+        .windows(fixture.payloads[3].bytes.len())
+        .any(|window| window == fixture.payloads[3].bytes));
     let (checkpoint, recovered) =
         decode_compiler_stage_transformation_payload(CompilerStageKind::Nir, &derived)
             .expect("decode derived NIR payload");
@@ -149,13 +154,79 @@ fn structural_checkpoint_round_trips_and_preserves_ordered_cursor_words() {
 }
 
 #[test]
+fn compact_record_payload_rejects_noncanonical_varints_and_metadata_drift() {
+    let fixture = fixture();
+    let derived = encode_compiler_stage_transformation_payload(
+        CompilerStageKind::Nir,
+        &fixture.payloads[3].bytes,
+        &fixture.nir_words,
+    )
+    .expect("encode compact records");
+
+    let mut noncanonical = Vec::with_capacity(derived.len() + 1);
+    noncanonical.extend_from_slice(&derived[..8]);
+    noncanonical.extend_from_slice(&[0x82, 0x00]);
+    noncanonical.extend_from_slice(&derived[9..]);
+    let error = decode_compiler_stage_transformation_payload(CompilerStageKind::Nir, &noncanonical)
+        .expect_err("noncanonical projection kind must fail");
+    assert!(error.to_string().contains("not canonically encoded"));
+
+    let mut impossible_count = derived.clone();
+    let mut record_count_offset = 8;
+    for _ in 0..3 {
+        loop {
+            let byte = impossible_count[record_count_offset];
+            record_count_offset += 1;
+            if byte & 0x80 == 0 {
+                break;
+            }
+        }
+    }
+    assert_eq!(impossible_count[record_count_offset] & 0x80, 0);
+    impossible_count[record_count_offset] = 0x7f;
+    let error =
+        decode_compiler_stage_transformation_payload(CompilerStageKind::Nir, &impossible_count)
+            .expect_err("impossible record count must fail before allocation");
+    assert!(error.to_string().contains("record count is invalid"));
+
+    let mut trailing = derived;
+    trailing.push(0);
+    let error = decode_compiler_stage_transformation_payload(CompilerStageKind::Nir, &trailing)
+        .expect_err("trailing payload bytes must fail");
+    assert!(error.to_string().contains("length mismatch"));
+
+    let mut metadata_drift = encode_compiler_stage_transformation_payload(
+        CompilerStageKind::Nir,
+        &fixture.payloads[3].bytes,
+        &fixture.nir_words,
+    )
+    .expect("encode compact records for metadata drift");
+    let mut cursor = 8;
+    for _ in 0..(4 + COMPILER_STAGE_CHECKPOINT_WORD_COUNT) {
+        loop {
+            let byte = metadata_drift[cursor];
+            cursor += 1;
+            if byte & 0x80 == 0 {
+                break;
+            }
+        }
+    }
+    assert_eq!(metadata_drift[cursor] & 0x0f, 1);
+    metadata_drift[cursor] = (metadata_drift[cursor] & 0xf0) | 3;
+    let error =
+        decode_compiler_stage_transformation_payload(CompilerStageKind::Nir, &metadata_drift)
+            .expect_err("valid but incorrect record kind must fail");
+    assert!(error.to_string().contains("record metadata mismatch"));
+}
+
+#[test]
 fn stage_transformation_builder_rejects_non_nuis_or_reordered_output() {
     let fixture = fixture();
     let mut drifted = fixture.nir_words;
     drifted[5] += 1;
     let records = [CompilerStageTransformationRecordInput {
         source_stage: CompilerStageKind::Nir,
-        transform_contract: COMPILER_STAGE_STRUCTURAL_CHECKPOINT_CONTRACT,
+        transform_contract: COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
         output_encoding: COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
         output_words: &drifted,
     }];

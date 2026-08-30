@@ -32,10 +32,10 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`705/705` passing drift checks. The weakest bootstrap-readiness coordinate is
-`standard-library/std/compiler-data-model` at `usable`, `94/100`. The
-stage-neutral IR boundary, stage driver, and differential gate are now all
-`usable/95`.
+`709/709` passing drift checks. The stage-neutral boundary, stage0/stage1
+driver, and reproducibility gate are now `usable`, `96/100`; compiler data
+model v6 remains `usable`, `95/100`, so the deterministic selector returns its
+typed owned arena payload as the next bootstrap task.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -44,14 +44,15 @@ compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
 `nuis bootstrap-status` frontdoor reports `1/5` gates closed. Compiler data
-model v5 now materializes four owned token records per bounded window, emits
+model v6 now materializes four owned token records per bounded window, emits
 the canonical 59-byte fixture plus the real candidate's 91-byte
 `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
 store, canonically re-emits the same bytes and hash, builds a stable-order
-sixteen-entry `CompilerMap` with ordered identity `415394959`, and executes
+sixteen-entry `CompilerMap` with ordered identity `415394959`, stores two
+stable-index arena objects with ordered identity `1064756829`, and executes
 natively at deterministic score `130`; the producer-neutral five-stage handoff is now
-`usable`, `94/100`. Its shared structural codec independently parses
+`usable`, `95/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
@@ -66,12 +67,13 @@ identity `164749511446`. Nuis then serializes eight-lane cursors and resumes
 both structural projections. The artifact layer independently verifies first
 AST/NIR identities `174028320749` and
 `132469386887`, and second-page identities `149528711957` and `146705724977`
-before production v9 emits the distinct
-`nuis-stage1-lossless-nir-payload-materializer-v8` candidate. Nuis also emits
+before production v10 emits the distinct
+`nuis-stage1-compact-structured-nir-producer-v10` candidate. Nuis also emits
 both NIR cursor arrays as a non-identity 22-word structural checkpoint;
-`nuis-compiler-stage-transformation-v2` independently replays every word and
-materializes a real byte-different binary that losslessly recovers the complete
-NIR payload. `nuis-compiler-stage-semantic-differential-v1` then records 1/1
+`nuis-compiler-stage-transformation-v3` independently replays every word and
+materializes canonical ULEB128 structural records without appending a complete
+source blob. It reparses every record and still losslessly recovers the NIR
+payload. `nuis-compiler-stage-semantic-differential-v1` then records 1/1
 representation equivalence before the candidate reaches repository-native
 `13/13` differential equivalence while retaining `replacement_authorized =
 false`. `nuis
@@ -99,9 +101,9 @@ existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, paged compiler data, first attested stage1 leaf, and
 two-clean-build aggregate in place, the tensor now routes mainline work to a
-compact structured NIR-derived encoding that no longer embeds source text,
-then a producer-neutral handoff v2 selection protocol. Broader compiler-data
-paging, reversible replacement authorization, Galaxy
+typed owned arena payload over stable compiler-object indices, followed by a
+producer-neutral handoff v2 selection protocol. Broader compiler-data paging,
+reversible replacement authorization, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 
