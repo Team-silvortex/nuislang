@@ -51,6 +51,16 @@ fn assert_file_not_contains(path: &Path, needle: &str) {
     );
 }
 
+fn assert_file_contains(path: &Path, needle: &str) {
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    assert!(
+        source.contains(needle),
+        "expected {} to contain `{needle}`",
+        path.display()
+    );
+}
+
 #[test]
 fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
     let project = "../../examples/projects/tooling/bootstrap_compiler_data_model_demo";
@@ -58,10 +68,15 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
     let output_dir_text = output_dir.display().to_string();
     let build = run_nuis(&["bootstrap-build", project, &output_dir_text]);
     assert_success(&build, "compiler data model build");
-    assert_file_not_contains(
-        &output_dir.join("bootstrap_compiler_data_model_demo.ll"),
-        "deferred lowering",
-    );
+    let llvm_path = output_dir.join("bootstrap_compiler_data_model_demo.ll");
+    assert_file_not_contains(&llvm_path, "deferred lowering");
+    for symbol in [
+        "@nuis_fn_StdCompilerData.compiler_text_arena_store",
+        "@nuis_fn_StdCompilerData.compiler_text_arena_get",
+        "@nuis_fn_StdCompilerData.compiler_text_arena_identity",
+    ] {
+        assert_file_contains(&llvm_path, symbol);
+    }
 
     let stage_manifest_path = output_dir.join("nuis.compiler-stage-handoff.toml");
     let (handoff, payloads) =

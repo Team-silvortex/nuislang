@@ -70,8 +70,9 @@ active NIR handoff record.
 
 ## Trust Chain
 
-Candidate production v10 binds the exact transformation manifest, compact
-payload metadata, semantic differential file, and semantic proof identity.
+Candidate production v11 binds the exact transformation manifest, compact
+payload metadata, semantic differential file, handoff v2 selection, and both
+proof identities.
 `bootstrap-diff` rereads that chain before producing the existing 13/13
 component report. The two-clean-build reproducibility aggregate then binds the
 production proof transitively without recording paths or timestamps.
@@ -81,10 +82,11 @@ integers, symlink payloads, malformed headers, length/hash drift, record
 metadata drift, source recovery drift, proof drift, and replacement authority
 all fail closed.
 
-The canonical five-stage handoff remains unchanged in v1 form. A future
-handoff v2 may select a derived NIR record only after a separate reversible
-replacement protocol exists. Third and later structural pages and independent
-attester trust also remain open.
+The canonical five-stage handoff remains unchanged in v1 form. Handoff v2 now
+selects every registered reversible derived record beside that canonical
+bundle, but does not replace it or authorize compiler replacement. Third and
+later structural pages, independent attester trust, and reversible replacement
+authorization remain open.
 
 ## Validation
 

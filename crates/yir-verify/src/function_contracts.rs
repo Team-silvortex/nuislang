@@ -1,13 +1,13 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{HashMap, HashSet};
 
 use yir_core::{Node, YirFunctionRole, YirModule};
 
 pub(crate) fn verify_function_table(
     module: &YirModule,
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
 ) -> Result<(), String> {
-    let mut function_names = BTreeSet::new();
-    let mut owned_body_nodes = BTreeMap::<&str, &str>::new();
+    let mut function_names = HashSet::with_capacity(module.functions.len());
+    let mut owned_body_nodes = HashMap::<&str, &str>::with_capacity(module.nodes.len());
     let mut entry_count = 0usize;
 
     for function in &module.functions {
@@ -25,7 +25,7 @@ pub(crate) fn verify_function_table(
             entry_count += 1;
         }
 
-        let mut body = BTreeSet::new();
+        let mut body = HashSet::with_capacity(function.body_nodes.len());
         for node in &function.body_nodes {
             if !body.insert(node.as_str()) {
                 return Err(format!(
@@ -33,7 +33,7 @@ pub(crate) fn verify_function_table(
                     function.name
                 ));
             }
-            if !nodes.contains_key(node) {
+            if !nodes.contains_key(node.as_str()) {
                 return Err(format!(
                     "YIR function `{}` references unknown body node `{node}`",
                     function.name
@@ -47,7 +47,7 @@ pub(crate) fn verify_function_table(
             }
         }
 
-        let mut parameter_names = BTreeSet::new();
+        let mut parameter_names = HashSet::with_capacity(function.parameters.len());
         for parameter in &function.parameters {
             if !valid_token(&parameter.name)
                 || parameter.ty.is_empty()
@@ -130,7 +130,7 @@ mod tests {
         let nodes = module
             .nodes
             .iter()
-            .map(|node| (node.name.clone(), node))
+            .map(|node| (node.name.as_str(), node))
             .collect();
         verify_function_table(&module, &nodes).unwrap();
     }
@@ -145,7 +145,7 @@ mod tests {
         let nodes = module
             .nodes
             .iter()
-            .map(|node| (node.name.clone(), node))
+            .map(|node| (node.name.as_str(), node))
             .collect();
         assert!(verify_function_table(&module, &nodes)
             .unwrap_err()
@@ -156,7 +156,7 @@ mod tests {
         let nodes = module
             .nodes
             .iter()
-            .map(|node| (node.name.clone(), node))
+            .map(|node| (node.name.as_str(), node))
             .collect();
         assert!(verify_function_table(&module, &nodes)
             .unwrap_err()

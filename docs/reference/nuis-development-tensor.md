@@ -1750,10 +1750,11 @@ The five required coordinates are:
 
 Subset v8 is `stable/100` through `nuisc bootstrap-check`; its twenty-one exact scalar exports add complete token pagination without widening the language surface, and readiness still waits for all five gates to reach `stable/100`.
 
-Production-bound token data, two AST/NIR pages, canonical ULEB128 structural records without one complete source blob, and 1/1 semantic replay move the stage-neutral boundary to `usable/96`.
-The v10 candidate trust chain and two cache-bypassed clean builds keep both driver and reproducibility gate at `usable/96`.
-Data model v6 remains `usable/95`: the stable-order map retains identity `415394959`, while two native arena objects bind stable indices and ordered identity `1064756829` at exit `130`.
-Typed owned arena payloads are therefore the deterministic next bootstrap boundary; handoff v2 selection follows the completed compact record codec.
+Production-bound token data, two AST/NIR pages, canonical ULEB128 structural records without one complete source blob, 1/1 semantic replay, and generic registration-order handoff v2 selection move the stage-neutral boundary to `usable/98`.
+The v11 candidate trust chain binds handoff v2 and moves the stage0/stage1 driver to `usable/98`; two local cache-bypassed clean builds keep the differential/reproducibility gate at `usable/96` until independent attester trust exists.
+Data model v7 reaches `usable/96`: the stable-order map retains identity `415394959`, two native arena objects retain identity `1064756829`, and a ten-byte typed `CompilerTextArena` payload binds identity `1643761726` at exit `130` without widening the twenty-one-export ceiling.
+The same stage0 driver now records a measured implementation optimization: helper-lane indexing, dense integer lowering/GLM graph verification, integer edge identities with borrowed node/resource lookup tables, hash-backed lowering node/resource and edge membership indexes, targeted proof-hash optimization, one normal AOT invocation after subset admission, and direct comparison of disk-verified handoff payloads against already rendered pipeline text reduce controlled compiler-data samples from 268.59 seconds to 19.94 seconds on a cold cache miss; the established cache-hit baseline is 1.57 seconds and the latest sample is 1.62 seconds. Successive graph-index samples reduce retired instructions from 175.44 billion through 166.73 billion to 159.15 billion and peak footprint from 266.7 MB through 259.6 MB to 244.1 MB while preserving byte-identical AST/NIR/YIR/LLVM/shim outputs, native exit `130`, and all semantic, canonical, hash, disk-read, and YIR verification. Recursive async helpers also enter their precompiled direct-call path before unsupported inline recursion is rejected; those optimizations do not freeze the ABI or grant replacement authority.
+With stage-neutral selection and the driver at `usable/98`, deterministic selection therefore advances to the differential/reproducibility gate at `usable/96`; its next proof is independent-machine or attester evidence over the v11 lineage.
 
 ## Runtime Lifecycle Loader Bootstrap
 

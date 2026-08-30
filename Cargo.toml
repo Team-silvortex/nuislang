@@ -52,3 +52,10 @@ log = "0.4"
 libc = "0.2"
 sha2 = "0.10"
 ed25519-dalek = { version = "2.2", default-features = false, features = ["std"] }
+
+# Stage handoff proofs hash multi-megabyte YIR payloads even in developer builds.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.test.package.sha2]
+opt-level = 3

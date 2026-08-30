@@ -2,9 +2,7 @@ use std::{fs, path::Path};
 
 use nuis_artifact::{
     build_compiler_stage_handoff, parse_compiler_stage_handoff_from_source,
-    parse_compiler_structural_projection, read_compiler_stage_handoff,
-    render_compiler_stage_handoff, render_compiler_structural_projection,
-    verify_compiler_projection_identity, CompilerProjectionKind, CompilerStageHandoff,
+    read_compiler_stage_handoff, render_compiler_stage_handoff, CompilerStageHandoff,
     CompilerStageKind, CompilerStagePayloadInput, VerifiedCompilerStagePayload,
 };
 use nuis_semantics::model::{AstModule, NirModule};
@@ -80,7 +78,7 @@ pub(crate) fn write_and_verify_compiler_stage_handoff(
         return Err("compiler stage handoff manifest failed canonical round-trip".to_owned());
     }
     write_text(&layout.stage_handoff_path, &rendered)?;
-    verify_compiler_stage_handoff(&layout.stage_handoff_path, Some(ast), Some(nir), Some(yir))?;
+    verify_compiler_stage_handoff(&layout.stage_handoff_path, &ast_text, &nir_text, &yir_text)?;
 
     Ok(CompileStageHandoffArtifacts {
         manifest_path: layout.stage_handoff_path.display().to_string(),
@@ -91,9 +89,9 @@ pub(crate) fn write_and_verify_compiler_stage_handoff(
 
 pub(crate) fn verify_compiler_stage_handoff(
     manifest_path: &Path,
-    expected_ast: Option<&AstModule>,
-    expected_nir: Option<&NirModule>,
-    expected_yir: Option<&YirModule>,
+    expected_ast_text: &str,
+    expected_nir_text: &str,
+    expected_yir_text: &str,
 ) -> Result<CompilerStageHandoff, String> {
     let (handoff, payloads) =
         read_compiler_stage_handoff(manifest_path).map_err(|error| error.to_string())?;
@@ -104,23 +102,13 @@ pub(crate) fn verify_compiler_stage_handoff(
     let yir_text = payload_text(&payloads, CompilerStageKind::Yir)?;
 
     frontend::verify_stage_neutral_token_stream(source, tokens)?;
-    verify_structural_projection(
-        CompilerProjectionKind::Ast,
-        ast_text,
-        &handoff.module_domain,
-        &handoff.module_unit,
-    )?;
-    if expected_ast.is_some_and(|expected| render::render_ast(expected) != ast_text) {
+    // The artifact reader already parses AST/NIR projections and verifies their
+    // canonical encoding plus module identity after reading them from disk.
+    if expected_ast_text != ast_text {
         return Err("compiler stage AST payload differs from the pipeline AST".to_owned());
     }
 
-    verify_structural_projection(
-        CompilerProjectionKind::Nir,
-        nir_text,
-        &handoff.module_domain,
-        &handoff.module_unit,
-    )?;
-    if expected_nir.is_some_and(|expected| render::render_nir(expected) != nir_text) {
+    if expected_nir_text != nir_text {
         return Err("compiler stage NIR payload differs from the pipeline NIR".to_owned());
     }
 
@@ -130,29 +118,10 @@ pub(crate) fn verify_compiler_stage_handoff(
         return Err("compiler stage YIR payload is not canonically rendered".to_owned());
     }
     // The portable boundary is the explicit text projection, not producer-private structs.
-    if expected_yir.is_some_and(|expected| render::render_yir(expected) != yir_text) {
+    if expected_yir_text != yir_text {
         return Err("compiler stage YIR payload differs from the pipeline YIR".to_owned());
     }
     Ok(handoff)
-}
-
-fn verify_structural_projection(
-    kind: CompilerProjectionKind,
-    source: &str,
-    module_domain: &str,
-    module_unit: &str,
-) -> Result<(), String> {
-    let projection =
-        parse_compiler_structural_projection(kind, source).map_err(|error| error.to_string())?;
-    verify_compiler_projection_identity(&projection, module_domain, module_unit)
-        .map_err(|error| error.to_string())?;
-    if render_compiler_structural_projection(&projection) != source {
-        return Err(format!(
-            "compiler stage {} projection failed canonical round-trip",
-            kind.as_str()
-        ));
-    }
-    Ok(())
 }
 
 fn payload_text(

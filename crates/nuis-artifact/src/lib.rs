@@ -9,6 +9,7 @@ mod compiler_component_diff;
 mod compiler_component_reproducibility;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
+mod compiler_stage_handoff_v2;
 mod compiler_stage_semantic_differential;
 mod compiler_stage_transformation;
 mod compiler_structural_projection;
@@ -101,6 +102,14 @@ pub use compiler_stage_handoff::{
     CompilerStageHandoffRecord, CompilerStageKind, CompilerStagePayloadInput,
     VerifiedCompilerStagePayload, COMPILER_STAGE_HANDOFF_PROTOCOL,
     COMPILER_STAGE_PRODUCER_CONTRACT,
+};
+pub use compiler_stage_handoff_v2::{
+    build_compiler_stage_handoff_v2, parse_compiler_stage_handoff_v2,
+    parse_compiler_stage_handoff_v2_from_source, read_compiler_stage_handoff_v2,
+    render_compiler_stage_handoff_v2, verify_compiler_stage_handoff_v2, CompilerStageHandoffV2,
+    CompilerStageHandoffV2Input, CompilerStageSelectionRecord, COMPILER_STAGE_HANDOFF_V2_AUTHORITY,
+    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_HANDOFF_V2_PROTOCOL,
+    COMPILER_STAGE_HANDOFF_V2_SELECTION_CONTRACT, COMPILER_STAGE_HANDOFF_V2_VERDICT,
 };
 pub use compiler_stage_semantic_differential::{
     build_compiler_stage_semantic_differential, parse_compiler_stage_semantic_differential,

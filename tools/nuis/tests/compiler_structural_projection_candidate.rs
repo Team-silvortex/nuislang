@@ -10,13 +10,14 @@ use nuis_artifact::{
     parse_compiler_structural_projection, read_compiler_candidate_execution,
     read_compiler_candidate_production, read_compiler_component_build,
     read_compiler_component_reproducibility, read_compiler_stage_handoff,
-    read_compiler_stage_semantic_differential, CompilerProjectionKind,
-    CompilerProjectionRecordKind, CompilerStageKind, CompilerStageSemanticDifferentialInput,
-    COMPILER_CANDIDATE_ADAPTER_FILE, COMPILER_CANDIDATE_EXECUTION_AUTHORITY,
-    COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_EXECUTION_ROLE,
-    COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_FILE,
-    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
+    CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
+    CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
+    COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
+    COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
+    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
     COMPILER_STAGE_TRANSFORMATION_FILE,
 };
 
@@ -161,6 +162,27 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert!(semantic_differential.deterministic_semantic_equivalent);
     assert!(!semantic_differential.comparisons[0].byte_identical);
     assert!(semantic_differential.comparisons[0].semantically_equivalent);
+    let stage_handoff_v2 = read_compiler_stage_handoff_v2(
+        &candidate_dir.join(COMPILER_STAGE_HANDOFF_V2_FILE),
+        &handoff,
+        &payloads,
+    )
+    .expect("verify stage handoff v2");
+    assert_eq!(stage_handoff_v2.selection_count, 1);
+    assert_eq!(
+        stage_handoff_v2.selections[0].source_stage,
+        CompilerStageKind::Nir
+    );
+    assert!(stage_handoff_v2.selections[0].reversible);
+    assert!(stage_handoff_v2.selections[0].semantically_equivalent);
+    assert_eq!(
+        production.stage_handoff_v2_file,
+        COMPILER_STAGE_HANDOFF_V2_FILE
+    );
+    assert_eq!(
+        production.stage_handoff_v2_proof_sha256,
+        stage_handoff_v2.proof_sha256
+    );
     assert!(!production.replacement_authorized);
 
     let differential = parse_compiler_component_differential(
@@ -211,6 +233,25 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
         .to_string()
         .contains("derived payload length or SHA-256 mismatch"));
     fs::write(&derived_payload_path, derived_payload).expect("restore derived stage payload");
+
+    let handoff_v2_path = candidate_dir.join(COMPILER_STAGE_HANDOFF_V2_FILE);
+    let handoff_v2_source = fs::read(&handoff_v2_path).expect("read stage handoff v2");
+    let mut tampered_handoff_v2 = handoff_v2_source.clone();
+    tampered_handoff_v2.push(0);
+    fs::write(&handoff_v2_path, tampered_handoff_v2).expect("tamper stage handoff v2");
+    let error = read_compiler_candidate_production(
+        &candidate_dir.join(COMPILER_CANDIDATE_PRODUCTION_FILE),
+        &stage0,
+        &execution,
+        &candidate,
+        &handoff,
+        &payloads,
+    )
+    .expect_err("stage handoff v2 tampering must invalidate production proof");
+    assert!(error
+        .to_string()
+        .contains("stage handoff v2 length or SHA-256 mismatch"));
+    fs::write(&handoff_v2_path, handoff_v2_source).expect("restore stage handoff v2");
 
     let adapter_path = candidate_dir.join(COMPILER_CANDIDATE_ADAPTER_FILE);
     let mut tampered = fs::read(&adapter_path).expect("read candidate adapter");

@@ -20,6 +20,7 @@ approved_external_types = [
   "Option",
   "Result",
   "CompilerText",
+  "CompilerTextArena",
   "CompilerDecimalState",
   "CompilerTokenBuffer",
   "CompilerTokenMaterializer",

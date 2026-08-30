@@ -39,9 +39,9 @@ impl ResultLoweringDomain {
 
 pub(super) struct LoweringState<'a> {
     pub(super) yir: &'a mut YirModule,
-    pub(super) node_resources: BTreeMap<String, String>,
+    pub(super) node_resources: HashMap<String, String>,
     pub(super) indexed_node_count: usize,
-    pub(super) edge_index: BTreeSet<(String, String, &'static str)>,
+    pub(super) edge_index: HashSet<(String, String, &'static str)>,
     pub(super) indexed_edge_count: usize,
     pub(super) branch_action_registry: &'a ModRegistry,
     pub(super) function_map: BTreeMap<&'a str, &'a NirFunction>,

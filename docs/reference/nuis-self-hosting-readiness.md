@@ -66,8 +66,8 @@ new language capability. Widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. Data model v6 is now
-`usable/95`: `StdLanguageCore` owns the foundational representation,
+and path contracts needed by a real compiler component. Data model v7 is now
+`usable/96`: `StdLanguageCore` owns the foundational representation,
 `StdCompilerData` owns materialized token records and payloads,
 `StdCompilerTokens` owns the standalone token DFA, and
 `StdCompilerTokenEmit` reconstructs canonical `nuis-token-stream-v1` bytes
@@ -87,17 +87,22 @@ It also stores two four-slot compiler objects at stable indices, reads their
 fields through checked projections, and pins ordered arena identity
 `1064756829`; capacity, kind, index, slot, and malformed-shape failures remain
 inside ordinary Nuis execution.
+V7 layers `CompilerTextArena` over that unchanged envelope. The native program
+stores `nuislang` and U+03BB as ten canonical UTF-8 payload bytes, rebuilds
+owned texts at stable indices, and pins typed identity `1643761726`. Wrong
+kind, invalid index, malformed UTF-8, forged hash, object exhaustion, and
+payload exhaustion fail closed without changing the pre-failure identity.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
-This is deliberately not `stable/100`. Each v6 materialization window remains
+This is deliberately not `stable/100`. Each v7 materialization window remains
 bounded to four token records, 64 payload bytes, and 128 output bytes, but
 production now covers the complete token stream with contiguous 128-byte pages
 whose boundaries may cross records. Nuis and the artifact layer independently
 recompute every page hash and chain link while preserving the canonical legacy
 page identity. `StdCompilerProjection` also owns and resumes the first two AST
 and NIR structural pages through opaque cursors. Vectors and maps remain
-`i64`-specific and bounded to sixteen entries; the arena owns sixteen
-four-`i64` envelopes but not nested text or arbitrary aggregates. Generic nested-page
+`i64`-specific and bounded to sixteen entries; typed arena text payloads share
+one sixteen-byte vector and arbitrary aggregate kinds remain open. Generic nested-page
 specialization lacks defining-module provenance, and arbitrary aggregate
 loop-carried state still requires general backedge lowering.
 
@@ -109,7 +114,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `usable/96`. Normal AOT builds emit the ordered five-stage
+This gate is now `usable/98`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -121,7 +126,7 @@ AOT execution, malformed-sequence rejection, and tamper-checked execution
 proof. The exact scalar producer ABI consumes every serialized stage byte,
 emits a Nuis-owned bundle fold, and drives `StdCompilerTokens` across the exact
 token header, seven record kinds, payload shape, and LF boundaries. Candidate
-production v10 now binds its record count, decoded semantic fold, every raw
+production v11 now binds its record count, decoded semantic fold, every raw
 token page and page-chain identity, plus the preserved four-record canonical
 prefix identity `164749511446`, to an independent artifact-layer result. It
 also binds three
@@ -138,15 +143,17 @@ canonical ULEB128 structural records without appending one complete source
 blob. Its decoder reconstructs indentation and LF boundaries, reparses every
 ordinal, depth, kind, and body, and independently replays every word and source
 byte before production can attest it. The semantic differential passes 1/1
-for the byte-different representation; selecting it in a future handoff v2
-remains open. See
+for the byte-different representation. `nuis-compiler-stage-handoff-v2` now
+selects every registered transform in order and binds its canonical source
+record, derived payload, checkpoint, recovery hash, and semantic verdict
+without stage-specific selection logic or replacement authority. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `usable/96`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `usable/98`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -166,8 +173,9 @@ The probe authority remains explicitly execution-only. The separate
 candidate's exact scalar exports, independently verifies the folds, token
 decode summary, canonical token page, AST/NIR continuation identities, and
 NIR checkpoint words, materializes a lossless byte-different NIR-derived
-payload, emits its semantic differential and
-`nuis-compiler-candidate-production-v10`, and then runs the differential gate.
+payload, emits its semantic differential and producer-neutral handoff v2,
+binds both through `nuis-compiler-candidate-production-v11`, and then runs the
+differential gate.
 See [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 The current producer is the bounded
 `nuis-stage1-compact-structured-nir-producer-v10` leaf; it preserves canonical
@@ -179,6 +187,25 @@ two initially empty roots with compile-cache read/write bypass. Its path-free
 `nuis-compiler-component-reproducibility-v1` aggregate binds distinct local
 witnesses, both exact report lineages, and stable component/native identities.
 The local witness intentionally carries no independent attester authority.
+
+The developer path now indexes lowering helper lanes once, verifies lowering
+and GLM graphs through dense integer node IDs, uses hash-backed lowering
+node/resource and edge membership indexes, and compiles SHA-256 proof hashing
+with targeted optimization. Bootstrap subset admission also feeds one normal
+AOT invocation instead of compiling the project once for admission and again
+for the artifact. The handoff verifier now compares disk-verified payloads with
+the already rendered pipeline text instead of reparsing AST/NIR or rerendering
+producer-private AST/NIR/YIR structures. Controlled compiler-data samples
+reduced a cold cache miss from 268.59 seconds to 19.94 seconds. The established
+cache-hit baseline is 1.57 seconds and the latest sample is 1.62 seconds.
+Successive graph-index samples reduced retired instructions from 175.44 billion
+through 166.73 billion to 159.15 billion and peak footprint from 266.7 MB through
+259.6 MB to 244.1 MB. The measured cold runs used no swap; AST, NIR, YIR, LLVM IR,
+and shim outputs remained byte-identical and native exit remained `130`.
+Recursive async helpers now enter their precompiled direct-call path before
+unsupported inline recursion is rejected. This is implementation evidence only:
+it does not freeze the aggregate ABI, relax semantic, canonical, hash, disk-read,
+or YIR verification, or advance the gate beyond `usable/98`.
 
 ### `differential-reproducibility-gate`
 
@@ -196,15 +223,16 @@ The checked-in Nuis token materializer now enters this path as a real
 `stage1-candidate` leaf and reaches repository-native `13/13` equivalence. The
 path frontdoor verifies its execution and production proofs, including exact
 adapter bytes, all stage folds, independently reproduced token summary,
-canonical token identity, complete token pagination, AST/NIR continuation identities, and the exact
-independently replayed transformation manifest before writing the report. Two local clean,
+canonical token identity, complete token pagination, AST/NIR continuation
+identities, and the exact independently replayed transformation, semantic, and
+handoff v2 selection manifests before writing the report. Two local clean,
 cache-bypassed runs now retain stable reproducible identities and 13/13
 verdicts; production proof identity transitively binds the transformation in
 both runs, including compact-record metadata and semantic recovery, and root or
 aggregate tampering fails closed. The thirteen current
-comparisons still require byte-identical stage payloads. Transformation-aware
-semantic comparison, independent-machine trust, and separate reversible
-replacement authorization remain open.
+comparisons still require byte-identical canonical v1 stage payloads even
+though v2 selects the derived record beside them. Independent-machine trust
+and separate reversible replacement authorization remain open.
 
 ## Migration Rule
 

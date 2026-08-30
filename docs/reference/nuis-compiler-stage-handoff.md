@@ -4,6 +4,10 @@
 boundary between the Rust-hosted stage0 compiler and a future Nuis-written
 stage1 component. Its machine-readable contract is
 [nuis-compiler-stage-handoff-v1.toml](nuis-compiler-stage-handoff-v1.toml).
+`nuis-compiler-stage-handoff-v2` retains that canonical bundle and adds a
+separate selection proof for registered, reversible derived stages. Its
+contract is
+[nuis-compiler-stage-handoff-v2.toml](nuis-compiler-stage-handoff-v2.toml).
 
 This self-hosting primitive is now consumed by the first bounded stage1 leaf,
 not a claim that the whole compiler is stage1.
@@ -81,6 +85,13 @@ The shared reader in `nuis-artifact` validates metadata, stage order,
 encodings, parent identities, record identities, root containment, byte
 lengths, payload hashes, and text policy before returning any payload.
 
+Handoff v2 then binds the v1 bundle, transformation registry, semantic
+differential, and one ordered selection for every registered transform. Each
+selection includes the canonical source record, transform contract, derived
+file and encoding, checkpoint, recovered source hash, and reversible semantic
+verdict. Its reader replays all sibling evidence before returning. It does not
+rewrite v1 or grant replacement authority.
+
 ## Current Limit
 
 The first identity-projection path is now stage1-candidate ready:
@@ -93,22 +104,24 @@ The first identity-projection path is now stage1-candidate ready:
   payloads and computes a Nuis-owned deterministic stage/bundle fold.
 * `nuis bootstrap-candidate-build` materializes a separately identified
   candidate handoff and binds it through
-  `nuis-compiler-candidate-production-v10`.
+  `nuis-compiler-candidate-production-v11`.
 * The adapter blindly transports one token page and two AST/NIR pages. Nuis
   owns the token records plus canonical emission, serializes an opaque
   eight-lane structural cursor, and resumes both projections into page two.
 * The Nuis consumer can resume repeatedly; production binds two structural
   pages, compact byte-different NIR records, and their 1/1 semantic
-  differential, but has not yet selected that payload in the v1 handoff.
+  differential. Handoff v2 selects the registered NIR-derived record without
+  embedding NIR or transform-specific logic in the selection protocol.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
   contracts; matching payload hashes alone never authorize it.
 
 The independent codec, native Nuis consumer, bounded token page, resumable AST
-and NIR pages, compact derived records, semantic proof, production proof, and
-`13/13` differential advance this coordinate to `usable/96`. The next closure
-task defines handoff v2 selection behind the same producer-neutral boundary. See
+and NIR pages, compact derived records, semantic proof, v2 selection,
+production proof, and `13/13` differential advance this coordinate to
+`usable/98`. Independent attester trust and reversible replacement
+authorization remain separate closure work. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
 [Nuis Compiler Stage Transformation](nuis-compiler-stage-transformation.md),
@@ -118,6 +131,7 @@ and [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1

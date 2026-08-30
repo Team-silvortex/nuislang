@@ -6,20 +6,21 @@ use std::{
 
 use crate::{
     build_compiler_candidate_execution, build_compiler_component_build,
-    build_compiler_stage_handoff, build_compiler_stage_semantic_differential,
-    build_compiler_stage_transformations, compiler_stage_structural_checkpoint_words,
-    compiler_token_first_page_identity, compiler_token_pagination_identity,
-    decode_compiler_token_stream, materialize_compiler_stage_transformation_payloads,
-    promote_compiler_component_candidate, render_compiler_stage_semantic_differential,
+    build_compiler_stage_handoff, build_compiler_stage_handoff_v2,
+    build_compiler_stage_semantic_differential, build_compiler_stage_transformations,
+    compiler_stage_structural_checkpoint_words, compiler_token_first_page_identity,
+    compiler_token_pagination_identity, decode_compiler_token_stream,
+    materialize_compiler_stage_transformation_payloads, promote_compiler_component_candidate,
+    render_compiler_stage_handoff_v2, render_compiler_stage_semantic_differential,
     render_compiler_stage_transformations, CompilerCandidateExecutionInput,
     CompilerComponentBuildInput, CompilerComponentCandidatePromotionInput,
-    CompilerComponentDependencyInput, CompilerStageKind, CompilerStagePayloadInput,
-    CompilerStageSemanticDifferential, CompilerStageSemanticDifferentialInput,
-    CompilerStageTransformationRecordInput, CompilerStageTransformations,
-    CompilerStageTransformationsInput, VerifiedCompilerStagePayload,
-    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-    COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
-    COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+    CompilerComponentDependencyInput, CompilerStageHandoffV2, CompilerStageHandoffV2Input,
+    CompilerStageKind, CompilerStagePayloadInput, CompilerStageSemanticDifferential,
+    CompilerStageSemanticDifferentialInput, CompilerStageTransformationRecordInput,
+    CompilerStageTransformations, CompilerStageTransformationsInput, VerifiedCompilerStagePayload,
+    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_STAGE_HANDOFF_V2_FILE,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 use super::*;
@@ -38,6 +39,7 @@ struct Evidence {
     nir_pages: CompilerProjectionTwoPageIdentity,
     stage_transformations: CompilerStageTransformations,
     stage_semantic_differential: CompilerStageSemanticDifferential,
+    stage_handoff_v2: CompilerStageHandoffV2,
 }
 
 fn evidence() -> Evidence {
@@ -187,6 +189,13 @@ fn evidence() -> Evidence {
             transformations: &stage_transformations,
         })
         .expect("build fixture stage semantic differential");
+    let stage_handoff_v2 = build_compiler_stage_handoff_v2(&CompilerStageHandoffV2Input {
+        handoff: &candidate_handoff,
+        payloads: &payloads,
+        transformations: &stage_transformations,
+        semantic_differential: &stage_semantic_differential,
+    })
+    .expect("build fixture stage handoff v2");
     Evidence {
         stage0,
         execution,
@@ -201,11 +210,12 @@ fn evidence() -> Evidence {
         nir_pages,
         stage_transformations,
         stage_semantic_differential,
+        stage_handoff_v2,
     }
 }
 
-fn build(evidence: &Evidence) -> CompilerCandidateProduction {
-    build_compiler_candidate_production(&CompilerCandidateProductionInput {
+fn input(evidence: &Evidence) -> CompilerCandidateProductionInput<'_> {
+    CompilerCandidateProductionInput {
         stage0: &evidence.stage0,
         execution: &evidence.execution,
         candidate: &evidence.candidate,
@@ -222,10 +232,15 @@ fn build(evidence: &Evidence) -> CompilerCandidateProduction {
         stage_transformations: &evidence.stage_transformations,
         stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
         stage_semantic_differential: &evidence.stage_semantic_differential,
+        stage_handoff_v2_file: COMPILER_STAGE_HANDOFF_V2_FILE,
+        stage_handoff_v2: &evidence.stage_handoff_v2,
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter: b"adapter-image",
-    })
-    .expect("build candidate production proof")
+    }
+}
+
+fn build(evidence: &Evidence) -> CompilerCandidateProduction {
+    build_compiler_candidate_production(&input(evidence)).expect("build candidate production proof")
 }
 
 #[test]
@@ -246,6 +261,12 @@ fn candidate_production_round_trips_and_never_authorizes_replacement() {
     assert_eq!(
         proof.stage_semantic_differential_proof_sha256,
         evidence.stage_semantic_differential.proof_sha256
+    );
+    assert_eq!(proof.stage_handoff_v2_file, COMPILER_STAGE_HANDOFF_V2_FILE);
+    assert!(proof.stage_handoff_v2_bytes > 0);
+    assert_eq!(
+        proof.stage_handoff_v2_proof_sha256,
+        evidence.stage_handoff_v2.proof_sha256
     );
     assert_eq!(proof.token_record_count, 5);
     assert_eq!(
@@ -330,155 +351,64 @@ fn candidate_production_rejects_fold_and_authority_tampering() {
     let evidence = evidence();
     let mut folds = evidence.folds.clone();
     folds[2] += 1;
-    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
-        stage0: &evidence.stage0,
-        execution: &evidence.execution,
-        candidate: &evidence.candidate,
-        handoff: &evidence.handoff,
-        payloads: &evidence.payloads,
-        stage_folds: &folds,
-        bundle_fold: compiler_candidate_bundle_fold(&folds),
-        token_decode: &evidence.token_decode,
-        token_page: &evidence.token_page,
-        token_pagination: &evidence.token_pagination,
-        ast_pages: &evidence.ast_pages,
-        nir_pages: &evidence.nir_pages,
-        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
-        stage_transformations: &evidence.stage_transformations,
-        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-        stage_semantic_differential: &evidence.stage_semantic_differential,
-        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
-        adapter: b"adapter-image",
-    })
-    .expect_err("Nuis fold drift must fail");
+    let mut drifted_input = input(&evidence);
+    drifted_input.stage_folds = &folds;
+    drifted_input.bundle_fold = compiler_candidate_bundle_fold(&folds);
+    let error =
+        build_compiler_candidate_production(&drifted_input).expect_err("Nuis fold drift must fail");
     assert!(error.to_string().contains("stage 2 fold"));
 
     let mut token_decode = evidence.token_decode;
     token_decode.semantic_fold += 1;
-    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
-        stage0: &evidence.stage0,
-        execution: &evidence.execution,
-        candidate: &evidence.candidate,
-        handoff: &evidence.handoff,
-        payloads: &evidence.payloads,
-        stage_folds: &evidence.folds,
-        bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
-        token_decode: &token_decode,
-        token_page: &evidence.token_page,
-        token_pagination: &evidence.token_pagination,
-        ast_pages: &evidence.ast_pages,
-        nir_pages: &evidence.nir_pages,
-        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
-        stage_transformations: &evidence.stage_transformations,
-        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-        stage_semantic_differential: &evidence.stage_semantic_differential,
-        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
-        adapter: b"adapter-image",
-    })
-    .expect_err("Nuis token decode drift must fail");
+    let mut drifted_input = input(&evidence);
+    drifted_input.token_decode = &token_decode;
+    let error = build_compiler_candidate_production(&drifted_input)
+        .expect_err("Nuis token decode drift must fail");
     assert!(error.to_string().contains("token decode summary"));
 
     let mut token_page = evidence.token_page;
     token_page.identity += 1;
-    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
-        stage0: &evidence.stage0,
-        execution: &evidence.execution,
-        candidate: &evidence.candidate,
-        handoff: &evidence.handoff,
-        payloads: &evidence.payloads,
-        stage_folds: &evidence.folds,
-        bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
-        token_decode: &evidence.token_decode,
-        token_page: &token_page,
-        token_pagination: &evidence.token_pagination,
-        ast_pages: &evidence.ast_pages,
-        nir_pages: &evidence.nir_pages,
-        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
-        stage_transformations: &evidence.stage_transformations,
-        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-        stage_semantic_differential: &evidence.stage_semantic_differential,
-        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
-        adapter: b"adapter-image",
-    })
-    .expect_err("Nuis canonical page identity drift must fail");
+    let mut drifted_input = input(&evidence);
+    drifted_input.token_page = &token_page;
+    let error = build_compiler_candidate_production(&drifted_input)
+        .expect_err("Nuis canonical page identity drift must fail");
     assert!(error
         .to_string()
         .contains("canonical token pagination identity"));
 
     let mut token_pagination = evidence.token_pagination.clone();
     token_pagination.chain_identity += 1;
-    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
-        stage0: &evidence.stage0,
-        execution: &evidence.execution,
-        candidate: &evidence.candidate,
-        handoff: &evidence.handoff,
-        payloads: &evidence.payloads,
-        stage_folds: &evidence.folds,
-        bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
-        token_decode: &evidence.token_decode,
-        token_page: &evidence.token_page,
-        token_pagination: &token_pagination,
-        ast_pages: &evidence.ast_pages,
-        nir_pages: &evidence.nir_pages,
-        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
-        stage_transformations: &evidence.stage_transformations,
-        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-        stage_semantic_differential: &evidence.stage_semantic_differential,
-        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
-        adapter: b"adapter-image",
-    })
-    .expect_err("Nuis token pagination chain drift must fail");
+    let mut drifted_input = input(&evidence);
+    drifted_input.token_pagination = &token_pagination;
+    let error = build_compiler_candidate_production(&drifted_input)
+        .expect_err("Nuis token pagination chain drift must fail");
     assert!(error.to_string().contains("token pagination identity"));
 
     let mut ast_pages = evidence.ast_pages;
     ast_pages.second.page.identity += 1;
-    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
-        stage0: &evidence.stage0,
-        execution: &evidence.execution,
-        candidate: &evidence.candidate,
-        handoff: &evidence.handoff,
-        payloads: &evidence.payloads,
-        stage_folds: &evidence.folds,
-        bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
-        token_decode: &evidence.token_decode,
-        token_page: &evidence.token_page,
-        token_pagination: &evidence.token_pagination,
-        ast_pages: &ast_pages,
-        nir_pages: &evidence.nir_pages,
-        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
-        stage_transformations: &evidence.stage_transformations,
-        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-        stage_semantic_differential: &evidence.stage_semantic_differential,
-        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
-        adapter: b"adapter-image",
-    })
-    .expect_err("Nuis AST continuation page identity drift must fail");
+    let mut drifted_input = input(&evidence);
+    drifted_input.ast_pages = &ast_pages;
+    let error = build_compiler_candidate_production(&drifted_input)
+        .expect_err("Nuis AST continuation page identity drift must fail");
     assert!(error.to_string().contains("AST structural page chain"));
 
     let mut nir_pages = evidence.nir_pages;
     nir_pages.first.cursor_identity += 1;
-    let error = build_compiler_candidate_production(&CompilerCandidateProductionInput {
-        stage0: &evidence.stage0,
-        execution: &evidence.execution,
-        candidate: &evidence.candidate,
-        handoff: &evidence.handoff,
-        payloads: &evidence.payloads,
-        stage_folds: &evidence.folds,
-        bundle_fold: compiler_candidate_bundle_fold(&evidence.folds),
-        token_decode: &evidence.token_decode,
-        token_page: &evidence.token_page,
-        token_pagination: &evidence.token_pagination,
-        ast_pages: &evidence.ast_pages,
-        nir_pages: &nir_pages,
-        stage_transformations_file: COMPILER_STAGE_TRANSFORMATION_FILE,
-        stage_transformations: &evidence.stage_transformations,
-        stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-        stage_semantic_differential: &evidence.stage_semantic_differential,
-        adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
-        adapter: b"adapter-image",
-    })
-    .expect_err("Nuis NIR structural cursor identity drift must fail");
+    let mut drifted_input = input(&evidence);
+    drifted_input.nir_pages = &nir_pages;
+    let error = build_compiler_candidate_production(&drifted_input)
+        .expect_err("Nuis NIR structural cursor identity drift must fail");
     assert!(error.to_string().contains("NIR structural page chain"));
+
+    let mut stage_handoff_v2 = evidence.stage_handoff_v2.clone();
+    stage_handoff_v2.selections[0].semantically_equivalent = false;
+    let mut drifted_input = input(&evidence);
+    drifted_input.stage_handoff_v2 = &stage_handoff_v2;
+    let error = build_compiler_candidate_production(&drifted_input)
+        .expect_err("stage handoff v2 drift must fail");
+    assert!(error
+        .to_string()
+        .contains("stage handoff v2 does not match its registered evidence"));
 
     let source = render_compiler_candidate_production(&build(&evidence));
     let tampered = source.replacen(
@@ -523,6 +453,11 @@ fn candidate_production_reader_binds_adapter_bytes_and_all_evidence() {
         render_compiler_stage_semantic_differential(&evidence.stage_semantic_differential),
     )
     .expect("write stage semantic differential");
+    fs::write(
+        root.join(COMPILER_STAGE_HANDOFF_V2_FILE),
+        render_compiler_stage_handoff_v2(&evidence.stage_handoff_v2),
+    )
+    .expect("write stage handoff v2");
     fs::write(root.join(COMPILER_CANDIDATE_ADAPTER_FILE), b"adapter-image").expect("write adapter");
 
     let verified = read_compiler_candidate_production(
@@ -554,6 +489,28 @@ fn candidate_production_reader_binds_adapter_bytes_and_all_evidence() {
 
     fs::write(root.join(COMPILER_CANDIDATE_ADAPTER_FILE), b"adapter-image")
         .expect("restore adapter");
+    fs::write(
+        root.join(COMPILER_STAGE_HANDOFF_V2_FILE),
+        b"tampered-stage-handoff-v2",
+    )
+    .expect("tamper stage handoff v2");
+    let error = read_compiler_candidate_production(
+        &path,
+        &evidence.stage0,
+        &evidence.execution,
+        &evidence.candidate,
+        &evidence.handoff,
+        &evidence.payloads,
+    )
+    .expect_err("stage handoff v2 tampering must fail");
+    assert!(error
+        .to_string()
+        .contains("stage handoff v2 length or SHA-256"));
+    fs::write(
+        root.join(COMPILER_STAGE_HANDOFF_V2_FILE),
+        render_compiler_stage_handoff_v2(&evidence.stage_handoff_v2),
+    )
+    .expect("restore stage handoff v2");
     fs::write(
         root.join(COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE),
         b"tampered-semantic-differential",

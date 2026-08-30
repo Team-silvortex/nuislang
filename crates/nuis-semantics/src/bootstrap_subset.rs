@@ -34,6 +34,7 @@ pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerProjectionState",
     "CompilerSourceSpan",
     "CompilerText",
+    "CompilerTextArena",
     "CompilerTokenBuffer",
     "CompilerTokenMaterializer",
     "CompilerTokenRecord",

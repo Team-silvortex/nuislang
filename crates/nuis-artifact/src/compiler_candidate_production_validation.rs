@@ -12,16 +12,17 @@ use super::{
 use crate::{
     compiler_projection_two_page_identity, compiler_token_first_page_identity,
     compiler_token_pagination_identity, decode_compiler_token_stream,
-    verify_compiler_stage_semantic_differential, verify_compiler_stage_transformations,
-    ArtifactError, CompilerProjectionKind, CompilerProjectionPageIdentity, CompilerStageKind,
+    verify_compiler_stage_handoff_v2, verify_compiler_stage_semantic_differential,
+    verify_compiler_stage_transformations, ArtifactError, CompilerProjectionKind,
+    CompilerProjectionPageIdentity, CompilerStageHandoffV2Input, CompilerStageKind,
     CompilerStageSemanticDifferentialInput, COMPILER_COMPONENT_STAGE0_ROLE,
     COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_PROJECTION_CURSOR_CONTRACT,
-    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_TRANSFORMATION_FILE,
-    COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_DECODER_FOLD_MODULUS,
-    COMPILER_TOKEN_DECODER_MAX_RECORDS, COMPILER_TOKEN_PAGE_CANONICAL_BYTES,
-    COMPILER_TOKEN_PAGE_IDENTITY_RADIX, COMPILER_TOKEN_PAGE_PAYLOAD_BYTES,
-    COMPILER_TOKEN_PAGE_RECORDS, COMPILER_TOKEN_PAGINATION_CONTRACT,
-    COMPILER_TOKEN_PAGINATION_PAGE_BYTES,
+    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_TOKEN_DECODER_CONTRACT,
+    COMPILER_TOKEN_DECODER_FOLD_MODULUS, COMPILER_TOKEN_DECODER_MAX_RECORDS,
+    COMPILER_TOKEN_PAGE_CANONICAL_BYTES, COMPILER_TOKEN_PAGE_IDENTITY_RADIX,
+    COMPILER_TOKEN_PAGE_PAYLOAD_BYTES, COMPILER_TOKEN_PAGE_RECORDS,
+    COMPILER_TOKEN_PAGINATION_CONTRACT, COMPILER_TOKEN_PAGINATION_PAGE_BYTES,
 };
 
 pub(super) fn validate_evidence(
@@ -154,6 +155,26 @@ pub(super) fn validate_evidence(
             transformations: input.stage_transformations,
         },
     )?;
+    validate_file_name(input.stage_handoff_v2_file, "stage handoff v2")?;
+    if input.stage_handoff_v2_file != COMPILER_STAGE_HANDOFF_V2_FILE {
+        return Err(ArtifactError::new(
+            "compiler candidate production requires the canonical stage handoff v2 file",
+        ));
+    }
+    verify_compiler_stage_handoff_v2(
+        input.stage_handoff_v2,
+        &CompilerStageHandoffV2Input {
+            handoff: input.handoff,
+            payloads: input.payloads,
+            transformations: input.stage_transformations,
+            semantic_differential: input.stage_semantic_differential,
+        },
+    )?;
+    if input.stage_handoff_v2.producer_id != input.candidate.producer_id {
+        return Err(ArtifactError::new(
+            "compiler candidate production stage handoff v2 does not bind its candidate producer",
+        ));
+    }
     validate_file_name(input.adapter_file, "candidate adapter")?;
     if input.adapter.is_empty() {
         return Err(ArtifactError::new(
@@ -237,6 +258,11 @@ pub(super) fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), 
             "stage semantic differential proof",
             proof.stage_semantic_differential_proof_sha256.as_str(),
         ),
+        ("stage handoff v2", proof.stage_handoff_v2_sha256.as_str()),
+        (
+            "stage handoff v2 proof",
+            proof.stage_handoff_v2_proof_sha256.as_str(),
+        ),
         ("candidate adapter", proof.adapter_sha256.as_str()),
         ("production proof", proof.proof_sha256.as_str()),
     ] {
@@ -248,16 +274,19 @@ pub(super) fn validate_proof(proof: &CompilerCandidateProduction) -> Result<(), 
         &proof.stage_semantic_differential_file,
         "stage semantic differential",
     )?;
+    validate_file_name(&proof.stage_handoff_v2_file, "stage handoff v2")?;
     validate_file_name(&proof.adapter_file, "candidate adapter")?;
     if proof.stage_transformations_file != COMPILER_STAGE_TRANSFORMATION_FILE
         || proof.stage_transformations_bytes == 0
         || proof.stage_semantic_differential_file != COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE
         || proof.stage_semantic_differential_bytes == 0
+        || proof.stage_handoff_v2_file != COMPILER_STAGE_HANDOFF_V2_FILE
+        || proof.stage_handoff_v2_bytes == 0
         || proof.adapter_bytes == 0
         || proof.bundle_fold >= FOLD_MODULUS as usize
     {
         return Err(ArtifactError::new(
-            "compiler candidate production adapter length or bundle fold is invalid",
+            "compiler candidate production evidence length or bundle fold is invalid",
         ));
     }
     if proof.token_record_count > COMPILER_TOKEN_DECODER_MAX_RECORDS

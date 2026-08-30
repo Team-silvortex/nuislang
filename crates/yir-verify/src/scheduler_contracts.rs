@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use yir_core::{EdgeKind, Node, Resource, YirModule};
 
@@ -20,8 +20,8 @@ use crate::scheduler_observer_contracts::{
 
 pub(crate) fn verify_scheduler_contract_nodes(
     module: &YirModule,
-    resources: &BTreeMap<String, &Resource>,
-    nodes: &BTreeMap<String, &Node>,
+    resources: &HashMap<&str, &Resource>,
+    nodes: &HashMap<&str, &Node>,
 ) -> Result<(), String> {
     for node in &module.nodes {
         if node.op.module != "cpu" || node.op.instruction != "text" {
@@ -69,7 +69,10 @@ pub(crate) fn verify_scheduler_contract_nodes(
                     node.name, target_name
                 )
             })?;
-            let target_resource = resources.get(&target.resource).copied().ok_or_else(|| {
+            let target_resource = resources
+                .get(target.resource.as_str())
+                .copied()
+                .ok_or_else(|| {
                 format!(
                     "scheduler contract node `{}` references target `{}` with unknown resource `{}`",
                     node.name, target.name, target.resource

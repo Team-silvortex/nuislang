@@ -55,10 +55,11 @@ pub(crate) fn run_bootstrap_check(input: PathBuf, json: bool) -> Result<(), Stri
     }
 }
 
-pub(crate) fn ensure_bootstrap_resolved(
+pub(crate) fn ensure_bootstrap_subset_resolved(
     resolved: &pipeline::ResolvedCompileInput,
 ) -> Result<(), String> {
-    let report = inspect_bootstrap_resolved(resolved)?;
+    let (input_kind, modules) = bootstrap_modules_for_resolved(resolved)?;
+    let report = inspect_bootstrap_subset_modules(input_kind, modules)?;
     ensure_bootstrap_report(&report)
 }
 
@@ -78,6 +79,13 @@ fn inspect_bootstrap_input(input: &std::path::Path) -> Result<BootstrapCheckRepo
 fn inspect_bootstrap_resolved(
     resolved: &pipeline::ResolvedCompileInput,
 ) -> Result<BootstrapCheckReport, String> {
+    let (input_kind, modules) = bootstrap_modules_for_resolved(resolved)?;
+    inspect_bootstrap_modules(input_kind, modules, || resolved.compile().map(|_| ()))
+}
+
+fn bootstrap_modules_for_resolved(
+    resolved: &pipeline::ResolvedCompileInput,
+) -> Result<(&'static str, Vec<AstModule>), String> {
     let input_kind = if resolved.project.is_some() {
         "project"
     } else {
@@ -103,17 +111,34 @@ fn inspect_bootstrap_resolved(
         })?;
         vec![frontend::parse_nuis_ast(&source)?]
     };
-    inspect_bootstrap_modules(input_kind, modules, || resolved.compile().map(|_| ()))
+    Ok((input_kind, modules))
 }
 
 fn inspect_bootstrap_modules<F>(
     input_kind: &'static str,
-    mut modules: Vec<AstModule>,
+    modules: Vec<AstModule>,
     semantic_check: F,
 ) -> Result<BootstrapCheckReport, String>
 where
     F: FnOnce() -> Result<(), String>,
 {
+    let mut report = inspect_bootstrap_subset_modules(input_kind, modules)?;
+    if !report.accepted() {
+        return Ok(report);
+    }
+    report.semantic_error = semantic_check().err();
+    report.semantic_pipeline = if report.semantic_error.is_some() {
+        "failed"
+    } else {
+        "checked"
+    };
+    Ok(report)
+}
+
+fn inspect_bootstrap_subset_modules(
+    input_kind: &'static str,
+    mut modules: Vec<AstModule>,
+) -> Result<BootstrapCheckReport, String> {
     if modules.is_empty() {
         return Err("bootstrap check requires at least one local source module".to_owned());
     }
@@ -124,23 +149,16 @@ where
         .map(|module| validate_bootstrap_subset(module, &context))
         .collect::<Vec<_>>();
     let subset_accepted = reports.iter().all(BootstrapSubsetReport::accepted);
-    let semantic_error = if subset_accepted {
-        semantic_check().err()
+    let semantic_pipeline = if subset_accepted {
+        "deferred"
     } else {
-        None
-    };
-    let semantic_pipeline = if !subset_accepted {
         "skipped"
-    } else if semantic_error.is_some() {
-        "failed"
-    } else {
-        "checked"
     };
     Ok(BootstrapCheckReport {
         input_kind,
         modules: reports,
         semantic_pipeline,
-        semantic_error,
+        semantic_error: None,
     })
 }
 

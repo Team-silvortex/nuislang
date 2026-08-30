@@ -278,6 +278,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "nuis_bootstrap_candidate_token_pagination_page_bytes_v1",
             "nuis_bootstrap_candidate_token_page_hash_step_v1",
             "nuis_bootstrap_candidate_token_page_chain_fold_v1",
+            "CompilerTextArena",
             "NBS001",
             "NBS017",
             "tests/fixtures/bootstrap/accepted/compiler_scanner.ns",
@@ -289,6 +290,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         path: "crates/nuis-semantics/src/bootstrap_subset.rs",
         required_patterns: &[
             "BOOTSTRAP_SUBSET_PROTOCOL",
+            "BOOTSTRAP_APPROVED_EXTERNAL_TYPES",
+            "CompilerTextArena",
             "BootstrapSubsetContext",
             "validate_bootstrap_subset",
             "CODE_UNSUPPORTED_DOMAIN",
@@ -362,9 +365,20 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         id: "nuis-compiler-data-model-registration",
         path: "stdlib/std/module.toml",
         required_patterns: &[
-            "surface.std.compiler-data-model.v6",
+            "surface.std.compiler-data-model.v7",
             "lib/compiler_data.ns",
             "lib/compiler_token_emit.ns",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-v7-typed-text-stdlib",
+        path: "stdlib/std/lib/compiler_data.ns",
+        required_patterns: &[
+            "pub struct CompilerTextArena",
+            "pub fn compiler_text_shape_valid",
+            "pub fn compiler_text_arena_store",
+            "pub fn compiler_text_arena_get",
+            "pub fn compiler_text_arena_identity",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -385,6 +399,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "415394959",
             "fn arena_boundaries_fail_closed",
             "1064756829",
+            "fn text_arena_boundaries_fail_closed",
+            "1643761726",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -393,6 +409,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         required_patterns: &[
             "compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis",
             "deferred lowering",
+            "compiler_text_arena_store",
+            "compiler_text_arena_get",
+            "compiler_text_arena_identity",
             "Some(130)",
         ],
     },
@@ -436,7 +455,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "nuis_nir_first_page_materializer = true",
             "nuis-compiler-structural-cursor-v1",
             "production_bound_structural_pages_per_projection = 2",
-            "nuis-compiler-candidate-production-v9",
+            "nuis-compiler-candidate-production-v11",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -526,14 +545,14 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         id: "nuis-compiler-stage-handoff-writer",
         path: "tools/nuisc/src/stage_handoff.rs",
         required_patterns: &[
-            "write_and_verify_compiler_stage_handoff",
             "build_compiler_stage_handoff",
+            "read_compiler_stage_handoff",
             "verify_stage_neutral_token_stream",
-            "parse_compiler_structural_projection",
-            "verify_compiler_projection_identity",
+            "expected_ast_text",
+            "expected_nir_text",
+            "expected_yir_text",
             "parse_explicit_module",
             "verify_module",
-            "portable boundary",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -691,7 +710,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         path: "tools/nuisc/src/bootstrap_stage_driver.rs",
         required_patterns: &[
             "run_bootstrap_build",
-            "ensure_bootstrap_resolved",
+            "ensure_bootstrap_subset_resolved",
             "run_compile_resolved",
             "nuisc-stage0-reference",
             "collect_dependencies",

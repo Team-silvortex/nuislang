@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use yir_core::Node;
 
 use crate::project_contracts::parse_semicolon_kv_contract;
 
 pub(crate) fn verify_scheduler_result_capability_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -66,7 +66,7 @@ pub(crate) fn verify_scheduler_result_capability_contract_text(
 }
 
 pub(crate) fn verify_scheduler_observer_role_variant_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -111,7 +111,7 @@ pub(crate) fn verify_scheduler_observer_role_variant_contract_text(
 }
 
 pub(crate) fn verify_scheduler_summary_capability_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -153,7 +153,7 @@ pub(crate) fn verify_scheduler_summary_capability_contract_text(
 }
 
 pub(crate) fn verify_scheduler_summary_class_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -203,7 +203,7 @@ pub(crate) fn verify_scheduler_summary_class_contract_text(
 }
 
 pub(crate) fn verify_scheduler_observer_source_class_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -245,7 +245,7 @@ pub(crate) fn verify_scheduler_observer_source_class_contract_text(
 }
 
 pub(crate) fn verify_scheduler_observer_stage_class_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -287,7 +287,7 @@ pub(crate) fn verify_scheduler_observer_stage_class_contract_text(
 }
 
 pub(crate) fn verify_scheduler_observer_scope_class_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -327,7 +327,7 @@ pub(crate) fn verify_scheduler_observer_scope_class_contract_text(
 }
 
 pub(crate) fn verify_scheduler_observer_branch_class_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,

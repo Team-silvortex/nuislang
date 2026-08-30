@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeMap, BinaryHeap},
+    collections::{BinaryHeap, HashMap},
 };
 
 use yir_core::{EdgeKind, YirModule};
@@ -8,19 +8,14 @@ use yir_core::{EdgeKind, YirModule};
 use super::extern_abi::is_cpu_extern_call_instruction;
 
 pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
-    let mut adjacency = BTreeMap::<&str, Vec<&str>>::new();
-    let mut indegree = BTreeMap::<&str, usize>::new();
-    let node_positions = module
+    let node_indices = module
         .nodes
         .iter()
         .enumerate()
         .map(|(index, node)| (node.name.as_str(), index))
-        .collect::<BTreeMap<_, _>>();
-
-    for node in &module.nodes {
-        adjacency.entry(node.name.as_str()).or_default();
-        indegree.entry(node.name.as_str()).or_insert(0);
-    }
+        .collect::<HashMap<_, _>>();
+    let mut adjacency = vec![Vec::<usize>::new(); module.nodes.len()];
+    let mut indegree = vec![0usize; module.nodes.len()];
 
     for edge in &module.edges {
         match edge.kind {
@@ -28,32 +23,28 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
             | EdgeKind::Effect
             | EdgeKind::Lifetime
             | EdgeKind::CrossDomainExchange => {
-                adjacency
-                    .entry(edge.from.as_str())
-                    .or_default()
-                    .push(edge.to.as_str());
-                *indegree.entry(edge.to.as_str()).or_insert(0) += 1;
+                let source_index = node_index(&node_indices, &edge.from, "source")?;
+                let target_index = node_index(&node_indices, &edge.to, "target")?;
+                adjacency[source_index].push(target_index);
+                indegree[target_index] += 1;
             }
         }
     }
 
-    let mut last_cpu_extern_on_resource = BTreeMap::<&str, &str>::new();
-    for node in &module.nodes {
+    let mut last_cpu_extern_on_resource = HashMap::<&str, usize>::new();
+    for (node_index, node) in module.nodes.iter().enumerate() {
         if node.op.module == "cpu" && is_cpu_extern_call_instruction(&node.op.instruction) {
             if let Some(previous) =
-                last_cpu_extern_on_resource.insert(node.resource.as_str(), node.name.as_str())
+                last_cpu_extern_on_resource.insert(node.resource.as_str(), node_index)
             {
-                adjacency
-                    .entry(previous)
-                    .or_default()
-                    .push(node.name.as_str());
-                *indegree.entry(node.name.as_str()).or_insert(0) += 1;
+                adjacency[previous].push(node_index);
+                indegree[node_index] += 1;
             }
         }
     }
 
-    let mut last_cpu_node_on_lane = BTreeMap::<(&str, &str), &str>::new();
-    for node in &module.nodes {
+    let mut last_cpu_node_on_lane = HashMap::<(&str, &str), usize>::new();
+    for (node_index, node) in module.nodes.iter().enumerate() {
         if node.op.module != "cpu" {
             continue;
         }
@@ -66,42 +57,42 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
             continue;
         }
         let key = (node.resource.as_str(), lane);
-        if let Some(previous) = last_cpu_node_on_lane.insert(key, node.name.as_str()) {
-            adjacency
-                .entry(previous)
-                .or_default()
-                .push(node.name.as_str());
-            *indegree.entry(node.name.as_str()).or_insert(0) += 1;
+        if let Some(previous) = last_cpu_node_on_lane.insert(key, node_index) {
+            adjacency[previous].push(node_index);
+            indegree[node_index] += 1;
         }
     }
 
     let mut ready = indegree
         .iter()
-        .filter_map(|(name, degree)| {
-            (*degree == 0).then_some(Reverse((node_positions[*name], *name)))
-        })
+        .enumerate()
+        .filter_map(|(index, degree)| (*degree == 0).then_some(Reverse(index)))
         .collect::<BinaryHeap<_>>();
 
     let mut order = Vec::with_capacity(module.nodes.len());
-    while let Some(Reverse((_, node))) = ready.pop() {
-        order.push(node.to_owned());
-        if let Some(targets) = adjacency.get(node) {
-            for target in targets {
-                if let Some(degree) = indegree.get_mut(target) {
-                    *degree -= 1;
-                    if *degree == 0 {
-                        ready.push(Reverse((node_positions[*target], *target)));
-                    }
-                }
+    while let Some(Reverse(node_index)) = ready.pop() {
+        order.push(module.nodes[node_index].name.clone());
+        for &target_index in &adjacency[node_index] {
+            indegree[target_index] -= 1;
+            if indegree[target_index] == 0 {
+                ready.push(Reverse(target_index));
             }
         }
     }
 
     if order.len() != module.nodes.len() {
-        let unresolved = indegree
+        let mut unresolved = indegree
             .iter()
-            .filter_map(|(name, degree)| (*degree > 0).then_some(format!("{name}:{degree}")))
+            .enumerate()
+            .filter_map(|(index, degree)| {
+                (*degree > 0).then_some((module.nodes[index].name.as_str(), *degree))
+            })
+            .collect::<Vec<_>>();
+        unresolved.sort_unstable_by_key(|(name, _)| *name);
+        let unresolved = unresolved
+            .into_iter()
             .take(12)
+            .map(|(name, degree)| format!("{name}:{degree}"))
             .collect::<Vec<_>>()
             .join(", ");
         return Err(format!(
@@ -110,6 +101,17 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
     }
 
     Ok(order)
+}
+
+fn node_index(
+    node_indices: &HashMap<&str, usize>,
+    name: &str,
+    role: &str,
+) -> Result<usize, String> {
+    node_indices
+        .get(name)
+        .copied()
+        .ok_or_else(|| format!("YIR edge references unknown {role} node `{name}`"))
 }
 
 #[cfg(test)]

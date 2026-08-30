@@ -101,12 +101,13 @@ continuation_cursor_identity = 38998897
 candidate_producer = "nuis-stage1-compact-structured-nir-producer-v10"
 adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v8"
 semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
-production_protocol = "nuis-compiler-candidate-production-v10"
+selection_successor_protocol = "nuis-compiler-stage-handoff-v2"
+production_protocol = "nuis-compiler-candidate-production-v11"
 
 [open_boundary]
 missing = [
   "third-and-later-structural-pages",
-  "producer-neutral-stage-handoff-v2-with-derived-stage-selection",
+  "additional-registered-derived-stage-encodings",
   "independent-machine-or-attester-proof",
   "reversible-replacement-authorization",
 ]

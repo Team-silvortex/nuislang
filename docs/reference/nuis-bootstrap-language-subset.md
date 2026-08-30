@@ -49,6 +49,11 @@ The executable type allowlist contains:
 - `Option`, `Result`, and the reserved compiler data-model names recorded in
   the TOML contract
 
+`CompilerTextArena` is one such v7 data-model name. Registering that aggregate
+admits no new source construct: it is composed entirely from already-approved
+structs, `CompilerArena`, and `CompilerVector`, and the scalar export count
+remains exactly twenty-one.
+
 The structural surface includes constants, aliases, structs, enums, ordinary
 functions, unbounded generics, local mutation, destructuring, direct and method
 calls, struct literals, field access, integer/Boolean operators, `if`, `match`,

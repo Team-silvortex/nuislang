@@ -1,0 +1,59 @@
+protocol = "nuis-compiler-stage-handoff-v2"
+version = 2
+predecessor = "nuis-compiler-stage-handoff-v1"
+status = "usable-registered-derived-stage-selection"
+scope = "producer-neutral-reversible-derived-stage-selection"
+manifest_name = "nuis.compiler-stage-handoff-v2.toml"
+base_handoff_protocol = "nuis-compiler-stage-handoff-v1"
+selection_contract = "nuis-compiler-derived-stage-selection-v1"
+authority = "reversible-derived-stage-selection-no-replacement"
+verdict = "registered-derived-stages-selected-awaiting-authorization"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+replacement_authorized = false
+
+registered_evidence = [
+  "nuis.compiler-stage-transformations.toml",
+  "nuis.compiler-stage-semantic-diff.toml",
+]
+
+selection_fields = [
+  "source-stage-and-canonical-source-encoding",
+  "source-handoff-record-and-payload-sha256",
+  "transformation-and-semantic-comparison-ordinals",
+  "registered-transform-contract-and-derived-encoding",
+  "derived-payload-file-byte-length-and-sha256",
+  "structural-checkpoint-sha256",
+  "recovered-source-payload-sha256",
+  "reversible-and-semantically-equivalent-verdicts",
+]
+
+invariants = [
+  "v1-remains-the-canonical-five-stage-source-of-truth",
+  "every-registered-transformation-has-one-same-ordinal-semantic-comparison",
+  "selection-order-is-registration-order-without-stage-specific-driver-logic",
+  "source-record-transform-derived-payload-and-semantic-proof-lineage-is-exact",
+  "every-selected-derived-payload-is-byte-different-losslessly-reversible-and-semantically-equivalent",
+  "manifest-reader-replays-transformation-derived-payload-and-semantic-differential-evidence",
+  "selection-does-not-authorize-canonical-stage-or-compiler-replacement",
+]
+
+current_candidate = [
+  "registered-nir-structured-record-codec-v1",
+  "nuis-derived-structural-records-v2",
+  "one-of-one-reversible-semantic-equivalence",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1",
+]
+
+[open_boundary]
+missing = [
+  "independent-machine-or-attester-trust",
+  "reversible-component-replacement-authorization",
+  "production-binding-for-third-and-later-structural-pages",
+  "additional-registered-derived-encodings-and-stages",
+]

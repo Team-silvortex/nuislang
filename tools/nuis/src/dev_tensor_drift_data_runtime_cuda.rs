@@ -33,12 +33,41 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         path: "crates/yir-verify/src/function_contracts.rs",
         required_patterns: &[
             "verify_function_table",
+            "HashMap<&str, &Node>",
+            "nodes.contains_key",
             "invalid or duplicate function boundary",
             "references unknown body node",
             "belongs to both",
             "has invalid parameter",
             "has an invalid result boundary",
             "expected at most one",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "yir-verifier-dense-edge-index",
+        path: "crates/yir-verify/src/lib.rs",
+        required_patterns: &[
+            "HashMap::with_capacity(module.nodes.len())",
+            "node_indices",
+            "HashSet::with_capacity(module.edges.len())",
+            "(source_index, target_index, edge.kind.as_str())",
+            "(source_index, node_index, required_kind.as_str())",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-lowering-hash-graph-index",
+        path: "tools/nuisc/src/lowering/state.rs",
+        required_patterns: &[
+            "node_resources: HashMap<String, String>",
+            "edge_index: HashSet<(String, String, &'static str)>",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-recursive-async-helper-regression",
+        path: "tools/nuisc/src/lowering/tests_async_runtime/recursive_helpers.rs",
+        required_patterns: &[
+            "lowers_generic_recursive_async_call_into_schedule_boundary_and_specialized_helper_lane",
+            "lowers_recursive_async_with_generic_payload_alias_higher_order_body_into_specialized_helper_lanes",
         ],
     },
     DevTensorDriftCheckSpec {

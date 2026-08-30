@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use yir_core::Node;
 
@@ -96,7 +96,7 @@ pub(crate) fn verify_scheduler_clock_contract_text(
 }
 
 pub(crate) fn verify_scheduler_lane_capability_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -174,7 +174,7 @@ pub(crate) fn verify_scheduler_lane_capability_contract_text(
 }
 
 pub(crate) fn verify_scheduler_bridge_capability_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,
@@ -243,7 +243,7 @@ pub(crate) fn verify_scheduler_bridge_capability_contract_text(
 }
 
 pub(crate) fn verify_scheduler_result_lane_contract_text(
-    nodes: &BTreeMap<String, &Node>,
+    nodes: &HashMap<&str, &Node>,
     node_name: &str,
     family: &str,
     value: &str,

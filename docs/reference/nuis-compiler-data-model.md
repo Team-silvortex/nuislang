@@ -1,8 +1,10 @@
 # Nuis Compiler Data Model
 
-`nuis-compiler-data-model-v6` is the current compiler-owned data boundary
+`nuis-compiler-data-model-v7` is the current compiler-owned data boundary
 written in Nuis itself. Its machine-readable contract is
-[nuis-compiler-data-model-v6.toml](nuis-compiler-data-model-v6.toml). The
+[nuis-compiler-data-model-v7.toml](nuis-compiler-data-model-v7.toml). The
+stable arena-envelope predecessor remains frozen in
+[nuis-compiler-data-model-v6.toml](nuis-compiler-data-model-v6.toml), the
 deterministic-map predecessor remains frozen in
 [nuis-compiler-data-model-v5.toml](nuis-compiler-data-model-v5.toml), the
 complete-token-pagination predecessor remains frozen in
@@ -24,9 +26,9 @@ Rust, C, libc, FFI, or host-language layouts.
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
 
-## V6 Surface
+## V7 Surface
 
-V6 retains the v5 compiler foundation:
+V7 retains the v6 compiler foundation:
 
 - `CompilerVector` stores up to sixteen `i64` values in four ordered pages.
 - `CompilerText` owns canonical UTF-8 bytes, scalar length, and a deterministic
@@ -34,6 +36,25 @@ V6 retains the v5 compiler foundation:
 - `CompilerPath`, `CompilerMap`, `CompilerArena`, `CompilerSourceSpan`, and
   `CompilerDiagnostic` retain stable-index and fail-closed behavior.
 - Generic `Option<T>` and `Result<T, E>` remain the absence and error channels.
+
+V7 adds the first typed aggregate payload over stable arena indices:
+
+- `CompilerTextArena` composes an unchanged `CompilerArena` envelope with one
+  contiguous compiler-owned `CompilerVector` UTF-8 payload column.
+- Kind `1` identifies an owned `CompilerText`; its three fields bind payload
+  start, byte length, and Unicode scalar length without storing a host pointer.
+- Store validates source vector shape, canonical UTF-8, scalar count, and text
+  hash before copying bytes and appending the envelope. Immutable value returns
+  make capacity or validation failure atomic to the caller.
+- Projection validates the complete store, copies the selected range into a
+  fresh vector, recomputes its hash, and returns `Result<CompilerText, i64>`.
+  Invalid indices use code `2`; malformed shape, kind, UTF-8, or hash uses `3`.
+- `nuis-compiler-text-arena-ordered-identity-v1` binds the existing envelope
+  identity, total payload length, and every payload byte in stable order.
+
+The typed store intentionally remains a bounded proof: all text payloads share
+one sixteen-byte vector. It introduces one approved data shape but no language
+capability, intrinsic, FFI edge, or additional bootstrap scalar export.
 
 V5 replaces the original four-slot map proof with a deterministic columnar
 map suitable for bootstrap symbol tables:
@@ -150,6 +171,13 @@ identity `1064756829`. Full capacity, negative kind, invalid index/slot,
 oversized capacity, malformed columns, and malformed identity all fail before
 observable mutation.
 
+The v7 path stores `nuislang` and U+03BB (two-byte UTF-8 `cebb`) at typed
+indices `0` and `1`. Their ten payload bytes rebuild owned texts with hashes
+`1135407074` and `53387`; the unchanged envelope binds identity `1856301942`
+and the complete typed store binds identity `1643761726`. Object exhaustion,
+payload exhaustion, invalid index, wrong kind, malformed UTF-8, and forged text
+hashes fail with exact codes while the pre-failure identity remains unchanged.
+
 The same executable also constructs the first complete materialized page from the real
 candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 21 payload bytes and canonically emits 91 bytes with independently pinned hash
@@ -160,10 +188,11 @@ and hash. Production additionally packs the actual handoff prefix through the
 twenty-one-export subset-v8 scalar ABI, and the artifact layer independently verifies page
 identity `164749511446`. This proves an owned decode/re-emit round trip across
 the fifth and sixth former 16-byte boundaries on a real compiler prefix rather
-than only a synthetic capacity test. Candidate production v10 additionally
+than only a synthetic capacity test. Candidate production v11 additionally
 pages the complete real token stream, binds its terminal page hash and ordered
-chain identity, and attests compact structured NIR records beside the data
-model without making host layout part of their identity.
+chain identity, and attests compact structured NIR records plus their
+producer-neutral v2 selection beside the data model without making host layout
+part of their identity.
 
 The acceptance chain is:
 
@@ -188,13 +217,14 @@ pins open-record versus completed-record and partial structural-line boundaries.
 
 `StdCompilerProjection` consumes the first AST and NIR structural pages,
 serializes an opaque eight-lane scanner cursor, and resumes both into a second
-page over this foundation. It does not claim that the bounded v6 model parses a
+page over this foundation. It does not claim that the bounded v7 model parses a
 complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
-V6 proves owned token materialization, canonical re-emission, complete token
-pagination, deterministic multi-page maps, and bounded arena object storage,
+V7 proves owned token materialization, canonical re-emission, complete token
+pagination, deterministic multi-page maps, bounded arena object storage, and
+one typed owned-text projection,
 but it is not
 yet an unbounded compiler heap:
 
@@ -203,15 +233,15 @@ yet an unbounded compiler heap:
   bytes, and 128 output bytes.
 - `CompilerVector` remains `i64`-specific and bounded to sixteen values.
 - `CompilerMap` remains `i64`-specific and bounded to sixteen entries.
-- `CompilerArena` remains a sixteen-object, four-`i64` envelope and does not
-  yet own nested `CompilerText` or arbitrary aggregate payloads.
+- `CompilerArena` remains a sixteen-object, four-`i64` envelope; its v7 text
+  payload column is limited to sixteen total bytes and does not yet generalize
+  to arbitrary aggregate payload kinds.
 - Generic helper specialization still needs defining-module provenance.
 - Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
   avoid pretending otherwise.
 
-The readiness gate is therefore not yet `stable/100`. The next mainline step
-is a typed owned-payload projection over the stable arena envelope.
-Broader structural paging and aggregate
+The readiness gate is therefore not yet `stable/100`. The next data-model step
+is paged typed payload storage beyond one sixteen-byte vector. Broader structural paging and aggregate
 backedge lowering follow without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
 or the frozen v8 import ceiling.

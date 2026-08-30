@@ -222,9 +222,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
     });
     let mut state = LoweringState {
         yir: &mut yir,
-        node_resources: BTreeMap::new(),
+        node_resources: HashMap::new(),
         indexed_node_count: 0,
-        edge_index: BTreeSet::new(),
+        edge_index: HashSet::new(),
         indexed_edge_count: 0,
         branch_action_registry,
         function_map,

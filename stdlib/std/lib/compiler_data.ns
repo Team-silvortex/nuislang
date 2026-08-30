@@ -16,6 +16,12 @@ mod cpu StdCompilerData {
     pub numeric_value: i64
   }
 
+  /// Stable compiler objects plus their canonical owned UTF-8 payload column.
+  pub struct CompilerTextArena {
+    pub arena: CompilerArena,
+    pub payload: CompilerVector
+  }
+
   /// Token metadata is columnar so record identity is independent of host layout.
   pub struct CompilerTokenStore {
     pub record_count: i64,
@@ -614,6 +620,176 @@ mod cpu StdCompilerData {
       numeric_values: store.numeric_values,
       payload: store.payload
     });
+  }
+
+  pub fn compiler_text_arena_byte(bytes: CompilerVector, index: i64) -> i64 {
+    match compiler_vector_get(bytes, index) {
+      Option.Some(byte) => { return byte; }
+      Option.None => { return -1; }
+    }
+  }
+
+  pub fn compiler_text_arena_continuation(byte: i64) -> bool {
+    return byte >= 128 && byte <= 191;
+  }
+  pub fn compiler_text_arena_scalar_width(
+    bytes: CompilerVector, index: i64, end: i64
+  ) -> i64 {
+    let b0: i64 = compiler_text_arena_byte(bytes, index);
+    if b0 < 0 || b0 > 255 { return 0; }
+    if b0 <= 127 { return 1; }
+    if index + 1 >= end { return 0; }
+    let b1: i64 = compiler_text_arena_byte(bytes, index + 1);
+    if b0 >= 194 && b0 <= 223 && compiler_text_arena_continuation(b1) {
+      return 2;
+    }
+    if index + 2 >= end { return 0; }
+    let b2: i64 = compiler_text_arena_byte(bytes, index + 2);
+    if compiler_text_arena_continuation(b2) == false { return 0; }
+    if b0 == 224 && b1 >= 160 && b1 <= 191 { return 3; }
+    if b0 >= 225 && b0 <= 236 && compiler_text_arena_continuation(b1) { return 3; }
+    if b0 == 237 && b1 >= 128 && b1 <= 159 { return 3; }
+    if b0 >= 238 && b0 <= 239 && compiler_text_arena_continuation(b1) { return 3; }
+    if index + 3 >= end { return 0; }
+    let b3: i64 = compiler_text_arena_byte(bytes, index + 3);
+    if compiler_text_arena_continuation(b2) == false
+      || compiler_text_arena_continuation(b3) == false { return 0; }
+    if b0 == 240 && b1 >= 144 && b1 <= 191 { return 4; }
+    if b0 >= 241 && b0 <= 243 && compiler_text_arena_continuation(b1) { return 4; }
+    if b0 == 244 && b1 >= 128 && b1 <= 143 { return 4; }
+    return 0;
+  }
+  pub fn compiler_text_arena_scalar_count_from(
+    bytes: CompilerVector, index: i64, end: i64, count: i64
+  ) -> i64 {
+    if index == end { return count; }
+    let width: i64 = compiler_text_arena_scalar_width(bytes, index, end);
+    if width == 0 { return -1; }
+    return compiler_text_arena_scalar_count_from(bytes, index + width, end, count + 1);
+  }
+  pub fn compiler_text_arena_hash_from(
+    bytes: CompilerVector, index: i64, hash: i64
+  ) -> i64 {
+    if index >= bytes.length { return hash; }
+    let byte: i64 = compiler_text_arena_byte(bytes, index);
+    let next: i64 = (hash * 257 + byte + 1) % 2147483647;
+    return compiler_text_arena_hash_from(bytes, index + 1, next);
+  }
+  pub fn compiler_text_shape_valid(text: CompilerText) -> bool {
+    if compiler_vector_valid(text.bytes) == false || text.scalar_length < 0 {
+      return false;
+    }
+    let scalars: i64 = compiler_text_arena_scalar_count_from(
+      text.bytes, 0, text.bytes.length, 0
+    );
+    if scalars != text.scalar_length { return false; }
+    if compiler_text_arena_hash_from(text.bytes, 0, 0) != text.hash { return false; }
+    return true;
+  }
+  pub fn compiler_text_arena_copy_step(
+    source: CompilerVector, start: i64, length: i64,
+    offset: i64, target: CompilerVector
+  ) -> Result<CompilerVector, i64> {
+    if offset >= length { return Result.Ok(target); }
+    return compiler_vector_push(target, compiler_text_arena_byte(source, start + offset));
+  }
+  pub fn compiler_text_arena_copy(
+    source: CompilerVector, start: i64, length: i64,
+    target: CompilerVector
+  ) -> Result<CompilerVector, i64> {
+    let p0: CompilerVector = compiler_text_arena_copy_step(source, start, length, 0, target)?;
+    let p1: CompilerVector = compiler_text_arena_copy_step(source, start, length, 1, p0)?;
+    let p2: CompilerVector = compiler_text_arena_copy_step(source, start, length, 2, p1)?;
+    let p3: CompilerVector = compiler_text_arena_copy_step(source, start, length, 3, p2)?;
+    let p4: CompilerVector = compiler_text_arena_copy_step(source, start, length, 4, p3)?;
+    let p5: CompilerVector = compiler_text_arena_copy_step(source, start, length, 5, p4)?;
+    let p6: CompilerVector = compiler_text_arena_copy_step(source, start, length, 6, p5)?;
+    let p7: CompilerVector = compiler_text_arena_copy_step(source, start, length, 7, p6)?;
+    let p8: CompilerVector = compiler_text_arena_copy_step(source, start, length, 8, p7)?;
+    let p9: CompilerVector = compiler_text_arena_copy_step(source, start, length, 9, p8)?;
+    let p10: CompilerVector = compiler_text_arena_copy_step(source, start, length, 10, p9)?;
+    let p11: CompilerVector = compiler_text_arena_copy_step(source, start, length, 11, p10)?;
+    let p12: CompilerVector = compiler_text_arena_copy_step(source, start, length, 12, p11)?;
+    let p13: CompilerVector = compiler_text_arena_copy_step(source, start, length, 13, p12)?;
+    let p14: CompilerVector = compiler_text_arena_copy_step(source, start, length, 14, p13)?;
+    return compiler_text_arena_copy_step(source, start, length, 15, p14);
+  }
+  pub fn compiler_text_arena_records_valid(
+    value: CompilerTextArena, index: i64, expected_start: i64
+  ) -> bool {
+    if index == value.arena.next_index { return expected_start == value.payload.length; }
+    let kind: i64 = compiler_token_vector_value(value.arena.kinds, index);
+    let start: i64 = compiler_token_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_token_vector_value(value.arena.field1s, index);
+    let scalars: i64 = compiler_token_vector_value(value.arena.field2s, index);
+    if kind != 1 || start != expected_start { return false; }
+    if length < 0 || scalars < 0 { return false; }
+    if length > value.payload.length - start { return false; }
+    if compiler_text_arena_scalar_count_from(value.payload, start, start + length, 0)
+      != scalars { return false; }
+    return compiler_text_arena_records_valid(value, index + 1, start + length);
+  }
+  pub fn compiler_text_arena_shape_valid(value: CompilerTextArena) -> bool {
+    if compiler_arena_shape_valid(value.arena) == false { return false; }
+    if compiler_vector_valid(value.payload) == false { return false; }
+    if compiler_text_arena_records_valid(value, 0, 0) == false { return false; }
+    return true;
+  }
+  pub fn compiler_text_arena_new(capacity: i64) -> Result<CompilerTextArena, i64> {
+    let arena: CompilerArena = compiler_arena_new(capacity)?;
+    return Result.Ok(CompilerTextArena {
+      arena: arena, payload: compiler_vector_empty(0)
+    });
+  }
+  pub fn compiler_text_arena_store(
+    value: CompilerTextArena, text: CompilerText
+  ) -> Result<CompilerTextArena, i64> {
+    if compiler_text_arena_shape_valid(value) == false
+      || compiler_text_shape_valid(text) == false { return Result.Err(3); }
+    if value.arena.next_index >= value.arena.capacity
+      || value.payload.length + text.bytes.length > 16 { return Result.Err(1); }
+    let start: i64 = value.payload.length;
+    let payload: CompilerVector = compiler_text_arena_copy(
+      text.bytes, 0, text.bytes.length, value.payload
+    )?;
+    let arena: CompilerArena = compiler_arena_store(
+      value.arena, 1, start, text.bytes.length, text.scalar_length
+    )?;
+    return Result.Ok(CompilerTextArena { arena: arena, payload: payload });
+  }
+
+  pub fn compiler_text_arena_get(
+    value: CompilerTextArena, index: i64
+  ) -> Result<CompilerText, i64> {
+    if compiler_text_arena_shape_valid(value) == false { return Result.Err(3); }
+    if index < 0 || index >= value.arena.next_index { return Result.Err(2); }
+    let start: i64 = compiler_token_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_token_vector_value(value.arena.field1s, index);
+    let scalars: i64 = compiler_token_vector_value(value.arena.field2s, index);
+    let bytes: CompilerVector = compiler_text_arena_copy(
+      value.payload, start, length, compiler_vector_empty(0)
+    )?;
+    return Result.Ok(CompilerText {
+      bytes: bytes, scalar_length: scalars,
+      hash: compiler_text_arena_hash_from(bytes, 0, 0)
+    });
+  }
+  pub fn compiler_text_arena_identity_from(
+    payload: CompilerVector, index: i64, identity: i64
+  ) -> i64 {
+    if index >= payload.length { return identity; }
+    let next: i64 = compiler_map_identity_fold(
+      identity, compiler_text_arena_byte(payload, index)
+    );
+    return compiler_text_arena_identity_from(payload, index + 1, next);
+  }
+
+  pub fn compiler_text_arena_identity(value: CompilerTextArena) -> Result<i64, i64> {
+    if compiler_text_arena_shape_valid(value) == false { return Result.Err(3); }
+    let arena: i64 = compiler_arena_identity(value.arena)?;
+    let seed: i64 = compiler_map_identity_fold(401, arena);
+    let length: i64 = compiler_map_identity_fold(seed, value.payload.length);
+    return Result.Ok(compiler_text_arena_identity_from(value.payload, 0, length));
   }
 
 }

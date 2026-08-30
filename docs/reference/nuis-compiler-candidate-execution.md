@@ -75,12 +75,13 @@ candidate image executed under the frozen boundary. By itself it cannot enter
 replacement.
 
 `nuis bootstrap-candidate-build` now consumes this immutable proof as one input
-to `nuis-compiler-candidate-production-v10`. That successor additionally binds
+to `nuis-compiler-candidate-production-v11`. That successor additionally binds
 the Nuis scalar producer ABI, every five-stage byte fold, the candidate
 handoff/component/diagnostics, complete token pagination plus the preserved
 canonical first-page identity, both AST/NIR structural-page chains and opaque
 cursor identities, the lossless
-derived NIR payload, its semantic differential, and the host adapter. See
+derived NIR payload, its semantic differential, producer-neutral handoff v2
+selection, and the host adapter. See
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md).
 
 ## Validation

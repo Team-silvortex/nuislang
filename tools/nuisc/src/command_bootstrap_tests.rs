@@ -1,4 +1,7 @@
-use super::{inspect_bootstrap_source, render_bootstrap_check_json, render_bootstrap_check_text};
+use super::{
+    inspect_bootstrap_source, inspect_bootstrap_subset_modules, render_bootstrap_check_json,
+    render_bootstrap_check_text,
+};
 
 const ACCEPTED_SCANNER: &str =
     include_str!("../../../tests/fixtures/bootstrap/accepted/compiler_scanner.ns");
@@ -38,6 +41,16 @@ fn accepted_compiler_fixture_crosses_the_semantic_pipeline() {
     assert!(json.contains("\"protocol\":\"nuis-bootstrap-language-subset-v8\""));
     assert!(json.contains("\"accepted\":true"));
     assert!(json.contains("\"semantic_pipeline\":\"checked\""));
+}
+
+#[test]
+fn bootstrap_build_subset_admission_defers_semantics_to_the_aot_invocation() {
+    let module = crate::frontend::parse_nuis_ast(ACCEPTED_SCANNER).unwrap();
+    let report = inspect_bootstrap_subset_modules("source", vec![module]).unwrap();
+
+    assert!(report.accepted());
+    assert_eq!(report.semantic_pipeline, "deferred");
+    assert_eq!(report.diagnostic_count(), 0);
 }
 
 #[test]

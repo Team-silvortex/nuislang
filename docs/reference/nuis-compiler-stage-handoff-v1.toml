@@ -1,6 +1,6 @@
 protocol = "nuis-compiler-stage-handoff-v1"
 version = 1
-status = "early-implemented"
+status = "usable-canonical-five-stage-source"
 scope = "compiler-stage-semantic-handoff"
 producer_contract = "nuis-compiler-stage-producer-v1"
 manifest_name = "nuis.compiler-stage-handoff.toml"
@@ -36,8 +36,9 @@ nuis_nir_page_contract = "nuis-compiler-structural-page-v1"
 nuis_structural_page_resume = true
 nuis_structural_cursor_contract = "nuis-compiler-structural-cursor-v1"
 production_bound_structural_pages_per_projection = 2
-candidate_production_protocol = "nuis-compiler-candidate-production-v9"
-stage_transformation_protocol = "nuis-compiler-stage-transformation-v2"
+derived_selection_successor_protocol = "nuis-compiler-stage-handoff-v2"
+candidate_production_protocol = "nuis-compiler-candidate-production-v11"
+stage_transformation_protocol = "nuis-compiler-stage-transformation-v3"
 stage_semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
 source_reparse_required_for_ast_verification = false
 
@@ -95,11 +96,10 @@ validation_commands = [
 ]
 
 [open_boundary]
-status = "first-stage1-token-two-ast-nir-pages-and-nir-checkpoint-ready"
+status = "canonical-source-retained-beside-v2-derived-selection"
 missing = [
-  "token-page-continuation",
   "production-binding-for-third-and-later-structural-pages",
-  "changed-stage-handoff-payload-from-the-nir-checkpoint",
-  "semantic-equivalence-for-non-byte-identical-stage-encodings",
+  "additional-registered-derived-stage-encodings",
+  "independent-machine-or-attester-trust",
   "stage0-stage1-replacement-authorization",
 ]

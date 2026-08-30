@@ -87,11 +87,6 @@ pub(in crate::lowering) fn lower_async_call_boundary(
     if !function.is_async {
         return lower_call_expr(callee, args, state, bindings);
     }
-    if state.call_stack.iter().any(|active| active == callee) {
-        return Err(format!(
-            "recursive async function call `{callee}` is not yet supported by minimal nuisc lowering"
-        ));
-    }
     if function.params.len() != args.len() {
         return Err(format!(
             "function `{callee}` expects {} args, found {}",
@@ -131,6 +126,12 @@ pub(in crate::lowering) fn lower_async_call_boundary(
             to: returned.clone(),
         });
         return Ok(returned);
+    }
+
+    if state.call_stack.iter().any(|active| active == callee) {
+        return Err(format!(
+            "recursive async function call `{callee}` is not yet supported by minimal nuisc lowering"
+        ));
     }
 
     let mut local_bindings = BTreeMap::new();

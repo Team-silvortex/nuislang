@@ -7,7 +7,8 @@ identified `stage1-candidate` component.
 Its machine-readable contracts are:
 
 * [nuis-compiler-diagnostic-report-v1.toml](nuis-compiler-diagnostic-report-v1.toml)
-* [nuis-compiler-candidate-production-v10.toml](nuis-compiler-candidate-production-v10.toml)
+* [nuis-compiler-candidate-production-v11.toml](nuis-compiler-candidate-production-v11.toml)
+* [nuis-compiler-stage-handoff-v2.toml](nuis-compiler-stage-handoff-v2.toml)
 * [nuis-compiler-stage-transformation-v3.toml](nuis-compiler-stage-transformation-v3.toml)
 * [nuis-compiler-stage-semantic-differential-v1.toml](nuis-compiler-stage-semantic-differential-v1.toml)
 * [nuis-compiler-component-differential-v1.toml](nuis-compiler-component-differential-v1.toml)
@@ -131,9 +132,9 @@ identities into `nuis-compiler-component-reproducibility-v1`. See
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
 
 This is not replacement authority or full compiler self-hosting. The next
-closures are compact structured derived NIR records, a handoff v2 selection
-contract, independent machine/attester evidence, and a separate reversible
-authorization protocol.
+The compact structured NIR record now crosses a producer-neutral handoff v2
+selection contract. The remaining closures are independent machine/attester
+evidence and a separate reversible authorization protocol.
 
 ## Validation
 

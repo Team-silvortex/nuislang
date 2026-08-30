@@ -1,0 +1,79 @@
+protocol = "nuis-compiler-candidate-production-v11"
+version = 11
+predecessor = "nuis-compiler-candidate-production-v10"
+status = "usable-producer-neutral-derived-stage-selection"
+scope = "nuis-written-stage1-candidate-leaf-production"
+manifest_name = "nuis.compiler-candidate-production.toml"
+producer_contract = "nuis-stage1-compact-structured-nir-producer-v10"
+authority = "stage1-candidate-component-production-no-replacement"
+frontdoor = "nuis bootstrap-candidate-build"
+stage0_directory = "stage0"
+candidate_directory = "stage1-candidate"
+candidate_role = "stage1-candidate"
+candidate_producer = "nuis-stage1-compact-structured-nir-producer-v10"
+adapter_file = "nuis.compiler-candidate-adapter"
+adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v8"
+stage_transformations_file = "nuis.compiler-stage-transformations.toml"
+stage_transformations_protocol = "nuis-compiler-stage-transformation-v3"
+stage_semantic_differential_file = "nuis.compiler-stage-semantic-diff.toml"
+stage_semantic_differential_protocol = "nuis-compiler-stage-semantic-differential-v1"
+stage_handoff_v2_file = "nuis.compiler-stage-handoff-v2.toml"
+stage_handoff_v2_protocol = "nuis-compiler-stage-handoff-v2"
+stage_handoff_v2_selection_contract = "nuis-compiler-derived-stage-selection-v1"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+record_count = 5
+current_selection_count = 1
+semantic_comparison_count = 1
+component_comparison_count = 13
+replacement_authorized = false
+reproducibility_successor_protocol = "nuis-compiler-component-reproducibility-v1"
+
+bootstrap_subset_protocol = "nuis-bootstrap-language-subset-v8"
+scalar_export_count = 21
+ordered_stages = ["source", "tokens", "ast", "nir", "yir"]
+token_pagination_contract = "nuis-compiler-token-pagination-v1"
+token_pagination_page_bytes = 128
+projection_page_contract = "nuis-compiler-structural-page-v1"
+projection_cursor_contract = "nuis-compiler-structural-cursor-v1"
+projection_cursor_lanes = 8
+projection_page_bytes = 128
+production_bound_structural_pages_per_projection = 2
+
+bound_inputs = [
+  "verified-stage0-component-and-candidate-execution",
+  "verified-stage1-candidate-component-and-five-stage-v1-handoff",
+  "every-stage-byte-length-sha256-and-nuis-fold",
+  "complete-token-pagination-and-independent-ast-nir-two-page-chains",
+  "exact-stage-transformation-manifest-and-derived-payload-identities",
+  "exact-stage-semantic-differential-length-sha256-and-proof-sha256",
+  "exact-stage-handoff-v2-length-sha256-proof-and-selection-identities",
+  "exact-adapter-file-length-and-sha256",
+  "candidate-producer-and-stage-bundle-identities",
+  "no-replacement-authority",
+]
+
+invariants = [
+  "v11-upgrades-the-proof-protocol-without-renaming-the-unchanged-v10-producer",
+  "candidate-driver-consumes-every-registered-selection-without-nir-index-special-casing",
+  "handoff-v2-binds-source-record-transform-derived-payload-checkpoint-and-semantic-recovery",
+  "every-selection-is-reversible-and-semantically-equivalent",
+  "bootstrap-diff-requires-production-proof-before-writing-a-report",
+  "payload-adapter-transformation-semantic-handoff-v2-or-production-tampering-fails-closed",
+  "thirteen-of-thirteen-component-equivalence-never-authorizes-replacement",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1",
+]
+
+[open_boundary]
+missing = [
+  "production-binding-for-third-and-later-structural-pages",
+  "typed-owned-arena-payloads-and-unbounded-growth",
+  "general-aggregate-loop-backedge-lowering",
+  "independent-machine-or-attester-reproducibility-proof",
+  "independent-reversible-component-replacement-authorization",
+]

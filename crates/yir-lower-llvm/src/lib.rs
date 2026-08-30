@@ -153,6 +153,37 @@ pub fn emit_module_with_registries(
         .filter(|lane| lane.starts_with("fn:"))
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
+    let mut helper_lane_nodes = helper_lanes
+        .iter()
+        .map(|lane| (lane.clone(), Vec::<&Node>::new()))
+        .collect::<BTreeMap<_, _>>();
+    for node in &module.nodes {
+        if let Some(nodes) = module
+            .node_lanes
+            .get(&node.name)
+            .and_then(|lane| helper_lane_nodes.get_mut(lane))
+        {
+            nodes.push(node);
+        }
+    }
+    let mut ordered_helper_nodes = helper_lanes
+        .iter()
+        .map(|lane| (lane.clone(), Vec::<String>::new()))
+        .collect::<BTreeMap<_, _>>();
+    for node_name in &order {
+        if let Some(nodes) = module
+            .node_lanes
+            .get(node_name)
+            .and_then(|lane| ordered_helper_nodes.get_mut(lane))
+        {
+            nodes.push(node_name.clone());
+        }
+    }
+    let functions_by_name = module
+        .functions
+        .iter()
+        .map(|function| (function.name.as_str(), function))
+        .collect::<BTreeMap<_, _>>();
     let mut global_counter = 0usize;
     let mut globals = Vec::new();
     let mut helper_defs = Vec::new();
@@ -160,10 +191,11 @@ pub fn emit_module_with_registries(
     let mut helper_signatures = BTreeMap::<String, CpuHelperSignature>::new();
     for lane in &helper_lanes {
         let function_name = lane.trim_start_matches("fn:").to_owned();
-        let mut params = module
-            .nodes
+        let lane_nodes = helper_lane_nodes
+            .get(lane)
+            .expect("helper lane index should contain every helper lane");
+        let mut params = lane_nodes
             .iter()
-            .filter(|node| module.node_lanes.get(&node.name) == Some(lane))
             .filter_map(|node| {
                 let kind = cpu_call_scalar_kind_for_instruction(&node.op.instruction)?;
                 node.op
@@ -183,10 +215,8 @@ pub fn emit_module_with_registries(
             })
             .collect::<Result<Vec<_>, String>>()?;
         params.sort_by_key(|(index, _, _)| *index);
-        let return_node = module
-            .nodes
+        let return_node = lane_nodes
             .iter()
-            .filter(|node| module.node_lanes.get(&node.name) == Some(lane))
             .find(|node| node.op.instruction.starts_with("return_"))
             .ok_or_else(|| {
                 format!("helper lane `{function_name}` does not contain a typed cpu.return_*")
@@ -228,10 +258,9 @@ pub fn emit_module_with_registries(
                 mutex_permit_params: params
                     .iter()
                     .map(|(index, _, _)| {
-                        module
-                            .functions
-                            .iter()
-                            .find(|function| function.name == lane.trim_start_matches("fn:"))
+                        functions_by_name
+                            .get(lane.trim_start_matches("fn:"))
+                            .copied()
                             .and_then(|function| function.parameters.get(*index))
                             .and_then(|parameter| mutex_permit_scalar_kind(&parameter.ty))
                     })
@@ -243,15 +272,14 @@ pub fn emit_module_with_registries(
     }
 
     for lane in &helper_lanes {
-        let lane_nodes = order
+        let lane_nodes = ordered_helper_nodes
+            .get(lane)
+            .expect("helper lane index should contain every helper lane");
+        let source_lane_nodes = helper_lane_nodes
+            .get(lane)
+            .expect("helper lane index should contain every helper lane");
+        let mut params = source_lane_nodes
             .iter()
-            .filter(|name| module.node_lanes.get(*name) == Some(lane))
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut params = module
-            .nodes
-            .iter()
-            .filter(|node| module.node_lanes.get(&node.name) == Some(lane))
             .filter_map(|node| {
                 let kind = cpu_call_scalar_kind_for_instruction(&node.op.instruction)?;
                 node.op
@@ -302,7 +330,7 @@ pub fn emit_module_with_registries(
         let emitted = emit_cpu_function(
             &nodes,
             &resources,
-            &lane_nodes,
+            lane_nodes,
             &param_bindings,
             &param_buffer_lengths,
             &helper_signatures,

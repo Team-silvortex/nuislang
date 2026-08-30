@@ -12,23 +12,24 @@ use support::{parse_record_blocks, sha256_hex, validate_text};
 use validation::{validate_evidence, validate_proof};
 
 use crate::{
-    compiler_projection_two_page_identity, read_compiler_stage_semantic_differential,
-    read_compiler_stage_transformations, render_compiler_stage_semantic_differential,
+    compiler_projection_two_page_identity, parse_compiler_stage_handoff_v2_from_source,
+    read_compiler_stage_semantic_differential, read_compiler_stage_transformations,
+    render_compiler_stage_handoff_v2, render_compiler_stage_semantic_differential,
     render_compiler_stage_transformations,
     toml::{
         escape_toml_string, parse_required_toml_bool, parse_required_toml_string,
         parse_required_toml_usize,
     },
     ArtifactError, CompilerCandidateExecution, CompilerComponentBuild, CompilerProjectionKind,
-    CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerStageKind,
-    CompilerStageSemanticDifferential, CompilerStageSemanticDifferentialInput,
+    CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerStageHandoffV2,
+    CompilerStageKind, CompilerStageSemanticDifferential, CompilerStageSemanticDifferentialInput,
     CompilerStageTransformations, CompilerTokenDecodeSummary, CompilerTokenPageIdentity,
     CompilerTokenPaginationIdentity, VerifiedCompilerStagePayload,
     COMPILER_PROJECTION_CURSOR_CONTRACT, COMPILER_PROJECTION_PAGE_CONTRACT,
     COMPILER_TOKEN_DECODER_CONTRACT, COMPILER_TOKEN_PAGINATION_CONTRACT,
 };
 
-pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v10";
+pub const COMPILER_CANDIDATE_PRODUCTION_PROTOCOL: &str = "nuis-compiler-candidate-production-v11";
 pub const COMPILER_CANDIDATE_PRODUCER_CONTRACT: &str =
     "nuis-stage1-compact-structured-nir-producer-v10";
 pub const COMPILER_CANDIDATE_PRODUCTION_AUTHORITY: &str =
@@ -57,6 +58,8 @@ pub struct CompilerCandidateProductionInput<'a> {
     pub stage_transformations: &'a CompilerStageTransformations,
     pub stage_semantic_differential_file: &'a str,
     pub stage_semantic_differential: &'a CompilerStageSemanticDifferential,
+    pub stage_handoff_v2_file: &'a str,
+    pub stage_handoff_v2: &'a CompilerStageHandoffV2,
     pub adapter_file: &'a str,
     pub adapter: &'a [u8],
 }
@@ -88,6 +91,10 @@ pub struct CompilerCandidateProduction {
     pub stage_semantic_differential_bytes: usize,
     pub stage_semantic_differential_sha256: String,
     pub stage_semantic_differential_proof_sha256: String,
+    pub stage_handoff_v2_file: String,
+    pub stage_handoff_v2_bytes: usize,
+    pub stage_handoff_v2_sha256: String,
+    pub stage_handoff_v2_proof_sha256: String,
     pub adapter_file: String,
     pub adapter_bytes: usize,
     pub adapter_sha256: String,
@@ -175,6 +182,7 @@ pub fn build_compiler_candidate_production(
         render_compiler_stage_transformations(input.stage_transformations);
     let stage_semantic_differential_source =
         render_compiler_stage_semantic_differential(input.stage_semantic_differential);
+    let stage_handoff_v2_source = render_compiler_stage_handoff_v2(input.stage_handoff_v2);
     let mut proof = CompilerCandidateProduction {
         protocol: COMPILER_CANDIDATE_PRODUCTION_PROTOCOL.to_owned(),
         producer_contract: COMPILER_CANDIDATE_PRODUCER_CONTRACT.to_owned(),
@@ -197,6 +205,10 @@ pub fn build_compiler_candidate_production(
             .stage_semantic_differential
             .proof_sha256
             .clone(),
+        stage_handoff_v2_file: input.stage_handoff_v2_file.to_owned(),
+        stage_handoff_v2_bytes: stage_handoff_v2_source.len(),
+        stage_handoff_v2_sha256: sha256_hex(stage_handoff_v2_source.as_bytes()),
+        stage_handoff_v2_proof_sha256: input.stage_handoff_v2.proof_sha256.clone(),
         adapter_file: input.adapter_file.to_owned(),
         adapter_bytes: input.adapter.len(),
         adapter_sha256: sha256_hex(input.adapter),
@@ -250,7 +262,7 @@ pub fn build_compiler_candidate_production(
 
 pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction) -> String {
     let mut out = format!(
-        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nstage_transformations_file = \"{}\"\nstage_transformations_bytes = {}\nstage_transformations_sha256 = \"{}\"\nstage_semantic_differential_file = \"{}\"\nstage_semantic_differential_bytes = {}\nstage_semantic_differential_sha256 = \"{}\"\nstage_semantic_differential_proof_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\ntoken_pagination_contract = \"{}\"\ntoken_page_count = {}\ntoken_terminal_page_hash = {}\ntoken_page_chain_identity = {}\nprojection_cursor_contract = \"{}\"\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nast_page_cursor_identity = {}\nast_continuation_page_identity = {}\nast_continuation_cursor_identity = {}\nnir_page_contract = \"{}\"\nnir_page_record_count = {}\nnir_page_bytes = {}\nnir_page_projection_hash = {}\nnir_page_continuation_indentation = {}\nnir_page_continuation_body_bytes = {}\nnir_page_continuation_body_hash = {}\nnir_page_state_hash = {}\nnir_page_identity = {}\nnir_page_cursor_identity = {}\nnir_continuation_page_identity = {}\nnir_continuation_cursor_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
+        "protocol = \"{}\"\nproducer_contract = \"{}\"\nauthority = \"{}\"\nstage0_component_sha256 = \"{}\"\nstage0_execution_sha256 = \"{}\"\ncandidate_component_sha256 = \"{}\"\ncandidate_producer_id = \"{}\"\ncandidate_compiler_image_sha256 = \"{}\"\nstage_handoff_bundle_sha256 = \"{}\"\nstage_transformations_file = \"{}\"\nstage_transformations_bytes = {}\nstage_transformations_sha256 = \"{}\"\nstage_semantic_differential_file = \"{}\"\nstage_semantic_differential_bytes = {}\nstage_semantic_differential_sha256 = \"{}\"\nstage_semantic_differential_proof_sha256 = \"{}\"\nstage_handoff_v2_file = \"{}\"\nstage_handoff_v2_bytes = {}\nstage_handoff_v2_sha256 = \"{}\"\nstage_handoff_v2_proof_sha256 = \"{}\"\nadapter_file = \"{}\"\nadapter_bytes = {}\nadapter_sha256 = \"{}\"\nrecord_count = {}\nbundle_fold = {}\ntoken_decoder_contract = \"{}\"\ntoken_record_count = {}\ntoken_semantic_fold = {}\ntoken_page_record_count = {}\ntoken_page_payload_bytes = {}\ntoken_page_canonical_bytes = {}\ntoken_page_canonical_hash = {}\ntoken_page_identity = {}\ntoken_pagination_contract = \"{}\"\ntoken_page_count = {}\ntoken_terminal_page_hash = {}\ntoken_page_chain_identity = {}\nprojection_cursor_contract = \"{}\"\nast_page_contract = \"{}\"\nast_page_record_count = {}\nast_page_bytes = {}\nast_page_projection_hash = {}\nast_page_continuation_indentation = {}\nast_page_continuation_body_bytes = {}\nast_page_continuation_body_hash = {}\nast_page_state_hash = {}\nast_page_identity = {}\nast_page_cursor_identity = {}\nast_continuation_page_identity = {}\nast_continuation_cursor_identity = {}\nnir_page_contract = \"{}\"\nnir_page_record_count = {}\nnir_page_bytes = {}\nnir_page_projection_hash = {}\nnir_page_continuation_indentation = {}\nnir_page_continuation_body_bytes = {}\nnir_page_continuation_body_hash = {}\nnir_page_state_hash = {}\nnir_page_identity = {}\nnir_page_cursor_identity = {}\nnir_continuation_page_identity = {}\nnir_continuation_cursor_identity = {}\nreplacement_authorized = {}\nproof_sha256 = \"{}\"\n",
         proof.protocol,
         proof.producer_contract,
         proof.authority,
@@ -267,6 +279,10 @@ pub fn render_compiler_candidate_production(proof: &CompilerCandidateProduction)
         proof.stage_semantic_differential_bytes,
         proof.stage_semantic_differential_sha256,
         proof.stage_semantic_differential_proof_sha256,
+        escape_toml_string(&proof.stage_handoff_v2_file),
+        proof.stage_handoff_v2_bytes,
+        proof.stage_handoff_v2_sha256,
+        proof.stage_handoff_v2_proof_sha256,
         escape_toml_string(&proof.adapter_file),
         proof.adapter_bytes,
         proof.adapter_sha256,
@@ -405,6 +421,18 @@ pub fn parse_compiler_candidate_production_from_source(
         stage_semantic_differential_proof_sha256: parse_required_toml_string(
             source,
             "stage_semantic_differential_proof_sha256",
+            path,
+        )?,
+        stage_handoff_v2_file: parse_required_toml_string(source, "stage_handoff_v2_file", path)?,
+        stage_handoff_v2_bytes: parse_required_toml_usize(source, "stage_handoff_v2_bytes", path)?,
+        stage_handoff_v2_sha256: parse_required_toml_string(
+            source,
+            "stage_handoff_v2_sha256",
+            path,
+        )?,
+        stage_handoff_v2_proof_sha256: parse_required_toml_string(
+            source,
+            "stage_handoff_v2_proof_sha256",
             path,
         )?,
         adapter_file: parse_required_toml_string(source, "adapter_file", path)?,
@@ -603,6 +631,24 @@ pub fn read_compiler_candidate_production(
         &stage_semantic_differential_path,
         &stage_semantic_input,
     )?;
+    let stage_handoff_v2_path = root.join(&proof.stage_handoff_v2_file);
+    let stage_handoff_v2_source = fs::read_to_string(&stage_handoff_v2_path).map_err(|error| {
+        ArtifactError::new(format!(
+            "failed to read compiler stage handoff v2 `{}`: {error}",
+            proof.stage_handoff_v2_file
+        ))
+    })?;
+    if stage_handoff_v2_source.len() != proof.stage_handoff_v2_bytes
+        || sha256_hex(stage_handoff_v2_source.as_bytes()) != proof.stage_handoff_v2_sha256
+    {
+        return Err(ArtifactError::new(
+            "compiler stage handoff v2 length or SHA-256 mismatch",
+        ));
+    }
+    let stage_handoff_v2 = parse_compiler_stage_handoff_v2_from_source(
+        &stage_handoff_v2_source,
+        &stage_handoff_v2_path,
+    )?;
     let adapter = fs::read(root.join(&proof.adapter_file)).map_err(|error| {
         ArtifactError::new(format!(
             "failed to read compiler candidate adapter `{}`: {error}",
@@ -664,6 +710,8 @@ pub fn read_compiler_candidate_production(
         stage_transformations: &stage_transformations,
         stage_semantic_differential_file: &proof.stage_semantic_differential_file,
         stage_semantic_differential: &stage_semantic_differential,
+        stage_handoff_v2_file: &proof.stage_handoff_v2_file,
+        stage_handoff_v2: &stage_handoff_v2,
         adapter_file: &proof.adapter_file,
         adapter: &adapter,
     };

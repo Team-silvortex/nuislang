@@ -1,0 +1,126 @@
+protocol = "nuis-compiler-data-model-v7"
+version = 7
+predecessor = "nuis-compiler-data-model-v6"
+status = "usable-typed-owned-text-arena"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v7"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+bootstrap_scalar_export_count = 21
+candidate_production = "nuis-compiler-candidate-production-v11"
+derived_stage_selection = "nuis-compiler-stage-handoff-v2"
+host_layout_identity = false
+host_ffi_required = false
+utf8_policy = "canonical-unicode-scalar-encoding"
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[typed_text_arena]
+type = "CompilerTextArena"
+layout = "CompilerArena-envelope-plus-contiguous-CompilerVector-payload"
+object_kind = 1
+object_kind_semantics = "owned-CompilerText"
+object_slots = ["kind", "payload_start", "payload_byte_length", "unicode_scalar_length"]
+payload_type = "canonical-UTF8-bytes-in-CompilerVector"
+maximum_objects = 16
+maximum_total_payload_bytes = 16
+storage = "validate-text-copy-payload-then-append-envelope"
+projection = "validate-whole-store-copy-range-and-rebuild-owned-CompilerText"
+shape_validation = "arena-shape-payload-shape-contiguous-records-kind-UTF8-and-scalar-count-agree"
+capacity_error = 1
+invalid_index_error = 2
+invalid_input_type_or_shape_error = 3
+identity_contract = "nuis-compiler-text-arena-ordered-identity-v1"
+identity_seed = 401
+identity_radix = 257
+identity_modulus = 2147483629
+text_hash_modulus = 2147483647
+reference_object_count = 2
+reference_payload_bytes = 10
+reference_first_text = "nuislang"
+reference_first_text_hash = 1135407074
+reference_second_scalar = 955
+reference_second_utf8_hex = "cebb"
+reference_second_text_hash = 53387
+reference_envelope_identity = 1856301942
+reference_identity = 1643761726
+
+typed_text_operations = [
+  "compiler_text_shape_valid",
+  "compiler_text_arena_new",
+  "compiler_text_arena_shape_valid",
+  "compiler_text_arena_store",
+  "compiler_text_arena_get",
+  "compiler_text_arena_identity",
+]
+
+typed_text_invariants = [
+  "arena-indices-remain-stable-after-text-storage",
+  "kind-one-is-the-only-admitted-typed-text-envelope",
+  "payload-ranges-are-contiguous-ordered-and-non-overlapping",
+  "every-payload-range-is-canonical-UTF8-with-an-exact-scalar-count",
+  "source-CompilerText-vector-scalar-count-and-content-hash-must-agree",
+  "projection-rebuilds-an-owned-CompilerText-without-alias-or-host-pointer",
+  "capacity-type-shape-and-index-failures-return-before-observable-mutation",
+  "identity-binds-envelope-identity-payload-length-and-every-payload-byte",
+  "implementation-uses-only-Nuis-owned-values-recursion-and-fixed-bounded-copy",
+]
+
+[preserved_arena]
+contract = "nuis-compiler-arena-ordered-identity-v1"
+maximum_objects = 16
+reference_identity = 1064756829
+untyped_lookup = "Option"
+
+[preserved_map]
+contract = "nuis-compiler-map-ordered-identity-v1"
+maximum_entries = 16
+reference_identity = 415394959
+
+[preserved_token_pagination]
+contract = "nuis-compiler-token-pagination-v1"
+page_bytes = 128
+legacy_first_page_identity = 164749511446
+
+[bootstrap_surface]
+new_language_capabilities = 0
+new_scalar_exports = 0
+new_approved_data_types = ["CompilerTextArena"]
+transitional_public_helpers = [
+  "compiler_text_arena_scalar_count_from",
+  "compiler_text_arena_hash_from",
+  "compiler_text_arena_copy",
+  "compiler_text_arena_records_valid",
+  "compiler_text_arena_identity_from",
+]
+
+[growth_boundary]
+status = "open"
+next_contract = "paged-typed-compiler-payload-storage"
+remaining = [
+  "typed-text-payload-is-bounded-to-one-sixteen-byte-CompilerVector",
+  "only-CompilerText-has-a-typed-arena-payload-contract",
+  "CompilerMap-and-CompilerArena-remain-bounded-to-sixteen-entries",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+  "wide-scalar-leaf-aggregate-calls-remain-compile-time-expensive",
+]
+preserve = [
+  "stable-arena-indices",
+  "atomic-envelope-and-payload-storage",
+  "canonical-arena-map-and-text-payload-identities",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-twenty-one-export-ceiling",
+]

@@ -10,7 +10,7 @@ use nuis_artifact::{
 };
 use nuis_semantics::bootstrap_subset::BOOTSTRAP_SUBSET_PROTOCOL;
 
-use crate::command_bootstrap::ensure_bootstrap_resolved;
+use crate::command_bootstrap::ensure_bootstrap_subset_resolved;
 use crate::command_compile::{run_compile_resolved, CompileCachePolicy};
 use crate::command_helpers::{resolve_compile_input, NUSTAR_REGISTRY_ROOT};
 use crate::{aot, registry, registry_load};
@@ -43,7 +43,8 @@ fn run_bootstrap_build_with_cache_policy(
         "bootstrap-build v1 requires a Nuis project so its complete dependency closure can be recorded"
             .to_owned()
     })?;
-    ensure_bootstrap_resolved(&resolved)?;
+    // The normal AOT invocation owns semantic validation or cache admission; do not compile twice.
+    ensure_bootstrap_subset_resolved(&resolved)?;
 
     run_compile_resolved(
         input.clone(),

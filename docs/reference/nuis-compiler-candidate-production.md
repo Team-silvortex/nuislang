@@ -1,13 +1,14 @@
 # Nuis Compiler Candidate Production
 
-`nuis-compiler-candidate-production-v10` is the attested path from an executed
+`nuis-compiler-candidate-production-v11` is the attested path from an executed
 Nuis compiler-shaped program to a separately identified `stage1-candidate`
-leaf. V10 retains the canonical token and structural page proofs, binds every
+leaf. V11 retains the canonical token and structural page proofs, binds every
 128-byte window in the complete token stream through a Nuis-produced hash
 chain, then turns the Nuis-produced NIR checkpoint into compact ordered
-structural records and attests their non-byte-identical semantic differential.
-The machine-readable contract is
-[nuis-compiler-candidate-production-v10.toml](nuis-compiler-candidate-production-v10.toml).
+structural records, attests their non-byte-identical semantic differential,
+and binds the producer-neutral v2 selection proof. The machine-readable
+contract is
+[nuis-compiler-candidate-production-v11.toml](nuis-compiler-candidate-production-v11.toml).
 
 This closes one real compiler-data production loop. It does not mean that
 `nuisc` is self-hosted, and it never authorizes replacing stage0.
@@ -26,7 +27,7 @@ The output root contains:
   and native-image evidence
 * `stage1-candidate/`, including the candidate component, handoff, diagnostics,
   scalar adapter, stage-transformation manifest, derived binary payload,
-  stage-semantic differential, and production proof
+  stage-semantic differential, v2 selection handoff, and production proof
 * `nuis.compiler-component-diff.toml`, which must report all thirteen
   comparisons equivalent while retaining `replacement_authorized = false`
 
@@ -145,7 +146,7 @@ remaining separate projection domains.
 ## Derived Stage Transformation
 
 The Nuis-produced NIR identities and both eight-lane cursors are encoded as a
-22-word checkpoint. V10 places those words and ordered producer-neutral NIR
+22-word checkpoint. V11 places those words and ordered producer-neutral NIR
 records into a canonical `nuis-derived-structural-records-v2` binary under
 `nuis-compiler-structured-record-codec-v1`. The versioned
 [stage-transformation protocol](nuis-compiler-stage-transformation.md) binds
@@ -162,6 +163,14 @@ derived bytes differ while their recovered source semantics match. Candidate
 production binds the exact transformation, binary, and semantic proof
 identities. Integer, record, word, order, payload, hash, producer, handoff,
 semantic comparison, or proof drift fails closed.
+
+`nuis-compiler-stage-handoff-v2` consumes the complete transformation registry
+and same-ordinal semantic comparisons. It emits one ordered selection per
+registered transform, binding the canonical source record, derived payload,
+checkpoint, recovery hash, and reversible semantic verdict. The current
+candidate registers NIR; tests additionally register AST and NIR together to
+prove that the protocol and driver do not depend on a fixed NIR-only index.
+Selection remains explicitly non-authoritative.
 
 ```text
 host adapter = opaque token/AST/NIR byte and cursor transport
@@ -187,21 +196,21 @@ candidate image, all five byte lengths/SHA-256/folds, the bundle fold, token
 count and semantic fold, legacy canonical token-page fields, complete token
 pagination identity, every AST and NIR page and first-page field, both cursor
 identities, both second-page identities, and the adapter, plus the independently
-replayed stage-transformation manifest. `bootstrap-diff` verifies this proof
+replayed stage-transformation manifest, semantic differential, and handoff v2
+selection manifest. `bootstrap-diff` verifies this proof
 before writing its report. Changing the adapter, any token byte or page,
 AST/NIR page or cursor, stage payload, role, producer, component record, derived
-payload, semantic differential, or proof therefore fails closed.
+payload, semantic differential, v2 selection, or proof therefore fails closed.
 
 ## Current Limit
 
-V10 binds every token byte through deterministic pagination but still binds
+V11 binds every token byte through deterministic pagination but still binds
 exactly two fixed-size structural pages for both AST and NIR. The generic Nuis
 resume function can continue again with the resulting cursor. Production now
 attests a compact, byte-different, losslessly recoverable NIR-derived payload
-and a 1/1 semantic comparison, but the producer-neutral five-stage handoff
-still contains the unchanged canonical NIR/YIR records. The next stage
-boundary is a handoff v2 selection protocol; production also does not yet
-attest a third structural page. Typed owned arena payloads and unbounded
+and a 1/1 semantic comparison, while handoff v2 selects it beside the unchanged
+canonical v1 NIR/YIR records. Production does not yet attest a third structural
+page. Typed owned arena payloads and unbounded
 compiler collections remain data-model work. The scalar boundary remains
 intentional until arbitrary aggregate loop-carried backedges have native
 lowering; this contract does not claim that general loop capability.

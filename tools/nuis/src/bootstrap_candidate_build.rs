@@ -5,23 +5,26 @@ use std::{
 
 use nuis_artifact::{
     build_compiler_candidate_production, build_compiler_diagnostic_report,
-    build_compiler_stage_handoff, build_compiler_stage_semantic_differential,
-    build_compiler_stage_transformations, materialize_compiler_stage_transformation_payloads,
-    parse_compiler_component_differential, promote_compiler_component_candidate,
-    read_compiler_candidate_execution, read_compiler_candidate_production,
-    read_compiler_component_build, read_compiler_diagnostic_report, read_compiler_stage_handoff,
+    build_compiler_stage_handoff, build_compiler_stage_handoff_v2,
+    build_compiler_stage_semantic_differential, build_compiler_stage_transformations,
+    materialize_compiler_stage_transformation_payloads, parse_compiler_component_differential,
+    promote_compiler_component_candidate, read_compiler_candidate_execution,
+    read_compiler_candidate_production, read_compiler_component_build,
+    read_compiler_diagnostic_report, read_compiler_stage_handoff, read_compiler_stage_handoff_v2,
     read_compiler_stage_semantic_differential, read_compiler_stage_transformations,
     render_compiler_candidate_production, render_compiler_component_build,
     render_compiler_diagnostic_report, render_compiler_stage_handoff,
-    render_compiler_stage_semantic_differential, render_compiler_stage_transformations,
-    CompilerCandidateProductionInput, CompilerComponentCandidatePromotionInput,
-    CompilerDiagnosticReportInput, CompilerStageKind, CompilerStagePayloadInput,
+    render_compiler_stage_handoff_v2, render_compiler_stage_semantic_differential,
+    render_compiler_stage_transformations, CompilerCandidateProductionInput,
+    CompilerComponentCandidatePromotionInput, CompilerDiagnosticReportInput,
+    CompilerStageHandoffV2Input, CompilerStageKind, CompilerStagePayloadInput,
     CompilerStageSemanticDifferentialInput, CompilerStageTransformationRecordInput,
     CompilerStageTransformationsInput, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_BUILD_FILE,
     COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
-    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
-    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
+    COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 use crate::{
@@ -202,6 +205,30 @@ fn handle_bootstrap_candidate_build_with_cache(
         &stage_semantic_input,
     )
     .map_err(|error| format!("failed to verify candidate stage semantics: {error}"))?;
+    let stage_handoff_v2 = build_compiler_stage_handoff_v2(&CompilerStageHandoffV2Input {
+        handoff: &verified_handoff,
+        payloads: &verified_payloads,
+        transformations: &verified_stage_transformations,
+        semantic_differential: &verified_stage_semantic_differential,
+    })
+    .map_err(|error| format!("failed to select candidate derived stages: {error}"))?;
+    let stage_handoff_v2_path = candidate_dir.join(COMPILER_STAGE_HANDOFF_V2_FILE);
+    fs::write(
+        &stage_handoff_v2_path,
+        render_compiler_stage_handoff_v2(&stage_handoff_v2),
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write candidate stage handoff v2 `{}`: {error}",
+            stage_handoff_v2_path.display()
+        )
+    })?;
+    let verified_stage_handoff_v2 = read_compiler_stage_handoff_v2(
+        &stage_handoff_v2_path,
+        &verified_handoff,
+        &verified_payloads,
+    )
+    .map_err(|error| format!("failed to verify candidate stage handoff v2: {error}"))?;
     let production = build_compiler_candidate_production(&CompilerCandidateProductionInput {
         stage0: &stage0,
         execution: &execution,
@@ -219,6 +246,8 @@ fn handle_bootstrap_candidate_build_with_cache(
         stage_transformations: &verified_stage_transformations,
         stage_semantic_differential_file: COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
         stage_semantic_differential: &verified_stage_semantic_differential,
+        stage_handoff_v2_file: COMPILER_STAGE_HANDOFF_V2_FILE,
+        stage_handoff_v2: &verified_stage_handoff_v2,
         adapter_file: adapter.adapter_file,
         adapter: &adapter.adapter,
     })
@@ -312,9 +341,21 @@ fn handle_bootstrap_candidate_build_with_cache(
         verified_production.stage_semantic_differential_proof_sha256
     );
     println!(
-        "  derived_stage_payload: {}",
-        verified_stage_transformations.records[0].output_payload_file
+        "  stage_handoff_v2_sha256: {}",
+        verified_production.stage_handoff_v2_proof_sha256
     );
+    println!(
+        "  selected_derived_stages: {}",
+        verified_stage_handoff_v2.selection_count
+    );
+    for selection in &verified_stage_handoff_v2.selections {
+        println!(
+            "  derived_stage_payload[{}:{}]: {}",
+            selection.ordinal,
+            selection.source_stage.as_str(),
+            selection.derived_payload_file
+        );
+    }
     println!("  production_sha256: {}", verified_production.proof_sha256);
     println!("  differential: {}", differential.verdict);
     println!("  replacement_authorized: false");

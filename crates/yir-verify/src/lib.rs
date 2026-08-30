@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use yir_core::{
     glm_profile_for_operation, DataMod, EdgeKind, GlmEffect, GlmUseMode, LegacyFabricMod,
@@ -58,41 +58,47 @@ pub fn verify_module_with_registry(
         return Err("module version must not be empty".to_owned());
     }
 
-    let mut resources = BTreeMap::<String, &Resource>::new();
+    let mut resources = HashMap::with_capacity(module.resources.len());
     for resource in &module.resources {
-        if resources.insert(resource.name.clone(), resource).is_some() {
+        if resources.insert(resource.name.as_str(), resource).is_some() {
             return Err(format!("duplicate resource `{}`", resource.name));
         }
     }
 
-    let mut nodes = BTreeMap::<String, &Node>::new();
+    let mut nodes = HashMap::with_capacity(module.nodes.len());
     for node in &module.nodes {
-        if nodes.insert(node.name.clone(), node).is_some() {
+        if nodes.insert(node.name.as_str(), node).is_some() {
             return Err(format!("duplicate node `{}`", node.name));
         }
     }
+    let node_indices = module
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| (node.name.as_str(), index))
+        .collect::<HashMap<_, _>>();
 
-    let mut edge_index = BTreeSet::<(String, String, &'static str)>::new();
+    let mut edge_index = HashSet::with_capacity(module.edges.len());
     for edge in &module.edges {
-        if !nodes.contains_key(&edge.from) {
+        let Some(&source_index) = node_indices.get(edge.from.as_str()) else {
             return Err(format!(
                 "edge `{}` {} `{}` references unknown source node",
                 edge.kind.as_str(),
                 edge.from,
                 edge.to
             ));
-        }
+        };
 
-        if !nodes.contains_key(&edge.to) {
+        let Some(&target_index) = node_indices.get(edge.to.as_str()) else {
             return Err(format!(
                 "edge `{}` {} `{}` references unknown target node",
                 edge.kind.as_str(),
                 edge.from,
                 edge.to
             ));
-        }
+        };
 
-        if !edge_index.insert((edge.from.clone(), edge.to.clone(), edge.kind.as_str())) {
+        if !edge_index.insert((source_index, target_index, edge.kind.as_str())) {
             return Err(format!(
                 "duplicate edge `{}` {} `{}`",
                 edge.kind.as_str(),
@@ -104,13 +110,16 @@ pub fn verify_module_with_registry(
 
     verify_function_table(module, &nodes)?;
 
-    for node in &module.nodes {
-        let resource = resources.get(&node.resource).copied().ok_or_else(|| {
-            format!(
-                "node `{}` references unknown resource `{}`",
-                node.name, node.resource
-            )
-        })?;
+    for (node_index, node) in module.nodes.iter().enumerate() {
+        let resource = resources
+            .get(node.resource.as_str())
+            .copied()
+            .ok_or_else(|| {
+                format!(
+                    "node `{}` references unknown resource `{}`",
+                    node.name, node.resource
+                )
+            })?;
 
         let module_impl = registry.lookup(&node.op.module).ok_or_else(|| {
             format!(
@@ -129,27 +138,30 @@ pub fn verify_module_with_registry(
                 return Err(format!("node `{}` may not depend on itself", node.name));
             }
 
-            let source = nodes.get(&dependency).copied().ok_or_else(|| {
-                format!(
-                    "node `{}` depends on unknown node `{dependency}`",
-                    node.name
-                )
-            })?;
+            let source_index = node_indices
+                .get(dependency.as_str())
+                .copied()
+                .ok_or_else(|| {
+                    format!(
+                        "node `{}` depends on unknown node `{dependency}`",
+                        node.name
+                    )
+                })?;
+            let source = &module.nodes[source_index];
 
-            let source_resource = resources.get(&source.resource).copied().ok_or_else(|| {
-                format!(
-                    "node `{}` depends on `{dependency}` with unknown resource `{}`",
-                    node.name, source.resource
-                )
-            })?;
+            let source_resource = resources
+                .get(source.resource.as_str())
+                .copied()
+                .ok_or_else(|| {
+                    format!(
+                        "node `{}` depends on `{dependency}` with unknown resource `{}`",
+                        node.name, source.resource
+                    )
+                })?;
 
             let required_kind =
                 required_dependency_edge_kind(&source_resource.kind, &resource.kind);
-            let key = (
-                dependency.clone(),
-                node.name.clone(),
-                required_kind.as_str(),
-            );
+            let key = (source_index, node_index, required_kind.as_str());
 
             if !edge_index.contains(&key) {
                 return Err(format!(
@@ -175,45 +187,54 @@ pub fn verify_module_with_registry(
 }
 
 fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
-    let nodes = module
+    let node_indices = module
         .nodes
         .iter()
-        .map(|node| (node.name.as_str(), node))
-        .collect::<BTreeMap<_, _>>();
+        .enumerate()
+        .map(|(index, node)| (node.name.as_str(), index))
+        .collect::<HashMap<_, _>>();
     let dependency_edges = module
         .edges
         .iter()
         .filter(|edge| matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange))
-        .map(|edge| (edge.from.as_str(), edge.to.as_str()))
-        .collect::<BTreeSet<_>>();
+        .filter_map(|edge| {
+            Some((
+                *node_indices.get(edge.from.as_str())?,
+                *node_indices.get(edge.to.as_str())?,
+            ))
+        })
+        .collect::<HashSet<_>>();
     let lifetime_edges = module
         .edges
         .iter()
         .filter(|edge| matches!(edge.kind, EdgeKind::Lifetime))
-        .map(|edge| (edge.from.as_str(), edge.to.as_str()))
-        .collect::<BTreeSet<_>>();
-    let mut reverse_edges = BTreeMap::<&str, Vec<&str>>::new();
+        .filter_map(|edge| {
+            Some((
+                *node_indices.get(edge.from.as_str())?,
+                *node_indices.get(edge.to.as_str())?,
+            ))
+        })
+        .collect::<HashSet<_>>();
+    let mut reverse_edges = vec![Vec::<usize>::new(); module.nodes.len()];
     for edge in &module.edges {
-        reverse_edges
-            .entry(edge.to.as_str())
-            .or_default()
-            .push(edge.from.as_str());
+        if let (Some(source), Some(target)) = (
+            node_indices.get(edge.from.as_str()),
+            node_indices.get(edge.to.as_str()),
+        ) {
+            reverse_edges[*target].push(*source);
+        }
     }
     let mut consumers =
-        BTreeMap::<String, Vec<(String, yir_core::GlmValueClass, GlmUseMode)>>::new();
+        vec![Vec::<(usize, yir_core::GlmValueClass, GlmUseMode)>::new(); module.nodes.len()];
 
-    for node in &module.nodes {
+    for (node_index, node) in module.nodes.iter().enumerate() {
         let profile = glm_profile_for_operation(&node.op);
         for access in &profile.accesses {
-            if !nodes.contains_key(access.input.as_str()) {
+            let Some(source_index) = node_indices.get(access.input.as_str()).copied() else {
                 continue;
-            }
-            consumers.entry(access.input.clone()).or_default().push((
-                node.name.clone(),
-                access.class,
-                access.mode,
-            ));
-            let has_dep = dependency_edges.contains(&(access.input.as_str(), node.name.as_str()));
+            };
+            consumers[source_index].push((node_index, access.class, access.mode));
+            let has_dep = dependency_edges.contains(&(source_index, node_index));
             if !has_dep {
                 return Err(format!(
                     "GLM: node `{}` uses `{}` as {} {} without dep/xfer edge",
@@ -223,8 +244,7 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             if matches!(access.class, yir_core::GlmValueClass::Res)
                 && matches!(access.mode, GlmUseMode::Own | GlmUseMode::Write)
             {
-                let has_lifetime =
-                    lifetime_edges.contains(&(access.input.as_str(), node.name.as_str()));
+                let has_lifetime = lifetime_edges.contains(&(source_index, node_index));
                 if !has_lifetime {
                     return Err(format!(
                         "GLM: node `{}` requires lifetime edge from `{}` for {} {} access",
@@ -238,7 +258,10 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             GlmEffect::DomainMove | GlmEffect::LifetimeEnd => {
                 if let Some(primary) = profile.accesses.first() {
                     if matches!(primary.class, yir_core::GlmValueClass::Res) {
-                        if !lifetime_edges.contains(&(primary.input.as_str(), node.name.as_str())) {
+                        let ordered = node_indices
+                            .get(primary.input.as_str())
+                            .is_some_and(|source| lifetime_edges.contains(&(*source, node_index)));
+                        if !ordered {
                             return Err(format!(
                                 "GLM: node `{}` must be ordered by lifetime from `{}`",
                                 node.name, primary.input
@@ -251,17 +274,28 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
         }
     }
 
-    for (source, consumers_for_source) in &consumers {
-        for (owner_node, class, mode) in consumers_for_source {
+    let mut consumed_sources = consumers
+        .iter()
+        .enumerate()
+        .filter_map(|(index, values)| (!values.is_empty()).then_some(index))
+        .collect::<Vec<_>>();
+    consumed_sources
+        .sort_unstable_by(|lhs, rhs| module.nodes[*lhs].name.cmp(&module.nodes[*rhs].name));
+    for source_index in consumed_sources {
+        let source = &module.nodes[source_index].name;
+        let consumers_for_source = &consumers[source_index];
+        for (owner_index, class, mode) in consumers_for_source {
             if !matches!(mode, GlmUseMode::Own) {
                 continue;
             }
-            let ordered_before_owner = reverse_reachable_nodes(&reverse_edges, owner_node);
-            for (other_node, _, _) in consumers_for_source {
-                if other_node == owner_node {
+            let owner_node = &module.nodes[*owner_index].name;
+            let ordered_before_owner = reverse_reachable_nodes(&reverse_edges, *owner_index);
+            for (other_index, _, _) in consumers_for_source {
+                if other_index == owner_index {
                     continue;
                 }
-                if !ordered_before_owner.contains(other_node.as_str()) {
+                if !ordered_before_owner.contains(other_index) {
+                    let other_node = &module.nodes[*other_index].name;
                     return Err(format!(
                         "GLM: node `{}` consumes {} `{}` with Own, but `{}` is not ordered before that consume",
                         owner_node, class, source, other_node
@@ -274,19 +308,14 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
     Ok(())
 }
 
-fn reverse_reachable_nodes<'a>(
-    reverse_edges: &BTreeMap<&'a str, Vec<&'a str>>,
-    target: &str,
-) -> BTreeSet<&'a str> {
-    let mut stack = reverse_edges.get(target).cloned().unwrap_or_default();
-    let mut reachable = BTreeSet::new();
+fn reverse_reachable_nodes<'a>(reverse_edges: &'a [Vec<usize>], target: usize) -> HashSet<usize> {
+    let mut stack = reverse_edges[target].clone();
+    let mut reachable = HashSet::new();
     while let Some(current) = stack.pop() {
         if !reachable.insert(current) {
             continue;
         }
-        if let Some(predecessors) = reverse_edges.get(current) {
-            stack.extend(predecessors.iter().copied());
-        }
+        stack.extend(reverse_edges[current].iter().copied());
     }
     reachable
 }
@@ -313,7 +342,7 @@ enum DataValueKind {
 
 fn verify_data_fabric_protocol(
     module: &YirModule,
-    resources: &BTreeMap<String, &Resource>,
+    resources: &HashMap<&str, &Resource>,
 ) -> Result<(), String> {
     let order = topological_order(module)?;
     let nodes = module
