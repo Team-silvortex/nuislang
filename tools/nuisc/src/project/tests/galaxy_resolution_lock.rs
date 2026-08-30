@@ -34,8 +34,8 @@ fn renders_portable_hash_bound_dependency_closure() {
     assert_eq!(first.summary.schema, PROJECT_GALAXY_RESOLUTION_LOCK_SCHEMA);
     assert_eq!(first.summary.digest_contract, "sha256");
     assert_eq!(first.summary.dependencies, 3);
-    assert_eq!(first.summary.library_modules, 24);
-    assert_eq!(first.summary.selected_library_modules, 24);
+    assert_eq!(first.summary.library_modules, 26);
+    assert_eq!(first.summary.selected_library_modules, 26);
     assert!(first.summary.source_modules >= 19);
     assert!(first.source.contains("name = \"pixelmagic\""));
     assert!(first.source.contains("depends_on = [\"core\", \"std\"]"));

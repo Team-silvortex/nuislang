@@ -1,0 +1,10 @@
+protocol = "nuis-compiler-component-attester-trust-registry-v1"
+generation = 1
+
+[[attester]]
+attester_id = "kyuubiki-lab-1"
+environment_id = "linux-amd64-cleanroom"
+trust_scope = "independent-machine-compiler-reproducibility-v1"
+public_key_id = "ed25519:sha256:c2819cec7c31d85e4c5acaae10b852966fb8979ec3a4030233d207a866adfaca"
+public_key_hex = "b92387677cc1c63d8418d86b85183574386475a5c720e06bcd405097fb2f7355"
+status = "active"

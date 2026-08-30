@@ -14,6 +14,8 @@ pub const BOOTSTRAP_APPROVED_IMPORTS: &[(&str, &str)] = &[
     ("cpu", "CorePrelude"),
     ("cpu", "StdLanguageCore"),
     ("cpu", "StdCompilerData"),
+    ("cpu", "StdCompilerPayload"),
+    ("cpu", "StdCompilerPayloadRegistry"),
     ("cpu", "StdCompilerTokenEmit"),
     ("cpu", "StdCompilerTokens"),
     ("cpu", "StdCompilerProjection"),
@@ -24,10 +26,14 @@ pub const BOOTSTRAP_PRIMITIVE_TYPES: &[&str] = &["bool", "i64", "text"];
 
 pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerArena",
+    "CompilerAggregateArena",
     "CompilerDiagnostic",
     "CompilerDecimalState",
     "CompilerMap",
     "CompilerPath",
+    "CompilerPagedTextArena",
+    "CompilerPayloadBuffer",
+    "CompilerPayloadRegistry",
     "CompilerProjectionKind",
     "CompilerProjectionRecordKind",
     "CompilerProjectionPageState",

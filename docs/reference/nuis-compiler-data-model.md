@@ -1,8 +1,12 @@
 # Nuis Compiler Data Model
 
-`nuis-compiler-data-model-v7` is the current compiler-owned data boundary
+`nuis-compiler-data-model-v9` is the current compiler-owned data boundary
 written in Nuis itself. Its machine-readable contract is
-[nuis-compiler-data-model-v7.toml](nuis-compiler-data-model-v7.toml). The
+[nuis-compiler-data-model-v9.toml](nuis-compiler-data-model-v9.toml). The
+paged typed-text predecessor remains frozen in
+[nuis-compiler-data-model-v8.toml](nuis-compiler-data-model-v8.toml), the
+single-vector typed-text predecessor remains frozen in
+[nuis-compiler-data-model-v7.toml](nuis-compiler-data-model-v7.toml), the
 stable arena-envelope predecessor remains frozen in
 [nuis-compiler-data-model-v6.toml](nuis-compiler-data-model-v6.toml), the
 deterministic-map predecessor remains frozen in
@@ -17,16 +21,67 @@ original four-slot proof remains frozen in
 [nuis-compiler-data-model-v1.toml](nuis-compiler-data-model-v1.toml).
 
 The implementation is split across `StdLanguageCore`, `StdCompilerData`,
-`StdCompilerTokenEmit`, `StdCompilerTokens`, and `StdCompilerProjection`, all
-inside bootstrap subset v8. It proves that a compiler component can own text,
-token records, canonical token serialization, structural page state, paths,
-source identity, allocation indices, maps, and diagnostics without borrowing
-Rust, C, libc, FFI, or host-language layouts.
+`StdCompilerPayload`, `StdCompilerPayloadRegistry`, `StdCompilerTokenEmit`,
+`StdCompilerTokens`, and `StdCompilerProjection`, all inside bootstrap subset
+v8. It proves that a
+compiler component can own text, paged payload bytes, token records, canonical
+token serialization, structural page state, paths, source identity,
+allocation indices, maps, and diagnostics without borrowing Rust, C, libc,
+FFI, or host-language layouts.
 
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
 
-## V7 Surface
+## V9 Surface
+
+V9 turns the v8 page store into a registered aggregate boundary without
+changing the frozen language subset or scalar export ABI:
+
+- `CompilerPayloadRegistry` is a stable insertion-order `CompilerMap` from a
+  positive kind to a compact schema and fixed/variable-length descriptor.
+  Duplicate registration fails with code `4`; registry identity is
+  `1630830726` for the reference text and source-span kinds.
+- `CompilerAggregateArena` composes the unchanged stable-index
+  `CompilerArena` envelope with one shared `CompilerPayloadBuffer`. Generic
+  storage validates registration and length before copying bytes and appending
+  the envelope, so failures leave the input identity unchanged.
+- Kind `1`, schema `101`, projects canonical `CompilerText`. Kind `2`, schema
+  `102`, projects `CompilerSourceSpan` as three canonical little-endian u31
+  fields with fixed length 12 and reference shape identity `1383365918`.
+- The reference store places eight-byte `nuislang` before the 12-byte span.
+  The span crosses the page boundary; page identities are `934788601` and
+  `1229397900`, envelope identity is `1109161393`, and complete identity is
+  `1274791798`.
+
+V9 adds one approved std import and two registered data names, but no source
+capability or scalar export. The subset remains v8 with exactly twenty-one
+exports, and the frozen v8 contracts remain unchanged.
+
+V8 adds the first typed payload column that crosses the old sixteen-byte
+boundary:
+
+- `CompilerPayloadBuffer` is the payload-facing alias for the canonical owned
+  packed-byte buffer already proven by the token path. It stores at most 128
+  bytes without making host endianness or aggregate layout part of identity.
+- `nuis-compiler-payload-pages-v1` views that contiguous storage as up to eight
+  logical sixteen-byte pages. Page ordinal and offset select one byte; only the
+  terminal page may be short.
+- Every page identity binds ordinal, byte start, byte length, and all bytes.
+  The reference pages have lengths `16` and `2` and identities `712007164` and
+  `132664649`.
+- `CompilerPagedTextArena` preserves the v7 `CompilerArena` envelope while
+  replacing its single-vector payload column with the paged buffer. UTF-8
+  validation, projection, and ordered identity cross page boundaries in Nuis.
+- The reference store contains `nuislang`, U+03BB, and `nuislang` as 18 bytes.
+  Its third record begins at byte 10 and crosses the sixteen-byte boundary;
+  envelope identity is `784615130` and complete identity is `322532187`.
+
+The underlying arithmetic packing is a storage implementation, not token
+semantics and not a host ABI. V8 adds one approved std import and two approved
+data names, but no source-language capability or scalar export; the frozen
+bootstrap ceiling remains twenty-one exports.
+
+V9 preserves the v8 surface, which retains the v7 compiler foundation:
 
 V7 retains the v6 compiler foundation:
 
@@ -52,9 +107,9 @@ V7 adds the first typed aggregate payload over stable arena indices:
 - `nuis-compiler-text-arena-ordered-identity-v1` binds the existing envelope
   identity, total payload length, and every payload byte in stable order.
 
-The typed store intentionally remains a bounded proof: all text payloads share
-one sixteen-byte vector. It introduces one approved data shape but no language
-capability, intrinsic, FFI edge, or additional bootstrap scalar export.
+The v7 typed store intentionally remains frozen as a bounded compatibility
+proof in which all text payloads share one sixteen-byte vector. V8 layers a
+new type beside it rather than changing its shape or identity.
 
 V5 replaces the original four-slot map proof with a deterministic columnar
 map suitable for bootstrap symbol tables:
@@ -171,12 +226,27 @@ identity `1064756829`. Full capacity, negative kind, invalid index/slot,
 oversized capacity, malformed columns, and malformed identity all fail before
 observable mutation.
 
-The v7 path stores `nuislang` and U+03BB (two-byte UTF-8 `cebb`) at typed
+The preserved v7 path stores `nuislang` and U+03BB (two-byte UTF-8 `cebb`) at typed
 indices `0` and `1`. Their ten payload bytes rebuild owned texts with hashes
 `1135407074` and `53387`; the unchanged envelope binds identity `1856301942`
 and the complete typed store binds identity `1643761726`. Object exhaustion,
 payload exhaustion, invalid index, wrong kind, malformed UTF-8, and forged text
 hashes fail with exact codes while the pre-failure identity remains unchanged.
+
+The v8 path then appends `nuislang` a second time through
+`CompilerPagedTextArena`. Its 18-byte payload occupies two logical pages, and
+the third record crosses the boundary at byte 16. Native checks project that
+record into a fresh `CompilerText`, verify page lengths and boundary bytes,
+pin both page identities plus complete identity `322532187`, and reject an
+absent page or object with exact error `2`.
+
+The v9 path explicitly registers text and source-span schemas, stores both at
+stable indices in one aggregate arena, and projects fresh owned values through
+typed getters. Its 20-byte payload crosses the first logical page inside the
+source-span record. Native checks pin registry, span, envelope, page, and
+complete identities, reject duplicate registration with code `4`, reject
+wrong kind and absent index with code `2`, reject malformed fixed-length bytes
+with code `3`, and prove the failed store leaves identity unchanged.
 
 The same executable also constructs the first complete materialized page from the real
 candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
@@ -217,14 +287,14 @@ pins open-record versus completed-record and partial structural-line boundaries.
 
 `StdCompilerProjection` consumes the first AST and NIR structural pages,
 serializes an opaque eight-lane scanner cursor, and resumes both into a second
-page over this foundation. It does not claim that the bounded v7 model parses a
+page over this foundation. It does not claim that the bounded v9 model parses a
 complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
-V7 proves owned token materialization, canonical re-emission, complete token
+V9 proves owned token materialization, canonical re-emission, complete token
 pagination, deterministic multi-page maps, bounded arena object storage, and
-one typed owned-text projection,
+registered typed text and source-span projection across logical payload pages,
 but it is not
 yet an unbounded compiler heap:
 
@@ -233,15 +303,19 @@ yet an unbounded compiler heap:
   bytes, and 128 output bytes.
 - `CompilerVector` remains `i64`-specific and bounded to sixteen values.
 - `CompilerMap` remains `i64`-specific and bounded to sixteen entries.
-- `CompilerArena` remains a sixteen-object, four-`i64` envelope; its v7 text
-  payload column is limited to sixteen total bytes and does not yet generalize
-  to arbitrary aggregate payload kinds.
+- `CompilerArena` remains a sixteen-object, four-`i64` envelope.
+- One `CompilerText` remains limited to sixteen bytes, while the v9 aggregate
+  payload column is bounded to 128 bytes across eight logical pages.
+- Registration is generic, but typed codecs currently cover only
+  `CompilerText` and `CompilerSourceSpan`; one payload remains at most 16 bytes.
 - Generic helper specialization still needs defining-module provenance.
+- Forwarding the complete aggregate arena through another nested helper remains
+  outside the current wide scalar-leaf lowering proof.
 - Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
   avoid pretending otherwise.
 
 The readiness gate is therefore not yet `stable/100`. The next data-model step
-is paged typed payload storage beyond one sixteen-byte vector. Broader structural paging and aggregate
-backedge lowering follow without weakening
+is chunked projection for larger individual owned values, followed by broader
+structural paging without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
 or the frozen v8 import ceiling.

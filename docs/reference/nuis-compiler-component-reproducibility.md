@@ -84,15 +84,18 @@ artifact and preserves `replacement_authorized = false`.
 V1 proves two fresh compiler productions under one local frontdoor. Handoff v2
 now binds a byte-different reversible NIR representation and its semantic
 equivalence, while attestation v1 supplies the cryptographic external-witness
-boundary. Repository tests still use a same-machine test key; one real
-separately provisioned attester run and reversible replacement authorization
-remain open.
+boundary. The repository now retains one separately operated Linux amd64
+attester generation with two cache-bypassed `13/13` runs, an exact registry
+pin, and a no-private-key verification regression. Cryptography still cannot
+prove physical-machine independence, and reversible replacement authorization
+remains open.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1
 ```

@@ -151,7 +151,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=21\tvisible_libraries=21\tvisible_modules=22\tdocumented_visible_modules=21\tdocumented_visible_items="
+        "summary\tlibraries=26\tvisible_libraries=26\tvisible_modules=27\tdocumented_visible_modules=26\tdocumented_visible_items="
     ));
     for library in [
         "image_contracts.ns",

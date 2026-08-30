@@ -1,0 +1,57 @@
+protocol = "nuis-compiler-component-reproducibility-v1"
+clean_build_contract = "nuis-compiler-two-clean-build-roots-v1"
+attestation_authority = "local-frontdoor-procedural-witness-no-independent-trust"
+replacement_authority_contract = "nuis-compiler-replacement-authorization-separate-v1"
+component_id = "bootstrap_structural_projection_candidate"
+run_count = 2
+comparison_count = 13
+equivalent_run_count = 2
+stage0_reproducible_build_sha256 = "2e2fe409a16402957476fe5838c8f577dc97fabf7a5a054ad9bb2b1323565da7"
+candidate_reproducible_build_sha256 = "18aabb34a5c7dfdd036789db5019154dbad109a68519ecb4d96c515d3b47d104"
+candidate_compiler_image_sha256 = "342c2a0ea98958a2ec6f7c8e069d6ab751ae72f058caa6596c391b5e4b356c4a"
+native_output_sha256 = "342c2a0ea98958a2ec6f7c8e069d6ab751ae72f058caa6596c391b5e4b356c4a"
+differential_verdict = "equivalent-awaiting-authorization"
+all_runs_equivalent = true
+replacement_authorized = false
+verdict = "reproducible-equivalent-awaiting-authorization"
+aggregate_sha256 = "c7fc7ae1490a78af36ab5dee6fd57815265b1874ba09f3680f36d3ccb684cd14"
+
+[[run]]
+ordinal = 0
+run_id = "clean-build-0"
+component_id = "bootstrap_structural_projection_candidate"
+clean_root_state = "absent-or-empty-before-build"
+clean_root_witness_sha256 = "8681972d1462c1999ae6e50bbdeffabebf9a473964b9af4f63319eb5ee5215e6"
+stage0_record_sha256 = "f5b4258e341b598c4a603ba0d1e4ec44e3d9807e1200d49db2f5b70ac697853c"
+stage0_reproducible_build_sha256 = "2e2fe409a16402957476fe5838c8f577dc97fabf7a5a054ad9bb2b1323565da7"
+candidate_record_sha256 = "d4d0fe39689a6b33c0513b4d1227def1db5143997362184ec1029e1728edd44b"
+candidate_reproducible_build_sha256 = "18aabb34a5c7dfdd036789db5019154dbad109a68519ecb4d96c515d3b47d104"
+candidate_compiler_image_sha256 = "342c2a0ea98958a2ec6f7c8e069d6ab751ae72f058caa6596c391b5e4b356c4a"
+native_output_sha256 = "342c2a0ea98958a2ec6f7c8e069d6ab751ae72f058caa6596c391b5e4b356c4a"
+production_proof_sha256 = "8cf1de7c35e40060a0c07ad4045bb68f0a1c803cd85613d13f46d896b6df7fdd"
+differential_report_sha256 = "f3781d7af3aef743050ef47753bdfd2bd1664b4ac46252dd2750308fbefc5db7"
+comparison_count = 13
+equivalent_count = 13
+deterministic_artifact_equivalent = true
+differential_verdict = "equivalent-awaiting-authorization"
+replacement_authorized = false
+
+[[run]]
+ordinal = 1
+run_id = "clean-build-1"
+component_id = "bootstrap_structural_projection_candidate"
+clean_root_state = "absent-or-empty-before-build"
+clean_root_witness_sha256 = "253901220d24e193e97c4fddd20d0078fa54c4534d9f8950c5a2aeec36bfccc8"
+stage0_record_sha256 = "6ad5ae494725f98f09ac139758e339b56553a353d3ac9c003647beb7a1ba1ca8"
+stage0_reproducible_build_sha256 = "2e2fe409a16402957476fe5838c8f577dc97fabf7a5a054ad9bb2b1323565da7"
+candidate_record_sha256 = "70a0dfc52da5913d309ca5ddf10351c6949b14579ae19c83f98bc7d6bdf3cb24"
+candidate_reproducible_build_sha256 = "18aabb34a5c7dfdd036789db5019154dbad109a68519ecb4d96c515d3b47d104"
+candidate_compiler_image_sha256 = "342c2a0ea98958a2ec6f7c8e069d6ab751ae72f058caa6596c391b5e4b356c4a"
+native_output_sha256 = "342c2a0ea98958a2ec6f7c8e069d6ab751ae72f058caa6596c391b5e4b356c4a"
+production_proof_sha256 = "ecb731a8b579637f5217ff689d31bf67e5a641d70486b8fbb43acb5f529a5293"
+differential_report_sha256 = "6cb0768596c180ce3bc37688fd9dc0f9f18991d466aadb144f9d51f9f9775a04"
+comparison_count = 13
+equivalent_count = 13
+deterministic_artifact_equivalent = true
+differential_verdict = "equivalent-awaiting-authorization"
+replacement_authorized = false

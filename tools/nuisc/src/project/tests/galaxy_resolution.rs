@@ -85,6 +85,8 @@ mod cpu Main {
             "lib/report_contracts.ns".to_owned(),
             "lib/language_core.ns".to_owned(),
             "lib/compiler_data.ns".to_owned(),
+            "lib/compiler_payload.ns".to_owned(),
+            "lib/compiler_payload_registry.ns".to_owned(),
             "lib/compiler_token_emit.ns".to_owned(),
             "lib/compiler_tokens.ns".to_owned(),
             "lib/compiler_projection.ns".to_owned(),
@@ -150,19 +152,19 @@ mod cpu Main {
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
     assert!(galaxy_index.contains(
-        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns, lib/hetero_contracts.ns, lib/report_contracts.ns, lib/language_core.ns, lib/compiler_data.ns, lib/compiler_token_emit.ns, lib/compiler_tokens.ns, lib/compiler_projection.ns, lib/language_ops.ns"
+        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns, lib/hetero_contracts.ns, lib/report_contracts.ns, lib/language_core.ns, lib/compiler_data.ns, lib/compiler_payload.ns, lib/compiler_payload_registry.ns, lib/compiler_token_emit.ns, lib/compiler_tokens.ns, lib/compiler_projection.ns, lib/language_ops.ns"
     ));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=25\tdocumented_modules=24\tdocumented_items="));
+    assert!(docs_index.contains("summary\tmodules=27\tdocumented_modules=26\tdocumented_items="));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=24\tvisible_libraries=24\tvisible_modules=25\tdocumented_visible_modules=24\tdocumented_visible_items="
+        "summary\tlibraries=26\tvisible_libraries=26\tvisible_modules=27\tdocumented_visible_modules=26\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -207,6 +209,9 @@ mod cpu Main {
         "library\tstd\tlib/compiler_data.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tstd\tlib/compiler_payload_registry.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "library\tstd\tlib/compiler_token_emit.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
@@ -237,6 +242,8 @@ mod cpu Main {
     assert!(imports_index.contains("visible\tcpu\tStdTimeContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdHeteroContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdCompilerData\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdCompilerPayload\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdCompilerPayloadRegistry\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdCompilerTokenEmit\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdCompilerTokens\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tPixelMagicContracts\tdoc_items="));

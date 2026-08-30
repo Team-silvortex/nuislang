@@ -32,12 +32,10 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`723/723` passing drift checks. The stage-neutral boundary, stage0/stage1
-driver, reproducibility gate, and compiler data model v7 are all `usable`.
-Stage-neutral selection and the driver are `98/100`, the reproducibility gate
-is `97/100`, and compiler data remains `96/100`; the selector therefore returns
-to paged typed compiler payload storage while real remote attestation evidence
-remains an explicit follow-up.
+`732/732` passing drift checks. The stage-neutral boundary, stage0/stage1
+driver, reproducibility gate, and compiler data model v9 are all `usable/98`.
+Data model v9 now closes the second registered typed payload proof, so
+deterministic coordinate ordering advances to the stage0/stage1 driver.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -46,15 +44,19 @@ compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
 `nuis bootstrap-status` frontdoor reports `1/5` gates closed. Compiler data
-model v7 now materializes four owned token records per bounded window, emits
+model v9 now materializes four owned token records per bounded window, emits
 the canonical 59-byte fixture plus the real candidate's 91-byte
 `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
 store, canonically re-emits the same bytes and hash, builds a stable-order
 sixteen-entry `CompilerMap` with ordered identity `415394959`, stores two
 stable-index arena objects with ordered identity `1064756829`, then stores and
-rebuilds two canonical owned texts through `CompilerTextArena` with typed
-identity `1643761726`, and executes
+rebuilds two canonical owned texts through the frozen `CompilerTextArena`, then
+stores 18 bytes across two logical pages through `CompilerPagedTextArena`,
+then registers canonical text and fixed-width source-span payload kinds. The
+shared aggregate arena stores 20 bytes, projects both values across the page
+boundary, and pins registry identity `1630830726`, page identities `934788601`
+and `1229397900`, plus complete identity `1274791798`, before executing
 natively at deterministic score `130`; the producer-neutral stage boundary is
 now `usable`, `98/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
@@ -93,10 +95,14 @@ still disabled. The separate `bootstrap-attest-reproducibility` and
 `bootstrap-verify-reproducibility-attestation` frontdoors now bind that exact
 aggregate, both production v11 proofs, and a fresh challenge to an
 environment-scoped Ed25519 key under a caller-pinned canonical trust registry.
-Repository tests use a same-machine test key, so this establishes the external
-attester protocol rather than claiming completed remote evidence. This closes
-one real Nuis leaf production and reproducibility loop; it is not a claim that
-the compiler is already self-hosted.
+The checked-in
+[Linux amd64 generation-one evidence](docs/evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml)
+contains two cache-bypassed `13/13` clean builds, the signed aggregate, and exact
+registry pin. Its random private seed remained on the attester; repository
+regression verifies the real claim without that seed and rejects a wrong
+challenge or pin. This closes one real Nuis leaf production and remote
+reproducibility loop; physical independence remains an operational fact and
+the compiler is not yet self-hosted.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -133,6 +139,7 @@ Start with these documents:
 * [Compiler stage handoff](docs/reference/nuis-compiler-stage-handoff.md)
 * [Compiler stage transformation](docs/reference/nuis-compiler-stage-transformation.md)
 * [Compiler component build](docs/reference/nuis-compiler-component-build.md)
+* [Compiler remote attestation evidence](docs/evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml)
 * [Compiler candidate execution](docs/reference/nuis-compiler-candidate-execution.md)
 * [Compiler candidate production](docs/reference/nuis-compiler-candidate-production.md)
 * [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)

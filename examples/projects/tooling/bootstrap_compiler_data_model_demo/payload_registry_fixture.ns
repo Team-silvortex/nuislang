@@ -1,0 +1,123 @@
+use cpu StdLanguageCore;
+use cpu StdCompilerData;
+use cpu StdCompilerPayload;
+use cpu StdCompilerPayloadRegistry;
+
+/// Executable v9 proof for registered aggregate payload kinds.
+mod cpu CompilerPayloadRegistryFixture {
+  pub fn registration_error(
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    schema: i64,
+    fixed_length: i64
+  ) -> i64 {
+    match compiler_payload_registry_register(
+      registry, kind, schema, fixed_length
+    ) {
+      Result.Ok(_) => { return -1; }
+      Result.Err(code) => { return code; }
+    }
+  }
+
+  pub fn compiler_payload_registry_fixture(text: CompilerText) -> Result<i64, i64> {
+    let empty: CompilerPayloadRegistry = compiler_payload_registry_empty();
+    let text_registry: CompilerPayloadRegistry = compiler_payload_registry_register(
+      empty, 1, compiler_payload_schema_text(), -1
+    )?;
+    let registry: CompilerPayloadRegistry = compiler_payload_registry_register(
+      text_registry, 2, compiler_payload_schema_source_span(), 12
+    )?;
+    let registry_identity: i64 = compiler_payload_registry_identity(registry)?;
+    if compiler_payload_registry_shape_valid(registry) == false
+      || compiler_payload_registry_accepts(
+        registry, 1, compiler_payload_schema_text(), -1
+      ) == false
+      || compiler_payload_registry_accepts(
+        registry, 2, compiler_payload_schema_source_span(), 12
+      ) == false
+      || registry_identity != 1630830726 {
+      return Result.Err(1);
+    }
+    if registration_error(
+      registry, 1, compiler_payload_schema_text(), -1
+    ) != 4
+      || registration_error(
+        registry, 3, compiler_payload_schema_source_span(), 17
+      ) != 3 {
+      return Result.Err(2);
+    }
+
+    let arena0: CompilerAggregateArena = compiler_aggregate_arena_new(
+      registry, 2
+    )?;
+    let arena1: CompilerAggregateArena = compiler_aggregate_arena_store_text(
+      arena0, registry, 1, text
+    )?;
+    let span: CompilerSourceSpan = compiler_source_span(7, 3, 11)?;
+    let arena2: CompilerAggregateArena = compiler_aggregate_arena_store_source_span(
+      arena1, registry, 2, span
+    )?;
+    let identity: i64 = compiler_aggregate_arena_identity(arena2, registry)?;
+    let projected_text: CompilerText = compiler_aggregate_arena_get_text(
+      arena2, registry, 0, 1
+    )?;
+    let projected_span: CompilerSourceSpan = compiler_aggregate_arena_get_source_span(
+      arena2, registry, 1, 2
+    )?;
+    let page0_identity: i64 = compiler_payload_page_identity(arena2.payload, 0)?;
+    let page1_identity: i64 = compiler_payload_page_identity(arena2.payload, 1)?;
+    let envelope_identity: i64 = compiler_arena_identity(arena2.arena)?;
+
+    if compiler_aggregate_arena_shape_valid(arena2, registry) == false
+      || arena2.arena.next_index != 2 || arena2.arena.last_index != 1
+      || arena2.payload.length != 20
+      || compiler_payload_page_count(arena2.payload) != 2
+      || compiler_payload_page_length(arena2.payload, 0) != 16
+      || compiler_payload_page_length(arena2.payload, 1) != 4 {
+      return Result.Err(3);
+    }
+    if projected_text.hash != text.hash
+      || projected_text.scalar_length != 8
+      || projected_span.source_id != 7
+      || projected_span.start != 3 || projected_span.end != 11
+      || compiler_source_span_payload_identity(projected_span) != 1383365918 {
+      return Result.Err(4);
+    }
+    if compiler_payload_byte(arena2.payload, 15) != 0
+      || compiler_payload_byte(arena2.payload, 16) != 11
+      || page0_identity != 934788601 || page1_identity != 1229397900
+      || envelope_identity != 1109161393
+      || identity != 1274791798 {
+      return Result.Err(5);
+    }
+    let wrong_kind_error: i64 = match compiler_aggregate_arena_get_text(
+      arena2, registry, 1, 1
+    ) {
+      Result.Ok(_) => { -1 }
+      Result.Err(code) => { code }
+    };
+    let absent_index_error: i64 = match compiler_aggregate_arena_get_text(
+      arena2, registry, 2, 1
+    ) {
+      Result.Ok(_) => { -1 }
+      Result.Err(code) => { code }
+    };
+    if wrong_kind_error != 2 {
+      return Result.Err(6);
+    }
+    if absent_index_error != 2 { return Result.Err(8); }
+    let identity_after_failure: i64 = compiler_aggregate_arena_identity(
+      arena2, registry
+    )?;
+    let malformed_store_error: i64 = match compiler_aggregate_arena_store_bytes(
+      arena2, registry, 2, text.bytes, text.scalar_length
+    ) {
+      Result.Ok(_) => { -1 }
+      Result.Err(code) => { code }
+    };
+    if malformed_store_error != 3 || identity_after_failure != identity {
+      return Result.Err(7);
+    }
+    return Result.Ok(0);
+  }
+}

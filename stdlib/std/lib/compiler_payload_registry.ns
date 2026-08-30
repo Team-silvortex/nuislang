@@ -1,0 +1,422 @@
+use cpu StdLanguageCore;
+use cpu StdCompilerData;
+use cpu StdCompilerPayload;
+
+/// Registered aggregate payload kinds over the canonical compiler page store.
+mod cpu StdCompilerPayloadRegistry {
+  pub type CompilerPayloadRegistry = CompilerMap;
+
+  /// Stable object envelopes and one shared canonical payload column.
+  pub struct CompilerAggregateArena {
+    pub arena: CompilerArena,
+    pub payload: CompilerPayloadBuffer
+  }
+
+  pub fn compiler_payload_schema_text() -> i64 {
+    return 101;
+  }
+
+  pub fn compiler_payload_schema_source_span() -> i64 {
+    return 102;
+  }
+
+  pub fn compiler_payload_descriptor(
+    schema: i64,
+    fixed_length: i64
+  ) -> i64 {
+    return schema * 32 + fixed_length + 1;
+  }
+
+  pub fn compiler_payload_descriptor_valid(descriptor: i64) -> bool {
+    if descriptor < 32 { return false; }
+    let schema: i64 = descriptor / 32;
+    let length_code: i64 = descriptor % 32;
+    return schema > 0 && schema <= 67000000
+      && length_code >= 0 && length_code <= 17;
+  }
+
+  pub fn compiler_payload_descriptor_schema(descriptor: i64) -> i64 {
+    if compiler_payload_descriptor_valid(descriptor) == false { return -1; }
+    return descriptor / 32;
+  }
+
+  pub fn compiler_payload_descriptor_fixed_length(descriptor: i64) -> i64 {
+    if compiler_payload_descriptor_valid(descriptor) == false { return -2; }
+    return descriptor % 32 - 1;
+  }
+
+  pub fn compiler_payload_registry_empty() -> CompilerPayloadRegistry {
+    return compiler_map_empty();
+  }
+
+  pub fn compiler_payload_registry_entries_valid(
+    registry: CompilerPayloadRegistry,
+    index: i64
+  ) -> bool {
+    if index >= registry.length { return true; }
+    let kind: i64 = compiler_map_vector_value(registry.keys, index);
+    let descriptor: i64 = compiler_map_vector_value(registry.values, index);
+    if kind <= 0 || compiler_payload_descriptor_valid(descriptor) == false {
+      return false;
+    }
+    if compiler_map_find_index(registry, kind, 0) != index { return false; }
+    return compiler_payload_registry_entries_valid(registry, index + 1);
+  }
+
+  pub fn compiler_payload_registry_shape_valid(
+    registry: CompilerPayloadRegistry
+  ) -> bool {
+    if compiler_map_shape_valid(registry) == false { return false; }
+    if compiler_payload_registry_entries_valid(registry, 0) == false {
+      return false;
+    }
+    return true;
+  }
+
+  pub fn compiler_payload_registry_register(
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    schema: i64,
+    fixed_length: i64
+  ) -> Result<CompilerPayloadRegistry, i64> {
+    if compiler_payload_registry_shape_valid(registry) == false
+      || kind <= 0 || schema <= 0 || schema > 67000000
+      || fixed_length < -1 || fixed_length > 16 {
+      return Result.Err(3);
+    }
+    if compiler_map_contains(registry, kind) { return Result.Err(4); }
+    return compiler_map_insert(
+      registry,
+      kind,
+      compiler_payload_descriptor(schema, fixed_length)
+    );
+  }
+
+  pub fn compiler_payload_registry_descriptor_or(
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    fallback: i64
+  ) -> i64 {
+    match compiler_map_get(registry, kind) {
+      Option.Some(descriptor) => { return descriptor; }
+      Option.None => { return fallback; }
+    }
+  }
+
+  pub fn compiler_payload_registry_accepts(
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    schema: i64,
+    fixed_length: i64
+  ) -> bool {
+    let descriptor: i64 = compiler_payload_registry_descriptor_or(
+      registry, kind, -1
+    );
+    if compiler_payload_descriptor_schema(descriptor) != schema { return false; }
+    if compiler_payload_descriptor_fixed_length(descriptor) != fixed_length {
+      return false;
+    }
+    return true;
+  }
+
+  pub fn compiler_payload_registry_identity(
+    registry: CompilerPayloadRegistry
+  ) -> Result<i64, i64> {
+    if compiler_payload_registry_shape_valid(registry) == false {
+      return Result.Err(3);
+    }
+    return compiler_map_identity(registry);
+  }
+
+  pub fn compiler_aggregate_records_valid(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    index: i64,
+    expected_start: i64
+  ) -> bool {
+    if index == value.arena.next_index {
+      return expected_start == value.payload.length;
+    }
+    let kind: i64 = compiler_map_vector_value(value.arena.kinds, index);
+    let start: i64 = compiler_map_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_map_vector_value(value.arena.field1s, index);
+    let shape_identity: i64 = compiler_map_vector_value(value.arena.field2s, index);
+    let descriptor: i64 = compiler_payload_registry_descriptor_or(
+      registry, kind, -1
+    );
+    if descriptor < 0 || start != expected_start || length < 0 || length > 16
+      || shape_identity < 0 || length > value.payload.length - start {
+      return false;
+    }
+    let fixed_length: i64 = compiler_payload_descriptor_fixed_length(descriptor);
+    if fixed_length >= 0 && fixed_length != length { return false; }
+    return compiler_aggregate_records_valid(
+      value, registry, index + 1, start + length
+    );
+  }
+
+  pub fn compiler_aggregate_arena_shape_valid(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry
+  ) -> bool {
+    if compiler_payload_registry_shape_valid(registry) == false
+      || compiler_arena_shape_valid(value.arena) == false
+      || compiler_payload_shape_valid(value.payload) == false {
+      return false;
+    }
+    return compiler_aggregate_records_valid(value, registry, 0, 0);
+  }
+
+  pub fn compiler_aggregate_arena_new(
+    registry: CompilerPayloadRegistry,
+    capacity: i64
+  ) -> Result<CompilerAggregateArena, i64> {
+    if compiler_payload_registry_shape_valid(registry) == false {
+      return Result.Err(3);
+    }
+    let arena: CompilerArena = compiler_arena_new(capacity)?;
+    return Result.Ok(CompilerAggregateArena {
+      arena: arena,
+      payload: compiler_payload_empty()
+    });
+  }
+
+  pub fn compiler_aggregate_arena_store_bytes(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    bytes: CompilerVector,
+    shape_identity: i64
+  ) -> Result<CompilerAggregateArena, i64> {
+    if compiler_aggregate_arena_shape_valid(value, registry) == false
+      || compiler_vector_valid(bytes) == false || shape_identity < 0 {
+      return Result.Err(3);
+    }
+    let descriptor: i64 = compiler_payload_registry_descriptor_or(
+      registry, kind, -1
+    );
+    if descriptor < 0 { return Result.Err(2); }
+    let fixed_length: i64 = compiler_payload_descriptor_fixed_length(descriptor);
+    if fixed_length >= 0 && fixed_length != bytes.length { return Result.Err(3); }
+    if value.arena.next_index >= value.arena.capacity
+      || value.payload.length + bytes.length > 128 {
+      return Result.Err(1);
+    }
+    let start: i64 = value.payload.length;
+    let payload: CompilerPayloadBuffer = compiler_payload_copy(
+      bytes, bytes.length, value.payload
+    )?;
+    let arena: CompilerArena = compiler_arena_store(
+      value.arena, kind, start, bytes.length, shape_identity
+    )?;
+    return Result.Ok(CompilerAggregateArena { arena: arena, payload: payload });
+  }
+
+  pub fn compiler_aggregate_arena_get_bytes(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    index: i64,
+    expected_kind: i64
+  ) -> Result<CompilerVector, i64> {
+    if compiler_aggregate_arena_shape_valid(value, registry) == false {
+      return Result.Err(3);
+    }
+    if index < 0 || index >= value.arena.next_index { return Result.Err(2); }
+    let kind: i64 = compiler_map_vector_value(value.arena.kinds, index);
+    if kind != expected_kind { return Result.Err(2); }
+    let start: i64 = compiler_map_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_map_vector_value(value.arena.field1s, index);
+    return compiler_payload_to_vector(value.payload, start, length);
+  }
+
+  pub fn compiler_aggregate_identity_pages(
+    payload: CompilerPayloadBuffer,
+    ordinal: i64,
+    page_count: i64,
+    identity: i64
+  ) -> i64 {
+    if ordinal >= page_count { return identity; }
+    let page_identity: i64 = compiler_payload_page_identity_raw(payload, ordinal);
+    return compiler_aggregate_identity_pages(
+      payload,
+      ordinal + 1,
+      page_count,
+      compiler_map_identity_fold(identity, page_identity)
+    );
+  }
+
+  pub fn compiler_aggregate_arena_identity(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry
+  ) -> Result<i64, i64> {
+    if compiler_aggregate_arena_shape_valid(value, registry) == false {
+      return Result.Err(3);
+    }
+    let registry_identity: i64 = compiler_payload_registry_identity(registry)?;
+    let arena_identity: i64 = compiler_arena_identity(value.arena)?;
+    let page_count: i64 = compiler_payload_page_count(value.payload);
+    let registry_fold: i64 = compiler_map_identity_fold(457, registry_identity);
+    let arena_fold: i64 = compiler_map_identity_fold(registry_fold, arena_identity);
+    let length_fold: i64 = compiler_map_identity_fold(arena_fold, value.payload.length);
+    let page_fold: i64 = compiler_map_identity_fold(length_fold, page_count);
+    return Result.Ok(compiler_aggregate_identity_pages(
+      value.payload, 0, page_count, page_fold
+    ));
+  }
+
+  pub fn compiler_aggregate_arena_store_text(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    text: CompilerText
+  ) -> Result<CompilerAggregateArena, i64> {
+    if compiler_text_shape_valid(text) == false
+      || compiler_payload_registry_accepts(
+        registry, kind, compiler_payload_schema_text(), -1
+      ) == false {
+      return Result.Err(3);
+    }
+    return compiler_aggregate_arena_store_bytes(
+      value, registry, kind, text.bytes, text.scalar_length
+    );
+  }
+
+  pub fn compiler_aggregate_arena_get_text(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    index: i64,
+    kind: i64
+  ) -> Result<CompilerText, i64> {
+    if compiler_payload_registry_accepts(
+      registry, kind, compiler_payload_schema_text(), -1
+    ) == false { return Result.Err(3); }
+    if compiler_aggregate_arena_shape_valid(value, registry) == false {
+      return Result.Err(3);
+    }
+    if index < 0 || index >= value.arena.next_index { return Result.Err(2); }
+    if compiler_map_vector_value(value.arena.kinds, index) != kind {
+      return Result.Err(2);
+    }
+    let bytes: CompilerVector = compiler_aggregate_arena_get_bytes(
+      value, registry, index, kind
+    )?;
+    let scalars: i64 = compiler_map_vector_value(value.arena.field2s, index);
+    let text: CompilerText = CompilerText {
+      bytes: bytes,
+      scalar_length: scalars,
+      hash: compiler_text_arena_hash_from(bytes, 0, 0)
+    };
+    if compiler_text_shape_valid(text) == false { return Result.Err(3); }
+    return Result.Ok(text);
+  }
+
+  pub fn compiler_payload_u31_valid(value: i64) -> bool {
+    return value >= 0 && value <= 2147483647;
+  }
+
+  pub fn compiler_payload_u31_append(
+    target: CompilerVector,
+    value: i64
+  ) -> Result<CompilerVector, i64> {
+    if compiler_payload_u31_valid(value) == false { return Result.Err(3); }
+    let b0: CompilerVector = compiler_vector_push(target, value % 256)?;
+    let b1: CompilerVector = compiler_vector_push(b0, (value / 256) % 256)?;
+    let b2: CompilerVector = compiler_vector_push(b1, (value / 65536) % 256)?;
+    return compiler_vector_push(b2, (value / 16777216) % 256);
+  }
+
+  pub fn compiler_payload_u31_decode(
+    bytes: CompilerVector,
+    start: i64
+  ) -> Result<i64, i64> {
+    if compiler_vector_valid(bytes) == false || start < 0 || start + 4 > bytes.length {
+      return Result.Err(3);
+    }
+    let b0: i64 = compiler_text_arena_byte(bytes, start);
+    let b1: i64 = compiler_text_arena_byte(bytes, start + 1);
+    let b2: i64 = compiler_text_arena_byte(bytes, start + 2);
+    let b3: i64 = compiler_text_arena_byte(bytes, start + 3);
+    if b0 < 0 || b0 > 255 || b1 < 0 || b1 > 255
+      || b2 < 0 || b2 > 255 || b3 < 0 || b3 > 127 {
+      return Result.Err(3);
+    }
+    return Result.Ok(b0 + b1 * 256 + b2 * 65536 + b3 * 16777216);
+  }
+
+  pub fn compiler_source_span_payload_valid(span: CompilerSourceSpan) -> bool {
+    if compiler_payload_u31_valid(span.source_id) == false { return false; }
+    if compiler_payload_u31_valid(span.start) == false { return false; }
+    if compiler_payload_u31_valid(span.end) == false { return false; }
+    if span.end < span.start { return false; }
+    return true;
+  }
+
+  pub fn compiler_source_span_payload_identity(span: CompilerSourceSpan) -> i64 {
+    let source: i64 = compiler_map_identity_fold(461, span.source_id);
+    let start: i64 = compiler_map_identity_fold(source, span.start);
+    return compiler_map_identity_fold(start, span.end);
+  }
+
+  pub fn compiler_source_span_payload_bytes(
+    span: CompilerSourceSpan
+  ) -> Result<CompilerVector, i64> {
+    if compiler_source_span_payload_valid(span) == false { return Result.Err(3); }
+    let source: CompilerVector = compiler_payload_u31_append(
+      compiler_vector_empty(0), span.source_id
+    )?;
+    let start: CompilerVector = compiler_payload_u31_append(source, span.start)?;
+    return compiler_payload_u31_append(start, span.end);
+  }
+
+  pub fn compiler_aggregate_arena_store_source_span(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    span: CompilerSourceSpan
+  ) -> Result<CompilerAggregateArena, i64> {
+    if compiler_source_span_payload_valid(span) == false
+      || compiler_payload_registry_accepts(
+        registry, kind, compiler_payload_schema_source_span(), 12
+      ) == false {
+      return Result.Err(3);
+    }
+    let bytes: CompilerVector = compiler_source_span_payload_bytes(span)?;
+    return compiler_aggregate_arena_store_bytes(
+      value,
+      registry,
+      kind,
+      bytes,
+      compiler_source_span_payload_identity(span)
+    );
+  }
+
+  pub fn compiler_aggregate_arena_get_source_span(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    index: i64,
+    kind: i64
+  ) -> Result<CompilerSourceSpan, i64> {
+    if compiler_payload_registry_accepts(
+      registry, kind, compiler_payload_schema_source_span(), 12
+    ) == false { return Result.Err(3); }
+    if compiler_aggregate_arena_shape_valid(value, registry) == false {
+      return Result.Err(3);
+    }
+    if index < 0 || index >= value.arena.next_index { return Result.Err(2); }
+    if compiler_map_vector_value(value.arena.kinds, index) != kind {
+      return Result.Err(2);
+    }
+    let bytes: CompilerVector = compiler_aggregate_arena_get_bytes(
+      value, registry, index, kind
+    )?;
+    let source_id: i64 = compiler_payload_u31_decode(bytes, 0)?;
+    let start: i64 = compiler_payload_u31_decode(bytes, 4)?;
+    let end: i64 = compiler_payload_u31_decode(bytes, 8)?;
+    let span: CompilerSourceSpan = compiler_source_span(source_id, start, end)?;
+    let shape_identity: i64 = compiler_map_vector_value(value.arena.field2s, index);
+    if compiler_source_span_payload_identity(span) != shape_identity {
+      return Result.Err(3);
+    }
+    return Result.Ok(span);
+  }
+}

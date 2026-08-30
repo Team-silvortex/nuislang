@@ -1,0 +1,358 @@
+use cpu StdLanguageCore;
+use cpu StdCompilerData;
+
+/// Paged compiler-owned payload storage built over the canonical packed byte buffer.
+mod cpu StdCompilerPayload {
+  pub type CompilerPayloadBuffer = CompilerTokenBuffer;
+
+  /// Stable compiler objects plus a payload column spanning eight logical pages.
+  pub struct CompilerPagedTextArena {
+    pub arena: CompilerArena,
+    pub payload: CompilerPayloadBuffer
+  }
+
+  pub fn compiler_payload_empty() -> CompilerPayloadBuffer {
+    return compiler_token_buffer_empty();
+  }
+
+  pub fn compiler_payload_shape_valid(value: CompilerPayloadBuffer) -> bool {
+    return compiler_token_buffer_shape_valid(value);
+  }
+
+  pub fn compiler_payload_page_count(value: CompilerPayloadBuffer) -> i64 {
+    if compiler_payload_shape_valid(value) == false { return -1; }
+    if value.length == 0 { return 0; }
+    return (value.length + 15) / 16;
+  }
+
+  pub fn compiler_payload_page_length(
+    value: CompilerPayloadBuffer,
+    ordinal: i64
+  ) -> i64 {
+    let page_count: i64 = compiler_payload_page_count(value);
+    if ordinal < 0 || ordinal >= page_count { return -1; }
+    let remaining: i64 = value.length - ordinal * 16;
+    if remaining >= 16 { return 16; }
+    return remaining;
+  }
+
+  pub fn compiler_payload_get(
+    value: CompilerPayloadBuffer,
+    index: i64
+  ) -> Option<i64> {
+    return compiler_token_buffer_get(value, index);
+  }
+
+  pub fn compiler_payload_page_get(
+    value: CompilerPayloadBuffer,
+    ordinal: i64,
+    offset: i64
+  ) -> Option<i64> {
+    let length: i64 = compiler_payload_page_length(value, ordinal);
+    if offset < 0 || offset >= length { return Option.None; }
+    return compiler_payload_get(value, ordinal * 16 + offset);
+  }
+
+  pub fn compiler_payload_byte(value: CompilerPayloadBuffer, index: i64) -> i64 {
+    match compiler_payload_get(value, index) {
+      Option.Some(byte) => { return byte; }
+      Option.None => { return -1; }
+    }
+  }
+
+  pub fn compiler_payload_page_identity_from(
+    value: CompilerPayloadBuffer,
+    index: i64,
+    end: i64,
+    identity: i64
+  ) -> i64 {
+    if index >= end { return identity; }
+    let next: i64 = compiler_map_identity_fold(
+      identity,
+      compiler_payload_byte(value, index)
+    );
+    return compiler_payload_page_identity_from(value, index + 1, end, next);
+  }
+
+  pub fn compiler_payload_page_identity_raw(
+    value: CompilerPayloadBuffer,
+    ordinal: i64
+  ) -> i64 {
+    let start: i64 = ordinal * 16;
+    let length: i64 = compiler_payload_page_length(value, ordinal);
+    let ordinal_identity: i64 = compiler_map_identity_fold(419, ordinal);
+    let start_identity: i64 = compiler_map_identity_fold(ordinal_identity, start);
+    let length_identity: i64 = compiler_map_identity_fold(start_identity, length);
+    return compiler_payload_page_identity_from(
+      value,
+      start,
+      start + length,
+      length_identity
+    );
+  }
+
+  pub fn compiler_payload_page_identity(
+    value: CompilerPayloadBuffer,
+    ordinal: i64
+  ) -> Result<i64, i64> {
+    if compiler_payload_shape_valid(value) == false { return Result.Err(3); }
+    if ordinal < 0 || ordinal >= compiler_payload_page_count(value) {
+      return Result.Err(2);
+    }
+    return Result.Ok(compiler_payload_page_identity_raw(value, ordinal));
+  }
+
+  pub fn compiler_payload_copy_step(
+    source: CompilerVector,
+    length: i64,
+    offset: i64,
+    target: CompilerPayloadBuffer
+  ) -> Result<CompilerPayloadBuffer, i64> {
+    if offset >= length { return Result.Ok(target); }
+    return compiler_token_buffer_push(
+      target,
+      compiler_text_arena_byte(source, offset)
+    );
+  }
+
+  pub fn compiler_payload_copy(
+    source: CompilerVector,
+    length: i64,
+    target: CompilerPayloadBuffer
+  ) -> Result<CompilerPayloadBuffer, i64> {
+    let p0: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 0, target)?;
+    let p1: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 1, p0)?;
+    let p2: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 2, p1)?;
+    let p3: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 3, p2)?;
+    let p4: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 4, p3)?;
+    let p5: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 5, p4)?;
+    let p6: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 6, p5)?;
+    let p7: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 7, p6)?;
+    let p8: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 8, p7)?;
+    let p9: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 9, p8)?;
+    let p10: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 10, p9)?;
+    let p11: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 11, p10)?;
+    let p12: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 12, p11)?;
+    let p13: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 13, p12)?;
+    let p14: CompilerPayloadBuffer = compiler_payload_copy_step(source, length, 14, p13)?;
+    return compiler_payload_copy_step(source, length, 15, p14);
+  }
+
+  pub fn compiler_payload_to_vector_step(
+    source: CompilerPayloadBuffer,
+    start: i64,
+    length: i64,
+    offset: i64,
+    target: CompilerVector
+  ) -> Result<CompilerVector, i64> {
+    if offset >= length { return Result.Ok(target); }
+    return compiler_vector_push(target, compiler_payload_byte(source, start + offset));
+  }
+
+  pub fn compiler_payload_to_vector(
+    source: CompilerPayloadBuffer,
+    start: i64,
+    length: i64
+  ) -> Result<CompilerVector, i64> {
+    let empty: CompilerVector = compiler_vector_empty(0);
+    let p0: CompilerVector = compiler_payload_to_vector_step(source, start, length, 0, empty)?;
+    let p1: CompilerVector = compiler_payload_to_vector_step(source, start, length, 1, p0)?;
+    let p2: CompilerVector = compiler_payload_to_vector_step(source, start, length, 2, p1)?;
+    let p3: CompilerVector = compiler_payload_to_vector_step(source, start, length, 3, p2)?;
+    let p4: CompilerVector = compiler_payload_to_vector_step(source, start, length, 4, p3)?;
+    let p5: CompilerVector = compiler_payload_to_vector_step(source, start, length, 5, p4)?;
+    let p6: CompilerVector = compiler_payload_to_vector_step(source, start, length, 6, p5)?;
+    let p7: CompilerVector = compiler_payload_to_vector_step(source, start, length, 7, p6)?;
+    let p8: CompilerVector = compiler_payload_to_vector_step(source, start, length, 8, p7)?;
+    let p9: CompilerVector = compiler_payload_to_vector_step(source, start, length, 9, p8)?;
+    let p10: CompilerVector = compiler_payload_to_vector_step(source, start, length, 10, p9)?;
+    let p11: CompilerVector = compiler_payload_to_vector_step(source, start, length, 11, p10)?;
+    let p12: CompilerVector = compiler_payload_to_vector_step(source, start, length, 12, p11)?;
+    let p13: CompilerVector = compiler_payload_to_vector_step(source, start, length, 13, p12)?;
+    let p14: CompilerVector = compiler_payload_to_vector_step(source, start, length, 14, p13)?;
+    return compiler_payload_to_vector_step(source, start, length, 15, p14);
+  }
+
+  pub fn compiler_paged_text_continuation(byte: i64) -> bool {
+    return byte >= 128 && byte <= 191;
+  }
+
+  pub fn compiler_paged_text_scalar_width(
+    payload: CompilerPayloadBuffer,
+    index: i64,
+    end: i64
+  ) -> i64 {
+    let b0: i64 = compiler_payload_byte(payload, index);
+    if b0 < 0 || b0 > 255 { return 0; }
+    if b0 <= 127 { return 1; }
+    if index + 1 >= end { return 0; }
+    let b1: i64 = compiler_payload_byte(payload, index + 1);
+    if b0 >= 194 && b0 <= 223 && compiler_paged_text_continuation(b1) {
+      return 2;
+    }
+    if index + 2 >= end { return 0; }
+    let b2: i64 = compiler_payload_byte(payload, index + 2);
+    if compiler_paged_text_continuation(b2) == false { return 0; }
+    if b0 == 224 && b1 >= 160 && b1 <= 191 { return 3; }
+    if b0 >= 225 && b0 <= 236 && compiler_paged_text_continuation(b1) { return 3; }
+    if b0 == 237 && b1 >= 128 && b1 <= 159 { return 3; }
+    if b0 >= 238 && b0 <= 239 && compiler_paged_text_continuation(b1) { return 3; }
+    if index + 3 >= end { return 0; }
+    let b3: i64 = compiler_payload_byte(payload, index + 3);
+    if compiler_paged_text_continuation(b2) == false
+      || compiler_paged_text_continuation(b3) == false { return 0; }
+    if b0 == 240 && b1 >= 144 && b1 <= 191 { return 4; }
+    if b0 >= 241 && b0 <= 243 && compiler_paged_text_continuation(b1) { return 4; }
+    if b0 == 244 && b1 >= 128 && b1 <= 143 { return 4; }
+    return 0;
+  }
+
+  pub fn compiler_paged_text_scalar_count_from(
+    payload: CompilerPayloadBuffer,
+    index: i64,
+    end: i64,
+    count: i64
+  ) -> i64 {
+    if index == end { return count; }
+    let width: i64 = compiler_paged_text_scalar_width(payload, index, end);
+    if width == 0 { return -1; }
+    return compiler_paged_text_scalar_count_from(
+      payload,
+      index + width,
+      end,
+      count + 1
+    );
+  }
+
+  pub fn compiler_paged_text_records_valid(
+    value: CompilerPagedTextArena,
+    index: i64,
+    expected_start: i64
+  ) -> bool {
+    if index == value.arena.next_index {
+      return expected_start == value.payload.length;
+    }
+    let kind: i64 = compiler_token_vector_value(value.arena.kinds, index);
+    let start: i64 = compiler_token_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_token_vector_value(value.arena.field1s, index);
+    let scalars: i64 = compiler_token_vector_value(value.arena.field2s, index);
+    if kind != 1 || start != expected_start || length < 0 || scalars < 0 {
+      return false;
+    }
+    if length > value.payload.length - start { return false; }
+    if compiler_paged_text_scalar_count_from(
+      value.payload,
+      start,
+      start + length,
+      0
+    ) != scalars { return false; }
+    return compiler_paged_text_records_valid(value, index + 1, start + length);
+  }
+
+  pub fn compiler_paged_text_arena_shape_valid(
+    value: CompilerPagedTextArena
+  ) -> bool {
+    if compiler_arena_shape_valid(value.arena) == false
+      || compiler_payload_shape_valid(value.payload) == false {
+      return false;
+    }
+    return compiler_paged_text_records_valid(value, 0, 0);
+  }
+
+  pub fn compiler_paged_text_arena_new(
+    capacity: i64
+  ) -> Result<CompilerPagedTextArena, i64> {
+    let arena: CompilerArena = compiler_arena_new(capacity)?;
+    return Result.Ok(CompilerPagedTextArena {
+      arena: arena,
+      payload: compiler_payload_empty()
+    });
+  }
+
+  pub fn compiler_paged_text_arena_store(
+    value: CompilerPagedTextArena,
+    text: CompilerText
+  ) -> Result<CompilerPagedTextArena, i64> {
+    if compiler_paged_text_arena_shape_valid(value) == false
+      || compiler_text_shape_valid(text) == false {
+      return Result.Err(3);
+    }
+    if value.arena.next_index >= value.arena.capacity
+      || value.payload.length + text.bytes.length > 128 {
+      return Result.Err(1);
+    }
+    let start: i64 = value.payload.length;
+    let payload: CompilerPayloadBuffer = compiler_payload_copy(
+      text.bytes,
+      text.bytes.length,
+      value.payload
+    )?;
+    let arena: CompilerArena = compiler_arena_store(
+      value.arena,
+      1,
+      start,
+      text.bytes.length,
+      text.scalar_length
+    )?;
+    return Result.Ok(CompilerPagedTextArena { arena: arena, payload: payload });
+  }
+
+  pub fn compiler_paged_text_arena_get(
+    value: CompilerPagedTextArena,
+    index: i64
+  ) -> Result<CompilerText, i64> {
+    if compiler_paged_text_arena_shape_valid(value) == false {
+      return Result.Err(3);
+    }
+    if index < 0 || index >= value.arena.next_index { return Result.Err(2); }
+    let start: i64 = compiler_token_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_token_vector_value(value.arena.field1s, index);
+    let scalars: i64 = compiler_token_vector_value(value.arena.field2s, index);
+    let bytes: CompilerVector = compiler_payload_to_vector(
+      value.payload,
+      start,
+      length
+    )?;
+    return Result.Ok(CompilerText {
+      bytes: bytes,
+      scalar_length: scalars,
+      hash: compiler_text_arena_hash_from(bytes, 0, 0)
+    });
+  }
+
+  pub fn compiler_paged_text_identity_pages(
+    payload: CompilerPayloadBuffer,
+    ordinal: i64,
+    page_count: i64,
+    identity: i64
+  ) -> i64 {
+    if ordinal >= page_count { return identity; }
+    let page_identity: i64 = compiler_payload_page_identity_raw(payload, ordinal);
+    let next: i64 = compiler_map_identity_fold(identity, page_identity);
+    return compiler_paged_text_identity_pages(
+      payload,
+      ordinal + 1,
+      page_count,
+      next
+    );
+  }
+
+  pub fn compiler_paged_text_arena_identity(
+    value: CompilerPagedTextArena
+  ) -> Result<i64, i64> {
+    if compiler_paged_text_arena_shape_valid(value) == false {
+      return Result.Err(3);
+    }
+    let arena_identity: i64 = compiler_arena_identity(value.arena)?;
+    let page_count: i64 = compiler_payload_page_count(value.payload);
+    let arena: i64 = compiler_map_identity_fold(433, arena_identity);
+    let length: i64 = compiler_map_identity_fold(arena, value.payload.length);
+    let pages: i64 = compiler_map_identity_fold(length, page_count);
+    return Result.Ok(compiler_paged_text_identity_pages(
+      value.payload,
+      0,
+      page_count,
+      pages
+    ));
+  }
+}

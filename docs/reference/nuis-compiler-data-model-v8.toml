@@ -1,0 +1,150 @@
+protocol = "nuis-compiler-data-model-v8"
+version = 8
+predecessor = "nuis-compiler-data-model-v7"
+status = "usable-paged-typed-owned-text-arena"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_payload.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v8"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+bootstrap_scalar_export_count = 21
+candidate_production = "nuis-compiler-candidate-production-v11"
+derived_stage_selection = "nuis-compiler-stage-handoff-v2"
+host_layout_identity = false
+host_ffi_required = false
+utf8_policy = "canonical-unicode-scalar-encoding"
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[paged_payload]
+protocol = "nuis-compiler-payload-pages-v1"
+type = "CompilerPayloadBuffer"
+storage_type = "canonical-packed-owned-byte-buffer"
+logical_page_bytes = 16
+maximum_pages = 8
+maximum_total_payload_bytes = 128
+packed_word_bytes = 7
+maximum_packed_words = 19
+page_address = "ordinal-times-sixteen-plus-offset"
+page_count = "ceil-total-length-divided-by-sixteen"
+terminal_page = "only-page-allowed-to-be-short"
+host_endianness_identity = false
+host_pointer_identity = false
+page_identity_contract = "nuis-compiler-payload-page-identity-v1"
+page_identity_seed = 419
+identity_radix = 257
+identity_modulus = 2147483629
+reference_page_count = 2
+reference_page0_length = 16
+reference_page1_length = 2
+reference_page0_identity = 712007164
+reference_page1_identity = 132664649
+
+paged_payload_operations = [
+  "compiler_payload_empty",
+  "compiler_payload_shape_valid",
+  "compiler_payload_page_count",
+  "compiler_payload_page_length",
+  "compiler_payload_get",
+  "compiler_payload_page_get",
+  "compiler_payload_page_identity",
+]
+
+paged_payload_invariants = [
+  "logical-pages-cover-one-contiguous-prefix-without-gaps-or-overlap",
+  "page-ordinal-and-offset-determine-one-canonical-byte-index",
+  "only-the-terminal-page-may-contain-fewer-than-sixteen-bytes",
+  "page-identity-binds-ordinal-start-length-and-every-byte",
+  "packing-is-arithmetic-and-does-not-consume-host-endianness-or-layout",
+  "malformed-shape-page-or-offset-fails-before-returning-a-byte-or-identity",
+]
+
+[paged_text_arena]
+type = "CompilerPagedTextArena"
+layout = "unchanged-CompilerArena-envelope-plus-CompilerPayloadBuffer-column"
+object_kind = 1
+object_kind_semantics = "owned-CompilerText"
+object_slots = ["kind", "payload_start", "payload_byte_length", "unicode_scalar_length"]
+maximum_objects = 16
+maximum_single_text_bytes = 16
+maximum_total_payload_bytes = 128
+storage = "validate-text-copy-canonical-bytes-then-append-envelope"
+projection = "validate-whole-store-copy-cross-page-range-and-rebuild-owned-CompilerText"
+shape_validation = "arena-shape-payload-shape-contiguous-records-kind-UTF8-and-scalar-count-agree"
+capacity_error = 1
+invalid_index_error = 2
+invalid_input_type_or_shape_error = 3
+identity_contract = "nuis-compiler-paged-text-arena-ordered-identity-v1"
+identity_seed = 433
+reference_object_count = 3
+reference_payload_bytes = 18
+reference_cross_page_record_index = 2
+reference_cross_page_record_start = 10
+reference_cross_page_record_length = 8
+reference_envelope_identity = 784615130
+reference_identity = 322532187
+
+paged_text_operations = [
+  "compiler_paged_text_arena_new",
+  "compiler_paged_text_arena_shape_valid",
+  "compiler_paged_text_arena_store",
+  "compiler_paged_text_arena_get",
+  "compiler_paged_text_arena_identity",
+]
+
+paged_text_invariants = [
+  "v7-stable-arena-indices-and-kind-one-envelope-semantics-are-preserved",
+  "records-remain-contiguous-ordered-and-non-overlapping-across-page-boundaries",
+  "UTF8-scalar-validation-crosses-logical-pages-without-host-text-decoding",
+  "projection-rebuilds-a-fresh-owned-CompilerText-from-a-cross-page-range",
+  "capacity-index-type-shape-and-page-failures-return-before-observable-mutation",
+  "arena-identity-binds-envelope-total-length-page-count-and-every-page-identity",
+]
+
+[preserved_v7]
+typed_text_arena_contract = "nuis-compiler-text-arena-ordered-identity-v1"
+typed_text_arena_identity = 1643761726
+arena_contract = "nuis-compiler-arena-ordered-identity-v1"
+arena_identity = 1064756829
+map_contract = "nuis-compiler-map-ordered-identity-v1"
+map_identity = 415394959
+token_pagination_contract = "nuis-compiler-token-pagination-v1"
+legacy_first_page_identity = 164749511446
+
+[bootstrap_surface]
+new_language_capabilities = 0
+new_scalar_exports = 0
+new_approved_imports = ["cpu/StdCompilerPayload"]
+new_approved_data_types = ["CompilerPayloadBuffer", "CompilerPagedTextArena"]
+
+[growth_boundary]
+status = "open"
+next_contract = "typed-aggregate-payload-kind-registration"
+remaining = [
+  "single-CompilerText-values-remain-bounded-to-sixteen-bytes",
+  "paged-payload-storage-remains-bounded-to-eight-logical-pages",
+  "only-CompilerText-has-a-typed-arena-payload-contract",
+  "CompilerMap-and-CompilerArena-remain-bounded-to-sixteen-entries",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+  "wide-scalar-leaf-aggregate-calls-remain-compile-time-expensive",
+]
+preserve = [
+  "stable-arena-indices",
+  "atomic-envelope-and-payload-storage",
+  "canonical-arena-map-text-and-page-identities",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-twenty-one-export-ceiling",
+]

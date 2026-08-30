@@ -74,6 +74,16 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
         "@nuis_fn_StdCompilerData.compiler_text_arena_store",
         "@nuis_fn_StdCompilerData.compiler_text_arena_get",
         "@nuis_fn_StdCompilerData.compiler_text_arena_identity",
+        "@nuis_fn_StdCompilerPayload.compiler_payload_page_identity",
+        "@nuis_fn_StdCompilerPayload.compiler_paged_text_arena_store",
+        "@nuis_fn_StdCompilerPayload.compiler_paged_text_arena_get",
+        "@nuis_fn_StdCompilerPayload.compiler_paged_text_arena_identity",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_payload_registry_register",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_store_text",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_store_source_span",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_get_text",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_get_source_span",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_identity",
     ] {
         assert_file_contains(&llvm_path, symbol);
     }

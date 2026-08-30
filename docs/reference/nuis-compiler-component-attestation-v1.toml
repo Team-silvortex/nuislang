@@ -49,18 +49,21 @@ verification_invariants = [
 cryptographic_claim = "a-pinned-registered-key-signed-the-exact-reproducibility-lineage"
 operational_policy = "the-key-operator-must-run-the-signing-frontdoor-on-the-registered-independent-environment"
 not_proven_by_cryptography = "physical-machine-independence"
-repository_test_scope = "same-machine-fixed-test-key"
-next_evidence = "one-separately-provisioned-machine-running-two-clean-builds-and-returning-a-pinned-attestation"
+repository_test_scope = "fixed-test-key-unit-coverage-plus-checked-in-separate-machine-generation-one-claim"
+checked_in_evidence = "docs/evidence/compiler-attestation/linux-amd64-cleanroom/generation-1"
+checked_in_registry_sha256 = "90b8f7f4c9d336c72caa7dc4dc9a91c41ec263a7bfffa282ee8211088b164f01"
+next_evidence = "second-independent-attester-or-explicit-higher-generation-key-rotation-ceremony"
 
 validation_commands = [
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_attestation_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
 ]
 
 [open_boundary]
 missing = [
-  "checked-in-separate-machine-attestation-evidence",
+  "second-independent-attester-or-higher-generation-key-rotation-evidence",
   "registry-rotation-ceremony-beyond-explicit-new-pin",
   "reversible-component-replacement-authorization",
 ]

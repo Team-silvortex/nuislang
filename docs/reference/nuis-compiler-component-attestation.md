@@ -61,16 +61,24 @@ therefore comes from key provisioning and the pinned registry policy: an
 attester key registered for `linux-amd64-cleanroom` must only be available in
 that environment.
 
-Repository tests use a fixed test key on one machine, so they prove the
-protocol and failure boundary, not a completed remote attestation ceremony.
-The next evidence step is one separately provisioned machine producing two
-clean builds and returning a claim verified against an independently supplied
-registry pin.
+Unit tests still use a fixed same-machine key to exercise signing and mutation
+cases. In addition, the repository now retains a real
+[Linux amd64 generation-one evidence set](../evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml):
+two cache-bypassed clean builds reached `13/13`, a random Ed25519 seed was
+generated and retained only on the attester, and the returned claim verifies
+against registry pin
+`90b8f7f4c9d336c72caa7dc4dc9a91c41ec263a7bfffa282ee8211088b164f01`.
+The regression uses no private key and proves that the exact claim verifies
+while a wrong challenge or pin fails closed. This is operational evidence of a
+separately operated machine, not cryptographic proof of physical independence.
+The next evidence step is a second attester or an explicit higher-generation
+key-rotation ceremony.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_attestation_commands -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1
 ```

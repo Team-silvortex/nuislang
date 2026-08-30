@@ -1,0 +1,175 @@
+protocol = "nuis-compiler-data-model-v9"
+version = 9
+predecessor = "nuis-compiler-data-model-v8"
+status = "usable-registered-typed-aggregate-arena"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_payload.ns",
+  "stdlib/std/lib/compiler_payload_registry.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v9"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+bootstrap_scalar_export_count = 21
+candidate_production = "nuis-compiler-candidate-production-v11"
+derived_stage_selection = "nuis-compiler-stage-handoff-v2"
+host_layout_identity = false
+host_ffi_required = false
+utf8_policy = "canonical-unicode-scalar-encoding"
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+example_fixture = "examples/projects/tooling/bootstrap_compiler_data_model_demo/payload_registry_fixture.ns"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[payload_registry]
+protocol = "nuis-compiler-payload-kind-registry-v1"
+type = "CompilerPayloadRegistry"
+storage_type = "stable-insertion-order-CompilerMap"
+maximum_kinds = 16
+kind_range = "positive-i64"
+schema_range = "one-through-67000000"
+fixed_length_range = "minus-one-variable-or-zero-through-sixteen"
+descriptor_encoding = "schema-times-thirty-two-plus-fixed-length-plus-one"
+duplicate_kind_error = 4
+invalid_registration_error = 3
+identity_contract = "nuis-compiler-map-ordered-identity-v1"
+reference_kind_count = 2
+reference_text_descriptor = 3232
+reference_source_span_descriptor = 3277
+reference_identity = 1630830726
+
+registry_operations = [
+  "compiler_payload_registry_empty",
+  "compiler_payload_registry_shape_valid",
+  "compiler_payload_registry_register",
+  "compiler_payload_registry_descriptor_or",
+  "compiler_payload_registry_accepts",
+  "compiler_payload_registry_identity",
+]
+
+registry_invariants = [
+  "kind-registration-order-is-stable-and-participates-in-identity",
+  "one-kind-has-exactly-one-schema-and-length-policy",
+  "duplicate-kinds-fail-before-returning-a-new-registry",
+  "descriptors-contain-no-host-pointer-layout-or-allocation-identity",
+  "typed-codecs-consume-the-registry-without-finite-compiler-linker-combinations",
+]
+
+[aggregate_arena]
+protocol = "nuis-compiler-registered-aggregate-arena-v1"
+type = "CompilerAggregateArena"
+layout = "unchanged-CompilerArena-envelope-plus-shared-CompilerPayloadBuffer-column"
+object_slots = ["kind", "payload_start", "payload_byte_length", "typed_shape_identity"]
+maximum_objects = 16
+maximum_single_payload_bytes = 16
+maximum_total_payload_bytes = 128
+logical_page_bytes = 16
+maximum_pages = 8
+store = "validate-registry-shape-and-length-copy-bytes-then-append-envelope"
+projection = "validate-whole-store-kind-and-index-then-copy-an-owned-range"
+capacity_error = 1
+invalid_index_or_kind_error = 2
+invalid_input_schema_or_shape_error = 3
+identity_contract = "nuis-compiler-registered-aggregate-arena-identity-v1"
+identity_seed = 457
+identity_radix = 257
+identity_modulus = 2147483629
+reference_object_count = 2
+reference_payload_bytes = 20
+reference_cross_page_record_index = 1
+reference_cross_page_record_start = 8
+reference_cross_page_record_length = 12
+reference_envelope_identity = 1109161393
+reference_page0_identity = 934788601
+reference_page1_identity = 1229397900
+reference_identity = 1274791798
+
+aggregate_operations = [
+  "compiler_aggregate_arena_new",
+  "compiler_aggregate_arena_shape_valid",
+  "compiler_aggregate_arena_store_bytes",
+  "compiler_aggregate_arena_get_bytes",
+  "compiler_aggregate_arena_identity",
+]
+
+aggregate_invariants = [
+  "stable-indices-are-envelope-order-and-never-host-addresses",
+  "records-are-contiguous-ordered-non-overlapping-and-registry-backed",
+  "fixed-length-schemas-reject-a-different-byte-count",
+  "failed-store-or-projection-does-not-change-the-input-value-or-identity",
+  "identity-binds-registry-envelope-total-length-page-count-and-page-identities",
+]
+
+[[typed_payloads]]
+kind = 1
+schema = 101
+name = "CompilerText"
+fixed_length = -1
+shape_identity = "unicode-scalar-length"
+encoding = "canonical-UTF8"
+store = "compiler_aggregate_arena_store_text"
+projection = "compiler_aggregate_arena_get_text"
+
+[[typed_payloads]]
+kind = 2
+schema = 102
+name = "CompilerSourceSpan"
+fixed_length = 12
+shape_identity = "nuis-compiler-source-span-payload-identity-v1"
+identity_seed = 461
+encoding = "three-canonical-little-endian-u31-fields"
+field_order = ["source_id", "start", "end"]
+reference_source_id = 7
+reference_start = 3
+reference_end = 11
+reference_identity = 1383365918
+store = "compiler_aggregate_arena_store_source_span"
+projection = "compiler_aggregate_arena_get_source_span"
+
+[preserved_v8]
+paged_payload_contract = "nuis-compiler-payload-pages-v1"
+paged_text_contract = "nuis-compiler-paged-text-arena-ordered-identity-v1"
+paged_text_page0_identity = 712007164
+paged_text_page1_identity = 132664649
+paged_text_envelope_identity = 784615130
+paged_text_identity = 322532187
+typed_text_arena_identity = 1643761726
+arena_identity = 1064756829
+map_identity = 415394959
+legacy_first_page_identity = 164749511446
+
+[bootstrap_surface]
+new_language_capabilities = 0
+new_scalar_exports = 0
+new_approved_imports = ["cpu/StdCompilerPayloadRegistry"]
+new_approved_data_types = ["CompilerAggregateArena", "CompilerPayloadRegistry"]
+frozen_scalar_export_ceiling = 21
+
+[growth_boundary]
+status = "open"
+next_contract = "chunked-individual-typed-payload-projection"
+remaining = [
+  "one-typed-payload-remains-bounded-to-sixteen-bytes",
+  "the-shared-payload-column-remains-bounded-to-eight-logical-pages",
+  "only-CompilerText-and-CompilerSourceSpan-have-registered-typed-codecs",
+  "CompilerMap-and-CompilerArena-remain-bounded-to-sixteen-entries",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "nested-forwarding-of-the-full-aggregate-arena-remains-a-lowering-boundary",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+]
+preserve = [
+  "stable-arena-indices",
+  "atomic-envelope-and-payload-storage",
+  "canonical-registry-arena-map-text-span-and-page-identities",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-twenty-one-export-ceiling",
+]

@@ -66,13 +66,16 @@ new language capability. Widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. Data model v7 is now
-`usable/96`: `StdLanguageCore` owns the foundational representation,
-`StdCompilerData` owns materialized token records and payloads,
+and path contracts needed by a real compiler component. Data model v9 is now
+`usable/98`: `StdLanguageCore` owns the foundational representation,
+`StdCompilerData` owns materialized token records and bounded bytes,
+`StdCompilerPayload` owns the typed logical-page view,
+`StdCompilerPayloadRegistry` owns kind/schema registration and the shared
+aggregate arena,
 `StdCompilerTokens` owns the standalone token DFA, and
 `StdCompilerTokenEmit` reconstructs canonical `nuis-token-stream-v1` bytes
 while materializing a complete bounded page into the owned store. The frozen
-subset accepts all four modules, and
+subset accepts these modules, and
 `bootstrap_compiler_data_model_demo` crosses bootstrap-check, NIR/YIR/LLVM,
 native build, and deterministic exit `130` without FFI or host collections. It
 materializes four records, emits 59 canonical bytes, then materializes the
@@ -92,19 +95,33 @@ stores `nuislang` and U+03BB as ten canonical UTF-8 payload bytes, rebuilds
 owned texts at stable indices, and pins typed identity `1643761726`. Wrong
 kind, invalid index, malformed UTF-8, forged hash, object exhaustion, and
 payload exhaustion fail closed without changing the pre-failure identity.
+V8 adds `CompilerPagedTextArena` beside that frozen type. The native program
+stores `nuislang`, U+03BB, and `nuislang` as 18 bytes across two logical pages,
+projects the third record across the boundary, pins page identities
+`712007164` and `132664649` plus complete identity `322532187`, and preserves
+the deterministic exit `130` without widening the twenty-one-export ceiling.
+V9 then registers kind-one canonical text and kind-two fixed twelve-byte source
+spans. One 20-byte aggregate arena projects both owned values across the page
+boundary and pins registry identity `1630830726`, source-span identity
+`1383365918`, page identities `934788601` and `1229397900`, envelope identity
+`1109161393`, and complete identity `1274791798`. Duplicate registration,
+wrong kind, absent index, and malformed fixed length fail with exact codes;
+failed storage leaves identity unchanged and the native exit remains `130`.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
-This is deliberately not `stable/100`. Each v7 materialization window remains
+This is deliberately not `stable/100`. Each token materialization window remains
 bounded to four token records, 64 payload bytes, and 128 output bytes, but
 production now covers the complete token stream with contiguous 128-byte pages
 whose boundaries may cross records. Nuis and the artifact layer independently
 recompute every page hash and chain link while preserving the canonical legacy
 page identity. `StdCompilerProjection` also owns and resumes the first two AST
 and NIR structural pages through opaque cursors. Vectors and maps remain
-`i64`-specific and bounded to sixteen entries; typed arena text payloads share
-one sixteen-byte vector and arbitrary aggregate kinds remain open. Generic nested-page
-specialization lacks defining-module provenance, and arbitrary aggregate
-loop-carried state still requires general backedge lowering.
+`i64`-specific and bounded to sixteen entries. One text remains limited to
+sixteen bytes, the v9 aggregate payload is bounded to 128 bytes, and registered
+typed codecs currently cover only text and source spans. Generic nested-page
+specialization lacks defining-module provenance, forwarding the full aggregate
+through another helper remains outside the wide-call proof, and arbitrary
+aggregate loop-carried state still requires general backedge lowering.
 
 ### `stage-neutral-ir-boundary`
 
@@ -190,9 +207,12 @@ The local witness intentionally carries no independent attester authority.
 `nuis-compiler-component-attestation-v1` now adds a separate Ed25519 claim over
 the exact aggregate, both v11 production proofs, fresh verifier challenge, and
 registered environment identity. Verification requires a caller-owned exact
-trust-registry hash pin and never grants replacement authority. Current tests
-exercise that boundary with a same-machine test key; a separately provisioned
-machine remains the next evidence step.
+trust-registry hash pin and never grants replacement authority. The checked-in
+[Linux amd64 generation-one evidence](../evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml)
+now records two cache-bypassed clean builds from a separately operated server,
+the exact signed aggregate, and registry pin `90b8f7f4c9d336c72caa7dc4dc9a91c41ec263a7bfffa282ee8211088b164f01`.
+Its private key remained on the attester; repository tests verify the real
+claim and reject a wrong challenge or registry pin.
 
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
@@ -217,7 +237,7 @@ or YIR verification, or advance the gate beyond `usable/98`.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/97`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/98`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -235,13 +255,16 @@ handoff v2 selection manifests before writing the report. Two local clean,
 cache-bypassed runs now retain stable reproducible identities and 13/13
 verdicts; production proof identity transitively binds the transformation in
 both runs, including compact-record metadata and semantic recovery, and root or
-aggregate tampering fails closed. A separately versioned signed attestation can
-now bind both runs to a challenge and a pinned environment-scoped key; claim,
-signature, registry, challenge, or lineage tampering also fails closed. The
-thirteen current
+aggregate tampering fails closed. A separately versioned signed attestation
+binds both runs to a challenge and a pinned environment-scoped key; the real
+generation-one Linux amd64 claim is checked in and verified without its private
+key. Claim, signature, registry, challenge, or lineage tampering fails closed.
+The thirteen current
 comparisons still require byte-identical canonical v1 stage payloads even
-though v2 selects the derived record beside them. A real remote claim and
-separate reversible replacement authorization remain open.
+though v2 selects the derived record beside them. Widening comparison semantics
+and separate reversible replacement authorization remain open. Cryptography
+does not prove physical-machine independence; that remains an operational
+provisioning fact.
 
 ## Migration Rule
 

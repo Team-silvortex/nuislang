@@ -37,7 +37,8 @@ obeys the allowlist but fails normal compilation also exits nonzero with
 
 V8 permits only `mod cpu` compiler modules. Local CPU modules may import each
 other; external imports are limited to `CorePrelude`, `StdLanguageCore`,
-`StdCompilerData`, `StdCompilerTokenEmit`, `StdCompilerTokens`,
+`StdCompilerData`, `StdCompilerPayload`, `StdCompilerPayloadRegistry`,
+`StdCompilerTokenEmit`, `StdCompilerTokens`,
 `StdCompilerProjection`, and
 `StdTextContracts`.
 
@@ -49,10 +50,11 @@ The executable type allowlist contains:
 - `Option`, `Result`, and the reserved compiler data-model names recorded in
   the TOML contract
 
-`CompilerTextArena` is one such v7 data-model name. Registering that aggregate
-admits no new source construct: it is composed entirely from already-approved
-structs, `CompilerArena`, and `CompilerVector`, and the scalar export count
-remains exactly twenty-one.
+`CompilerTextArena`, `CompilerPayloadBuffer`, `CompilerPagedTextArena`,
+`CompilerPayloadRegistry`, and `CompilerAggregateArena` are registered
+data-model names. Data-model v8 and v9 admit no new source construct: they
+compose already-approved owned structs, maps, and arithmetic byte packing,
+while the scalar export count remains exactly twenty-one.
 
 The structural surface includes constants, aliases, structs, enums, ordinary
 functions, unbounded generics, local mutation, destructuring, direct and method
