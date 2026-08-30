@@ -5,20 +5,24 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use ed25519_dalek::SigningKey;
 use nuis_artifact::{
-    parse_build_manifest, parse_compiler_component_differential,
-    parse_compiler_structural_projection, read_compiler_candidate_execution,
-    read_compiler_candidate_production, read_compiler_component_build,
+    build_compiler_component_attester_trust_registry,
+    compiler_component_attester_trust_registry_sha256, parse_build_manifest,
+    parse_compiler_component_differential, parse_compiler_structural_projection,
+    read_compiler_candidate_execution, read_compiler_candidate_production,
+    read_compiler_component_attestation, read_compiler_component_build,
     read_compiler_component_reproducibility, read_compiler_stage_handoff,
     read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
+    render_compiler_component_attester_trust_registry, CompilerComponentAttesterTrustEntryInput,
     CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
     CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
     COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
-    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
-    COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
-    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-    COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_COMPONENT_ATTESTATION_FILE, COMPILER_COMPONENT_BUILD_FILE,
+    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_FILE,
+    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_STAGE_HANDOFF_V2_FILE,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_TRANSFORMATION_FILE,
 };
 
 fn temp_dir() -> PathBuf {
@@ -333,6 +337,96 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     let source = fs::read_to_string(&aggregate_path).expect("read aggregate source");
     assert!(!source.contains(&output_dir_text));
 
+    let signing_key_hex = "07".repeat(32);
+    let challenge_sha256 = "f".repeat(64);
+    let first_root_text = roots[0].display().to_string();
+    let second_root_text = roots[1].display().to_string();
+    let aggregate_text = aggregate_path.display().to_string();
+    let attestation_path = output_dir.join(COMPILER_COMPONENT_ATTESTATION_FILE);
+    let attestation_text = attestation_path.display().to_string();
+    let signed = run_nuis_with_env(
+        &[
+            "bootstrap-attest-reproducibility",
+            &aggregate_text,
+            &first_root_text,
+            &second_root_text,
+            &challenge_sha256,
+            "linux-builder-1",
+            "linux-amd64-cleanroom",
+            &attestation_text,
+        ],
+        "NUIS_COMPILER_ATTESTER_SIGNING_KEY_HEX",
+        &signing_key_hex,
+    );
+    assert!(
+        signed.status.success(),
+        "attestation signing failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&signed.stdout),
+        String::from_utf8_lossy(&signed.stderr),
+    );
+
+    let public_key_hex = SigningKey::from_bytes(&[7u8; 32])
+        .verifying_key()
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let registry = build_compiler_component_attester_trust_registry(
+        1,
+        &[CompilerComponentAttesterTrustEntryInput {
+            attester_id: "linux-builder-1",
+            environment_id: "linux-amd64-cleanroom",
+            public_key_hex: &public_key_hex,
+            status: "active",
+        }],
+    )
+    .expect("build attester registry");
+    let registry_source = render_compiler_component_attester_trust_registry(&registry);
+    let registry_sha256 = compiler_component_attester_trust_registry_sha256(&registry_source);
+    let registry_path = output_dir.join("attester-registry.toml");
+    fs::write(&registry_path, registry_source).expect("write attester registry");
+    let registry_text = registry_path.display().to_string();
+    let verified = run_nuis(&[
+        "bootstrap-verify-reproducibility-attestation",
+        &aggregate_text,
+        &attestation_text,
+        &registry_text,
+        &registry_sha256,
+        &challenge_sha256,
+    ]);
+    assert!(
+        verified.status.success(),
+        "attestation verification failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified.stdout),
+        String::from_utf8_lossy(&verified.stderr),
+    );
+    assert!(String::from_utf8_lossy(&verified.stdout)
+        .contains("bootstrap compiler attestation: verified"));
+    let attestation = read_compiler_component_attestation(
+        &attestation_path,
+        &aggregate_path,
+        &registry_path,
+        &registry_sha256,
+        &challenge_sha256,
+    )
+    .expect("read verified attestation");
+    assert_eq!(
+        attestation.candidate_production_protocol,
+        "nuis-compiler-candidate-production-v11"
+    );
+    assert!(!attestation.replacement_authorized);
+
+    let replay = run_nuis(&[
+        "bootstrap-verify-reproducibility-attestation",
+        &aggregate_text,
+        &attestation_text,
+        &registry_text,
+        &registry_sha256,
+        &"e".repeat(64),
+    ]);
+    assert!(!replay.status.success());
+    assert!(String::from_utf8_lossy(&replay.stderr).contains("verifier request"));
+
     let rerun = run_nuis(&["bootstrap-reproducibility", project, &output_dir_text]);
     assert!(!rerun.status.success());
     assert!(String::from_utf8_lossy(&rerun.stderr).contains("must be empty"));
@@ -361,6 +455,14 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
 fn run_nuis(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_nuis"))
         .args(args)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run nuis {args:?}: {error}"))
+}
+
+fn run_nuis_with_env(args: &[&str], key: &str, value: &str) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .args(args)
+        .env(key, value)
         .output()
         .unwrap_or_else(|error| panic!("failed to run nuis {args:?}: {error}"))
 }

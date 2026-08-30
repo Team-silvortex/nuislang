@@ -216,10 +216,13 @@ intentional until arbitrary aggregate loop-carried backedges have native
 lowering; this contract does not claim that general loop capability.
 
 Local reproducibility remains proven across two empty,
-compile-cache-bypassed roots by `nuis bootstrap-reproducibility`. Independent
-machine or attester trust and reversible replacement authorization remain
-separate future protocols. A `13/13` report is evidence of equivalence, not
-permission to switch the active compiler.
+compile-cache-bypassed roots by `nuis bootstrap-reproducibility`. The separate
+component-attestation v1 protocol can now bind both v11 proof hashes and the
+exact aggregate to an environment-scoped Ed25519 key under an externally
+pinned trust registry. Repository coverage uses a same-machine test key, so a
+real independently provisioned attester run and reversible replacement
+authorization remain open. A `13/13` report or verified witness is evidence,
+not permission to switch the active compiler.
 
 ## Validation
 

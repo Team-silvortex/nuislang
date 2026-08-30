@@ -1,0 +1,66 @@
+protocol = "nuis-compiler-component-attestation-v1"
+version = 1
+status = "usable-external-attester-boundary"
+scope = "signed-two-clean-build-reproducibility-observation"
+manifest_name = "nuis.compiler-component-attestation.toml"
+authority = "external-ed25519-attester-claim-no-replacement"
+signature_contract = "nuis-compiler-component-attestation-ed25519-v1"
+required_trust_scope = "independent-machine-compiler-reproducibility-v1"
+reproducibility_protocol = "nuis-compiler-component-reproducibility-v1"
+candidate_production_protocol = "nuis-compiler-candidate-production-v11"
+run_count = 2
+digest = "sha256-lowercase"
+signature = "ed25519-strict"
+private_key_input = "NUIS_COMPILER_ATTESTER_SIGNING_KEY_HEX"
+path_policy = "no-physical-paths-or-timestamps-in-attestation"
+replacement_authorized = false
+verdict = "attester-claims-reproducible-equivalent-awaiting-authorization"
+
+frontdoors = [
+  "nuis bootstrap-attest-reproducibility",
+  "nuis bootstrap-verify-reproducibility-attestation",
+]
+
+signed_lineage = [
+  "verifier-issued-challenge-sha256",
+  "attester-id-and-environment-id",
+  "exact-canonical-reproducibility-file-bytes-and-sha256",
+  "reproducibility-aggregate-sha256",
+  "both-candidate-production-v11-proof-sha256-values",
+  "candidate-reproducible-build-sha256",
+  "candidate-compiler-image-sha256",
+  "native-output-sha256",
+  "attester-public-key-id",
+  "replacement-authorized-false",
+]
+
+verification_invariants = [
+  "signer-rereads-and-verifies-both-clean-build-roots-before-signing",
+  "private-key-never-enters-command-line-artifact-or-log",
+  "verifier-requires-the-original-challenge",
+  "verifier-requires-an-exact-trust-registry-sha256-pin",
+  "registry-entry-binds-attester-environment-key-and-independent-machine-scope",
+  "revoked-untrusted-malformed-or-mismatched-keys-fail-closed",
+  "claim-lineage-signature-registry-or-challenge-tampering-fails-closed",
+  "attester-trust-never-implies-replacement-authorization",
+]
+
+[honest_boundary]
+cryptographic_claim = "a-pinned-registered-key-signed-the-exact-reproducibility-lineage"
+operational_policy = "the-key-operator-must-run-the-signing-frontdoor-on-the-registered-independent-environment"
+not_proven_by_cryptography = "physical-machine-independence"
+repository_test_scope = "same-machine-fixed-test-key"
+next_evidence = "one-separately-provisioned-machine-running-two-clean-builds-and-returning-a-pinned-attestation"
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_attestation_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]
+
+[open_boundary]
+missing = [
+  "checked-in-separate-machine-attestation-evidence",
+  "registry-rotation-ceremony-beyond-explicit-new-pin",
+  "reversible-component-replacement-authorization",
+]

@@ -167,6 +167,59 @@ fn parses_bootstrap_reproducibility_command() {
 }
 
 #[test]
+fn parses_bootstrap_attestation_commands() {
+    let command = parse_args(
+        [
+            "bootstrap-attest-reproducibility".to_owned(),
+            "build/repro/nuis.compiler-component-reproducibility.toml".to_owned(),
+            "build/repro/clean-build-0".to_owned(),
+            "build/repro/clean-build-1".to_owned(),
+            "f".repeat(64),
+            "linux-builder-1".to_owned(),
+            "linux-amd64-cleanroom".to_owned(),
+            "build/repro/nuis.compiler-component-attestation.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap attestation parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapAttestReproducibility {
+            aggregate: PathBuf::from("build/repro/nuis.compiler-component-reproducibility.toml"),
+            first_root: PathBuf::from("build/repro/clean-build-0"),
+            second_root: PathBuf::from("build/repro/clean-build-1"),
+            challenge_sha256: "f".repeat(64),
+            attester_id: "linux-builder-1".to_owned(),
+            environment_id: "linux-amd64-cleanroom".to_owned(),
+            output: PathBuf::from("build/repro/nuis.compiler-component-attestation.toml"),
+        }
+    );
+
+    let command = parse_args(
+        [
+            "bootstrap-verify-reproducibility-attestation".to_owned(),
+            "aggregate.toml".to_owned(),
+            "attestation.toml".to_owned(),
+            "registry.toml".to_owned(),
+            "a".repeat(64),
+            "f".repeat(64),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap attestation verification parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapVerifyReproducibilityAttestation {
+            aggregate: PathBuf::from("aggregate.toml"),
+            attestation: PathBuf::from("attestation.toml"),
+            trust_registry: PathBuf::from("registry.toml"),
+            registry_sha256: "a".repeat(64),
+            challenge_sha256: "f".repeat(64),
+        }
+    );
+}
+
+#[test]
 fn parses_bootstrap_diff_command() {
     let command = parse_args(
         [

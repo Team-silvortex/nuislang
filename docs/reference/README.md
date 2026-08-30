@@ -60,6 +60,7 @@ Start in this order:
   - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
   - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
   - [nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md)
+  - [nuis-compiler-component-attestation.md](nuis-compiler-component-attestation.md)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)

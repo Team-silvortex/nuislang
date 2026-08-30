@@ -438,7 +438,7 @@ fn validate_bound_evidence(
     Ok(())
 }
 
-fn build_from_runs(
+pub(crate) fn build_from_runs(
     runs: Vec<CompilerComponentReproducibilityRun>,
 ) -> Result<CompilerComponentReproducibility, ArtifactError> {
     if runs.len() != EXPECTED_RUN_COUNT {

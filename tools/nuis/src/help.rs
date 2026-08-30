@@ -54,6 +54,8 @@ pub(crate) fn print_help() {
     println!("    nuis bootstrap-candidate-probe <project-dir|nuis.toml> <output-dir>");
     println!("    nuis bootstrap-candidate-build <project-dir|nuis.toml> <output-dir>");
     println!("    nuis bootstrap-reproducibility <project-dir|nuis.toml> <output-dir>");
+    println!("    nuis bootstrap-attest-reproducibility <aggregate> <clean-root-0> <clean-root-1> <challenge-sha256> <attester-id> <environment-id> <output>");
+    println!("    nuis bootstrap-verify-reproducibility-attestation <aggregate> <attestation> <trust-registry> <registry-sha256> <challenge-sha256>");
     println!("    nuis bootstrap-diff <stage0-record> <candidate-record> <report>");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");

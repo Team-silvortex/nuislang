@@ -10,6 +10,7 @@ description = "Shared compiled-artifact, envelope, and build-manifest decoding m
 
 [dependencies]
 sha2.workspace = true
+ed25519-dalek.workspace = true
 
 [lib]
 path = "src/lib.rs"

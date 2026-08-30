@@ -187,6 +187,12 @@ two initially empty roots with compile-cache read/write bypass. Its path-free
 `nuis-compiler-component-reproducibility-v1` aggregate binds distinct local
 witnesses, both exact report lineages, and stable component/native identities.
 The local witness intentionally carries no independent attester authority.
+`nuis-compiler-component-attestation-v1` now adds a separate Ed25519 claim over
+the exact aggregate, both v11 production proofs, fresh verifier challenge, and
+registered environment identity. Verification requires a caller-owned exact
+trust-registry hash pin and never grants replacement authority. Current tests
+exercise that boundary with a same-machine test key; a separately provisioned
+machine remains the next evidence step.
 
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
@@ -211,7 +217,7 @@ or YIR verification, or advance the gate beyond `usable/98`.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/96`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `usable/97`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -229,10 +235,13 @@ handoff v2 selection manifests before writing the report. Two local clean,
 cache-bypassed runs now retain stable reproducible identities and 13/13
 verdicts; production proof identity transitively binds the transformation in
 both runs, including compact-record metadata and semantic recovery, and root or
-aggregate tampering fails closed. The thirteen current
+aggregate tampering fails closed. A separately versioned signed attestation can
+now bind both runs to a challenge and a pinned environment-scoped key; claim,
+signature, registry, challenge, or lineage tampering also fails closed. The
+thirteen current
 comparisons still require byte-identical canonical v1 stage payloads even
-though v2 selects the derived record beside them. Independent-machine trust
-and separate reversible replacement authorization remain open.
+though v2 selects the derived record beside them. A real remote claim and
+separate reversible replacement authorization remain open.
 
 ## Migration Rule
 

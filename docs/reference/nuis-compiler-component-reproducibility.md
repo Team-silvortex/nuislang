@@ -34,8 +34,9 @@ refetch protocol.
 
 Each run retains its exact stage0 record, candidate record, production proof,
 stage-transformation manifest, and thirteen-comparison differential report
-identities. Candidate production v7 binds the transformation file SHA-256, so
-the aggregate covers it transitively. These exact audit
+identities. Candidate production v11 binds the transformation, semantic
+differential, and producer-neutral handoff v2 selection, so the aggregate
+covers them transitively. These exact audit
 identities may differ because build manifests record their physical output
 locations.
 
@@ -69,19 +70,29 @@ compile generated different NIR temporary names even though its source and YIR
 were unchanged. The counter is now thread-local and reset at each project
 lowering boundary, with a same-thread repeated-lowering regression test.
 
+## External Attestation
+
+The separate
+[component attestation v1](nuis-compiler-component-attestation.md) frontdoors
+can now sign this exact aggregate after rereading both roots and verify it with
+a fresh challenge, strict Ed25519 signature, environment-scoped attester key,
+and caller-owned trust-registry SHA-256 pin. The attestation remains a separate
+artifact and preserves `replacement_authorized = false`.
+
 ## Honest Boundary
 
-V1 proves two fresh compiler productions under one local frontdoor and includes
-the Nuis-produced non-identity NIR checkpoint. It does not prove a changed
-handoff stage payload, transformation-aware semantic equivalence,
-independent-machine diversity, or trusted remote attestation. Those remain
-separate upgrades, followed by an independently versioned reversible
-replacement protocol.
+V1 proves two fresh compiler productions under one local frontdoor. Handoff v2
+now binds a byte-different reversible NIR representation and its semantic
+equivalence, while attestation v1 supplies the cryptographic external-witness
+boundary. Repository tests still use a same-machine test key; one real
+separately provisioned attester run and reversible replacement authorization
+remain open.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1
 ```

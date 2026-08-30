@@ -4,6 +4,8 @@ mod build_manifest;
 mod clock_protocol;
 mod compiler_candidate_execution;
 mod compiler_candidate_production;
+mod compiler_component_attestation;
+mod compiler_component_attestation_registry;
 mod compiler_component_build;
 mod compiler_component_diff;
 mod compiler_component_reproducibility;
@@ -59,6 +61,25 @@ pub use compiler_candidate_production::{
     COMPILER_CANDIDATE_ADAPTER_FILE, COMPILER_CANDIDATE_PRODUCER_CONTRACT,
     COMPILER_CANDIDATE_PRODUCTION_AUTHORITY, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_CANDIDATE_PRODUCTION_PROTOCOL,
+};
+pub use compiler_component_attestation::{
+    build_compiler_component_attestation, parse_compiler_component_attestation,
+    parse_compiler_component_attestation_from_source, read_compiler_component_attestation,
+    render_compiler_component_attestation, verify_compiler_component_attestation,
+    CompilerComponentAttestation, CompilerComponentAttestationInput,
+    COMPILER_COMPONENT_ATTESTATION_AUTHORITY, COMPILER_COMPONENT_ATTESTATION_FILE,
+    COMPILER_COMPONENT_ATTESTATION_PROTOCOL, COMPILER_COMPONENT_ATTESTATION_SIGNATURE_CONTRACT,
+    COMPILER_COMPONENT_ATTESTATION_TRUST_SCOPE, COMPILER_COMPONENT_ATTESTATION_VERDICT,
+};
+pub use compiler_component_attestation_registry::{
+    build_compiler_component_attester_trust_registry, compiler_component_attester_public_key_id,
+    compiler_component_attester_trust_registry_sha256,
+    parse_compiler_component_attester_trust_registry,
+    parse_compiler_component_attester_trust_registry_from_source,
+    render_compiler_component_attester_trust_registry, CompilerComponentAttesterTrustEntry,
+    CompilerComponentAttesterTrustEntryInput, CompilerComponentAttesterTrustRegistry,
+    COMPILER_COMPONENT_ATTESTER_TRUST_REGISTRY_FILE,
+    COMPILER_COMPONENT_ATTESTER_TRUST_REGISTRY_PROTOCOL,
 };
 pub use compiler_component_build::{
     build_compiler_component_build, parse_compiler_component_build,

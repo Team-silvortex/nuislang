@@ -1,0 +1,43 @@
+protocol = "nuis-compiler-component-attester-trust-registry-v1"
+version = 1
+status = "usable-explicit-pin"
+manifest_name = "nuis.compiler-component-attester-trust-registry.toml"
+generation_minimum = 1
+hash_pin = "sha256-of-exact-canonical-registry-source"
+entry_order = "attester-id-environment-id-public-key-id"
+maximum_active_keys_per_environment = 1
+trust_scope = "independent-machine-compiler-reproducibility-v1"
+key_algorithm = "ed25519"
+key_id = "ed25519:sha256:<public-key-bytes>"
+statuses = ["active", "revoked"]
+
+required_entry_fields = [
+  "attester_id",
+  "environment_id",
+  "trust_scope",
+  "public_key_id",
+  "public_key_hex",
+  "status",
+]
+
+invariants = [
+  "registry-source-is-canonical-UTF8-LF",
+  "attester-and-environment-ids-are-non-path-ASCII-tokens",
+  "public-key-id-is-recomputed-from-exact-key-bytes",
+  "entries-are-unique-and-canonically-sorted",
+  "one-active-key-exists-at-most-per-attester-environment",
+  "revoked-keys-never-verify-attestations",
+  "verification-requires-an-out-of-band-exact-registry-hash-pin",
+]
+
+[rotation]
+rule = "publish-a-higher-generation-canonical-registry-and-provision-its-new-hash-pin-out-of-band"
+rollback_protection = "the-caller-owned-hash-pin-not-an-unpinned-file-claim"
+
+[[attester]]
+attester_id = "example-builder"
+environment_id = "linux-amd64-cleanroom"
+trust_scope = "independent-machine-compiler-reproducibility-v1"
+public_key_id = "ed25519:sha256:<64-lowercase-hex>"
+public_key_hex = "<64-lowercase-hex>"
+status = "active"

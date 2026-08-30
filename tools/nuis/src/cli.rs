@@ -39,6 +39,22 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
     },
+    BootstrapAttestReproducibility {
+        aggregate: PathBuf,
+        first_root: PathBuf,
+        second_root: PathBuf,
+        challenge_sha256: String,
+        attester_id: String,
+        environment_id: String,
+        output: PathBuf,
+    },
+    BootstrapVerifyReproducibilityAttestation {
+        aggregate: PathBuf,
+        attestation: PathBuf,
+        trust_registry: PathBuf,
+        registry_sha256: String,
+        challenge_sha256: String,
+    },
     BootstrapDiff {
         stage0_record: PathBuf,
         candidate_record: PathBuf,
@@ -284,6 +300,46 @@ where
                 return Err(usage.to_owned());
             }
             Ok(CommandKind::BootstrapReproducibility { input, output_dir })
+        }
+        "bootstrap-attest-reproducibility" => {
+            let usage = "usage: nuis bootstrap-attest-reproducibility <aggregate> <clean-root-0> <clean-root-1> <challenge-sha256> <attester-id> <environment-id> <output>";
+            let aggregate = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let first_root = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let second_root = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let attester_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let environment_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let output = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapAttestReproducibility {
+                aggregate,
+                first_root,
+                second_root,
+                challenge_sha256,
+                attester_id,
+                environment_id,
+                output,
+            })
+        }
+        "bootstrap-verify-reproducibility-attestation" => {
+            let usage = "usage: nuis bootstrap-verify-reproducibility-attestation <aggregate> <attestation> <trust-registry> <registry-sha256> <challenge-sha256>";
+            let aggregate = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let attestation = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let trust_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapVerifyReproducibilityAttestation {
+                aggregate,
+                attestation,
+                trust_registry,
+                registry_sha256,
+                challenge_sha256,
+            })
         }
         "bootstrap-diff" => {
             let usage = "usage: nuis bootstrap-diff <stage0-record> <candidate-record> <report>";
@@ -558,7 +614,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

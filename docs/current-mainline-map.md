@@ -135,10 +135,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned data -> producer-neutral structural handoff -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed differential report -> two-clean-build aggregate -> separate replacement authorization`
+`frozen compiler subset -> compiler-owned data -> producer-neutral structural handoff -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed differential report -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

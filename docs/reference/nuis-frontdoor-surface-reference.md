@@ -25,7 +25,9 @@ Their current route is documented by
 [Compiler candidate production](nuis-compiler-candidate-production.md),
 plus [Compiler component reproducibility](nuis-compiler-component-reproducibility.md),
 including `nuis bootstrap-candidate-build` and
-`nuis bootstrap-reproducibility`.
+`nuis bootstrap-reproducibility`, and
+[Compiler component attestation](nuis-compiler-component-attestation.md) for
+the signing and pinned-verification frontdoors.
 
 It does not attempt to freeze:
 

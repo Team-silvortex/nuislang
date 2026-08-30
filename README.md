@@ -32,11 +32,12 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`718/718` passing drift checks. The stage-neutral boundary, stage0/stage1
+`723/723` passing drift checks. The stage-neutral boundary, stage0/stage1
 driver, reproducibility gate, and compiler data model v7 are all `usable`.
-Stage-neutral selection and the driver are `98/100`; reproducibility and data
-remain `96/100`, so the selector now advances to independent attester evidence
-at the differential/reproducibility gate.
+Stage-neutral selection and the driver are `98/100`, the reproducibility gate
+is `97/100`, and compiler data remains `96/100`; the selector therefore returns
+to paged typed compiler payload storage while real remote attestation evidence
+remains an explicit follow-up.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -88,8 +89,14 @@ bootstrap-reproducibility` now performs
 two cache-bypassed clean candidate builds, rereads both evidence roots, requires
 stable compiler-image, native-output, and differential identities, and emits a
 path-free reproducibility aggregate with independent replacement authorization
-still disabled. This closes one real Nuis leaf production and reproducibility
-loop; it is not a claim that the compiler is already self-hosted.
+still disabled. The separate `bootstrap-attest-reproducibility` and
+`bootstrap-verify-reproducibility-attestation` frontdoors now bind that exact
+aggregate, both production v11 proofs, and a fresh challenge to an
+environment-scoped Ed25519 key under a caller-pinned canonical trust registry.
+Repository tests use a same-machine test key, so this establishes the external
+attester protocol rather than claiming completed remote evidence. This closes
+one real Nuis leaf production and reproducibility loop; it is not a claim that
+the compiler is already self-hosted.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -108,8 +115,9 @@ existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, paged compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
-routes mainline work to independent-machine or attester evidence over the v11
-production lineage.
+routes mainline work to paged compiler payload storage. The v11 production
+lineage now has a challenge-bound Ed25519 attester protocol; one separately
+provisioned machine still needs to exercise it.
 Broader compiler-data paging,
 reversible replacement authorization, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate

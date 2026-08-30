@@ -36,7 +36,7 @@ required_before = "beta-0.10.0"
 next_action = "preserve producer-neutral v2 selection while registering additional reversible derived encodings without stage-specific driver branches"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
 expected_artifact = "registered derived stages selected in source order with exact source, transform, payload, checkpoint, recovery, and semantic identities beside the canonical v1 bundle"
-blocker = "v2 selection is closed for registered reversible transforms, but current production exercises one NIR encoding and still lacks independent attester trust plus replacement authorization"
+blocker = "v2 selection is closed for registered reversible transforms and attestation v1 can bind its production lineage, but current production exercises one NIR encoding, real remote evidence is absent, and replacement authorization remains open"
 
 [[gates]]
 id = "stage0-stage1-driver"
@@ -44,18 +44,18 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
 progress = 98
 required_before = "beta-0.10.0"
-next_action = "bind an independent-machine or attester witness to the v11 production lineage without granting replacement authority"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "candidate production v11 binding the generic v2 selection and preserving its proof identity across independently witnessed clean builds"
-blocker = "the driver now binds generic v2 selections through production v11 and local clean builds, while independent attester trust and reversible authorization remain open"
+next_action = "run component attestation v1 on one separately provisioned machine and retain its out-of-band registry hash pin"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
+expected_artifact = "candidate production v11 and two clean roots beneath a challenge-bound signed claim verified by an externally pinned environment registry"
+blocker = "the Ed25519 attester boundary is usable, but repository coverage uses a same-machine test key and reversible authorization remains open"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "usable"
-progress = 96
+progress = 97
 required_before = "beta-0.10.0"
-next_action = "preserve the v2-selected 1/1 semantic proof while adding independent-machine or attester evidence"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib repeated_same_thread_lowering_resets_try_expansion_names -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "compact non-byte-identical stage records retaining semantic proof and the path-free two-clean-build aggregate without replacement authority"
-blocker = "handoff v2 selects the compact lossless non-byte-identical representation, but the 13 component comparisons still inspect canonical v1 payloads and independent attester trust plus reversible authorization remain open"
+next_action = "run the signed two-clean-build gate on an independently provisioned environment and verify it against an out-of-band registry pin"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_attestation -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_attestation_commands -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "v2 semantic proof and exact reproducibility aggregate under a fresh challenge, strict signature, environment-scoped key, pinned registry, and false replacement authority"
+blocker = "the attester channel is usable but current tests are same-machine, the 13 component comparisons still inspect canonical v1 payloads, and reversible authorization remains open"

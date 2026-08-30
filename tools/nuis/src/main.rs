@@ -42,6 +42,7 @@ mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_probe;
 mod bootstrap_reproducibility;
+mod bootstrap_reproducibility_attestation;
 mod bootstrap_status;
 mod build_report_command;
 mod build_report_nsld_status;
@@ -392,6 +393,40 @@ fn run() -> Result<(), String> {
         cli::CommandKind::BootstrapReproducibility { input, output_dir } => {
             bootstrap_reproducibility::handle_bootstrap_reproducibility(input, output_dir)?;
         }
+        cli::CommandKind::BootstrapAttestReproducibility {
+            aggregate,
+            first_root,
+            second_root,
+            challenge_sha256,
+            attester_id,
+            environment_id,
+            output,
+        } => bootstrap_reproducibility_attestation::handle_bootstrap_attest_reproducibility(
+            bootstrap_reproducibility_attestation::BootstrapAttestationInput {
+                aggregate,
+                first_root,
+                second_root,
+                challenge_sha256,
+                attester_id,
+                environment_id,
+                output,
+            },
+        )?,
+        cli::CommandKind::BootstrapVerifyReproducibilityAttestation {
+            aggregate,
+            attestation,
+            trust_registry,
+            registry_sha256,
+            challenge_sha256,
+        } => bootstrap_reproducibility_attestation::handle_bootstrap_verify_reproducibility_attestation(
+            bootstrap_reproducibility_attestation::BootstrapAttestationVerificationInput {
+                aggregate,
+                attestation,
+                trust_registry,
+                registry_sha256,
+                challenge_sha256,
+            },
+        )?,
         cli::CommandKind::BootstrapDiff {
             stage0_record,
             candidate_record,
