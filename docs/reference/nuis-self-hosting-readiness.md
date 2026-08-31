@@ -1,8 +1,8 @@
 # Nuis Self-Hosting Readiness
 
-This reference defines the executable preparation boundary for beginning the
-formal `stage0 -> stage1` compiler migration at `beta-0.10.*`. The checked-in
-machine-readable source is
+This reference defines the executable control boundary for the formal
+`stage0 -> stage1` compiler migration, active from `beta-0.10.0`. The checked-in
+machine-readable v2 source is
 [nuis-self-hosting-readiness.toml](nuis-self-hosting-readiness.toml).
 Completed stage2-equivalent compiler ownership remains a later
 `gamma-0.5.*` through `gamma-0.10.*` closure window.
@@ -11,12 +11,21 @@ Completed stage2-equivalent compiler ownership remains a later
 
 `developer-system/dev-tensor/self-hosting-phase-roadmap` is `stable/100`
 because the schedule is agreed and versioned. It does not mean a Nuis-written
-compiler stage exists.
+compiler is self-hosted or ready to replace stage0.
 
 The readiness manifest therefore owns five separate bootstrap-critical
 coordinates with their own evidence, status, progress, blocker, next action,
 validation command, and expected artifact. These coordinates begin at honest
 nonterminal scores and can only close independently.
+
+## Active Migration Semantics
+
+Readiness v2 separates phase activation from final readiness. The current
+manifest reports `stage0-to-stage1-migration/active` because Git has entered
+`beta-0.10.*`, while `ready = false` and `2/5` gates closed preserve the actual
+replacement boundary. Active means candidate-owned vertical slices are now the
+mainline; it does not authorize stage0 removal, component replacement, or final
+selection.
 
 ## Frontdoor
 
@@ -178,7 +187,7 @@ without stage-specific selection logic or replacement authority. See
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `usable/99`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `stable/100` for its bounded canonical migration slice. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -303,6 +312,18 @@ stage0 handoff or runtime provider is loaded, while native materialization,
 replacement, and selection remain false. See
 [Nuis Compiler Candidate Fresh-Source Capability](nuis-compiler-candidate-fresh-source-capability.md).
 
+The same frontdoor then invokes `nsld-input-v1` on the same verified adapter.
+The Nuis candidate uses reserved subset-v8 ordinals rather than adding an
+export, and emits fourteen semantic values binding source identity
+`12832741133`, YIR identity `9279238763`, `Main.main`, return value `7`, time
+ordinal zero, no dependencies/relocations/GLM resources, and materialization
+fold `1403051547`. The artifact layer independently rebuilds the exact
+`nuis-compiler-candidate-nsld-input-v1`; capability v1 binds it to the complete
+fresh-source and signed-successor lineage. `nsld candidate-input` consumes the
+target-neutral record and stops at registered object-writer selection. It does
+not claim native object bytes or grant replacement/selection authority. See
+[Nuis Compiler Candidate to Nsld Materialization](nuis-compiler-candidate-nsld-materialization.md).
+
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
 node/resource and edge membership indexes, and compiles SHA-256 proof hashing
@@ -367,9 +388,10 @@ under the continuing component-owner key. Direct capability v2 closes front-end
 execution without that runtime provider, and candidate successor v1 now signs
 the exact proof and result into generation three without mutating any
 predecessor. The bounded fresh-source capability now gives the candidate
-ownership of one canonical source-to-YIR identity path, but it does not yet own
-general parsing or native materialization. Remote direct-successor and
-fresh-source evidence also remain open.
+ownership of one canonical source-to-YIR identity path. The bounded
+materialization capability now extends that ownership to one equivalent Nsld
+input, but not to general parsing or native object bytes. Remote mirrors of the
+direct-successor, fresh-source, and materialization evidence remain open.
 Cryptography does not prove physical-machine
 independence; that remains an operational fact.
 
@@ -386,7 +408,8 @@ freeze subset and compiler data contracts
   -> prove direct stage1-owned compilation
   -> bind the direct proof into a signed generation-three successor
   -> prove candidate-owned fresh-source front-end compilation
-  -> prove candidate-owned native object materialization
+  -> prove one candidate-owned equivalent Nsld materialization input
+  -> emit and independently verify candidate-owned native object bytes
   -> permit one reversible component replacement
 ```
 
@@ -397,8 +420,8 @@ stage1 builds and differential reports are deterministic.
 
 ## Honest Boundary
 
-This protocol is preparation infrastructure. It does not claim that Nuis is
+This protocol is migration infrastructure. It does not claim that Nuis is
 self-hosted, that the bootstrap subset is stable public language surface, or
-that `beta-0.10.*` guarantees immediate compiler replacement. It makes missing
-prerequisites visible early enough for that minor line to begin migration
-without inventing the ground rules at the same time.
+that entering `beta-0.10.*` grants immediate compiler replacement. It keeps the
+open prerequisites visible while bounded ownership transfers proceed under an
+immutable stage0 rollback chain.

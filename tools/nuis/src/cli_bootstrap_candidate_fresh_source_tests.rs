@@ -5,7 +5,7 @@ use super::{parse_args, BootstrapCandidateFreshSourceInput, CommandKind};
 #[test]
 fn parses_bootstrap_candidate_fresh_source_command() {
     let args =
-        "bootstrap-candidate-fresh-source candidate-root successor source.ns result capability";
+        "bootstrap-candidate-fresh-source candidate-root successor source.ns result capability nsld-input materialization";
     let command = parse_args(args.split_whitespace().map(str::to_owned))
         .expect("bootstrap-candidate-fresh-source parses");
     let CommandKind::BootstrapCandidateFreshSource(BootstrapCandidateFreshSourceInput {
@@ -14,6 +14,8 @@ fn parses_bootstrap_candidate_fresh_source_command() {
         source,
         result_output,
         capability_output,
+        nsld_input_output,
+        materialization_capability_output,
     }) = command
     else {
         panic!("expected candidate fresh-source command");
@@ -23,4 +25,9 @@ fn parses_bootstrap_candidate_fresh_source_command() {
     assert_eq!(source, PathBuf::from("source.ns"));
     assert_eq!(result_output, PathBuf::from("result"));
     assert_eq!(capability_output, PathBuf::from("capability"));
+    assert_eq!(nsld_input_output, PathBuf::from("nsld-input"));
+    assert_eq!(
+        materialization_capability_output,
+        PathBuf::from("materialization")
+    );
 }

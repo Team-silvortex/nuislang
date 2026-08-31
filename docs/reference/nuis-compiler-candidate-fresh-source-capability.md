@@ -14,12 +14,15 @@ replacement, or final selection.
 ```text
 nuis bootstrap-candidate-fresh-source \
   <candidate-build-root> <candidate-successor> <source.ns> \
-  <fresh-source-result-output> <fresh-source-capability-output>
+  <fresh-source-result-output> <fresh-source-capability-output> \
+  <nsld-input-output> <materialization-capability-output>
 ```
 
-The command requires both outputs to be absent. It stages a private copy of the
+The command requires all four outputs to be absent and distinct. It stages a private copy of the
 production-v11 adapter, clears the process environment, closes stdin, and
-executes `fresh-source-v1` without a shell or runtime compiler provider.
+executes `fresh-source-v1` followed by `nsld-input-v1` without a shell or
+runtime compiler provider. Fresh-source capability v1 remains unchanged; the
+second execution produces a separately versioned materialization capability.
 
 ## Canonical Snapshot
 
@@ -99,13 +102,13 @@ The verdict is
 `candidate-owned-canonical-fresh-source-front-end-verified-no-native-or-selection-authority`.
 No field authorizes a compiler replacement or changes the selected component.
 
-## Honest Next Step
+## Successor Materialization Slice
 
-The next weakest boundary is candidate-owned native materialization: carry this
-canonical snapshot's verified NIR/YIR identity into one candidate-produced
-native object or equivalent Nsld input without invoking stage0. The source
-surface should remain bounded until that vertical slice is reproducible and
-fail-closed.
+The bounded next boundary is now closed by
+[Nuis Compiler Candidate to Nsld Materialization](nuis-compiler-candidate-nsld-materialization.md).
+It carries this snapshot's YIR identity into an independently verified,
+candidate-owned equivalent Nsld input without invoking stage0. Real native
+object bytes and wider source coverage remain later versioned slices.
 
 The machine-readable contract is
 [nuis-compiler-candidate-fresh-source-capability-v1.toml](nuis-compiler-candidate-fresh-source-capability-v1.toml).

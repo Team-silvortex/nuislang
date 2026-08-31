@@ -249,6 +249,7 @@ fn render_adapter_source() -> String {
 #define NUIS_STAGE0_PROVIDER_ENV "NUIS_BOOTSTRAP_STAGE0_PROVIDER_V1"
 #define NUIS_COMPILE_COMMAND "bootstrap-build"
 #define NUIS_FRESH_SOURCE_COMMAND "fresh-source-v1"
+#define NUIS_NSLD_INPUT_COMMAND "nsld-input-v1"
 #define NUIS_MAX_RUNTIME_PATH_BYTES 4096
 
 extern int64_t nuis_bootstrap_candidate_stage_seed_v1(int64_t ordinal);
@@ -649,6 +650,9 @@ static int64_t fold_text(int64_t ordinal, const char* text, int64_t length) {
 int main(int argc, char** argv) {
     if (argc == 3 && strcmp(argv[1], NUIS_FRESH_SOURCE_COMMAND) == 0) {
         return run_fresh_source(argv[2]);
+    }
+    if (argc == 3 && strcmp(argv[1], NUIS_NSLD_INPUT_COMMAND) == 0) {
+        return run_nsld_input(argv[2]);
     }
     if (argc == 4) return run_compile_request(argv);
     if (argc != 6) return 64;

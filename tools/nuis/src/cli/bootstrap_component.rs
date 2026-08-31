@@ -43,13 +43,15 @@ pub(super) fn parse_bootstrap_candidate_direct_compile(
 pub(super) fn parse_bootstrap_candidate_fresh_source(
     args: &mut impl Iterator<Item = String>,
 ) -> Result<CommandKind, String> {
-    let usage = "usage: nuis bootstrap-candidate-fresh-source <candidate-build-root> <candidate-successor> <source.ns> <fresh-source-result-output> <fresh-source-capability-output>";
+    let usage = "usage: nuis bootstrap-candidate-fresh-source <candidate-build-root> <candidate-successor> <source.ns> <fresh-source-result-output> <fresh-source-capability-output> <nsld-input-output> <materialization-capability-output>";
     let command = CommandKind::BootstrapCandidateFreshSource(BootstrapCandidateFreshSourceInput {
         candidate_root: path(args, usage)?,
         successor: path(args, usage)?,
         source: path(args, usage)?,
         result_output: path(args, usage)?,
         capability_output: path(args, usage)?,
+        nsld_input_output: path(args, usage)?,
+        materialization_capability_output: path(args, usage)?,
     });
     finish(args, usage, command)
 }

@@ -145,4 +145,62 @@ mod cpu CandidateFreshSource {
     }
     return ((candidate_fresh_state_hash(state) * 129) + count) * 129 + position;
   }
+
+  pub fn candidate_fresh_materialization_fold_unit(state: i64, value: i64) -> i64 {
+    return ((state * 65537) + value + 1) % 2147483629;
+  }
+
+  pub fn candidate_fresh_entry_symbol_identity() -> i64 {
+    return 1040689614;
+  }
+
+  pub fn candidate_fresh_materialization_fold(
+    source_identity: i64,
+    yir_identity: i64
+  ) -> i64 {
+    let fold0: i64 = candidate_fresh_materialization_fold_unit(541, 1);
+    let fold1: i64 = candidate_fresh_materialization_fold_unit(fold0, 56);
+    let fold2: i64 = candidate_fresh_materialization_fold_unit(
+      fold1,
+      source_identity % 2147483629
+    );
+    let fold3: i64 = candidate_fresh_materialization_fold_unit(
+      fold2,
+      yir_identity % 2147483629
+    );
+    let fold4: i64 = candidate_fresh_materialization_fold_unit(fold3, 1);
+    let fold5: i64 = candidate_fresh_materialization_fold_unit(fold4, 1);
+    let fold6: i64 = candidate_fresh_materialization_fold_unit(fold5, 1);
+    let fold7: i64 = candidate_fresh_materialization_fold_unit(fold6, 7);
+    let fold8: i64 = candidate_fresh_materialization_fold_unit(fold7, 0);
+    let fold9: i64 = candidate_fresh_materialization_fold_unit(fold8, 0);
+    let fold10: i64 = candidate_fresh_materialization_fold_unit(fold9, 0);
+    let fold11: i64 = candidate_fresh_materialization_fold_unit(fold10, 0);
+    return candidate_fresh_materialization_fold_unit(
+      fold11,
+      candidate_fresh_entry_symbol_identity()
+    );
+  }
+
+  pub fn candidate_fresh_materialization_value(
+    source_state: i64,
+    yir_state: i64,
+    selector: i64
+  ) -> i64 {
+    let source_identity: i64 = candidate_fresh_stage_finish(source_state, 0);
+    let yir_identity: i64 = candidate_fresh_stage_finish(yir_state, 4);
+    if source_identity <= 0 || yir_identity <= 0 { return -1; }
+    if selector == 0 { return 1; }
+    if selector == 1 { return candidate_fresh_source_length(); }
+    if selector == 2 { return source_identity; }
+    if selector == 3 { return yir_identity; }
+    if selector >= 4 && selector <= 6 { return 1; }
+    if selector == 7 { return 7; }
+    if selector >= 8 && selector <= 11 { return 0; }
+    if selector == 12 { return candidate_fresh_entry_symbol_identity(); }
+    if selector == 13 {
+      return candidate_fresh_materialization_fold(source_identity, yir_identity);
+    }
+    return -1;
+  }
 }

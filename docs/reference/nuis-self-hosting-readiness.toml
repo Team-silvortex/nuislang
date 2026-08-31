@@ -1,5 +1,7 @@
-protocol = "nuis-self-hosting-readiness-v1"
-release_line = "beta-0.9.*"
+protocol = "nuis-self-hosting-readiness-v2"
+release_line = "beta-0.10.*"
+phase = "stage0-to-stage1-migration"
+phase_status = "active"
 migration_start = "beta-0.10.*"
 completion_window_start = "gamma-0.5.*"
 completion_window_end = "gamma-0.10.*"
@@ -41,13 +43,13 @@ blocker = "the real candidate closes generic two-encoding production selection, 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
-status = "usable"
+status = "stable"
 required_before = "beta-0.10.0"
-progress = 99
-next_action = "materialize one native object or equivalent Nsld input from the canonical fresh-source snapshot under candidate ownership without invoking stage0"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_fresh_source -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "one candidate-owned native-materialization capability that binds the canonical fresh-source YIR identity to an exact object or equivalent Nsld input while retaining false replacement and selection authority"
-blocker = "fresh-source capability v1 closes one canonical no-handoff source-to-YIR path, but the grammar and stage representations are deliberately snapshot-bounded and candidate-owned YIR-to-native object materialization remains absent"
+progress = 100
+next_action = "preserve candidate Nsld input v1 while wider source coverage and real native object bytes advance under separate versioned contracts"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_nsld -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nsld candidate_input -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "one candidate-owned nuis-compiler-candidate-nsld-input-v1 and bound materialization capability tying canonical source/YIR identity to Main.main return-i64 7 while stage0/provider/native-object/replacement/selection remain false"
+blocker = "none for the bounded canonical source-to-equivalent-Nsld-input gate; general grammar, unbounded stage representations, and candidate-owned native object bytes remain later migration slices"
 
 [[gates]]
 id = "differential-reproducibility-gate"

@@ -36,6 +36,9 @@ mod cpu Main {
     if ordinal >= 30 && ordinal < 35 {
       return candidate_fresh_stage_finish(state, ordinal - 30);
     }
+    if ordinal >= 40 && ordinal < 54 {
+      return candidate_fresh_materialization_value(state, stage_fold, ordinal - 40);
+    }
     return ((state * 65537) + stage_fold + ordinal + 1) % 2147483629;
   }
 

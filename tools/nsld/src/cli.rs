@@ -5,6 +5,10 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Command {
     Status,
+    CandidateInput {
+        input: PathBuf,
+        json: bool,
+    },
     Plan {
         input: PathBuf,
         json: bool,
@@ -376,6 +380,19 @@ mod tests {
 
     fn parse(args: &[&str]) -> Result<Command, String> {
         parse_args(args.iter().map(|arg| (*arg).to_owned()))
+    }
+
+    #[test]
+    fn parses_candidate_input_and_verification_alias() {
+        for command in ["candidate-input", "verify-candidate-input"] {
+            assert_eq!(
+                parse(&[command, "candidate.toml", "--json"]).unwrap(),
+                Command::CandidateInput {
+                    input: PathBuf::from("candidate.toml"),
+                    json: true,
+                }
+            );
+        }
     }
 
     #[test]

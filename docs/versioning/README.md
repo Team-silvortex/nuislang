@@ -9,6 +9,10 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-beta-0.10.0-self-hosting-entry.md](nuis-beta-0.10.0-self-hosting-entry.md)
+
+The previous curated foundation entry is:
+
 * [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md)
 
 The previous curated beta anchors are:
@@ -41,8 +45,8 @@ Earlier alpha anchors are:
 
 Use this section when the question is:
 
-* what the current `beta-0.7.*` line inherits and hardens after the first beta
-  foundation snapshots
+* why `beta-0.10.*` activates formal stage0-to-stage1 migration without
+  claiming completed self-hosting or final replacement readiness
 * what `beta-0.0.1` established at the alpha-to-beta transition
 * what `alpha-0.20.*` added by closing alpha around a beta-prep
   compiler/std/Nustar/Nsld/Nsdb/tensor foundation
@@ -62,7 +66,7 @@ Use this section when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `beta-0.7.*`
+* what the current mainline should optimize during `beta-0.10.*`
 * which documentation routes and wording are current after the beta entry
   refresh
 * which broad README surfaces were refreshed for the current beta line
@@ -176,7 +180,8 @@ Read:
 
 Practical rule:
 
-* start at the latest curated `beta-0.6.*` mainline entry first
+* start at the current `beta-0.10.*` self-hosting entry first
+* use `beta-0.6.*` for the previous curated foundation snapshot
 * use `beta-0.3.*` for the previous curated linker/runtime snapshot
 * use `beta-0.1.0` for the earlier curated beta foundation snapshot
 * use `beta-0.0.1` for the recorded first-beta predecessor

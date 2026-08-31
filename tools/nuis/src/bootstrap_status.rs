@@ -1,7 +1,10 @@
 use crate::{json_bool_field, json_field, json_optional_string_field, json_usize_field};
 use std::{collections::BTreeSet, fs, path::Path};
 
-pub(crate) const BOOTSTRAP_READINESS_PROTOCOL: &str = "nuis-self-hosting-readiness-v1";
+pub(crate) const BOOTSTRAP_READINESS_PROTOCOL: &str = "nuis-self-hosting-readiness-v2";
+
+const SELF_HOSTING_PHASE: &str = "stage0-to-stage1-migration";
+const SELF_HOSTING_PHASE_STATUS: &str = "active";
 
 const REQUIRED_GATES: &[(&str, &str)] = &[
     (
@@ -49,6 +52,8 @@ impl BootstrapReadinessGate {
 pub(crate) struct BootstrapReadinessReport {
     protocol: String,
     release_line: String,
+    phase: String,
+    phase_status: String,
     migration_start: String,
     completion_window_start: String,
     completion_window_end: String,
@@ -64,8 +69,16 @@ impl BootstrapReadinessReport {
         self.closed_gate_count() == self.gates.len()
     }
 
+    fn migration_active(&self) -> bool {
+        self.phase == SELF_HOSTING_PHASE && self.phase_status == SELF_HOSTING_PHASE_STATUS
+    }
+
     fn status(&self) -> &'static str {
-        if self.ready() {
+        if self.migration_active() && self.ready() {
+            "migration-active-readiness-closed"
+        } else if self.migration_active() {
+            "migration-active-open-readiness-gates"
+        } else if self.ready() {
             "ready-for-stage0-stage1-migration"
         } else {
             "preparing-foundation"
@@ -100,6 +113,8 @@ fn readiness_status_rank(status: &str) -> usize {
 struct HeaderBuilder {
     protocol: Option<String>,
     release_line: Option<String>,
+    phase: Option<String>,
+    phase_status: Option<String>,
     migration_start: Option<String>,
     completion_window_start: Option<String>,
     completion_window_end: Option<String>,
@@ -178,6 +193,8 @@ fn assign_header_field(
     match key {
         "protocol" => set_string(&mut header.protocol, key, value, line),
         "release_line" => set_string(&mut header.release_line, key, value, line),
+        "phase" => set_string(&mut header.phase, key, value, line),
+        "phase_status" => set_string(&mut header.phase_status, key, value, line),
         "migration_start" => set_string(&mut header.migration_start, key, value, line),
         "completion_window_start" => {
             set_string(&mut header.completion_window_start, key, value, line)
@@ -304,11 +321,24 @@ fn finish_report(
         ));
     }
     validate_gates(&gates)?;
+    let phase = header
+        .phase
+        .ok_or_else(|| "self-hosting readiness manifest is missing phase".to_owned())?;
+    let phase_status = header
+        .phase_status
+        .ok_or_else(|| "self-hosting readiness manifest is missing phase_status".to_owned())?;
+    if phase != SELF_HOSTING_PHASE || phase_status != SELF_HOSTING_PHASE_STATUS {
+        return Err(format!(
+            "self-hosting readiness phase must be {SELF_HOSTING_PHASE}/{SELF_HOSTING_PHASE_STATUS}"
+        ));
+    }
     Ok(BootstrapReadinessReport {
         protocol,
         release_line: header
             .release_line
             .ok_or_else(|| "self-hosting readiness manifest is missing release_line".to_owned())?,
+        phase,
+        phase_status,
         migration_start: header.migration_start.ok_or_else(|| {
             "self-hosting readiness manifest is missing migration_start".to_owned()
         })?,
@@ -375,6 +405,9 @@ pub(crate) fn render_bootstrap_readiness_json(
         json_field("protocol", &report.protocol),
         json_field("manifest", &input.display().to_string()),
         json_field("release_line", &report.release_line),
+        json_field("phase", &report.phase),
+        json_field("phase_status", &report.phase_status),
+        json_bool_field("migration_active", report.migration_active()),
         json_field("migration_start", &report.migration_start),
         json_field("completion_window_start", &report.completion_window_start),
         json_field("completion_window_end", &report.completion_window_end),
@@ -433,10 +466,13 @@ pub(crate) fn render_bootstrap_readiness_text(
     report: &BootstrapReadinessReport,
 ) -> String {
     let mut out = format!(
-        "nuis self-hosting readiness\n  protocol: {}\n  manifest: {}\n  release_line: {}\n  migration_start: {}\n  completion_window_start: {}\n  completion_window_end: {}\n  status: {}\n  ready: {}\n  gates: {}/{}\n",
+        "nuis self-hosting readiness\n  protocol: {}\n  manifest: {}\n  release_line: {}\n  phase: {}\n  phase_status: {}\n  migration_active: {}\n  migration_start: {}\n  completion_window_start: {}\n  completion_window_end: {}\n  status: {}\n  ready: {}\n  gates: {}/{}\n",
         report.protocol,
         input.display(),
         report.release_line,
+        report.phase,
+        report.phase_status,
+        report.migration_active(),
         report.migration_start,
         report.completion_window_start,
         report.completion_window_end,
@@ -480,14 +516,17 @@ mod tests {
     fn checked_in_manifest_is_valid_and_names_the_weakest_real_gate() {
         let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         assert_eq!(report.gates.len(), REQUIRED_GATES.len());
-        assert_eq!(report.closed_gate_count(), 1);
+        assert_eq!(report.closed_gate_count(), 2);
         assert!(!report.ready());
-        assert_eq!(report.status(), "preparing-foundation");
+        assert!(report.migration_active());
+        assert_eq!(report.phase, "stage0-to-stage1-migration");
+        assert_eq!(report.phase_status, "active");
+        assert_eq!(report.status(), "migration-active-open-readiness-gates");
         assert_eq!(report.completion_window_start, "gamma-0.5.*");
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage0-stage1-driver")
+            Some("differential-reproducibility-gate")
         );
     }
 
@@ -497,13 +536,18 @@ mod tests {
         let path = Path::new("docs/reference/nuis-self-hosting-readiness.toml");
         let json = render_bootstrap_readiness_json(path, &report);
         let text = render_bootstrap_readiness_text(path, &report);
-        assert!(json.contains("\"protocol\":\"nuis-self-hosting-readiness-v1\""));
+        assert!(json.contains("\"protocol\":\"nuis-self-hosting-readiness-v2\""));
+        assert!(json.contains("\"phase\":\"stage0-to-stage1-migration\""));
+        assert!(json.contains("\"phase_status\":\"active\""));
+        assert!(json.contains("\"migration_active\":true"));
         assert!(json.contains("\"ready\":false"));
         assert!(json.contains("\"gate_count\":5"));
         assert!(json.contains("\"completion_window_start\":\"gamma-0.5.*\""));
         assert!(json.contains("\"completion_window_end\":\"gamma-0.10.*\""));
-        assert!(text.contains("status: preparing-foundation"));
-        assert!(text.contains("gates: 1/5"));
+        assert!(text.contains("phase: stage0-to-stage1-migration"));
+        assert!(text.contains("phase_status: active"));
+        assert!(text.contains("status: migration-active-open-readiness-gates"));
+        assert!(text.contains("gates: 2/5"));
     }
 
     #[test]
@@ -551,7 +595,19 @@ mod tests {
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);
         assert!(report.ready());
+        assert_eq!(report.status(), "migration-active-readiness-closed");
         assert!(json.contains("\"next_gate\":null"));
         assert!(json.contains("\"first_blocker\":null"));
+    }
+
+    #[test]
+    fn migration_phase_cannot_silently_return_to_planning() {
+        let inactive = CHECKED_IN_MANIFEST.replacen(
+            "phase_status = \"active\"",
+            "phase_status = \"planned\"",
+            1,
+        );
+        let error = parse_bootstrap_readiness(&inactive).expect_err("phase drift must fail");
+        assert!(error.contains("stage0-to-stage1-migration/active"));
     }
 }

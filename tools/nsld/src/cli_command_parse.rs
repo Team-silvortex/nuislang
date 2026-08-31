@@ -14,6 +14,7 @@ where
         Err(err) => return Some(Err(err)),
     };
     let parsed = match command {
+        "candidate-input" | "verify-candidate-input" => Command::CandidateInput { input, json },
         "plan" => Command::Plan { input, json },
         "check" => Command::Check { input, json },
         "check-next-action" => Command::CheckNextAction { input, json },

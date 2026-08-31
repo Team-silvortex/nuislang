@@ -8,6 +8,8 @@ mod compiler_candidate_execution;
 mod compiler_candidate_fresh_source;
 mod compiler_candidate_fresh_source_result;
 mod compiler_candidate_frontend_result;
+mod compiler_candidate_nsld_input;
+mod compiler_candidate_nsld_materialization;
 mod compiler_candidate_preselection;
 mod compiler_candidate_production;
 mod compiler_candidate_successor;
@@ -124,6 +126,30 @@ pub use compiler_candidate_frontend_result::{
     parse_compiler_candidate_frontend_result_from_source,
     render_compiler_candidate_frontend_result, CompilerCandidateFrontendResult,
     COMPILER_CANDIDATE_FRONTEND_RESULT_FILE, COMPILER_CANDIDATE_FRONTEND_RESULT_PROTOCOL,
+};
+pub use compiler_candidate_nsld_input::{
+    build_compiler_candidate_nsld_input, parse_compiler_candidate_nsld_input,
+    parse_compiler_candidate_nsld_input_bytes, parse_compiler_candidate_nsld_input_from_source,
+    render_compiler_candidate_nsld_input, CompilerCandidateNsldInput,
+    COMPILER_CANDIDATE_NSLD_ENTRY_SYMBOL, COMPILER_CANDIDATE_NSLD_FUNCTION_CONTRACT,
+    COMPILER_CANDIDATE_NSLD_GLM_CONTRACT, COMPILER_CANDIDATE_NSLD_INPUT_CONTRACT,
+    COMPILER_CANDIDATE_NSLD_INPUT_FILE, COMPILER_CANDIDATE_NSLD_INPUT_PROTOCOL,
+    COMPILER_CANDIDATE_NSLD_OPERATION_CONTRACT, COMPILER_CANDIDATE_NSLD_TARGET_CONTRACT,
+    COMPILER_CANDIDATE_NSLD_TARGET_SELECTOR, COMPILER_CANDIDATE_NSLD_TIME_CONTRACT,
+};
+pub use compiler_candidate_nsld_materialization::{
+    build_compiler_candidate_nsld_materialization_capability,
+    parse_compiler_candidate_nsld_materialization_capability,
+    parse_compiler_candidate_nsld_materialization_capability_from_source,
+    render_compiler_candidate_nsld_materialization_capability,
+    verify_compiler_candidate_nsld_materialization_capability,
+    CompilerCandidateNsldMaterializationCapability,
+    CompilerCandidateNsldMaterializationCapabilityInput,
+    COMPILER_CANDIDATE_NSLD_MATERIALIZATION_ARGUMENT_CONTRACT,
+    COMPILER_CANDIDATE_NSLD_MATERIALIZATION_AUTHORITY,
+    COMPILER_CANDIDATE_NSLD_MATERIALIZATION_DRIVER, COMPILER_CANDIDATE_NSLD_MATERIALIZATION_FILE,
+    COMPILER_CANDIDATE_NSLD_MATERIALIZATION_PROTOCOL,
+    COMPILER_CANDIDATE_NSLD_MATERIALIZATION_VERDICT,
 };
 pub use compiler_candidate_preselection::{
     build_compiler_candidate_preselection, parse_compiler_candidate_preselection,

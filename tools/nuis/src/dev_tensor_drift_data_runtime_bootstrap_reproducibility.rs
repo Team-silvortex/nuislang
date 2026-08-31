@@ -666,8 +666,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "Candidate preselection v1 replays the complete generation-two signature",
             "Candidate compile capability v2 now deep-verifies that production lineage",
             "Canonical recursive owned-struct layouts now have one bounded parser",
-            "deterministic coordinate ordering remains at `compiler-toolchain/bootstrap/stage0-stage1-driver`",
-            "fresh-source capability v1 now binds the immutable signed-successor identity",
+            "The stage0/stage1 driver is now `stable/100`",
+            "Deterministic coordinate ordering therefore moves to `developer-system/bootstrap/differential-reproducibility-gate`",
+            "nsld candidate-input",
         ],
     },
     DevTensorDriftCheckSpec {

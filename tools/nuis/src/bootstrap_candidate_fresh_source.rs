@@ -6,11 +6,18 @@ use std::{
 
 use nuis_artifact::{
     build_compiler_candidate_fresh_source_capability, build_compiler_candidate_fresh_source_result,
+    build_compiler_candidate_nsld_input, build_compiler_candidate_nsld_materialization_capability,
     parse_compiler_candidate_fresh_source_capability, parse_compiler_candidate_fresh_source_result,
-    parse_compiler_candidate_fresh_source_result_bytes, parse_compiler_candidate_successor,
+    parse_compiler_candidate_fresh_source_result_bytes, parse_compiler_candidate_nsld_input,
+    parse_compiler_candidate_nsld_input_bytes,
+    parse_compiler_candidate_nsld_materialization_capability, parse_compiler_candidate_successor,
     render_compiler_candidate_fresh_source_capability,
-    render_compiler_candidate_fresh_source_result,
-    verify_compiler_candidate_fresh_source_capability, CompilerCandidateFreshSourceCapabilityInput,
+    render_compiler_candidate_fresh_source_result, render_compiler_candidate_nsld_input,
+    render_compiler_candidate_nsld_materialization_capability,
+    verify_compiler_candidate_fresh_source_capability,
+    verify_compiler_candidate_nsld_materialization_capability,
+    CompilerCandidateFreshSourceCapabilityInput,
+    CompilerCandidateNsldMaterializationCapabilityInput,
 };
 
 use crate::{
@@ -19,6 +26,7 @@ use crate::{
 };
 
 const FRESH_SOURCE_COMMAND: &str = "fresh-source-v1";
+const NSLD_INPUT_COMMAND: &str = "nsld-input-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BootstrapCandidateFreshSourceInput {
@@ -27,6 +35,8 @@ pub(crate) struct BootstrapCandidateFreshSourceInput {
     pub(crate) source: PathBuf,
     pub(crate) result_output: PathBuf,
     pub(crate) capability_output: PathBuf,
+    pub(crate) nsld_input_output: PathBuf,
+    pub(crate) materialization_capability_output: PathBuf,
 }
 
 pub(crate) fn handle_bootstrap_candidate_fresh_source(
@@ -99,6 +109,59 @@ pub(crate) fn handle_bootstrap_candidate_fresh_source(
     };
     let capability = build_compiler_candidate_fresh_source_capability(&verification)
         .map_err(|error| format!("candidate fresh-source capability failed: {error}"))?;
+    let fresh_capability_source = render_compiler_candidate_fresh_source_capability(&capability);
+
+    let nsld_process = Command::new(staged_adapter.path())
+        .arg(NSLD_INPUT_COMMAND)
+        .arg(&input.source)
+        .env_clear()
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| format!("failed to execute candidate Nsld-input adapter: {error}"))?;
+    let nsld_exit_code = nsld_process.status.code().ok_or_else(|| {
+        "candidate Nsld-input adapter terminated without a process exit code".to_owned()
+    })?;
+    let nsld_exit_code = usize::try_from(nsld_exit_code).map_err(|_| {
+        format!("candidate Nsld-input adapter returned negative exit code {nsld_exit_code}")
+    })?;
+    if nsld_exit_code != 0 {
+        return Err(format!(
+            "candidate Nsld-input request failed with exit code {nsld_exit_code}\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&nsld_process.stdout),
+            String::from_utf8_lossy(&nsld_process.stderr),
+        ));
+    }
+    let actual_nsld_input =
+        parse_compiler_candidate_nsld_input_bytes(&nsld_process.stdout, &input.nsld_input_output)
+            .map_err(|error| format!("failed to verify candidate Nsld input: {error}"))?;
+    let expected_nsld_input = build_compiler_candidate_nsld_input(&source)
+        .map_err(|error| format!("candidate Nsld-input reference verification failed: {error}"))?;
+    if actual_nsld_input != expected_nsld_input
+        || render_compiler_candidate_nsld_input(&expected_nsld_input).as_bytes()
+            != nsld_process.stdout
+    {
+        return Err(
+            "candidate Nsld input disagrees with the independent materialization model".to_owned(),
+        );
+    }
+    let nsld_input_source = render_compiler_candidate_nsld_input(&actual_nsld_input);
+    let materialization_verification = CompilerCandidateNsldMaterializationCapabilityInput {
+        candidate: &lineage.candidate,
+        production: &lineage.production,
+        successor: &successor,
+        fresh_capability: &capability,
+        fresh_capability_source: &fresh_capability_source,
+        adapter: &lineage.adapter,
+        nsld_input: &actual_nsld_input,
+        nsld_input_source: &nsld_input_source,
+        exit_code: nsld_exit_code,
+        stderr: &nsld_process.stderr,
+    };
+    let materialization_capability =
+        build_compiler_candidate_nsld_materialization_capability(&materialization_verification)
+            .map_err(|error| {
+                format!("candidate Nsld materialization capability failed: {error}")
+            })?;
     write_new(
         &input.result_output,
         &process.stdout,
@@ -106,8 +169,19 @@ pub(crate) fn handle_bootstrap_candidate_fresh_source(
     )?;
     write_new(
         &input.capability_output,
-        render_compiler_candidate_fresh_source_capability(&capability).as_bytes(),
+        fresh_capability_source.as_bytes(),
         "compiler candidate fresh-source capability",
+    )?;
+    write_new(
+        &input.nsld_input_output,
+        nsld_input_source.as_bytes(),
+        "compiler candidate Nsld input",
+    )?;
+    write_new(
+        &input.materialization_capability_output,
+        render_compiler_candidate_nsld_materialization_capability(&materialization_capability)
+            .as_bytes(),
+        "compiler candidate Nsld materialization capability",
     )?;
     let persisted_result = parse_compiler_candidate_fresh_source_result(&input.result_output)
         .map_err(|error| format!("failed to reread candidate fresh-source result: {error}"))?;
@@ -117,7 +191,24 @@ pub(crate) fn handle_bootstrap_candidate_fresh_source(
     .map_err(|error| format!("failed to reread candidate fresh-source capability: {error}"))?;
     verify_compiler_candidate_fresh_source_capability(&persisted_capability, &verification)
         .map_err(|error| format!("failed to replay candidate fresh-source capability: {error}"))?;
-    if persisted_result != actual_result || persisted_capability != capability {
+    let persisted_nsld_input = parse_compiler_candidate_nsld_input(&input.nsld_input_output)
+        .map_err(|error| format!("failed to reread candidate Nsld input: {error}"))?;
+    let persisted_materialization = parse_compiler_candidate_nsld_materialization_capability(
+        &input.materialization_capability_output,
+    )
+    .map_err(|error| {
+        format!("failed to reread candidate Nsld materialization capability: {error}")
+    })?;
+    verify_compiler_candidate_nsld_materialization_capability(
+        &persisted_materialization,
+        &materialization_verification,
+    )
+    .map_err(|error| format!("failed to replay candidate Nsld materialization: {error}"))?;
+    if persisted_result != actual_result
+        || persisted_capability != capability
+        || persisted_nsld_input != actual_nsld_input
+        || persisted_materialization != materialization_capability
+    {
         return Err("candidate fresh-source evidence changed after persistence".to_owned());
     }
 
@@ -129,8 +220,14 @@ pub(crate) fn handle_bootstrap_candidate_fresh_source(
     println!("  nir_identity: {}", capability.nir_identity);
     println!("  yir_identity: {}", capability.yir_identity);
     println!("  stage0_handoff_required: false");
-    println!("  native_materialization: false");
+    println!("  equivalent_nsld_input: true");
+    println!("  native_object: false");
     println!("  capability: {}", input.capability_output.display());
+    println!("  nsld_input: {}", input.nsld_input_output.display());
+    println!(
+        "  materialization_capability: {}",
+        input.materialization_capability_output.display()
+    );
     Ok(())
 }
 
@@ -138,6 +235,11 @@ fn validate_paths(input: &BootstrapCandidateFreshSourceInput) -> Result<(), Stri
     for (label, path) in [
         ("fresh-source result", &input.result_output),
         ("fresh-source capability", &input.capability_output),
+        ("Nsld input", &input.nsld_input_output),
+        (
+            "Nsld materialization capability",
+            &input.materialization_capability_output,
+        ),
     ] {
         if path.exists() {
             return Err(format!(
@@ -146,9 +248,17 @@ fn validate_paths(input: &BootstrapCandidateFreshSourceInput) -> Result<(), Stri
             ));
         }
     }
-    if input.result_output == input.capability_output
-        || input.source == input.result_output
-        || input.source == input.capability_output
+    let outputs = [
+        &input.result_output,
+        &input.capability_output,
+        &input.nsld_input_output,
+        &input.materialization_capability_output,
+    ];
+    if outputs.iter().any(|path| **path == input.source)
+        || outputs
+            .iter()
+            .enumerate()
+            .any(|(index, path)| outputs[index + 1..].contains(path))
     {
         return Err("candidate fresh-source input and outputs must be distinct".to_owned());
     }

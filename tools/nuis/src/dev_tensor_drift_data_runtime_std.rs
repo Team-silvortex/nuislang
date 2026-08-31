@@ -235,7 +235,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "std-readme-host-io-text-lane",
         path: "stdlib/std/README.md",
         required_patterns: &[
-            "beta-0.9.*",
+            "beta-0.10.*",
             "host I/O and text",
             "filesystem/path/location",
             "worker lease",
@@ -417,34 +417,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "rejects_memory_capability_hash_and_signature_drift",
             "rejects_owned_return_buffer_destructor_drift",
             "rejects_owned_object_size_and_read_policy_drift",
-        ],
-    },
-    DevTensorDriftCheckSpec {
-        id: "beta-0.9-mainline-router",
-        path: "docs/current-mainline-map.md",
-        required_patterns: &[
-            "current `beta-0.9.*` reading route",
-            "nuis-beta-0.6.0-mainline-entry.md",
-            "previous curated `beta-0.3.*` entry",
-            "recorded predecessor `beta-0.0.1` entry",
-            "nuis-beta-0.0.1-mainline-entry.md",
-            "direct predecessor `alpha-0.20.*` closeout entry",
-            "predecessor `alpha-0.17.*` registered worker entry",
-            "predecessor `alpha-0.16.*` tensor-guided closure entry",
-            "nuis-development-tensor.md",
-        ],
-    },
-    DevTensorDriftCheckSpec {
-        id: "beta-0.9-repository-frontdoor",
-        path: "README.md",
-        required_patterns: &[
-            "repository is on `beta-0.9.*`",
-            "nuis-beta-0.6.0-mainline-entry.md",
-            "registered execution domains",
-            "nuis-nsld-final-output-selection-evidence-file-v1",
-            "generated GNU resolver and symbol-version registry",
-            "bootstrap-reproducibility",
-            "Development tensor",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -2,6 +2,7 @@ pub(crate) fn usage() -> &'static str {
     concat!(
         "usage:\n",
         "  nsld status\n",
+        "  nsld candidate-input <nuis.compiler-candidate-nsld-input.toml> [--json]\n",
         "  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld check-next-action <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

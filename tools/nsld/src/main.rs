@@ -1,6 +1,7 @@
 mod artifact_chain;
 mod artifact_chain_actions;
 mod assembly;
+mod candidate_input;
 mod check;
 mod check_container;
 mod check_core;
@@ -308,6 +309,9 @@ fn run() -> Result<(), String> {
     let command = parse_args(env::args().skip(1))?;
     if let Some(result) = run_object_command(&command) {
         return result;
+    }
+    if candidate_input::run_candidate_input_command(&command)? {
+        return Ok(());
     }
     if main_final_executable_commands::run_final_executable_command(&command)? {
         return Ok(());

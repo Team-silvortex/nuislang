@@ -5,8 +5,10 @@ use nuis_artifact::{
     compiler_component_replacement_authorizer_registry_sha256,
     parse_compiler_candidate_direct_compile_capability,
     parse_compiler_candidate_fresh_source_capability, parse_compiler_candidate_fresh_source_result,
+    parse_compiler_candidate_nsld_input, parse_compiler_candidate_nsld_materialization_capability,
     parse_compiler_candidate_successor, COMPILER_CANDIDATE_FRESH_SOURCE_VERDICT,
-    COMPILER_CANDIDATE_SUCCESSOR_FILE, COMPILER_CANDIDATE_SUCCESSOR_VERDICT,
+    COMPILER_CANDIDATE_NSLD_MATERIALIZATION_VERDICT, COMPILER_CANDIDATE_SUCCESSOR_FILE,
+    COMPILER_CANDIDATE_SUCCESSOR_VERDICT,
 };
 
 use super::assert_success;
@@ -128,6 +130,8 @@ fn assert_fresh_source_capability(
         Path::new("../../tests/fixtures/bootstrap/accepted/compiler_candidate_fresh_snapshot.ns");
     let result_path = output_dir.join("candidate-fresh-source-result.txt");
     let capability_path = output_dir.join("candidate-fresh-source-capability.toml");
+    let nsld_input_path = output_dir.join("candidate-nsld-input.toml");
+    let materialization_path = output_dir.join("candidate-nsld-materialization.toml");
     let successor_before = fs::read(successor).expect("snapshot signed candidate successor");
     let output = Command::new(env!("CARGO_BIN_EXE_nuis"))
         .arg("bootstrap-candidate-fresh-source")
@@ -136,6 +140,8 @@ fn assert_fresh_source_capability(
         .arg(source)
         .arg(&result_path)
         .arg(&capability_path)
+        .arg(&nsld_input_path)
+        .arg(&materialization_path)
         .env(
             "NUIS_BOOTSTRAP_STAGE0_PROVIDER_V1",
             "/provider-must-not-be-observed",
@@ -175,9 +181,39 @@ fn assert_fresh_source_capability(
     assert!(!capability.native_materialization);
     assert!(!capability.replacement_authorized);
     assert!(!capability.selection_authorized);
+    let nsld_input =
+        parse_compiler_candidate_nsld_input(&nsld_input_path).expect("verify candidate Nsld input");
+    assert_eq!(nsld_input.source_identity, result.stages[0].identity);
+    assert_eq!(nsld_input.yir_identity, result.stages[4].identity);
+    assert_eq!(nsld_input.return_value, 7);
+    assert_eq!(nsld_input.materialization_fold, 1_403_051_547);
+    assert!(nsld_input.candidate_owned_yir_materialization);
+    assert!(nsld_input.equivalent_nsld_input);
+    assert!(!nsld_input.native_object);
+    let materialization =
+        parse_compiler_candidate_nsld_materialization_capability(&materialization_path)
+            .expect("verify candidate Nsld materialization capability");
+    assert_eq!(
+        materialization.verdict,
+        COMPILER_CANDIDATE_NSLD_MATERIALIZATION_VERDICT
+    );
+    assert_eq!(materialization.yir_identity, result.stages[4].identity);
+    assert!(materialization.candidate_owned_yir_materialization);
+    assert!(materialization.equivalent_nsld_input);
+    assert!(!materialization.native_object);
+    assert!(!materialization.stage0_handoff_required);
+    assert!(!materialization.provider_dependency_required);
+    assert!(!materialization.replacement_authorized);
+    assert!(!materialization.selection_authorized);
     let capability_source =
         fs::read_to_string(&capability_path).expect("read fresh-source capability source");
     assert!(!capability_source.contains(output_dir_text));
+    assert!(!fs::read_to_string(&nsld_input_path)
+        .expect("read candidate Nsld input source")
+        .contains(output_dir_text));
+    assert!(!fs::read_to_string(&materialization_path)
+        .expect("read candidate Nsld materialization source")
+        .contains(output_dir_text));
     assert_eq!(
         fs::read(successor).expect("reread signed candidate successor"),
         successor_before
@@ -193,6 +229,8 @@ fn assert_fresh_source_capability(
     fs::write(&tampered_source, tampered).expect("write tampered fresh-source snapshot");
     let rejected_result = output_dir.join("candidate-fresh-source-rejected.txt");
     let rejected_capability = output_dir.join("candidate-fresh-source-rejected.toml");
+    let rejected_nsld_input = output_dir.join("candidate-nsld-input-rejected.toml");
+    let rejected_materialization = output_dir.join("candidate-nsld-materialization-rejected.toml");
     let rejected = Command::new(env!("CARGO_BIN_EXE_nuis"))
         .arg("bootstrap-candidate-fresh-source")
         .arg(selected_root)
@@ -200,9 +238,13 @@ fn assert_fresh_source_capability(
         .arg(&tampered_source)
         .arg(&rejected_result)
         .arg(&rejected_capability)
+        .arg(&rejected_nsld_input)
+        .arg(&rejected_materialization)
         .output()
         .expect("reject drifted fresh-source snapshot");
     assert!(!rejected.status.success());
     assert!(!rejected_result.exists());
     assert!(!rejected_capability.exists());
+    assert!(!rejected_nsld_input.exists());
+    assert!(!rejected_materialization.exists());
 }

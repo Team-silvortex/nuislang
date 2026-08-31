@@ -1,0 +1,45 @@
+protocol = "nuis-compiler-candidate-nsld-input-v1"
+version = 1
+status = "stable-canonical-snapshot-input"
+scope = "candidate-owned-yir-to-nsld-boundary"
+input_contract = "nuis-stage1-yir-to-nsld-materialization-input-v1"
+source_snapshot_contract = "nuis-canonical-bootstrap-source-snapshot-v1"
+target_contract = "nuis-registered-native-object-target-v1"
+target_selector = "registered-native-cpu"
+entry_symbol = "Main.main"
+function_contract = "nuis-yir-scalar-function-v1"
+operation_contract = "nuis-yir-return-i64-v1"
+return_type = "i64"
+time_contract = "timestamped-partial-order"
+glm_contract = "candidate-snapshot-no-owned-resource-v1"
+source_bytes = 56
+source_identity = 12832741133
+yir_identity = 9279238763
+unit_count = 1
+function_count = 1
+operation_count = 1
+return_value = 7
+dependency_count = 0
+relocation_count = 0
+time_ordinal = 0
+glm_resource_count = 0
+entry_symbol_identity = 1040689614
+materialization_fold = 1403051547
+candidate_owned_yir_materialization = true
+equivalent_nsld_input = true
+native_object = false
+stage0_handoff_required = false
+provider_dependency_required = false
+replacement_authorized = false
+selection_authorized = false
+
+invariants = [
+  "frozen-subset-v8-keeps-twenty-one-exact-exports",
+  "reserved-ordinals-40-through-53-carry-fourteen-candidate-owned-values",
+  "target-selection-remains-open-and-registry-owned",
+  "adapter-serializes-but-does-not-select-ir-semantics",
+  "nsld-independently-reparses-the-complete-canonical-input",
+  "no-native-object-replacement-or-selection-authority",
+]
+
+next_action = "select one registered object writer and lower this exact input into independently verified native object bytes"

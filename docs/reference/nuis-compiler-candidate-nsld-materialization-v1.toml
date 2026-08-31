@@ -1,0 +1,37 @@
+protocol = "nuis-compiler-candidate-nsld-materialization-capability-v1"
+version = 1
+status = "stable-bounded-equivalent-input"
+scope = "stage1-candidate-native-materialization-migration-slice"
+driver_contract = "nuis-stage1-candidate-nsld-input-driver-v1"
+authority = "candidate-owned-equivalent-nsld-input-only-no-replacement-or-selection"
+argument_contract = "nsld-input-v1-command-plus-one-source-path-no-shell-v1"
+fresh_source_capability_protocol = "nuis-compiler-candidate-fresh-source-capability-v1"
+nsld_input_protocol = "nuis-compiler-candidate-nsld-input-v1"
+nsld_consumption_contract = "nsld-candidate-materialization-input-consumption-v1"
+frontdoor = "nuis bootstrap-candidate-fresh-source"
+consumer_frontdoor = "nsld candidate-input"
+candidate_owned_yir_materialization = true
+equivalent_nsld_input = true
+native_object = false
+stage0_handoff_required = false
+provider_dependency_required = false
+replacement_authorized = false
+selection_authorized = false
+verdict = "candidate-owned-yir-to-nsld-input-verified-no-native-object-or-selection-authority"
+
+bound_evidence = [
+  "verified-stage1-candidate-component-and-production-v11",
+  "immutable-generation-three-successor-proof",
+  "canonical-fresh-source-capability-source-and-proof",
+  "exact-production-adapter-bytes-and-sha256",
+  "canonical-nsld-input-bytes-sha256-source-and-yir-identities",
+  "zero-exit-empty-stderr-cleared-environment-closed-stdin",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_nsld -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nsld candidate_input -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]
+
+open_boundary = "candidate-owned-native-object-bytes-and-wider-source-yir-coverage"

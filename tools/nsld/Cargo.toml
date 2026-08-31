@@ -9,6 +9,7 @@ readme.workspace = true
 description = "Nsld linker front-door prototype for the Nuis toolchain."
 
 [dependencies]
+nuis-artifact = { path = "../../crates/nuis-artifact" }
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuisc = { path = "../nuisc" }
 nsdb = { path = "../nsdb" }

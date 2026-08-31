@@ -170,6 +170,7 @@ name = "nsld"
 version = "0.1.0"
 dependencies = [
  "nsdb",
+ "nuis-artifact",
  "nuis-runtime",
  "nuisc",
  "sha2",

@@ -8,7 +8,7 @@ provider-neutral plan boundary shared with `nuisc::linker`. It now owns
 substantial native finalization behavior, but does not claim a finished
 self-hosted linker core or stable public linker API.
 
-For the current `beta-0.9.*` line, the emphasis is tensor-guided native
+For the current `beta-0.10.*` line, the emphasis is tensor-guided native
 finalization hardening: preserve the structured frontdoor while moving backend
 registration out of built-in tables and keeping admission, publication, and
 selection evidence independently replayable.
@@ -434,6 +434,15 @@ required = true
 `nsld verify-section-manifest` re-computes the section manifest and fails if
 the file is missing, if the full content differs, or if `section_count` or
 `section_table_hash` no longer match.
+
+`nsld candidate-input <nuis.compiler-candidate-nsld-input.toml> [--json]`
+is the stage1 migration intake before a full `LinkPlan` exists. It consumes the
+shared `nuis-compiler-candidate-nsld-input-v1` contract, verifies the canonical
+source/YIR/function/time/GLM identities, and returns
+`select-registered-object-writer`. It does not derive section-layout hashes,
+choose a concrete object family, or claim native object bytes. This keeps the
+candidate compiler decoupled from Nsld's internal object-plan implementation.
+See [Nuis Compiler Candidate to Nsld Materialization](nuis-compiler-candidate-nsld-materialization.md).
 
 `nsld object-plan` derives the first object-writer-facing plan from the section
 manifest. It maps each Nsld section to a stable object section name and role

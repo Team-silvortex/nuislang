@@ -10,13 +10,14 @@ backends, but they do not define the language model.
 
 ## Current Line
 
-The repository is on `beta-0.9.*`. Git history is the authoritative source for
+The repository is on `beta-0.10.*`. Git history is the authoritative source for
 the exact patch checkpoint; the independent Cargo package versions are not the
 project release number yet.
 
-This is an early-beta hardening line, not an API-stability or production-ready
-claim. The important change from the earlier alpha and first-beta snapshots is
-that the major pieces now form one exercised toolchain spine:
+This is the formal staged self-hosting migration line, not a self-hosting,
+API-stability, or production-ready claim. `stage0` remains an immutable rollback
+root while bounded compiler capabilities move into the Nuis candidate. The
+important inherited foundation is one exercised toolchain spine:
 
 ```text
 nuis source / nuis.toml
@@ -32,7 +33,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`786/786` passing drift checks. The compiler data model, stage0/stage1 driver,
+`791/791` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
 state close their previous weakest tasks. Dispatch v1 now resolves an unordered
@@ -56,8 +57,16 @@ strengthening only: its own fresh-source, native-materialization, replacement,
 and final-selection claims remain false. The downstream fresh-source capability
 now drives one canonical 56-byte Nuis snapshot through candidate-owned source,
 token, AST, NIR, and YIR identities with no stage0 handoff or runtime provider;
-it remains a bounded front-end proof with native materialization and authority
-flags false.
+the same candidate now carries that verified YIR through reserved subset-v8
+ordinals into one exact `nuis-compiler-candidate-nsld-input-v1`. Nsld consumes
+the target-neutral `Main.main -> i64 7` record and stops at registered
+object-writer selection. This closes the bounded equivalent-input slice while
+native object bytes and all authority flags remain false.
+Self-hosting readiness v2 now records
+`stage0-to-stage1-migration/active` while retaining `ready = false` and only
+`2/5` gates closed. Deterministic ordering now advances the
+differential/reproducibility successor before broader source and native-object
+ownership.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native
@@ -69,7 +78,7 @@ audit record, and component-bound diagnostic proof for one project-form
 compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
-`nuis bootstrap-status` frontdoor reports `1/5` gates closed. Compiler data
+`nuis bootstrap-status` frontdoor reports `2/5` gates closed. Compiler data
 model v10 now materializes four owned token records per bounded window, emits
 the canonical 59-byte fixture plus the real candidate's 91-byte
 `use cpu StdLanguageCore;` token
@@ -196,7 +205,8 @@ registered foundation work.
 Start with these documents:
 
 * [Current mainline map](docs/current-mainline-map.md)
-* [Beta 0.6 mainline entry](docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
+* [Beta 0.10 self-hosting entry](docs/versioning/nuis-beta-0.10.0-self-hosting-entry.md)
+* [Beta 0.6 foundation entry](docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
 * [Development tensor](docs/reference/nuis-development-tensor.md)
 * [Self-hosting readiness](docs/reference/nuis-self-hosting-readiness.md)
 * [Compiler data model](docs/reference/nuis-compiler-data-model.md)
