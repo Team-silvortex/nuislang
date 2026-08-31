@@ -61,12 +61,12 @@ fail_closed = [
 [honest_boundary]
 claim = "the-continuing-component-owner-signs-the-direct-stage1-front-end-proof-into-generation-three-without-a-runtime-stage0-provider"
 does_not_claim = "fresh-source-processing-native-object-materialization-component-replacement-final-selection-or-self-hosting"
-next_step = "bind-one-canonical-fresh-source-snapshot-to-candidate-owned-front-end-stage-evidence-without-a-preexisting-stage0-handoff"
+next_step = "bind-this-immutable-successor-as-the-predecessor-anchor-for-a-separate-fresh-source-capability-then-pursue-candidate-owned-native-materialization"
 
 [open_boundary]
 missing = [
-  "candidate-owned-fresh-source-to-token-ast-nir-yir-processing",
   "candidate-owned-nir-yir-to-native-object-materialization",
+  "signed-transition-that-replays-and-binds-the-downstream-fresh-source-capability",
   "independent-remote-direct-successor-evidence",
   "signed-generation-three-component-transition-and-final-selection",
 ]

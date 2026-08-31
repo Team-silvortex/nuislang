@@ -77,13 +77,18 @@ successor_authorized = true
 direct front-end evidence into generation-three review. It cannot be used as a
 native image, a replacement authorization, or a final selector.
 
-## Honest Next Step
+## Downstream Boundary
 
-The stage1 candidate still consumes a canonical handoff originally materialized
-by stage0. The next boundary is candidate-owned fresh-source processing:
-bind one canonical source snapshot directly to source-to-token/AST/NIR/YIR
-evidence without requiring a preexisting stage0 handoff. Native object
-materialization remains a separate later capability.
+The successor remains immutable and therefore still carries
+`fresh_source_compile = false`. The separate downstream
+`nuis-compiler-candidate-fresh-source-capability-v1` now binds this successor's
+canonical source and proof identity to one candidate-owned 56-byte source-to-
+token/AST/NIR/YIR execution without a preexisting stage0 handoff. It inherits
+no signing, replacement, or selection authority from this record.
+
+The next weakest boundary is candidate-owned native object materialization for
+that frozen source snapshot. See
+[Nuis Compiler Candidate Fresh-Source Capability](nuis-compiler-candidate-fresh-source-capability.md).
 
 The machine-readable contract is
 [nuis-compiler-candidate-successor-v1.toml](nuis-compiler-candidate-successor-v1.toml).

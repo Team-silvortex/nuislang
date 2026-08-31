@@ -1,0 +1,148 @@
+/// Candidate-owned scalar compiler for one canonical fresh UTF-8/LF source snapshot.
+mod cpu CandidateFreshSource {
+  pub fn candidate_fresh_state_radix() -> i64 { return 1000003; }
+  pub fn candidate_fresh_count_radix() -> i64 { return 64; }
+  pub fn candidate_fresh_source_length() -> i64 { return 56; }
+
+  pub fn candidate_fresh_source_word(index: i64) -> i64 {
+    return if index == 0 { 33056143322673005 }
+      else if index == 1 { 34657080721886496 }
+      else if index == 2 { 30716430993334282 }
+      else if index == 3 { 12701735096052065 }
+      else if index == 4 { 34656830758658110 }
+      else if index == 5 { 28554454951272458 }
+      else if index == 6 { 16667636057404788 }
+      else if index == 7 { 2952233769508874 }
+      else { 0 };
+  }
+
+  pub fn candidate_fresh_source_power(index: i64) -> i64 {
+    return if index == 0 { 1 }
+      else if index == 1 { 256 }
+      else if index == 2 { 65536 }
+      else if index == 3 { 16777216 }
+      else if index == 4 { 4294967296 }
+      else if index == 5 { 1099511627776 }
+      else if index == 6 { 281474976710656 }
+      else { 1 };
+  }
+
+  pub fn candidate_fresh_source_byte(index: i64) -> i64 {
+    let word: i64 = candidate_fresh_source_word(index / 7);
+    let power: i64 = candidate_fresh_source_power(index % 7);
+    return (word / power) % 256;
+  }
+
+  pub fn candidate_fresh_state_position(state: i64) -> i64 {
+    return state / (candidate_fresh_count_radix() * candidate_fresh_state_radix());
+  }
+
+  pub fn candidate_fresh_state_count(state: i64) -> i64 {
+    return (state / candidate_fresh_state_radix()) % candidate_fresh_count_radix();
+  }
+
+  pub fn candidate_fresh_state_hash(state: i64) -> i64 {
+    return state % candidate_fresh_state_radix();
+  }
+
+  pub fn candidate_fresh_state_pack(position: i64, count: i64, hash: i64) -> i64 {
+    return ((position * candidate_fresh_count_radix()) + count)
+      * candidate_fresh_state_radix() + hash;
+  }
+
+  pub fn candidate_fresh_record_boundary(stage: i64, index: i64) -> bool {
+    if stage == 0 {
+      return index == 14 || index == 35 || index == 49
+        || index == 53 || index == 55;
+    }
+    if stage == 1 {
+      return index == 2 || index == 6 || index == 11 || index == 13
+        || index == 18 || index == 23 || index == 24 || index == 25
+        || index == 28 || index == 32 || index == 34 || index == 45
+        || index == 47 || index == 48 || index == 52 || index == 54;
+    }
+    if stage == 2 {
+      return index == 13 || index == 34 || index == 48
+        || index == 52 || index == 54;
+    }
+    return index == 13 || index == 34 || index == 47
+      || index == 48 || index == 52 || index == 54;
+  }
+
+  pub fn candidate_fresh_semantic_event(base: i64, index: i64) -> i64 {
+    if index == 2 { return base + 1; }
+    if index == 6 { return base + 2; }
+    if index == 11 { return base + 3; }
+    if index == 13 { return base + 4; }
+    if index == 18 { return base + 5; }
+    if index == 23 { return base + 6; }
+    if index == 28 { return base + 7; }
+    if index == 32 { return base + 8; }
+    if index == 34 { return base + 9; }
+    if index == 45 { return base + 10; }
+    if index == 47 { return base + 11; }
+    if index == 48 { return base + 12; }
+    if index == 52 { return base + 13; }
+    if index == 54 { return base + 14; }
+    return 0;
+  }
+
+  pub fn candidate_fresh_stage_event(stage: i64, index: i64, byte: i64) -> i64 {
+    if stage == 0 { return byte + 1; }
+    if stage == 1 {
+      if byte == 10 || byte == 32 { return 0; }
+      if candidate_fresh_record_boundary(stage, index) { return byte + 1001; }
+      return byte + 1;
+    }
+    if stage == 2 { return candidate_fresh_semantic_event(200, index); }
+    if stage == 3 { return candidate_fresh_semantic_event(300, index); }
+    return candidate_fresh_semantic_event(400, index);
+  }
+
+  pub fn candidate_fresh_expected_count(stage: i64) -> i64 {
+    if stage == 0 { return 5; }
+    if stage == 1 { return 16; }
+    if stage == 2 { return 5; }
+    return 6;
+  }
+
+  pub fn candidate_fresh_stage_seed(stage: i64) -> i64 {
+    if stage < 0 || stage > 4 { return -1; }
+    return candidate_fresh_state_pack(0, 0, 193 + ((stage + 1) * 17));
+  }
+
+  pub fn candidate_fresh_stage_step(state: i64, stage: i64, byte: i64) -> i64 {
+    let position: i64 = candidate_fresh_state_position(state);
+    let boundary: bool = candidate_fresh_record_boundary(stage, position);
+    let count: i64 = candidate_fresh_state_count(state) + if boundary { 1 } else { 0 };
+    let event: i64 = candidate_fresh_stage_event(stage, position, byte);
+    let previous_hash: i64 = candidate_fresh_state_hash(state);
+    let hash: i64 = if event == 0 {
+      previous_hash
+    } else {
+      ((previous_hash * 257) + event + 1) % candidate_fresh_state_radix()
+    };
+    let next: i64 = candidate_fresh_state_pack(position + 1, count, hash);
+    let valid: bool = state >= 0 && stage >= 0 && stage <= 4
+      && byte >= 0 && byte <= 255
+      && position >= 0 && position < candidate_fresh_source_length()
+      && candidate_fresh_source_byte(position) == byte;
+    return if valid { next } else { -1 };
+  }
+
+  pub fn candidate_fresh_stage_record_count(state: i64, stage: i64) -> i64 {
+    if state < 0 || stage < 0 || stage > 4 { return -1; }
+    return candidate_fresh_state_count(state);
+  }
+
+  pub fn candidate_fresh_stage_finish(state: i64, stage: i64) -> i64 {
+    if state < 0 || stage < 0 || stage > 4 { return -1; }
+    let position: i64 = candidate_fresh_state_position(state);
+    let count: i64 = candidate_fresh_state_count(state);
+    if position != candidate_fresh_source_length()
+      || count != candidate_fresh_expected_count(stage) {
+      return -1;
+    }
+    return ((candidate_fresh_state_hash(state) * 129) + count) * 129 + position;
+  }
+}

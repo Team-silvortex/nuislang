@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::bootstrap_candidate_compile_capability::BootstrapCandidateCompileCapabilityInput;
 use crate::bootstrap_candidate_direct_compile::BootstrapCandidateDirectCompileInput;
+use crate::bootstrap_candidate_fresh_source::BootstrapCandidateFreshSourceInput;
 use crate::bootstrap_candidate_preselection::BootstrapCandidatePreselectionInput;
 use crate::bootstrap_candidate_successor::BootstrapCandidateSuccessorInput;
 use crate::bootstrap_component_compile_dispatch::BootstrapComponentCompileDispatchInput;
@@ -36,6 +37,20 @@ pub(super) fn parse_bootstrap_candidate_direct_compile(
             result_output: path(args, usage)?,
             capability_output: path(args, usage)?,
         });
+    finish(args, usage, command)
+}
+
+pub(super) fn parse_bootstrap_candidate_fresh_source(
+    args: &mut impl Iterator<Item = String>,
+) -> Result<CommandKind, String> {
+    let usage = "usage: nuis bootstrap-candidate-fresh-source <candidate-build-root> <candidate-successor> <source.ns> <fresh-source-result-output> <fresh-source-capability-output>";
+    let command = CommandKind::BootstrapCandidateFreshSource(BootstrapCandidateFreshSourceInput {
+        candidate_root: path(args, usage)?,
+        successor: path(args, usage)?,
+        source: path(args, usage)?,
+        result_output: path(args, usage)?,
+        capability_output: path(args, usage)?,
+    });
     finish(args, usage, command)
 }
 

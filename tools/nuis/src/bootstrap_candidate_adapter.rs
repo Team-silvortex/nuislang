@@ -238,8 +238,8 @@ fn run_clang(command: &mut Command, label: &str) -> Result<(), String> {
     ))
 }
 
-fn render_adapter_source() -> &'static str {
-    r#"#include <stdint.h>
+fn render_adapter_source() -> String {
+    let prefix = r#"#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -248,6 +248,7 @@ fn render_adapter_source() -> &'static str {
 
 #define NUIS_STAGE0_PROVIDER_ENV "NUIS_BOOTSTRAP_STAGE0_PROVIDER_V1"
 #define NUIS_COMPILE_COMMAND "bootstrap-build"
+#define NUIS_FRESH_SOURCE_COMMAND "fresh-source-v1"
 #define NUIS_MAX_RUNTIME_PATH_BYTES 4096
 
 extern int64_t nuis_bootstrap_candidate_stage_seed_v1(int64_t ordinal);
@@ -612,7 +613,9 @@ static int64_t fold_text(int64_t ordinal, const char* text, int64_t length) {
     return state;
 }
 
-static int run_compile_request(char** argv) {
+"#;
+    let fresh_source = crate::bootstrap_candidate_fresh_source_adapter::FRESH_SOURCE_ADAPTER;
+    let suffix = r#"static int run_compile_request(char** argv) {
     const char* provider = getenv(NUIS_STAGE0_PROVIDER_ENV);
     int64_t lengths[4] = {0, 0, 0, 0};
     const char* values[4] = {argv[1], argv[2], argv[3], provider};
@@ -644,6 +647,9 @@ static int run_compile_request(char** argv) {
 }
 
 int main(int argc, char** argv) {
+    if (argc == 3 && strcmp(argv[1], NUIS_FRESH_SOURCE_COMMAND) == 0) {
+        return run_fresh_source(argv[2]);
+    }
     if (argc == 4) return run_compile_request(argv);
     if (argc != 6) return 64;
     int64_t folds[5] = {0, 0, 0, 0, 0};
@@ -778,7 +784,8 @@ int main(int argc, char** argv) {
     }
     return 0;
 }
-"#
+"#;
+    format!("{prefix}{fresh_source}{suffix}")
 }
 
 #[cfg(test)]

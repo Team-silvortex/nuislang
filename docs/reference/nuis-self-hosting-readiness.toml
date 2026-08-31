@@ -44,10 +44,10 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
 required_before = "beta-0.10.0"
 progress = 99
-next_action = "bind one canonical fresh-source snapshot to candidate-owned source-to-token-AST-NIR-YIR evidence without a preexisting stage0 handoff while keeping native materialization false"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_successor -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "one candidate-owned fresh-source front-end capability whose canonical source snapshot reaches verified stage evidence without a preexisting stage0 handoff or native-materialization claim"
-blocker = "candidate successor v1 now signs direct provider-free front-end evidence into generation three, but that execution still consumes a canonical handoff originally materialized by stage0 and does not own fresh-source parsing or native object materialization"
+next_action = "materialize one native object or equivalent Nsld input from the canonical fresh-source snapshot under candidate ownership without invoking stage0"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_fresh_source -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "one candidate-owned native-materialization capability that binds the canonical fresh-source YIR identity to an exact object or equivalent Nsld input while retaining false replacement and selection authority"
+blocker = "fresh-source capability v1 closes one canonical no-handoff source-to-YIR path, but the grammar and stage representations are deliberately snapshot-bounded and candidate-owned YIR-to-native object materialization remains absent"
 
 [[gates]]
 id = "differential-reproducibility-gate"

@@ -1,0 +1,5 @@
+mod cpu Main {
+  fn main() -> i64 {
+    return 7;
+  }
+}

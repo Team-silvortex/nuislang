@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::bootstrap_candidate_compile_capability::BootstrapCandidateCompileCapabilityInput;
 use crate::bootstrap_candidate_direct_compile::BootstrapCandidateDirectCompileInput;
+use crate::bootstrap_candidate_fresh_source::BootstrapCandidateFreshSourceInput;
 use crate::bootstrap_candidate_preselection::BootstrapCandidatePreselectionInput;
 use crate::bootstrap_candidate_successor::BootstrapCandidateSuccessorInput;
 use crate::bootstrap_component_compile_dispatch::BootstrapComponentCompileDispatchInput;
@@ -51,6 +52,7 @@ pub enum CommandKind {
     },
     BootstrapCandidateCompileCapability(BootstrapCandidateCompileCapabilityInput),
     BootstrapCandidateDirectCompile(BootstrapCandidateDirectCompileInput),
+    BootstrapCandidateFreshSource(BootstrapCandidateFreshSourceInput),
     BootstrapPreselectCandidate(BootstrapCandidatePreselectionInput),
     BootstrapSignCandidateSuccessor(BootstrapCandidateSuccessorInput),
     BootstrapReproducibility {
@@ -321,6 +323,9 @@ where
         }
         "bootstrap-candidate-direct-compile" => {
             bootstrap_component::parse_bootstrap_candidate_direct_compile(&mut args)
+        }
+        "bootstrap-candidate-fresh-source" => {
+            bootstrap_component::parse_bootstrap_candidate_fresh_source(&mut args)
         }
         "bootstrap-preselect-candidate" => {
             bootstrap_component::parse_bootstrap_candidate_preselection(&mut args)
@@ -752,7 +757,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-candidate-compile-capability`, `bootstrap-candidate-direct-compile`, `bootstrap-preselect-candidate`, `bootstrap-sign-candidate-successor`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-dispatch-component`, `bootstrap-dispatch-compile`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-candidate-compile-capability`, `bootstrap-candidate-direct-compile`, `bootstrap-candidate-fresh-source`, `bootstrap-preselect-candidate`, `bootstrap-sign-candidate-successor`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-dispatch-component`, `bootstrap-dispatch-compile`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }
@@ -776,3 +781,7 @@ fn sanitize_path_label(raw: &str) -> String {
 #[cfg(test)]
 #[path = "cli_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "cli_bootstrap_candidate_fresh_source_tests.rs"]
+mod fresh_source_tests;

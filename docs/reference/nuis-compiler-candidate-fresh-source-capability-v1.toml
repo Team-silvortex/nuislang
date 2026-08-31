@@ -1,0 +1,105 @@
+protocol = "nuis-compiler-candidate-fresh-source-capability-v1"
+version = 1
+status = "usable-bounded-candidate-owned-fresh-source-front-end"
+scope = "one-canonical-source-snapshot-through-candidate-owned-source-token-ast-nir-yir-identities"
+manifest_name = "nuis.compiler-candidate-fresh-source-capability.toml"
+result_protocol = "nuis-bootstrap-candidate-fresh-source-result-v1"
+result_name = "nuis.compiler-candidate-fresh-source-result"
+snapshot_contract = "nuis-canonical-bootstrap-source-snapshot-v1"
+driver_contract = "nuis-stage1-candidate-canonical-fresh-source-driver-v1"
+abi_contract = "v8-exact-exports-reserved-fresh-source-ordinals-v1"
+input_contract = "single-canonical-utf8-lf-source-no-stage0-handoff-v1"
+argument_contract = "fresh-source-v1-command-plus-one-source-path-no-shell-v1"
+environment_contract = "cleared-process-environment-v1"
+stdin_contract = "closed-stdin-v1"
+native_contract = "front-end-stage-identities-only-no-native-materialization-v1"
+authority = "single-canonical-fresh-source-front-end-capability-only-no-replacement-or-selection"
+path_policy = "runtime-paths-never-enter-canonical-fields"
+stage0_handoff_required = false
+provider_dependency_required = false
+candidate_owned_source_processing = true
+direct_stage1_compile = true
+fresh_source_compile = true
+native_materialization = false
+replacement_authorized = false
+selection_authorized = false
+verdict = "candidate-owned-canonical-fresh-source-front-end-verified-no-native-or-selection-authority"
+
+frontdoor = "nuis bootstrap-candidate-fresh-source"
+candidate_production_protocol = "nuis-compiler-candidate-production-v11"
+predecessor_successor_protocol = "nuis-compiler-candidate-successor-v1"
+predecessor_contract = "canonical-source-and-proof-identity-anchor-no-authority-inheritance"
+source_bytes = 56
+source_lines = 5
+stage_count = 5
+result_lines = 18
+bundle_fold = 357450558
+
+[[stages]]
+ordinal = 0
+name = "source"
+record_count = 5
+identity = 12832741133
+
+[[stages]]
+ordinal = 1
+name = "tokens"
+record_count = 16
+identity = 8634151688
+
+[[stages]]
+ordinal = 2
+name = "ast"
+record_count = 5
+identity = 16043672006
+
+[[stages]]
+ordinal = 3
+name = "nir"
+record_count = 6
+identity = 12661455449
+
+[[stages]]
+ordinal = 4
+name = "yir"
+record_count = 6
+identity = 9279238763
+
+verification_order = [
+  "deep-verify-candidate-production-v11-and-stage1-image",
+  "parse-and-byte-rerender-the-canonical-successor-v1-source",
+  "stage-and-reread-the-exact-production-bound-adapter",
+  "execute-fresh-source-v1-with-closed-stdin-and-cleared-environment",
+  "parse-the-canonical-18-line-result",
+  "independently-rebuild-all-five-stage-identities-from-source-bytes",
+  "persist-create-new-result-and-capability",
+  "reread-and-replay-both-persisted-artifacts",
+]
+
+fail_closed = [
+  "noncanonical-utf8-lf-or-nonmatching-source-snapshot",
+  "candidate-production-image-adapter-or-successor-identity-drift",
+  "stage-count-identity-order-bundle-or-result-encoding-drift",
+  "nonzero-exit-nonempty-stderr-provider-or-stage0-handoff-claim",
+  "native-materialization-replacement-or-selection-claim",
+  "existing-output-or-post-write-reread-drift",
+]
+
+[honest_boundary]
+claim = "one-canonical-fresh-source-snapshot-is-consumed-by-the-stage1-candidate-without-a-preexisting-stage0-handoff-or-runtime-provider"
+does_not_claim = "general-source-parsing-serialized-general-purpose-ir-native-object-materialization-component-replacement-final-selection-or-self-hosting"
+next_step = "materialize-one-native-object-or-equivalent-nsld-input-from-this-canonical-snapshot-under-candidate-ownership"
+
+[open_boundary]
+missing = [
+  "candidate-owned-nir-yir-to-native-object-materialization",
+  "wider-source-grammar-and-general-stage-representations",
+  "signed-transition-that-replays-and-binds-this-capability",
+  "independent-remote-fresh-source-evidence",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_fresh_source -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --bin nuis parses_bootstrap_candidate_fresh_source_command -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]

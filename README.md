@@ -32,7 +32,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`780/780` passing drift checks. The compiler data model, stage0/stage1 driver,
+`786/786` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
 state close their previous weakest tasks. Dispatch v1 now resolves an unordered
@@ -52,8 +52,12 @@ fresh-source parsing, native materialization, and selection open.
 Candidate successor v1 now replays the complete generation-two and preselection
 chain, deep-verifies that direct result, and signs it into generation-three
 review under the continuing component-owner key. It is same-generation evidence
-strengthening only: fresh-source compilation, native materialization,
-replacement, and final selection all remain false.
+strengthening only: its own fresh-source, native-materialization, replacement,
+and final-selection claims remain false. The downstream fresh-source capability
+now drives one canonical 56-byte Nuis snapshot through candidate-owned source,
+token, AST, NIR, and YIR identities with no stage0 handoff or runtime provider;
+it remains a bounded front-end proof with native materialization and authority
+flags false.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native

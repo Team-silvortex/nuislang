@@ -219,6 +219,13 @@ than changing this producer contract. See
 [Nuis Compiler Candidate Direct Compile Capability](nuis-compiler-candidate-direct-compile-capability.md)
 and [Nuis Compiler Candidate Successor](nuis-compiler-candidate-successor.md).
 
+The adapter also exposes a disjoint `fresh-source-v1` mode. It passes one
+canonical source snapshot through reserved v8 export ordinals and emits five
+front-end stage identities without loading a stage0 handoff or compiler
+provider. This does not change production v11 or its original payload ABI; the
+separate capability binds the exact adapter bytes and predecessor identity. See
+[Nuis Compiler Candidate Fresh-Source Capability](nuis-compiler-candidate-fresh-source-capability.md).
+
 ## Current Limit
 
 V11 binds every token byte through deterministic pagination but still binds

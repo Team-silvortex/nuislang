@@ -5,6 +5,8 @@ mod clock_protocol;
 mod compiler_candidate_compile_capability;
 mod compiler_candidate_direct_compile;
 mod compiler_candidate_execution;
+mod compiler_candidate_fresh_source;
+mod compiler_candidate_fresh_source_result;
 mod compiler_candidate_frontend_result;
 mod compiler_candidate_preselection;
 mod compiler_candidate_production;
@@ -91,6 +93,30 @@ pub use compiler_candidate_execution::{
     CompilerCandidateExecutionInput, COMPILER_CANDIDATE_EXECUTION_AUTHORITY,
     COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_EXECUTION_PROTOCOL,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_RUNNER_CONTRACT,
+};
+pub use compiler_candidate_fresh_source::{
+    build_compiler_candidate_fresh_source_capability,
+    parse_compiler_candidate_fresh_source_capability,
+    parse_compiler_candidate_fresh_source_capability_from_source,
+    render_compiler_candidate_fresh_source_capability,
+    verify_compiler_candidate_fresh_source_capability, CompilerCandidateFreshSourceCapability,
+    CompilerCandidateFreshSourceCapabilityInput, COMPILER_CANDIDATE_FRESH_SOURCE_ABI_CONTRACT,
+    COMPILER_CANDIDATE_FRESH_SOURCE_ARGUMENT_CONTRACT, COMPILER_CANDIDATE_FRESH_SOURCE_AUTHORITY,
+    COMPILER_CANDIDATE_FRESH_SOURCE_CAPABILITY_FILE,
+    COMPILER_CANDIDATE_FRESH_SOURCE_CAPABILITY_PROTOCOL,
+    COMPILER_CANDIDATE_FRESH_SOURCE_DRIVER_CONTRACT,
+    COMPILER_CANDIDATE_FRESH_SOURCE_ENVIRONMENT_CONTRACT,
+    COMPILER_CANDIDATE_FRESH_SOURCE_INPUT_CONTRACT,
+    COMPILER_CANDIDATE_FRESH_SOURCE_NATIVE_CONTRACT, COMPILER_CANDIDATE_FRESH_SOURCE_VERDICT,
+};
+pub use compiler_candidate_fresh_source_result::{
+    build_compiler_candidate_fresh_source_result, parse_compiler_candidate_fresh_source_result,
+    parse_compiler_candidate_fresh_source_result_bytes,
+    parse_compiler_candidate_fresh_source_result_from_source,
+    render_compiler_candidate_fresh_source_result, CompilerCandidateFreshSourceResult,
+    CompilerCandidateFreshSourceStage, COMPILER_CANDIDATE_FRESH_SOURCE_RESULT_FILE,
+    COMPILER_CANDIDATE_FRESH_SOURCE_RESULT_PROTOCOL, COMPILER_CANDIDATE_FRESH_SOURCE_SNAPSHOT,
+    COMPILER_CANDIDATE_FRESH_SOURCE_SNAPSHOT_CONTRACT,
 };
 pub use compiler_candidate_frontend_result::{
     build_compiler_candidate_frontend_result, parse_compiler_candidate_frontend_result,

@@ -1,5 +1,5 @@
 name = "bootstrap_structural_projection_candidate"
 version = "0.1.0"
 entry = "main.ns"
-modules = ["main.ns"]
+modules = ["main.ns", "fresh_source.ns"]
 galaxy = ["std=workspace"]

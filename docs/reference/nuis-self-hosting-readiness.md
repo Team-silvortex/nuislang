@@ -293,6 +293,16 @@ fresh-source compilation, native materialization, replacement, and final
 selection remain false. See
 [Nuis Compiler Candidate Successor](nuis-compiler-candidate-successor.md).
 
+`nuis bootstrap-candidate-fresh-source` now crosses the next ownership boundary
+without mutating that signed successor. It stages the exact production-v11
+adapter, clears the environment, closes stdin, and drives one canonical
+56-byte Nuis snapshot through five candidate-owned source, token, AST, NIR, and
+YIR identities. The independent artifact implementation reproduces all counts,
+identities, and the bundle fold before create-new evidence is persisted. No
+stage0 handoff or runtime provider is loaded, while native materialization,
+replacement, and selection remain false. See
+[Nuis Compiler Candidate Fresh-Source Capability](nuis-compiler-candidate-fresh-source-capability.md).
+
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
 node/resource and edge membership indexes, and compiles SHA-256 proof hashing
@@ -356,8 +366,10 @@ production proof, provider dependency, and immutable generation-two transition
 under the continuing component-owner key. Direct capability v2 closes front-end
 execution without that runtime provider, and candidate successor v1 now signs
 the exact proof and result into generation three without mutating any
-predecessor. The candidate still does not own fresh-source parsing or native
-materialization. Remote direct-successor evidence also remains open.
+predecessor. The bounded fresh-source capability now gives the candidate
+ownership of one canonical source-to-YIR identity path, but it does not yet own
+general parsing or native materialization. Remote direct-successor and
+fresh-source evidence also remain open.
 Cryptography does not prove physical-machine
 independence; that remains an operational fact.
 
@@ -374,6 +386,7 @@ freeze subset and compiler data contracts
   -> prove direct stage1-owned compilation
   -> bind the direct proof into a signed generation-three successor
   -> prove candidate-owned fresh-source front-end compilation
+  -> prove candidate-owned native object materialization
   -> permit one reversible component replacement
 ```
 

@@ -66,6 +66,8 @@ Start in this order:
   - [nuis-compiler-candidate-preselection-v1.toml](nuis-compiler-candidate-preselection-v1.toml)
   - [nuis-compiler-candidate-successor.md](nuis-compiler-candidate-successor.md)
   - [nuis-compiler-candidate-successor-v1.toml](nuis-compiler-candidate-successor-v1.toml)
+  - [nuis-compiler-candidate-fresh-source-capability.md](nuis-compiler-candidate-fresh-source-capability.md)
+  - [nuis-compiler-candidate-fresh-source-capability-v1.toml](nuis-compiler-candidate-fresh-source-capability-v1.toml)
   - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
   - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
   - [nuis-compiler-component-representation-differential-v1.toml](nuis-compiler-component-representation-differential-v1.toml)

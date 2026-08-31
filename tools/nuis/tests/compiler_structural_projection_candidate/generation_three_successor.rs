@@ -3,8 +3,10 @@ use std::{fs, path::Path, process::Command};
 use nuis_artifact::{
     compiler_component_attester_trust_registry_sha256,
     compiler_component_replacement_authorizer_registry_sha256,
-    parse_compiler_candidate_direct_compile_capability, parse_compiler_candidate_successor,
-    COMPILER_CANDIDATE_SUCCESSOR_VERDICT,
+    parse_compiler_candidate_direct_compile_capability,
+    parse_compiler_candidate_fresh_source_capability, parse_compiler_candidate_fresh_source_result,
+    parse_compiler_candidate_successor, COMPILER_CANDIDATE_FRESH_SOURCE_VERDICT,
+    COMPILER_CANDIDATE_SUCCESSOR_FILE, COMPILER_CANDIDATE_SUCCESSOR_VERDICT,
 };
 
 use super::assert_success;
@@ -113,4 +115,94 @@ pub(super) fn assert_signed_direct_successor(
         fs::read(&delegated_capability).expect("reread delegated capability v1"),
         delegated_before
     );
+    assert_fresh_source_capability(output_dir, selected_root, &successor_path, output_dir_text);
+}
+
+fn assert_fresh_source_capability(
+    output_dir: &Path,
+    selected_root: &Path,
+    successor: &Path,
+    output_dir_text: &str,
+) {
+    let source =
+        Path::new("../../tests/fixtures/bootstrap/accepted/compiler_candidate_fresh_snapshot.ns");
+    let result_path = output_dir.join("candidate-fresh-source-result.txt");
+    let capability_path = output_dir.join("candidate-fresh-source-capability.toml");
+    let successor_before = fs::read(successor).expect("snapshot signed candidate successor");
+    let output = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-candidate-fresh-source")
+        .arg(selected_root)
+        .arg(successor)
+        .arg(source)
+        .arg(&result_path)
+        .arg(&capability_path)
+        .env(
+            "NUIS_BOOTSTRAP_STAGE0_PROVIDER_V1",
+            "/provider-must-not-be-observed",
+        )
+        .output()
+        .expect("execute candidate-owned fresh-source compiler");
+    assert_success(&output, "candidate-owned fresh-source compiler");
+
+    let result = parse_compiler_candidate_fresh_source_result(&result_path)
+        .expect("verify candidate fresh-source result");
+    assert_eq!(result.stages[1].record_count, 16);
+    assert_eq!(result.stages[2].record_count, 5);
+    assert_eq!(result.stages[3].record_count, 6);
+    assert_eq!(result.stages[4].record_count, 6);
+    assert_eq!(result.stages[1].identity, 8_634_151_688);
+    assert_eq!(result.stages[2].identity, 16_043_672_006);
+    assert_eq!(result.stages[3].identity, 12_661_455_449);
+    assert_eq!(result.stages[4].identity, 9_279_238_763);
+    assert_eq!(result.bundle_fold, 357_450_558);
+    assert!(!result.stage0_handoff_required);
+    assert!(result.candidate_owned_source_processing);
+    assert!(result.fresh_source_compile);
+    assert!(!result.native_materialization);
+
+    let capability = parse_compiler_candidate_fresh_source_capability(&capability_path)
+        .expect("verify candidate fresh-source capability");
+    assert_eq!(capability.verdict, COMPILER_CANDIDATE_FRESH_SOURCE_VERDICT);
+    assert_eq!(
+        capability.predecessor_successor_file,
+        COMPILER_CANDIDATE_SUCCESSOR_FILE
+    );
+    assert!(!capability.stage0_handoff_required);
+    assert!(!capability.provider_dependency_required);
+    assert!(capability.candidate_owned_source_processing);
+    assert!(capability.direct_stage1_compile);
+    assert!(capability.fresh_source_compile);
+    assert!(!capability.native_materialization);
+    assert!(!capability.replacement_authorized);
+    assert!(!capability.selection_authorized);
+    let capability_source =
+        fs::read_to_string(&capability_path).expect("read fresh-source capability source");
+    assert!(!capability_source.contains(output_dir_text));
+    assert_eq!(
+        fs::read(successor).expect("reread signed candidate successor"),
+        successor_before
+    );
+
+    let tampered_source = output_dir.join("candidate-fresh-source-tampered.ns");
+    let mut tampered = fs::read(source).expect("read canonical fresh-source snapshot");
+    let literal = tampered
+        .iter()
+        .position(|byte| *byte == b'7')
+        .expect("find canonical source literal");
+    tampered[literal] = b'8';
+    fs::write(&tampered_source, tampered).expect("write tampered fresh-source snapshot");
+    let rejected_result = output_dir.join("candidate-fresh-source-rejected.txt");
+    let rejected_capability = output_dir.join("candidate-fresh-source-rejected.toml");
+    let rejected = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-candidate-fresh-source")
+        .arg(selected_root)
+        .arg(successor)
+        .arg(&tampered_source)
+        .arg(&rejected_result)
+        .arg(&rejected_capability)
+        .output()
+        .expect("reject drifted fresh-source snapshot");
+    assert!(!rejected.status.success());
+    assert!(!rejected_result.exists());
+    assert!(!rejected_capability.exists());
 }

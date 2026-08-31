@@ -42,6 +42,8 @@ mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_compile_capability;
 mod bootstrap_candidate_direct_compile;
+mod bootstrap_candidate_fresh_source;
+mod bootstrap_candidate_fresh_source_adapter;
 mod bootstrap_candidate_preselection;
 mod bootstrap_candidate_probe;
 mod bootstrap_candidate_successor;
@@ -407,6 +409,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapCandidateDirectCompile(input) => {
             bootstrap_candidate_direct_compile::handle_bootstrap_candidate_direct_compile(input)?;
+        }
+        cli::CommandKind::BootstrapCandidateFreshSource(input) => {
+            bootstrap_candidate_fresh_source::handle_bootstrap_candidate_fresh_source(input)?;
         }
         cli::CommandKind::BootstrapPreselectCandidate(input) => {
             bootstrap_candidate_preselection::handle_bootstrap_preselect_candidate(input)?;

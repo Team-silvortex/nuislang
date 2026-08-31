@@ -3,16 +3,23 @@ use cpu StdCompilerData;
 use cpu StdCompilerTokenEmit;
 use cpu StdCompilerTokens;
 use cpu StdCompilerProjection;
+use cpu CandidateFreshSource;
 
 /// First Nuis-written consumer of the producer-neutral AST/NIR record model.
 mod cpu Main {
   @export(name = "nuis_bootstrap_candidate_stage_seed_v1")
   fn compiler_candidate_stage_seed(ordinal: i64) -> i64 {
+    if ordinal >= 10 && ordinal < 15 {
+      return candidate_fresh_stage_seed(ordinal - 10);
+    }
     return 97 + ((ordinal + 1) * 17);
   }
 
   @export(name = "nuis_bootstrap_candidate_stage_fold_v1")
   fn compiler_candidate_stage_fold(state: i64, ordinal: i64, byte: i64) -> i64 {
+    if ordinal >= 10 && ordinal < 15 {
+      return candidate_fresh_stage_step(state, ordinal - 10, byte);
+    }
     return ((state * 257) + byte + ordinal + 1) % 2147483629;
   }
 
@@ -23,6 +30,12 @@ mod cpu Main {
 
   @export(name = "nuis_bootstrap_candidate_bundle_fold_v1")
   fn compiler_candidate_bundle_fold(state: i64, ordinal: i64, stage_fold: i64) -> i64 {
+    if ordinal >= 20 && ordinal < 25 {
+      return candidate_fresh_stage_record_count(state, ordinal - 20);
+    }
+    if ordinal >= 30 && ordinal < 35 {
+      return candidate_fresh_stage_finish(state, ordinal - 30);
+    }
     return ((state * 65537) + stage_fold + ordinal + 1) % 2147483629;
   }
 

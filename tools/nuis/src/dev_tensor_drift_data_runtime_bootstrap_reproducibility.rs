@@ -667,7 +667,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "Candidate compile capability v2 now deep-verifies that production lineage",
             "Canonical recursive owned-struct layouts now have one bounded parser",
             "deterministic coordinate ordering remains at `compiler-toolchain/bootstrap/stage0-stage1-driver`",
-            "candidate successor v1 now signs the direct no-runtime-provider front-end proof",
+            "fresh-source capability v1 now binds the immutable signed-successor identity",
         ],
     },
     DevTensorDriftCheckSpec {

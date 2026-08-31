@@ -115,8 +115,8 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert_eq!(production.ast_page_state_hash, 1_349_056_749);
     assert_eq!(production.ast_page_identity, 174_028_320_749);
     assert_eq!(production.ast_page_cursor_identity, 1_136_712_771);
-    assert_eq!(production.ast_continuation_page_identity, 149_528_711_957);
-    assert_eq!(production.ast_continuation_cursor_identity, 1_472_919_348);
+    assert_eq!(production.ast_continuation_page_identity, 50_235_927_296);
+    assert_eq!(production.ast_continuation_cursor_identity, 594_036_323);
     assert_eq!(production.nir_page_record_count, 4);
     assert_eq!(production.nir_page_bytes, 128);
     assert_eq!(production.nir_page_projection_hash, 568_515_310);
@@ -126,8 +126,8 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert_eq!(production.nir_page_state_hash, 1_026_894_471);
     assert_eq!(production.nir_page_identity, 132_469_386_887);
     assert_eq!(production.nir_page_cursor_identity, 754_343_074);
-    assert_eq!(production.nir_continuation_page_identity, 146_705_724_977);
-    assert_eq!(production.nir_continuation_cursor_identity, 38_998_897);
+    assert_eq!(production.nir_continuation_page_identity, 38_763_668_594);
+    assert_eq!(production.nir_continuation_cursor_identity, 1_094_258_016);
     assert_eq!(
         production.stage_transformations_file,
         COMPILER_STAGE_TRANSFORMATION_FILE
@@ -163,16 +163,16 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
             1,
             174_028_320_749,
             1_136_712_771,
-            149_528_711_957,
-            1_472_919_348,
+            50_235_927_296,
+            594_036_323,
         ),
         (
             nir_transformation,
             2,
             132_469_386_887,
             754_343_074,
-            146_705_724_977,
-            38_998_897,
+            38_763_668_594,
+            1_094_258_016,
         ),
     ] {
         assert_eq!(record.output_word_count, 22);
