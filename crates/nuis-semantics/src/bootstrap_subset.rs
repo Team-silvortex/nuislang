@@ -27,6 +27,7 @@ pub const BOOTSTRAP_PRIMITIVE_TYPES: &[&str] = &["bool", "i64", "text"];
 pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerArena",
     "CompilerAggregateArena",
+    "CompilerChunkedPayload",
     "CompilerDiagnostic",
     "CompilerDecimalState",
     "CompilerMap",

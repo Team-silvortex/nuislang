@@ -10,7 +10,7 @@ backends, but they do not define the language model.
 
 ## Current Line
 
-The repository is on `beta-0.8.*`. Git history is the authoritative source for
+The repository is on `beta-0.9.*`. Git history is the authoritative source for
 the exact patch checkpoint; the independent Cargo package versions are not the
 project release number yet.
 
@@ -32,12 +32,11 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`740/740` passing drift checks. The stage0/stage1 driver and
-differential/reproducibility gate are `usable/99`; the stage-neutral boundary
-now joins them at `usable/99`, while compiler data model v9 remains
-`usable/98`. Real AST plus NIR derived-stage selection closes the previous
-stage-neutral task, so deterministic coordinate ordering advances to the
-compiler data model.
+`743/743` passing drift checks. The compiler data model, stage0/stage1 driver,
+differential/reproducibility gate, and stage-neutral boundary are all
+`usable/99`. Chunked typed payload projection and canonical reversible active
+state close their previous weakest tasks, so deterministic coordinate ordering
+now advances the stage driver toward a signed generation-two transition.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -46,7 +45,7 @@ compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
 `nuis bootstrap-status` frontdoor reports `1/5` gates closed. Compiler data
-model v9 now materializes four owned token records per bounded window, emits
+model v10 now materializes four owned token records per bounded window, emits
 the canonical 59-byte fixture plus the real candidate's 91-byte
 `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
@@ -58,9 +57,11 @@ stores 18 bytes across two logical pages through `CompilerPagedTextArena`,
 then registers canonical text and fixed-width source-span payload kinds. The
 shared aggregate arena stores 20 bytes, projects both values across the page
 boundary, and pins registry identity `1630830726`, page identities `934788601`
-and `1229397900`, plus complete identity `1274791798`, before executing
-natively at deterministic score `130`; the producer-neutral stage boundary is
-now `usable`, `98/100`. Its shared structural codec independently parses
+and `1229397900`, plus complete identity `1274791798`. It then registers a
+24-byte `CompilerChunkedPayload`, projects it from a 44-byte three-page arena,
+and pins typed identity `94500080`, extended registry identity `1593840720`,
+and complete identity `551151124` before executing natively at deterministic
+score `130`; the compiler data boundary is now `usable`, `99/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
@@ -115,7 +116,12 @@ The separate `bootstrap-authorize-component-replacement` and
 component-scoped registry pin, challenge, identity, and Ed25519 key. They reject
 attester identity or key reuse and bind one generation-one stage0-to-candidate
 transition with stage0 retained as rollback. The signed record grants exact
-permission but does not yet switch active compiler state.
+permission without changing the attestation. `bootstrap-activate-component`
+now repeats both pinned trust checks and derives a canonical active-state record
+whose provider-neutral selector resolves the candidate as `active` and the
+original stage0 build as `rollback`; authorization and attestation bytes remain
+immutable. A signed generation-two transition and execution through the
+selected compiler image remain open.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -132,12 +138,14 @@ The first GNU resolver providers and symbol-version rows now belong to
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
-execution proof, paged compiler data, first attested stage1 leaf, and
+execution proof, chunked compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
-routes mainline work to paged compiler payload storage. The v11 production
+routes mainline work to a signed generation-two transition beyond the
+reversible active-component selector. The v11 production
 lineage now has checked-in challenge-bound Ed25519 attester evidence and a
-separate genesis replacement-authorization protocol. Authorization consumption,
-a signed rollback chain, broader compiler-data paging, Galaxy
+separate genesis replacement-authorization protocol. Authorization consumption
+is closed by canonical active-state v1; a signed rollback chain, broader
+compiler-data paging, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 

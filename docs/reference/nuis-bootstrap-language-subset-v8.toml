@@ -24,6 +24,7 @@ approved_external_types = [
   "CompilerText",
   "CompilerTextArena",
   "CompilerAggregateArena",
+  "CompilerChunkedPayload",
   "CompilerPayloadBuffer",
   "CompilerPayloadRegistry",
   "CompilerPagedTextArena",

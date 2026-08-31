@@ -40,8 +40,10 @@ and authorization IDs, authorizer role, candidate compiler image, and native
 output. It is created with `create_new` and cannot silently overwrite an older
 authorization.
 
-The record says permission exists; it does not apply the transition. There is
-no active-component state mutation in v1.
+The authorization record says permission exists; it does not itself apply the
+transition. The separate
+[active-component state v1](nuis-compiler-component-active-state-v1.toml)
+consumes a verified record without changing these v1 bytes.
 
 ## Signing Frontdoor
 
@@ -82,6 +84,26 @@ Wrong challenges, changed pins, revoked keys, component drift, lineage drift,
 same-role keys, transition drift, proof changes, and signature changes fail
 closed.
 
+## Active-State Consumer
+
+After verification, the same pinned inputs can derive one canonical state:
+
+```bash
+nuis bootstrap-activate-component \
+  <aggregate> <attestation> \
+  <attester-registry> <attester-registry-sha256> \
+  <attestation-challenge-sha256> <authorization> \
+  <authorizer-registry> <authorizer-registry-sha256> \
+  <authorization-challenge-sha256> <active-state-output>
+```
+
+The frontdoor repeats both trust-domain checks before creating a new file. Its
+provider-neutral selector resolves `active` to the stage1 candidate build and
+`rollback` to the exact stage0 build retained by the authorization. State,
+authorization, and attestation files are never overwritten. Re-deriving the
+same authorization yields the same state identity rather than a second logical
+transition.
+
 ## Honest Boundary
 
 The repository regression combines the checked-in Linux amd64 generation-one
@@ -89,15 +111,16 @@ attestation with a temporary local component-owner key. This proves protocol
 composition and role separation, not an independently operated release-owner
 ceremony.
 
-The next step is an active-component state record that consumes one verified
-authorization and retains a signed rollback path. Generation-two rollback or
-forward transitions, threshold authorization, and checked-in operational
-authorizer evidence remain open.
+The repository now proves a canonical active-component state consumer with an
+exact stage0 rollback selection. A signed generation-two rollback or forward
+transition, runtime execution through the selected compiler image, threshold
+authorization, and checked-in operational authorizer evidence remain open.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_active_state -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_replacement_commands -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1
 ```

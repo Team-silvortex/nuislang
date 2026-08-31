@@ -1,0 +1,139 @@
+protocol = "nuis-compiler-data-model-v10"
+version = 10
+predecessor = "nuis-compiler-data-model-v9"
+status = "usable-chunked-typed-aggregate-arena"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_payload.ns",
+  "stdlib/std/lib/compiler_payload_registry.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v10"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+bootstrap_scalar_export_count = 21
+candidate_production = "nuis-compiler-candidate-production-v11"
+derived_stage_selection = "nuis-compiler-stage-handoff-v2"
+host_layout_identity = false
+host_ffi_required = false
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+example_fixture = "examples/projects/tooling/bootstrap_compiler_data_model_demo/payload_registry_fixture.ns"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[chunked_payload]
+protocol = "nuis-compiler-chunked-payload-v1"
+type = "CompilerChunkedPayload"
+kind = 3
+schema = 103
+descriptor = 3296
+fixed_length = -1
+storage = "CompilerPayloadBuffer"
+maximum_payload_bytes = 128
+logical_page_bytes = 16
+maximum_pages = 8
+copy_contract = "eight-fixed-sixteen-byte-Nuis-chunks"
+projection_contract = "fresh-owned-CompilerPayloadBuffer-range"
+identity_contract = "nuis-compiler-chunked-payload-identity-v1"
+identity_seed = 467
+identity_radix = 257
+identity_modulus = 2147483629
+reference_payload = "nuis-compiler-payload-v1"
+reference_payload_bytes = 24
+reference_page_count = 2
+reference_page0_identity = 1042165038
+reference_page1_identity = 957262363
+reference_identity = 94500080
+
+operations = [
+  "compiler_payload_copy_buffer_range",
+  "compiler_chunked_payload",
+  "compiler_chunked_payload_shape_valid",
+  "compiler_chunked_payload_identity",
+  "compiler_aggregate_arena_store_payload",
+  "compiler_aggregate_arena_get_payload",
+  "compiler_aggregate_arena_store_chunked",
+  "compiler_aggregate_arena_get_chunked",
+]
+
+invariants = [
+  "source-range-and-target-capacity-validate-before-copy",
+  "copy-and-projection-use-no-host-collection-pointer-or-layout",
+  "typed-identity-binds-length-page-count-and-every-page-identity",
+  "projection-returns-a-fresh-owned-packed-buffer",
+  "forged-shape-identity-fails-before-observable-mutation",
+]
+
+[extended_registry]
+protocol = "nuis-compiler-payload-kind-registry-v1"
+reference_kind_count = 3
+reference_text_descriptor = 3232
+reference_source_span_descriptor = 3277
+reference_chunked_descriptor = 3296
+reference_identity = 1593840720
+preserved_v9_two_kind_identity = 1630830726
+
+[extended_aggregate_arena]
+protocol = "nuis-compiler-registered-aggregate-arena-v1"
+reference_object_count = 3
+reference_payload_bytes = 44
+reference_chunked_record_index = 2
+reference_chunked_record_start = 20
+reference_chunked_record_length = 24
+reference_envelope_identity = 1520342505
+reference_page_count = 3
+reference_page0_identity = 934788601
+reference_page1_identity = 1001962162
+reference_page2_identity = 1407376619
+reference_identity = 551151124
+
+atomic_failures = [
+  "forged-chunked-identity-returns-error-three-without-changing-the-input-arena",
+  "full-object-capacity-returns-error-one-without-changing-the-input-arena",
+]
+
+[preserved_v9]
+registry_identity = 1630830726
+aggregate_envelope_identity = 1109161393
+aggregate_page0_identity = 934788601
+aggregate_page1_identity = 1229397900
+aggregate_identity = 1274791798
+source_span_identity = 1383365918
+paged_text_identity = 322532187
+typed_text_arena_identity = 1643761726
+arena_identity = 1064756829
+map_identity = 415394959
+legacy_first_page_identity = 164749511446
+
+[bootstrap_surface]
+new_language_capabilities = 0
+new_scalar_exports = 0
+new_approved_imports = []
+new_approved_data_types = ["CompilerChunkedPayload"]
+frozen_scalar_export_ceiling = 21
+
+[growth_boundary]
+status = "open"
+next_contract = "nested-complete-aggregate-forwarding"
+remaining = [
+  "the-shared-payload-column-remains-bounded-to-eight-logical-pages",
+  "CompilerMap-and-CompilerArena-remain-bounded-to-sixteen-entries",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance",
+  "nested-forwarding-of-the-full-aggregate-arena-remains-a-lowering-boundary",
+  "production-binds-only-two-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+]
+preserve = [
+  "stable-arena-indices",
+  "atomic-envelope-and-payload-storage",
+  "canonical-v9-and-v10-identities",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-twenty-one-export-ceiling",
+]

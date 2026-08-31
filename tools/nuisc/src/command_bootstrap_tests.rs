@@ -389,6 +389,7 @@ fn machine_readable_contract_tracks_the_executable_policy() {
         "cpu/StdCompilerPayloadRegistry",
         "cpu/StdCompilerTokenEmit",
         "CompilerAggregateArena",
+        "CompilerChunkedPayload",
         "CompilerDecimalState",
         "CompilerPagedTextArena",
         "CompilerPayloadBuffer",

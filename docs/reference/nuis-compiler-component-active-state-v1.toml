@@ -1,0 +1,80 @@
+protocol = "nuis-compiler-component-active-state-v1"
+version = 1
+status = "usable-genesis-active-component-state"
+scope = "one-verified-compiler-component-activation-with-stage0-rollback-selection"
+manifest_name = "nuis.compiler-component-active-state.toml"
+authority = "verified-replacement-authorization-consumer"
+selection_contract = "nuis-compiler-active-component-selector-v1"
+authorization_protocol = "nuis-compiler-component-replacement-authorization-v1"
+authorization_action = "activate-candidate"
+digest = "sha256-lowercase"
+path_policy = "no-physical-paths-or-timestamps-in-active-state"
+generation = 1
+predecessor_state_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+active_selector = "active"
+active_stage_role = "stage1-candidate"
+rollback_selector = "rollback"
+rollback_stage_role = "stage0"
+reversible = true
+verdict = "candidate-active-stage0-rollback-retained"
+
+frontdoors = [
+  "nuis bootstrap-activate-component",
+]
+
+bound_authorization_fields = [
+  "canonical-authorization-file-byte-length-and-sha256",
+  "authorization-protocol-id-generation-and-predecessor",
+  "authorization-proof-sha256",
+  "authorization-attestation-proof-sha256",
+  "candidate-active-reproducible-build-sha256",
+  "candidate-compiler-image-sha256",
+  "stage0-rollback-reproducible-build-sha256",
+  "equivalent-native-output-sha256",
+]
+
+[consumption]
+verification = "repeat-both-caller-pinned-attester-and-authorizer-trust-domain-checks"
+authorization_source_mutated = false
+attestation_source_mutated = false
+output_creation = "create-new-without-overwrite"
+state_derivation = "deterministic-from-one-canonical-verified-authorization"
+duplicate_derivation_effect = "same-state-identity-not-a-second-transition"
+
+[selection]
+active_result = "authorization-to-reproducible-build-sha256"
+rollback_result = "authorization-from-and-rollback-reproducible-build-sha256"
+active_and_rollback_must_differ = true
+selector_is_provider_neutral = true
+selector_mutates_state = false
+
+verification_invariants = [
+  "the-authorization-is-cryptographically-verified-before-state-construction",
+  "the-canonical-authorization-source-hash-and-proof-are-recomputed",
+  "the-attestation-proof-is-copied-from-the-immutable-authorization-lineage",
+  "active-selects-stage1-candidate-and-rollback-selects-stage0",
+  "rollback-exactly-retains-the-authorized-stage0-build-identity",
+  "state-identity-covers-every-field-with-length-prefixed-sha256",
+  "unknown-selector-state-tampering-or-authorization-drift-fails-closed",
+  "an-existing-output-is-never-overwritten",
+]
+
+[honest_boundary]
+claim = "one-verified-genesis-authorization-has-a-canonical-reversible-active-state-consumer"
+does_not_claim = "a-signed-generation-two-rollback-transition-or-stage1-self-hosting"
+repository_test_scope = "checked-in-linux-amd64-attestation-plus-temporary-local-component-owner-key"
+next_step = "sign-and-consume-generation-two-rollback-or-forward-transition-with-predecessor-state-lineage"
+
+[open_boundary]
+missing = [
+  "signed-generation-two-rollback-or-forward-transition-chain",
+  "checked-in-independent-component-owner-authorization-evidence",
+  "multi-component-and-threshold-authorizer-policy",
+  "runtime-stage-driver-execution-through-the-selected-compiler-image",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_active_state -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_replacement_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1",
+]

@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("compiler-data-model")
+            Some("stage0-stage1-driver")
         );
     }
 
@@ -520,8 +520,8 @@ mod tests {
     #[test]
     fn stable_status_requires_exactly_one_hundred_progress() {
         let invalid = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 98",
-            "status = \"stable\"\nprogress = 98",
+            "status = \"usable\"\nprogress = 99",
+            "status = \"stable\"\nprogress = 99",
             1,
         );
         let error = parse_bootstrap_readiness(&invalid).expect_err("status drift must fail");
@@ -530,7 +530,7 @@ mod tests {
 
     #[test]
     fn next_gate_follows_status_progress_coordinate_order() {
-        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 98", "progress = 94", 1);
+        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 99", "progress = 94", 1);
         let report = parse_bootstrap_readiness(&adjusted).expect("manifest parses");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),

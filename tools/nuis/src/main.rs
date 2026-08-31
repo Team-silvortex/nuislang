@@ -436,6 +436,9 @@ fn run() -> Result<(), String> {
         cli::CommandKind::BootstrapVerifyComponentReplacement(input) => {
             bootstrap_component_replacement::handle_bootstrap_verify_component_replacement(input)?
         }
+        cli::CommandKind::BootstrapActivateComponent(input) => {
+            bootstrap_component_replacement::handle_bootstrap_activate_component(input)?
+        }
         cli::CommandKind::BootstrapDiff {
             stage0_record,
             candidate_record,

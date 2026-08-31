@@ -1,5 +1,5 @@
 protocol = "nuis-self-hosting-readiness-v1"
-release_line = "beta-0.8.*"
+release_line = "beta-0.9.*"
 migration_start = "beta-0.10.*"
 completion_window_start = "gamma-0.5.*"
 completion_window_end = "gamma-0.10.*"
@@ -20,12 +20,12 @@ blocker = "none for subset v8; chunked individual aggregate projection and aggre
 id = "compiler-data-model"
 coordinate = "standard-library/std/compiler-data-model"
 status = "usable"
-progress = 98
+progress = 99
 required_before = "beta-0.10.0"
-next_action = "design chunked individual typed-payload projection while preserving v9 registration, stable indices, canonical identity, and atomic stores"
+next_action = "forward one complete v10 CompilerAggregateArena through a nested Nuis helper while preserving registry provenance, stable indices, canonical identity, and atomic failure"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-data-model-v9 with registered CompilerText and CompilerSourceSpan projections sharing a 20-byte cross-page arena, stable indices, canonical identities, and native exit 130"
-blocker = "v9 registers text and source-span codecs over eight canonical pages, but one payload and collection indices remain bounded to sixteen, defining-module provenance and nested full-arena forwarding are incomplete, and general aggregate loop backedges remain open"
+expected_artifact = "nuis-compiler-data-model-v10 with one registered 24-byte CompilerChunkedPayload projected across three aggregate pages, exact v9/v10 identities, atomic failures, and native exit 130"
+blocker = "v10 closes individual payloads larger than sixteen bytes, but collection indices remain bounded to sixteen, defining-module provenance and nested full-arena forwarding are incomplete, and general aggregate loop backedges remain open"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"
@@ -44,10 +44,10 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
 required_before = "beta-0.10.0"
 progress = 99
-next_action = "consume one verified genesis authorization through a reversible active-component selector without mutating its attestation or losing the stage0 rollback target"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
-expected_artifact = "candidate production v11 and two clean roots beneath a checked-in attestation plus a separately pinned component-owner authorization that binds stage0 to candidate and retains stage0 as rollback"
-blocker = "genesis authorization is cryptographically separate from attester trust and verifies end to end, but no active-component state record consumes it and no signed generation-two rollback transition exists"
+next_action = "define one signed generation-two rollback transition that binds the predecessor authorization proof and active-state identity while preserving deterministic restoration of stage0"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_active_state -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
+expected_artifact = "one canonical active-component state derived only after both trust-domain checks, selecting stage1-candidate as active and retaining the exact stage0 reproducible build under a provider-neutral rollback selector without mutating signed evidence"
+blocker = "one verified genesis authorization derives a reversible active state, but no signed generation-two transition consumes the predecessor authorization and state identities, and the runtime driver does not yet execute through the selected compiler image"
 
 [[gates]]
 id = "differential-reproducibility-gate"

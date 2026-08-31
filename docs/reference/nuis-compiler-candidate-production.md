@@ -223,9 +223,10 @@ exact aggregate to an environment-scoped Ed25519 key under an externally
 pinned trust registry. Repository coverage uses a same-machine test key, so a
 real independently provisioned attester run is now checked in. The separate
 replacement-authorization v1 frontdoor composes that evidence with a distinct
-component-owner key and rollback target, but no consumer switches the active
-compiler yet. A `13/13` report or verified witness remains evidence, not
-permission by itself.
+component-owner key and rollback target. Active-state v1 now consumes that
+verified permission into a canonical candidate-active/stage0-rollback selector
+without changing either signed source. A `13/13` report or verified witness
+remains evidence, not permission by itself.
 
 ## Validation
 

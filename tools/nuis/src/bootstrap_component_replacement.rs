@@ -6,12 +6,15 @@ use std::{
 };
 
 use nuis_artifact::{
-    build_compiler_component_replacement_authorization, parse_compiler_component_attestation,
-    parse_compiler_component_replacement_authorization,
+    build_compiler_component_active_state, build_compiler_component_replacement_authorization,
+    parse_compiler_component_attestation, parse_compiler_component_replacement_authorization,
     parse_compiler_component_replacement_authorizer_registry,
-    parse_compiler_component_reproducibility, render_compiler_component_replacement_authorization,
-    verify_compiler_component_attestation, verify_compiler_component_replacement_authorization,
-    CompilerComponentReplacementAuthorizationInput, CompilerComponentReplacementVerificationInput,
+    parse_compiler_component_reproducibility, render_compiler_component_active_state,
+    render_compiler_component_replacement_authorization, select_compiler_component_active_target,
+    verify_compiler_component_active_state, verify_compiler_component_attestation,
+    verify_compiler_component_replacement_authorization, CompilerComponentActiveSelection,
+    CompilerComponentReplacementAuthorization, CompilerComponentReplacementAuthorizationInput,
+    CompilerComponentReplacementVerificationInput,
 };
 
 pub(crate) const COMPILER_REPLACEMENT_SIGNING_KEY_ENV: &str =
@@ -44,6 +47,12 @@ pub(crate) struct BootstrapComponentReplacementVerificationInput {
     pub(crate) authorizer_registry: PathBuf,
     pub(crate) authorizer_registry_sha256: String,
     pub(crate) authorization_challenge_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BootstrapComponentActivationInput {
+    pub(crate) verification: BootstrapComponentReplacementVerificationInput,
+    pub(crate) output: PathBuf,
 }
 
 pub(crate) fn handle_bootstrap_authorize_component_replacement(
@@ -121,6 +130,67 @@ pub(crate) fn handle_bootstrap_authorize_component_replacement(
 pub(crate) fn handle_bootstrap_verify_component_replacement(
     input: BootstrapComponentReplacementVerificationInput,
 ) -> Result<(), String> {
+    let (authorization, _) = verify_replacement_input(&input)?;
+
+    println!("bootstrap component replacement: verified");
+    println!("  component_id: {}", authorization.component_id);
+    println!("  authorization_id: {}", authorization.authorization_id);
+    println!("  authorizer_id: {}", authorization.authorizer_id);
+    println!("  action: {}", authorization.action);
+    println!("  reversible: true");
+    println!("  replacement_authorized: true");
+    Ok(())
+}
+
+pub(crate) fn handle_bootstrap_activate_component(
+    input: BootstrapComponentActivationInput,
+) -> Result<(), String> {
+    let (authorization, authorization_source) = verify_replacement_input(&input.verification)?;
+    let state = build_compiler_component_active_state(&authorization, &authorization_source)
+        .map_err(|error| format!("failed to build compiler active-component state: {error}"))?;
+    verify_compiler_component_active_state(&state, &authorization, &authorization_source).map_err(
+        |error| format!("failed to self-verify compiler active-component state: {error}"),
+    )?;
+    let active = select_compiler_component_active_target(
+        &state,
+        &authorization,
+        &authorization_source,
+        CompilerComponentActiveSelection::Active,
+    )
+    .map_err(|error| format!("failed to select active compiler component: {error}"))?;
+    let rollback = select_compiler_component_active_target(
+        &state,
+        &authorization,
+        &authorization_source,
+        CompilerComponentActiveSelection::Rollback,
+    )
+    .map_err(|error| format!("failed to select rollback compiler component: {error}"))?;
+    write_new(
+        &input.output,
+        render_compiler_component_active_state(&state).as_bytes(),
+    )?;
+
+    println!("bootstrap compiler component: activated");
+    println!("  component_id: {}", state.component_id);
+    println!("  state_sha256: {}", state.state_sha256);
+    println!("  active_stage_role: {}", active.stage_role);
+    println!(
+        "  active_reproducible_build_sha256: {}",
+        active.reproducible_build_sha256
+    );
+    println!("  rollback_stage_role: {}", rollback.stage_role);
+    println!(
+        "  rollback_reproducible_build_sha256: {}",
+        rollback.reproducible_build_sha256
+    );
+    println!("  reversible: true");
+    println!("  active_state: {}", input.output.display());
+    Ok(())
+}
+
+fn verify_replacement_input(
+    input: &BootstrapComponentReplacementVerificationInput,
+) -> Result<(CompilerComponentReplacementAuthorization, String), String> {
     let sources = read_sources(
         &input.aggregate,
         &input.attestation,
@@ -139,6 +209,8 @@ pub(crate) fn handle_bootstrap_verify_component_replacement(
             .map_err(|error| format!("failed to parse replacement authorizer registry: {error}"))?;
     let authorization = parse_compiler_component_replacement_authorization(&input.authorization)
         .map_err(|error| format!("failed to parse compiler replacement authorization: {error}"))?;
+    let authorization_source =
+        read_text(&input.authorization, "compiler replacement authorization")?;
 
     verify_compiler_component_replacement_authorization(
         &authorization,
@@ -158,15 +230,7 @@ pub(crate) fn handle_bootstrap_verify_component_replacement(
         },
     )
     .map_err(|error| format!("failed to verify compiler replacement authorization: {error}"))?;
-
-    println!("bootstrap component replacement: verified");
-    println!("  component_id: {}", authorization.component_id);
-    println!("  authorization_id: {}", authorization.authorization_id);
-    println!("  authorizer_id: {}", authorization.authorizer_id);
-    println!("  action: {}", authorization.action);
-    println!("  reversible: true");
-    println!("  replacement_authorized: true");
-    Ok(())
+    Ok((authorization, authorization_source))
 }
 
 struct Sources {

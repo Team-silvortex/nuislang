@@ -93,8 +93,9 @@ equivalence, while attestation v1 supplies the cryptographic external-witness
 boundary. The repository now retains one separately operated Linux amd64
 attester generation with two cache-bypassed `13/13` runs, an exact registry
 pin, and a no-private-key verification regression. Cryptography still cannot
-prove physical-machine independence, and reversible replacement authorization
-consumption plus a signed rollback chain remain open.
+prove physical-machine independence. Canonical active-state v1 closes genesis
+authorization consumption while a signed generation-two rollback chain remains
+open.
 
 ## Validation
 

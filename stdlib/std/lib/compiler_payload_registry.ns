@@ -12,12 +12,22 @@ mod cpu StdCompilerPayloadRegistry {
     pub payload: CompilerPayloadBuffer
   }
 
+  /// One canonical typed payload that may span all eight logical pages.
+  pub struct CompilerChunkedPayload {
+    pub bytes: CompilerPayloadBuffer,
+    pub identity: i64
+  }
+
   pub fn compiler_payload_schema_text() -> i64 {
     return 101;
   }
 
   pub fn compiler_payload_schema_source_span() -> i64 {
     return 102;
+  }
+
+  pub fn compiler_payload_schema_chunked() -> i64 {
+    return 103;
   }
 
   pub fn compiler_payload_descriptor(
@@ -144,7 +154,7 @@ mod cpu StdCompilerPayloadRegistry {
     let descriptor: i64 = compiler_payload_registry_descriptor_or(
       registry, kind, -1
     );
-    if descriptor < 0 || start != expected_start || length < 0 || length > 16
+    if descriptor < 0 || start != expected_start || length < 0 || length > 128
       || shape_identity < 0 || length > value.payload.length - start {
       return false;
     }
@@ -212,6 +222,37 @@ mod cpu StdCompilerPayloadRegistry {
     return Result.Ok(CompilerAggregateArena { arena: arena, payload: payload });
   }
 
+  pub fn compiler_aggregate_arena_store_payload(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    bytes: CompilerPayloadBuffer,
+    shape_identity: i64
+  ) -> Result<CompilerAggregateArena, i64> {
+    if compiler_aggregate_arena_shape_valid(value, registry) == false
+      || compiler_payload_shape_valid(bytes) == false || shape_identity < 0 {
+      return Result.Err(3);
+    }
+    let descriptor: i64 = compiler_payload_registry_descriptor_or(
+      registry, kind, -1
+    );
+    if descriptor < 0 { return Result.Err(2); }
+    let fixed_length: i64 = compiler_payload_descriptor_fixed_length(descriptor);
+    if fixed_length >= 0 && fixed_length != bytes.length { return Result.Err(3); }
+    if value.arena.next_index >= value.arena.capacity
+      || value.payload.length + bytes.length > 128 {
+      return Result.Err(1);
+    }
+    let start: i64 = value.payload.length;
+    let payload: CompilerPayloadBuffer = compiler_payload_copy_buffer_range(
+      bytes, 0, bytes.length, value.payload
+    )?;
+    let arena: CompilerArena = compiler_arena_store(
+      value.arena, kind, start, bytes.length, shape_identity
+    )?;
+    return Result.Ok(CompilerAggregateArena { arena: arena, payload: payload });
+  }
+
   pub fn compiler_aggregate_arena_get_bytes(
     value: CompilerAggregateArena,
     registry: CompilerPayloadRegistry,
@@ -227,6 +268,25 @@ mod cpu StdCompilerPayloadRegistry {
     let start: i64 = compiler_map_vector_value(value.arena.field0s, index);
     let length: i64 = compiler_map_vector_value(value.arena.field1s, index);
     return compiler_payload_to_vector(value.payload, start, length);
+  }
+
+  pub fn compiler_aggregate_arena_get_payload(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    index: i64,
+    expected_kind: i64
+  ) -> Result<CompilerPayloadBuffer, i64> {
+    if compiler_aggregate_arena_shape_valid(value, registry) == false {
+      return Result.Err(3);
+    }
+    if index < 0 || index >= value.arena.next_index { return Result.Err(2); }
+    let kind: i64 = compiler_map_vector_value(value.arena.kinds, index);
+    if kind != expected_kind { return Result.Err(2); }
+    let start: i64 = compiler_map_vector_value(value.arena.field0s, index);
+    let length: i64 = compiler_map_vector_value(value.arena.field1s, index);
+    return compiler_payload_copy_buffer_range(
+      value.payload, start, length, compiler_payload_empty()
+    );
   }
 
   pub fn compiler_aggregate_identity_pages(
@@ -262,6 +322,92 @@ mod cpu StdCompilerPayloadRegistry {
     return Result.Ok(compiler_aggregate_identity_pages(
       value.payload, 0, page_count, page_fold
     ));
+  }
+
+  pub fn compiler_chunked_payload_identity_pages(
+    bytes: CompilerPayloadBuffer,
+    ordinal: i64,
+    page_count: i64,
+    identity: i64
+  ) -> i64 {
+    if ordinal >= page_count { return identity; }
+    let page_identity: i64 = compiler_payload_page_identity_raw(bytes, ordinal);
+    return compiler_chunked_payload_identity_pages(
+      bytes,
+      ordinal + 1,
+      page_count,
+      compiler_map_identity_fold(identity, page_identity)
+    );
+  }
+
+  pub fn compiler_chunked_payload_identity(
+    bytes: CompilerPayloadBuffer
+  ) -> Result<i64, i64> {
+    if compiler_payload_shape_valid(bytes) == false || bytes.length <= 0 {
+      return Result.Err(3);
+    }
+    let page_count: i64 = compiler_payload_page_count(bytes);
+    let length: i64 = compiler_map_identity_fold(467, bytes.length);
+    let pages: i64 = compiler_map_identity_fold(length, page_count);
+    return Result.Ok(compiler_chunked_payload_identity_pages(
+      bytes, 0, page_count, pages
+    ));
+  }
+
+  pub fn compiler_chunked_payload_shape_valid(
+    value: CompilerChunkedPayload
+  ) -> bool {
+    match compiler_chunked_payload_identity(value.bytes) {
+      Result.Ok(identity) => { return identity == value.identity; }
+      Result.Err(_) => { return false; }
+    }
+  }
+
+  pub fn compiler_chunked_payload(
+    bytes: CompilerPayloadBuffer
+  ) -> Result<CompilerChunkedPayload, i64> {
+    let identity: i64 = compiler_chunked_payload_identity(bytes)?;
+    return Result.Ok(CompilerChunkedPayload {
+      bytes: bytes,
+      identity: identity
+    });
+  }
+
+  pub fn compiler_aggregate_arena_store_chunked(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    kind: i64,
+    payload: CompilerChunkedPayload
+  ) -> Result<CompilerAggregateArena, i64> {
+    if compiler_chunked_payload_shape_valid(payload) == false
+      || compiler_payload_registry_accepts(
+        registry, kind, compiler_payload_schema_chunked(), -1
+      ) == false {
+      return Result.Err(3);
+    }
+    return compiler_aggregate_arena_store_payload(
+      value, registry, kind, payload.bytes, payload.identity
+    );
+  }
+
+  pub fn compiler_aggregate_arena_get_chunked(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    index: i64,
+    kind: i64
+  ) -> Result<CompilerChunkedPayload, i64> {
+    if compiler_payload_registry_accepts(
+      registry, kind, compiler_payload_schema_chunked(), -1
+    ) == false { return Result.Err(3); }
+    let bytes: CompilerPayloadBuffer = compiler_aggregate_arena_get_payload(
+      value, registry, index, kind
+    )?;
+    let projected: CompilerChunkedPayload = compiler_chunked_payload(bytes)?;
+    let stored_identity: i64 = compiler_map_vector_value(
+      value.arena.field2s, index
+    );
+    if projected.identity != stored_identity { return Result.Err(3); }
+    return Result.Ok(projected);
   }
 
   pub fn compiler_aggregate_arena_store_text(

@@ -1,7 +1,9 @@
 # Nuis Compiler Data Model
 
-`nuis-compiler-data-model-v9` is the current compiler-owned data boundary
+`nuis-compiler-data-model-v10` is the current compiler-owned data boundary
 written in Nuis itself. Its machine-readable contract is
+[nuis-compiler-data-model-v10.toml](nuis-compiler-data-model-v10.toml). The
+registered aggregate predecessor remains frozen in
 [nuis-compiler-data-model-v9.toml](nuis-compiler-data-model-v9.toml). The
 paged typed-text predecessor remains frozen in
 [nuis-compiler-data-model-v8.toml](nuis-compiler-data-model-v8.toml), the
@@ -32,7 +34,30 @@ FFI, or host-language layouts.
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
 
-## V9 Surface
+## V10 Surface
+
+V10 closes the first individual-payload paging gap without changing the v9
+registry, arena, or scalar-export contracts:
+
+- `CompilerChunkedPayload` owns one canonical `CompilerPayloadBuffer` and a
+  page-derived shape identity. It may span all eight logical pages instead of
+  returning through the sixteen-value `CompilerVector` compatibility path.
+- `compiler_payload_copy_buffer_range` validates source shape, range, target
+  shape, and capacity before applying eight fixed sixteen-byte Nuis chunks.
+  Store and projection expose no host collection, pointer, loop state, or
+  partial mutation.
+- Kind `3`, schema `103`, stores the 24-byte reference payload
+  `nuis-compiler-payload-v1`. Its page identities are `1042165038` and
+  `957262363`; the typed identity is `94500080`.
+- The extended three-kind registry has identity `1593840720`, while the frozen
+  two-kind v9 registry remains `1630830726`. Text, source span, and chunked
+  payloads occupy 44 aggregate bytes and three pages with complete identity
+  `551151124`.
+- Forged typed identity and full object capacity fail before returning a new
+  arena. Native execution remains `130`, and the subset still has exactly
+  twenty-one scalar exports.
+
+## Preserved V9 Surface
 
 V9 turns the v8 page store into a registered aggregate boundary without
 changing the frozen language subset or scalar export ABI:
@@ -248,6 +273,16 @@ complete identities, reject duplicate registration with code `4`, reject
 wrong kind and absent index with code `2`, reject malformed fixed-length bytes
 with code `3`, and prove the failed store leaves identity unchanged.
 
+The v10 extension registers kind `3` beside those frozen entries and stores
+`nuis-compiler-payload-v1` as one 24-byte `CompilerChunkedPayload`. The record
+starts at aggregate byte 20, spans the second and third logical pages, and
+projects into a fresh packed buffer with the same `94500080` typed identity.
+The extended registry identity is `1593840720`, envelope identity is
+`1520342505`, page identities are `934788601`, `1001962162`, and `1407376619`,
+and complete aggregate identity is `551151124`. A forged identity returns code
+`3`; a fourth object returns capacity code `1`; both leave the input identity
+unchanged.
+
 The same executable also constructs the first complete materialized page from the real
 candidate token stream: `use`, `cpu`, `StdLanguageCore`, and semicolon. It owns
 21 payload bytes and canonically emits 91 bytes with independently pinned hash
@@ -287,14 +322,15 @@ pins open-record versus completed-record and partial structural-line boundaries.
 
 `StdCompilerProjection` consumes the first AST and NIR structural pages,
 serializes an opaque eight-lane scanner cursor, and resumes both into a second
-page over this foundation. It does not claim that the bounded v9 model parses a
+page over this foundation. It does not claim that the bounded v10 model parses a
 complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
-V9 proves owned token materialization, canonical re-emission, complete token
+V10 proves owned token materialization, canonical re-emission, complete token
 pagination, deterministic multi-page maps, bounded arena object storage, and
-registered typed text and source-span projection across logical payload pages,
+registered typed text, source-span, and 24-byte chunked projection across
+logical payload pages,
 but it is not
 yet an unbounded compiler heap:
 
@@ -304,10 +340,10 @@ yet an unbounded compiler heap:
 - `CompilerVector` remains `i64`-specific and bounded to sixteen values.
 - `CompilerMap` remains `i64`-specific and bounded to sixteen entries.
 - `CompilerArena` remains a sixteen-object, four-`i64` envelope.
-- One `CompilerText` remains limited to sixteen bytes, while the v9 aggregate
+- One `CompilerText` remains limited to sixteen bytes, while the v10 aggregate
   payload column is bounded to 128 bytes across eight logical pages.
 - Registration is generic, but typed codecs currently cover only
-  `CompilerText` and `CompilerSourceSpan`; one payload remains at most 16 bytes.
+  `CompilerText`, `CompilerSourceSpan`, and canonical chunked bytes.
 - Generic helper specialization still needs defining-module provenance.
 - Forwarding the complete aggregate arena through another nested helper remains
   outside the current wide scalar-leaf lowering proof.
@@ -315,7 +351,7 @@ yet an unbounded compiler heap:
   avoid pretending otherwise.
 
 The readiness gate is therefore not yet `stable/100`. The next data-model step
-is chunked projection for larger individual owned values, followed by broader
-structural paging without weakening
+is forwarding the complete registered aggregate through a nested helper,
+followed by broader structural paging without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
 or the frozen v8 import ceiling.

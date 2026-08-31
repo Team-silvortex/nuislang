@@ -5,9 +5,10 @@ use nuis_artifact::{
     build_compiler_component_replacement_authorizer_registry,
     compiler_component_attester_trust_registry_sha256,
     compiler_component_replacement_authorizer_registry_sha256,
-    parse_compiler_component_attester_trust_registry,
+    parse_compiler_component_active_state, parse_compiler_component_attester_trust_registry,
     parse_compiler_component_replacement_authorization, read_compiler_component_attestation,
     render_compiler_component_replacement_authorizer_registry,
+    select_compiler_component_active_target, CompilerComponentActiveSelection,
     CompilerComponentReplacementAuthorizerEntryInput,
 };
 
@@ -87,6 +88,7 @@ fn remote_attestation_requires_a_distinct_pinned_replacement_authorizer() {
     std::fs::create_dir_all(&scratch).expect("create replacement scratch");
     let authorizer_registry_path = scratch.join("authorizers.toml");
     let authorization_path = scratch.join("authorization.toml");
+    let active_state_path = scratch.join("active-state.toml");
 
     let signing_key = SigningKey::from_bytes(&[9; 32]);
     let public_key_hex: String = signing_key
@@ -168,6 +170,86 @@ fn remote_attestation_requires_a_distinct_pinned_replacement_authorizer() {
     );
     assert!(String::from_utf8_lossy(&verify.stdout)
         .contains("bootstrap component replacement: verified"));
+
+    let attestation_source_before =
+        std::fs::read_to_string(&attestation).expect("read immutable attestation");
+    let authorization_source_before =
+        std::fs::read_to_string(&authorization_path).expect("read immutable authorization");
+    let activate = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-activate-component")
+        .arg(&aggregate)
+        .arg(&attestation)
+        .arg(&attester_registry)
+        .arg(REGISTRY_SHA256)
+        .arg(CHALLENGE_SHA256)
+        .arg(&authorization_path)
+        .arg(&authorizer_registry_path)
+        .arg(&authorizer_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .output()
+        .expect("run active-component consumer");
+    assert!(
+        activate.status.success(),
+        "activation failed: {}",
+        String::from_utf8_lossy(&activate.stderr)
+    );
+    let activation_stdout = String::from_utf8_lossy(&activate.stdout);
+    assert!(activation_stdout.contains("bootstrap compiler component: activated"));
+    assert!(activation_stdout.contains("active_stage_role: stage1-candidate"));
+    assert!(activation_stdout.contains("rollback_stage_role: stage0"));
+
+    let active_state = parse_compiler_component_active_state(&active_state_path)
+        .expect("parse emitted active-component state");
+    let active = select_compiler_component_active_target(
+        &active_state,
+        &authorization,
+        &authorization_source_before,
+        CompilerComponentActiveSelection::Active,
+    )
+    .expect("resolve active candidate");
+    let rollback = select_compiler_component_active_target(
+        &active_state,
+        &authorization,
+        &authorization_source_before,
+        CompilerComponentActiveSelection::Rollback,
+    )
+    .expect("resolve stage0 rollback");
+    assert_eq!(active.stage_role, "stage1-candidate");
+    assert_eq!(
+        active.reproducible_build_sha256,
+        authorization.to_reproducible_build_sha256
+    );
+    assert_eq!(rollback.stage_role, "stage0");
+    assert_eq!(
+        rollback.reproducible_build_sha256,
+        authorization.from_reproducible_build_sha256
+    );
+    assert_eq!(
+        std::fs::read_to_string(&attestation).expect("reread immutable attestation"),
+        attestation_source_before
+    );
+    assert_eq!(
+        std::fs::read_to_string(&authorization_path).expect("reread immutable authorization"),
+        authorization_source_before
+    );
+
+    let replay_state = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-activate-component")
+        .arg(&aggregate)
+        .arg(&attestation)
+        .arg(&attester_registry)
+        .arg(REGISTRY_SHA256)
+        .arg(CHALLENGE_SHA256)
+        .arg(&authorization_path)
+        .arg(&authorizer_registry_path)
+        .arg(&authorizer_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .output()
+        .expect("run active-state replacement rejection");
+    assert!(!replay_state.status.success());
+    assert!(String::from_utf8_lossy(&replay_state.stderr).contains("without replacement"));
 
     let replay = Command::new(env!("CARGO_BIN_EXE_nuis"))
         .arg("bootstrap-verify-component-replacement")

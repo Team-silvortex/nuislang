@@ -7,7 +7,7 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `beta-0.8.*` reading route, use this order:
+If you only need the shortest current `beta-0.9.*` reading route, use this order:
 
 1. [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
@@ -135,10 +135,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization`
+`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two transition`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

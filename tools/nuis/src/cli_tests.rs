@@ -1,6 +1,6 @@
 use super::{
-    parse_args, BootstrapComponentReplacementInput, BootstrapComponentReplacementVerificationInput,
-    CommandKind, GalaxyCommand,
+    parse_args, BootstrapComponentActivationInput, BootstrapComponentReplacementInput,
+    BootstrapComponentReplacementVerificationInput, CommandKind, GalaxyCommand,
 };
 use std::path::PathBuf;
 
@@ -292,6 +292,41 @@ fn parses_bootstrap_component_replacement_commands() {
                 authorization_challenge_sha256: "d".repeat(64),
             },
         )
+    );
+
+    let command = parse_args(
+        [
+            "bootstrap-activate-component".to_owned(),
+            "aggregate.toml".to_owned(),
+            "attestation.toml".to_owned(),
+            "attesters.toml".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "authorization.toml".to_owned(),
+            "authorizers.toml".to_owned(),
+            "c".repeat(64),
+            "d".repeat(64),
+            "active-state.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap component activation parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapActivateComponent(BootstrapComponentActivationInput {
+            verification: BootstrapComponentReplacementVerificationInput {
+                aggregate: PathBuf::from("aggregate.toml"),
+                attestation: PathBuf::from("attestation.toml"),
+                attester_registry: PathBuf::from("attesters.toml"),
+                attester_registry_sha256: "a".repeat(64),
+                attestation_challenge_sha256: "b".repeat(64),
+                authorization: PathBuf::from("authorization.toml"),
+                authorizer_registry: PathBuf::from("authorizers.toml"),
+                authorizer_registry_sha256: "c".repeat(64),
+                authorization_challenge_sha256: "d".repeat(64),
+            },
+            output: PathBuf::from("active-state.toml"),
+        })
     );
 }
 

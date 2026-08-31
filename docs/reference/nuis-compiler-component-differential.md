@@ -156,8 +156,9 @@ compact structured AST and NIR records now cross both a producer-neutral
 handoff-v2 selection and the component representation gate. The sidecar's exact hash is
 not yet a field of generation-one reproducibility aggregates; that requires a
 versioned successor rather than rewriting signed v1 evidence. Independent
-remote sidecar evidence, authorization consumption, and a signed rollback
-transition chain also remain open.
+remote sidecar evidence and a signed generation-two rollback transition chain
+remain open; canonical active-state v1 now consumes the genesis authorization
+without rewriting either signed source.
 
 ## Validation
 

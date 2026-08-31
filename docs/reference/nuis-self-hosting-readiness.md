@@ -66,8 +66,8 @@ new language capability. Widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. Data model v9 is now
-`usable/98`: `StdLanguageCore` owns the foundational representation,
+and path contracts needed by a real compiler component. Data model v10 is now
+`usable/99`: `StdLanguageCore` owns the foundational representation,
 `StdCompilerData` owns materialized token records and bounded bytes,
 `StdCompilerPayload` owns the typed logical-page view,
 `StdCompilerPayloadRegistry` owns kind/schema registration and the shared
@@ -107,6 +107,14 @@ boundary and pins registry identity `1630830726`, source-span identity
 `1109161393`, and complete identity `1274791798`. Duplicate registration,
 wrong kind, absent index, and malformed fixed length fail with exact codes;
 failed storage leaves identity unchanged and the native exit remains `130`.
+V10 adds kind-three `CompilerChunkedPayload` without changing those identities.
+The 24-byte `nuis-compiler-payload-v1` value is copied and projected through
+eight fixed Nuis chunks, spans three aggregate pages, and pins typed identity
+`94500080`, extended registry identity `1593840720`, envelope identity
+`1520342505`, page identities `934788601`, `1001962162`, and `1407376619`, plus
+complete identity `551151124`. Forged identity and full-capacity failures leave
+the input arena unchanged; native exit and the twenty-one-export ceiling remain
+unchanged.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
 This is deliberately not `stable/100`. Each token materialization window remains
@@ -117,8 +125,8 @@ recompute every page hash and chain link while preserving the canonical legacy
 page identity. `StdCompilerProjection` also owns and resumes the first two AST
 and NIR structural pages through opaque cursors. Vectors and maps remain
 `i64`-specific and bounded to sixteen entries. One text remains limited to
-sixteen bytes, the v9 aggregate payload is bounded to 128 bytes, and registered
-typed codecs currently cover only text and source spans. Generic nested-page
+sixteen bytes, the v10 aggregate payload is bounded to 128 bytes, and registered
+typed codecs now cover text, source spans, and canonical chunked bytes. Generic nested-page
 specialization lacks defining-module provenance, forwarding the full aggregate
 through another helper remains outside the wide-call proof, and arbitrary
 aggregate loop-carried state still requires general backedge lowering.
@@ -222,6 +230,14 @@ sign one generation-one stage0-to-candidate transition with stage0 retained as
 the rollback target. The authorization is written without replacement and
 does not itself switch the active compiler. See
 [Nuis Compiler Component Replacement Authorization](nuis-compiler-component-replacement-authorization.md).
+
+`nuis bootstrap-activate-component` now consumes that permission through
+`nuis-compiler-component-active-state-v1`. It repeats both pinned trust checks,
+binds the immutable authorization source, authorization proof, and attestation
+proof, and creates one canonical state without overwrite. The same
+provider-neutral selector resolves `active` to the stage1 candidate build and
+`rollback` to the exact stage0 build. A signed generation-two transition and
+runtime execution through the selected compiler image remain open.
 
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering

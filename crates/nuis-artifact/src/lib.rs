@@ -4,6 +4,7 @@ mod build_manifest;
 mod clock_protocol;
 mod compiler_candidate_execution;
 mod compiler_candidate_production;
+mod compiler_component_active_state;
 mod compiler_component_attestation;
 mod compiler_component_attestation_registry;
 mod compiler_component_build;
@@ -64,6 +65,16 @@ pub use compiler_candidate_production::{
     COMPILER_CANDIDATE_ADAPTER_FILE, COMPILER_CANDIDATE_PRODUCER_CONTRACT,
     COMPILER_CANDIDATE_PRODUCTION_AUTHORITY, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_CANDIDATE_PRODUCTION_PROTOCOL,
+};
+pub use compiler_component_active_state::{
+    build_compiler_component_active_state, parse_compiler_component_active_state,
+    parse_compiler_component_active_state_from_source, render_compiler_component_active_state,
+    select_compiler_component_active_target, verify_compiler_component_active_state,
+    CompilerComponentActiveSelection, CompilerComponentActiveState, CompilerComponentActiveTarget,
+    COMPILER_COMPONENT_ACTIVE_SELECTION_CONTRACT, COMPILER_COMPONENT_ACTIVE_SELECTOR,
+    COMPILER_COMPONENT_ACTIVE_STATE_AUTHORITY, COMPILER_COMPONENT_ACTIVE_STATE_FILE,
+    COMPILER_COMPONENT_ACTIVE_STATE_PROTOCOL, COMPILER_COMPONENT_ACTIVE_STATE_VERDICT,
+    COMPILER_COMPONENT_ROLLBACK_SELECTOR,
 };
 pub use compiler_component_attestation::{
     build_compiler_component_attestation, parse_compiler_component_attestation,

@@ -138,6 +138,69 @@ mod cpu StdCompilerPayload {
     return compiler_payload_copy_step(source, length, 15, p14);
   }
 
+  pub fn compiler_payload_copy_buffer_step(
+    source: CompilerPayloadBuffer,
+    start: i64,
+    length: i64,
+    offset: i64,
+    target: CompilerPayloadBuffer
+  ) -> Result<CompilerPayloadBuffer, i64> {
+    if offset >= length { return Result.Ok(target); }
+    return compiler_token_buffer_push(
+      target,
+      compiler_token_buffer_byte_raw(source, start + offset)
+    );
+  }
+
+  pub fn compiler_payload_copy_buffer_chunk(
+    source: CompilerPayloadBuffer,
+    start: i64,
+    length: i64,
+    base: i64,
+    target: CompilerPayloadBuffer
+  ) -> Result<CompilerPayloadBuffer, i64> {
+    let p0: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base, target)?;
+    let p1: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 1, p0)?;
+    let p2: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 2, p1)?;
+    let p3: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 3, p2)?;
+    let p4: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 4, p3)?;
+    let p5: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 5, p4)?;
+    let p6: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 6, p5)?;
+    let p7: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 7, p6)?;
+    let p8: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 8, p7)?;
+    let p9: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 9, p8)?;
+    let p10: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 10, p9)?;
+    let p11: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 11, p10)?;
+    let p12: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 12, p11)?;
+    let p13: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 13, p12)?;
+    let p14: CompilerPayloadBuffer = compiler_payload_copy_buffer_step(source, start, length, base + 14, p13)?;
+    return compiler_payload_copy_buffer_step(source, start, length, base + 15, p14);
+  }
+
+  /// Copies one checked payload range without exposing a host collection or pointer.
+  pub fn compiler_payload_copy_buffer_range(
+    source: CompilerPayloadBuffer,
+    start: i64,
+    length: i64,
+    target: CompilerPayloadBuffer
+  ) -> Result<CompilerPayloadBuffer, i64> {
+    if compiler_payload_shape_valid(source) == false
+      || compiler_payload_shape_valid(target) == false
+      || start < 0 || length < 0 || start > source.length
+      || length > source.length - start {
+      return Result.Err(3);
+    }
+    if target.length + length > 128 { return Result.Err(1); }
+    let p0: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 0, target)?;
+    let p1: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 16, p0)?;
+    let p2: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 32, p1)?;
+    let p3: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 48, p2)?;
+    let p4: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 64, p3)?;
+    let p5: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 80, p4)?;
+    let p6: CompilerPayloadBuffer = compiler_payload_copy_buffer_chunk(source, start, length, 96, p5)?;
+    return compiler_payload_copy_buffer_chunk(source, start, length, 112, p6);
+  }
+
   pub fn compiler_payload_to_vector_step(
     source: CompilerPayloadBuffer,
     start: i64,
