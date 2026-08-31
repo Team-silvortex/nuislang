@@ -11,6 +11,7 @@ use nuis_artifact::{
     build_compiler_component_replacement_authorizer_registry,
     compiler_component_attester_trust_registry_sha256,
     compiler_component_replacement_authorizer_registry_sha256, parse_build_manifest,
+    parse_compiler_candidate_compile_capability, parse_compiler_candidate_preselection,
     parse_compiler_component_compile_dispatch_receipt, parse_compiler_component_differential,
     parse_compiler_component_dispatch_receipt, parse_compiler_structural_projection,
     read_compiler_candidate_execution, read_compiler_candidate_production,
@@ -22,15 +23,16 @@ use nuis_artifact::{
     CompilerComponentAttesterTrustEntryInput, CompilerComponentReplacementAuthorizerEntryInput,
     CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
     CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
+    COMPILER_CANDIDATE_COMPILE_CAPABILITY_VERDICT, COMPILER_CANDIDATE_COMPILE_PROVIDER_ENVIRONMENT,
     COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
-    COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
-    COMPILER_COMPONENT_ATTESTATION_FILE, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_COMPILE_DISPATCH_FILE, COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT,
-    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_DISPATCH_FILE,
-    COMPILER_COMPONENT_DISPATCH_VERDICT, COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
-    COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
-    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-    COMPILER_STAGE_TRANSFORMATION_FILE,
+    COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRESELECTION_VERDICT,
+    COMPILER_CANDIDATE_PRODUCTION_FILE, COMPILER_COMPONENT_ATTESTATION_FILE,
+    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_COMPILE_DISPATCH_FILE,
+    COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_DISPATCH_FILE, COMPILER_COMPONENT_DISPATCH_VERDICT,
+    COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_FILE,
+    COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE, COMPILER_STAGE_HANDOFF_V2_FILE,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_TRANSFORMATION_FILE,
 };
 
 fn temp_dir() -> PathBuf {
@@ -346,7 +348,8 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     fs::write(&handoff_v2_path, handoff_v2_source).expect("restore stage handoff v2");
 
     let adapter_path = candidate_dir.join(COMPILER_CANDIDATE_ADAPTER_FILE);
-    let mut tampered = fs::read(&adapter_path).expect("read candidate adapter");
+    let adapter = fs::read(&adapter_path).expect("read candidate adapter");
+    let mut tampered = adapter.clone();
     tampered.push(0);
     fs::write(&adapter_path, tampered).expect("tamper candidate adapter");
     let error = read_compiler_candidate_production(
@@ -372,6 +375,74 @@ fn pure_nuis_candidate_produces_an_attested_equivalent_stage1_component() {
     assert!(String::from_utf8_lossy(&tampered_diff.stderr)
         .contains("adapter length or SHA-256 mismatch"));
     assert!(!tampered_report_path.exists());
+
+    fs::write(&adapter_path, adapter).expect("restore production-bound candidate adapter");
+    let missing_provider_output = output_dir.join("missing-provider-result");
+    let missing_provider = Command::new(&adapter_path)
+        .arg("bootstrap-build")
+        .arg(project)
+        .arg(&missing_provider_output)
+        .env_remove(COMPILER_CANDIDATE_COMPILE_PROVIDER_ENVIRONMENT)
+        .output()
+        .expect("execute candidate adapter without a provider");
+    assert_eq!(missing_provider.status.code(), Some(66));
+    assert!(missing_provider.stdout.is_empty());
+    assert!(missing_provider.stderr.is_empty());
+    assert!(!missing_provider_output.exists());
+
+    let wrong_provider_output = output_dir.join("wrong-provider-result");
+    let wrong_provider_capability = output_dir.join("wrong-provider-capability.toml");
+    let wrong_provider = run_nuis(&[
+        "bootstrap-candidate-compile-capability",
+        &output_dir.display().to_string(),
+        &candidate_dir
+            .join(&candidate.native_binary_file)
+            .display()
+            .to_string(),
+        project,
+        &wrong_provider_output.display().to_string(),
+        &wrong_provider_capability.display().to_string(),
+    ]);
+    assert!(!wrong_provider.status.success());
+    assert!(String::from_utf8_lossy(&wrong_provider.stderr)
+        .contains("compiler image identity mismatch"));
+    assert!(!wrong_provider_output.exists());
+    assert!(!wrong_provider_capability.exists());
+
+    let capability_build = output_dir.join("candidate-compile-result");
+    let capability_path = output_dir.join("candidate-compile-capability.toml");
+    let capability = run_nuis(&[
+        "bootstrap-candidate-compile-capability",
+        &output_dir.display().to_string(),
+        env!("CARGO_BIN_EXE_nuis"),
+        project,
+        &capability_build.display().to_string(),
+        &capability_path.display().to_string(),
+    ]);
+    assert!(
+        capability.status.success(),
+        "candidate compile capability failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&capability.stdout),
+        String::from_utf8_lossy(&capability.stderr),
+    );
+    let capability = parse_compiler_candidate_compile_capability(&capability_path)
+        .expect("verify candidate compile capability");
+    assert_eq!(
+        capability.verdict,
+        COMPILER_CANDIDATE_COMPILE_CAPABILITY_VERDICT
+    );
+    assert_eq!(capability.production_proof_sha256, production.proof_sha256);
+    assert_eq!(capability.stage0_record_sha256, stage0.record_sha256);
+    assert_eq!(capability.candidate_record_sha256, candidate.record_sha256);
+    assert!(!capability.replacement_authorized);
+    assert!(!capability.selection_authorized);
+    let rebuilt =
+        read_compiler_component_build(&capability_build.join(COMPILER_COMPONENT_BUILD_FILE))
+            .expect("verify candidate-driven rebuild");
+    assert_eq!(
+        rebuilt.reproducible_build_sha256,
+        stage0.reproducible_build_sha256
+    );
 
     fs::remove_dir_all(output_dir).expect("remove candidate component output");
 }
@@ -600,6 +671,67 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     let candidate_component =
         read_compiler_component_build(&candidate_record).expect("verify dispatch candidate");
     let candidate_image = candidate_dir.join(&candidate_component.native_binary_file);
+    let preselection_build = output_dir.join("preselection-capability-build");
+    let preselection_capability = output_dir.join("preselection-capability.toml");
+    let capability = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-candidate-compile-capability")
+        .arg(selected_root)
+        .arg(env!("CARGO_BIN_EXE_nuis"))
+        .arg(project)
+        .arg(&preselection_build)
+        .arg(&preselection_capability)
+        .output()
+        .expect("build production-bound capability for preselection");
+    assert_success(&capability, "generation-three candidate capability");
+    let preselection_path = output_dir.join("candidate-preselection.toml");
+    let preselection_challenge = "f".repeat(64);
+    let transition_before = fs::read(&transition_path).expect("snapshot generation two");
+    let preselection = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-preselect-candidate")
+        .arg(&aggregate_path)
+        .arg(&attestation_path)
+        .arg(&registry_path)
+        .arg(&registry_sha256)
+        .arg(&challenge_sha256)
+        .arg(&authorization_path)
+        .arg(&owner_registry_path)
+        .arg(&owner_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .arg(&transition_path)
+        .arg(&transition_challenge)
+        .arg(selected_root)
+        .arg(&preselection_capability)
+        .arg(&preselection_challenge)
+        .arg("compiler-owner-1")
+        .arg("release-control")
+        .arg("clean-build-preselection-3")
+        .arg(&preselection_path)
+        .env("NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX", &owner_key_hex)
+        .output()
+        .expect("preselect production-bound compiler candidate");
+    assert_success(
+        &preselection,
+        "signed generation-three candidate preselection",
+    );
+    assert_eq!(
+        fs::read(&transition_path).expect("reread generation two"),
+        transition_before
+    );
+    let preselection = parse_compiler_candidate_preselection(&preselection_path)
+        .expect("verify candidate preselection record");
+    assert_eq!(
+        preselection.verdict,
+        COMPILER_CANDIDATE_PRESELECTION_VERDICT
+    );
+    assert_eq!(preselection.target_generation, 3);
+    assert!(preselection.provider_dependency_required);
+    assert!(!preselection.direct_stage1_compile);
+    assert!(!preselection.selection_authorized);
+    assert!(!preselection.replacement_authorized);
+    let preselection_source =
+        fs::read_to_string(&preselection_path).expect("read candidate preselection source");
+    assert!(!preselection_source.contains(&output_dir_text));
     let dispatch = Command::new(env!("CARGO_BIN_EXE_nuis"))
         .arg("bootstrap-dispatch-component")
         .arg(&aggregate_path)

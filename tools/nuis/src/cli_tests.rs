@@ -1,5 +1,6 @@
 use super::{
-    parse_args, BootstrapComponentActivationInput, BootstrapComponentCompileDispatchInput,
+    parse_args, BootstrapCandidateCompileCapabilityInput, BootstrapCandidatePreselectionInput,
+    BootstrapComponentActivationInput, BootstrapComponentCompileDispatchInput,
     BootstrapComponentDispatchInput, BootstrapComponentReplacementInput,
     BootstrapComponentReplacementVerificationInput, BootstrapComponentRollbackInput,
     BootstrapComponentTransitionVerificationInput, CommandKind, GalaxyCommand,
@@ -149,6 +150,57 @@ fn parses_bootstrap_candidate_build_command() {
             output_dir: PathBuf::from("build/candidate-component"),
         }
     );
+}
+
+#[test]
+fn parses_bootstrap_candidate_compile_capability_command() {
+    let command = parse_args(
+        [
+            "bootstrap-candidate-compile-capability".to_owned(),
+            "build/candidate-component".to_owned(),
+            "bin/nuis".to_owned(),
+            "compiler-project".to_owned(),
+            "build/candidate-compile".to_owned(),
+            "build/candidate-capability.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap-candidate-compile-capability parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapCandidateCompileCapability(
+            BootstrapCandidateCompileCapabilityInput {
+                candidate_root: PathBuf::from("build/candidate-component"),
+                provider_image: PathBuf::from("bin/nuis"),
+                project_input: PathBuf::from("compiler-project"),
+                build_output: PathBuf::from("build/candidate-compile"),
+                output: PathBuf::from("build/candidate-capability.toml"),
+            }
+        )
+    );
+}
+
+#[test]
+fn parses_bootstrap_candidate_preselection_command() {
+    let args = "bootstrap-preselect-candidate aggregate attestation attesters attesters-sha attestation-challenge authorization owners owners-sha authorization-challenge active transition transition-challenge candidate-root capability preselection-challenge owner release preselection-3 output";
+    let command = parse_args(args.split_whitespace().map(str::to_owned))
+        .expect("bootstrap-preselect-candidate parses");
+    let CommandKind::BootstrapPreselectCandidate(BootstrapCandidatePreselectionInput {
+        candidate_root,
+        capability,
+        challenge_sha256,
+        preselection_id,
+        output,
+        ..
+    }) = command
+    else {
+        panic!("expected candidate preselection command");
+    };
+    assert_eq!(candidate_root, PathBuf::from("candidate-root"));
+    assert_eq!(capability, PathBuf::from("capability"));
+    assert_eq!(challenge_sha256, "preselection-challenge");
+    assert_eq!(preselection_id, "preselection-3");
+    assert_eq!(output, PathBuf::from("output"));
 }
 
 #[test]

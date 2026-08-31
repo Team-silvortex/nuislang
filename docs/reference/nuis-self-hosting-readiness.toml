@@ -44,10 +44,10 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
 required_before = "beta-0.10.0"
 progress = 99
-next_action = "give one Nuis-owned stage1 candidate the same canonical compile capability before any generation-three forward selection"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_dispatch -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_transition_commands -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "one stage1 candidate image that accepts the versioned canonical compile request and reproduces component semantic identities while generation two remains immutable until verification"
-blocker = "compile dispatch v1 now rebuilds the canonical project through the exact selected current image, but the signed forward image remains a specialized structural producer without the bootstrap-build frontdoor required for honest generation-three selection"
+next_action = "prove one direct stage1-owned canonical compile without stage0 provider delegation while preserving capability v1 and preselection v1"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_preselection -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --bin nuis candidate_preselection -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "one path-free capability-v2 proof whose candidate-owned front-end reaches the canonical component result without invoking the stage0 provider"
+blocker = "generation-three preselection now binds the exact predecessor, production, candidate capability, result, provider dependency, owner challenge, and signature, but the candidate compile route still exact-execs stage0"
 
 [[gates]]
 id = "differential-reproducibility-gate"

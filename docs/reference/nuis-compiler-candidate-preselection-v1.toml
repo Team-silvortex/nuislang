@@ -1,0 +1,75 @@
+protocol = "nuis-compiler-candidate-preselection-v1"
+version = 1
+status = "usable-signed-generation-three-preselection"
+scope = "component-owner-binding-of-candidate-compile-capability"
+manifest_name = "nuis.compiler-candidate-preselection.toml"
+authority = "independent-ed25519-component-owner-preselection"
+signature_contract = "nuis-compiler-candidate-preselection-ed25519-v1"
+action = "preselect-stage1-candidate-for-generation-three"
+provider_dependency_contract = "verified-stage0-provider-dependency-v1"
+target_generation = 3
+predecessor_generation = 2
+provider_dependency_required = true
+direct_stage1_compile = false
+replacement_authorized = false
+selection_authorized = false
+preselection_authorized = true
+verdict = "generation-three-candidate-preselected-no-selection-authority"
+digest = "sha256-lowercase"
+path_policy = "operational-paths-never-enter-canonical-fields"
+
+frontdoor = "nuis bootstrap-preselect-candidate"
+predecessor_protocol = "nuis-compiler-component-transition-v2"
+production_protocol = "nuis-compiler-candidate-production-v11"
+compile_capability_protocol = "nuis-compiler-candidate-compile-capability-v1"
+owner_registry_protocol = "nuis-compiler-component-replacement-authorizer-registry-v1"
+
+verification_order = [
+  "reverify-generation-two-authorization-state-transition-registry-and-signature",
+  "deep-read-stage0-candidate-execution-handoff-production-and-adapter-lineage",
+  "parse-and-canonically-rerender-production-and-compile-capability-sources",
+  "bind-exact-stage0-provider-and-stage1-candidate-component-identities",
+  "bind-transition-production-capability-result-and-provider-dependency-identities",
+  "require-generation-two-component-owner-role-environment-and-key-continuity",
+  "sign-a-fresh-challenge-scoped-path-free-preselection-proof",
+  "self-verify-persist-reread-and-compare-the-create-new-record",
+]
+
+bound_identity = [
+  "complete-generation-two-transition-file-and-proof",
+  "stage0-record-reproducible-build-and-compiler-image",
+  "candidate-record-reproducible-build-producer-and-compiler-image",
+  "complete-production-v11-file-and-proof",
+  "complete-compile-capability-v1-file-and-proof",
+  "compiled-artifact-semantic-and-result-identities",
+  "explicit-stage0-provider-dependency",
+  "component-owner-id-environment-public-key-and-fresh-challenge",
+]
+
+fail_closed = [
+  "generation-two-source-signature-challenge-or-owner-registry-drift",
+  "stage0-candidate-production-handoff-payload-or-adapter-drift",
+  "compile-capability-source-proof-or-lineage-drift",
+  "component-owner-role-environment-key-or-signing-key-drift",
+  "noncanonical-source-or-path-bearing-record-substitution",
+  "existing-output-or-post-write-reread-drift",
+]
+
+[honest_boundary]
+claim = "the-generation-two-component-owner-signs-one-exact-candidate-capability-into-generation-three-preselection"
+does_not_claim = "the-candidate-directly-compiles-without-stage0-or-has-final-selection-or-replacement-authority"
+next_step = "prove-one-direct-stage1-owned-canonical-compile-without-stage0-provider-delegation"
+
+[open_boundary]
+missing = [
+  "direct-stage1-front-end-compilation-without-stage0-provider-delegation",
+  "capability-v2-binding-that-direct-stage1-result",
+  "signed-generation-three-forward-transition-consuming-the-direct-proof",
+  "independent-remote-capability-and-preselection-evidence",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_preselection -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --bin nuis candidate_preselection -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]

@@ -32,13 +32,19 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`761/761` passing drift checks. The compiler data model, stage0/stage1 driver,
+`769/769` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
 state close their previous weakest tasks. Dispatch v1 now resolves an unordered
 exact-two build/image inventory through the signed generation-two identities,
 executes a private byte-verified copy of the stage0 `current` image, and retains
 the stage1 candidate as `forward` without persisting paths or timestamps.
+Candidate compile capability v1 now reuses the production-v11-bound adapter,
+folds the complete request through Nuis exports, and drives an exact verified
+stage0 provider with no shell while granting no replacement or selection
+authority. Candidate preselection v1 now replays that complete trust chain and
+lets the generation-two component owner sign the exact capability into
+generation-three review while keeping both final authority flags false.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native
@@ -157,16 +163,20 @@ structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candid
 execution proof, chunked compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
 routes mainline work to a canonical bootstrap compile request through the
-already verified generation-two `current` image. That compile dispatch is now
-closed for stage0; the next stage-driver gap is giving a Nuis-owned stage1
-candidate the same versioned compile capability before any generation-three
-forward selection. The v11 production
+already verified generation-two `current` image. That compile dispatch is
+closed for stage0, and the production-bound Nuis candidate adapter now drives
+the same canonical request through an explicit verified stage0 provider. The
+capability is now bound by a path-free generation-three preselection without
+mutating generation two or claiming direct stage1 compilation. The v11 production
 lineage now has checked-in challenge-bound Ed25519 attester evidence and a
 separate genesis replacement-authorization protocol. Authorization consumption
 is closed by canonical active-state v1, and the first rollback link is signed
 by transition v2; dispatch v1 closes the first selected-image process
-execution, and compile-dispatch v1 closes the first selected-image project
-rebuild. Stage1 compile capability, broader compiler-data paging, Galaxy
+execution, compile-dispatch v1 closes the first selected-image project rebuild,
+and candidate compile-capability v1 closes the delegated stage1 driver boundary,
+while candidate preselection v1 closes the owner-signed trust binding. Direct
+stage1 compilation without the stage0 provider, a capability-v2 successor and
+final generation-three transition, broader compiler-data paging, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 
@@ -183,6 +193,8 @@ Start with these documents:
 * [Compiler remote attestation evidence](docs/evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml)
 * [Compiler candidate execution](docs/reference/nuis-compiler-candidate-execution.md)
 * [Compiler candidate production](docs/reference/nuis-compiler-candidate-production.md)
+* [Compiler candidate compile capability](docs/reference/nuis-compiler-candidate-compile-capability.md)
+* [Compiler candidate preselection](docs/reference/nuis-compiler-candidate-preselection.md)
 * [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
 * [Compiler component reproducibility](docs/reference/nuis-compiler-component-reproducibility.md)
 * [Compiler component replacement authorization](docs/reference/nuis-compiler-component-replacement-authorization.md)
@@ -257,6 +269,7 @@ cargo run -p nuis -- bootstrap-status
 cargo run -p nuis -- bootstrap-build examples/projects/tooling/bootstrap_compiler_data_model_demo build/bootstrap-component
 cargo run -p nuis -- bootstrap-candidate-probe examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate
 cargo run -p nuis -- bootstrap-candidate-build examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-production
+cargo run -p nuis -- bootstrap-candidate-compile-capability build/bootstrap-candidate-production target/debug/nuis examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-compile build/bootstrap-candidate-compile-capability.toml
 cargo run -p nuis -- bootstrap-reproducibility examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-reproducibility
 cargo run -p nuis -- workflow examples/projects/kernel_tensor_demo
 cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo

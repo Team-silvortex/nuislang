@@ -378,7 +378,6 @@ fn verify_compile_result(
     result: &CompilerComponentBuild,
 ) -> Result<(), ArtifactError> {
     verify_compiler_component_build(request)?;
-    verify_compiler_component_build(result)?;
     if request.record_sha256 != current.record_sha256
         || request.stage_role != COMPILER_COMPONENT_STAGE0_ROLE
     {
@@ -386,14 +385,23 @@ fn verify_compile_result(
             "compiler component compile request must be the exact selected current stage0 record",
         ));
     }
+    verify_compiler_component_rebuild(request, result)
+}
+
+pub(crate) fn verify_compiler_component_rebuild(
+    request: &CompilerComponentBuild,
+    result: &CompilerComponentBuild,
+) -> Result<(), ArtifactError> {
+    verify_compiler_component_build(request)?;
+    verify_compiler_component_build(result)?;
     if result.stage_role != COMPILER_COMPONENT_STAGE0_ROLE
         || result.bootstrap_subset_protocol != request.bootstrap_subset_protocol
         || result.component_id != request.component_id
         || result.component_domain != request.component_domain
         || result.component_unit != request.component_unit
         || result.producer_id != request.producer_id
-        || result.compiler_image_bytes != current.compiler_image_bytes
-        || result.compiler_image_sha256 != current.compiler_image_sha256
+        || result.compiler_image_bytes != request.compiler_image_bytes
+        || result.compiler_image_sha256 != request.compiler_image_sha256
         || result.stage_handoff_file != request.stage_handoff_file
         || result.stage_handoff_bundle_sha256 != request.stage_handoff_bundle_sha256
         || result.compiled_artifact_file != request.compiled_artifact_file
@@ -414,7 +422,7 @@ fn verify_compile_result(
     Ok(())
 }
 
-fn verify_artifact_bytes(
+pub(crate) fn verify_artifact_bytes(
     build: &CompilerComponentBuild,
     bytes: &[u8],
 ) -> Result<(), ArtifactError> {
@@ -428,7 +436,7 @@ fn verify_artifact_bytes(
     Ok(())
 }
 
-fn compiled_artifact_semantic_identity(artifact: &NuisCompiledArtifact) -> String {
+pub(crate) fn compiled_artifact_semantic_identity(artifact: &NuisCompiledArtifact) -> String {
     let mut hash = Sha256::new();
     hash_field(
         &mut hash,

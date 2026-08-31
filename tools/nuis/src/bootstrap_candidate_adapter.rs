@@ -240,6 +240,14 @@ fn run_clang(command: &mut Command, label: &str) -> Result<(), String> {
 fn render_adapter_source() -> &'static str {
     r#"#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#define NUIS_STAGE0_PROVIDER_ENV "NUIS_BOOTSTRAP_STAGE0_PROVIDER_V1"
+#define NUIS_COMPILE_COMMAND "bootstrap-build"
+#define NUIS_MAX_RUNTIME_PATH_BYTES 4096
 
 extern int64_t nuis_bootstrap_candidate_stage_seed_v1(int64_t ordinal);
 extern int64_t nuis_bootstrap_candidate_stage_fold_v1(int64_t state, int64_t ordinal, int64_t byte);
@@ -583,7 +591,59 @@ static int projection_continuation(
         && *second_cursor_identity >= 0;
 }
 
+static int bounded_text_length(const char* text, int64_t* out_length) {
+    if (text == NULL || out_length == NULL) return 0;
+    size_t length = strnlen(text, NUIS_MAX_RUNTIME_PATH_BYTES + 1);
+    if (length == 0 || length > NUIS_MAX_RUNTIME_PATH_BYTES) return 0;
+    *out_length = (int64_t)length;
+    return 1;
+}
+
+static int64_t fold_text(int64_t ordinal, const char* text, int64_t length) {
+    int64_t state = nuis_bootstrap_candidate_stage_seed_v1(ordinal);
+    for (int64_t index = 0; index < length; ++index) {
+        state = nuis_bootstrap_candidate_stage_fold_v1(
+            state,
+            ordinal,
+            (int64_t)(unsigned char)text[index]
+        );
+    }
+    return state;
+}
+
+static int run_compile_request(char** argv) {
+    const char* provider = getenv(NUIS_STAGE0_PROVIDER_ENV);
+    int64_t lengths[4] = {0, 0, 0, 0};
+    const char* values[4] = {argv[1], argv[2], argv[3], provider};
+    if (strcmp(argv[1], NUIS_COMPILE_COMMAND) != 0
+        || strcmp(argv[2], argv[3]) == 0) return 65;
+    for (int index = 0; index < 4; ++index) {
+        if (!bounded_text_length(values[index], &lengths[index])) return 66;
+    }
+    int64_t bundle = nuis_bootstrap_candidate_bundle_seed_v1();
+    for (int64_t ordinal = 0; ordinal < 4; ++ordinal) {
+        int64_t fold = fold_text(ordinal, values[ordinal], lengths[ordinal]);
+        if (fold <= 0) return 67;
+        bundle = nuis_bootstrap_candidate_bundle_fold_v1(bundle, ordinal, fold);
+    }
+    if (bundle <= 0) return 68;
+    pid_t pid = fork();
+    if (pid < 0) return 69;
+    if (pid == 0) {
+        execl(provider, provider, NUIS_COMPILE_COMMAND, argv[2], argv[3], (char*)NULL);
+        _exit(127);
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) != pid) return 70;
+    if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+    if (!WIFEXITED(status)) return 70;
+    int exit_code = WEXITSTATUS(status);
+    if (exit_code == 0) puts("candidate_compile_admission=nuis-owned-stage-fold-v1");
+    return exit_code;
+}
+
 int main(int argc, char** argv) {
+    if (argc == 4) return run_compile_request(argv);
     if (argc != 6) return 64;
     int64_t folds[5] = {0, 0, 0, 0, 0};
     int64_t bundle = nuis_bootstrap_candidate_bundle_seed_v1();

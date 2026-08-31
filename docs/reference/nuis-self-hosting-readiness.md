@@ -261,6 +261,17 @@ raw path-bearing artifact hashes remain auditable while operational paths stay
 out of the receipt. See [Nuis Compiler Component Dispatch](nuis-compiler-component-dispatch.md)
 and [Nuis Compiler Component Compile Dispatch](nuis-compiler-component-compile-dispatch.md).
 
+`nuis bootstrap-candidate-compile-capability` now proves the next narrower
+boundary without rewriting that transition. It reuses the exact adapter bound
+by candidate production v11, folds the command and all runtime path bytes
+through Nuis exports, and invokes only a byte-verified stage0 provider through
+separate `execl` arguments. The rebuilt component must satisfy the same
+component and decoded artifact-semantic predicate as compile dispatch v1.
+Missing providers, adapter or provider drift, and absent Nuis admission fail
+before a receipt is written. The receipt explicitly grants neither replacement
+nor selection authority. See
+[Nuis Compiler Candidate Compile Capability](nuis-compiler-candidate-compile-capability.md).
+
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
 node/resource and edge membership indexes, and compiles SHA-256 proof hashing
@@ -317,8 +328,13 @@ aggregate. Replacement authorization v1 now feeds canonical active-state v1,
 transition v2 signs generation-two stage0 restoration while retaining the
 candidate as the forward target, dispatch v1 executes that exact current image,
 and compile dispatch v1 rebuilds one canonical project without rewriting a
-predecessor. Remote sidecar evidence, a stage1 image with the same compile
-capability, and a generation-three successor remain open.
+predecessor. Candidate compile capability v1 closes the production-bound
+delegating driver route while retaining the verified stage0 provider as an
+explicit dependency. Candidate preselection v1 now signs that exact capability,
+production proof, provider dependency, and immutable generation-two transition
+under the continuing component-owner key while keeping replacement and final
+selection authority false. Remote capability evidence and direct stage1
+compilation without that provider remain open.
 Cryptography does not prove physical-machine
 independence; that remains an operational fact.
 
@@ -331,6 +347,8 @@ freeze subset and compiler data contracts
   -> freeze stage-neutral handoffs
   -> build one component through stage0
   -> compare stage0 and candidate stage1 outputs
+  -> sign candidate capability into generation-three preselection
+  -> prove direct stage1-owned compilation
   -> permit one reversible component replacement
 ```
 

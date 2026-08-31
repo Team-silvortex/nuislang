@@ -58,6 +58,10 @@ Start in this order:
   - [nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md)
   - [nuis-compiler-stage-transformation.md](nuis-compiler-stage-transformation.md)
   - [nuis-compiler-candidate-production.md](nuis-compiler-candidate-production.md)
+  - [nuis-compiler-candidate-compile-capability.md](nuis-compiler-candidate-compile-capability.md)
+  - [nuis-compiler-candidate-compile-capability-v1.toml](nuis-compiler-candidate-compile-capability-v1.toml)
+  - [nuis-compiler-candidate-preselection.md](nuis-compiler-candidate-preselection.md)
+  - [nuis-compiler-candidate-preselection-v1.toml](nuis-compiler-candidate-preselection-v1.toml)
   - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
   - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
   - [nuis-compiler-component-representation-differential-v1.toml](nuis-compiler-component-representation-differential-v1.toml)
@@ -143,6 +147,11 @@ with [nuis-compiler-component-dispatch.md](nuis-compiler-component-dispatch.md).
 If your question is specifically “how does that selected image compile a real
 project without making runtime paths part of the request?”, start with
 [nuis-compiler-component-compile-dispatch.md](nuis-compiler-component-compile-dispatch.md).
+
+If your question is specifically “how can the production-bound Nuis stage1
+candidate drive the same request while its stage0 dependency remains explicit?”,
+start with
+[nuis-compiler-candidate-compile-capability.md](nuis-compiler-candidate-compile-capability.md).
 
 If your question is specifically “how does stage0 attest one complete
 project-form compiler-component build?”, start with

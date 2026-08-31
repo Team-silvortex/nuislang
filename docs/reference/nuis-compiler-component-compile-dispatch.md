@@ -81,10 +81,14 @@ image can rebuild the canonical structural-projection component through the
 real Nuis frontdoor while retaining the candidate as forward. Cache/path noise
 changes the raw container but not its semantic identity.
 
-The forward image is still a specialized Nuis structural producer, not a full
-`bootstrap-build` frontdoor. This protocol therefore does not authorize a
-generation-three switch, claim the candidate can compile projects, or claim
-self-hosting. That capability is the next stage-driver gap.
+The signed forward image remains a specialized Nuis structural producer.
+The separately versioned
+[candidate compile capability](nuis-compiler-candidate-compile-capability.md)
+now proves that its production-bound adapter can drive the same request through
+an exact stage0 provider, but it grants no selection authority and does not
+rewrite generation two. Candidate preselection v1 now owner-signs that exact
+evidence without final selection authority. The remaining gap is direct stage1
+compilation without provider delegation and its capability-v2 successor.
 
 ## Validation
 

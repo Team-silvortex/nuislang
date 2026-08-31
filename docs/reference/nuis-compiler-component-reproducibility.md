@@ -96,8 +96,10 @@ pin, and a no-private-key verification regression. Cryptography still cannot
 prove physical-machine independence. Canonical active-state v1 closes genesis
 authorization consumption, and transition v2 signs exact stage0 restoration
 plus candidate forward retention. Dispatch v1 now executes the exact current
-image while retaining the forward candidate. A canonical selected-image
-stage1 compile capability and a generation-three successor remain open.
+image while retaining the forward candidate. Candidate preselection v1 now
+owner-signs the exact delegated capability and provider dependency. Direct
+stage1 compilation without that provider and a final generation-three
+transition remain open.
 
 ## Validation
 

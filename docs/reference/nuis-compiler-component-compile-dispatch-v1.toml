@@ -72,12 +72,13 @@ compiled_artifact_audit_rule = "request-and-result-raw-container-lengths-and-sha
 
 [honest_boundary]
 claim = "the-exact-signed-generation-two-current-image-rebuilds-one-canonical-bootstrap-component-request-while-forward-remains-bound"
-does_not_claim = "the-forward-stage1-candidate-exposes-bootstrap-build-or-is-ready-for-generation-three-current-selection"
-next_step = "give-one-nuis-owned-stage1-candidate-the-same-versioned-canonical-compile-capability-before-forward-selection"
+does_not_claim = "candidate-preselection-is-a-final-generation-three-transition-or-directly-compiles-without-stage0"
+next_step = "prove-direct-stage1-owned-compilation-without-stage0-provider-delegation"
 
 [open_boundary]
 missing = [
-  "stage1-candidate-bootstrap-build-capability",
+  "direct-stage1-owned-compile-proof-and-capability-v2",
+  "direct-stage1-compilation-without-stage0-provider-delegation",
   "signed-generation-three-forward-transition",
   "component-owner-key-rotation-chain",
   "checked-in-independent-component-owner-compile-dispatch-evidence",

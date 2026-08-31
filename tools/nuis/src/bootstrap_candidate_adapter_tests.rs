@@ -48,3 +48,20 @@ fn adapter_output_parser_requires_exact_order_and_utf8_lf() {
     assert!(parse_adapter_output(reordered.as_bytes(), ADAPTER_OUTPUT_PROTOCOL).is_err());
     assert!(parse_adapter_output(&source[..source.len() - 1], ADAPTER_OUTPUT_PROTOCOL).is_err());
 }
+
+#[test]
+fn adapter_compile_route_is_nuis_folded_and_never_uses_a_shell() {
+    let source = render_adapter_source();
+    for required in [
+        "NUIS_BOOTSTRAP_STAGE0_PROVIDER_V1",
+        "if (argc == 4) return run_compile_request(argv);",
+        "nuis_bootstrap_candidate_stage_fold_v1(",
+        "nuis_bootstrap_candidate_bundle_fold_v1(",
+        "execl(provider, provider, NUIS_COMPILE_COMMAND",
+        "candidate_compile_admission=nuis-owned-stage-fold-v1",
+    ] {
+        assert!(source.contains(required), "missing `{required}`");
+    }
+    assert!(!source.contains("sh -c"));
+    assert!(!source.contains("system("));
+}

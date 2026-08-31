@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::bootstrap_candidate_compile_capability::BootstrapCandidateCompileCapabilityInput;
+use crate::bootstrap_candidate_preselection::BootstrapCandidatePreselectionInput;
 use crate::bootstrap_component_compile_dispatch::BootstrapComponentCompileDispatchInput;
 use crate::bootstrap_component_dispatch::BootstrapComponentDispatchInput;
 use crate::bootstrap_component_replacement::{
@@ -45,6 +47,8 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
     },
+    BootstrapCandidateCompileCapability(BootstrapCandidateCompileCapabilityInput),
+    BootstrapPreselectCandidate(BootstrapCandidatePreselectionInput),
     BootstrapReproducibility {
         input: PathBuf,
         output_dir: PathBuf,
@@ -307,6 +311,12 @@ where
                 return Err(usage.to_owned());
             }
             Ok(CommandKind::BootstrapCandidateBuild { input, output_dir })
+        }
+        "bootstrap-candidate-compile-capability" => {
+            bootstrap_component::parse_bootstrap_candidate_compile_capability(&mut args)
+        }
+        "bootstrap-preselect-candidate" => {
+            bootstrap_component::parse_bootstrap_candidate_preselection(&mut args)
         }
         "bootstrap-reproducibility" => {
             let usage =
@@ -732,7 +742,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-dispatch-component`, `bootstrap-dispatch-compile`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-candidate-compile-capability`, `bootstrap-preselect-candidate`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-dispatch-component`, `bootstrap-dispatch-compile`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

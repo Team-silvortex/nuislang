@@ -2,7 +2,9 @@ mod artifact;
 mod bridge_registry;
 mod build_manifest;
 mod clock_protocol;
+mod compiler_candidate_compile_capability;
 mod compiler_candidate_execution;
+mod compiler_candidate_preselection;
 mod compiler_candidate_production;
 mod compiler_component_active_state;
 mod compiler_component_attestation;
@@ -51,6 +53,17 @@ pub use build_manifest::{
 pub use clock_protocol::{
     parse_clock_protocol, parse_clock_protocol_from_source, ClockDomain, ClockEdge, ClockProtocol,
 };
+pub use compiler_candidate_compile_capability::{
+    build_compiler_candidate_compile_capability, parse_compiler_candidate_compile_capability,
+    parse_compiler_candidate_compile_capability_from_source,
+    render_compiler_candidate_compile_capability, CompilerCandidateCompileCapability,
+    CompilerCandidateCompileCapabilityInput, COMPILER_CANDIDATE_COMPILE_ADMISSION_CONTRACT,
+    COMPILER_CANDIDATE_COMPILE_ARGUMENT_CONTRACT, COMPILER_CANDIDATE_COMPILE_CAPABILITY_AUTHORITY,
+    COMPILER_CANDIDATE_COMPILE_CAPABILITY_FILE, COMPILER_CANDIDATE_COMPILE_CAPABILITY_PROTOCOL,
+    COMPILER_CANDIDATE_COMPILE_CAPABILITY_VERDICT, COMPILER_CANDIDATE_COMPILE_COMMAND,
+    COMPILER_CANDIDATE_COMPILE_DRIVER_CONTRACT, COMPILER_CANDIDATE_COMPILE_PROVIDER_CONTRACT,
+    COMPILER_CANDIDATE_COMPILE_PROVIDER_ENVIRONMENT, COMPILER_CANDIDATE_COMPILE_REQUEST_CONTRACT,
+};
 pub use compiler_candidate_execution::{
     build_compiler_candidate_execution, parse_compiler_candidate_execution,
     parse_compiler_candidate_execution_from_source, read_compiler_candidate_execution,
@@ -58,6 +71,16 @@ pub use compiler_candidate_execution::{
     CompilerCandidateExecutionInput, COMPILER_CANDIDATE_EXECUTION_AUTHORITY,
     COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_EXECUTION_PROTOCOL,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_RUNNER_CONTRACT,
+};
+pub use compiler_candidate_preselection::{
+    build_compiler_candidate_preselection, parse_compiler_candidate_preselection,
+    parse_compiler_candidate_preselection_from_source, render_compiler_candidate_preselection,
+    verify_compiler_candidate_preselection, CompilerCandidatePreselection,
+    CompilerCandidatePreselectionInput, CompilerCandidatePreselectionVerificationInput,
+    COMPILER_CANDIDATE_PRESELECTION_ACTION, COMPILER_CANDIDATE_PRESELECTION_AUTHORITY,
+    COMPILER_CANDIDATE_PRESELECTION_FILE, COMPILER_CANDIDATE_PRESELECTION_PROTOCOL,
+    COMPILER_CANDIDATE_PRESELECTION_PROVIDER_CONTRACT,
+    COMPILER_CANDIDATE_PRESELECTION_SIGNATURE_CONTRACT, COMPILER_CANDIDATE_PRESELECTION_VERDICT,
 };
 pub use compiler_candidate_production::{
     build_compiler_candidate_production, compiler_candidate_bundle_fold,

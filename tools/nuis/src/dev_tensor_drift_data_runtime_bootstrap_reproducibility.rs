@@ -399,7 +399,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "predecessor-authorization-id-generation-and-proof-sha256",
             "predecessor-active-state-generation-and-state-sha256",
             "authorization_and_state_mutated = false",
-            "give-one-nuis-owned-stage1-candidate-the-same-canonical-compile-capability",
+            "prove-direct-stage1-owned-compilation-without-stage0-provider-delegation",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -441,7 +441,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "retained_stage_role = \"stage1-candidate\"",
             "current-executed-forward-retained",
             "no-physical-paths-staging-names-registration-ordinals-or-timestamps-in-receipt",
-            "give-one-nuis-owned-stage1-candidate-the-same-canonical-compile-capability",
+            "prove-direct-stage1-owned-compilation-without-stage0-provider-delegation",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -662,9 +662,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "Transition v2 now binds that authorization proof",
             "Dispatch v1 then replays the trust chain",
             "Compile dispatch v1 derives a canonical rebuild request",
+            "Candidate compile capability v1 reuses the production-bound adapter",
+            "Candidate preselection v1 replays the complete generation-two signature",
             "Canonical recursive owned-struct layouts now have one bounded parser",
             "deterministic coordinate ordering remains at `compiler-toolchain/bootstrap/stage0-stage1-driver`",
-            "giving a Nuis-owned stage1 candidate the same canonical compile capability",
+            "direct stage1-owned compilation without provider delegation",
         ],
     },
     DevTensorDriftCheckSpec {

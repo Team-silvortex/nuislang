@@ -40,6 +40,8 @@ mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
+mod bootstrap_candidate_compile_capability;
+mod bootstrap_candidate_preselection;
 mod bootstrap_candidate_probe;
 mod bootstrap_component_compile_dispatch;
 mod bootstrap_component_dispatch;
@@ -395,6 +397,14 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapCandidateBuild { input, output_dir } => {
             bootstrap_candidate_build::handle_bootstrap_candidate_build(input, output_dir)?;
+        }
+        cli::CommandKind::BootstrapCandidateCompileCapability(input) => {
+            bootstrap_candidate_compile_capability::handle_bootstrap_candidate_compile_capability(
+                input,
+            )?;
+        }
+        cli::CommandKind::BootstrapPreselectCandidate(input) => {
+            bootstrap_candidate_preselection::handle_bootstrap_preselect_candidate(input)?;
         }
         cli::CommandKind::BootstrapReproducibility { input, output_dir } => {
             bootstrap_reproducibility::handle_bootstrap_reproducibility(input, output_dir)?;

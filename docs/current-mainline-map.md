@@ -17,21 +17,22 @@ If you only need the shortest current `beta-0.9.*` reading route, use this order
 6. [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
 7. [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
 8. [reference/nuis-compiler-stage-transformation.md](reference/nuis-compiler-stage-transformation.md)
-9. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-10. [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
-11. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-12. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-13. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-14. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-15. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-16. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-17. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-18. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-19. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-20. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-21. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-22. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-23. [versioning/README.md](versioning/README.md)
+9. [reference/nuis-compiler-candidate-preselection.md](reference/nuis-compiler-candidate-preselection.md)
+10. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
+11. [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
+12. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+13. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+14. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+15. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+16. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+17. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+18. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+19. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+20. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+21. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+22. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+23. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+24. [versioning/README.md](versioning/README.md)
 
 Short rule:
 
@@ -53,6 +54,10 @@ Short rule:
   [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
 * current attested Nuis stage1 leaf production proof:
   [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
+* current production-bound candidate compile capability:
+  [reference/nuis-compiler-candidate-compile-capability.md](reference/nuis-compiler-candidate-compile-capability.md)
+* current owner-signed generation-three candidate preselection:
+  [reference/nuis-compiler-candidate-preselection.md](reference/nuis-compiler-candidate-preselection.md)
 * current stage0/stage1 candidate differential gate:
   [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
 * current two-clean-build compiler reproducibility aggregate:
@@ -135,10 +140,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component/bootstrap-rollback-component/bootstrap-verify-component-transition/bootstrap-dispatch-component/bootstrap-dispatch-compile -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-candidate-compile-capability/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component/bootstrap-rollback-component/bootstrap-verify-component-transition/bootstrap-dispatch-component/bootstrap-dispatch-compile -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch -> canonical selected-image compile request -> stage1 compile-capability closure`
+`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch -> canonical selected-image compile request -> production-bound Nuis candidate delegated compile capability -> signed generation-three preselection -> direct stage1 compile proof`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

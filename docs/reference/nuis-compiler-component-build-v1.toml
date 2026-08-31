@@ -99,6 +99,6 @@ validation_commands = [
 status = "first-stage1-leaf-produced"
 missing = [
   "general-stage1-component-production-beyond-identity-projection",
-  "stage1-candidate-canonical-compile-capability",
+  "direct-stage1-owned-compile-proof-and-capability-v2",
   "signed-generation-three-forward-transition-and-owner-key-rotation",
 ]

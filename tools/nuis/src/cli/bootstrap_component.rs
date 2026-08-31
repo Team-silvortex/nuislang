@@ -1,10 +1,54 @@
 use std::path::PathBuf;
 
+use crate::bootstrap_candidate_compile_capability::BootstrapCandidateCompileCapabilityInput;
+use crate::bootstrap_candidate_preselection::BootstrapCandidatePreselectionInput;
 use crate::bootstrap_component_compile_dispatch::BootstrapComponentCompileDispatchInput;
 use crate::bootstrap_component_dispatch::BootstrapComponentDispatchInput;
 use crate::bootstrap_component_replacement::BootstrapComponentTransitionVerificationInput;
 
 use super::{support::parse_bootstrap_component_verification_prefix, CommandKind};
+
+pub(super) fn parse_bootstrap_candidate_compile_capability(
+    args: &mut impl Iterator<Item = String>,
+) -> Result<CommandKind, String> {
+    let usage = "usage: nuis bootstrap-candidate-compile-capability <candidate-build-root> <stage0-provider-image> <project-dir|nuis.toml> <fresh-build-output> <output>";
+    let command = CommandKind::BootstrapCandidateCompileCapability(
+        BootstrapCandidateCompileCapabilityInput {
+            candidate_root: path(args, usage)?,
+            provider_image: path(args, usage)?,
+            project_input: path(args, usage)?,
+            build_output: path(args, usage)?,
+            output: path(args, usage)?,
+        },
+    );
+    finish(args, usage, command)
+}
+
+pub(super) fn parse_bootstrap_candidate_preselection(
+    args: &mut impl Iterator<Item = String>,
+) -> Result<CommandKind, String> {
+    let usage = "usage: nuis bootstrap-preselect-candidate <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256> <candidate-build-root> <candidate-compile-capability> <preselection-challenge-sha256> <authorizer-id> <environment-id> <preselection-id> <output>";
+    let verification = parse_bootstrap_component_verification_prefix(args, usage)?;
+    let active_state = path(args, usage)?;
+    let transition = path(args, usage)?;
+    let transition_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+    let command = CommandKind::BootstrapPreselectCandidate(BootstrapCandidatePreselectionInput {
+        transition_verification: BootstrapComponentTransitionVerificationInput {
+            verification,
+            active_state,
+            transition,
+            transition_challenge_sha256,
+        },
+        candidate_root: path(args, usage)?,
+        capability: path(args, usage)?,
+        challenge_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+        authorizer_id: args.next().ok_or_else(|| usage.to_owned())?,
+        environment_id: args.next().ok_or_else(|| usage.to_owned())?,
+        preselection_id: args.next().ok_or_else(|| usage.to_owned())?,
+        output: path(args, usage)?,
+    });
+    finish(args, usage, command)
+}
 
 pub(super) fn parse_bootstrap_component_dispatch(
     command: &str,
@@ -61,4 +105,16 @@ fn path(args: &mut impl Iterator<Item = String>, usage: &str) -> Result<PathBuf,
     args.next()
         .map(PathBuf::from)
         .ok_or_else(|| usage.to_owned())
+}
+
+fn finish(
+    args: &mut impl Iterator<Item = String>,
+    usage: &str,
+    command: CommandKind,
+) -> Result<CommandKind, String> {
+    if args.next().is_some() {
+        Err(usage.to_owned())
+    } else {
+        Ok(command)
+    }
 }

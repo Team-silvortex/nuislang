@@ -203,6 +203,15 @@ before writing its report. Changing the adapter, any token byte or page,
 AST/NIR page or cursor, stage payload, role, producer, component record, derived
 payload, semantic differential, v2 selection, or proof therefore fails closed.
 
+The same production-bound adapter now has a second, disjoint command shape for
+candidate compile capability v1. Its original five-payload scalar output stays
+at v9. The compile route folds every command and runtime path byte through the
+same Nuis exports, then delegates only to an exact verified stage0 provider
+with no shell. The separate capability receipt binds that execution and grants
+no replacement or selection authority; production v11 itself remains
+unchanged. See
+[Nuis Compiler Candidate Compile Capability](nuis-compiler-candidate-compile-capability.md).
+
 ## Current Limit
 
 V11 binds every token byte through deterministic pagination but still binds
