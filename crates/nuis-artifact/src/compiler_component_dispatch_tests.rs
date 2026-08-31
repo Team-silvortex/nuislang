@@ -5,18 +5,23 @@ use ed25519_dalek::SigningKey;
 use super::*;
 use crate::{
     build_compiler_component_active_state, build_compiler_component_attestation,
-    build_compiler_component_build, build_compiler_component_replacement_authorization,
+    build_compiler_component_build, build_compiler_component_compile_dispatch_receipt,
+    build_compiler_component_replacement_authorization,
     build_compiler_component_replacement_authorizer_registry, build_compiler_component_transition,
     compiler_component_replacement_authorizer_registry_sha256,
-    compiler_component_reproducibility::build_from_runs, promote_compiler_component_candidate,
-    render_compiler_component_active_state, render_compiler_component_attestation,
+    compiler_component_reproducibility::build_from_runs, encode_nuis_compiled_artifact_binary,
+    promote_compiler_component_candidate, render_compiler_component_active_state,
+    render_compiler_component_attestation, render_compiler_component_compile_dispatch_receipt,
     render_compiler_component_replacement_authorization,
     render_compiler_component_replacement_authorizer_registry,
     render_compiler_component_reproducibility, CompilerComponentAttestationInput,
     CompilerComponentBuildInput, CompilerComponentCandidatePromotionInput,
-    CompilerComponentDependencyInput, CompilerComponentReplacementAuthorizationInput,
+    CompilerComponentCompileDispatchReceiptInput, CompilerComponentDependencyInput,
+    CompilerComponentReplacementAuthorizationInput,
     CompilerComponentReplacementAuthorizerEntryInput, CompilerComponentReproducibilityRun,
-    CompilerComponentTransitionInput, COMPILER_COMPONENT_STAGE0_ROLE,
+    CompilerComponentTransitionInput, NuisCompiledArtifact, NuisExecutableEnvelope,
+    NuisLifecycleContract, COMPILER_COMPONENT_COMPILE_DISPATCH_FILE,
+    COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT, COMPILER_COMPONENT_STAGE0_ROLE,
 };
 
 const TRANSITION_CHALLENGE: &str =
@@ -42,6 +47,7 @@ fn public_key_hex(seed: u8) -> String {
 }
 
 fn component_pair() -> (CompilerComponentBuild, CompilerComponentBuild) {
+    let compiled_artifact = compiled_artifact("request build manifest", b"native compiler output");
     let dependencies = [CompilerComponentDependencyInput {
         kind: "component-source",
         identity: "main.ns",
@@ -60,7 +66,7 @@ fn component_pair() -> (CompilerComponentBuild, CompilerComponentBuild) {
         build_manifest_file: "nuis.build.manifest.toml",
         build_manifest: b"build manifest",
         compiled_artifact_file: "nuis.compiled.artifact",
-        compiled_artifact: b"compiled artifact",
+        compiled_artifact: &compiled_artifact,
         native_binary_file: "projection_relay",
         native_binary: b"native compiler output",
         dependencies: &dependencies,
@@ -75,6 +81,88 @@ fn component_pair() -> (CompilerComponentBuild, CompilerComponentBuild) {
         })
         .expect("promote candidate component");
     (stage0, candidate)
+}
+
+fn rebuilt_stage0(native_binary: &[u8]) -> CompilerComponentBuild {
+    let compiled_artifact = compiled_artifact("result build manifest", native_binary);
+    rebuilt_stage0_with_artifact(native_binary, &compiled_artifact)
+}
+
+fn rebuilt_stage0_with_artifact(
+    native_binary: &[u8],
+    compiled_artifact: &[u8],
+) -> CompilerComponentBuild {
+    let dependencies = [CompilerComponentDependencyInput {
+        kind: "component-source",
+        identity: "main.ns",
+        bytes: b"mod cpu Main {}\n",
+    }];
+    build_compiler_component_build(&CompilerComponentBuildInput {
+        stage_role: COMPILER_COMPONENT_STAGE0_ROLE,
+        bootstrap_subset_protocol: "nuis-bootstrap-language-subset-v8",
+        component_id: "projection_relay",
+        component_domain: "cpu",
+        component_unit: "Main",
+        producer_id: "nuisc-stage0-reference",
+        compiler_image: STAGE0_IMAGE,
+        stage_handoff_file: "nuis.compiler-stage-handoff.toml",
+        stage_handoff_bundle_sha256: &hash('1'),
+        build_manifest_file: "nuis.build.manifest.toml",
+        build_manifest: b"cache-hit build manifest",
+        compiled_artifact_file: "nuis.compiled.artifact",
+        compiled_artifact,
+        native_binary_file: "projection_relay",
+        native_binary,
+        dependencies: &dependencies,
+    })
+    .expect("build dispatched stage0 result")
+}
+
+fn compiled_artifact(build_manifest_source: &str, binary_blob: &[u8]) -> Vec<u8> {
+    compiled_artifact_with_mode(build_manifest_source, binary_blob, "native-cpu-llvm")
+}
+
+fn compiled_artifact_with_mode(
+    build_manifest_source: &str,
+    binary_blob: &[u8],
+    packaging_mode: &str,
+) -> Vec<u8> {
+    encode_nuis_compiled_artifact_binary(&NuisCompiledArtifact {
+        schema: "nuis-compiled-artifact-v1".to_owned(),
+        packaging_mode: packaging_mode.to_owned(),
+        cpu_target_abi: "cpu.test".to_owned(),
+        cpu_target_machine_arch: "test".to_owned(),
+        cpu_target_machine_os: "test".to_owned(),
+        cpu_target_object_format: "test".to_owned(),
+        cpu_target_calling_abi: "test".to_owned(),
+        binary_name: "projection_relay".to_owned(),
+        binary_bytes: binary_blob.len(),
+        build_manifest_bytes: build_manifest_source.len(),
+        envelope: NuisExecutableEnvelope {
+            schema: "nuis-executable-envelope-v1".to_owned(),
+            executable_kind: "native-cpu-llvm".to_owned(),
+            package_count: 1,
+            domain_families: vec!["cpu".to_owned()],
+            contract_families: vec!["cpu".to_owned()],
+            function_kind: "function-node".to_owned(),
+            graph_kind: "minimal-function-graph".to_owned(),
+            default_time_mode: "logical".to_owned(),
+        },
+        lifecycle: NuisLifecycleContract {
+            schema: "nuis-lifecycle-contract-v1".to_owned(),
+            bootstrap_entry: "main".to_owned(),
+            tick_policy: "owned".to_owned(),
+            shutdown_policy: "drain".to_owned(),
+            yalivia_rpc: "disabled".to_owned(),
+            hook_surface: vec!["on_bootstrap".to_owned()],
+            export_surface: vec!["main".to_owned()],
+            runtime_capability_flags: vec!["runtime.bootstrap".to_owned()],
+        },
+        build_manifest_source: build_manifest_source.to_owned(),
+        binary_blob: binary_blob.to_vec(),
+        host_objects: Vec::new(),
+    })
+    .expect("encode test compiled artifact")
 }
 
 fn run(
@@ -346,4 +434,165 @@ fn image_tampering_duplicate_registration_and_receipt_drift_fail_closed() {
     )
     .expect_err("receipt target drift must fail");
     assert!(error.to_string().contains("unsupported contract"));
+}
+
+#[test]
+fn selected_current_rebuilds_one_canonical_request_without_persisting_paths() {
+    let fixture = fixture();
+    let candidates = [
+        CompilerComponentDispatchCandidate {
+            component: &fixture.candidate,
+            compiler_image: FORWARD_IMAGE,
+        },
+        CompilerComponentDispatchCandidate {
+            component: &fixture.stage0,
+            compiler_image: STAGE0_IMAGE,
+        },
+    ];
+    let resolution = resolve_compiler_component_dispatch(
+        &fixture.transition,
+        verification_input(&fixture),
+        &candidates,
+    )
+    .expect("resolve compile dispatch");
+    let result = rebuilt_stage0(b"native compiler output");
+    let request_artifact = compiled_artifact("request build manifest", b"native compiler output");
+    let result_artifact = compiled_artifact("result build manifest", b"native compiler output");
+    assert_ne!(result.record_sha256, fixture.stage0.record_sha256);
+    assert_eq!(
+        result.reproducible_build_sha256,
+        fixture.stage0.reproducible_build_sha256
+    );
+
+    let receipt = build_compiler_component_compile_dispatch_receipt(
+        CompilerComponentCompileDispatchReceiptInput {
+            transition: &fixture.transition,
+            resolution: &resolution,
+            request: &fixture.stage0,
+            result: &result,
+            request_compiled_artifact: &request_artifact,
+            result_compiled_artifact: &result_artifact,
+            exit_code: 0,
+            stdout: b"bootstrap component build: recorded\n",
+            stderr: b"",
+        },
+    )
+    .expect("build compile dispatch receipt");
+    let source = render_compiler_component_compile_dispatch_receipt(&receipt);
+    assert!(!source.contains('/'));
+    assert!(!source.contains("timestamp"));
+    let parsed = crate::parse_compiler_component_compile_dispatch_receipt_from_source(
+        &source,
+        Path::new(COMPILER_COMPONENT_COMPILE_DISPATCH_FILE),
+    )
+    .expect("parse canonical compile dispatch receipt");
+    assert_eq!(parsed, receipt);
+    assert_eq!(parsed.verdict, COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT);
+    assert_eq!(
+        parsed.request_reproducible_build_sha256,
+        parsed.result_reproducible_build_sha256
+    );
+    assert_eq!(
+        parsed.forward_reproducible_build_sha256,
+        fixture.transition.forward_reproducible_build_sha256
+    );
+}
+
+#[test]
+fn compile_result_and_receipt_semantic_drift_fail_closed() {
+    let fixture = fixture();
+    let candidates = [
+        CompilerComponentDispatchCandidate {
+            component: &fixture.stage0,
+            compiler_image: STAGE0_IMAGE,
+        },
+        CompilerComponentDispatchCandidate {
+            component: &fixture.candidate,
+            compiler_image: FORWARD_IMAGE,
+        },
+    ];
+    let resolution = resolve_compiler_component_dispatch(
+        &fixture.transition,
+        verification_input(&fixture),
+        &candidates,
+    )
+    .expect("resolve compile dispatch");
+    let drifted = rebuilt_stage0(b"different native compiler output");
+    let request_artifact = compiled_artifact("request build manifest", b"native compiler output");
+    let drifted_artifact =
+        compiled_artifact("result build manifest", b"different native compiler output");
+    let error = build_compiler_component_compile_dispatch_receipt(
+        CompilerComponentCompileDispatchReceiptInput {
+            transition: &fixture.transition,
+            resolution: &resolution,
+            request: &fixture.stage0,
+            result: &drifted,
+            request_compiled_artifact: &request_artifact,
+            result_compiled_artifact: &drifted_artifact,
+            exit_code: 0,
+            stdout: b"bootstrap component build: recorded\n",
+            stderr: b"",
+        },
+    )
+    .expect_err("native result drift must fail closed");
+    assert!(error
+        .to_string()
+        .contains("does not satisfy the canonical rebuild request"));
+
+    let semantic_drift_artifact = compiled_artifact_with_mode(
+        "result build manifest",
+        b"native compiler output",
+        "native-cpu-drift",
+    );
+    let semantic_drift =
+        rebuilt_stage0_with_artifact(b"native compiler output", &semantic_drift_artifact);
+    let error = build_compiler_component_compile_dispatch_receipt(
+        CompilerComponentCompileDispatchReceiptInput {
+            transition: &fixture.transition,
+            resolution: &resolution,
+            request: &fixture.stage0,
+            result: &semantic_drift,
+            request_compiled_artifact: &request_artifact,
+            result_compiled_artifact: &semantic_drift_artifact,
+            exit_code: 0,
+            stdout: b"bootstrap component build: recorded\n",
+            stderr: b"",
+        },
+    )
+    .expect_err("compiled artifact semantic drift must fail closed");
+    assert!(error
+        .to_string()
+        .contains("changed the path-neutral compiled artifact semantics"));
+
+    let result = rebuilt_stage0(b"native compiler output");
+    let result_artifact = compiled_artifact("result build manifest", b"native compiler output");
+    let receipt = build_compiler_component_compile_dispatch_receipt(
+        CompilerComponentCompileDispatchReceiptInput {
+            transition: &fixture.transition,
+            resolution: &resolution,
+            request: &fixture.stage0,
+            result: &result,
+            request_compiled_artifact: &request_artifact,
+            result_compiled_artifact: &result_artifact,
+            exit_code: 0,
+            stdout: b"bootstrap component build: recorded\n",
+            stderr: b"",
+        },
+    )
+    .expect("build valid compile dispatch receipt");
+    let source = render_compiler_component_compile_dispatch_receipt(&receipt);
+    let tampered = source.replacen(
+        &format!(
+            "result_native_binary_sha256 = \"{}\"",
+            receipt.result_native_binary_sha256
+        ),
+        &format!("result_native_binary_sha256 = \"{}\"", hash('f')),
+        1,
+    );
+    let error = crate::parse_compiler_component_compile_dispatch_receipt_from_source(
+        &tampered,
+        Path::new(COMPILER_COMPONENT_COMPILE_DISPATCH_FILE),
+    )
+    .expect_err("receipt request/result drift must fail closed");
+    assert!(error.to_string().contains("inconsistent request"));
 }

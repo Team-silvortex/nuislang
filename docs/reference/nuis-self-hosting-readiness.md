@@ -252,9 +252,14 @@ the restored stage0 image from a private create-new staging slot, rereads the
 staged bytes before launch, removes the slot afterward, and emits canonical
 `nuis-compiler-component-dispatch-v1` evidence. The receipt retains the exact
 candidate as `forward` and carries no physical path or timestamp. The current
-request is deliberately limited to the `help` frontdoor; routing a canonical
-project compile request through the selected image remains open. See
-[Nuis Compiler Component Dispatch](nuis-compiler-component-dispatch.md).
+request remains deliberately limited to the `help` frontdoor. Its separately
+versioned `nuis bootstrap-dispatch-compile` companion derives a canonical
+rebuild request from the exact selected stage0 record, runs real
+`bootstrap-build`, rereads the complete result, and requires equal dependency,
+handoff, native, reproducible, and decoded artifact-semantic identities. Both
+raw path-bearing artifact hashes remain auditable while operational paths stay
+out of the receipt. See [Nuis Compiler Component Dispatch](nuis-compiler-component-dispatch.md)
+and [Nuis Compiler Component Compile Dispatch](nuis-compiler-component-compile-dispatch.md).
 
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
@@ -310,9 +315,10 @@ equivalence despite non-identical bytes while retaining false replacement author
 sidecar's exact hash is not yet carried by the generation-one reproducibility
 aggregate. Replacement authorization v1 now feeds canonical active-state v1,
 transition v2 signs generation-two stage0 restoration while retaining the
-candidate as the forward target, and dispatch v1 executes that exact current
-image without rewriting a predecessor. Remote sidecar evidence, selected-image
-project compilation, and a generation-three successor remain open.
+candidate as the forward target, dispatch v1 executes that exact current image,
+and compile dispatch v1 rebuilds one canonical project without rewriting a
+predecessor. Remote sidecar evidence, a stage1 image with the same compile
+capability, and a generation-three successor remain open.
 Cryptography does not prove physical-machine
 independence; that remains an operational fact.
 

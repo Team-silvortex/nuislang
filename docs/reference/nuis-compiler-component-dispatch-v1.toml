@@ -67,11 +67,10 @@ receipt_identity = [
 [honest_boundary]
 claim = "the-signed-generation-two-current-image-is-resolved-and-really-executed-while-forward-remains-bound"
 does_not_claim = "a-project-was-compiled-through-the-selected-image-or-the-forward-candidate-is-a-complete-compiler"
-next_step = "route-one-canonical-bootstrap-subset-compile-request-through-the-verified-current-image"
+next_step = "give-one-nuis-owned-stage1-candidate-the-same-canonical-compile-capability"
 
 [open_boundary]
 missing = [
-  "canonical-project-compile-request-dispatch",
   "signed-generation-three-forward-transition",
   "component-owner-key-rotation-chain",
   "checked-in-independent-component-owner-dispatch-evidence",

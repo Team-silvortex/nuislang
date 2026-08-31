@@ -78,6 +78,6 @@ missing = [
   "typed-owned-arena-payloads-and-unbounded-growth",
   "general-aggregate-loop-backedge-lowering",
   "second-independent-attester-or-higher-generation-rotation-evidence",
-  "canonical-project-compile-request-through-the-verified-generation-two-current-image",
+  "stage1-candidate-canonical-compile-capability",
   "signed-generation-three-forward-transition-and-owner-key-rotation",
 ]

@@ -1,8 +1,8 @@
 use super::{
-    parse_args, BootstrapComponentActivationInput, BootstrapComponentDispatchInput,
-    BootstrapComponentReplacementInput, BootstrapComponentReplacementVerificationInput,
-    BootstrapComponentRollbackInput, BootstrapComponentTransitionVerificationInput, CommandKind,
-    GalaxyCommand,
+    parse_args, BootstrapComponentActivationInput, BootstrapComponentCompileDispatchInput,
+    BootstrapComponentDispatchInput, BootstrapComponentReplacementInput,
+    BootstrapComponentReplacementVerificationInput, BootstrapComponentRollbackInput,
+    BootstrapComponentTransitionVerificationInput, CommandKind, GalaxyCommand,
 };
 use std::path::PathBuf;
 
@@ -400,7 +400,7 @@ fn parses_bootstrap_component_transition_commands() {
     );
 
     let mut dispatch_args = vec!["bootstrap-dispatch-component".to_owned()];
-    dispatch_args.extend(args);
+    dispatch_args.extend(args.clone());
     dispatch_args.extend([
         "active-state.toml".to_owned(),
         "transition.toml".to_owned(),
@@ -425,6 +425,39 @@ fn parses_bootstrap_component_transition_commands() {
             forward_component: PathBuf::from("candidate-component.toml"),
             forward_image: PathBuf::from("candidate-image"),
             output: PathBuf::from("dispatch.toml"),
+        })
+    );
+
+    let mut compile_args = vec!["bootstrap-dispatch-compile".to_owned()];
+    compile_args.extend(args);
+    compile_args.extend([
+        "active-state.toml".to_owned(),
+        "transition.toml".to_owned(),
+        "e".repeat(64),
+        "stage0-component.toml".to_owned(),
+        "stage0-image".to_owned(),
+        "candidate-component.toml".to_owned(),
+        "candidate-image".to_owned(),
+        "project/nuis.toml".to_owned(),
+        "fresh-build".to_owned(),
+        "compile-dispatch.toml".to_owned(),
+    ]);
+    assert_eq!(
+        parse_args(compile_args.into_iter()).expect("bootstrap compile dispatch parses"),
+        CommandKind::BootstrapDispatchCompile(BootstrapComponentCompileDispatchInput {
+            transition_verification: BootstrapComponentTransitionVerificationInput {
+                verification: verification(),
+                active_state: PathBuf::from("active-state.toml"),
+                transition: PathBuf::from("transition.toml"),
+                transition_challenge_sha256: "e".repeat(64),
+            },
+            current_component: PathBuf::from("stage0-component.toml"),
+            current_image: PathBuf::from("stage0-image"),
+            forward_component: PathBuf::from("candidate-component.toml"),
+            forward_image: PathBuf::from("candidate-image"),
+            project_input: PathBuf::from("project/nuis.toml"),
+            build_output: PathBuf::from("fresh-build"),
+            output: PathBuf::from("compile-dispatch.toml"),
         })
     );
 }

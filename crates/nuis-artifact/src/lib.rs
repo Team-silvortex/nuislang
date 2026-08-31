@@ -8,6 +8,7 @@ mod compiler_component_active_state;
 mod compiler_component_attestation;
 mod compiler_component_attestation_registry;
 mod compiler_component_build;
+mod compiler_component_compile_dispatch;
 mod compiler_component_diff;
 mod compiler_component_dispatch;
 mod compiler_component_replacement;
@@ -107,6 +108,19 @@ pub use compiler_component_build::{
     COMPILER_COMPONENT_BUILD_PROTOCOL, COMPILER_COMPONENT_DEPENDENCY_CLOSURE_CONTRACT,
     COMPILER_COMPONENT_DRIVER_CONTRACT, COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT,
     COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+};
+pub use compiler_component_compile_dispatch::{
+    build_compiler_component_compile_dispatch_receipt,
+    parse_compiler_component_compile_dispatch_receipt,
+    parse_compiler_component_compile_dispatch_receipt_from_source,
+    render_compiler_component_compile_dispatch_receipt, CompilerComponentCompileDispatchReceipt,
+    CompilerComponentCompileDispatchReceiptInput,
+    COMPILER_COMPONENT_COMPILED_ARTIFACT_IDENTITY_CONTRACT,
+    COMPILER_COMPONENT_COMPILE_ARGUMENT_CONTRACT, COMPILER_COMPONENT_COMPILE_COMMAND,
+    COMPILER_COMPONENT_COMPILE_DISPATCH_AUTHORITY,
+    COMPILER_COMPONENT_COMPILE_DISPATCH_DRIVER_CONTRACT, COMPILER_COMPONENT_COMPILE_DISPATCH_FILE,
+    COMPILER_COMPONENT_COMPILE_DISPATCH_PROTOCOL, COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT,
+    COMPILER_COMPONENT_COMPILE_REQUEST_CONTRACT,
 };
 pub use compiler_component_diff::{
     build_compiler_component_differential, compare_compiler_component_paths,

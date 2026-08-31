@@ -32,7 +32,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`756/756` passing drift checks. The compiler data model, stage0/stage1 driver,
+`761/761` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
 state close their previous weakest tasks. Dispatch v1 now resolves an unordered
@@ -130,8 +130,14 @@ immutable. `bootstrap-rollback-component` now signs generation two over the
 predecessor authorization proof and active-state identity, restores stage0 as
 `current`, and retains the candidate as `forward`. Execution through that
 selected identity now runs through `bootstrap-dispatch-component` and emits a
-canonical `current-executed-forward-retained` receipt. Routing a real project
-compile request through the selected image remains open.
+canonical `current-executed-forward-retained` receipt.
+`bootstrap-dispatch-compile` now derives a canonical rebuild request from that
+exact current record, invokes its byte-verified image through the real
+`bootstrap-build` frontdoor, rereads every result payload, and emits a path-free
+`current-compiled-forward-retained` receipt while preserving the candidate as
+forward. Raw path-bearing artifact containers stay auditable, while decoded
+artifact semantics, dependencies, handoff, native output, and reproducible
+identity must match.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -151,12 +157,16 @@ structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candid
 execution proof, chunked compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
 routes mainline work to a canonical bootstrap compile request through the
-already verified generation-two `current` image. The v11 production
+already verified generation-two `current` image. That compile dispatch is now
+closed for stage0; the next stage-driver gap is giving a Nuis-owned stage1
+candidate the same versioned compile capability before any generation-three
+forward selection. The v11 production
 lineage now has checked-in challenge-bound Ed25519 attester evidence and a
 separate genesis replacement-authorization protocol. Authorization consumption
 is closed by canonical active-state v1, and the first rollback link is signed
-by transition v2, and dispatch v1 closes the first selected-image process
-execution; selected-image project compilation, broader compiler-data paging, Galaxy
+by transition v2; dispatch v1 closes the first selected-image process
+execution, and compile-dispatch v1 closes the first selected-image project
+rebuild. Stage1 compile capability, broader compiler-data paging, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 
@@ -176,6 +186,7 @@ Start with these documents:
 * [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
 * [Compiler component reproducibility](docs/reference/nuis-compiler-component-reproducibility.md)
 * [Compiler component replacement authorization](docs/reference/nuis-compiler-component-replacement-authorization.md)
+* [Compiler component compile dispatch](docs/reference/nuis-compiler-component-compile-dispatch.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
 * [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)

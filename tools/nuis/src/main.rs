@@ -41,7 +41,9 @@ mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_probe;
+mod bootstrap_component_compile_dispatch;
 mod bootstrap_component_dispatch;
+mod bootstrap_component_image;
 mod bootstrap_component_replacement;
 mod bootstrap_reproducibility;
 mod bootstrap_reproducibility_attestation;
@@ -450,6 +452,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapDispatchComponent(input) => {
             bootstrap_component_dispatch::handle_bootstrap_dispatch_component(input)?
+        }
+        cli::CommandKind::BootstrapDispatchCompile(input) => {
+            bootstrap_component_compile_dispatch::handle_bootstrap_dispatch_compile(input)?
         }
         cli::CommandKind::BootstrapDiff {
             stage0_record,

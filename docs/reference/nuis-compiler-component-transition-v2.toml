@@ -80,11 +80,11 @@ verification_invariants = [
 claim = "one-signed-generation-two-transition-deterministically-restores-stage0-and-retains-the-candidate-forward-target"
 does_not_claim = "the-selected-image-has-compiled-a-project-or-that-key-rotation-is-supported"
 repository_test_scope = "checked-in-linux-amd64-attestation-plus-temporary-local-component-owner-key"
-next_step = "route-one-canonical-bootstrap-subset-compile-request-through-the-verified-current-image"
+next_step = "give-one-nuis-owned-stage1-candidate-the-same-canonical-compile-capability"
 
 [open_boundary]
 missing = [
-  "canonical-project-compile-request-through-the-selected-current-image",
+  "stage1-candidate-canonical-compile-capability",
   "signed-generation-three-forward-transition",
   "component-owner-key-rotation-chain",
   "checked-in-independent-component-owner-transition-evidence",

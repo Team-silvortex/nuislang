@@ -68,6 +68,8 @@ Start in this order:
   - [nuis-compiler-component-transition-v2.toml](nuis-compiler-component-transition-v2.toml)
   - [nuis-compiler-component-dispatch.md](nuis-compiler-component-dispatch.md)
   - [nuis-compiler-component-dispatch-v1.toml](nuis-compiler-component-dispatch-v1.toml)
+  - [nuis-compiler-component-compile-dispatch.md](nuis-compiler-component-compile-dispatch.md)
+  - [nuis-compiler-component-compile-dispatch-v1.toml](nuis-compiler-component-compile-dispatch-v1.toml)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
@@ -137,6 +139,10 @@ payloads identified without Rust layout coupling?”, start with
 If your question is specifically “how does a signed component transition select
 and execute exact compiler-image bytes without persisting their path?”, start
 with [nuis-compiler-component-dispatch.md](nuis-compiler-component-dispatch.md).
+
+If your question is specifically “how does that selected image compile a real
+project without making runtime paths part of the request?”, start with
+[nuis-compiler-component-compile-dispatch.md](nuis-compiler-component-compile-dispatch.md).
 
 If your question is specifically “how does stage0 attest one complete
 project-form compiler-component build?”, start with

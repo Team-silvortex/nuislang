@@ -62,15 +62,18 @@ output bytes.
 ## Honest Boundary
 
 This proves real execution of the generation-two `current` compiler frontdoor
-while retaining the signed `forward` candidate. It does not yet route a source
-project through that selected image, advance to generation three, execute the
-forward candidate, rotate the owner key, or claim full self-hosting.
+while retaining the signed `forward` candidate. The separately versioned
+[compile dispatch v1](nuis-compiler-component-compile-dispatch.md) now routes a
+real canonical project rebuild through the same selected image without changing
+this fixed-`help` protocol. Neither protocol advances to generation three,
+executes the forward candidate, rotates the owner key, or claims self-hosting.
 
 The repository integration extends the existing two-clean-build path through
 attestation, independent authorization, active state, signed rollback, real
 Mach-O stage0 execution, canonical receipt verification, and staging cleanup.
 Artifact tests additionally reverse inventory order and reject image,
-registration, or receipt drift.
+registration, or receipt drift. The compile companion further checks decoded
+artifact semantics while retaining both path-sensitive raw container hashes.
 
 ## Validation
 

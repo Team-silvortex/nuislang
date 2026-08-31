@@ -1,0 +1,91 @@
+protocol = "nuis-compiler-component-compile-dispatch-v1"
+version = 1
+status = "usable-selected-current-project-compilation"
+scope = "signed-generation-two-current-bootstrap-build-with-forward-retention"
+manifest_name = "nuis.compiler-component-compile-dispatch.toml"
+driver_contract = "nuis-stage0-stage1-verified-compile-dispatch-v1"
+authority = "verified-transition-current-rebuild-no-state-mutation"
+inventory_contract = "unordered-exact-current-forward-build-images-v1"
+request_contract = "canonical-verified-stage0-component-rebuild-v1"
+command = "bootstrap-build"
+argument_contract = "runtime-project-and-fresh-output-paths-not-persisted-v1"
+stdin_contract = "closed-stdin-v1"
+compiled_artifact_identity_contract = "nuis-compiled-artifact-semantic-identity-v1"
+digest = "sha256-lowercase"
+path_policy = "operational-input-and-output-paths-never-enter-the-receipt"
+output_creation = "create-new-receipt-and-absent-build-root"
+verdict = "current-compiled-forward-retained"
+
+frontdoor = "nuis bootstrap-dispatch-compile"
+transition_protocol = "nuis-compiler-component-transition-v2"
+required_transition_generation = 2
+selected_selector = "current"
+selected_stage_role = "stage0"
+retained_selector = "forward"
+retained_stage_role = "stage1-candidate"
+
+verification_order = [
+  "reverify-complete-attestation-authorization-active-state-and-transition-lineage",
+  "read-both-component-records-and-every-record-bound-disk-payload",
+  "resolve-unordered-exact-current-forward-images-by-signed-identity",
+  "verify-both-images-by-byte-length-and-sha256",
+  "derive-the-canonical-request-from-the-exact-selected-current-record",
+  "stage-reread-and-execute-current-bootstrap-build-with-closed-stdin",
+  "read-the-result-record-and-every-result-bound-disk-payload",
+  "decode-request-and-result-compiled-artifacts",
+  "compare-path-neutral-artifact-and-component-semantic-identities",
+  "persist-and-reparse-one-canonical-path-free-receipt",
+]
+
+request_invariants = [
+  "request-record-is-the-exact-signed-current-stage0-record",
+  "project-and-fresh-output-paths-are-runtime-carriers-only",
+  "build-output-must-not-exist-before-dispatch",
+  "receipt-must-not-exist-before-dispatch",
+  "runtime-paths-output-text-and-staging-name-are-not-persisted",
+]
+
+result_invariants = [
+  "stage-role-bootstrap-subset-component-domain-unit-and-producer-match-request",
+  "result-compiler-image-equals-byte-verified-selected-current-image",
+  "dependency-records-count-closure-contract-and-closure-sha256-match",
+  "stage-handoff-file-and-bundle-sha256-match",
+  "native-file-length-and-sha256-match",
+  "reproducible-identity-contract-and-sha256-match",
+  "compiled-artifact-files-are-individually-length-and-sha256-bound",
+  "compiled-artifact-path-neutral-semantic-sha256-matches",
+  "forward-record-and-image-remain-bound-but-unexecuted",
+]
+
+compiled_artifact_semantic_identity = [
+  "schema-packaging-mode-target-abi-and-binary-name",
+  "executable-envelope-fields-and-ordered-surfaces",
+  "lifecycle-fields-and-ordered-surfaces",
+  "native-binary-blob",
+  "ordered-host-object-identities-roles-formats-and-bytes",
+]
+compiled_artifact_excluded_audit_fields = [
+  "embedded-build-manifest-source",
+  "embedded-build-manifest-byte-count",
+]
+compiled_artifact_audit_rule = "request-and-result-raw-container-lengths-and-sha256-remain-separately-recorded"
+
+[honest_boundary]
+claim = "the-exact-signed-generation-two-current-image-rebuilds-one-canonical-bootstrap-component-request-while-forward-remains-bound"
+does_not_claim = "the-forward-stage1-candidate-exposes-bootstrap-build-or-is-ready-for-generation-three-current-selection"
+next_step = "give-one-nuis-owned-stage1-candidate-the-same-versioned-canonical-compile-capability-before-forward-selection"
+
+[open_boundary]
+missing = [
+  "stage1-candidate-bootstrap-build-capability",
+  "signed-generation-three-forward-transition",
+  "component-owner-key-rotation-chain",
+  "checked-in-independent-component-owner-compile-dispatch-evidence",
+  "multi-component-and-threshold-authorizer-policy",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_dispatch -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_transition_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]

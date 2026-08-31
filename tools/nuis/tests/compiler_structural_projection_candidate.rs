@@ -11,13 +11,13 @@ use nuis_artifact::{
     build_compiler_component_replacement_authorizer_registry,
     compiler_component_attester_trust_registry_sha256,
     compiler_component_replacement_authorizer_registry_sha256, parse_build_manifest,
-    parse_compiler_component_differential, parse_compiler_component_dispatch_receipt,
-    parse_compiler_structural_projection, read_compiler_candidate_execution,
-    read_compiler_candidate_production, read_compiler_component_attestation,
-    read_compiler_component_build, read_compiler_component_representation_differential,
-    read_compiler_component_reproducibility, read_compiler_stage_handoff,
-    read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
-    render_compiler_component_attester_trust_registry,
+    parse_compiler_component_compile_dispatch_receipt, parse_compiler_component_differential,
+    parse_compiler_component_dispatch_receipt, parse_compiler_structural_projection,
+    read_compiler_candidate_execution, read_compiler_candidate_production,
+    read_compiler_component_attestation, read_compiler_component_build,
+    read_compiler_component_representation_differential, read_compiler_component_reproducibility,
+    read_compiler_stage_handoff, read_compiler_stage_handoff_v2,
+    read_compiler_stage_semantic_differential, render_compiler_component_attester_trust_registry,
     render_compiler_component_replacement_authorizer_registry,
     CompilerComponentAttesterTrustEntryInput, CompilerComponentReplacementAuthorizerEntryInput,
     CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
@@ -25,6 +25,7 @@ use nuis_artifact::{
     COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_COMPONENT_ATTESTATION_FILE, COMPILER_COMPONENT_BUILD_FILE,
+    COMPILER_COMPONENT_COMPILE_DISPATCH_FILE, COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT,
     COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_DISPATCH_FILE,
     COMPILER_COMPONENT_DISPATCH_VERDICT, COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
@@ -640,6 +641,67 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     assert!(!receipt_source.contains(&output_dir_text));
     assert!(!fs::read_dir(&output_dir)
         .expect("scan dispatch output")
+        .filter_map(Result::ok)
+        .any(|entry| entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".nuis-stage-driver-")));
+
+    let compile_output = output_dir.join("selected-current-build");
+    let compile_dispatch_path = output_dir.join(COMPILER_COMPONENT_COMPILE_DISPATCH_FILE);
+    let compile_dispatch = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-dispatch-compile")
+        .arg(&aggregate_path)
+        .arg(&attestation_path)
+        .arg(&registry_path)
+        .arg(&registry_sha256)
+        .arg(&challenge_sha256)
+        .arg(&authorization_path)
+        .arg(&owner_registry_path)
+        .arg(&owner_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .arg(&transition_path)
+        .arg(&transition_challenge)
+        .arg(&stage0_record)
+        .arg(env!("CARGO_BIN_EXE_nuis"))
+        .arg(&candidate_record)
+        .arg(&candidate_image)
+        .arg(project)
+        .arg(&compile_output)
+        .arg(&compile_dispatch_path)
+        .output()
+        .expect("compile through verified stage0 image");
+    assert_success(
+        &compile_dispatch,
+        "canonical compile request through selected current image",
+    );
+    let compile_receipt = parse_compiler_component_compile_dispatch_receipt(&compile_dispatch_path)
+        .expect("verify component compile dispatch receipt");
+    assert_eq!(
+        compile_receipt.verdict,
+        COMPILER_COMPONENT_COMPILE_DISPATCH_VERDICT
+    );
+    assert_eq!(
+        compile_receipt.request_reproducible_build_sha256,
+        compile_receipt.result_reproducible_build_sha256
+    );
+    assert_eq!(
+        compile_receipt.forward_reproducible_build_sha256,
+        aggregate.candidate_reproducible_build_sha256
+    );
+    let compiled_component =
+        read_compiler_component_build(&compile_output.join(COMPILER_COMPONENT_BUILD_FILE))
+            .expect("verify selected-current compile result");
+    assert_eq!(
+        compiled_component.compiler_image_sha256,
+        compile_receipt.selected_compiler_image_sha256
+    );
+    let compile_receipt_source =
+        fs::read_to_string(&compile_dispatch_path).expect("read compile dispatch receipt");
+    assert!(!compile_receipt_source.contains(&output_dir_text));
+    assert!(!fs::read_dir(&output_dir)
+        .expect("scan compile dispatch output")
         .filter_map(Result::ok)
         .any(|entry| entry
             .file_name()

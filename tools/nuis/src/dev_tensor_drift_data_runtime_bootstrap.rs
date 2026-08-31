@@ -9,8 +9,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "nuis-runtime-lifecycle-bootstrap-plan-identity-v1",
             "loader_entry_machine_arch",
             "plan_lifecycle_bootstrap",
-            "map-section",
-            "apply-relocation",
             "bind-loader-entry",
             "bind-runtime-service",
             "runtime.clock-root",

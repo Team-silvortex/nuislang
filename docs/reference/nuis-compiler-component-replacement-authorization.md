@@ -138,9 +138,11 @@ ceremony.
 The repository now proves a canonical active-component state consumer, one
 signed generation-two transition that restores the exact stage0 build while
 retaining the candidate as a forward target, and one path-free runtime receipt
-for real execution of that current image. A canonical project compile request,
-a signed generation-three forward transition, owner-key rotation, threshold
-authorization, and checked-in operational authorizer evidence remain open.
+for real execution of that current image. Compile dispatch v1 now also routes a
+canonical project rebuild through the exact current image. A stage1 candidate
+with the same compile capability, signed generation-three forward transition,
+owner-key rotation, threshold authorization, and checked-in operational
+authorizer evidence remain open.
 
 ## Validation
 

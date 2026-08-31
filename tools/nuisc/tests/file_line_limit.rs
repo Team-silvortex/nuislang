@@ -90,7 +90,7 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nuisc/tests/glm_verify.rs", 1400),
         ("tools/nuisc/tests/memory_compile.rs", 1786),
         ("tools/nuisc/tests/network_compile.rs", 1446),
-        ("tools/yir-pack-aot/src/main.rs", 4329),
+        ("tools/yir-pack-aot/src/main.rs", 3910),
     ])
 }
 
