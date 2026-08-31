@@ -135,10 +135,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component/bootstrap-rollback-component/bootstrap-verify-component-transition -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component/bootstrap-rollback-component/bootstrap-verify-component-transition/bootstrap-dispatch-component -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch`
+`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch -> canonical selected-image compile request`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

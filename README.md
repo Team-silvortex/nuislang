@@ -32,12 +32,13 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`751/751` passing drift checks. The compiler data model, stage0/stage1 driver,
+`756/756` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
-state close their previous weakest tasks, so deterministic coordinate ordering
-now advances the stage driver toward path-free execution of the verified
-current build identity.
+state close their previous weakest tasks. Dispatch v1 now resolves an unordered
+exact-two build/image inventory through the signed generation-two identities,
+executes a private byte-verified copy of the stage0 `current` image, and retains
+the stage1 candidate as `forward` without persisting paths or timestamps.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native
@@ -128,7 +129,9 @@ original stage0 build as `rollback`; authorization and attestation bytes remain
 immutable. `bootstrap-rollback-component` now signs generation two over the
 predecessor authorization proof and active-state identity, restores stage0 as
 `current`, and retains the candidate as `forward`. Execution through that
-selected build identity remains open.
+selected identity now runs through `bootstrap-dispatch-component` and emits a
+canonical `current-executed-forward-retained` receipt. Routing a real project
+compile request through the selected image remains open.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -147,12 +150,13 @@ existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, chunked compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
-routes mainline work to stage-driver dispatch of the verified generation-two
-`current` selection. The v11 production
+routes mainline work to a canonical bootstrap compile request through the
+already verified generation-two `current` image. The v11 production
 lineage now has checked-in challenge-bound Ed25519 attester evidence and a
 separate genesis replacement-authorization protocol. Authorization consumption
 is closed by canonical active-state v1, and the first rollback link is signed
-by transition v2; selected-build dispatch, broader compiler-data paging, Galaxy
+by transition v2, and dispatch v1 closes the first selected-image process
+execution; selected-image project compilation, broader compiler-data paging, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 

@@ -80,6 +80,28 @@ pub(crate) struct BootstrapComponentTransitionVerificationInput {
     pub(crate) transition_challenge_sha256: String,
 }
 
+pub(crate) struct VerifiedComponentTransition {
+    transition: nuis_artifact::CompilerComponentTransition,
+    predecessor: VerifiedTransitionPredecessor,
+}
+
+impl VerifiedComponentTransition {
+    pub(crate) fn transition(&self) -> &nuis_artifact::CompilerComponentTransition {
+        &self.transition
+    }
+
+    pub(crate) fn verification_input<'a>(
+        &'a self,
+        input: &'a BootstrapComponentTransitionVerificationInput,
+    ) -> ArtifactTransitionVerificationInput<'a> {
+        transition_verification_input(
+            &self.predecessor,
+            &input.verification,
+            &input.transition_challenge_sha256,
+        )
+    }
+}
+
 pub(crate) fn handle_bootstrap_authorize_component_replacement(
     input: BootstrapComponentReplacementInput,
 ) -> Result<(), String> {
@@ -286,24 +308,17 @@ pub(crate) fn handle_bootstrap_rollback_component(
 pub(crate) fn handle_bootstrap_verify_component_transition(
     input: BootstrapComponentTransitionVerificationInput,
 ) -> Result<(), String> {
-    let predecessor = verify_transition_predecessors(&input.verification, &input.active_state)?;
-    let transition = parse_compiler_component_transition(&input.transition)
-        .map_err(|error| format!("failed to parse compiler component transition: {error}"))?;
-    let verification = transition_verification_input(
-        &predecessor,
-        &input.verification,
-        &input.transition_challenge_sha256,
-    );
-    verify_compiler_component_transition(&transition, verification)
-        .map_err(|error| format!("failed to verify compiler component transition: {error}"))?;
+    let verified = load_verified_component_transition(&input)?;
+    let transition = verified.transition();
+    let verification = verified.verification_input(&input);
     let current = select_compiler_component_transition_target(
-        &transition,
+        transition,
         verification,
         CompilerComponentTransitionSelection::Current,
     )
     .map_err(|error| format!("failed to select restored stage0 component: {error}"))?;
     let forward = select_compiler_component_transition_target(
-        &transition,
+        transition,
         verification,
         CompilerComponentTransitionSelection::Forward,
     )
@@ -325,6 +340,27 @@ pub(crate) fn handle_bootstrap_verify_component_transition(
     );
     println!("  reversible: true");
     Ok(())
+}
+
+pub(crate) fn load_verified_component_transition(
+    input: &BootstrapComponentTransitionVerificationInput,
+) -> Result<VerifiedComponentTransition, String> {
+    let predecessor = verify_transition_predecessors(&input.verification, &input.active_state)?;
+    let transition = parse_compiler_component_transition(&input.transition)
+        .map_err(|error| format!("failed to parse compiler component transition: {error}"))?;
+    verify_compiler_component_transition(
+        &transition,
+        transition_verification_input(
+            &predecessor,
+            &input.verification,
+            &input.transition_challenge_sha256,
+        ),
+    )
+    .map_err(|error| format!("failed to verify compiler component transition: {error}"))?;
+    Ok(VerifiedComponentTransition {
+        transition,
+        predecessor,
+    })
 }
 
 struct VerifiedTransitionPredecessor {

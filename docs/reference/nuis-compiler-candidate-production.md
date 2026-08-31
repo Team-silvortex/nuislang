@@ -228,8 +228,10 @@ verified permission into a canonical candidate-active/stage0-rollback selector
 without changing either signed source. Transition v2 then binds that exact
 authorization proof and active-state identity under the same component-owner
 role and key, signs generation two, restores stage0 as `current`, and retains
-stage1-candidate as `forward`. A `13/13` report or verified witness remains
-evidence, not permission by itself.
+stage1-candidate as `forward`. Dispatch v1 resolves both exact images from that
+signed identity pair and executes only the restored current frontdoor. A
+`13/13` report, dispatch receipt, or verified witness remains evidence, not
+permission by itself.
 
 ## Validation
 

@@ -1,0 +1,85 @@
+protocol = "nuis-compiler-component-dispatch-v1"
+version = 1
+status = "usable-path-free-current-image-execution"
+scope = "signed-generation-two-current-execution-with-forward-retention"
+manifest_name = "nuis.compiler-component-dispatch.toml"
+driver_contract = "nuis-stage0-stage1-verified-dispatch-v1"
+authority = "verified-transition-runtime-evidence-no-state-mutation"
+inventory_contract = "unordered-exact-current-forward-build-images-v1"
+request_contract = "nuis-help-frontdoor-closed-stdin-v1"
+request_argument = "help"
+stdin_contract = "closed-stdin-v1"
+digest = "sha256-lowercase"
+path_policy = "no-physical-paths-staging-names-registration-ordinals-or-timestamps-in-receipt"
+output_creation = "create-new-without-overwrite"
+verdict = "current-executed-forward-retained"
+
+frontdoor = "nuis bootstrap-dispatch-component"
+transition_protocol = "nuis-compiler-component-transition-v2"
+required_transition_generation = 2
+selected_selector = "current"
+selected_stage_role = "stage0"
+retained_selector = "forward"
+retained_stage_role = "stage1-candidate"
+
+verification_order = [
+  "reverify-attester-registry-pin-and-challenge",
+  "reverify-component-owner-registry-pin-and-authorization-challenge",
+  "reverify-active-state-and-generation-two-transition-challenge-signature-lineage",
+  "parse-two-canonical-component-build-records",
+  "resolve-an-unordered-exact-two-image-inventory-by-signed-identity",
+  "verify-both-compiler-images-by-byte-length-and-sha256",
+  "stage-reread-and-execute-only-the-current-image",
+  "persist-and-reparse-one-canonical-dispatch-receipt",
+]
+
+pair_invariants = [
+  "both-builds-belong-to-the-transition-component",
+  "stage0-reproducible-build-equals-signed-current-target",
+  "stage1-candidate-reproducible-build-equals-signed-forward-target",
+  "candidate-image-equals-transition-candidate-image",
+  "both-builds-retain-the-transition-native-output",
+  "bootstrap-subset-domain-unit-handoff-and-dependency-closure-match",
+  "component-record-identities-are-distinct",
+  "inventory-order-does-not-select-a-target",
+]
+
+execution_invariants = [
+  "the-executed-file-is-created-from-the-already-verified-current-image-bytes",
+  "the-staged-file-is-reread-before-process-launch",
+  "fixed-help-request-runs-with-closed-stdin",
+  "exit-code-is-zero-stdout-is-nonempty-and-stderr-is-empty",
+  "private-staging-file-is-not-carried-by-the-receipt-and-is-removed",
+  "forward-candidate-is-retained-but-not-executed",
+  "no-predecessor-source-or-component-record-is-mutated",
+]
+
+receipt_identity = [
+  "transition-generation-and-proof-sha256",
+  "component-id",
+  "selected-role-reproducible-build-record-and-image-identities",
+  "forward-role-reproducible-build-record-and-image-identities",
+  "request-argument-and-stdin-contract",
+  "exit-code-and-stdout-stderr-lengths-and-sha256",
+  "verdict",
+]
+
+[honest_boundary]
+claim = "the-signed-generation-two-current-image-is-resolved-and-really-executed-while-forward-remains-bound"
+does_not_claim = "a-project-was-compiled-through-the-selected-image-or-the-forward-candidate-is-a-complete-compiler"
+next_step = "route-one-canonical-bootstrap-subset-compile-request-through-the-verified-current-image"
+
+[open_boundary]
+missing = [
+  "canonical-project-compile-request-dispatch",
+  "signed-generation-three-forward-transition",
+  "component-owner-key-rotation-chain",
+  "checked-in-independent-component-owner-dispatch-evidence",
+  "multi-component-and-threshold-authorizer-policy",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_dispatch -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_transition_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]

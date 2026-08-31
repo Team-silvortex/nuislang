@@ -243,8 +243,18 @@ provider-neutral selector resolves `active` to the stage1 candidate build and
 authorization proof and active-state identity, requires the same component-
 owner role and key, restores stage0 as `current`, and retains the candidate as
 `forward`. The private-key-free verification frontdoor repeats the full
-predecessor chain. Path-free stage-driver execution through the selected build
-identity remains open.
+predecessor chain.
+
+`nuis bootstrap-dispatch-component` now replays that complete trust chain,
+resolves an unordered exact-two component/image inventory by the signed
+reproducible identities, and verifies both image byte hashes. It executes only
+the restored stage0 image from a private create-new staging slot, rereads the
+staged bytes before launch, removes the slot afterward, and emits canonical
+`nuis-compiler-component-dispatch-v1` evidence. The receipt retains the exact
+candidate as `forward` and carries no physical path or timestamp. The current
+request is deliberately limited to the `help` frontdoor; routing a canonical
+project compile request through the selected image remains open. See
+[Nuis Compiler Component Dispatch](nuis-compiler-component-dispatch.md).
 
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
@@ -299,10 +309,11 @@ The real AST and NIR paths therefore reach `2/2` selected-representation
 equivalence despite non-identical bytes while retaining false replacement authority. The
 sidecar's exact hash is not yet carried by the generation-one reproducibility
 aggregate. Replacement authorization v1 now feeds canonical active-state v1,
-and transition v2 signs generation-two stage0 restoration while retaining the
-candidate as the forward target without rewriting either predecessor. Remote
-sidecar evidence, path-free selected-build execution, and a generation-three
-successor remain open. Cryptography does not prove physical-machine
+transition v2 signs generation-two stage0 restoration while retaining the
+candidate as the forward target, and dispatch v1 executes that exact current
+image without rewriting a predecessor. Remote sidecar evidence, selected-image
+project compilation, and a generation-three successor remain open.
+Cryptography does not prove physical-machine
 independence; that remains an operational fact.
 
 ## Migration Rule

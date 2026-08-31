@@ -63,7 +63,7 @@ verification_invariants = [
 claim = "one-verified-genesis-authorization-has-a-canonical-reversible-active-state-consumer"
 does_not_claim = "runtime-execution-through-the-selected-build-or-stage1-self-hosting"
 repository_test_scope = "checked-in-linux-amd64-attestation-plus-temporary-local-component-owner-key"
-next_step = "advance-the-signed-generation-two-successor-into-path-free-stage-driver-dispatch"
+next_step = "route-one-canonical-bootstrap-subset-compile-request-through-the-verified-current-image"
 
 [signed_transition_successor]
 protocol = "nuis-compiler-component-transition-v2"
@@ -75,11 +75,10 @@ stage0_current_and_candidate_forward_retained = true
 
 [open_boundary]
 missing = [
-  "runtime-stage-driver-execution-through-the-selected-build-identity",
+  "canonical-project-compile-request-through-the-selected-current-image",
   "signed-generation-three-forward-transition",
   "checked-in-independent-component-owner-authorization-evidence",
   "multi-component-and-threshold-authorizer-policy",
-  "runtime-stage-driver-execution-through-the-selected-compiler-image",
 ]
 
 validation_commands = [

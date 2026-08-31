@@ -95,8 +95,9 @@ attester generation with two cache-bypassed `13/13` runs, an exact registry
 pin, and a no-private-key verification regression. Cryptography still cannot
 prove physical-machine independence. Canonical active-state v1 closes genesis
 authorization consumption, and transition v2 signs exact stage0 restoration
-plus candidate forward retention. Path-free selected-build execution and a
-generation-three successor remain open.
+plus candidate forward retention. Dispatch v1 now executes the exact current
+image while retaining the forward candidate. A canonical selected-image
+project compile request and a generation-three successor remain open.
 
 ## Validation
 

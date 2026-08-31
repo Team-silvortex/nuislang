@@ -8,19 +8,25 @@ use std::{
 use ed25519_dalek::SigningKey;
 use nuis_artifact::{
     build_compiler_component_attester_trust_registry,
-    compiler_component_attester_trust_registry_sha256, parse_build_manifest,
-    parse_compiler_component_differential, parse_compiler_structural_projection,
-    read_compiler_candidate_execution, read_compiler_candidate_production,
-    read_compiler_component_attestation, read_compiler_component_build,
-    read_compiler_component_representation_differential, read_compiler_component_reproducibility,
-    read_compiler_stage_handoff, read_compiler_stage_handoff_v2,
-    read_compiler_stage_semantic_differential, render_compiler_component_attester_trust_registry,
-    CompilerComponentAttesterTrustEntryInput, CompilerProjectionKind, CompilerProjectionRecordKind,
-    CompilerStageKind, CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
+    build_compiler_component_replacement_authorizer_registry,
+    compiler_component_attester_trust_registry_sha256,
+    compiler_component_replacement_authorizer_registry_sha256, parse_build_manifest,
+    parse_compiler_component_differential, parse_compiler_component_dispatch_receipt,
+    parse_compiler_structural_projection, read_compiler_candidate_execution,
+    read_compiler_candidate_production, read_compiler_component_attestation,
+    read_compiler_component_build, read_compiler_component_representation_differential,
+    read_compiler_component_reproducibility, read_compiler_stage_handoff,
+    read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
+    render_compiler_component_attester_trust_registry,
+    render_compiler_component_replacement_authorizer_registry,
+    CompilerComponentAttesterTrustEntryInput, CompilerComponentReplacementAuthorizerEntryInput,
+    CompilerProjectionKind, CompilerProjectionRecordKind, CompilerStageKind,
+    CompilerStageSemanticDifferentialInput, COMPILER_CANDIDATE_ADAPTER_FILE,
     COMPILER_CANDIDATE_EXECUTION_AUTHORITY, COMPILER_CANDIDATE_EXECUTION_FILE,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_COMPONENT_ATTESTATION_FILE, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_DISPATCH_FILE,
+    COMPILER_COMPONENT_DISPATCH_VERDICT, COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
     COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
     COMPILER_STAGE_TRANSFORMATION_FILE,
@@ -497,6 +503,149 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     );
     assert!(!attestation.replacement_authorized);
 
+    let owner_key_hex = "09".repeat(32);
+    let owner_public_key_hex = SigningKey::from_bytes(&[9u8; 32])
+        .verifying_key()
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let owner_registry = build_compiler_component_replacement_authorizer_registry(
+        1,
+        &[CompilerComponentReplacementAuthorizerEntryInput {
+            authorizer_id: "compiler-owner-1",
+            environment_id: "release-control",
+            component_id: &aggregate.component_id,
+            public_key_hex: &owner_public_key_hex,
+            status: "active",
+        }],
+    )
+    .expect("build component-owner registry");
+    let owner_registry_source =
+        render_compiler_component_replacement_authorizer_registry(&owner_registry);
+    let owner_registry_sha256 =
+        compiler_component_replacement_authorizer_registry_sha256(&owner_registry_source);
+    let owner_registry_path = output_dir.join("component-owner-registry.toml");
+    fs::write(&owner_registry_path, owner_registry_source).expect("write component-owner registry");
+    let authorization_path = output_dir.join("component-authorization.toml");
+    let active_state_path = output_dir.join("component-active-state.toml");
+    let transition_path = output_dir.join("component-transition.toml");
+    let dispatch_path = output_dir.join(COMPILER_COMPONENT_DISPATCH_FILE);
+    let authorization_challenge = "d".repeat(64);
+    let transition_challenge = "e".repeat(64);
+
+    let authorization = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-authorize-component-replacement")
+        .arg(&aggregate_path)
+        .arg(&attestation_path)
+        .arg(&registry_path)
+        .arg(&registry_sha256)
+        .arg(&challenge_sha256)
+        .arg(&owner_registry_path)
+        .arg(&owner_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg("compiler-owner-1")
+        .arg("release-control")
+        .arg("clean-build-genesis")
+        .arg(&authorization_path)
+        .env("NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX", &owner_key_hex)
+        .output()
+        .expect("authorize clean-build candidate");
+    assert_success(&authorization, "clean-build component authorization");
+
+    let activation = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-activate-component")
+        .arg(&aggregate_path)
+        .arg(&attestation_path)
+        .arg(&registry_path)
+        .arg(&registry_sha256)
+        .arg(&challenge_sha256)
+        .arg(&authorization_path)
+        .arg(&owner_registry_path)
+        .arg(&owner_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .output()
+        .expect("activate clean-build candidate");
+    assert_success(&activation, "clean-build component activation");
+
+    let rollback = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-rollback-component")
+        .arg(&aggregate_path)
+        .arg(&attestation_path)
+        .arg(&registry_path)
+        .arg(&registry_sha256)
+        .arg(&challenge_sha256)
+        .arg(&authorization_path)
+        .arg(&owner_registry_path)
+        .arg(&owner_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .arg(&transition_challenge)
+        .arg("compiler-owner-1")
+        .arg("release-control")
+        .arg("clean-build-rollback-2")
+        .arg(&transition_path)
+        .env("NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX", &owner_key_hex)
+        .output()
+        .expect("roll back clean-build candidate");
+    assert_success(&rollback, "clean-build generation-two rollback");
+
+    let selected_root = &roots[0];
+    let stage0_dir = selected_root.join("stage0");
+    let candidate_dir = selected_root.join("stage1-candidate");
+    let stage0_record = stage0_dir.join(COMPILER_COMPONENT_BUILD_FILE);
+    let candidate_record = candidate_dir.join(COMPILER_COMPONENT_BUILD_FILE);
+    let candidate_component =
+        read_compiler_component_build(&candidate_record).expect("verify dispatch candidate");
+    let candidate_image = candidate_dir.join(&candidate_component.native_binary_file);
+    let dispatch = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .arg("bootstrap-dispatch-component")
+        .arg(&aggregate_path)
+        .arg(&attestation_path)
+        .arg(&registry_path)
+        .arg(&registry_sha256)
+        .arg(&challenge_sha256)
+        .arg(&authorization_path)
+        .arg(&owner_registry_path)
+        .arg(&owner_registry_sha256)
+        .arg(&authorization_challenge)
+        .arg(&active_state_path)
+        .arg(&transition_path)
+        .arg(&transition_challenge)
+        .arg(&stage0_record)
+        .arg(env!("CARGO_BIN_EXE_nuis"))
+        .arg(&candidate_record)
+        .arg(&candidate_image)
+        .arg(&dispatch_path)
+        .output()
+        .expect("dispatch verified stage0 image");
+    assert_success(&dispatch, "path-free stage-driver dispatch");
+    assert!(String::from_utf8_lossy(&dispatch.stdout)
+        .contains("bootstrap compiler component: dispatched"));
+    let receipt = parse_compiler_component_dispatch_receipt(&dispatch_path)
+        .expect("verify component dispatch receipt");
+    assert_eq!(receipt.verdict, COMPILER_COMPONENT_DISPATCH_VERDICT);
+    assert_eq!(receipt.selected_stage_role, "stage0");
+    assert_eq!(receipt.forward_stage_role, "stage1-candidate");
+    assert_eq!(
+        receipt.selected_reproducible_build_sha256,
+        aggregate.stage0_reproducible_build_sha256
+    );
+    assert_eq!(
+        receipt.forward_reproducible_build_sha256,
+        aggregate.candidate_reproducible_build_sha256
+    );
+    let receipt_source = fs::read_to_string(&dispatch_path).expect("read dispatch receipt");
+    assert!(!receipt_source.contains(&output_dir_text));
+    assert!(!fs::read_dir(&output_dir)
+        .expect("scan dispatch output")
+        .filter_map(Result::ok)
+        .any(|entry| entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".nuis-stage-driver-")));
+
     let replay = run_nuis(&[
         "bootstrap-verify-reproducibility-attestation",
         &aggregate_text,
@@ -538,6 +687,16 @@ fn run_nuis(args: &[&str]) -> std::process::Output {
         .args(args)
         .output()
         .unwrap_or_else(|error| panic!("failed to run nuis {args:?}: {error}"))
+}
+
+fn assert_success(output: &std::process::Output, context: &str) {
+    assert!(
+        output.status.success(),
+        "{context} failed\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
 }
 
 fn run_nuis_with_env(args: &[&str], key: &str, value: &str) -> std::process::Output {

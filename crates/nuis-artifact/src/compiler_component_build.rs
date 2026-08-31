@@ -455,6 +455,12 @@ pub fn verify_compiler_component_build_image(
     Ok(())
 }
 
+pub fn verify_compiler_component_build(
+    build: &CompilerComponentBuild,
+) -> Result<(), ArtifactError> {
+    validate_compiler_component_build(build)
+}
+
 fn parse_dependency_blocks(
     source: &str,
     path: &Path,

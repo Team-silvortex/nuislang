@@ -78,13 +78,13 @@ verification_invariants = [
 
 [honest_boundary]
 claim = "one-signed-generation-two-transition-deterministically-restores-stage0-and-retains-the-candidate-forward-target"
-does_not_claim = "the-stage-driver-has-executed-the-selected-build-or-that-key-rotation-is-supported"
+does_not_claim = "the-selected-image-has-compiled-a-project-or-that-key-rotation-is-supported"
 repository_test_scope = "checked-in-linux-amd64-attestation-plus-temporary-local-component-owner-key"
-next_step = "execute-the-verified-current-build-identity-through-a-path-free-stage-driver-dispatch"
+next_step = "route-one-canonical-bootstrap-subset-compile-request-through-the-verified-current-image"
 
 [open_boundary]
 missing = [
-  "runtime-stage-driver-execution-through-the-selected-build-identity",
+  "canonical-project-compile-request-through-the-selected-current-image",
   "signed-generation-three-forward-transition",
   "component-owner-key-rotation-chain",
   "checked-in-independent-component-owner-transition-evidence",

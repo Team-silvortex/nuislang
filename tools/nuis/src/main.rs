@@ -41,6 +41,7 @@ mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_probe;
+mod bootstrap_component_dispatch;
 mod bootstrap_component_replacement;
 mod bootstrap_reproducibility;
 mod bootstrap_reproducibility_attestation;
@@ -66,6 +67,7 @@ mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_language;
 mod dev_tensor_drift_data_runtime;
 mod dev_tensor_drift_data_runtime_bootstrap;
+mod dev_tensor_drift_data_runtime_bootstrap_evidence;
 mod dev_tensor_drift_data_runtime_bootstrap_reproducibility;
 mod dev_tensor_drift_data_runtime_cffi_object;
 mod dev_tensor_drift_data_runtime_cuda;
@@ -445,6 +447,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapVerifyComponentTransition(input) => {
             bootstrap_component_replacement::handle_bootstrap_verify_component_transition(input)?
+        }
+        cli::CommandKind::BootstrapDispatchComponent(input) => {
+            bootstrap_component_dispatch::handle_bootstrap_dispatch_component(input)?
         }
         cli::CommandKind::BootstrapDiff {
             stage0_record,

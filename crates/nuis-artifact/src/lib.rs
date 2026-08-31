@@ -9,6 +9,7 @@ mod compiler_component_attestation;
 mod compiler_component_attestation_registry;
 mod compiler_component_build;
 mod compiler_component_diff;
+mod compiler_component_dispatch;
 mod compiler_component_replacement;
 mod compiler_component_replacement_registry;
 mod compiler_component_representation_diff;
@@ -100,9 +101,9 @@ pub use compiler_component_build::{
     build_compiler_component_build, parse_compiler_component_build,
     parse_compiler_component_build_from_source, promote_compiler_component_candidate,
     read_compiler_component_build, render_compiler_component_build,
-    verify_compiler_component_build_image, CompilerComponentBuild, CompilerComponentBuildInput,
-    CompilerComponentCandidatePromotionInput, CompilerComponentDependency,
-    CompilerComponentDependencyInput, COMPILER_COMPONENT_BUILD_FILE,
+    verify_compiler_component_build, verify_compiler_component_build_image, CompilerComponentBuild,
+    CompilerComponentBuildInput, CompilerComponentCandidatePromotionInput,
+    CompilerComponentDependency, CompilerComponentDependencyInput, COMPILER_COMPONENT_BUILD_FILE,
     COMPILER_COMPONENT_BUILD_PROTOCOL, COMPILER_COMPONENT_DEPENDENCY_CLOSURE_CONTRACT,
     COMPILER_COMPONENT_DRIVER_CONTRACT, COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT,
     COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
@@ -114,6 +115,17 @@ pub use compiler_component_diff::{
     CompilerComponentDifferential, CompilerComponentEvidence, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_DIFFERENTIAL_GATE_CONTRACT, COMPILER_COMPONENT_DIFFERENTIAL_PROTOCOL,
     COMPILER_COMPONENT_REPLACEMENT_AUTHORITY_CONTRACT,
+};
+pub use compiler_component_dispatch::{
+    build_compiler_component_dispatch_receipt, parse_compiler_component_dispatch_receipt,
+    parse_compiler_component_dispatch_receipt_from_source,
+    render_compiler_component_dispatch_receipt, resolve_compiler_component_dispatch,
+    CompilerComponentDispatchCandidate, CompilerComponentDispatchReceipt,
+    CompilerComponentDispatchReceiptInput, CompilerComponentDispatchResolution,
+    COMPILER_COMPONENT_DISPATCH_AUTHORITY, COMPILER_COMPONENT_DISPATCH_DRIVER_CONTRACT,
+    COMPILER_COMPONENT_DISPATCH_FILE, COMPILER_COMPONENT_DISPATCH_INVENTORY_CONTRACT,
+    COMPILER_COMPONENT_DISPATCH_PROTOCOL, COMPILER_COMPONENT_DISPATCH_REQUEST_ARGUMENT,
+    COMPILER_COMPONENT_DISPATCH_REQUEST_CONTRACT, COMPILER_COMPONENT_DISPATCH_VERDICT,
 };
 pub use compiler_component_replacement::{
     build_compiler_component_replacement_authorization,

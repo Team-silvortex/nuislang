@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::bootstrap_component_dispatch::BootstrapComponentDispatchInput;
 use crate::bootstrap_component_replacement::{
     BootstrapComponentActivationInput, BootstrapComponentReplacementInput,
     BootstrapComponentReplacementVerificationInput, BootstrapComponentRollbackInput,
@@ -67,6 +68,7 @@ pub enum CommandKind {
     BootstrapActivateComponent(BootstrapComponentActivationInput),
     BootstrapRollbackComponent(BootstrapComponentRollbackInput),
     BootstrapVerifyComponentTransition(BootstrapComponentTransitionVerificationInput),
+    BootstrapDispatchComponent(BootstrapComponentDispatchInput),
     BootstrapDiff {
         stage0_record: PathBuf,
         candidate_record: PathBuf,
@@ -451,6 +453,36 @@ where
                 },
             ))
         }
+        "bootstrap-dispatch-component" => {
+            let usage = "usage: nuis bootstrap-dispatch-component <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256> <current-component> <current-image> <forward-component> <forward-image> <output>";
+            let verification = parse_bootstrap_component_verification_prefix(&mut args, usage)?;
+            let active_state = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let transition = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let transition_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let current_component = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let current_image = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let forward_component = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let forward_image = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let output = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapDispatchComponent(
+                BootstrapComponentDispatchInput {
+                    transition_verification: BootstrapComponentTransitionVerificationInput {
+                        verification,
+                        active_state,
+                        transition,
+                        transition_challenge_sha256,
+                    },
+                    current_component,
+                    current_image,
+                    forward_component,
+                    forward_image,
+                    output,
+                },
+            ))
+        }
         "bootstrap-diff" => {
             let usage = "usage: nuis bootstrap-diff <stage0-record> <candidate-record> <report>";
             let stage0_record = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
@@ -724,7 +756,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-dispatch-component`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

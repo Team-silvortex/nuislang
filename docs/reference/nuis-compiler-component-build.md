@@ -122,6 +122,10 @@ exist; see
 `nuis bootstrap-reproducibility` now proves the current identity relay across
 two empty, compile-cache-bypassed roots; see
 [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md).
+Independent authorization now feeds active-state v1 and signed transition v2;
+dispatch v1 resolves their current/forward identities to exact image bytes and
+executes the restored stage0 frontdoor. See
+[Nuis Compiler Component Dispatch](nuis-compiler-component-dispatch.md).
 The current producer is still not a tokenizer/parser replacement. A later
 component must own a real transformation and retain clean-build equivalence.
 Only an independent reversible authorization record may permit replacement.

@@ -135,12 +135,12 @@ attestation with a temporary local component-owner key. This proves protocol
 composition and role separation, not an independently operated release-owner
 ceremony.
 
-The repository now proves a canonical active-component state consumer and one
+The repository now proves a canonical active-component state consumer, one
 signed generation-two transition that restores the exact stage0 build while
-retaining the candidate as a forward target. Runtime execution through the
-selected build, a signed generation-three forward transition, owner-key
-rotation, threshold authorization, and checked-in operational authorizer
-evidence remain open.
+retaining the candidate as a forward target, and one path-free runtime receipt
+for real execution of that current image. A canonical project compile request,
+a signed generation-three forward transition, owner-key rotation, threshold
+authorization, and checked-in operational authorizer evidence remain open.
 
 ## Validation
 
