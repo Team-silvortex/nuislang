@@ -22,7 +22,7 @@ nonterminal scores and can only close independently.
 
 Readiness v2 separates phase activation from final readiness. The current
 manifest reports `stage0-to-stage1-migration/active` because Git has entered
-`beta-0.10.*`, while `ready = false` and `2/5` gates closed preserve the actual
+`beta-0.10.*`, while `ready = false` and `3/5` gates closed preserve the actual
 replacement boundary. Active means candidate-owned vertical slices are now the
 mainline; it does not authorize stage0 removal, component replacement, or final
 selection.
@@ -347,7 +347,7 @@ or YIR verification, or advance the gate beyond `usable/99`.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This gate is now `usable/99`. `nuis bootstrap-diff` consumes verified stage0 and
+This gate is now `stable/100`. `nuis bootstrap-diff` consumes verified stage0 and
 explicit `stage1-candidate` records plus their handoffs, payloads, normalized
 diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
 report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
@@ -374,9 +374,15 @@ verification. A second canonical sidecar now walks every registered v2
 selection without stage-specific branches and binds the actual selected bytes,
 recovered payload, transform, checkpoint, base comparison, and handoff proof.
 The real AST and NIR paths therefore reach `2/2` selected-representation
-equivalence despite non-identical bytes while retaining false replacement authority. The
-sidecar's exact hash is not yet carried by the generation-one reproducibility
-aggregate. Replacement authorization v1 now feeds canonical active-state v1,
+equivalence despite non-identical bytes while retaining false replacement
+authority. Reproducibility v2 preserves the exact canonical v1 predecessor and
+its signed aggregate, independently rebuilds that predecessor from both clean
+roots, and directly binds each root's canonical sidecar bytes, internal report
+hash, base report, production proof, and clean-root witness. The two sidecar
+hashes intentionally may differ because each binds a distinct root audit; the
+closure criterion is per-root replay plus `4/4` semantic equivalence. Sidecar
+tampering fails closed without invalidating immutable generation-one v1
+evidence. Replacement authorization v1 now feeds canonical active-state v1,
 transition v2 signs generation-two stage0 restoration while retaining the
 candidate as the forward target, dispatch v1 executes that exact current image,
 and compile dispatch v1 rebuilds one canonical project without rewriting a

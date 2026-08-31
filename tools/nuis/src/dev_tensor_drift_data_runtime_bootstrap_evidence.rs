@@ -655,6 +655,51 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_EVIDENCE_DRIFT_CHECKS:
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-reproducibility-v2-contract",
+        path: "docs/reference/nuis-compiler-component-reproducibility-v2.toml",
+        required_patterns: &[
+            "nuis-compiler-component-reproducibility-v2",
+            "sidecars_individually_bound = true",
+            "sidecar_hash_equality_required = false",
+            "generation_one_v1_attestation_remains_verifiable = true",
+            "replacement_authorized = false",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-reproducibility-v2-artifact",
+        path: "crates/nuis-artifact/src/compiler_component_reproducibility_v2.rs",
+        required_patterns: &[
+            "COMPILER_COMPONENT_REPRODUCIBILITY_V2_PROTOCOL",
+            "build_compiler_component_reproducibility_v2_from_paths",
+            "read_compiler_component_reproducibility_v2",
+            "read_compiler_component_representation_differential",
+            "sidecars_individually_bound",
+            "predecessor_signature_compatible",
+            "replacement_authorized",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-reproducibility-v2-frontdoor",
+        path: "tools/nuis/src/bootstrap_reproducibility.rs",
+        required_patterns: &[
+            "build_compiler_component_reproducibility_v2_from_paths",
+            "render_compiler_component_reproducibility_v2",
+            "read_compiler_component_reproducibility_v2",
+            "sidecars_individually_bound",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-component-reproducibility-v2-integration",
+        path: "tools/nuis/tests/compiler_structural_projection_candidate/reproducibility_v2.rs",
+        required_patterns: &[
+            "read_compiler_component_reproducibility_v2",
+            "assert_ne!",
+            "assert_sidecar_tampering_fails",
+            "restore second representation sidecar",
+            "read_compiler_component_reproducibility(predecessor, roots)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-self-hosting-readiness-manifest",
         path: "docs/reference/nuis-self-hosting-readiness.toml",
         required_patterns: &[
@@ -696,7 +741,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_EVIDENCE_DRIFT_CHECKS:
             "Active Migration Semantics",
             "stage0-to-stage1-migration/active",
             "ready = false",
-            "2/5",
+            "3/5",
             "bootstrap-language-subset",
             "stage0-stage1-driver",
             "differential-reproducibility-gate",

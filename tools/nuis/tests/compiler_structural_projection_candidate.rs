@@ -37,6 +37,8 @@ use nuis_artifact::{
 
 #[path = "compiler_structural_projection_candidate/generation_three_successor.rs"]
 mod generation_three_successor;
+#[path = "compiler_structural_projection_candidate/reproducibility_v2.rs"]
+mod reproducibility_v2;
 
 fn temp_dir() -> PathBuf {
     let nonce = SystemTime::now()
@@ -470,6 +472,12 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     let aggregate_path = output_dir.join(COMPILER_COMPONENT_REPRODUCIBILITY_FILE);
     let aggregate = read_compiler_component_reproducibility(&aggregate_path, &roots)
         .expect("verify clean-build aggregate");
+    let aggregate_v2_path = reproducibility_v2::assert_bound_selected_representations(
+        &output_dir,
+        &output_dir_text,
+        &aggregate_path,
+        &roots,
+    );
     assert_eq!(aggregate.run_count, 2);
     assert_eq!(aggregate.equivalent_run_count, 2);
     assert_eq!(aggregate.comparison_count, 13);
@@ -863,6 +871,7 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     assert!(!rerun.status.success());
     assert!(String::from_utf8_lossy(&rerun.stderr).contains("must be empty"));
 
+    reproducibility_v2::assert_sidecar_tampering_fails(&aggregate_v2_path, &aggregate_path, &roots);
     let candidate = read_compiler_component_build(
         &roots[1]
             .join("stage1-candidate")

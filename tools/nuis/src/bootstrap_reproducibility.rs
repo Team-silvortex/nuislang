@@ -7,9 +7,12 @@ use std::{
 };
 
 use nuis_artifact::{
-    build_compiler_component_reproducibility_from_paths, read_compiler_component_reproducibility,
-    render_compiler_component_reproducibility, CompilerComponentReproducibilityRootInput,
-    COMPILER_COMPONENT_REPRODUCIBILITY_FILE,
+    build_compiler_component_reproducibility_from_paths,
+    build_compiler_component_reproducibility_v2_from_paths,
+    read_compiler_component_reproducibility, read_compiler_component_reproducibility_v2,
+    render_compiler_component_reproducibility, render_compiler_component_reproducibility_v2,
+    CompilerComponentReproducibilityRootInput, COMPILER_COMPONENT_REPRODUCIBILITY_FILE,
+    COMPILER_COMPONENT_REPRODUCIBILITY_V2_FILE,
 };
 
 use crate::{
@@ -60,19 +63,30 @@ pub(crate) fn handle_bootstrap_reproducibility(
         .collect::<Vec<_>>();
     let report = build_compiler_component_reproducibility_from_paths(&root_inputs)
         .map_err(|error| format!("failed to aggregate clean compiler builds: {error}"))?;
+    let report_source = render_compiler_component_reproducibility(&report);
+    let report_v2 =
+        build_compiler_component_reproducibility_v2_from_paths(&report, &report_source, &roots)
+            .map_err(|error| format!("failed to bind clean representation sidecars: {error}"))?;
+    let report_v2_source = render_compiler_component_reproducibility_v2(&report_v2);
     let report_path = output_dir.join(COMPILER_COMPONENT_REPRODUCIBILITY_FILE);
-    fs::write(
-        &report_path,
-        render_compiler_component_reproducibility(&report),
-    )
-    .map_err(|error| {
+    fs::write(&report_path, report_source).map_err(|error| {
         format!(
             "failed to write compiler reproducibility aggregate `{}`: {error}",
             report_path.display()
         )
     })?;
+    let report_v2_path = output_dir.join(COMPILER_COMPONENT_REPRODUCIBILITY_V2_FILE);
+    fs::write(&report_v2_path, report_v2_source).map_err(|error| {
+        format!(
+            "failed to write compiler reproducibility v2 `{}`: {error}",
+            report_v2_path.display()
+        )
+    })?;
     let verified = read_compiler_component_reproducibility(&report_path, &roots)
         .map_err(|error| format!("failed to verify clean compiler builds: {error}"))?;
+    let verified_v2 =
+        read_compiler_component_reproducibility_v2(&report_v2_path, &report_path, &roots)
+            .map_err(|error| format!("failed to verify clean representation sidecars: {error}"))?;
 
     println!("bootstrap compiler reproducibility: verified");
     println!("  clean_runs: {}", verified.run_count);
@@ -82,8 +96,17 @@ pub(crate) fn handle_bootstrap_reproducibility(
     );
     println!("  differential: {}", verified.differential_verdict);
     println!("  verdict: {}", verified.verdict);
+    println!(
+        "  selected_representations: {}/{}",
+        verified_v2.equivalent_representation_count, verified_v2.representation_comparison_count
+    );
+    println!(
+        "  sidecars_individually_bound: {}",
+        verified_v2.sidecars_individually_bound
+    );
     println!("  replacement_authorized: false");
     println!("  aggregate: {}", report_path.display());
+    println!("  aggregate_v2: {}", report_v2_path.display());
     Ok(())
 }
 

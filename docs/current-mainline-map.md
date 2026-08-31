@@ -66,7 +66,7 @@ Short rule:
   [reference/nuis-compiler-candidate-fresh-source-capability.md](reference/nuis-compiler-candidate-fresh-source-capability.md)
 * current stage0/stage1 candidate differential gate:
   [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-* current two-clean-build compiler reproducibility aggregate:
+* current two-clean-build compiler reproducibility aggregate and per-root sidecar binding:
   [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
 * current self-hosting migration entry, `beta-0.10.*`:
   [versioning/nuis-beta-0.10.0-self-hosting-entry.md](versioning/nuis-beta-0.10.0-self-hosting-entry.md)
@@ -151,7 +151,7 @@ Current CLI frontdoor rule:
 `nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-candidate-compile-capability/bootstrap-preselect-candidate/bootstrap-candidate-direct-compile/bootstrap-sign-candidate-successor/bootstrap-candidate-fresh-source -> nsld candidate-input -> nuis bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component/bootstrap-rollback-component/bootstrap-verify-component-transition/bootstrap-dispatch-component/bootstrap-dispatch-compile -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch -> canonical selected-image compile request -> production-bound Nuis candidate delegated compile capability -> signed generation-three preselection -> direct stage1 front-end compile capability -> signed generation-three successor -> candidate-owned fresh-source front-end capability -> candidate-owned equivalent Nsld input -> reproducibility sidecar binding -> registered native object writer`
+`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch -> canonical selected-image compile request -> production-bound Nuis candidate delegated compile capability -> signed generation-three preselection -> direct stage1 front-end compile capability -> signed generation-three successor -> candidate-owned fresh-source front-end capability -> candidate-owned equivalent Nsld input -> per-root reproducibility-v2 sidecar binding -> stage-neutral IR boundary -> registered native object writer`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

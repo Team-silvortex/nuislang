@@ -75,6 +75,7 @@ Start in this order:
   - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
   - [nuis-compiler-component-representation-differential-v1.toml](nuis-compiler-component-representation-differential-v1.toml)
   - [nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md)
+  - [nuis-compiler-component-reproducibility-v2.toml](nuis-compiler-component-reproducibility-v2.toml)
   - [nuis-compiler-component-attestation.md](nuis-compiler-component-attestation.md)
   - [nuis-compiler-component-replacement-authorization.md](nuis-compiler-component-replacement-authorization.md)
   - [nuis-compiler-component-active-state-v1.toml](nuis-compiler-component-active-state-v1.toml)

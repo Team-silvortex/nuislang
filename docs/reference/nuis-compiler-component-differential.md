@@ -153,9 +153,12 @@ identities into `nuis-compiler-component-reproducibility-v1`. See
 
 Neither report is replacement authority or full compiler self-hosting. The
 compact structured AST and NIR records now cross both a producer-neutral
-handoff-v2 selection and the component representation gate. The sidecar's exact hash is
-not yet a field of generation-one reproducibility aggregates; that requires a
-versioned successor rather than rewriting signed v1 evidence. Canonical
+handoff-v2 selection and the component representation gate. Reproducibility v2
+is that versioned successor: it preserves the exact generation-one v1 bytes and
+aggregate while binding each clean root's distinct sidecar, independently
+replaying both roots, and proving `4/4` selected-representation equivalence.
+Cross-root sidecar hash equality is neither expected nor required because each
+sidecar binds a different root audit. Canonical
 active-state v1 consumes the genesis authorization without rewriting either
 signed source, and transition v2 signs the exact rollback to stage0 while
 retaining the candidate forward target. Dispatch v1 now executes the selected

@@ -1,0 +1,57 @@
+protocol = "nuis-compiler-component-reproducibility-v2"
+status = "stable-bounded-self-hosting-gate"
+binding_contract = "nuis-two-clean-roots-selected-representation-sidecar-binding-v1"
+authority = "local-successor-evidence-no-independent-trust-or-replacement"
+frontdoor = "nuis bootstrap-reproducibility"
+artifact = "nuis.compiler-component-reproducibility-v2.toml"
+verdict = "reproducible-selected-representations-bound-awaiting-authorization"
+replacement_authorized = false
+
+[predecessor]
+protocol = "nuis-compiler-component-reproducibility-v1"
+artifact = "nuis.compiler-component-reproducibility.toml"
+binding = "exact-canonical-bytes-sha256-and-aggregate-sha256"
+root_replay = "rebuild-v1-from-both-clean-roots-before-v2-admission"
+signature_compatible = true
+mutation_permitted = false
+
+[run_binding]
+run_count = 2
+run_order = ["clean-build-0", "clean-build-1"]
+fields = [
+  "clean_root_witness_sha256",
+  "production_proof_sha256",
+  "base_differential_report_sha256",
+  "representation_differential_bytes",
+  "representation_differential_sha256",
+  "representation_report_sha256",
+]
+representation_sidecar = "nuis.compiler-component-representation-diff.toml"
+sidecar_validation = "canonical-parse-plus-independent-component-evidence-rebuild"
+comparisons_per_run = 2
+equivalent_per_run = 2
+
+[aggregate]
+representation_comparison_count = 4
+equivalent_representation_count = 4
+all_selected_representations_equivalent = true
+sidecars_individually_bound = true
+sidecar_hash_equality_required = false
+reason = "each-sidecar-binds-root-specific-stage0-and-candidate-audit-records"
+identity = "sha256-of-canonical-v2-record-with-empty-aggregate-field"
+
+[failure_boundary]
+missing_or_noncanonical_predecessor = "reject"
+predecessor_root_drift = "reject"
+missing_or_noncanonical_sidecar = "reject"
+sidecar_component_or_base_differential_drift = "reject"
+sidecar_selected_or_recovered_payload_drift = "reject"
+sidecar_hash_or_report_hash_drift = "reject"
+duplicate_clean_root_witness = "reject"
+replacement_authority_drift = "reject"
+
+[compatibility]
+v1_artifact_remains_canonical = true
+generation_one_v1_attestation_remains_verifiable = true
+v2_remote_attestation_defined = false
+physical_machine_independence_cryptographically_proven = false

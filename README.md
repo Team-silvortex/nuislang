@@ -33,10 +33,11 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`791/791` passing drift checks. The compiler data model, stage0/stage1 driver,
-differential/reproducibility gate, and stage-neutral boundary are all
-`usable/99`. Chunked typed payload projection and canonical reversible active
-state close their previous weakest tasks. Dispatch v1 now resolves an unordered
+`795/795` passing drift checks. The compiler data model and stage-neutral
+boundary remain `usable/99`; the bootstrap subset, stage0/stage1 driver, and
+differential/reproducibility gate are now `stable/100`. Chunked typed payload
+projection and canonical reversible active state close their previous weakest
+tasks. Dispatch v1 now resolves an unordered
 exact-two build/image inventory through the signed generation-two identities,
 executes a private byte-verified copy of the stage0 `current` image, and retains
 the stage1 candidate as `forward` without persisting paths or timestamps.
@@ -64,9 +65,10 @@ object-writer selection. This closes the bounded equivalent-input slice while
 native object bytes and all authority flags remain false.
 Self-hosting readiness v2 now records
 `stage0-to-stage1-migration/active` while retaining `ready = false` and only
-`2/5` gates closed. Deterministic ordering now advances the
-differential/reproducibility successor before broader source and native-object
-ownership.
+`3/5` gates closed. Reproducibility v2 preserves the exact signed v1 aggregate
+while binding each clean root's distinct selected-representation sidecar and
+proving `4/4` semantic equivalence. Deterministic ordering now advances the
+stage-neutral IR boundary before broader source and native-object ownership.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native
@@ -78,7 +80,7 @@ audit record, and component-bound diagnostic proof for one project-form
 compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
-`nuis bootstrap-status` frontdoor reports `2/5` gates closed. Compiler data
+`nuis bootstrap-status` frontdoor reports `3/5` gates closed. Compiler data
 model v10 now materializes four owned token records per bounded window, emits
 the canonical 59-byte fixture plus the real candidate's 91-byte
 `use cpu StdLanguageCore;` token

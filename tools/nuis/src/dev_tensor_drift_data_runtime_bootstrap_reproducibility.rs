@@ -655,7 +655,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
         required_patterns: &[
             "stage-neutral boundary to `usable/99`",
             "stage0/stage1 driver to `usable/99`",
-            "differential/reproducibility gate at `usable/99`",
+            "closes the differential/reproducibility gate at `stable/100`",
             "Data model v10 reaches `usable/99`",
             "24-byte `CompilerChunkedPayload`",
             "Active-state v1 repeats both trust checks",
@@ -667,7 +667,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "Candidate compile capability v2 now deep-verifies that production lineage",
             "Canonical recursive owned-struct layouts now have one bounded parser",
             "The stage0/stage1 driver is now `stable/100`",
-            "Deterministic coordinate ordering therefore moves to `developer-system/bootstrap/differential-reproducibility-gate`",
+            "deterministic coordinate ordering moves to `language-core/nuisc/stage-neutral-ir-boundary`",
             "nsld candidate-input",
         ],
     },

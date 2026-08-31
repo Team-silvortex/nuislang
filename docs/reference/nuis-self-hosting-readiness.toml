@@ -54,10 +54,10 @@ blocker = "none for the bounded canonical source-to-equivalent-Nsld-input gate; 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
-status = "usable"
-progress = 99
+status = "stable"
+progress = 100
 required_before = "beta-0.10.0"
-next_action = "define a versioned reproducibility successor that binds the exact representation report hash for each clean root while leaving signed v1 aggregates verifiable"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_representation_diff -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate pure_nuis_candidate_produces_an_attested_equivalent_stage1_component -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
-expected_artifact = "two clean roots whose next-version aggregate binds both canonical 13/13 reports and exact selected-representation sidecar hashes without invalidating the checked-in generation-one signature"
-blocker = "the live differential frontdoor consumes selected reversible v2 bytes, but generation-one reproducibility only binds that lineage transitively through production v11 and carries no sidecar report hash; no remote sidecar generation is checked in, and physical independence remains operational rather than cryptographically measurable"
+next_action = "preserve reproducibility v2 and the immutable signed v1 predecessor while remote v2 mirroring advances under a separate attestation protocol"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_reproducibility_v2 -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
+expected_artifact = "nuis-compiler-component-reproducibility-v2 binds each clean root's exact canonical 2/2 representation sidecar beside the unchanged v1 aggregate and leaves replacement authority false"
+blocker = "none for the bounded local differential/reproducibility gate; remote v2 sidecar attestation and cryptographic proof of physical independence remain later migration concerns"

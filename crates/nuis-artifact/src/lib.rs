@@ -24,6 +24,7 @@ mod compiler_component_replacement;
 mod compiler_component_replacement_registry;
 mod compiler_component_representation_diff;
 mod compiler_component_reproducibility;
+mod compiler_component_reproducibility_v2;
 mod compiler_component_transition;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
@@ -302,6 +303,17 @@ pub use compiler_component_reproducibility::{
     CompilerComponentReproducibilityRun, CompilerComponentReproducibilityRunInput,
     COMPILER_COMPONENT_CLEAN_BUILD_CONTRACT, COMPILER_COMPONENT_REPRODUCIBILITY_AUTHORITY,
     COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_PROTOCOL,
+};
+pub use compiler_component_reproducibility_v2::{
+    build_compiler_component_reproducibility_v2_from_paths,
+    parse_compiler_component_reproducibility_v2,
+    parse_compiler_component_reproducibility_v2_from_source,
+    read_compiler_component_reproducibility_v2, render_compiler_component_reproducibility_v2,
+    CompilerComponentReproducibilityV2, CompilerComponentReproducibilityV2Run,
+    COMPILER_COMPONENT_REPRODUCIBILITY_V2_AUTHORITY,
+    COMPILER_COMPONENT_REPRODUCIBILITY_V2_BINDING_CONTRACT,
+    COMPILER_COMPONENT_REPRODUCIBILITY_V2_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_V2_PROTOCOL,
+    COMPILER_COMPONENT_REPRODUCIBILITY_V2_VERDICT,
 };
 pub use compiler_component_transition::{
     build_compiler_component_transition, parse_compiler_component_transition,

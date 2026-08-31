@@ -516,7 +516,7 @@ mod tests {
     fn checked_in_manifest_is_valid_and_names_the_weakest_real_gate() {
         let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         assert_eq!(report.gates.len(), REQUIRED_GATES.len());
-        assert_eq!(report.closed_gate_count(), 2);
+        assert_eq!(report.closed_gate_count(), 3);
         assert!(!report.ready());
         assert!(report.migration_active());
         assert_eq!(report.phase, "stage0-to-stage1-migration");
@@ -526,7 +526,7 @@ mod tests {
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("differential-reproducibility-gate")
+            Some("stage-neutral-ir-boundary")
         );
     }
 
@@ -547,7 +547,7 @@ mod tests {
         assert!(text.contains("phase: stage0-to-stage1-migration"));
         assert!(text.contains("phase_status: active"));
         assert!(text.contains("status: migration-active-open-readiness-gates"));
-        assert!(text.contains("gates: 2/5"));
+        assert!(text.contains("gates: 3/5"));
     }
 
     #[test]
