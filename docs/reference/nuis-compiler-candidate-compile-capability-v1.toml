@@ -49,12 +49,12 @@ fail_closed = [
 [honest_boundary]
 claim = "one-production-bound-nuis-candidate-adapter-drives-a-canonical-rebuild-through-an-exact-verified-stage0-provider"
 does_not_claim = "the-signed-forward-image-is-a-self-hosted-compiler-or-has-generation-three-selection-authority"
-next_step = "consume-the-now-signed-preselection-with-one-direct-stage1-owned-compile-proof"
+next_step = "preserve-this-delegated-proof-while-capability-v2-enters-the-signed-generation-three-successor"
 
 [open_boundary]
 missing = [
-  "direct-stage1-front-end-compilation-without-stage0-provider-delegation",
-  "capability-v2-and-generation-three-transition-consuming-the-direct-proof",
+  "signed-generation-three-transition-consuming-direct-capability-v2",
+  "fresh-source-and-native-materialization-under-stage1-ownership",
   "independent-remote-capability-evidence",
   "provider-key-rotation-and-threshold-policy",
 ]

@@ -1,0 +1,71 @@
+protocol = "nuis-compiler-candidate-compile-capability-v2"
+version = 2
+status = "usable-direct-stage1-front-end-compile"
+scope = "candidate-owned-five-stage-front-end-result-without-runtime-provider"
+manifest_name = "nuis.compiler-candidate-direct-compile-capability.toml"
+result_protocol = "nuis-bootstrap-candidate-scalar-output-v9"
+result_name = "nuis.compiler-candidate-front-end-result"
+driver_contract = "nuis-stage1-candidate-direct-front-end-driver-v1"
+authority = "front-end-compile-capability-only-no-replacement-or-selection"
+request_contract = "canonical-five-stage-handoff-through-production-bound-candidate-v1"
+provider_contract = "no-runtime-compiler-provider-v1"
+environment_contract = "cleared-process-environment-v1"
+input_contract = "verified-candidate-handoff-five-stage-payloads-v1"
+argument_contract = "exact-five-stage-payloads-no-shell-v1"
+stdin_contract = "closed-stdin-v1"
+native_contract = "front-end-result-only-no-native-materialization-v1"
+digest = "sha256-lowercase"
+path_policy = "runtime-paths-never-enter-canonical-fields"
+provider_dependency_required = false
+direct_stage1_compile = true
+native_materialization = false
+replacement_authorized = false
+selection_authorized = false
+verdict = "candidate-direct-front-end-compile-verified-no-selection-authority"
+
+frontdoor = "nuis bootstrap-candidate-direct-compile"
+candidate_production_protocol = "nuis-compiler-candidate-production-v11"
+candidate_adapter_protocol = "nuis-bootstrap-candidate-scalar-output-v9"
+candidate_role = "stage1-candidate"
+input_stage_count = 5
+
+verification_order = [
+  "read-and-deeply-verify-candidate-production-lineage",
+  "verify-production-bound-adapter-length-and-sha256",
+  "read-candidate-source-token-ast-nir-yir-handoff-payloads",
+  "verify-two-production-bound-ast-nir-transformation-checkpoints",
+  "stage-and-reread-one-private-adapter-image",
+  "clear-the-process-environment-and-close-stdin",
+  "execute-exactly-five-payload-arguments-without-a-shell-or-provider",
+  "parse-the-exact-53-line-canonical-front-end-result",
+  "rebuild-the-expected-result-from-production-and-transformation-evidence",
+  "persist-and-reparse-path-free-result-and-capability-files",
+]
+
+fail_closed = [
+  "candidate-production-adapter-or-handoff-drift",
+  "payload-length-sha256-order-or-fold-drift",
+  "transformation-checkpoint-or-production-summary-drift",
+  "noncanonical-result-protocol-order-line-count-or-encoding",
+  "nonzero-exit-or-nonempty-stderr",
+  "existing-or-overlapping-output-paths",
+  "provider-dependency-native-materialization-or-selection-claim",
+]
+
+[honest_boundary]
+claim = "the-production-bound-stage1-candidate-directly-consumes-the-complete-canonical-front-end-handoff-and-emits-its-own-verified-result-without-invoking-stage0"
+does_not_claim = "fresh-project-parsing-native-object-materialization-final-linking-or-generation-three-selection"
+next_step = "bind-one-canonical-fresh-source-snapshot-to-candidate-owned-front-end-stage-evidence-without-a-preexisting-stage0-handoff"
+
+[open_boundary]
+missing = [
+  "fresh-source-to-token-and-ast-ownership-without-a-preexisting-stage0-handoff",
+  "candidate-owned-nir-yir-to-native-object-materialization",
+  "independent-remote-direct-compile-evidence",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_direct_compile -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_frontend_result -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_candidate_direct_compile -j 1 -- --test-threads=1",
+]

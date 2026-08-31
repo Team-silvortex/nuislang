@@ -54,7 +54,9 @@ pub(crate) fn print_help() {
     println!("    nuis bootstrap-candidate-probe <project-dir|nuis.toml> <output-dir>");
     println!("    nuis bootstrap-candidate-build <project-dir|nuis.toml> <output-dir>");
     println!("    nuis bootstrap-candidate-compile-capability <candidate-build-root> <stage0-provider-image> <project-dir|nuis.toml> <fresh-build-output> <output>");
+    println!("    nuis bootstrap-candidate-direct-compile <candidate-build-root> <front-end-result-output> <capability-output>");
     println!("    nuis bootstrap-preselect-candidate <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256> <candidate-build-root> <candidate-compile-capability> <preselection-challenge-sha256> <authorizer-id> <environment-id> <preselection-id> <output>");
+    println!("    nuis bootstrap-sign-candidate-successor <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256> <candidate-build-root> <candidate-compile-capability-v1> <preselection> <preselection-challenge-sha256> <direct-compile-capability-v2> <front-end-result> <successor-challenge-sha256> <authorizer-id> <environment-id> <successor-id> <output>");
     println!("    nuis bootstrap-reproducibility <project-dir|nuis.toml> <output-dir>");
     println!("    nuis bootstrap-attest-reproducibility <aggregate> <clean-root-0> <clean-root-1> <challenge-sha256> <attester-id> <environment-id> <output>");
     println!("    nuis bootstrap-verify-reproducibility-attestation <aggregate> <attestation> <trust-registry> <registry-sha256> <challenge-sha256>");

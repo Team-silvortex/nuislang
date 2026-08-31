@@ -1,22 +1,16 @@
 use std::{fs, path::Path, process::Command};
 
-#[path = "bootstrap_candidate_adapter_output.rs"]
-mod output;
-
-use output::{
-    parse_adapter_output, AdapterProjectionCheckpointOutput, AdapterTokenPaginationOutput,
-};
-
 use nuis_artifact::{
     compiler_candidate_bundle_fold, compiler_candidate_stage_fold,
-    compiler_projection_two_page_identity, compiler_token_first_page_identity,
-    compiler_token_pagination_identity, decode_compiler_token_stream, parse_build_manifest,
-    CompilerProjectionKind, CompilerProjectionTwoPageIdentity, CompilerStageHandoff,
-    CompilerTokenDecodeSummary, CompilerTokenPageIdentity, CompilerTokenPaginationIdentity,
-    COMPILER_CANDIDATE_ADAPTER_FILE,
+    compiler_projection_two_page_identity, compiler_stage_structural_checkpoint_words,
+    compiler_token_first_page_identity, compiler_token_pagination_identity,
+    decode_compiler_token_stream, parse_build_manifest,
+    parse_compiler_candidate_frontend_result_bytes, CompilerProjectionKind,
+    CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerTokenDecodeSummary,
+    CompilerTokenPageIdentity, CompilerTokenPaginationIdentity, COMPILER_CANDIDATE_ADAPTER_FILE,
+    COMPILER_CANDIDATE_FRONTEND_RESULT_FILE,
 };
 
-const ADAPTER_OUTPUT_PROTOCOL: &str = "nuis-bootstrap-candidate-scalar-output-v9";
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
 const ADAPTER_RUNTIME_OBJECT_FILE: &str = "nuis.compiler-candidate-runtime.o";
 
@@ -137,8 +131,11 @@ pub(crate) fn run_candidate_adapter(
             String::from_utf8_lossy(&output.stderr),
         ));
     }
-    let (stage_folds, bundle_fold, token_decode, token_pagination, ast_output, nir_output) =
-        parse_adapter_output(&output.stdout, ADAPTER_OUTPUT_PROTOCOL)?;
+    let result = parse_compiler_candidate_frontend_result_bytes(
+        &output.stdout,
+        Path::new(COMPILER_CANDIDATE_FRONTEND_RESULT_FILE),
+    )
+    .map_err(|error| format!("failed to parse candidate front-end result: {error}"))?;
     let expected_folds = payload_paths
         .iter()
         .enumerate()
@@ -186,16 +183,20 @@ pub(crate) fn run_candidate_adapter(
         compiler_projection_two_page_identity(CompilerProjectionKind::Nir, &nir_bytes).map_err(
             |error| format!("failed to independently materialize NIR structural pages: {error}"),
         )?;
-    if stage_folds != expected_folds
-        || bundle_fold != expected_bundle
-        || token_decode != expected_token_decode
-        || token_pagination
-            != AdapterTokenPaginationOutput::from_evidence(
-                expected_token_page.identity,
-                &expected_token_pagination,
-            )
-        || ast_output != AdapterProjectionCheckpointOutput::from_pages(expected_ast_pages)
-        || nir_output != AdapterProjectionCheckpointOutput::from_pages(expected_nir_pages)
+    let expected_ast_words =
+        compiler_stage_structural_checkpoint_words(CompilerProjectionKind::Ast, expected_ast_pages);
+    let expected_nir_words =
+        compiler_stage_structural_checkpoint_words(CompilerProjectionKind::Nir, expected_nir_pages);
+    if result.stage_folds != expected_folds
+        || result.bundle_fold != expected_bundle
+        || result.token_record_count != expected_token_decode.record_count
+        || result.token_semantic_fold != expected_token_decode.semantic_fold
+        || result.token_page_identity != expected_token_page.identity
+        || result.token_page_count != expected_token_pagination.page_count
+        || result.token_terminal_page_hash != expected_token_pagination.terminal_page_hash
+        || result.token_page_chain_identity != expected_token_pagination.chain_identity
+        || result.ast_checkpoint_words != expected_ast_words
+        || result.nir_checkpoint_words != expected_nir_words
     {
         return Err(
             "Nuis candidate scalar output disagrees with the independent host fold, token decode, token pagination, AST page chain, or NIR page chain".to_owned(),
@@ -211,15 +212,15 @@ pub(crate) fn run_candidate_adapter(
     Ok(CandidateAdapterOutput {
         adapter_file: COMPILER_CANDIDATE_ADAPTER_FILE,
         adapter,
-        stage_folds,
-        bundle_fold,
-        token_decode,
+        stage_folds: result.stage_folds,
+        bundle_fold: result.bundle_fold,
+        token_decode: expected_token_decode,
         token_page: expected_token_page,
         token_pagination: expected_token_pagination,
         ast_pages: expected_ast_pages,
         nir_pages: expected_nir_pages,
-        ast_transformation_words: ast_output.checkpoint_words(CompilerProjectionKind::Ast),
-        nir_transformation_words: nir_output.checkpoint_words(CompilerProjectionKind::Nir),
+        ast_transformation_words: result.ast_checkpoint_words,
+        nir_transformation_words: result.nir_checkpoint_words,
     })
 }
 

@@ -1,0 +1,78 @@
+protocol = "nuis-compiler-candidate-successor-v1"
+version = 1
+status = "usable-signed-generation-three-direct-front-end-successor"
+scope = "same-generation-strengthening-from-delegated-preselection-to-direct-stage1-front-end-evidence"
+manifest_name = "nuis.compiler-candidate-successor.toml"
+authority = "independent-ed25519-component-owner-generation-three-successor"
+signature_contract = "nuis-compiler-candidate-successor-ed25519-v1"
+action = "strengthen-generation-three-with-direct-front-end-capability"
+relation_contract = "same-generation-capability-strengthening-v1"
+target_generation = 3
+digest = "sha256-lowercase"
+path_policy = "runtime-paths-never-enter-canonical-fields"
+provider_dependency_required = false
+direct_stage1_compile = true
+fresh_source_compile = false
+native_materialization = false
+replacement_authorized = false
+selection_authorized = false
+preselection_authorized = true
+successor_authorized = true
+verdict = "generation-three-direct-front-end-successor-no-native-or-selection-authority"
+
+frontdoor = "nuis bootstrap-sign-candidate-successor"
+predecessor_transition_protocol = "nuis-compiler-component-transition-v2"
+predecessor_preselection_protocol = "nuis-compiler-candidate-preselection-v1"
+delegated_capability_protocol = "nuis-compiler-candidate-compile-capability-v1"
+direct_capability_protocol = "nuis-compiler-candidate-compile-capability-v2"
+candidate_production_protocol = "nuis-compiler-candidate-production-v11"
+front_end_result_protocol = "nuis-bootstrap-candidate-scalar-output-v9"
+
+verification_order = [
+  "replay-attestation-replacement-active-state-and-generation-two-transition",
+  "require-both-caller-pinned-trust-registry-hashes-and-all-fresh-challenges",
+  "deep-verify-candidate-production-v11-and-delegated-capability-v1",
+  "parse-and-byte-rerender-the-immutable-preselection-v1-source",
+  "deep-verify-direct-capability-v2-over-the-exact-candidate-handoff-and-transformations",
+  "parse-and-byte-rerender-the-canonical-53-line-front-end-result",
+  "require-candidate-production-and-owner-identity-continuity-across-both-branches",
+  "sign-a-fresh-path-free-same-generation-successor-proof",
+  "persist-reread-and-compare-the-create-new-successor",
+]
+
+bound_identity = [
+  "complete-preselection-v1-file-id-and-proof",
+  "candidate-record-reproducible-build-producer-and-compiler-image",
+  "candidate-production-v11-protocol-and-proof",
+  "complete-direct-capability-v2-file-proof-driver-provider-and-input-identity",
+  "front-end-result-protocol-length-sha256-and-bundle-fold",
+  "component-owner-id-environment-public-key-and-fresh-challenge",
+]
+
+fail_closed = [
+  "generation-two-preselection-or-delegated-capability-lineage-drift",
+  "candidate-production-adapter-handoff-payload-or-transformation-drift",
+  "direct-capability-or-front-end-result-source-proof-or-canonical-encoding-drift",
+  "component-owner-role-environment-key-registry-or-signature-drift",
+  "provider-fresh-source-native-replacement-or-final-selection-claim",
+  "existing-output-or-post-write-reread-drift",
+]
+
+[honest_boundary]
+claim = "the-continuing-component-owner-signs-the-direct-stage1-front-end-proof-into-generation-three-without-a-runtime-stage0-provider"
+does_not_claim = "fresh-source-processing-native-object-materialization-component-replacement-final-selection-or-self-hosting"
+next_step = "bind-one-canonical-fresh-source-snapshot-to-candidate-owned-front-end-stage-evidence-without-a-preexisting-stage0-handoff"
+
+[open_boundary]
+missing = [
+  "candidate-owned-fresh-source-to-token-ast-nir-yir-processing",
+  "candidate-owned-nir-yir-to-native-object-materialization",
+  "independent-remote-direct-successor-evidence",
+  "signed-generation-three-component-transition-and-final-selection",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_successor -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --bin nuis -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]

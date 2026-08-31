@@ -160,9 +160,10 @@ active-state v1 consumes the genesis authorization without rewriting either
 signed source, and transition v2 signs the exact rollback to stage0 while
 retaining the candidate forward target. Dispatch v1 now executes the selected
 current image while retaining forward, and compile dispatch v1 routes one
-canonical project rebuild through it. Independent remote sidecar evidence, a
-stage1 image with the same compile capability, and a generation-three successor
-remain open.
+canonical project rebuild through it. Direct capability v2 and candidate
+successor v1 now bind the provider-free front-end slice into generation three.
+Independent remote sidecar evidence, candidate-owned fresh-source processing,
+and a stage1-owned native image remain open.
 
 ## Validation
 

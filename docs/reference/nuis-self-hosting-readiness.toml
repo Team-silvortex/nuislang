@@ -44,10 +44,10 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
 required_before = "beta-0.10.0"
 progress = 99
-next_action = "prove one direct stage1-owned canonical compile without stage0 provider delegation while preserving capability v1 and preselection v1"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_preselection -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --bin nuis candidate_preselection -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
-expected_artifact = "one path-free capability-v2 proof whose candidate-owned front-end reaches the canonical component result without invoking the stage0 provider"
-blocker = "generation-three preselection now binds the exact predecessor, production, candidate capability, result, provider dependency, owner challenge, and signature, but the candidate compile route still exact-execs stage0"
+next_action = "bind one canonical fresh-source snapshot to candidate-owned source-to-token-AST-NIR-YIR evidence without a preexisting stage0 handoff while keeping native materialization false"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_successor -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "one candidate-owned fresh-source front-end capability whose canonical source snapshot reaches verified stage evidence without a preexisting stage0 handoff or native-materialization claim"
+blocker = "candidate successor v1 now signs direct provider-free front-end evidence into generation three, but that execution still consumes a canonical handoff originally materialized by stage0 and does not own fresh-source parsing or native object materialization"
 
 [[gates]]
 id = "differential-reproducibility-gate"

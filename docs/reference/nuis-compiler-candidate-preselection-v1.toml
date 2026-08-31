@@ -57,14 +57,13 @@ fail_closed = [
 
 [honest_boundary]
 claim = "the-generation-two-component-owner-signs-one-exact-candidate-capability-into-generation-three-preselection"
-does_not_claim = "the-candidate-directly-compiles-without-stage0-or-has-final-selection-or-replacement-authority"
-next_step = "prove-one-direct-stage1-owned-canonical-compile-without-stage0-provider-delegation"
+does_not_claim = "the-candidate-has-fresh-source-native-materialization-or-final-selection-or-replacement-authority"
+next_step = "preserve-this-preselection-as-the-immutable-predecessor-of-candidate-successor-v1"
 
 [open_boundary]
 missing = [
-  "direct-stage1-front-end-compilation-without-stage0-provider-delegation",
-  "capability-v2-binding-that-direct-stage1-result",
-  "signed-generation-three-forward-transition-consuming-the-direct-proof",
+  "signed-generation-three-component-transition-and-final-selection",
+  "fresh-source-and-native-materialization-under-stage1-ownership",
   "independent-remote-capability-and-preselection-evidence",
 ]
 

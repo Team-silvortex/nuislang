@@ -32,7 +32,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`769/769` passing drift checks. The compiler data model, stage0/stage1 driver,
+`780/780` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
 state close their previous weakest tasks. Dispatch v1 now resolves an unordered
@@ -45,6 +45,15 @@ stage0 provider with no shell while granting no replacement or selection
 authority. Candidate preselection v1 now replays that complete trust chain and
 lets the generation-two component owner sign the exact capability into
 generation-three review while keeping both final authority flags false.
+Candidate compile capability v2 now executes the production-bound adapter over
+the exact five-stage handoff with a cleared environment and no runtime provider,
+then binds the canonical 53-line front-end result while explicitly leaving
+fresh-source parsing, native materialization, and selection open.
+Candidate successor v1 now replays the complete generation-two and preselection
+chain, deep-verifies that direct result, and signs it into generation-three
+review under the continuing component-owner key. It is same-generation evidence
+strengthening only: fresh-source compilation, native materialization,
+replacement, and final selection all remain false.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native
@@ -270,6 +279,7 @@ cargo run -p nuis -- bootstrap-build examples/projects/tooling/bootstrap_compile
 cargo run -p nuis -- bootstrap-candidate-probe examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate
 cargo run -p nuis -- bootstrap-candidate-build examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-production
 cargo run -p nuis -- bootstrap-candidate-compile-capability build/bootstrap-candidate-production target/debug/nuis examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-compile build/bootstrap-candidate-compile-capability.toml
+cargo run -p nuis -- bootstrap-candidate-direct-compile build/bootstrap-candidate-production build/bootstrap-candidate-front-end-result build/bootstrap-candidate-direct-compile-capability.toml
 cargo run -p nuis -- bootstrap-reproducibility examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-reproducibility
 cargo run -p nuis -- workflow examples/projects/kernel_tensor_demo
 cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo

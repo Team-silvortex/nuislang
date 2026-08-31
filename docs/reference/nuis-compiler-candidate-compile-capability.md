@@ -82,8 +82,10 @@ This closes the candidate compile-driver capability boundary, not self-hosting.
 The signed generation-two forward image remains unchanged, and the candidate
 still consumes an explicit stage0 provider. The capability is now consumed by
 `nuis-compiler-candidate-preselection-v1`, whose owner signature also keeps
-selection authority false. The next protocol must prove direct stage1-owned
-compilation without silently treating provider delegation as self-hosting.
+selection authority false. That next execution slice is now recorded by
+[Nuis Compiler Candidate Direct Compile Capability](nuis-compiler-candidate-direct-compile-capability.md).
+It preserves this v1 record and proves only direct five-stage front-end result
+production, not fresh-source parsing or native materialization.
 
 The machine-readable contract is
 [nuis-compiler-candidate-compile-capability-v1.toml](nuis-compiler-candidate-compile-capability-v1.toml).

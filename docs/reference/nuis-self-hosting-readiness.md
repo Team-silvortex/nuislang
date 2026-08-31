@@ -272,6 +272,27 @@ before a receipt is written. The receipt explicitly grants neither replacement
 nor selection authority. See
 [Nuis Compiler Candidate Compile Capability](nuis-compiler-candidate-compile-capability.md).
 
+`nuis bootstrap-candidate-direct-compile` now proves the first non-delegating
+stage1 execution slice. It deep-verifies the production-v11 candidate and its
+five-stage handoff, launches a private adapter copy with closed stdin, a cleared
+environment, and exactly five payload arguments, then parses the exact 53-line
+front-end result. Capability v2 independently reconstructs its folds, token
+pagination, bundle, and AST/NIR checkpoints from production evidence. It binds
+`provider_dependency_required = false` and `direct_stage1_compile = true`, while
+keeping native materialization, replacement, and selection false. See
+[Nuis Compiler Candidate Direct Compile Capability](nuis-compiler-candidate-direct-compile-capability.md).
+
+`nuis bootstrap-sign-candidate-successor` now joins that direct proof to the
+immutable preselection lineage. It replays the complete generation-two trust
+chain, delegated capability v1, production v11, direct capability v2, and the
+canonical front-end result, then signs one path-free
+`nuis-compiler-candidate-successor-v1` under the continuing component-owner key.
+The relation strengthens generation three without changing the selected
+compiler. Provider dependency is false and direct stage1 compilation is true;
+fresh-source compilation, native materialization, replacement, and final
+selection remain false. See
+[Nuis Compiler Candidate Successor](nuis-compiler-candidate-successor.md).
+
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
 node/resource and edge membership indexes, and compiles SHA-256 proof hashing
@@ -330,11 +351,13 @@ candidate as the forward target, dispatch v1 executes that exact current image,
 and compile dispatch v1 rebuilds one canonical project without rewriting a
 predecessor. Candidate compile capability v1 closes the production-bound
 delegating driver route while retaining the verified stage0 provider as an
-explicit dependency. Candidate preselection v1 now signs that exact capability,
+explicit dependency. Candidate preselection v1 signs that exact capability,
 production proof, provider dependency, and immutable generation-two transition
-under the continuing component-owner key while keeping replacement and final
-selection authority false. Remote capability evidence and direct stage1
-compilation without that provider remain open.
+under the continuing component-owner key. Direct capability v2 closes front-end
+execution without that runtime provider, and candidate successor v1 now signs
+the exact proof and result into generation three without mutating any
+predecessor. The candidate still does not own fresh-source parsing or native
+materialization. Remote direct-successor evidence also remains open.
 Cryptography does not prove physical-machine
 independence; that remains an operational fact.
 
@@ -349,6 +372,8 @@ freeze subset and compiler data contracts
   -> compare stage0 and candidate stage1 outputs
   -> sign candidate capability into generation-three preselection
   -> prove direct stage1-owned compilation
+  -> bind the direct proof into a signed generation-three successor
+  -> prove candidate-owned fresh-source front-end compilation
   -> permit one reversible component replacement
 ```
 

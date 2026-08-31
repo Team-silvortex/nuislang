@@ -41,8 +41,10 @@ mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;
 mod bootstrap_candidate_compile_capability;
+mod bootstrap_candidate_direct_compile;
 mod bootstrap_candidate_preselection;
 mod bootstrap_candidate_probe;
+mod bootstrap_candidate_successor;
 mod bootstrap_component_compile_dispatch;
 mod bootstrap_component_dispatch;
 mod bootstrap_component_image;
@@ -403,8 +405,14 @@ fn run() -> Result<(), String> {
                 input,
             )?;
         }
+        cli::CommandKind::BootstrapCandidateDirectCompile(input) => {
+            bootstrap_candidate_direct_compile::handle_bootstrap_candidate_direct_compile(input)?;
+        }
         cli::CommandKind::BootstrapPreselectCandidate(input) => {
             bootstrap_candidate_preselection::handle_bootstrap_preselect_candidate(input)?;
+        }
+        cli::CommandKind::BootstrapSignCandidateSuccessor(input) => {
+            bootstrap_candidate_successor::handle_bootstrap_sign_candidate_successor(input)?;
         }
         cli::CommandKind::BootstrapReproducibility { input, output_dir } => {
             bootstrap_reproducibility::handle_bootstrap_reproducibility(input, output_dir)?;

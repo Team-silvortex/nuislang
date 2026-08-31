@@ -86,9 +86,11 @@ The separately versioned
 [candidate compile capability](nuis-compiler-candidate-compile-capability.md)
 now proves that its production-bound adapter can drive the same request through
 an exact stage0 provider, but it grants no selection authority and does not
-rewrite generation two. Candidate preselection v1 now owner-signs that exact
-evidence without final selection authority. The remaining gap is direct stage1
-compilation without provider delegation and its capability-v2 successor.
+rewrite generation two. Candidate preselection v1 owner-signs that exact
+evidence without final selection authority. Direct capability v2 and candidate
+successor v1 now close the provider-free front-end execution and signed
+same-generation strengthening slices. Fresh-source processing and native
+materialization remain separate gaps.
 
 ## Validation
 

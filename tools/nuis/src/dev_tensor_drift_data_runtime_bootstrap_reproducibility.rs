@@ -399,7 +399,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "predecessor-authorization-id-generation-and-proof-sha256",
             "predecessor-active-state-generation-and-state-sha256",
             "authorization_and_state_mutated = false",
-            "prove-direct-stage1-owned-compilation-without-stage0-provider-delegation",
+            "preserve-candidate-successor-v1-while-closing-candidate-owned-fresh-source-processing",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -441,7 +441,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "retained_stage_role = \"stage1-candidate\"",
             "current-executed-forward-retained",
             "no-physical-paths-staging-names-registration-ordinals-or-timestamps-in-receipt",
-            "prove-direct-stage1-owned-compilation-without-stage0-provider-delegation",
+            "preserve-candidate-successor-v1-while-closing-candidate-owned-fresh-source-processing",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -664,9 +664,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS:
             "Compile dispatch v1 derives a canonical rebuild request",
             "Candidate compile capability v1 reuses the production-bound adapter",
             "Candidate preselection v1 replays the complete generation-two signature",
+            "Candidate compile capability v2 now deep-verifies that production lineage",
             "Canonical recursive owned-struct layouts now have one bounded parser",
             "deterministic coordinate ordering remains at `compiler-toolchain/bootstrap/stage0-stage1-driver`",
-            "direct stage1-owned compilation without provider delegation",
+            "candidate successor v1 now signs the direct no-runtime-provider front-end proof",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -3,9 +3,12 @@ mod bridge_registry;
 mod build_manifest;
 mod clock_protocol;
 mod compiler_candidate_compile_capability;
+mod compiler_candidate_direct_compile;
 mod compiler_candidate_execution;
+mod compiler_candidate_frontend_result;
 mod compiler_candidate_preselection;
 mod compiler_candidate_production;
+mod compiler_candidate_successor;
 mod compiler_component_active_state;
 mod compiler_component_attestation;
 mod compiler_component_attestation_registry;
@@ -64,6 +67,23 @@ pub use compiler_candidate_compile_capability::{
     COMPILER_CANDIDATE_COMPILE_DRIVER_CONTRACT, COMPILER_CANDIDATE_COMPILE_PROVIDER_CONTRACT,
     COMPILER_CANDIDATE_COMPILE_PROVIDER_ENVIRONMENT, COMPILER_CANDIDATE_COMPILE_REQUEST_CONTRACT,
 };
+pub use compiler_candidate_direct_compile::{
+    build_compiler_candidate_direct_compile_capability,
+    parse_compiler_candidate_direct_compile_capability,
+    parse_compiler_candidate_direct_compile_capability_from_source,
+    render_compiler_candidate_direct_compile_capability,
+    verify_compiler_candidate_direct_compile_capability, CompilerCandidateDirectCompileCapability,
+    CompilerCandidateDirectCompileCapabilityInput,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_ARGUMENT_CONTRACT,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_AUTHORITY, COMPILER_CANDIDATE_DIRECT_COMPILE_CAPABILITY_FILE,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_CAPABILITY_PROTOCOL,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_DRIVER_CONTRACT,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_ENVIRONMENT_CONTRACT,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_INPUT_CONTRACT,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_NATIVE_CONTRACT,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_PROVIDER_CONTRACT,
+    COMPILER_CANDIDATE_DIRECT_COMPILE_REQUEST_CONTRACT, COMPILER_CANDIDATE_DIRECT_COMPILE_VERDICT,
+};
 pub use compiler_candidate_execution::{
     build_compiler_candidate_execution, parse_compiler_candidate_execution,
     parse_compiler_candidate_execution_from_source, read_compiler_candidate_execution,
@@ -71,6 +91,13 @@ pub use compiler_candidate_execution::{
     CompilerCandidateExecutionInput, COMPILER_CANDIDATE_EXECUTION_AUTHORITY,
     COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_EXECUTION_PROTOCOL,
     COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_RUNNER_CONTRACT,
+};
+pub use compiler_candidate_frontend_result::{
+    build_compiler_candidate_frontend_result, parse_compiler_candidate_frontend_result,
+    parse_compiler_candidate_frontend_result_bytes,
+    parse_compiler_candidate_frontend_result_from_source,
+    render_compiler_candidate_frontend_result, CompilerCandidateFrontendResult,
+    COMPILER_CANDIDATE_FRONTEND_RESULT_FILE, COMPILER_CANDIDATE_FRONTEND_RESULT_PROTOCOL,
 };
 pub use compiler_candidate_preselection::{
     build_compiler_candidate_preselection, parse_compiler_candidate_preselection,
@@ -91,6 +118,16 @@ pub use compiler_candidate_production::{
     COMPILER_CANDIDATE_ADAPTER_FILE, COMPILER_CANDIDATE_PRODUCER_CONTRACT,
     COMPILER_CANDIDATE_PRODUCTION_AUTHORITY, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_CANDIDATE_PRODUCTION_PROTOCOL,
+};
+pub use compiler_candidate_successor::{
+    build_compiler_candidate_successor, parse_compiler_candidate_successor,
+    parse_compiler_candidate_successor_from_source, render_compiler_candidate_successor,
+    verify_compiler_candidate_successor, CompilerCandidateSuccessor,
+    CompilerCandidateSuccessorInput, CompilerCandidateSuccessorVerificationInput,
+    COMPILER_CANDIDATE_SUCCESSOR_ACTION, COMPILER_CANDIDATE_SUCCESSOR_AUTHORITY,
+    COMPILER_CANDIDATE_SUCCESSOR_FILE, COMPILER_CANDIDATE_SUCCESSOR_PROTOCOL,
+    COMPILER_CANDIDATE_SUCCESSOR_RELATION_CONTRACT,
+    COMPILER_CANDIDATE_SUCCESSOR_SIGNATURE_CONTRACT, COMPILER_CANDIDATE_SUCCESSOR_VERDICT,
 };
 pub use compiler_component_active_state::{
     build_compiler_component_active_state, parse_compiler_component_active_state,

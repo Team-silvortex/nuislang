@@ -35,6 +35,9 @@ use nuis_artifact::{
     COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_TRANSFORMATION_FILE,
 };
 
+#[path = "compiler_structural_projection_candidate/generation_three_successor.rs"]
+mod generation_three_successor;
+
 fn temp_dir() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -732,6 +735,11 @@ fn two_uncached_clean_candidates_bind_one_reproducibility_aggregate() {
     let preselection_source =
         fs::read_to_string(&preselection_path).expect("read candidate preselection source");
     assert!(!preselection_source.contains(&output_dir_text));
+    generation_three_successor::assert_signed_direct_successor(
+        &output_dir,
+        selected_root,
+        &output_dir_text,
+    );
     let dispatch = Command::new(env!("CARGO_BIN_EXE_nuis"))
         .arg("bootstrap-dispatch-component")
         .arg(&aggregate_path)

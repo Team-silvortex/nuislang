@@ -1,9 +1,10 @@
 use super::{
     parse_args, BootstrapCandidateCompileCapabilityInput, BootstrapCandidatePreselectionInput,
-    BootstrapComponentActivationInput, BootstrapComponentCompileDispatchInput,
-    BootstrapComponentDispatchInput, BootstrapComponentReplacementInput,
-    BootstrapComponentReplacementVerificationInput, BootstrapComponentRollbackInput,
-    BootstrapComponentTransitionVerificationInput, CommandKind, GalaxyCommand,
+    BootstrapCandidateSuccessorInput, BootstrapComponentActivationInput,
+    BootstrapComponentCompileDispatchInput, BootstrapComponentDispatchInput,
+    BootstrapComponentReplacementInput, BootstrapComponentReplacementVerificationInput,
+    BootstrapComponentRollbackInput, BootstrapComponentTransitionVerificationInput, CommandKind,
+    GalaxyCommand,
 };
 use std::path::PathBuf;
 
@@ -200,6 +201,29 @@ fn parses_bootstrap_candidate_preselection_command() {
     assert_eq!(capability, PathBuf::from("capability"));
     assert_eq!(challenge_sha256, "preselection-challenge");
     assert_eq!(preselection_id, "preselection-3");
+    assert_eq!(output, PathBuf::from("output"));
+}
+
+#[test]
+fn parses_bootstrap_candidate_successor_command() {
+    let args = "bootstrap-sign-candidate-successor aggregate attestation attesters attesters-sha attestation-challenge authorization owners owners-sha authorization-challenge active transition transition-challenge candidate-root delegated preselection preselection-challenge direct result successor-challenge owner release successor-3 output";
+    let command = parse_args(args.split_whitespace().map(str::to_owned))
+        .expect("bootstrap-sign-candidate-successor parses");
+    let CommandKind::BootstrapSignCandidateSuccessor(BootstrapCandidateSuccessorInput {
+        candidate_root,
+        delegated_capability,
+        direct_capability,
+        successor_id,
+        output,
+        ..
+    }) = command
+    else {
+        panic!("expected candidate successor command");
+    };
+    assert_eq!(candidate_root, PathBuf::from("candidate-root"));
+    assert_eq!(delegated_capability, PathBuf::from("delegated"));
+    assert_eq!(direct_capability, PathBuf::from("direct"));
+    assert_eq!(successor_id, "successor-3");
     assert_eq!(output, PathBuf::from("output"));
 }
 

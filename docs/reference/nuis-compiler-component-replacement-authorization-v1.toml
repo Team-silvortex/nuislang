@@ -92,7 +92,7 @@ stage0_current_and_candidate_forward_retained = true
 
 [open_boundary]
 missing = [
-  "direct-stage1-owned-compile-proof-and-capability-v2",
+  "fresh-source-and-native-materialization-under-stage1-ownership",
   "signed-generation-three-forward-transition",
   "checked-in-independent-component-owner-authorization-evidence",
   "multi-component-and-threshold-authorizer-policy",

@@ -76,11 +76,11 @@ selected compiler generation.
 
 ## Honest Next Step
 
-The weakest remaining bootstrap boundary is now execution rather than trust
-binding: the production-bound candidate still exact-execs a verified stage0
-provider. The next versioned capability must prove one canonical compile whose
-front-end stages are owned directly by stage1, while preserving capability v1,
-this preselection, and generation two as immutable predecessors.
+Direct capability v2 closes the next execution slice by consuming the complete
+five-stage handoff with a cleared environment and no runtime provider.
+Candidate successor v1 now consumes that proof under the continuing owner key
+without rewriting this preselection or delegated capability v1. Fresh-source
+parsing, native materialization, and final selection remain open.
 
 The machine-readable contract is
 [nuis-compiler-candidate-preselection-v1.toml](nuis-compiler-candidate-preselection-v1.toml).

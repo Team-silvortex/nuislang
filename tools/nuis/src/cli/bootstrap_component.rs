@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use crate::bootstrap_candidate_compile_capability::BootstrapCandidateCompileCapabilityInput;
+use crate::bootstrap_candidate_direct_compile::BootstrapCandidateDirectCompileInput;
 use crate::bootstrap_candidate_preselection::BootstrapCandidatePreselectionInput;
+use crate::bootstrap_candidate_successor::BootstrapCandidateSuccessorInput;
 use crate::bootstrap_component_compile_dispatch::BootstrapComponentCompileDispatchInput;
 use crate::bootstrap_component_dispatch::BootstrapComponentDispatchInput;
 use crate::bootstrap_component_replacement::BootstrapComponentTransitionVerificationInput;
@@ -21,6 +23,19 @@ pub(super) fn parse_bootstrap_candidate_compile_capability(
             output: path(args, usage)?,
         },
     );
+    finish(args, usage, command)
+}
+
+pub(super) fn parse_bootstrap_candidate_direct_compile(
+    args: &mut impl Iterator<Item = String>,
+) -> Result<CommandKind, String> {
+    let usage = "usage: nuis bootstrap-candidate-direct-compile <candidate-build-root> <front-end-result-output> <capability-output>";
+    let command =
+        CommandKind::BootstrapCandidateDirectCompile(BootstrapCandidateDirectCompileInput {
+            candidate_root: path(args, usage)?,
+            result_output: path(args, usage)?,
+            capability_output: path(args, usage)?,
+        });
     finish(args, usage, command)
 }
 
@@ -45,6 +60,34 @@ pub(super) fn parse_bootstrap_candidate_preselection(
         authorizer_id: args.next().ok_or_else(|| usage.to_owned())?,
         environment_id: args.next().ok_or_else(|| usage.to_owned())?,
         preselection_id: args.next().ok_or_else(|| usage.to_owned())?,
+        output: path(args, usage)?,
+    });
+    finish(args, usage, command)
+}
+
+pub(super) fn parse_bootstrap_candidate_successor(
+    args: &mut impl Iterator<Item = String>,
+) -> Result<CommandKind, String> {
+    let usage = "usage: nuis bootstrap-sign-candidate-successor <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256> <candidate-build-root> <candidate-compile-capability-v1> <preselection> <preselection-challenge-sha256> <direct-compile-capability-v2> <front-end-result> <successor-challenge-sha256> <authorizer-id> <environment-id> <successor-id> <output>";
+    let verification = parse_bootstrap_component_verification_prefix(args, usage)?;
+    let transition_verification = BootstrapComponentTransitionVerificationInput {
+        verification,
+        active_state: path(args, usage)?,
+        transition: path(args, usage)?,
+        transition_challenge_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+    };
+    let command = CommandKind::BootstrapSignCandidateSuccessor(BootstrapCandidateSuccessorInput {
+        transition_verification,
+        candidate_root: path(args, usage)?,
+        delegated_capability: path(args, usage)?,
+        preselection: path(args, usage)?,
+        preselection_challenge_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+        direct_capability: path(args, usage)?,
+        frontend_result: path(args, usage)?,
+        challenge_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+        authorizer_id: args.next().ok_or_else(|| usage.to_owned())?,
+        environment_id: args.next().ok_or_else(|| usage.to_owned())?,
+        successor_id: args.next().ok_or_else(|| usage.to_owned())?,
         output: path(args, usage)?,
     });
     finish(args, usage, command)

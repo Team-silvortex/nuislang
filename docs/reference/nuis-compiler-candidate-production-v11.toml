@@ -78,6 +78,6 @@ missing = [
   "typed-owned-arena-payloads-and-unbounded-growth",
   "general-aggregate-loop-backedge-lowering",
   "second-independent-attester-or-higher-generation-rotation-evidence",
-  "direct-stage1-owned-compile-proof-and-capability-v2",
+  "fresh-source-and-native-materialization-under-stage1-ownership",
   "signed-generation-three-forward-transition-and-owner-key-rotation",
 ]

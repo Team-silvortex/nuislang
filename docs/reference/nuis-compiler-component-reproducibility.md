@@ -98,8 +98,9 @@ authorization consumption, and transition v2 signs exact stage0 restoration
 plus candidate forward retention. Dispatch v1 now executes the exact current
 image while retaining the forward candidate. Candidate preselection v1 now
 owner-signs the exact delegated capability and provider dependency. Direct
-stage1 compilation without that provider and a final generation-three
-transition remain open.
+capability v2 and candidate successor v1 now bind provider-free front-end
+execution into generation three. Candidate-owned fresh-source processing,
+native materialization, and a final generation-three transition remain open.
 
 ## Validation
 

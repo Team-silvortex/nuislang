@@ -212,6 +212,13 @@ no replacement or selection authority; production v11 itself remains
 unchanged. See
 [Nuis Compiler Candidate Compile Capability](nuis-compiler-candidate-compile-capability.md).
 
+The original five-payload mode is also now promoted to a canonical front-end
+result and consumed without a runtime provider by capability v2. Production
+v11 remains byte-compatible; the successor proof binds it transitively rather
+than changing this producer contract. See
+[Nuis Compiler Candidate Direct Compile Capability](nuis-compiler-candidate-direct-compile-capability.md)
+and [Nuis Compiler Candidate Successor](nuis-compiler-candidate-successor.md).
+
 ## Current Limit
 
 V11 binds every token byte through deterministic pagination but still binds
