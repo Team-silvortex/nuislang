@@ -104,6 +104,30 @@ authorization, and attestation files are never overwritten. Re-deriving the
 same authorization yields the same state identity rather than a second logical
 transition.
 
+## Signed Generation-Two Rollback
+
+The component owner can now derive and sign the successor transition:
+
+```bash
+NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX=<private-key> \
+  nuis bootstrap-rollback-component \
+  <aggregate> <attestation> \
+  <attester-registry> <attester-registry-sha256> \
+  <attestation-challenge-sha256> <authorization> \
+  <authorizer-registry> <authorizer-registry-sha256> \
+  <authorization-challenge-sha256> <active-state> \
+  <transition-challenge-sha256> \
+  <authorizer-id> <environment-id> <transition-id> <output>
+```
+
+`nuis-compiler-component-transition-v2` binds the immutable authorization
+proof and active-state identity before mapping the candidate-active build back
+to stage0. Its `current` selector returns stage0, while `forward` retains the
+same candidate build for a later signed successor. V2 deliberately requires
+the same component-owner identity, environment, and public key as generation
+one. The saved record can be reverified without the private key through
+`nuis bootstrap-verify-component-transition`.
+
 ## Honest Boundary
 
 The repository regression combines the checked-in Linux amd64 generation-one
@@ -111,16 +135,19 @@ attestation with a temporary local component-owner key. This proves protocol
 composition and role separation, not an independently operated release-owner
 ceremony.
 
-The repository now proves a canonical active-component state consumer with an
-exact stage0 rollback selection. A signed generation-two rollback or forward
-transition, runtime execution through the selected compiler image, threshold
-authorization, and checked-in operational authorizer evidence remain open.
+The repository now proves a canonical active-component state consumer and one
+signed generation-two transition that restores the exact stage0 build while
+retaining the candidate as a forward target. Runtime execution through the
+selected build, a signed generation-three forward transition, owner-key
+rotation, threshold authorization, and checked-in operational authorizer
+evidence remain open.
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_active_state -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_transition -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_replacement_commands -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1
 ```

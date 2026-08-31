@@ -6,7 +6,7 @@ use nuis_semantics::model::{
 
 use super::LoweringState;
 
-pub(super) const OWNED_VARIANT_UNION_PREFIX: &str = "__nuis_variant_union__";
+pub(super) const OWNED_VARIANT_UNION_PREFIX: &str = yir_core::OWNED_VARIANT_UNION_LAYOUT_PREFIX;
 
 pub(super) fn module_owned_struct_layout(module: &NirModule, ty: &NirTypeRef) -> Option<String> {
     let structs = module

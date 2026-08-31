@@ -32,11 +32,16 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`743/743` passing drift checks. The compiler data model, stage0/stage1 driver,
+`751/751` passing drift checks. The compiler data model, stage0/stage1 driver,
 differential/reproducibility gate, and stage-neutral boundary are all
 `usable/99`. Chunked typed payload projection and canonical reversible active
 state close their previous weakest tasks, so deterministic coordinate ordering
-now advances the stage driver toward a signed generation-two transition.
+now advances the stage driver toward path-free execution of the verified
+current build identity.
+Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
+shared by CPU execution and LLVM lowering; the common `nuis-runtime`
+blob/aggregate shim also carries the shader result-enum bundle through native
+AppKit host linking without stale-layout or undefined-symbol failures.
 The dedicated
 `nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
@@ -120,8 +125,10 @@ permission without changing the attestation. `bootstrap-activate-component`
 now repeats both pinned trust checks and derives a canonical active-state record
 whose provider-neutral selector resolves the candidate as `active` and the
 original stage0 build as `rollback`; authorization and attestation bytes remain
-immutable. A signed generation-two transition and execution through the
-selected compiler image remain open.
+immutable. `bootstrap-rollback-component` now signs generation two over the
+predecessor authorization proof and active-state identity, restores stage0 as
+`current`, and retains the candidate as `forward`. Execution through that
+selected build identity remains open.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -140,12 +147,12 @@ existing private-image or admission identity. With the producer-neutral
 structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
 execution proof, chunked compiler data, first attested stage1 leaf, and
 two-clean-build aggregate and typed owned-text arena in place, the tensor now
-routes mainline work to a signed generation-two transition beyond the
-reversible active-component selector. The v11 production
+routes mainline work to stage-driver dispatch of the verified generation-two
+`current` selection. The v11 production
 lineage now has checked-in challenge-bound Ed25519 attester evidence and a
 separate genesis replacement-authorization protocol. Authorization consumption
-is closed by canonical active-state v1; a signed rollback chain, broader
-compiler-data paging, Galaxy
+is closed by canonical active-state v1, and the first rollback link is signed
+by transition v2; selected-build dispatch, broader compiler-data paging, Galaxy
 hardening, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 

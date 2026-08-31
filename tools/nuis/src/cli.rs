@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use crate::bootstrap_component_replacement::{
     BootstrapComponentActivationInput, BootstrapComponentReplacementInput,
-    BootstrapComponentReplacementVerificationInput,
+    BootstrapComponentReplacementVerificationInput, BootstrapComponentRollbackInput,
+    BootstrapComponentTransitionVerificationInput,
 };
 
 mod galaxy;
@@ -11,10 +12,11 @@ mod support;
 use galaxy::parse_galaxy_args;
 pub use galaxy::GalaxyCommand;
 use support::{
-    parse_bench_args, parse_build_args, parse_cache_status_args, parse_clean_cache_args,
-    parse_debug_request_args, parse_debug_resume_args, parse_optional_json_input,
-    parse_prune_cache_args, parse_release_check_args, parse_required_json_input,
-    parse_required_json_input_output, parse_test_args,
+    parse_bench_args, parse_bootstrap_component_verification_prefix, parse_build_args,
+    parse_cache_status_args, parse_clean_cache_args, parse_debug_request_args,
+    parse_debug_resume_args, parse_optional_json_input, parse_prune_cache_args,
+    parse_release_check_args, parse_required_json_input, parse_required_json_input_output,
+    parse_test_args,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +65,8 @@ pub enum CommandKind {
     BootstrapAuthorizeComponentReplacement(BootstrapComponentReplacementInput),
     BootstrapVerifyComponentReplacement(BootstrapComponentReplacementVerificationInput),
     BootstrapActivateComponent(BootstrapComponentActivationInput),
+    BootstrapRollbackComponent(BootstrapComponentRollbackInput),
+    BootstrapVerifyComponentTransition(BootstrapComponentTransitionVerificationInput),
     BootstrapDiff {
         stage0_record: PathBuf,
         candidate_record: PathBuf,
@@ -385,61 +389,65 @@ where
         }
         "bootstrap-verify-component-replacement" => {
             let usage = "usage: nuis bootstrap-verify-component-replacement <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256>";
-            let aggregate = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let attestation = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let attester_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let attester_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
-            let attestation_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
-            let authorization = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let authorizer_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let authorizer_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
-            let authorization_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let verification = parse_bootstrap_component_verification_prefix(&mut args, usage)?;
             if args.next().is_some() {
                 return Err(usage.to_owned());
             }
-            Ok(CommandKind::BootstrapVerifyComponentReplacement(
-                BootstrapComponentReplacementVerificationInput {
-                aggregate,
-                attestation,
-                attester_registry,
-                attester_registry_sha256,
-                attestation_challenge_sha256,
-                authorization,
-                authorizer_registry,
-                authorizer_registry_sha256,
-                authorization_challenge_sha256,
-                },
-            ))
+            Ok(CommandKind::BootstrapVerifyComponentReplacement(verification))
         }
         "bootstrap-activate-component" => {
             let usage = "usage: nuis bootstrap-activate-component <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <output>";
-            let aggregate = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let attestation = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let attester_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let attester_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
-            let attestation_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
-            let authorization = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let authorizer_registry = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
-            let authorizer_registry_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
-            let authorization_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let verification = parse_bootstrap_component_verification_prefix(&mut args, usage)?;
             let output = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
             if args.next().is_some() {
                 return Err(usage.to_owned());
             }
             Ok(CommandKind::BootstrapActivateComponent(
                 BootstrapComponentActivationInput {
-                    verification: BootstrapComponentReplacementVerificationInput {
-                        aggregate,
-                        attestation,
-                        attester_registry,
-                        attester_registry_sha256,
-                        attestation_challenge_sha256,
-                        authorization,
-                        authorizer_registry,
-                        authorizer_registry_sha256,
-                        authorization_challenge_sha256,
-                    },
+                    verification,
                     output,
+                },
+            ))
+        }
+        "bootstrap-rollback-component" => {
+            let usage = "usage: nuis bootstrap-rollback-component <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition-challenge-sha256> <authorizer-id> <environment-id> <transition-id> <output>";
+            let verification = parse_bootstrap_component_verification_prefix(&mut args, usage)?;
+            let active_state = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let transition_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            let authorizer_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let environment_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let transition_id = args.next().ok_or_else(|| usage.to_owned())?;
+            let output = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapRollbackComponent(
+                BootstrapComponentRollbackInput {
+                    verification,
+                    active_state,
+                    transition_challenge_sha256,
+                    authorizer_id,
+                    environment_id,
+                    transition_id,
+                    output,
+                },
+            ))
+        }
+        "bootstrap-verify-component-transition" => {
+            let usage = "usage: nuis bootstrap-verify-component-transition <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256>";
+            let verification = parse_bootstrap_component_verification_prefix(&mut args, usage)?;
+            let active_state = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let transition = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let transition_challenge_sha256 = args.next().ok_or_else(|| usage.to_owned())?;
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapVerifyComponentTransition(
+                BootstrapComponentTransitionVerificationInput {
+                    verification,
+                    active_state,
+                    transition,
+                    transition_challenge_sha256,
                 },
             ))
         }
@@ -716,7 +724,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-candidate-probe`, `bootstrap-candidate-build`, `bootstrap-reproducibility`, `bootstrap-attest-reproducibility`, `bootstrap-verify-reproducibility-attestation`, `bootstrap-authorize-component-replacement`, `bootstrap-verify-component-replacement`, `bootstrap-activate-component`, `bootstrap-rollback-component`, `bootstrap-verify-component-transition`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

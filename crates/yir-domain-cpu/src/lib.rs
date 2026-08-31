@@ -23,6 +23,8 @@ mod runtime_helpers;
 mod tests_loop_describe;
 #[cfg(test)]
 mod tests_mutex_lifecycle;
+#[cfg(test)]
+mod tests_owned_struct_layout;
 
 use branch_effect::{execute_cpu_branch_effect_action, CPU_BRANCH_EFFECT_ACTIONS};
 use carry_payload::*;

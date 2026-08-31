@@ -94,8 +94,9 @@ boundary. The repository now retains one separately operated Linux amd64
 attester generation with two cache-bypassed `13/13` runs, an exact registry
 pin, and a no-private-key verification regression. Cryptography still cannot
 prove physical-machine independence. Canonical active-state v1 closes genesis
-authorization consumption while a signed generation-two rollback chain remains
-open.
+authorization consumption, and transition v2 signs exact stage0 restoration
+plus candidate forward retention. Path-free selected-build execution and a
+generation-three successor remain open.
 
 ## Validation
 

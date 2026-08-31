@@ -5,6 +5,7 @@ use std::{
     process::{self, Command},
 };
 
+use nuis_runtime::append_c_shim_owned_blob_runtime;
 use yir_core::{
     ffi::{ffi_symbol_signature_hash, is_ffi_symbol_hash_token, FFI_SYMBOL_HASH_PREFIX},
     Value, YirModule,
@@ -2637,6 +2638,8 @@ fn c_shim_source(host_ffi_symbols: &BTreeMap<String, HostFfiSignature>) -> Strin
     out.push_str(
         r#"#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 extern int64_t nuis_yir_entry(void);
 
@@ -2680,7 +2683,9 @@ int64_t host_mix_tick(int64_t base, int64_t tick) {
 }
 "#,
     );
+    out.push_str(host_text_runtime_source());
     out.push_str(&host_ffi_stubs);
+    append_c_shim_owned_blob_runtime(&mut out);
     out.push_str(
         r#"
 
@@ -2690,6 +2695,53 @@ int main(void) {
 "#,
     );
     out
+}
+
+fn host_text_runtime_source() -> &'static str {
+    r#"
+static char* nuis_host_text_slots[4096];
+static size_t nuis_host_text_lengths[4096];
+static int64_t nuis_host_text_len = 0;
+
+static int64_t nuis_host_text_register_sized(const char* text, size_t len) {
+    if (text == NULL || nuis_host_text_len >= 4096 || len == SIZE_MAX) return 0;
+    char* copy = (char*)malloc(len + 1);
+    if (copy == NULL) return 0;
+    if (len > 0) memcpy(copy, text, len);
+    copy[len] = 0;
+    nuis_host_text_slots[nuis_host_text_len] = copy;
+    nuis_host_text_lengths[nuis_host_text_len] = len;
+    nuis_host_text_len += 1;
+    return nuis_host_text_len;
+}
+
+static int64_t nuis_host_text_register(const char* text) {
+    return text == NULL ? 0 : nuis_host_text_register_sized(text, strlen(text));
+}
+
+int64_t nuis_host_text_lift(const char* text) {
+    return nuis_host_text_register(text);
+}
+
+static const char* nuis_host_text_lookup(int64_t handle) {
+    static char fallback[64];
+    if (handle > 0 && handle <= nuis_host_text_len
+        && nuis_host_text_slots[handle - 1] != NULL) {
+        return nuis_host_text_slots[handle - 1];
+    }
+    if (handle == 0) return "";
+    snprintf(fallback, sizeof(fallback), "%lld", (long long)handle);
+    return fallback;
+}
+
+static size_t nuis_host_text_lookup_len(int64_t handle) {
+    if (handle > 0 && handle <= nuis_host_text_len
+        && nuis_host_text_slots[handle - 1] != NULL) {
+        return nuis_host_text_lengths[handle - 1];
+    }
+    return strlen(nuis_host_text_lookup(handle));
+}
+"#
 }
 
 fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
@@ -3230,6 +3282,9 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
     let embedded_runtime_module_bytes = runtime_frame_support
         .map(|support| support.embedded_module_bytes.as_str())
         .unwrap_or("");
+    let host_text_runtime = host_text_runtime_source();
+    let mut owned_blob_runtime = String::new();
+    append_c_shim_owned_blob_runtime(&mut owned_blob_runtime);
     let runtime_support = if runtime_mode {
         format!(
             r#"
@@ -3475,34 +3530,8 @@ static NSImage *nuisImageFromPpmData(NSData *ppmData) {
 
 extern int64_t nuis_yir_entry(void);
 
-static char* nuis_host_text_slots[4096];
-static int64_t nuis_host_text_len = 0;
-
-static int64_t nuis_host_text_register(const char* text) {{
-    if (text == NULL) return 0;
-    if (nuis_host_text_len >= 4096) return 0;
-    size_t size = strlen(text) + 1;
-    char* copy = (char*)malloc(size);
-    if (copy == NULL) return 0;
-    memcpy(copy, text, size);
-    nuis_host_text_slots[nuis_host_text_len] = copy;
-    nuis_host_text_len += 1;
-    return nuis_host_text_len;
-}}
-
-int64_t nuis_host_text_lift(const char* text) {{
-    return nuis_host_text_register(text);
-}}
-
-static const char* nuis_host_text_lookup(int64_t handle) {{
-    static char fallback[64];
-    if (handle > 0 && handle <= nuis_host_text_len && nuis_host_text_slots[handle - 1] != NULL) {{
-        return nuis_host_text_slots[handle - 1];
-    }}
-    if (handle == 0) return "";
-    snprintf(fallback, sizeof(fallback), "%lld", (long long)handle);
-    return fallback;
-}}
+{host_text_runtime}
+{owned_blob_runtime}
 
 void nuis_debug_print_i64(int64_t value) {{
     printf("%lld\n", (long long)value);
@@ -3569,12 +3598,12 @@ static pthread_t gNuisFabricWorker;
 
 typedef struct {{
     int kind;
-    char action_class[16];
-    char action_slot[16];
-    char event_name[32];
-    char table_id[32];
-    char source[32];
-    char target[32];
+    const char *action_class;
+    const char *action_slot;
+    const char *event_name;
+    const char *table_id;
+    const char *source;
+    const char *target;
 }} NuisFabricEvent;
 
 enum {{

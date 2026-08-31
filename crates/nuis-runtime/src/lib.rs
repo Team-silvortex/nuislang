@@ -5,6 +5,7 @@
 //! external `yalivia` project.
 
 pub mod bridge;
+mod c_shim_owned_blob_runtime;
 pub mod error;
 pub mod executable_memory;
 pub mod executor;
@@ -19,6 +20,7 @@ pub mod runtime_dispatch_binding;
 pub mod session;
 
 pub use bridge::{BridgeExecutor, PreparedDomainExecution};
+pub use c_shim_owned_blob_runtime::append_c_shim_owned_blob_runtime;
 pub use error::RuntimeError;
 pub use executable_memory::{
     canonical_machine_arch, native_host_machine_arch, AuthorizedNativeEntry,

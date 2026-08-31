@@ -225,8 +225,11 @@ real independently provisioned attester run is now checked in. The separate
 replacement-authorization v1 frontdoor composes that evidence with a distinct
 component-owner key and rollback target. Active-state v1 now consumes that
 verified permission into a canonical candidate-active/stage0-rollback selector
-without changing either signed source. A `13/13` report or verified witness
-remains evidence, not permission by itself.
+without changing either signed source. Transition v2 then binds that exact
+authorization proof and active-state identity under the same component-owner
+role and key, signs generation two, restores stage0 as `current`, and retains
+stage1-candidate as `forward`. A `13/13` report or verified witness remains
+evidence, not permission by itself.
 
 ## Validation
 

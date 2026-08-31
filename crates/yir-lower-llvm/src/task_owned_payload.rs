@@ -2,7 +2,7 @@ use super::{
     fresh_reg, LlvmLoweringState, LlvmValueRef, StructLlvmValueRef, VariantUnionLlvmValueRef,
 };
 
-const OWNED_VARIANT_UNION_PREFIX: &str = "__nuis_variant_union__";
+const OWNED_VARIANT_UNION_PREFIX: &str = yir_core::OWNED_VARIANT_UNION_LAYOUT_PREFIX;
 
 const OWNED_DESCRIPTOR_SIZE: usize = 48;
 const OWNED_AGGREGATE_HEADER_SIZE: usize = 24;

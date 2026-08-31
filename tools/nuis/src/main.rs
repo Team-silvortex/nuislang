@@ -76,6 +76,7 @@ mod dev_tensor_drift_data_runtime_execution;
 mod dev_tensor_drift_data_runtime_mutex;
 mod dev_tensor_drift_data_runtime_nsld;
 mod dev_tensor_drift_data_runtime_nsld_shell_image;
+mod dev_tensor_drift_data_runtime_owned_layout;
 mod dev_tensor_drift_data_runtime_provider;
 mod dev_tensor_drift_data_runtime_provider_completion;
 mod dev_tensor_drift_data_runtime_shader_graph;
@@ -438,6 +439,12 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapActivateComponent(input) => {
             bootstrap_component_replacement::handle_bootstrap_activate_component(input)?
+        }
+        cli::CommandKind::BootstrapRollbackComponent(input) => {
+            bootstrap_component_replacement::handle_bootstrap_rollback_component(input)?
+        }
+        cli::CommandKind::BootstrapVerifyComponentTransition(input) => {
+            bootstrap_component_replacement::handle_bootstrap_verify_component_transition(input)?
         }
         cli::CommandKind::BootstrapDiff {
             stage0_record,

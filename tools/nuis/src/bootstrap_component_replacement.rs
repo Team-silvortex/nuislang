@@ -7,14 +7,20 @@ use std::{
 
 use nuis_artifact::{
     build_compiler_component_active_state, build_compiler_component_replacement_authorization,
-    parse_compiler_component_attestation, parse_compiler_component_replacement_authorization,
+    build_compiler_component_transition, parse_compiler_component_attestation,
+    parse_compiler_component_replacement_authorization,
     parse_compiler_component_replacement_authorizer_registry,
-    parse_compiler_component_reproducibility, render_compiler_component_active_state,
-    render_compiler_component_replacement_authorization, select_compiler_component_active_target,
-    verify_compiler_component_active_state, verify_compiler_component_attestation,
-    verify_compiler_component_replacement_authorization, CompilerComponentActiveSelection,
-    CompilerComponentReplacementAuthorization, CompilerComponentReplacementAuthorizationInput,
-    CompilerComponentReplacementVerificationInput,
+    parse_compiler_component_reproducibility, parse_compiler_component_transition,
+    render_compiler_component_active_state, render_compiler_component_replacement_authorization,
+    render_compiler_component_transition, select_compiler_component_active_target,
+    select_compiler_component_transition_target, verify_compiler_component_active_state,
+    verify_compiler_component_attestation, verify_compiler_component_replacement_authorization,
+    verify_compiler_component_transition, CompilerComponentActiveSelection,
+    CompilerComponentActiveState, CompilerComponentReplacementAuthorization,
+    CompilerComponentReplacementAuthorizationInput, CompilerComponentReplacementAuthorizerRegistry,
+    CompilerComponentReplacementVerificationInput, CompilerComponentTransitionInput,
+    CompilerComponentTransitionSelection,
+    CompilerComponentTransitionVerificationInput as ArtifactTransitionVerificationInput,
 };
 
 pub(crate) const COMPILER_REPLACEMENT_SIGNING_KEY_ENV: &str =
@@ -53,6 +59,25 @@ pub(crate) struct BootstrapComponentReplacementVerificationInput {
 pub(crate) struct BootstrapComponentActivationInput {
     pub(crate) verification: BootstrapComponentReplacementVerificationInput,
     pub(crate) output: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BootstrapComponentRollbackInput {
+    pub(crate) verification: BootstrapComponentReplacementVerificationInput,
+    pub(crate) active_state: PathBuf,
+    pub(crate) transition_challenge_sha256: String,
+    pub(crate) authorizer_id: String,
+    pub(crate) environment_id: String,
+    pub(crate) transition_id: String,
+    pub(crate) output: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BootstrapComponentTransitionVerificationInput {
+    pub(crate) verification: BootstrapComponentReplacementVerificationInput,
+    pub(crate) active_state: PathBuf,
+    pub(crate) transition: PathBuf,
+    pub(crate) transition_challenge_sha256: String,
 }
 
 pub(crate) fn handle_bootstrap_authorize_component_replacement(
@@ -103,6 +128,7 @@ pub(crate) fn handle_bootstrap_authorize_component_replacement(
     write_new(
         &input.output,
         render_compiler_component_replacement_authorization(&authorization).as_bytes(),
+        "compiler replacement authorization",
     )?;
 
     println!("bootstrap component replacement: authorized");
@@ -168,6 +194,7 @@ pub(crate) fn handle_bootstrap_activate_component(
     write_new(
         &input.output,
         render_compiler_component_active_state(&state).as_bytes(),
+        "compiler active-component state",
     )?;
 
     println!("bootstrap compiler component: activated");
@@ -186,6 +213,171 @@ pub(crate) fn handle_bootstrap_activate_component(
     println!("  reversible: true");
     println!("  active_state: {}", input.output.display());
     Ok(())
+}
+
+pub(crate) fn handle_bootstrap_rollback_component(
+    input: BootstrapComponentRollbackInput,
+) -> Result<(), String> {
+    let predecessor = verify_transition_predecessors(&input.verification, &input.active_state)?;
+    let signing_key = env::var(COMPILER_REPLACEMENT_SIGNING_KEY_ENV).map_err(|_| {
+        format!(
+            "{COMPILER_REPLACEMENT_SIGNING_KEY_ENV} must contain a 32-byte lowercase hexadecimal Ed25519 signing key"
+        )
+    })?;
+    let transition = build_compiler_component_transition(
+        CompilerComponentTransitionInput {
+            authorization: &predecessor.authorization,
+            authorization_source: &predecessor.authorization_source,
+            active_state: &predecessor.active_state,
+            active_state_source: &predecessor.active_state_source,
+            challenge_sha256: &input.transition_challenge_sha256,
+            transition_id: &input.transition_id,
+            authorizer_id: &input.authorizer_id,
+            environment_id: &input.environment_id,
+        },
+        &signing_key,
+    )
+    .map_err(|error| format!("failed to build compiler rollback transition: {error}"))?;
+    let verification = transition_verification_input(
+        &predecessor,
+        &input.verification,
+        &input.transition_challenge_sha256,
+    );
+    verify_compiler_component_transition(&transition, verification)
+        .map_err(|error| format!("failed to self-verify compiler rollback transition: {error}"))?;
+    let current = select_compiler_component_transition_target(
+        &transition,
+        verification,
+        CompilerComponentTransitionSelection::Current,
+    )
+    .map_err(|error| format!("failed to select restored stage0 component: {error}"))?;
+    let forward = select_compiler_component_transition_target(
+        &transition,
+        verification,
+        CompilerComponentTransitionSelection::Forward,
+    )
+    .map_err(|error| format!("failed to select retained forward component: {error}"))?;
+    write_new(
+        &input.output,
+        render_compiler_component_transition(&transition).as_bytes(),
+        "compiler component transition",
+    )?;
+
+    println!("bootstrap compiler component: rolled back");
+    println!("  component_id: {}", transition.component_id);
+    println!("  transition_id: {}", transition.transition_id);
+    println!("  generation: {}", transition.generation);
+    println!("  proof_sha256: {}", transition.proof_sha256);
+    println!("  current_stage_role: {}", current.stage_role);
+    println!(
+        "  current_reproducible_build_sha256: {}",
+        current.reproducible_build_sha256
+    );
+    println!("  forward_stage_role: {}", forward.stage_role);
+    println!(
+        "  forward_reproducible_build_sha256: {}",
+        forward.reproducible_build_sha256
+    );
+    println!("  reversible: true");
+    println!("  transition: {}", input.output.display());
+    Ok(())
+}
+
+pub(crate) fn handle_bootstrap_verify_component_transition(
+    input: BootstrapComponentTransitionVerificationInput,
+) -> Result<(), String> {
+    let predecessor = verify_transition_predecessors(&input.verification, &input.active_state)?;
+    let transition = parse_compiler_component_transition(&input.transition)
+        .map_err(|error| format!("failed to parse compiler component transition: {error}"))?;
+    let verification = transition_verification_input(
+        &predecessor,
+        &input.verification,
+        &input.transition_challenge_sha256,
+    );
+    verify_compiler_component_transition(&transition, verification)
+        .map_err(|error| format!("failed to verify compiler component transition: {error}"))?;
+    let current = select_compiler_component_transition_target(
+        &transition,
+        verification,
+        CompilerComponentTransitionSelection::Current,
+    )
+    .map_err(|error| format!("failed to select restored stage0 component: {error}"))?;
+    let forward = select_compiler_component_transition_target(
+        &transition,
+        verification,
+        CompilerComponentTransitionSelection::Forward,
+    )
+    .map_err(|error| format!("failed to select retained forward component: {error}"))?;
+
+    println!("bootstrap compiler component transition: verified");
+    println!("  component_id: {}", transition.component_id);
+    println!("  transition_id: {}", transition.transition_id);
+    println!("  generation: {}", transition.generation);
+    println!("  current_stage_role: {}", current.stage_role);
+    println!(
+        "  current_reproducible_build_sha256: {}",
+        current.reproducible_build_sha256
+    );
+    println!("  forward_stage_role: {}", forward.stage_role);
+    println!(
+        "  forward_reproducible_build_sha256: {}",
+        forward.reproducible_build_sha256
+    );
+    println!("  reversible: true");
+    Ok(())
+}
+
+struct VerifiedTransitionPredecessor {
+    authorization: CompilerComponentReplacementAuthorization,
+    authorization_source: String,
+    active_state: CompilerComponentActiveState,
+    active_state_source: String,
+    authorizer_registry: CompilerComponentReplacementAuthorizerRegistry,
+    authorizer_registry_source: String,
+}
+
+fn verify_transition_predecessors(
+    verification: &BootstrapComponentReplacementVerificationInput,
+    active_state_path: &Path,
+) -> Result<VerifiedTransitionPredecessor, String> {
+    let (authorization, authorization_source) = verify_replacement_input(verification)?;
+    let active_state = nuis_artifact::parse_compiler_component_active_state(active_state_path)
+        .map_err(|error| format!("failed to parse compiler active-component state: {error}"))?;
+    let active_state_source = read_text(active_state_path, "compiler active-component state")?;
+    verify_compiler_component_active_state(&active_state, &authorization, &authorization_source)
+        .map_err(|error| format!("failed to verify compiler active-component state: {error}"))?;
+    let authorizer_registry =
+        parse_compiler_component_replacement_authorizer_registry(&verification.authorizer_registry)
+            .map_err(|error| format!("failed to parse replacement authorizer registry: {error}"))?;
+    let authorizer_registry_source = read_text(
+        &verification.authorizer_registry,
+        "replacement authorizer registry",
+    )?;
+    Ok(VerifiedTransitionPredecessor {
+        authorization,
+        authorization_source,
+        active_state,
+        active_state_source,
+        authorizer_registry,
+        authorizer_registry_source,
+    })
+}
+
+fn transition_verification_input<'a>(
+    predecessor: &'a VerifiedTransitionPredecessor,
+    verification: &'a BootstrapComponentReplacementVerificationInput,
+    challenge_sha256: &'a str,
+) -> ArtifactTransitionVerificationInput<'a> {
+    ArtifactTransitionVerificationInput {
+        authorization: &predecessor.authorization,
+        authorization_source: &predecessor.authorization_source,
+        active_state: &predecessor.active_state,
+        active_state_source: &predecessor.active_state_source,
+        authorizer_registry: &predecessor.authorizer_registry,
+        authorizer_registry_source: &predecessor.authorizer_registry_source,
+        expected_authorizer_registry_sha256: &verification.authorizer_registry_sha256,
+        expected_transition_challenge_sha256: challenge_sha256,
+    }
 }
 
 fn verify_replacement_input(
@@ -305,27 +497,19 @@ fn read_text(path: &Path, label: &str) -> Result<String, String> {
         .map_err(|error| format!("failed to read {label} `{}`: {error}", path.display()))
 }
 
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+fn write_new(path: &Path, bytes: &[u8], label: &str) -> Result<(), String> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(path)
         .map_err(|error| {
             format!(
-                "failed to create compiler replacement authorization `{}` without replacement: {error}",
+                "failed to create {label} `{}` without replacement: {error}",
                 path.display()
             )
         })?;
-    file.write_all(bytes).map_err(|error| {
-        format!(
-            "failed to write compiler replacement authorization `{}`: {error}",
-            path.display()
-        )
-    })?;
-    file.sync_all().map_err(|error| {
-        format!(
-            "failed to sync compiler replacement authorization `{}`: {error}",
-            path.display()
-        )
-    })
+    file.write_all(bytes)
+        .map_err(|error| format!("failed to write {label} `{}`: {error}", path.display()))?;
+    file.sync_all()
+        .map_err(|error| format!("failed to sync {label} `{}`: {error}", path.display()))
 }

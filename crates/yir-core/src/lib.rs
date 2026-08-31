@@ -12,6 +12,7 @@ mod mutex_contract;
 mod operation_results;
 mod operation_semantics;
 mod owned_select_tree;
+mod owned_struct_layout;
 mod registry;
 mod value_display;
 mod value_types;
@@ -24,6 +25,7 @@ pub use glm::*;
 pub use module_graph::*;
 pub use mutex_contract::*;
 pub use owned_select_tree::*;
+pub use owned_struct_layout::*;
 pub use registry::*;
 pub use value_types::*;
 

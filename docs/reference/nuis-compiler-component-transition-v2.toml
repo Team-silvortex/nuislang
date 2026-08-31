@@ -1,0 +1,98 @@
+protocol = "nuis-compiler-component-transition-v2"
+version = 2
+status = "usable-signed-generation-two-rollback"
+scope = "one-signed-stage1-candidate-to-stage0-rollback-with-forward-retention"
+manifest_name = "nuis.compiler-component-transition.toml"
+authority = "independent-ed25519-component-owner-transition"
+signature_contract = "nuis-compiler-component-transition-ed25519-v2"
+authorizer_registry_protocol = "nuis-compiler-component-replacement-authorizer-registry-v1"
+private_key_input = "NUIS_COMPILER_REPLACEMENT_SIGNING_KEY_HEX"
+digest = "sha256-lowercase"
+signature = "ed25519-strict"
+path_policy = "no-physical-paths-or-timestamps-in-transition"
+action = "rollback-stage0"
+generation = 2
+predecessor_authorization_generation = 1
+predecessor_state_generation = 1
+from_selector = "active"
+from_stage_role = "stage1-candidate"
+current_selector = "current"
+current_stage_role = "stage0"
+forward_selector = "forward"
+forward_stage_role = "stage1-candidate"
+reversible = true
+verdict = "stage0-restored-candidate-forward-retained"
+
+frontdoors = [
+  "nuis bootstrap-rollback-component",
+  "nuis bootstrap-verify-component-transition",
+]
+
+signed_lineage = [
+  "fresh-transition-challenge-sha256",
+  "component-and-transition-id",
+  "generation-two",
+  "canonical-predecessor-authorization-file-bytes-and-sha256",
+  "predecessor-authorization-id-generation-and-proof-sha256",
+  "canonical-predecessor-active-state-file-bytes-and-sha256",
+  "predecessor-active-state-generation-and-state-sha256",
+  "stage1-candidate-from-build",
+  "stage0-current-build",
+  "stage1-candidate-forward-build",
+  "candidate-compiler-image-and-equivalent-native-output",
+  "component-owner-id-environment-and-public-key-id",
+]
+
+[owner_continuity]
+authorizer_id = "must-equal-genesis-authorization-authorizer-id"
+authorizer_environment_id = "must-equal-genesis-authorization-environment-id"
+authorizer_public_key_id = "must-equal-genesis-authorization-public-key-id"
+registry_scope = "exact-component-owner-entry"
+registry_pin = "caller-owned-sha256"
+key_rotation = "not-supported-by-v2"
+
+[predecessor]
+authorization_protocol = "nuis-compiler-component-replacement-authorization-v1"
+active_state_protocol = "nuis-compiler-component-active-state-v1"
+authorization_and_state_mutated = false
+both_sources_must_be_canonical = true
+active_state_must_rederive_from_authorization = true
+
+[transition]
+from = "predecessor-active-state-active-reproducible-build-sha256"
+current = "predecessor-active-state-rollback-reproducible-build-sha256"
+forward = "predecessor-active-state-active-reproducible-build-sha256"
+from_must_differ_from_current = true
+forward_must_equal_from = true
+output_creation = "create-new-without-overwrite"
+
+verification_invariants = [
+  "the-genesis-authorization-is-reverified-through-both-pinned-trust-domains-before-signing-or-verifying",
+  "the-predecessor-active-state-is-reverified-against-that-exact-authorization",
+  "all-predecessor-source-lengths-hashes-proofs-and-state-identities-are-recomputed",
+  "the-generation-two-owner-role-and-key-exactly-match-generation-one",
+  "the-transition-challenge-proof-or-signature-cannot-be-replayed-or-mutated",
+  "current-selects-stage0-and-forward-selects-the-original-stage1-candidate",
+  "unknown-selector-registry-drift-owner-key-drift-or-lineage-drift-fails-closed",
+]
+
+[honest_boundary]
+claim = "one-signed-generation-two-transition-deterministically-restores-stage0-and-retains-the-candidate-forward-target"
+does_not_claim = "the-stage-driver-has-executed-the-selected-build-or-that-key-rotation-is-supported"
+repository_test_scope = "checked-in-linux-amd64-attestation-plus-temporary-local-component-owner-key"
+next_step = "execute-the-verified-current-build-identity-through-a-path-free-stage-driver-dispatch"
+
+[open_boundary]
+missing = [
+  "runtime-stage-driver-execution-through-the-selected-build-identity",
+  "signed-generation-three-forward-transition",
+  "component-owner-key-rotation-chain",
+  "checked-in-independent-component-owner-transition-evidence",
+  "multi-component-and-threshold-authorizer-policy",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_transition -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis parses_bootstrap_component_transition_commands -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1",
+]

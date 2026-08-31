@@ -236,8 +236,15 @@ does not itself switch the active compiler. See
 binds the immutable authorization source, authorization proof, and attestation
 proof, and creates one canonical state without overwrite. The same
 provider-neutral selector resolves `active` to the stage1 candidate build and
-`rollback` to the exact stage0 build. A signed generation-two transition and
-runtime execution through the selected compiler image remain open.
+`rollback` to the exact stage0 build.
+
+`nuis bootstrap-rollback-component` now emits the signed
+`nuis-compiler-component-transition-v2` successor. It binds the generation-one
+authorization proof and active-state identity, requires the same component-
+owner role and key, restores stage0 as `current`, and retains the candidate as
+`forward`. The private-key-free verification frontdoor repeats the full
+predecessor chain. Path-free stage-driver execution through the selected build
+identity remains open.
 
 The developer path now indexes lowering helper lanes once, verifies lowering
 and GLM graphs through dense integer node IDs, uses hash-backed lowering
@@ -291,9 +298,12 @@ recovered payload, transform, checkpoint, base comparison, and handoff proof.
 The real AST and NIR paths therefore reach `2/2` selected-representation
 equivalence despite non-identical bytes while retaining false replacement authority. The
 sidecar's exact hash is not yet carried by the generation-one reproducibility
-aggregate; a versioned successor, remote sidecar evidence, authorization
-consumption, and a signed rollback chain remain open. Cryptography does not
-prove physical-machine independence; that remains an operational fact.
+aggregate. Replacement authorization v1 now feeds canonical active-state v1,
+and transition v2 signs generation-two stage0 restoration while retaining the
+candidate as the forward target without rewriting either predecessor. Remote
+sidecar evidence, path-free selected-build execution, and a generation-three
+successor remain open. Cryptography does not prove physical-machine
+independence; that remains an operational fact.
 
 ## Migration Rule
 

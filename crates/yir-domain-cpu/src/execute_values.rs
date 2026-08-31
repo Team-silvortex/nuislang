@@ -1,4 +1,10 @@
-use yir_core::{parse_branch_owned_call_args, ExecutionState, Node, Resource, StructValue, Value};
+use std::collections::BTreeMap;
+
+use yir_core::{
+    parse_branch_owned_call_args, parse_owned_struct_layout, ExecutionState, Node,
+    OwnedStructFieldLayout, OwnedStructLayout, OwnedStructScalarLayout, Resource, StructValue,
+    Value, VariantUnionValue, OWNED_VARIANT_UNION_LAYOUT_PREFIX,
+};
 
 use crate::runtime_helpers::resolve_project_profile_ref;
 
@@ -223,38 +229,16 @@ pub(crate) fn execute_cpu_value_node(
             Ok(Value::OwnedBytes(bytes))
         }
         "call_owned_struct" => {
-            let (type_name, fields_source) = node.op.args[1]
-                .split_once('|')
-                .ok_or_else(|| format!("node `{}` has invalid owned struct layout", node.name))?;
-            let fields = fields_source
-                .split(',')
-                .map(|field| {
-                    let (name, kind) = field.split_once(':').ok_or_else(|| {
-                        format!(
-                            "node `{}` has invalid owned struct field `{field}`",
-                            node.name
-                        )
-                    })?;
-                    let value = match kind {
-                        "bool" => Value::Bool(false),
-                        "i32" => Value::I32(0),
-                        "i64" => Value::Int(0),
-                        "f32" => Value::F32(0.0),
-                        "f64" => Value::F64(0.0),
-                        _ => {
-                            return Err(format!(
-                                "node `{}` has unsupported owned struct field kind `{kind}`",
-                                node.name
-                            ))
-                        }
-                    };
-                    Ok((name.to_owned(), value))
-                })
-                .collect::<Result<Vec<_>, String>>()?;
-            Ok(Value::Struct(StructValue {
-                type_name: type_name.to_owned(),
-                fields,
-            }))
+            let layout_source = node.op.args.get(1).ok_or_else(|| {
+                format!("node `{}` is missing its owned struct layout", node.name)
+            })?;
+            let layout = parse_owned_struct_layout(layout_source).map_err(|error| {
+                format!(
+                    "node `{}` has invalid owned struct layout: {error}",
+                    node.name
+                )
+            })?;
+            default_owned_layout_value(layout)
         }
         "return_bool" => {
             let value = state.expect_bool(&node.op.args[0])?;
@@ -279,15 +263,49 @@ pub(crate) fn execute_cpu_value_node(
             Ok(Value::I32(value))
         }
         "return_owned_struct" => {
-            let value = state.expect_struct(&node.op.args[0])?.clone();
+            let value = state.expect_value(&node.op.args[0])?.clone();
+            let type_name = match &value {
+                Value::Struct(value) => value.type_name.as_str(),
+                Value::VariantUnion(value) => {
+                    let layout_source = node.op.args.get(1).ok_or_else(|| {
+                        format!(
+                            "node `{}` must bind an owned variant union layout",
+                            node.name
+                        )
+                    })?;
+                    let layout = parse_owned_struct_layout(layout_source).map_err(|error| {
+                        format!(
+                            "node `{}` has invalid owned variant union layout: {error}",
+                            node.name
+                        )
+                    })?;
+                    if layout
+                        .type_name
+                        .strip_prefix(OWNED_VARIANT_UNION_LAYOUT_PREFIX)
+                        != Some(value.parent_type_name.as_str())
+                    {
+                        return Err(format!(
+                            "node `{}` owned variant union layout does not match `{}`",
+                            node.name, value.parent_type_name
+                        ));
+                    }
+                    value.parent_type_name.as_str()
+                }
+                other => {
+                    return Err(format!(
+                        "node `{}` expects an owned struct or variant union, got {other}",
+                        node.name
+                    ))
+                }
+            };
             state.push_resource_event(
                 resource,
                 format!(
                     "effect cpu.return_owned_struct @{} [{}] {}",
-                    node.resource, resource.kind.raw, value.type_name
+                    node.resource, resource.kind.raw, type_name
                 ),
             );
-            Ok(Value::Struct(value))
+            Ok(value)
         }
         "return_owned_bytes" => {
             let Value::OwnedBytes(bytes) = state.expect_value(&node.op.args[0])? else {
@@ -353,4 +371,79 @@ pub(crate) fn execute_cpu_value_node(
         _ => return Ok(None),
     }?;
     Ok(Some(value))
+}
+
+fn default_owned_layout_value(layout: OwnedStructLayout) -> Result<Value, String> {
+    let Some(parent_type_name) = layout
+        .type_name
+        .strip_prefix(OWNED_VARIANT_UNION_LAYOUT_PREFIX)
+        .map(str::to_owned)
+    else {
+        let fields = layout
+            .fields
+            .into_iter()
+            .map(|(name, field)| Ok((name, default_owned_field_value(field)?)))
+            .collect::<Result<Vec<_>, String>>()?;
+        return Ok(Value::Struct(StructValue {
+            type_name: layout.type_name,
+            fields,
+        }));
+    };
+
+    let mut has_tag = false;
+    let mut active_variant = None;
+    let mut variants = BTreeMap::new();
+    for (name, field) in layout.fields {
+        if name == "tag" {
+            if has_tag || field != OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::I64) {
+                return Err("owned variant union must contain one i64 tag".to_owned());
+            }
+            has_tag = true;
+            continue;
+        }
+        let OwnedStructFieldLayout::Struct(variant_layout) = field else {
+            return Err(format!(
+                "owned variant union field `{name}` must contain a struct layout"
+            ));
+        };
+        if variant_layout.type_name != name {
+            return Err(format!(
+                "owned variant union field `{name}` does not match nested type `{}`",
+                variant_layout.type_name
+            ));
+        }
+        let Value::Struct(variant) = default_owned_layout_value(variant_layout)? else {
+            return Err(format!(
+                "owned variant union field `{name}` cannot contain another union root"
+            ));
+        };
+        active_variant.get_or_insert_with(|| name.clone());
+        if variants.insert(name.clone(), variant).is_some() {
+            return Err(format!("owned variant union repeats field `{name}`"));
+        }
+    }
+    if !has_tag {
+        return Err("owned variant union is missing its i64 tag".to_owned());
+    }
+    Ok(Value::VariantUnion(VariantUnionValue {
+        parent_type_name,
+        active_variant: active_variant
+            .ok_or_else(|| "owned variant union has no variants".to_owned())?,
+        variants,
+    }))
+}
+
+fn default_owned_field_value(field: OwnedStructFieldLayout) -> Result<Value, String> {
+    match field {
+        OwnedStructFieldLayout::Struct(layout) => default_owned_layout_value(layout),
+        OwnedStructFieldLayout::Scalar(kind) => Ok(match kind {
+            OwnedStructScalarLayout::Bool => Value::Bool(false),
+            OwnedStructScalarLayout::I32 => Value::I32(0),
+            OwnedStructScalarLayout::I64 => Value::Int(0),
+            OwnedStructScalarLayout::F32 => Value::F32(0.0),
+            OwnedStructScalarLayout::F64 => Value::F64(0.0),
+            OwnedStructScalarLayout::String => Value::Symbol(String::new()),
+            OwnedStructScalarLayout::Bytes => Value::OwnedBytes(Vec::new()),
+        }),
+    }
 }

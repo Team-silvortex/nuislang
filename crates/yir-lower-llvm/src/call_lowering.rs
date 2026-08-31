@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::{parse_branch_owned_call_args, Node};
+use yir_core::{
+    parse_branch_owned_call_args, Node, OwnedStructFieldLayout, OwnedStructLayout,
+    OwnedStructScalarLayout,
+};
 
 use super::{
     call_return::cpu_scalar_kind_llvm_type,
@@ -588,110 +591,53 @@ fn unpack_immediate_scalar(
 }
 
 pub(crate) fn parse_owned_struct_layout(layout: &str) -> Result<super::StructLlvmValueRef, String> {
-    let mut parser = OwnedStructLayoutParser::new(layout);
-    let parsed = parser.parse_struct()?;
-    if parser.position != parser.source.len() {
-        return Err(format!("trailing data in owned struct layout `{layout}`"));
-    }
-    Ok(parsed)
+    Ok(owned_struct_layout_template(
+        yir_core::parse_owned_struct_layout(layout)?,
+    ))
 }
 
-struct OwnedStructLayoutParser<'a> {
-    source: &'a [u8],
-    position: usize,
-}
-
-impl<'a> OwnedStructLayoutParser<'a> {
-    fn new(source: &'a str) -> Self {
-        Self {
-            source: source.as_bytes(),
-            position: 0,
-        }
-    }
-
-    fn parse_struct(&mut self) -> Result<super::StructLlvmValueRef, String> {
-        let type_name = self.parse_name()?;
-        self.parse_struct_body(type_name)
-    }
-
-    fn parse_struct_body(
-        &mut self,
-        type_name: String,
-    ) -> Result<super::StructLlvmValueRef, String> {
-        self.expect(b'{')?;
-        let mut fields = Vec::new();
-        loop {
-            if self.consume(b'}') {
-                break;
-            }
-            let name = self.parse_name()?;
-            self.expect(b':')?;
-            let kind = self.parse_name()?;
-            let value = match scalar_template(&kind) {
-                Some(value) => value,
-                None => LlvmValueRef::Struct(self.parse_struct_body(kind)?),
-            };
-            fields.push((name, value));
-            if self.consume(b'}') {
-                break;
-            }
-            self.expect(b';')?;
-        }
-        Ok(super::StructLlvmValueRef { type_name, fields })
-    }
-
-    fn parse_name(&mut self) -> Result<String, String> {
-        let start = self.position;
-        while self.position < self.source.len()
-            && !matches!(self.source[self.position], b'{' | b'}' | b':' | b';')
-        {
-            self.position += 1;
-        }
-        if start == self.position {
-            return Err("expected name in owned struct layout".to_owned());
-        }
-        String::from_utf8(self.source[start..self.position].to_vec())
-            .map_err(|_| "owned struct layout names must be UTF-8".to_owned())
-    }
-
-    fn expect(&mut self, byte: u8) -> Result<(), String> {
-        if self.consume(byte) {
-            Ok(())
-        } else {
-            Err(format!(
-                "expected `{}` in owned struct layout",
-                byte as char
-            ))
-        }
-    }
-
-    fn consume(&mut self, byte: u8) -> bool {
-        if self.source.get(self.position) == Some(&byte) {
-            self.position += 1;
-            true
-        } else {
-            false
-        }
+fn owned_struct_layout_template(layout: OwnedStructLayout) -> super::StructLlvmValueRef {
+    super::StructLlvmValueRef {
+        type_name: layout.type_name,
+        fields: layout
+            .fields
+            .into_iter()
+            .map(|(name, field)| (name, owned_struct_field_template(field)))
+            .collect(),
     }
 }
 
-fn scalar_template(kind: &str) -> Option<LlvmValueRef> {
-    match kind {
-        "bool" => Some(LlvmValueRef::Bool {
+fn owned_struct_field_template(field: OwnedStructFieldLayout) -> LlvmValueRef {
+    match field {
+        OwnedStructFieldLayout::Struct(layout) => {
+            LlvmValueRef::Struct(owned_struct_layout_template(layout))
+        }
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::Bool) => LlvmValueRef::Bool {
             i1: "false".to_owned(),
             i64: "0".to_owned(),
-        }),
-        "i32" => Some(LlvmValueRef::I32("0".to_owned())),
-        "i64" => Some(LlvmValueRef::I64("0".to_owned())),
-        "f32" => Some(LlvmValueRef::F32("0.0".to_owned())),
-        "f64" => Some(LlvmValueRef::F64("0.0".to_owned())),
-        "String" => Some(LlvmValueRef::TextHandle {
-            ptr: "null".to_owned(),
-            handle: "0".to_owned(),
-        }),
-        "Bytes" => Some(LlvmValueRef::OwnedBytes {
-            blob: "null".to_owned(),
-        }),
-        _ => None,
+        },
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::I32) => {
+            LlvmValueRef::I32("0".to_owned())
+        }
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::I64) => {
+            LlvmValueRef::I64("0".to_owned())
+        }
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::F32) => {
+            LlvmValueRef::F32("0.0".to_owned())
+        }
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::F64) => {
+            LlvmValueRef::F64("0.0".to_owned())
+        }
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::String) => {
+            LlvmValueRef::TextHandle {
+                ptr: "null".to_owned(),
+                handle: "0".to_owned(),
+            }
+        }
+        OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::Bytes) => {
+            LlvmValueRef::OwnedBytes {
+                blob: "null".to_owned(),
+            }
+        }
     }
 }

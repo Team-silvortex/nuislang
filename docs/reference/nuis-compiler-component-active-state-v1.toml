@@ -61,13 +61,22 @@ verification_invariants = [
 
 [honest_boundary]
 claim = "one-verified-genesis-authorization-has-a-canonical-reversible-active-state-consumer"
-does_not_claim = "a-signed-generation-two-rollback-transition-or-stage1-self-hosting"
+does_not_claim = "runtime-execution-through-the-selected-build-or-stage1-self-hosting"
 repository_test_scope = "checked-in-linux-amd64-attestation-plus-temporary-local-component-owner-key"
-next_step = "sign-and-consume-generation-two-rollback-or-forward-transition-with-predecessor-state-lineage"
+next_step = "advance-the-signed-generation-two-successor-into-path-free-stage-driver-dispatch"
+
+[signed_transition_successor]
+protocol = "nuis-compiler-component-transition-v2"
+manifest_name = "nuis.compiler-component-transition.toml"
+action = "rollback-stage0"
+generation = 2
+predecessor_authorization_and_state_bound = true
+stage0_current_and_candidate_forward_retained = true
 
 [open_boundary]
 missing = [
-  "signed-generation-two-rollback-or-forward-transition-chain",
+  "runtime-stage-driver-execution-through-the-selected-build-identity",
+  "signed-generation-three-forward-transition",
   "checked-in-independent-component-owner-authorization-evidence",
   "multi-component-and-threshold-authorizer-policy",
   "runtime-stage-driver-execution-through-the-selected-compiler-image",

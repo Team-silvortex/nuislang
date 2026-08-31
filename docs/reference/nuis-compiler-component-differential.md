@@ -155,10 +155,11 @@ Neither report is replacement authority or full compiler self-hosting. The
 compact structured AST and NIR records now cross both a producer-neutral
 handoff-v2 selection and the component representation gate. The sidecar's exact hash is
 not yet a field of generation-one reproducibility aggregates; that requires a
-versioned successor rather than rewriting signed v1 evidence. Independent
-remote sidecar evidence and a signed generation-two rollback transition chain
-remain open; canonical active-state v1 now consumes the genesis authorization
-without rewriting either signed source.
+versioned successor rather than rewriting signed v1 evidence. Canonical
+active-state v1 consumes the genesis authorization without rewriting either
+signed source, and transition v2 signs the exact rollback to stage0 while
+retaining the candidate forward target. Independent remote sidecar evidence,
+selected-build execution, and a generation-three successor remain open.
 
 ## Validation
 

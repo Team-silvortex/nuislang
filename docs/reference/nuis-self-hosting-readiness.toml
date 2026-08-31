@@ -44,10 +44,10 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "usable"
 required_before = "beta-0.10.0"
 progress = 99
-next_action = "define one signed generation-two rollback transition that binds the predecessor authorization proof and active-state identity while preserving deterministic restoration of stage0"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_active_state -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
-expected_artifact = "one canonical active-component state derived only after both trust-domain checks, selecting stage1-candidate as active and retaining the exact stage0 reproducible build under a provider-neutral rollback selector without mutating signed evidence"
-blocker = "one verified genesis authorization derives a reversible active state, but no signed generation-two transition consumes the predecessor authorization and state identities, and the runtime driver does not yet execute through the selected compiler image"
+next_action = "dispatch the verified generation-two current build identity through a path-free stage-driver selector while retaining the signed candidate forward target"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_replacement -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_active_state -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_transition -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_remote_attestation_evidence -j 1 -- --test-threads=1"
+expected_artifact = "one signed generation-two transition binding the predecessor authorization proof and active-state identity, selecting exact stage0 as current and retaining stage1-candidate as forward without mutating any predecessor source"
+blocker = "the signed generation-two rollback deterministically restores stage0 and retains the candidate forward target, but the runtime stage driver does not yet resolve that build identity to a path-free verified compiler image execution"
 
 [[gates]]
 id = "differential-reproducibility-gate"

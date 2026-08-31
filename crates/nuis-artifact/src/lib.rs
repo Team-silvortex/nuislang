@@ -13,6 +13,7 @@ mod compiler_component_replacement;
 mod compiler_component_replacement_registry;
 mod compiler_component_representation_diff;
 mod compiler_component_reproducibility;
+mod compiler_component_transition;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
 mod compiler_stage_handoff_v2;
@@ -163,6 +164,17 @@ pub use compiler_component_reproducibility::{
     CompilerComponentReproducibilityRun, CompilerComponentReproducibilityRunInput,
     COMPILER_COMPONENT_CLEAN_BUILD_CONTRACT, COMPILER_COMPONENT_REPRODUCIBILITY_AUTHORITY,
     COMPILER_COMPONENT_REPRODUCIBILITY_FILE, COMPILER_COMPONENT_REPRODUCIBILITY_PROTOCOL,
+};
+pub use compiler_component_transition::{
+    build_compiler_component_transition, parse_compiler_component_transition,
+    parse_compiler_component_transition_from_source, render_compiler_component_transition,
+    select_compiler_component_transition_target, verify_compiler_component_transition,
+    CompilerComponentTransition, CompilerComponentTransitionInput,
+    CompilerComponentTransitionSelection, CompilerComponentTransitionTarget,
+    CompilerComponentTransitionVerificationInput, COMPILER_COMPONENT_TRANSITION_ACTION,
+    COMPILER_COMPONENT_TRANSITION_AUTHORITY, COMPILER_COMPONENT_TRANSITION_FILE,
+    COMPILER_COMPONENT_TRANSITION_PROTOCOL, COMPILER_COMPONENT_TRANSITION_SIGNATURE_CONTRACT,
+    COMPILER_COMPONENT_TRANSITION_VERDICT,
 };
 pub use compiler_diagnostic_report::{
     build_compiler_diagnostic_report, parse_compiler_diagnostic_report,

@@ -65,6 +65,7 @@ Start in this order:
   - [nuis-compiler-component-attestation.md](nuis-compiler-component-attestation.md)
   - [nuis-compiler-component-replacement-authorization.md](nuis-compiler-component-replacement-authorization.md)
   - [nuis-compiler-component-active-state-v1.toml](nuis-compiler-component-active-state-v1.toml)
+  - [nuis-compiler-component-transition-v2.toml](nuis-compiler-component-transition-v2.toml)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)

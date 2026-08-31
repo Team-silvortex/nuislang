@@ -1,5 +1,27 @@
 use std::path::PathBuf;
 
+use crate::bootstrap_component_replacement::BootstrapComponentReplacementVerificationInput;
+
+pub(super) fn parse_bootstrap_component_verification_prefix<I>(
+    args: &mut I,
+    usage: &str,
+) -> Result<BootstrapComponentReplacementVerificationInput, String>
+where
+    I: Iterator<Item = String>,
+{
+    Ok(BootstrapComponentReplacementVerificationInput {
+        aggregate: PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?),
+        attestation: PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?),
+        attester_registry: PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?),
+        attester_registry_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+        attestation_challenge_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+        authorization: PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?),
+        authorizer_registry: PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?),
+        authorizer_registry_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+        authorization_challenge_sha256: args.next().ok_or_else(|| usage.to_owned())?,
+    })
+}
+
 pub(super) struct CacheStatusArgs {
     pub(super) input: Option<PathBuf>,
     pub(super) all: bool,

@@ -9,6 +9,7 @@ readme.workspace = true
 description = "Build a small AOT bundle from a YIR module using LLVM/clang when possible and prerendered assets otherwise."
 
 [dependencies]
+nuis-runtime = { path = "../../crates/nuis-runtime" }
 yir-core = { path = "../../crates/yir-core" }
 yir-exec = { path = "../../crates/yir-exec" }
 yir-host-render = { path = "../../crates/yir-host-render" }

@@ -83,9 +83,17 @@ authorization_source_mutated = false
 attestation_source_mutated = false
 stage0_rollback_retained = true
 
+[generation_two_successor]
+protocol = "nuis-compiler-component-transition-v2"
+action = "rollback-stage0"
+predecessor_authorization_proof_bound = true
+predecessor_active_state_identity_bound = true
+stage0_current_and_candidate_forward_retained = true
+
 [open_boundary]
 missing = [
-  "signed-generation-two-rollback-or-forward-transition-chain",
+  "runtime-stage-driver-execution-through-the-selected-build-identity",
+  "signed-generation-three-forward-transition",
   "checked-in-independent-component-owner-authorization-evidence",
   "multi-component-and-threshold-authorizer-policy",
 ]

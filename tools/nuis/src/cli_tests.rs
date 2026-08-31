@@ -1,6 +1,7 @@
 use super::{
     parse_args, BootstrapComponentActivationInput, BootstrapComponentReplacementInput,
-    BootstrapComponentReplacementVerificationInput, CommandKind, GalaxyCommand,
+    BootstrapComponentReplacementVerificationInput, BootstrapComponentRollbackInput,
+    BootstrapComponentTransitionVerificationInput, CommandKind, GalaxyCommand,
 };
 use std::path::PathBuf;
 
@@ -327,6 +328,74 @@ fn parses_bootstrap_component_replacement_commands() {
             },
             output: PathBuf::from("active-state.toml"),
         })
+    );
+}
+
+#[test]
+fn parses_bootstrap_component_transition_commands() {
+    let args = [
+        "aggregate.toml".to_owned(),
+        "attestation.toml".to_owned(),
+        "attesters.toml".to_owned(),
+        "a".repeat(64),
+        "b".repeat(64),
+        "authorization.toml".to_owned(),
+        "authorizers.toml".to_owned(),
+        "c".repeat(64),
+        "d".repeat(64),
+    ];
+    let verification = || BootstrapComponentReplacementVerificationInput {
+        aggregate: PathBuf::from("aggregate.toml"),
+        attestation: PathBuf::from("attestation.toml"),
+        attester_registry: PathBuf::from("attesters.toml"),
+        attester_registry_sha256: "a".repeat(64),
+        attestation_challenge_sha256: "b".repeat(64),
+        authorization: PathBuf::from("authorization.toml"),
+        authorizer_registry: PathBuf::from("authorizers.toml"),
+        authorizer_registry_sha256: "c".repeat(64),
+        authorization_challenge_sha256: "d".repeat(64),
+    };
+
+    let mut rollback_args = vec!["bootstrap-rollback-component".to_owned()];
+    rollback_args.extend(args.clone());
+    rollback_args.extend([
+        "active-state.toml".to_owned(),
+        "e".repeat(64),
+        "compiler-owner-1".to_owned(),
+        "release-control".to_owned(),
+        "projection-relay-rollback-2".to_owned(),
+        "transition.toml".to_owned(),
+    ]);
+    assert_eq!(
+        parse_args(rollback_args.into_iter()).expect("bootstrap rollback parses"),
+        CommandKind::BootstrapRollbackComponent(BootstrapComponentRollbackInput {
+            verification: verification(),
+            active_state: PathBuf::from("active-state.toml"),
+            transition_challenge_sha256: "e".repeat(64),
+            authorizer_id: "compiler-owner-1".to_owned(),
+            environment_id: "release-control".to_owned(),
+            transition_id: "projection-relay-rollback-2".to_owned(),
+            output: PathBuf::from("transition.toml"),
+        })
+    );
+
+    let mut verify_args = vec!["bootstrap-verify-component-transition".to_owned()];
+    verify_args.extend(args);
+    verify_args.extend([
+        "active-state.toml".to_owned(),
+        "transition.toml".to_owned(),
+        "e".repeat(64),
+    ]);
+    assert_eq!(
+        parse_args(verify_args.into_iter()).expect("bootstrap transition verification parses"),
+        CommandKind::BootstrapVerifyComponentTransition(
+            BootstrapComponentTransitionVerificationInput {
+                verification: verification(),
+                active_state: PathBuf::from("active-state.toml"),
+                transition: PathBuf::from("transition.toml"),
+                transition_challenge_sha256: "e".repeat(64),
+            }
+        )
     );
 }
 

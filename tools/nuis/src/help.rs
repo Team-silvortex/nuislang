@@ -59,6 +59,8 @@ pub(crate) fn print_help() {
     println!("    nuis bootstrap-authorize-component-replacement <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <authorizer-id> <environment-id> <authorization-id> <output>");
     println!("    nuis bootstrap-verify-component-replacement <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256>");
     println!("    nuis bootstrap-activate-component <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <output>");
+    println!("    nuis bootstrap-rollback-component <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition-challenge-sha256> <authorizer-id> <environment-id> <transition-id> <output>");
+    println!("    nuis bootstrap-verify-component-transition <aggregate> <attestation> <attester-registry> <attester-registry-sha256> <attestation-challenge-sha256> <authorization> <authorizer-registry> <authorizer-registry-sha256> <authorization-challenge-sha256> <active-state> <transition> <transition-challenge-sha256>");
     println!("    nuis bootstrap-diff <stage0-record> <candidate-record> <report>");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");
