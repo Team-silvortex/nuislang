@@ -358,6 +358,7 @@ fn select_dev_tensor_handoff_bootstrap_cell(cells: &[DevTensorCell]) -> Option<&
     cells
         .iter()
         .filter(|cell| cell.bootstrap_critical)
+        .filter(|cell| cell.status != "stable" || cell.progress < 100)
         .filter(|cell| {
             dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function)
                 != "developer-system/dev-tensor/architecture-module-function-progress-model"

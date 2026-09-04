@@ -57,8 +57,10 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "guard_loop_continue_repeat",
             "guard_loop_print_continue_repeat",
             "guard_return_struct_then",
+            "can_emit_owned_struct_return",
             "emit_owned_struct_return",
             "materialize_owned_variant_storage",
+            "value contains a resource outside the owned aggregate ABI",
         ],
     },
     DevTensorDriftCheckSpec {

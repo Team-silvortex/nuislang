@@ -196,48 +196,80 @@ pub fn parse_compiler_candidate_nsld_input_from_source(
         )));
     }
     let mut line = 0;
-    let mut text = |key: &str| {
-        let value = parse_value(lines[line], key, path)?;
-        line += 1;
-        if value.is_empty() || value.chars().any(char::is_control) {
-            return Err(ArtifactError::new(format!(
-                "compiler candidate Nsld input `{}` has invalid text for `{key}`",
-                path.display()
-            )));
-        }
-        Ok(value.to_owned())
+    let (
+        protocol,
+        input_contract,
+        source_snapshot_contract,
+        target_contract,
+        target_selector,
+        entry_symbol,
+        function_contract,
+        operation_contract,
+        return_type,
+        time_contract,
+        glm_contract,
+    ) = {
+        let mut text = |key: &str| {
+            let value = parse_value(lines[line], key, path)?;
+            line += 1;
+            if value.is_empty() || value.chars().any(char::is_control) {
+                return Err(ArtifactError::new(format!(
+                    "compiler candidate Nsld input `{}` has invalid text for `{key}`",
+                    path.display()
+                )));
+            }
+            Ok(value.to_owned())
+        };
+        (
+            text("protocol")?,
+            text("input_contract")?,
+            text("source_snapshot_contract")?,
+            text("target_contract")?,
+            text("target_selector")?,
+            text("entry_symbol")?,
+            text("function_contract")?,
+            text("operation_contract")?,
+            text("return_type")?,
+            text("time_contract")?,
+            text("glm_contract")?,
+        )
     };
-    let protocol = text("protocol")?;
-    let input_contract = text("input_contract")?;
-    let source_snapshot_contract = text("source_snapshot_contract")?;
-    let target_contract = text("target_contract")?;
-    let target_selector = text("target_selector")?;
-    let entry_symbol = text("entry_symbol")?;
-    let function_contract = text("function_contract")?;
-    let operation_contract = text("operation_contract")?;
-    let return_type = text("return_type")?;
-    let time_contract = text("time_contract")?;
-    let glm_contract = text("glm_contract")?;
-    drop(text);
-    let mut number = |key: &str| {
-        let value = parse_integer(parse_value(lines[line], key, path)?, path)?;
-        line += 1;
-        Ok(value)
+    let (
+        source_bytes,
+        source_identity,
+        yir_identity,
+        unit_count,
+        function_count,
+        operation_count,
+        return_value,
+        dependency_count,
+        relocation_count,
+        time_ordinal,
+        glm_resource_count,
+        entry_symbol_identity,
+        materialization_fold,
+    ) = {
+        let mut number = |key: &str| {
+            let value = parse_integer(parse_value(lines[line], key, path)?, path)?;
+            line += 1;
+            Ok(value)
+        };
+        (
+            number("source_bytes")?,
+            number("source_identity")?,
+            number("yir_identity")?,
+            number("unit_count")?,
+            number("function_count")?,
+            number("operation_count")?,
+            number("return_value")?,
+            number("dependency_count")?,
+            number("relocation_count")?,
+            number("time_ordinal")?,
+            number("glm_resource_count")?,
+            number("entry_symbol_identity")?,
+            number("materialization_fold")?,
+        )
     };
-    let source_bytes = number("source_bytes")?;
-    let source_identity = number("source_identity")?;
-    let yir_identity = number("yir_identity")?;
-    let unit_count = number("unit_count")?;
-    let function_count = number("function_count")?;
-    let operation_count = number("operation_count")?;
-    let return_value = number("return_value")?;
-    let dependency_count = number("dependency_count")?;
-    let relocation_count = number("relocation_count")?;
-    let time_ordinal = number("time_ordinal")?;
-    let glm_resource_count = number("glm_resource_count")?;
-    let entry_symbol_identity = number("entry_symbol_identity")?;
-    let materialization_fold = number("materialization_fold")?;
-    drop(number);
     let mut boolean = |key: &str| {
         let value = parse_bool(parse_value(lines[line], key, path)?, path)?;
         line += 1;

@@ -105,11 +105,14 @@ The first identity-projection path is now stage1-candidate ready:
 * `nuis bootstrap-candidate-build` materializes a separately identified
   candidate handoff and binds it through
   `nuis-compiler-candidate-production-v11`.
-* The adapter blindly transports one token page and two AST/NIR pages. Nuis
+* The default production adapter blindly transports one token page and two
+  AST/NIR pages. Its additive structural-pagination mode transports a third
+  page for each projection without changing production-v11. Nuis
   owns the token records plus canonical emission, serializes an opaque
   eight-lane structural cursor, and resumes both projections into page two.
-* The Nuis consumer can resume repeatedly; production binds two pages for each
-  projection, compact byte-different AST and NIR records, and their `2/2`
+* The Nuis consumer can resume repeatedly; production-v11 binds two pages for
+  each projection, while its successor independently binds page three, compact
+  byte-different AST and NIR records, and their `2/2`
   semantic differential. Handoff v2 selects both registered derived records
   without embedding AST, NIR, or transform-specific logic in the protocol.
 * Compiler image and dependency-closure identity are added by the separate
@@ -119,9 +122,10 @@ The first identity-projection path is now stage1-candidate ready:
 
 The independent codec, native Nuis consumer, bounded token page, resumable AST
 and NIR pages, compact derived records, semantic proof, v2 selection,
-production proof, and `13/13` differential advance this coordinate to
-`usable/99`. Independent attester trust and reversible replacement
-authorization remain separate closure work. See
+production proof, candidate-owned three-page successor, cross-root semantic
+agreement, and `13/13` differential close this bounded coordinate at
+`stable/100`. Complete-stream structural pagination, independent attester trust,
+and reversible replacement authorization remain separate work. See
 [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md),
 [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md),
 [Nuis Compiler Stage Transformation](nuis-compiler-stage-transformation.md),
@@ -134,6 +138,7 @@ CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_structural_pagination -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1

@@ -481,6 +481,48 @@ fn emits_structural_guard_return_through_owned_aggregate_abi() {
 }
 
 #[test]
+fn defers_resource_struct_guard_return_before_emitting_a_branch() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "cond", "cpu.const_bool", vec!["true"]);
+    push_cpu_const_i64(&mut module, "payload", "64");
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["worker", "payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "summary",
+        "cpu.struct",
+        vec!["Result.Ok", "value=task"],
+    );
+    push_cpu_node(
+        &mut module,
+        "guard",
+        "cpu.guard_return",
+        vec!["cond", "summary"],
+    );
+    push_cpu_const_i64(&mut module, "later", "7");
+    push_deps(
+        &mut module,
+        &[
+            ("payload", "task"),
+            ("task", "summary"),
+            ("cond", "guard"),
+            ("summary", "guard"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("resource guard return should defer safely");
+    assert!(llvm_ir.contains(
+        "deferred lowering for structural cpu.guard_return `guard` because its value contains a resource outside the owned aggregate ABI"
+    ));
+    assert!(!llvm_ir.contains("guard_return_struct_then."));
+    assert!(llvm_ir.contains("= add i64 0, 7"));
+}
+
+#[test]
 fn emits_guard_print_return_as_real_branch() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

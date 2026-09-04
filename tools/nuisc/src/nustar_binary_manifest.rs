@@ -155,7 +155,7 @@ fn validate_surface_pattern_for_domain(
 }
 pub(super) fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nhost_ffi_memory_capabilities = {}\nlinker_resolver_providers = {}\nlinker_symbol_versions = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nprovider_bundles = {}\ncode_assets = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nhost_ffi_memory_capabilities = {}\nlinker_resolver_providers = {}\nlinker_symbol_versions = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nprovider_bundles = {}\nprovider_capabilities = {}\ncode_assets = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -189,6 +189,7 @@ pub(super) fn render_manifest(manifest: &NustarPackageManifest) -> String {
         render_array(&manifest.capability_tags),
         render_array(&manifest.default_lanes),
         render_array(&manifest.provider_bundles),
+        render_array(&manifest.provider_capabilities),
         render_array(&manifest.code_assets),
         manifest.clock_domain_id,
         manifest.clock_kind,
@@ -309,6 +310,8 @@ pub(super) fn parse_manifest_text(
             .unwrap_or_else(|| infer_default_capability_tags(&domain_family)),
         default_lanes: parse_optional_string_array(source, "default_lanes").unwrap_or_default(),
         provider_bundles: parse_optional_string_array(source, "provider_bundles")
+            .unwrap_or_default(),
+        provider_capabilities: parse_optional_string_array(source, "provider_capabilities")
             .unwrap_or_default(),
         code_assets: parse_optional_string_array(source, "code_assets").unwrap_or_default(),
         clock_domain_id: parse_required_string(source, "clock_domain_id", path)?,

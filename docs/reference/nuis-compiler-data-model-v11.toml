@@ -1,0 +1,102 @@
+protocol = "nuis-compiler-data-model-v11"
+version = 11
+predecessor = "nuis-compiler-data-model-v10"
+status = "stable-nested-complete-aggregate-forwarding"
+scope = "bootstrap-compiler-owned-data"
+public_std_stability = false
+source_modules = [
+  "stdlib/std/lib/language_core.ns",
+  "stdlib/std/lib/compiler_data.ns",
+  "stdlib/std/lib/compiler_payload.ns",
+  "stdlib/std/lib/compiler_payload_registry.ns",
+  "stdlib/std/lib/compiler_token_emit.ns",
+  "stdlib/std/lib/compiler_tokens.ns",
+]
+std_surface = "surface.std.compiler-data-model.v11"
+bootstrap_subset = "nuis-bootstrap-language-subset-v8"
+bootstrap_scalar_export_count = 21
+candidate_production = "nuis-compiler-candidate-production-v11"
+derived_stage_selection = "nuis-compiler-stage-handoff-v2"
+host_layout_identity = false
+host_ffi_required = false
+example_project = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+example_fixture = "examples/projects/tooling/bootstrap_compiler_data_model_demo/payload_registry_fixture.ns"
+expected_native_exit = 130
+bootstrap_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1 -- --test-threads=1"
+
+[complete_aggregate_forwarding]
+protocol = "nuis-compiler-complete-aggregate-forwarding-v1"
+outer_operation = "compiler_aggregate_arena_forward"
+checked_operation = "compiler_aggregate_arena_forward_checked"
+argument_contract = "owned-CompilerAggregateArena-plus-CompilerPayloadRegistry"
+return_contract = "Result<CompilerAggregateArena,i64>"
+boundary_count = 2
+reference_object_count = 3
+reference_payload_bytes = 44
+reference_page_count = 3
+reference_registry_identity = 1593840720
+reference_envelope_identity = 1520342505
+reference_page0_identity = 934788601
+reference_page1_identity = 1001962162
+reference_page2_identity = 1407376619
+reference_identity = 551151124
+
+invariants = [
+  "registry-and-arena-shapes-validate-before-return",
+  "registry-identity-crosses-the-inner-helper-boundary",
+  "complete-arena-identity-is-equal-before-and-after-both-boundaries",
+  "stable-object-indices-and-payload-pages-remain-byte-identical",
+  "forwarding-uses-no-host-collection-pointer-layout-or-ffi",
+]
+
+atomic_failures = [
+  "mismatched-valid-v9-registry-returns-error-three",
+  "registry-mismatch-does-not-change-the-v10-arena-under-its-correct-registry",
+  "preserved-v10-forged-identity-and-capacity-failures-remain-atomic",
+]
+
+[preserved_v10]
+chunked_payload_identity = 94500080
+registry_identity = 1593840720
+aggregate_envelope_identity = 1520342505
+aggregate_page0_identity = 934788601
+aggregate_page1_identity = 1001962162
+aggregate_page2_identity = 1407376619
+aggregate_identity = 551151124
+v9_registry_identity = 1630830726
+v9_aggregate_identity = 1274791798
+
+[bootstrap_surface]
+new_language_capabilities = 0
+new_scalar_exports = 0
+new_approved_imports = []
+new_approved_data_types = []
+frozen_scalar_export_ceiling = 21
+
+[readiness]
+coordinate = "standard-library/std/compiler-data-model"
+status = "stable"
+progress = 100
+closure = "bounded-bootstrap-data-model-ready"
+replacement_authority = false
+
+[growth_boundary]
+status = "readiness-closed-bounded-growth-open"
+remaining = [
+  "the-shared-payload-column-remains-bounded-to-eight-logical-pages",
+  "CompilerMap-and-CompilerArena-remain-bounded-to-sixteen-entries",
+  "generic-helper-specialization-does-not-yet-preserve-defining-module-provenance-in-general",
+  "production-binds-only-three-structural-pages-per-AST-or-NIR-projection",
+  "general-aggregate-loop-backedges-remain-incomplete",
+]
+preserve = [
+  "stable-arena-indices",
+  "atomic-envelope-and-payload-storage",
+  "canonical-v9-v10-and-v11-identities",
+  "canonical-utf8",
+  "canonical-token-stream-v1",
+  "fail-closed-errors",
+  "host-layout-independence",
+  "frozen-bootstrap-v8-twenty-one-export-ceiling",
+]

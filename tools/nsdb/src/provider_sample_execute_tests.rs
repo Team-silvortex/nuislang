@@ -191,6 +191,22 @@ materialization_status = "provider-sample-materialized"
     assert!(payload.contains("provider_bundle_package_id = \"official.data\""));
     assert!(payload.contains("provider_bundle_id = \"data.host.bundle.v1\""));
     assert!(payload.contains(
+        "provider_capability_registry_contract = \"nuis-provider-capability-registry-v1\""
+    ));
+    assert!(payload.contains(
+        "provider_capability_manifest_contract = \"nuis-provider-capability-manifest-v1\""
+    ));
+    assert!(payload.contains("provider_capability_manifest_hash = \"fnv1a64:d9930501cc045ea0\""));
+    assert!(payload.contains("provider_capability_manifest_entry_count = 1"));
+    assert!(payload
+        .contains("provider_capability_record_contract = \"nuis-provider-capability-record-v1\""));
+    assert!(payload.contains("provider_capability_provider_id = \"data.cpu-memory.reference.v1\""));
+    assert!(payload.contains("provider_capability_priority = 100"));
+    assert!(payload.contains(
+        "provider_capability_values = \"clock.fabric-monotonic,completion.verified,glm.owned-transfer,memory.cpu,movement.copy,residency.host\""
+    ));
+    assert!(payload.contains("provider_capability_selection_hash = \"fnv1a64:d0e7db5a3ab8fb6b\""));
+    assert!(payload.contains(
         "native_output_worker_execution_capsule_invocation_mode = \"nuis-provider-worker-process-adapter-v5\""
     ));
     assert!(payload.contains(

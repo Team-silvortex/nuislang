@@ -38,6 +38,8 @@ pub enum GalaxyCommand {
         provider_root: PathBuf,
         provider_id: String,
         provider_kind: String,
+        trust_registry: Option<PathBuf>,
+        trust_state: Option<PathBuf>,
     },
     SyncDeps {
         input: PathBuf,
@@ -129,26 +131,35 @@ where
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         })),
         "resolve-deps" => {
+            const USAGE: &str = "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>] [--trust-registry <file> --trust-state <file>]";
             let mut input = None;
             let mut provider_root = None;
             let mut provider_id = "offline.layout".to_owned();
             let mut provider_kind = "offline-layout".to_owned();
+            let mut trust_registry = None;
+            let mut trust_state = None;
             while let Some(arg) = args.next() {
                 match arg.as_str() {
                     "--provider-root" => {
-                        provider_root = Some(PathBuf::from(args.next().ok_or_else(|| {
-                            "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
-                        })?));
+                        provider_root = Some(PathBuf::from(
+                            args.next().ok_or_else(|| USAGE.to_owned())?,
+                        ));
                     }
                     "--provider-id" => {
-                        provider_id = args.next().ok_or_else(|| {
-                            "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
-                        })?;
+                        provider_id = args.next().ok_or_else(|| USAGE.to_owned())?;
                     }
                     "--provider-kind" => {
-                        provider_kind = args.next().ok_or_else(|| {
-                            "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
-                        })?;
+                        provider_kind = args.next().ok_or_else(|| USAGE.to_owned())?;
+                    }
+                    "--trust-registry" => {
+                        trust_registry = Some(PathBuf::from(
+                            args.next().ok_or_else(|| USAGE.to_owned())?,
+                        ));
+                    }
+                    "--trust-state" => {
+                        trust_state = Some(PathBuf::from(
+                            args.next().ok_or_else(|| USAGE.to_owned())?,
+                        ));
                     }
                     _ if input.is_none() => input = Some(PathBuf::from(arg)),
                     _ => {
@@ -158,13 +169,18 @@ where
                     }
                 }
             }
+            if trust_registry.is_some() != trust_state.is_some() {
+                return Err(format!(
+                    "{USAGE}; --trust-registry and --trust-state must be provided together"
+                ));
+            }
             Ok(CommandKind::Galaxy(GalaxyCommand::ResolveDeps {
                 input: input.unwrap_or_else(|| PathBuf::from(".")),
-                provider_root: provider_root.ok_or_else(|| {
-                    "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
-                })?,
+                provider_root: provider_root.ok_or_else(|| USAGE.to_owned())?,
                 provider_id,
                 provider_kind,
+                trust_registry,
+                trust_state,
             }))
         }
         "sync-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::SyncDeps {

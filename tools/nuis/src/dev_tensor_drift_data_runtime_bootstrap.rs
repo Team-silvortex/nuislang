@@ -337,7 +337,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         id: "nuis-compiler-data-model-registration",
         path: "stdlib/std/module.toml",
         required_patterns: &[
-            "surface.std.compiler-data-model.v10",
+            "surface.std.compiler-data-model.v11",
             "lib/compiler_payload.ns",
             "lib/compiler_payload_registry.ns",
         ],
@@ -384,6 +384,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "compiler_paged_text_arena_store",
             "compiler_paged_text_arena_get",
             "compiler_paged_text_arena_identity",
+            "compiler_aggregate_arena_forward_checked",
+            "compiler_aggregate_arena_forward",
             "Some(130)",
         ],
     },

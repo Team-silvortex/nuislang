@@ -4,6 +4,7 @@ use std::fs;
 
 use ed25519_dalek::{Signature, VerifyingKey};
 
+use super::stdlib_registry_provider_trust_state::enforce_candidate_set_trust;
 use super::{
     GalaxyResolutionCandidateSetReport, GalaxyResolutionProviderDescriptor, StdlibIndexModule,
 };
@@ -57,6 +58,7 @@ pub(super) fn verify_candidate_set(
             response_sha256: sha256(&payload),
             signature_count: 0,
             signer_ids: Vec::new(),
+            trust: None,
         });
     }
 
@@ -101,15 +103,23 @@ pub(super) fn verify_candidate_set(
     for signer_id in &signer_ids {
         append_text(&mut response, signer_id);
     }
+    let response_sha256 = sha256(response.as_bytes());
+    let trust =
+        enforce_candidate_set_trust(provider, claim.generation, &response_sha256, &signer_ids)?;
     Ok(GalaxyResolutionCandidateSetReport {
         contract: GALAXY_CANDIDATE_SET_CONTRACT.to_owned(),
-        status: "verified-signed-candidate-set".to_owned(),
+        status: if trust.is_some() {
+            "verified-trusted-candidate-set".to_owned()
+        } else {
+            "verified-signed-untrusted-exact-only".to_owned()
+        },
         generation: claim.generation,
         index_sha256,
         candidate_sha256,
-        response_sha256: sha256(response.as_bytes()),
+        response_sha256,
         signature_count: signer_ids.len(),
         signer_ids,
+        trust,
     })
 }
 

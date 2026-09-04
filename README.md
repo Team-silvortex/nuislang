@@ -33,11 +33,11 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `26/26` registered coordinates and
-`795/795` passing drift checks. The compiler data model and stage-neutral
-boundary remain `usable/99`; the bootstrap subset, stage0/stage1 driver, and
-differential/reproducibility gate are now `stable/100`. Chunked typed payload
-projection and canonical reversible active state close their previous weakest
-tasks. Dispatch v1 now resolves an unordered
+`815/815` passing drift checks. The compiler data model, stage-neutral boundary,
+bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
+bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
+forwarding, chunked typed payload projection, and canonical reversible active
+state close their previous weakest tasks. Dispatch v1 now resolves an unordered
 exact-two build/image inventory through the signed generation-two identities,
 executes a private byte-verified copy of the stage0 `current` image, and retains
 the stage1 candidate as `forward` without persisting paths or timestamps.
@@ -64,11 +64,18 @@ the target-neutral `Main.main -> i64 7` record and stops at registered
 object-writer selection. This closes the bounded equivalent-input slice while
 native object bytes and all authority flags remain false.
 Self-hosting readiness v2 now records
-`stage0-to-stage1-migration/active` while retaining `ready = false` and only
-`3/5` gates closed. Reproducibility v2 preserves the exact signed v1 aggregate
+`stage0-to-stage1-migration/active` with `ready = true` and all `5/5`
+preparation gates closed. This starts candidate-owned migration work but grants
+no stage0 replacement or final-selection authority. Reproducibility v2 preserves the exact signed v1 aggregate
 while binding each clean root's distinct selected-representation sidecar and
-proving `4/4` semantic equivalence. Deterministic ordering now advances the
-stage-neutral IR boundary before broader source and native-object ownership.
+proving `4/4` semantic equivalence. Persistent Galaxy signer trust and rollback
+protection have closed the package-resolution coordinate at `stable/100`; both
+the readiness manifest and global bootstrap-first tensor can now leave the
+bounded preparation gate. The next global tensor task is
+`heterogeneous-runtime/data/provider-neutral-data-fabric`. That lane now has a
+capability-ranked, build-time-generated provider inventory and an executable
+CPU-memory reference provider; physical DPU/IPU/RDMA providers remain the next
+honest boundary.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native
@@ -80,8 +87,8 @@ audit record, and component-bound diagnostic proof for one project-form
 compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
 stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
-`nuis bootstrap-status` frontdoor reports `3/5` gates closed. Compiler data
-model v10 now materializes four owned token records per bounded window, emits
+`nuis bootstrap-status` frontdoor reports `5/5` gates closed. Compiler data
+model v11 materializes four owned token records per bounded window, emits
 the canonical 59-byte fixture plus the real candidate's 91-byte
 `use cpu StdLanguageCore;` token
 prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
@@ -96,8 +103,11 @@ boundary, and pins registry identity `1630830726`, page identities `934788601`
 and `1229397900`, plus complete identity `1274791798`. It then registers a
 24-byte `CompilerChunkedPayload`, projects it from a 44-byte three-page arena,
 and pins typed identity `94500080`, extended registry identity `1593840720`,
-and complete identity `551151124` before executing natively at deterministic
-score `130`; the compiler data boundary is now `usable`, `99/100`. Its shared structural codec independently parses
+and complete identity `551151124`, then forwards that complete arena through
+two owned Nuis helper boundaries before projection. A valid but mismatched v9
+registry fails atomically with code `3`. Native execution remains deterministic
+at score `130`; the bounded compiler data boundary is now `stable`, `100/100`.
+Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
 from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
 pure Nuis typed structural consumer, then binds its stage0 component and native
@@ -105,14 +115,12 @@ image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
 then feeds all five serialized payloads through twenty-one exact Nuis scalar
 exports, independently verifies their folds, drives the complete token payload
 through a bounded Nuis-native DFA, hashes every contiguous 128-byte token page
-through a Nuis-produced chain, and transports two opaque AST and NIR pages.
+through a Nuis-produced chain, and preserves production-v11's two opaque AST
+and NIR pages.
 Token pages may cross records; the artifact layer independently replays the
 complete byte stream while preserving the legacy 91-byte canonical prefix
 identity `164749511446`. Nuis then serializes eight-lane cursors and resumes
-both structural projections. The artifact layer independently verifies first
-AST/NIR identities `174028320749` and
-`132469386887`, and second-page identities `149528711957` and `146705724977`
-before production v11 emits the distinct
+both structural projections before production v11 emits the distinct
 `nuis-stage1-compact-structured-nir-producer-v10` candidate. Nuis also emits
 both AST and NIR cursor pairs as two non-identity 22-word structural
 checkpoints through adapter protocol v9;
@@ -130,6 +138,11 @@ actually selected byte-different AST and NIR payloads, recovered canonical
 anchors, and handoff-v2 proof at `2/2` equivalence without a stage-specific
 comparison branch;
 both reports retain `replacement_authorized = false`. `nuis
+bootstrap-candidate-build` additionally executes a disjoint three-page mode,
+persists its canonical 62-line result, and emits
+`nuis-compiler-candidate-structural-pagination-v1`. That successor binds full
+third-page state and all cursor lanes for AST and NIR to an independent replay
+without mutating production-v11 or granting authority. `nuis
 bootstrap-reproducibility` now performs
 two cache-bypassed clean candidate builds, rereads both evidence roots, requires
 stable compiler-image, native-output, and differential identities, and emits a
@@ -200,8 +213,8 @@ execution, compile-dispatch v1 closes the first selected-image project rebuild,
 and candidate compile-capability v1 closes the delegated stage1 driver boundary,
 while candidate preselection v1 closes the owner-signed trust binding. Direct
 stage1 compilation without the stage0 provider, a capability-v2 successor and
-final generation-three transition, broader compiler-data paging, Galaxy
-hardening, broader ELF architecture coverage, and PE/COFF remain separate
+final generation-three transition, broader compiler-data paging, remote Galaxy
+transport, broader ELF architecture coverage, and PE/COFF remain separate
 registered foundation work.
 
 Start with these documents:

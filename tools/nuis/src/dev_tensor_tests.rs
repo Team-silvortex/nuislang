@@ -3,36 +3,24 @@ use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 
 #[test]
 fn handoff_selection_is_status_aware_and_input_order_independent() {
-    let selected =
-        select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS).expect("select handoff cell");
+    let selected = select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS);
     let mut reversed = DEV_TENSOR_CELLS.to_vec();
     reversed.reverse();
-    let reversed_selected =
-        select_dev_tensor_handoff_bootstrap_cell(&reversed).expect("select reversed handoff cell");
+    let reversed_selected = select_dev_tensor_handoff_bootstrap_cell(&reversed);
 
-    let expected =
-        dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function);
-    assert_eq!(
-        dev_tensor_coordinate_key(
-            reversed_selected.architecture,
-            reversed_selected.module,
-            reversed_selected.function
-        ),
-        expected
-    );
-    assert_eq!(expected, "language-core/nuisc/stage-neutral-ir-boundary");
-    assert_eq!(selected.status, "usable");
+    assert!(selected.is_none());
+    assert!(reversed_selected.is_none());
 }
 
 #[test]
-fn handoff_uses_coordinate_order_after_data_model_closes() {
+fn handoff_uses_coordinate_order_while_equal_gates_are_open() {
     let mut cells = DEV_TENSOR_CELLS.to_vec();
-    let data_model = cells
+    let stage_neutral = cells
         .iter_mut()
-        .find(|cell| cell.function == "compiler-data-model")
-        .expect("compiler data model cell");
-    data_model.status = "stable";
-    data_model.progress = 100;
+        .find(|cell| cell.function == "stage-neutral-ir-boundary")
+        .expect("stage-neutral cell");
+    stage_neutral.status = "usable";
+    stage_neutral.progress = 99;
     let selected = select_dev_tensor_handoff_bootstrap_cell(&cells).expect("select handoff cell");
     assert_eq!(
         dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
@@ -126,7 +114,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.function_count >= 5);
     assert!(summary.average_progress > 0);
     assert!(summary.bootstrap_critical_count >= 5);
-    assert!(summary.bootstrap_critical_average_progress > 0);
+    assert_eq!(summary.bootstrap_critical_average_progress, 100);
     assert_ne!(summary.weakest_bootstrap_architecture, "<none>");
     assert_ne!(summary.weakest_bootstrap_module, "<none>");
     assert_ne!(summary.weakest_bootstrap_function, "<none>");
@@ -145,20 +133,20 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_source,
-        "weakest-bootstrap-status-progress-path"
+        "weakest-global-incomplete-status-progress-path"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "language-core/nuisc/stage-neutral-ir-boundary"
+        "heterogeneous-runtime/data/provider-neutral-data-fabric"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("weakest bootstrap-critical status/progress ordering"));
+        .contains("all bootstrap-critical cells are stable at 100/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "language-core/nuisc/stage-neutral-ir-boundary"
+        "heterogeneous-runtime/data/provider-neutral-data-fabric"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -199,13 +187,13 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "language-core/nuisc/stage-neutral-ir-boundary"
+        "heterogeneous-runtime/data/provider-neutral-data-fabric"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
         0
     );
-    assert!(summary.bootstrap_critical_average_progress < 100);
+    assert_eq!(summary.bootstrap_critical_average_progress, 100);
     let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
     assert_eq!(
         hierarchy.hierarchy_protocol_version,
@@ -279,7 +267,7 @@ fn self_hosting_phase_roadmap_is_protocolized_without_claiming_completion() {
     assert!(cell.evidence.contains("stage0-to-stage1-migration/active"));
     assert!(cell.evidence.contains("gamma-0.5.*"));
     assert!(cell.evidence.contains("gamma-0.10.*"));
-    assert!(cell.blocker.contains("final replacement remains blocked"));
+    assert!(cell.blocker.contains("candidate-owned native object bytes"));
 }
 
 #[test]
@@ -319,7 +307,7 @@ fn dev_tensor_json_exposes_coordinate_cells() {
         json.contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\"")
     );
     assert!(json.contains(
-        "\"weakest_bootstrap_task_card_source\":\"weakest-bootstrap-status-progress-path\""
+        "\"weakest_bootstrap_task_card_source\":\"weakest-global-incomplete-status-progress-path\""
     ));
     assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
@@ -345,7 +333,7 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("standard-library/std/concurrency-task-thread-lock"));
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
-    assert!(json.contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(json.contains("all bootstrap-critical cells are stable at 100/100"));
     assert!(json.contains("\"module\":\"nuis-runtime\""));
     assert!(json.contains("\"function\":\"lifecycle-loader-bootstrap\""));
     assert!(json.contains("\"function\":\"lifecycle-context-dispatch\""));
@@ -557,9 +545,9 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_validation_command:"));
     assert!(text.contains("weakest_bootstrap_expected_artifact:"));
     assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
-    assert!(
-        text.contains("weakest_bootstrap_task_card_source: weakest-bootstrap-status-progress-path")
-    );
+    assert!(text.contains(
+        "weakest_bootstrap_task_card_source: weakest-global-incomplete-status-progress-path"
+    ));
     assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
     assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
     assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
@@ -579,10 +567,10 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: language-core/nuisc/stage-neutral-ir-boundary"
+        "weakest_bootstrap_task_card_common_ancestor_path: heterogeneous-runtime/data/provider-neutral-data-fabric"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
-    assert!(text.contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));
     assert!(text.contains(
         "cell: architecture=standard-library module=std function=concurrency-task-thread-lock"
     ));

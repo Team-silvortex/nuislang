@@ -27,7 +27,8 @@ The output root contains:
   and native-image evidence
 * `stage1-candidate/`, including the candidate component, handoff, diagnostics,
   scalar adapter, stage-transformation manifest, derived binary payload,
-  stage-semantic differential, v2 selection handoff, and production proof
+  stage-semantic differential, v2 selection handoff, production proof,
+  canonical three-page result, and structural-pagination successor proof
 * `nuis.compiler-component-diff.toml`, which must report all thirteen
   comparisons equivalent while retaining `replacement_authorized = false`
 
@@ -219,6 +220,17 @@ than changing this producer contract. See
 [Nuis Compiler Candidate Direct Compile Capability](nuis-compiler-candidate-direct-compile-capability.md)
 and [Nuis Compiler Candidate Successor](nuis-compiler-candidate-successor.md).
 
+The same production-bound adapter now also exposes an explicit
+`structural-pagination-v1` mode. It emits a separate canonical 62-line result
+for three contiguous AST pages and three contiguous NIR pages, including every
+page identity, cursor identity, and all eight opaque cursor lanes. The additive
+`nuis-compiler-candidate-structural-pagination-v1` successor binds that result,
+the complete source payloads, the exact adapter, and production-v11. It
+independently replays all six pages and requires pages one and two to remain
+identical to the predecessor, so neither production-v11 nor its default 53-line
+output changes. See
+[Nuis Compiler Candidate Structural Pagination](nuis-compiler-candidate-structural-pagination-v1.toml).
+
 The adapter also exposes a disjoint `fresh-source-v1` mode. It passes one
 canonical source snapshot through reserved v8 export ordinals and emits five
 front-end stage identities without loading a stage0 handoff or compiler
@@ -228,13 +240,14 @@ separate capability binds the exact adapter bytes and predecessor identity. See
 
 ## Current Limit
 
-V11 binds every token byte through deterministic pagination but still binds
-exactly two fixed-size structural pages for both AST and NIR. The generic Nuis
-resume function can continue again with the resulting cursor. Production now
+V11 itself still binds exactly two fixed-size structural pages for both AST and
+NIR. Its additive structural-pagination successor now proves the next bounded
+step: the same generic Nuis resume function reaches page three for both
+projections and agrees with an independent host replay. Production now
 attests compact, byte-different, losslessly recoverable AST- and NIR-derived
 payloads and a `2/2` semantic comparison, while handoff v2 selects both beside
-the unchanged canonical v1 records. Production does not yet attest a third structural
-page. Typed owned arena payloads and unbounded
+the unchanged canonical v1 records. Fourth-and-later or complete-stream
+structural pagination remains open. Typed owned arena payloads and unbounded
 compiler collections remain data-model work. The scalar boundary remains
 intentional until arbitrary aggregate loop-carried backedges have native
 lowering; this contract does not claim that general loop capability.
@@ -263,6 +276,7 @@ CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_token_decoder -j 1 -
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection_page -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_transformation -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_structural_pagination -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1
 ```

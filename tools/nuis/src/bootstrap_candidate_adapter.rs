@@ -2,13 +2,17 @@ use std::{fs, path::Path, process::Command};
 
 use nuis_artifact::{
     compiler_candidate_bundle_fold, compiler_candidate_stage_fold,
-    compiler_projection_two_page_identity, compiler_stage_structural_checkpoint_words,
-    compiler_token_first_page_identity, compiler_token_pagination_identity,
-    decode_compiler_token_stream, parse_build_manifest,
+    compiler_stage_structural_checkpoint_words, compiler_token_first_page_identity,
+    compiler_token_pagination_identity, decode_compiler_token_stream, parse_build_manifest,
     parse_compiler_candidate_frontend_result_bytes, CompilerProjectionKind,
     CompilerProjectionTwoPageIdentity, CompilerStageHandoff, CompilerTokenDecodeSummary,
     CompilerTokenPageIdentity, CompilerTokenPaginationIdentity, COMPILER_CANDIDATE_ADAPTER_FILE,
     COMPILER_CANDIDATE_FRONTEND_RESULT_FILE,
+};
+
+use crate::bootstrap_candidate_structural_pagination::{
+    run_candidate_structural_pagination, CandidateStructuralPaginationOutput,
+    STRUCTURAL_PAGINATION_ADAPTER,
 };
 
 const ADAPTER_SOURCE_FILE: &str = "nuis.compiler-candidate-adapter.c";
@@ -26,6 +30,7 @@ pub(crate) struct CandidateAdapterOutput {
     pub(crate) nir_pages: CompilerProjectionTwoPageIdentity,
     pub(crate) ast_transformation_words: Vec<usize>,
     pub(crate) nir_transformation_words: Vec<usize>,
+    pub(crate) structural_pagination: CandidateStructuralPaginationOutput,
 }
 
 pub(crate) fn run_candidate_adapter(
@@ -163,26 +168,10 @@ pub(crate) fn run_candidate_adapter(
         .map_err(|error| format!("failed to independently paginate candidate tokens: {error}"))?;
     let expected_token_page = compiler_token_first_page_identity(&token_bytes)
         .map_err(|error| format!("failed to materialize candidate token first page: {error}"))?;
-    let ast_bytes = fs::read(&payload_paths[2]).map_err(|error| {
-        format!(
-            "failed to read candidate AST payload `{}`: {error}",
-            payload_paths[2].display()
-        )
-    })?;
-    let expected_ast_pages =
-        compiler_projection_two_page_identity(CompilerProjectionKind::Ast, &ast_bytes).map_err(
-            |error| format!("failed to independently materialize AST structural pages: {error}"),
-        )?;
-    let nir_bytes = fs::read(&payload_paths[3]).map_err(|error| {
-        format!(
-            "failed to read candidate NIR payload `{}`: {error}",
-            payload_paths[3].display()
-        )
-    })?;
-    let expected_nir_pages =
-        compiler_projection_two_page_identity(CompilerProjectionKind::Nir, &nir_bytes).map_err(
-            |error| format!("failed to independently materialize NIR structural pages: {error}"),
-        )?;
+    let structural_pagination =
+        run_candidate_structural_pagination(&adapter_path, &payload_paths[2], &payload_paths[3])?;
+    let expected_ast_pages = structural_pagination.ast_pages.first_two();
+    let expected_nir_pages = structural_pagination.nir_pages.first_two();
     let expected_ast_words =
         compiler_stage_structural_checkpoint_words(CompilerProjectionKind::Ast, expected_ast_pages);
     let expected_nir_words =
@@ -221,6 +210,7 @@ pub(crate) fn run_candidate_adapter(
         nir_pages: expected_nir_pages,
         ast_transformation_words: result.ast_checkpoint_words,
         nir_transformation_words: result.nir_checkpoint_words,
+        structural_pagination,
     })
 }
 
@@ -654,6 +644,9 @@ int main(int argc, char** argv) {
     if (argc == 3 && strcmp(argv[1], NUIS_NSLD_INPUT_COMMAND) == 0) {
         return run_nsld_input(argv[2]);
     }
+    if (argc == 4 && strcmp(argv[1], NUIS_STRUCTURAL_PAGINATION_COMMAND) == 0) {
+        return run_structural_pagination(argv[2], argv[3]);
+    }
     if (argc == 4) return run_compile_request(argv);
     if (argc != 6) return 64;
     int64_t folds[5] = {0, 0, 0, 0, 0};
@@ -789,7 +782,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 "#;
-    format!("{prefix}{fresh_source}{suffix}")
+    format!("{prefix}{STRUCTURAL_PAGINATION_ADAPTER}{fresh_source}{suffix}")
 }
 
 #[cfg(test)]

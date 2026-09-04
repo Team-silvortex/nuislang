@@ -20,6 +20,24 @@ const NIR_PAGE_FIXTURE: &str = concat!(
     "    return 0\n",
 );
 
+const THREE_PAGE_AST_FIXTURE: &str = concat!(
+    "/// Three-page producer-neutral structural projection.\n",
+    "use cpu StdLanguageCore\n",
+    "use cpu StdCompilerData\n",
+    "use cpu StdCompilerProjection\n",
+    "ast mod cpu unit Main\n",
+    "  fn first(value: i64) -> i64\n",
+    "    let shifted = value + 1\n",
+    "    return shifted\n",
+    "  fn second(value: i64) -> i64\n",
+    "    let doubled = value * 2\n",
+    "    return doubled\n",
+    "  fn main() -> i64\n",
+    "    let first_value = first(20)\n",
+    "    let second_value = second(first_value)\n",
+    "    return second_value\n",
+);
+
 #[test]
 fn ast_first_page_binds_complete_records_and_partial_continuation() {
     let page = compiler_projection_first_page_identity(
@@ -166,6 +184,54 @@ fn structural_cursor_tampering_and_missing_second_page_fail_closed() {
     assert!(compiler_projection_two_page_identity(
         CompilerProjectionKind::Nir,
         b"nir mod cpu unit Main\n",
+    )
+    .is_err());
+}
+
+#[test]
+fn structural_cursor_resumes_a_third_bounded_page() {
+    assert!(THREE_PAGE_AST_FIXTURE.len() > COMPILER_PROJECTION_PAGE_BYTES * 3);
+    let chain = compiler_projection_three_page_identity(
+        CompilerProjectionKind::Ast,
+        THREE_PAGE_AST_FIXTURE.as_bytes(),
+    )
+    .expect("materialize three structural pages");
+    let second = compiler_projection_resume_page_identity(
+        CompilerProjectionKind::Ast,
+        chain.first.cursor,
+        &THREE_PAGE_AST_FIXTURE.as_bytes()
+            [COMPILER_PROJECTION_PAGE_BYTES..COMPILER_PROJECTION_PAGE_BYTES * 2],
+    )
+    .expect("resume second structural page");
+    let third = compiler_projection_resume_page_identity(
+        CompilerProjectionKind::Ast,
+        second.cursor,
+        &THREE_PAGE_AST_FIXTURE.as_bytes()
+            [COMPILER_PROJECTION_PAGE_BYTES * 2..COMPILER_PROJECTION_PAGE_BYTES * 3],
+    )
+    .expect("resume third structural page");
+
+    assert_eq!(
+        chain.first_two(),
+        CompilerProjectionTwoPageIdentity {
+            first: chain.first,
+            second,
+        }
+    );
+    assert_eq!(chain.third, third);
+    assert_eq!(chain.third.page.page_bytes, COMPILER_PROJECTION_PAGE_BYTES);
+    assert_eq!(
+        chain.third.cursor.lanes()[0] / 32,
+        COMPILER_PROJECTION_PAGE_BYTES * 3
+    );
+    assert!(chain.third.page.record_count >= chain.second.page.record_count);
+}
+
+#[test]
+fn structural_three_page_chain_requires_third_page_bytes() {
+    assert!(compiler_projection_three_page_identity(
+        CompilerProjectionKind::Ast,
+        AST_PAGE_FIXTURE.as_bytes(),
     )
     .is_err());
 }

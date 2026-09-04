@@ -53,7 +53,7 @@ The executable type allowlist contains:
 `CompilerTextArena`, `CompilerPayloadBuffer`, `CompilerPagedTextArena`,
 `CompilerPayloadRegistry`, `CompilerAggregateArena`, and
 `CompilerChunkedPayload` are registered data-model names. Data-model v8 through
-v10 admit no new source construct: they
+v11 admit no new source construct: they
 compose already-approved owned structs, maps, and arithmetic byte packing,
 while the scalar export count remains exactly twenty-one.
 

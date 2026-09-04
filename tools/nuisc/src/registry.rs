@@ -52,6 +52,10 @@ pub use crate::registry_provider_bundle::{
     provider_bundle_registrations, NustarProviderBundleRegistration,
     NUSTAR_PROVIDER_BUNDLE_ENTRY_CONTRACT,
 };
+pub use crate::registry_provider_capability::{
+    provider_capability_registrations, NustarProviderCapabilityRegistration,
+    NUSTAR_PROVIDER_CAPABILITY_ENTRY_CONTRACT,
+};
 pub use crate::registry_scheduler_summary::{
     scheduler_summary, std_net_summary, NustarSchedulerSummary, NustarStdNetSummary,
 };

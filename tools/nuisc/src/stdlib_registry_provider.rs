@@ -51,7 +51,7 @@ pub fn resolve_galaxy_dependencies_with_provider(
     }
     let candidates = collect_candidates(provider, layout.modules)?;
     let candidate_set = verify_candidate_set(provider, &index_bytes, &candidates)?;
-    let allow_ranges = candidate_set.status == "verified-signed-candidate-set";
+    let allow_ranges = candidate_set.status == "verified-trusted-candidate-set";
     let solved = solve_candidates(
         &provider.provider_id,
         &candidates,
@@ -156,7 +156,7 @@ pub fn resolve_galaxy_dependencies_with_provider(
         report: GalaxyResolutionProviderReport {
             contract: GALAXY_RESOLUTION_PROVIDER_CONTRACT.to_owned(),
             status: if allow_ranges {
-                "resolved-signed-provider-closure".to_owned()
+                "resolved-trusted-provider-closure".to_owned()
             } else {
                 "resolved-pinned-provider-closure".to_owned()
             },

@@ -13,6 +13,15 @@ pub(crate) enum CompileCachePolicy {
     Bypass,
 }
 
+pub(crate) struct CompileInvocation {
+    pub(crate) input: PathBuf,
+    pub(crate) output_dir: PathBuf,
+    pub(crate) verbose_cache: bool,
+    pub(crate) cpu_abi: Option<String>,
+    pub(crate) target: Option<String>,
+    pub(crate) packaging_mode: Option<String>,
+}
+
 impl CompileCachePolicy {
     fn manifest_status(self, restored: bool) -> &'static str {
         match (self, restored) {
@@ -107,27 +116,32 @@ pub(crate) fn run_compile(
 ) -> Result<(), String> {
     let resolved = resolve_compile_input(&input)?;
     run_compile_resolved(
-        input,
-        output_dir,
-        verbose_cache,
-        cpu_abi,
-        target,
-        packaging_mode,
+        CompileInvocation {
+            input,
+            output_dir,
+            verbose_cache,
+            cpu_abi,
+            target,
+            packaging_mode,
+        },
         &resolved,
         CompileCachePolicy::Reuse,
     )
 }
 
 pub(crate) fn run_compile_resolved(
-    input: PathBuf,
-    output_dir: PathBuf,
-    verbose_cache: bool,
-    cpu_abi: Option<String>,
-    target: Option<String>,
-    packaging_mode: Option<String>,
+    invocation: CompileInvocation,
     resolved: &pipeline::ResolvedCompileInput,
     cache_policy: CompileCachePolicy,
 ) -> Result<(), String> {
+    let CompileInvocation {
+        input,
+        output_dir,
+        verbose_cache,
+        cpu_abi,
+        target,
+        packaging_mode,
+    } = invocation;
     if let Some(project) = &resolved.project {
         project::verify_committed_project_galaxy_resolution_lock(project)?;
     }

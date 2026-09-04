@@ -12,6 +12,8 @@ mod compiler_candidate_nsld_input;
 mod compiler_candidate_nsld_materialization;
 mod compiler_candidate_preselection;
 mod compiler_candidate_production;
+mod compiler_candidate_structural_pagination;
+mod compiler_candidate_structural_pagination_result;
 mod compiler_candidate_successor;
 mod compiler_component_active_state;
 mod compiler_component_attestation;
@@ -171,6 +173,27 @@ pub use compiler_candidate_production::{
     COMPILER_CANDIDATE_ADAPTER_FILE, COMPILER_CANDIDATE_PRODUCER_CONTRACT,
     COMPILER_CANDIDATE_PRODUCTION_AUTHORITY, COMPILER_CANDIDATE_PRODUCTION_FILE,
     COMPILER_CANDIDATE_PRODUCTION_PROTOCOL,
+};
+pub use compiler_candidate_structural_pagination::{
+    build_compiler_candidate_structural_pagination,
+    parse_compiler_candidate_structural_pagination_from_source,
+    read_compiler_candidate_structural_pagination, render_compiler_candidate_structural_pagination,
+    CompilerCandidateStructuralPagination, CompilerCandidateStructuralPaginationInput,
+    CompilerCandidateStructuralPaginationProjection,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_AUTHORITY,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_CONTRACT,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_FILE,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_PROTOCOL,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_VERDICT,
+};
+pub use compiler_candidate_structural_pagination_result::{
+    parse_compiler_candidate_structural_pagination_result_bytes,
+    parse_compiler_candidate_structural_pagination_result_from_source,
+    render_compiler_candidate_structural_pagination_result,
+    CompilerCandidateStructuralPaginationPage, CompilerCandidateStructuralPaginationResult,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_PAGE_COUNT,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_RESULT_FILE,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_RESULT_PROTOCOL,
 };
 pub use compiler_candidate_successor::{
     build_compiler_candidate_successor, parse_compiler_candidate_successor,
@@ -382,13 +405,14 @@ pub use compiler_structural_projection::{
 };
 pub use compiler_structural_projection_page::{
     compiler_projection_first_page_identity, compiler_projection_resume_page_identity,
-    compiler_projection_two_page_identity, CompilerProjectionPageAdvance,
-    CompilerProjectionPageCursor, CompilerProjectionPageIdentity,
-    CompilerProjectionTwoPageIdentity, COMPILER_PROJECTION_CURSOR_CONTRACT,
-    COMPILER_PROJECTION_CURSOR_HASH_SEED, COMPILER_PROJECTION_CURSOR_LANES,
-    COMPILER_PROJECTION_PAGE_BODY_HASH_SEED, COMPILER_PROJECTION_PAGE_BYTES,
-    COMPILER_PROJECTION_PAGE_CONTRACT, COMPILER_PROJECTION_PAGE_HASH_MODULUS,
-    COMPILER_PROJECTION_PAGE_HASH_SEED, COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,
+    compiler_projection_three_page_identity, compiler_projection_two_page_identity,
+    CompilerProjectionPageAdvance, CompilerProjectionPageCursor, CompilerProjectionPageIdentity,
+    CompilerProjectionThreePageIdentity, CompilerProjectionTwoPageIdentity,
+    COMPILER_PROJECTION_CURSOR_CONTRACT, COMPILER_PROJECTION_CURSOR_HASH_SEED,
+    COMPILER_PROJECTION_CURSOR_LANES, COMPILER_PROJECTION_PAGE_BODY_HASH_SEED,
+    COMPILER_PROJECTION_PAGE_BYTES, COMPILER_PROJECTION_PAGE_CONTRACT,
+    COMPILER_PROJECTION_PAGE_HASH_MODULUS, COMPILER_PROJECTION_PAGE_HASH_SEED,
+    COMPILER_PROJECTION_PAGE_IDENTITY_RADIX,
 };
 pub use compiler_token_decoder::{
     compiler_token_first_page_identity, compiler_token_page_identity, decode_compiler_token_stream,

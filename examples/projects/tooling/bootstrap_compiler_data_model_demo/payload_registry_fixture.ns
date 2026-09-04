@@ -187,11 +187,14 @@ mod cpu CompilerPayloadRegistryFixture {
     let extended3: CompilerAggregateArena = compiler_aggregate_arena_store_chunked(
       extended2, chunked_registry, 3, chunked
     )?;
+    let forwarded: CompilerAggregateArena = compiler_aggregate_arena_forward(
+      extended3, chunked_registry
+    )?;
     let projected_chunked: CompilerChunkedPayload = compiler_aggregate_arena_get_chunked(
-      extended3, chunked_registry, 2, 3
+      forwarded, chunked_registry, 2, 3
     )?;
     let chunked_identity: i64 = compiler_aggregate_arena_identity(
-      extended3, chunked_registry
+      forwarded, chunked_registry
     )?;
     let chunk_page0_identity: i64 = compiler_payload_page_identity(
       projected_chunked.bytes, 0
@@ -200,15 +203,15 @@ mod cpu CompilerPayloadRegistryFixture {
       projected_chunked.bytes, 1
     )?;
     let extended_page0_identity: i64 = compiler_payload_page_identity(
-      extended3.payload, 0
+      forwarded.payload, 0
     )?;
     let extended_page1_identity: i64 = compiler_payload_page_identity(
-      extended3.payload, 1
+      forwarded.payload, 1
     )?;
     let extended_page2_identity: i64 = compiler_payload_page_identity(
-      extended3.payload, 2
+      forwarded.payload, 2
     )?;
-    let extended_envelope_identity: i64 = compiler_arena_identity(extended3.arena)?;
+    let extended_envelope_identity: i64 = compiler_arena_identity(forwarded.arena)?;
     if compiler_payload_registry_accepts(
       chunked_registry, 3, compiler_payload_schema_chunked(), -1
     ) == false
@@ -220,21 +223,21 @@ mod cpu CompilerPayloadRegistryFixture {
       || compiler_payload_page_count(projected_chunked.bytes) != 2
       || chunk_page0_identity != 1042165038
       || chunk_page1_identity != 957262363
-      || compiler_payload_page_count(extended3.payload) != 3
-      || compiler_payload_page_length(extended3.payload, 2) != 12
-      || extended3.payload.length != 44
-      || extended3.arena.next_index != 3 || extended3.arena.last_index != 2
-      || compiler_map_vector_value(extended3.arena.field0s, 2) != 20
-      || compiler_map_vector_value(extended3.arena.field1s, 2) != 24
-      || compiler_map_vector_value(extended3.arena.field2s, 2) != chunked.identity {
+      || compiler_payload_page_count(forwarded.payload) != 3
+      || compiler_payload_page_length(forwarded.payload, 2) != 12
+      || forwarded.payload.length != 44
+      || forwarded.arena.next_index != 3 || forwarded.arena.last_index != 2
+      || compiler_map_vector_value(forwarded.arena.field0s, 2) != 20
+      || compiler_map_vector_value(forwarded.arena.field1s, 2) != 24
+      || compiler_map_vector_value(forwarded.arena.field2s, 2) != chunked.identity {
       return Result.Err(10);
     }
     if compiler_payload_byte(projected_chunked.bytes, 0) != 110
       || compiler_payload_byte(projected_chunked.bytes, 13) != 45
       || compiler_payload_byte(projected_chunked.bytes, 23) != 49
-      || compiler_payload_byte(extended3.payload, 20) != 110
-      || compiler_payload_byte(extended3.payload, 33) != 45
-      || compiler_payload_byte(extended3.payload, 43) != 49
+      || compiler_payload_byte(forwarded.payload, 20) != 110
+      || compiler_payload_byte(forwarded.payload, 33) != 45
+      || compiler_payload_byte(forwarded.payload, 43) != 49
       || extended_page0_identity != 934788601
       || extended_page1_identity != 1001962162
       || extended_page2_identity != 1407376619
@@ -242,17 +245,30 @@ mod cpu CompilerPayloadRegistryFixture {
       || chunked_identity != 551151124 {
       return Result.Err(11);
     }
+    let wrong_registry_error: i64 = match compiler_aggregate_arena_forward(
+      forwarded, registry
+    ) {
+      Result.Ok(_) => { -1 }
+      Result.Err(code) => { code }
+    };
+    let identity_after_wrong_registry: i64 = compiler_aggregate_arena_identity(
+      forwarded, chunked_registry
+    )?;
+    if wrong_registry_error != 3
+      || identity_after_wrong_registry != chunked_identity {
+      return Result.Err(12);
+    }
     let full_error: i64 = match compiler_aggregate_arena_store_chunked(
-      extended3, chunked_registry, 3, chunked
+      forwarded, chunked_registry, 3, chunked
     ) {
       Result.Ok(_) => { -1 }
       Result.Err(code) => { code }
     };
     let identity_after_full: i64 = compiler_aggregate_arena_identity(
-      extended3, chunked_registry
+      forwarded, chunked_registry
     )?;
     if full_error != 1 || identity_after_full != chunked_identity {
-      return Result.Err(12);
+      return Result.Err(13);
     }
     return Result.Ok(0);
   }

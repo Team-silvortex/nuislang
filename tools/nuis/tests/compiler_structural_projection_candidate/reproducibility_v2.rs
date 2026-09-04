@@ -4,8 +4,11 @@ use std::{
 };
 
 use nuis_artifact::{
+    parse_compiler_candidate_structural_pagination_from_source,
+    parse_compiler_candidate_structural_pagination_result_bytes,
     read_compiler_component_representation_differential, read_compiler_component_reproducibility,
-    read_compiler_component_reproducibility_v2, COMPILER_COMPONENT_BUILD_FILE,
+    read_compiler_component_reproducibility_v2, COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_FILE,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_RESULT_FILE, COMPILER_COMPONENT_BUILD_FILE,
     COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
     COMPILER_COMPONENT_REPRODUCIBILITY_V2_FILE,
 };
@@ -52,7 +55,67 @@ pub(super) fn assert_bound_selected_representations(
     }
     let source = fs::read_to_string(&successor).expect("read reproducibility v2 source");
     assert!(!source.contains(output_dir_text));
+    assert_structural_pagination_is_reproducible(roots, output_dir_text);
     successor
+}
+
+fn assert_structural_pagination_is_reproducible(roots: &[PathBuf; 2], output_dir_text: &str) {
+    let mut proofs = Vec::new();
+    let mut proof_sources = Vec::new();
+    let mut result_sources = Vec::new();
+    for root in roots {
+        let candidate = root.join("stage1-candidate");
+        let proof_path = candidate.join(COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_FILE);
+        let proof_source = fs::read_to_string(&proof_path).expect("read pagination proof");
+        let proof =
+            parse_compiler_candidate_structural_pagination_from_source(&proof_source, &proof_path)
+                .expect("parse canonical pagination proof");
+        assert_eq!(proof.page_count, 3);
+        assert_eq!(proof.projections.len(), 2);
+        assert!(proof.candidate_owned_pagination);
+        assert!(proof.host_recomputed);
+        assert!(proof.predecessor_unchanged);
+        assert!(!proof.stage0_provider_dependency);
+        assert!(!proof.replacement_authorized);
+        assert!(!proof.selection_authorized);
+        assert!(proof
+            .projections
+            .iter()
+            .all(|projection| projection.third_page_identity > 0));
+        assert!(!proof_source.contains(output_dir_text));
+
+        let result_path = candidate.join(COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_RESULT_FILE);
+        let result_source = fs::read(&result_path).expect("read pagination result");
+        let result = parse_compiler_candidate_structural_pagination_result_bytes(
+            &result_source,
+            &result_path,
+        )
+        .expect("parse canonical pagination result");
+        assert_eq!(result.page_count, 3);
+        assert_eq!(result.ast_pages.len(), 3);
+        assert_eq!(result.nir_pages.len(), 3);
+        assert!(!String::from_utf8_lossy(&result_source).contains(output_dir_text));
+        proofs.push(proof);
+        proof_sources.push(proof_source);
+        result_sources.push(result_source);
+    }
+    assert_ne!(proof_sources[0], proof_sources[1]);
+    assert_ne!(
+        proofs[0].candidate_component_sha256,
+        proofs[1].candidate_component_sha256
+    );
+    assert_ne!(
+        proofs[0].predecessor_proof_sha256,
+        proofs[1].predecessor_proof_sha256
+    );
+    assert_eq!(
+        proofs[0].stage_handoff_bundle_sha256,
+        proofs[1].stage_handoff_bundle_sha256
+    );
+    assert_eq!(proofs[0].adapter_sha256, proofs[1].adapter_sha256);
+    assert_eq!(proofs[0].result_sha256, proofs[1].result_sha256);
+    assert_eq!(proofs[0].projections, proofs[1].projections);
+    assert_eq!(result_sources[0], result_sources[1]);
 }
 
 pub(super) fn assert_sidecar_tampering_fails(

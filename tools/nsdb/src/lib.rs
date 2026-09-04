@@ -8,6 +8,7 @@ mod handoff_status;
 mod model;
 mod provider_adapter_binding;
 mod provider_bundle_registry;
+mod provider_capability_registry;
 mod provider_carrier_channel;
 mod provider_carrier_channel_registry;
 #[cfg(unix)]

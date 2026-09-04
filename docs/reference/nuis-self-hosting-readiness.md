@@ -22,10 +22,10 @@ nonterminal scores and can only close independently.
 
 Readiness v2 separates phase activation from final readiness. The current
 manifest reports `stage0-to-stage1-migration/active` because Git has entered
-`beta-0.10.*`, while `ready = false` and `3/5` gates closed preserve the actual
-replacement boundary. Active means candidate-owned vertical slices are now the
-mainline; it does not authorize stage0 removal, component replacement, or final
-selection.
+`beta-0.10.*`. All `5/5` preparation gates are now closed and the frontdoor
+reports `ready = true`, so candidate-owned vertical slices may proceed as the
+mainline. Readiness still does not authorize stage0 removal, component
+replacement, or final selection.
 
 ## Frontdoor
 
@@ -75,8 +75,8 @@ new language capability. Widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. Data model v10 is now
-`usable/99`: `StdLanguageCore` owns the foundational representation,
+and path contracts needed by a real compiler component. Data model v11 is now
+`stable/100`: `StdLanguageCore` owns the foundational representation,
 `StdCompilerData` owns materialized token records and bounded bytes,
 `StdCompilerPayload` owns the typed logical-page view,
 `StdCompilerPayloadRegistry` owns kind/schema registration and the shared
@@ -124,9 +124,16 @@ eight fixed Nuis chunks, spans three aggregate pages, and pins typed identity
 complete identity `551151124`. Forged identity and full-capacity failures leave
 the input arena unchanged; native exit and the twenty-one-export ceiling remain
 unchanged.
+V11 then sends that complete three-object, 44-byte arena and its registry
+through `compiler_aggregate_arena_forward` and a second checked Nuis helper
+before projection. Registry identity `1593840720`, every stable index and page,
+and complete identity `551151124` remain unchanged. Supplying the valid v9
+registry fails with code `3` and leaves the original arena unchanged under its
+correct registry. This adds no import, type, FFI dependency, pointer identity,
+or scalar export.
 See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
 
-This is deliberately not `stable/100`. Each token materialization window remains
+This bounded gate is `stable/100`. Each token materialization window remains
 bounded to four token records, 64 payload bytes, and 128 output bytes, but
 production now covers the complete token stream with contiguous 128-byte pages
 whose boundaries may cross records. Nuis and the artifact layer independently
@@ -134,11 +141,12 @@ recompute every page hash and chain link while preserving the canonical legacy
 page identity. `StdCompilerProjection` also owns and resumes the first two AST
 and NIR structural pages through opaque cursors. Vectors and maps remain
 `i64`-specific and bounded to sixteen entries. One text remains limited to
-sixteen bytes, the v10 aggregate payload is bounded to 128 bytes, and registered
+sixteen bytes, the v11 aggregate payload is bounded to 128 bytes, and registered
 typed codecs now cover text, source spans, and canonical chunked bytes. Generic nested-page
-specialization lacks defining-module provenance, forwarding the full aggregate
-through another helper remains outside the wide-call proof, and arbitrary
-aggregate loop-carried state still requires general backedge lowering.
+specialization still lacks defining-module provenance in the general case, and
+arbitrary aggregate loop-carried state still requires general backedge
+lowering. These are growth limits rather than blockers for the bounded
+self-hosting preparation gate.
 
 ### `stage-neutral-ir-boundary`
 
@@ -148,7 +156,7 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `usable/99`. Normal AOT builds emit the ordered five-stage
+This gate is now `stable/100` for its bounded three-page migration slice. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
@@ -169,8 +177,7 @@ and identity `174028320749`, all recomputed independently by the artifact
 layer. The same scanner binds four completed NIR records, its 25-byte
 continuation body, state hash `1026894471`, and identity `132469386887` to a
 second independent result. Nuis then serializes opaque cursors and resumes the
-AST and NIR streams into second-page identities `149528711957` and
-`146705724977`, both independently replayed by the artifact layer. Adapter
+AST and NIR streams into independently replayed second pages. Adapter
 protocol v9 now emits both complete AST and NIR cursor pairs as two ordered
 22-word non-identity checkpoints. `nuis-compiler-stage-transformation-v3`
 binds each checkpoint to canonical ULEB128 structural records without appending one complete source
@@ -180,7 +187,18 @@ byte before production can attest it. The semantic differential passes `2/2`
 for the byte-different representations. `nuis-compiler-stage-handoff-v2` now
 selects every registered transform in order and binds its canonical source
 record, derived payload, checkpoint, recovery hash, and semantic verdict
-without stage-specific selection logic or replacement authority. See
+without stage-specific selection logic or replacement authority.
+
+The production-bound adapter now has a disjoint
+`structural-pagination-v1` mode whose canonical 62-line result carries three
+AST and three NIR pages with every page identity, cursor identity, and opaque
+cursor lane. `nuis-compiler-candidate-structural-pagination-v1` binds that
+result to production-v11, the complete payload hashes, and the exact adapter;
+the artifact layer independently replays all six pages and proves predecessor
+pages one and two unchanged. Two cache-bypassed roots preserve identical raw
+results and projection semantics while retaining their distinct root-bound
+component and production lineage. Complete-stream pagination remains a later
+versioned slice. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`
@@ -340,8 +358,9 @@ through 166.73 billion to 159.15 billion and peak footprint from 266.7 MB throug
 and shim outputs remained byte-identical and native exit remained `130`.
 Recursive async helpers now enter their precompiled direct-call path before
 unsupported inline recursion is rejected. This is implementation evidence only:
-it does not freeze the aggregate ABI, relax semantic, canonical, hash, disk-read,
-or YIR verification, or advance the gate beyond `usable/99`.
+it does not freeze the aggregate ABI or relax semantic, canonical, hash,
+disk-read, or YIR verification. The separate v11 nested-arena proof is what
+closes the bounded data-model gate at `stable/100`.
 
 ### `differential-reproducibility-gate`
 

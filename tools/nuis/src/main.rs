@@ -46,6 +46,7 @@ mod bootstrap_candidate_fresh_source;
 mod bootstrap_candidate_fresh_source_adapter;
 mod bootstrap_candidate_preselection;
 mod bootstrap_candidate_probe;
+mod bootstrap_candidate_structural_pagination;
 mod bootstrap_candidate_successor;
 mod bootstrap_component_compile_dispatch;
 mod bootstrap_component_dispatch;
@@ -76,13 +77,16 @@ mod dev_tensor_drift_data_language;
 mod dev_tensor_drift_data_runtime;
 mod dev_tensor_drift_data_runtime_bootstrap;
 mod dev_tensor_drift_data_runtime_bootstrap_evidence;
+mod dev_tensor_drift_data_runtime_bootstrap_pagination;
 mod dev_tensor_drift_data_runtime_bootstrap_reproducibility;
 mod dev_tensor_drift_data_runtime_cffi_object;
 mod dev_tensor_drift_data_runtime_cuda;
+mod dev_tensor_drift_data_runtime_current;
 mod dev_tensor_drift_data_runtime_dev;
 mod dev_tensor_drift_data_runtime_dev_lineage;
 mod dev_tensor_drift_data_runtime_dispatch_capability;
 mod dev_tensor_drift_data_runtime_execution;
+mod dev_tensor_drift_data_runtime_galaxy_trust;
 mod dev_tensor_drift_data_runtime_mutex;
 mod dev_tensor_drift_data_runtime_nsld;
 mod dev_tensor_drift_data_runtime_nsld_shell_image;
@@ -117,7 +121,10 @@ mod run_artifact;
 mod runtime_host_yir;
 mod scheduler_surface;
 mod surface_render;
+mod text_helpers;
 mod workflow;
+
+pub(crate) use text_helpers::yes_no;
 
 use std::{
     path::{Path, PathBuf},
@@ -784,14 +791,6 @@ fn run_nuis_rc(args: &[String]) -> Result<(), String> {
             }
         }
         Err(error) => Err(format!("failed to run nuis-rc: {error}")),
-    }
-}
-
-pub(crate) fn yes_no(value: bool) -> &'static str {
-    if value {
-        "yes"
-    } else {
-        "no"
     }
 }
 

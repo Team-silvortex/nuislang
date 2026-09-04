@@ -39,6 +39,26 @@ pub struct GalaxyResolutionProviderDescriptor {
     pub provider_id: String,
     pub provider_kind: String,
     pub root: PathBuf,
+    pub trust_policy: Option<GalaxyResolutionProviderTrustPolicy>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderTrustPolicy {
+    pub registry_path: PathBuf,
+    pub state_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderTrustReport {
+    pub contract: String,
+    pub status: String,
+    pub registry_generation: u64,
+    pub registry_sha256: String,
+    pub highest_candidate_generation: u64,
+    pub candidate_response_sha256: String,
+    pub state_sha256: String,
+    pub active_signer_ids: Vec<String>,
+    pub revoked_signer_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,6 +77,7 @@ pub struct GalaxyResolutionCandidateSetReport {
     pub response_sha256: String,
     pub signature_count: usize,
     pub signer_ids: Vec<String>,
+    pub trust: Option<GalaxyResolutionProviderTrustReport>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

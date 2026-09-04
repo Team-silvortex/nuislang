@@ -54,11 +54,14 @@ edge may pin its own exact version, and an unpinned edge is accepted only when
 the active constraints leave one candidate.
 
 Range selection requires a verified `nuis-galaxy-candidate-set-v1` response in
-`candidate-set.toml`. The response binds the provider ID and registered kind,
-a nonzero generation, raw `index.toml` SHA-256, canonical candidate count and
-SHA-256, and one or more unique Ed25519 signer identities. Every signature
-covers the same canonical response. Index, candidate, provider, signer,
-generation, signature, or count drift fails before solving.
+`candidate-set.toml` plus the caller-owned
+`nuis-galaxy-provider-trust-registry-v1` and persistent
+`nuis-galaxy-provider-trust-state-v1` boundary. The response binds the provider
+ID and registered kind, a nonzero generation, raw `index.toml` SHA-256,
+canonical candidate count and SHA-256, and one or more unique Ed25519 signer
+identities. Every signature covers the same canonical response. A valid
+self-contained signature without external trust remains exact-only and reports
+`verified-signed-untrusted-exact-only`.
 
 The bounded solver accepts strict three-component semantic versions through
 `^x.y.z`, `~x.y.z`, or one explicit lower/upper pair such as
@@ -87,23 +90,57 @@ public_key_hex = "<32-byte-public-key>"
 signature_hex = "<64-byte-signature>"
 ```
 
-This is a provider-root integrity contract, not yet a global registry identity
-system. The caller explicitly chooses the provider root and ID. Persistent
-trust anchors, generation rollback detection across invocations, revocation,
-remote discovery, and transport remain outside this contract rather than
-being implied by a self-contained public key.
+The independently provisioned registry uses the signer identity derived from
+that public key, but never accepts a key merely because it appears in the
+provider sidecar:
+
+```toml
+trust_registry_contract = "nuis-galaxy-provider-trust-registry-v1"
+provider_id = "example.offline"
+provider_kind = "offline-layout"
+generation = 1
+
+[[signer]]
+signer_id = "ed25519:sha256:<public-key-id>"
+status = "active"
+```
+
+Entries are sorted by `signer_id`; rotation advances the registry generation.
+Retained old identities use `status = "revoked"` rather than disappearing.
+The resolver creates or advances the separate state file after all candidate
+content and signatures pass verification.
+
+The external registry is canonical UTF-8/LF, lives outside the provider root,
+binds the provider ID/kind and a monotonic registry generation, and classifies
+each signer as `active` or `revoked`. Every candidate signer must be active;
+unknown and revoked signers fail closed. The state file binds the complete
+registry hash and signer set, highest accepted candidate generation, and exact
+candidate response SHA-256. Lower generations and same-generation forks are
+rejected across invocations. Updates use a bounded cross-process lock,
+same-directory temporary file, file and parent synchronization, atomic rename,
+and immediate reread. The state advances only after provider content and every
+signature verify, and before solving, so an unsatisfiable trusted generation
+cannot later be silently replaced by an older response.
+
+Neither trust paths nor trust-state fields enter `request_sha256`, resolution
+lock bytes, or addressed-cache content. Equivalent trusted and exact-only
+dependency closures therefore preserve the existing lock/cache protocol. See
+[the trust-state protocol](galaxy-provider-trust-state-v1.toml).
 
 The offline front door is:
 
 ```bash
 cargo run -p nuis -- galaxy resolve-deps <project-dir|nuis.toml> \
   --provider-root <offline-layout> \
-  [--provider-id <id>] [--provider-kind <kind>]
+  [--provider-id <id>] [--provider-kind <kind>] \
+  [--trust-registry <file> --trust-state <file>]
 ```
 
-It routes through the same generic project loader, writes the canonical root
-lock, and materializes the same SHA-256-addressed compile cache. It does not add
-registry-specific resolution branches to `nuisc`.
+The two trust arguments are optional as a pair for exact-only resolution and
+mandatory as a pair for ranges. Registry and state parents must already exist.
+The command routes through the same generic project loader, writes the
+canonical root lock, and materializes the same SHA-256-addressed compile cache.
+It does not add registry-specific resolution branches to `nuisc`.
 
 ## Bound State
 
@@ -202,9 +239,12 @@ the lock and addressed cache; it does not silently create or refresh either.
 The early-beta development workflow still permits a missing root lock so old
 workspace examples can be checked and built before they are individually
 locked. This fallback is never used when a root lock exists. Signed static
-candidate sets and bounded semantic-version solving now feed the existing
-provider request/report boundary; they do not create a registry-specific
-compiler branch. Remote candidate discovery, persistent registry trust and
-rollback state, revocation, download transport, and cache garbage collection
-remain later work. Those providers must produce the same canonical lock and
-addressed cache rather than becoming new compiler-side resolution authorities.
+candidate sets and bounded semantic-version solving feed the existing provider
+request/report boundary; they do not create a registry-specific compiler
+branch. Version ranges additionally require a caller-owned external signer
+registry and persistent monotonic state. Unknown or revoked signers, registry
+or candidate rollback, same-generation forks, and state tampering fail closed;
+self-signed providers without that policy remain exact-only. Remote discovery,
+download transport, registry distribution, protected anchor backends, and cache
+garbage collection remain later work. They must produce the same canonical lock
+and addressed cache rather than becoming compiler-side resolution authorities.

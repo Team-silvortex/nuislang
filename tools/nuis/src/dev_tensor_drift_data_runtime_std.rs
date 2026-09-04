@@ -680,7 +680,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "selection_sha256",
             "verify_candidate_set",
             "solve_candidates",
-            "verified-signed-candidate-set",
+            "verified-trusted-candidate-set",
             "escapes provider root",
         ],
     },
@@ -693,7 +693,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "generation must be greater than zero",
             "canonical_candidate_sha256",
             "verify_strict",
-            "verified-signed-candidate-set",
+            "enforce_candidate_set_trust",
+            "verified-signed-untrusted-exact-only",
         ],
     },
     DevTensorDriftCheckSpec {

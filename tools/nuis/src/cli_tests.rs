@@ -582,6 +582,8 @@ fn parses_galaxy_provider_resolution() {
             provider_root: PathBuf::from("mirror"),
             provider_id: "fixture.offline".to_owned(),
             provider_kind: "offline-layout".to_owned(),
+            trust_registry: None,
+            trust_state: None,
         })
     );
 }

@@ -5,13 +5,16 @@ use crate::{
     dev_tensor_drift_data_runtime::DEV_TENSOR_RUNTIME_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_bootstrap::DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_bootstrap_evidence::DEV_TENSOR_RUNTIME_BOOTSTRAP_EVIDENCE_DRIFT_CHECKS,
+    dev_tensor_drift_data_runtime_bootstrap_pagination::DEV_TENSOR_RUNTIME_BOOTSTRAP_PAGINATION_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_bootstrap_reproducibility::DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_cffi_object::DEV_TENSOR_RUNTIME_CFFI_OBJECT_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_cuda::DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS,
+    dev_tensor_drift_data_runtime_current::DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_dev::DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_dev_lineage::DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_dispatch_capability::DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_execution::DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS,
+    dev_tensor_drift_data_runtime_galaxy_trust::DEV_TENSOR_RUNTIME_GALAXY_TRUST_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_mutex::DEV_TENSOR_RUNTIME_MUTEX_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_nsld::DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_nsld_shell_image::DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS,
@@ -31,12 +34,15 @@ pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTens
         .chain(DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS.iter())
+        .chain(DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_BOOTSTRAP_REPRODUCIBILITY_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_BOOTSTRAP_EVIDENCE_DRIFT_CHECKS.iter())
+        .chain(DEV_TENSOR_RUNTIME_BOOTSTRAP_PAGINATION_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_CFFI_OBJECT_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS.iter())
+        .chain(DEV_TENSOR_RUNTIME_GALAXY_TRUST_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_OWNED_LAYOUT_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_PROVIDER_COMPLETION_DRIFT_CHECKS.iter())

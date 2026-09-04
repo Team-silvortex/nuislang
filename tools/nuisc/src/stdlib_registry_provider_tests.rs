@@ -10,7 +10,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-struct TempProvider(PathBuf);
+struct TempProvider {
+    base: PathBuf,
+    root: PathBuf,
+    trust: PathBuf,
+}
 
 impl TempProvider {
     fn new(name: &str) -> Self {
@@ -18,27 +22,53 @@ impl TempProvider {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("nuis_galaxy_provider_{name}_{nonce}"));
+        let base = std::env::temp_dir().join(format!("nuis_galaxy_provider_{name}_{nonce}"));
+        let root = base.join("provider");
+        let trust = base.join("trust");
         fs::create_dir_all(&root).unwrap();
-        Self(root)
+        fs::create_dir_all(&trust).unwrap();
+        Self { base, root, trust }
     }
 
     fn path(&self) -> &Path {
-        &self.0
+        &self.root
     }
 
     fn descriptor(&self) -> GalaxyResolutionProviderDescriptor {
         GalaxyResolutionProviderDescriptor {
             provider_id: "fixture.offline".to_owned(),
             provider_kind: "offline-layout".to_owned(),
-            root: self.0.clone(),
+            root: self.root.clone(),
+            trust_policy: None,
         }
+    }
+
+    fn trusted_descriptor(&self, signer_id: &str) -> GalaxyResolutionProviderDescriptor {
+        let mut descriptor = self.descriptor();
+        let registry_path = self.trust.join("registry.toml");
+        fs::write(
+            &registry_path,
+            format!(
+                "trust_registry_contract = \"{}\"\nprovider_id = \"{}\"\nprovider_kind = \"{}\"\ngeneration = 1\n\n[[signer]]\nsigner_id = \"{signer_id}\"\nstatus = \"active\"\n",
+                crate::stdlib_registry::GALAXY_PROVIDER_TRUST_REGISTRY_CONTRACT,
+                descriptor.provider_id,
+                descriptor.provider_kind,
+            ),
+        )
+        .unwrap();
+        descriptor.trust_policy = Some(
+            crate::stdlib_registry::GalaxyResolutionProviderTrustPolicy {
+                registry_path,
+                state_path: self.trust.join("state.toml"),
+            },
+        );
+        descriptor
     }
 }
 
 impl Drop for TempProvider {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        let _ = fs::remove_dir_all(&self.base);
     }
 }
 
@@ -217,7 +247,8 @@ fn signed_range_solver_backtracks_and_is_input_order_independent() {
     write_package(provider.path(), "core-v1", "core", "nuis.core.v1", &[]);
     write_package(provider.path(), "core-v2", "core", "nuis.core.v2", &[]);
     write_package(provider.path(), "guard", "guard", "nuis.guard", &["core"]);
-    write_signed_candidate_set(&provider, 7, 19);
+    let signer_id = write_signed_candidate_set(&provider, 7, 19);
+    let descriptor = provider.trusted_descriptor(&signer_id);
 
     let forward = [
         ProjectGalaxyDependency {
@@ -230,13 +261,19 @@ fn signed_range_solver_backtracks_and_is_input_order_independent() {
         },
     ];
     let reversed = [forward[1].clone(), forward[0].clone()];
-    let first =
-        resolve_galaxy_dependencies_with_provider(&provider.descriptor(), &forward).unwrap();
-    let second =
-        resolve_galaxy_dependencies_with_provider(&provider.descriptor(), &reversed).unwrap();
+    let first = resolve_galaxy_dependencies_with_provider(&descriptor, &forward).unwrap();
+    let second = resolve_galaxy_dependencies_with_provider(&descriptor, &reversed).unwrap();
 
     assert_eq!(first, second);
-    assert_eq!(first.report.status, "resolved-signed-provider-closure");
+    assert_eq!(first.report.status, "resolved-trusted-provider-closure");
+    assert_eq!(
+        first.report.candidate_set.status,
+        "verified-trusted-candidate-set"
+    );
+    assert_eq!(
+        first.report.candidate_set.trust.as_ref().unwrap().status,
+        "verified-persistent-trust"
+    );
     assert_eq!(first.report.candidate_set.generation, 7);
     assert_eq!(first.report.candidate_set.signature_count, 1);
     assert_eq!(
@@ -254,6 +291,46 @@ fn signed_range_solver_backtracks_and_is_input_order_independent() {
 }
 
 #[test]
+fn self_signed_provider_without_external_trust_is_exact_only() {
+    let provider = TempProvider::new("signed_untrusted");
+    write_index(
+        provider.path(),
+        &[candidate("core", "1.0.0", "core", "nuis.core", &[])],
+    );
+    write_package(provider.path(), "core", "core", "nuis.core", &[]);
+    write_signed_candidate_set(&provider, 2, 29);
+    let descriptor = provider.descriptor();
+
+    let error = resolve_galaxy_dependencies_with_provider(
+        &descriptor,
+        &[ProjectGalaxyDependency {
+            name: "core".to_owned(),
+            version: "^1.0.0".to_owned(),
+        }],
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("persistent external provider trust"),
+        "{error}"
+    );
+
+    let exact = resolve_galaxy_dependencies_with_provider(
+        &descriptor,
+        &[ProjectGalaxyDependency {
+            name: "core".to_owned(),
+            version: "1.0.0".to_owned(),
+        }],
+    )
+    .unwrap();
+    assert_eq!(exact.report.status, "resolved-pinned-provider-closure");
+    assert_eq!(
+        exact.report.candidate_set.status,
+        "verified-signed-untrusted-exact-only"
+    );
+    assert!(exact.report.candidate_set.trust.is_none());
+}
+
+#[test]
 fn signed_candidate_set_rejects_index_and_signature_tampering() {
     let provider = TempProvider::new("signed_tamper");
     write_index(
@@ -261,8 +338,9 @@ fn signed_candidate_set_rejects_index_and_signature_tampering() {
         &[candidate("core", "1.0.0", "core", "nuis.core", &[])],
     );
     write_package(provider.path(), "core", "core", "nuis.core", &[]);
-    write_signed_candidate_set(&provider, 2, 23);
-    let descriptor = provider.descriptor();
+    let signer_id = write_signed_candidate_set(&provider, 2, 23);
+    let descriptor = provider.trusted_descriptor(&signer_id);
+    let state_path = descriptor.trust_policy.as_ref().unwrap().state_path.clone();
     let request = [ProjectGalaxyDependency {
         name: "core".to_owned(),
         version: "^1.0.0".to_owned(),
@@ -272,6 +350,7 @@ fn signed_candidate_set_rejects_index_and_signature_tampering() {
     fs::write(&index_path, format!("{original_index}# changed\n")).unwrap();
     let error = resolve_galaxy_dependencies_with_provider(&descriptor, &request).unwrap_err();
     assert!(error.contains("index_sha256 does not match"), "{error}");
+    assert!(!state_path.exists());
 
     fs::write(&index_path, original_index).unwrap();
     let sidecar_path = provider.path().join(GALAXY_CANDIDATE_SET_FILE);
@@ -289,6 +368,7 @@ fn signed_candidate_set_rejects_index_and_signature_tampering() {
         error.contains("does not match the canonical response"),
         "{error}"
     );
+    assert!(!state_path.exists());
 }
 
 #[test]
@@ -436,7 +516,7 @@ fn write_package(root: &Path, path: &str, name: &str, package_id: &str, depends_
     .unwrap();
 }
 
-fn write_signed_candidate_set(provider: &TempProvider, generation: u64, seed: u8) {
+fn write_signed_candidate_set(provider: &TempProvider, generation: u64, seed: u8) -> String {
     let descriptor = provider.descriptor();
     let index_bytes = fs::read(provider.path().join("index.toml")).unwrap();
     let layout = load_stdlib_layout(provider.path()).unwrap();
@@ -469,6 +549,7 @@ fn write_signed_candidate_set(provider: &TempProvider, generation: u64, seed: u8
         ),
     )
     .unwrap();
+    signer_id
 }
 
 fn hex(bytes: &[u8]) -> String {

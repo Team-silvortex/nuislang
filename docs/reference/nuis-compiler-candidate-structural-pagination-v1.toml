@@ -1,0 +1,89 @@
+protocol = "nuis-compiler-candidate-structural-pagination-v1"
+version = 1
+status = "stable-bounded-candidate-owned-three-page-pagination"
+scope = "stage1-candidate-ast-nir-structural-pagination-successor"
+manifest_name = "nuis.compiler-candidate-structural-pagination.toml"
+result_name = "nuis.compiler-candidate-structural-pagination-result"
+result_protocol = "nuis-bootstrap-candidate-structural-pagination-v1"
+predecessor_protocol = "nuis-compiler-candidate-production-v11"
+pagination_contract = "nuis-stage1-three-page-structural-pagination-successor-v1"
+authority = "candidate-owned-three-page-pagination-only-no-replacement-or-selection"
+frontdoor = "nuis bootstrap-candidate-build"
+candidate_role = "stage1-candidate"
+candidate_producer = "nuis-stage1-compact-structured-nir-producer-v10"
+adapter_file = "nuis.compiler-candidate-adapter"
+path_policy = "runtime-paths-never-enter-canonical-fields"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+projection_count = 2
+ordered_projections = ["ast", "nir"]
+page_count = 3
+page_bytes = 128
+page_contract = "nuis-compiler-structural-page-v1"
+cursor_contract = "nuis-compiler-structural-cursor-v1"
+cursor_lanes = 8
+result_line_count = 62
+candidate_owned_pagination = true
+host_recomputed = true
+predecessor_unchanged = true
+stage0_provider_dependency = false
+replacement_authorized = false
+selection_authorized = false
+verdict = "candidate-owned-ast-nir-three-page-pagination-verified"
+
+bound_inputs = [
+  "exact-stage1-candidate-component-and-producer",
+  "exact-production-v11-protocol-proof-and-stage-bundle",
+  "exact-production-bound-adapter-length-and-sha256",
+  "exact-canonical-62-line-candidate-result-length-and-sha256",
+  "complete-ast-and-nir-source-payload-length-and-sha256",
+  "predecessor-first-and-second-page-and-cursor-identities",
+  "third-page-record-byte-projection-continuation-state-and-identity-fields",
+  "third-page-complete-eight-lane-cursor-and-cursor-identity",
+  "no-stage0-provider-replacement-or-selection-authority",
+]
+
+verification_order = [
+  "execute-the-exact-production-bound-adapter-in-structural-pagination-v1-mode",
+  "clear-the-process-environment-and-close-stdin",
+  "parse-the-exact-62-line-canonical-result",
+  "independently-parse-complete-ast-and-nir-projections",
+  "independently-replay-three-contiguous-128-byte-pages-and-opaque-cursors",
+  "require-every-candidate-page-identity-cursor-identity-and-lane-to-match",
+  "require-pages-one-and-two-to-match-production-v11-without-mutating-it",
+  "persist-reread-rebuild-and-byte-compare-the-successor-proof",
+]
+
+invariants = [
+  "production-v11-and-its-53-line-default-adapter-output-remain-unchanged",
+  "the-adapter-packs-bytes-and-transports-cursors-without-classifying-ast-or-nir-records",
+  "the-same-nuis-projection-resume-export-computes-all-three-pages-for-both-projections",
+  "cross-root-result-bytes-adapter-hash-stage-bundle-and-projection-semantics-are-identical",
+  "root-bound-successor-proofs-retain-their-distinct-component-and-production-lineage",
+  "no-evidence-artifact-authorizes-component-replacement-or-final-selection",
+]
+
+[reference]
+ast_third_page_identity = 52512046640
+ast_third_cursor_identity = 134949883
+nir_third_page_identity = 263937486482
+nir_third_cursor_identity = 128767437
+
+[honest_boundary]
+claim = "the-production-bound-stage1-candidate-resumes-both-producer-neutral-structural-projections-through-three-pages-and-agrees-with-independent-host-replay"
+does_not_claim = "unbounded-pagination-a-third-derived-encoding-native-object-materialization-component-replacement-final-selection-or-self-hosting"
+next_step = "preserve-this-successor-while-forwarding-the-complete-v10-compiler-aggregate-arena-through-one-nested-nuis-helper"
+
+[open_boundary]
+missing = [
+  "fourth-and-later-structural-pages-or-complete-stream-pagination",
+  "third-registered-derived-stage-encoding",
+  "unbounded-compiler-collections",
+  "general-aggregate-loop-backedge-lowering",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_structural_pagination -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate pure_nuis_candidate_produces_an_attested_equivalent_stage1_component -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1",
+]

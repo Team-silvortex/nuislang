@@ -78,6 +78,29 @@ fn registered_provider_bundles_are_manifest_owned_and_deterministic() {
 }
 
 #[test]
+fn provider_capabilities_must_cross_bind_their_owning_bundle() {
+    let root = temp_registry_root("provider-capability-cross-binding");
+    let mut data = load_manifest_for_domain(Path::new("nustar-packages"), "data").unwrap();
+    data.provider_capabilities = vec![
+        "nuis-provider-capability-record-v1|data.cpu-memory.reference.v1|data.host.bundle.v1|data:other|100|memory.cpu"
+            .to_owned(),
+    ];
+    let entries = vec![NustarPackageIndexEntry {
+        package_id: data.package_id.clone(),
+        manifest: "data.toml".to_owned(),
+        domain_family: data.domain_family.clone(),
+    }];
+    write_registry_fixture(&root, &entries, &[data]);
+
+    let issues = validate_registered_domains(&root).unwrap();
+    assert!(issues.iter().any(|issue| {
+        issue.kind == NustarRegistryIssueKind::ProviderCapabilityContractMismatch
+            && issue.message.contains("does not bind an owning bundle")
+    }));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn validate_registered_domains_allows_duplicate_domain_but_rejects_bad_lane_target() {
     let root = temp_registry_root("registry-duplicate-domain");
     let cpu = cpu_manifest_with_host_target();

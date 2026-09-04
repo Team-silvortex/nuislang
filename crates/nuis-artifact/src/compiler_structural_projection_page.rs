@@ -62,6 +62,22 @@ pub struct CompilerProjectionTwoPageIdentity {
     pub second: CompilerProjectionPageAdvance,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompilerProjectionThreePageIdentity {
+    pub first: CompilerProjectionPageAdvance,
+    pub second: CompilerProjectionPageAdvance,
+    pub third: CompilerProjectionPageAdvance,
+}
+
+impl CompilerProjectionThreePageIdentity {
+    pub fn first_two(self) -> CompilerProjectionTwoPageIdentity {
+        CompilerProjectionTwoPageIdentity {
+            first: self.first,
+            second: self.second,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct ProjectionState {
     is_ast: usize,
@@ -118,6 +134,38 @@ pub fn compiler_projection_two_page_identity(
         &bytes[COMPILER_PROJECTION_PAGE_BYTES..second_end],
     )?;
     Ok(CompilerProjectionTwoPageIdentity { first, second })
+}
+
+pub fn compiler_projection_three_page_identity(
+    kind: CompilerProjectionKind,
+    bytes: &[u8],
+) -> Result<CompilerProjectionThreePageIdentity, ArtifactError> {
+    validate_projection_source(kind, bytes)?;
+    if bytes.len() <= COMPILER_PROJECTION_PAGE_BYTES * 2 {
+        return Err(ArtifactError::new(
+            "compiler structural continuation requires a third page",
+        ));
+    }
+    let first = advance_page(
+        PageState::new(kind),
+        &bytes[..COMPILER_PROJECTION_PAGE_BYTES],
+    )?;
+    let second = compiler_projection_resume_page_identity(
+        kind,
+        first.cursor,
+        &bytes[COMPILER_PROJECTION_PAGE_BYTES..COMPILER_PROJECTION_PAGE_BYTES * 2],
+    )?;
+    let third_end = bytes.len().min(COMPILER_PROJECTION_PAGE_BYTES * 3);
+    let third = compiler_projection_resume_page_identity(
+        kind,
+        second.cursor,
+        &bytes[COMPILER_PROJECTION_PAGE_BYTES * 2..third_end],
+    )?;
+    Ok(CompilerProjectionThreePageIdentity {
+        first,
+        second,
+        third,
+    })
 }
 
 pub fn compiler_projection_resume_page_identity(

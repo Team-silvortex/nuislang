@@ -12,6 +12,8 @@ mod stdlib_registry_provider_semver;
 mod stdlib_registry_provider_solver;
 #[path = "stdlib_registry_provider_trust.rs"]
 mod stdlib_registry_provider_trust;
+#[path = "stdlib_registry_provider_trust_state.rs"]
+mod stdlib_registry_provider_trust_state;
 #[path = "stdlib_registry_render.rs"]
 mod stdlib_registry_render;
 #[path = "stdlib_registry_types.rs"]
@@ -28,6 +30,9 @@ pub use stdlib_registry_provider::{
 pub use stdlib_registry_provider_trust::{
     GALAXY_CANDIDATE_SET_CONTRACT, GALAXY_CANDIDATE_SET_FILE,
 };
+pub use stdlib_registry_provider_trust_state::{
+    GALAXY_PROVIDER_TRUST_REGISTRY_CONTRACT, GALAXY_PROVIDER_TRUST_STATE_CONTRACT,
+};
 pub(crate) use stdlib_registry_render::summarize_resolved_galaxy_docs;
 pub use stdlib_registry_render::{render_resolved_galaxy_index, write_resolved_galaxy_index};
 pub(crate) use stdlib_registry_types::ResolvedGalaxyDocSummary;
@@ -35,7 +40,8 @@ pub use stdlib_registry_types::{
     GalaxyResolutionCandidateSetReport, GalaxyResolutionProviderDescriptor,
     GalaxyResolutionProviderReport, GalaxyResolutionProviderRequest,
     GalaxyResolutionProviderRequirement, GalaxyResolutionProviderResolution,
-    GalaxyResolutionProviderSelection, ResolvedGalaxyContentIdentity, ResolvedGalaxyDependency,
+    GalaxyResolutionProviderSelection, GalaxyResolutionProviderTrustPolicy,
+    GalaxyResolutionProviderTrustReport, ResolvedGalaxyContentIdentity, ResolvedGalaxyDependency,
     StdlibIndexModule, StdlibLayout, StdlibLibraryImportPolicy, StdlibModuleManifest,
 };
 pub fn load_stdlib_layout(stdlib_root: &Path) -> Result<StdlibLayout, String> {
@@ -129,6 +135,7 @@ pub fn resolve_galaxy_dependencies(
         provider_id: "official.workspace".to_owned(),
         provider_kind: "workspace-layout".to_owned(),
         root: stdlib_root.to_path_buf(),
+        trust_policy: None,
     };
     resolve_galaxy_dependencies_with_provider(&provider, requested)
         .map(|resolution| resolution.dependencies)
@@ -352,6 +359,7 @@ mod tests {
                 "surface.std.compiler-data-model.v8".to_owned(),
                 "surface.std.compiler-data-model.v9".to_owned(),
                 "surface.std.compiler-data-model.v10".to_owned(),
+                "surface.std.compiler-data-model.v11".to_owned(),
                 "surface.std.compiler-token-emitter.v1".to_owned(),
                 "surface.std.compiler-token-decoder.v1".to_owned(),
                 "surface.std.compiler-structural-projection.v1".to_owned(),

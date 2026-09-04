@@ -8,7 +8,9 @@ use super::{
         can_emit_typed_return_from_value, cpu_scalar_kind_llvm_type, emit_typed_return_from_value,
     },
     fresh_block, fresh_reg, guard_host_call,
-    task_owned_payload::{emit_owned_struct_return, materialize_owned_variant_storage},
+    task_owned_payload::{
+        can_emit_owned_struct_return, emit_owned_struct_return, materialize_owned_variant_storage,
+    },
     value_ref::{coerce_to_cstr, coerce_to_i64, get_bool, get_f32, get_f64, get_i32},
     CpuCallScalarKind, LlvmValueRef,
 };
@@ -284,6 +286,13 @@ pub(crate) fn lower_cpu_guard_return_node(
                 None
             };
             if let Some(struct_value) = structural_value {
+                if !can_emit_owned_struct_return(&struct_value) {
+                    body.push(format!(
+                        "  ; deferred lowering for structural cpu.guard_return `{}` because its value contains a resource outside the owned aggregate ABI",
+                        node.name
+                    ));
+                    return Ok(GuardReturnLoweringOutcome::Continue);
+                }
                 if function_return_kind != CpuCallScalarKind::I64 {
                     body.push(format!(
                         "  ; deferred lowering for structural cpu.guard_return `{}` because its function ABI is not i64",
@@ -301,7 +310,7 @@ pub(crate) fn lower_cpu_guard_return_node(
                 body.push(format!("{then_label}:"));
                 if !emit_owned_struct_return(&struct_value, body, next_reg) {
                     return Err(format!(
-                        "cpu.guard_return `{}` cannot pack its structural return value",
+                        "cpu.guard_return `{}` changed packability after owned aggregate preflight",
                         node.name
                     ));
                 }

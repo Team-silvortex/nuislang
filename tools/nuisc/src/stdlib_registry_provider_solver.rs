@@ -314,7 +314,7 @@ fn validate_bounds(
 fn require_range_trust(requirement: &VersionRequirement, allow_ranges: bool) -> Result<(), String> {
     if requirement.is_range() && !allow_ranges {
         return Err(format!(
-            "Galaxy version range `{}` requires a verified `{}` sidecar",
+            "Galaxy version range `{}` requires a verified `{}` sidecar with persistent external provider trust",
             requirement.canonical(),
             super::stdlib_registry_provider_trust::GALAXY_CANDIDATE_SET_FILE
         ));

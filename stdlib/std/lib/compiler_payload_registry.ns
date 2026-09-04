@@ -565,4 +565,42 @@ mod cpu StdCompilerPayloadRegistry {
     }
     return Result.Ok(span);
   }
+
+  pub fn compiler_aggregate_arena_forward_checked(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry,
+    expected_registry_identity: i64,
+    expected_arena_identity: i64
+  ) -> Result<CompilerAggregateArena, i64> {
+    let registry_identity: i64 = compiler_payload_registry_identity(registry)?;
+    if registry_identity != expected_registry_identity {
+      return Result.Err(3);
+    }
+    let arena_identity: i64 = compiler_aggregate_arena_identity(value, registry)?;
+    if arena_identity != expected_arena_identity {
+      return Result.Err(3);
+    }
+    return Result.Ok(value);
+  }
+
+  /// Forwards one complete registered arena without exposing host layout or pointers.
+  pub fn compiler_aggregate_arena_forward(
+    value: CompilerAggregateArena,
+    registry: CompilerPayloadRegistry
+  ) -> Result<CompilerAggregateArena, i64> {
+    let registry_identity: i64 = compiler_payload_registry_identity(registry)?;
+    let arena_identity: i64 = compiler_aggregate_arena_identity(value, registry)?;
+    let forwarded: CompilerAggregateArena = compiler_aggregate_arena_forward_checked(
+      value, registry, registry_identity, arena_identity
+    )?;
+    let forwarded_registry_identity: i64 = compiler_payload_registry_identity(registry)?;
+    let forwarded_arena_identity: i64 = compiler_aggregate_arena_identity(
+      forwarded, registry
+    )?;
+    if forwarded_registry_identity != registry_identity
+      || forwarded_arena_identity != arena_identity {
+      return Result.Err(3);
+    }
+    return Result.Ok(forwarded);
+  }
 }

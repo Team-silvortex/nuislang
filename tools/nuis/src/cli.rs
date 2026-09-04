@@ -785,3 +785,7 @@ mod tests;
 #[cfg(test)]
 #[path = "cli_bootstrap_candidate_fresh_source_tests.rs"]
 mod fresh_source_tests;
+
+#[cfg(test)]
+#[path = "cli_galaxy_trust_tests.rs"]
+mod galaxy_trust_tests;

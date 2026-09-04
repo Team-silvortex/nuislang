@@ -11,7 +11,7 @@ use nuis_artifact::{
 use nuis_semantics::bootstrap_subset::BOOTSTRAP_SUBSET_PROTOCOL;
 
 use crate::command_bootstrap::ensure_bootstrap_subset_resolved;
-use crate::command_compile::{run_compile_resolved, CompileCachePolicy};
+use crate::command_compile::{run_compile_resolved, CompileCachePolicy, CompileInvocation};
 use crate::command_helpers::{resolve_compile_input, NUSTAR_REGISTRY_ROOT};
 use crate::{aot, registry, registry_load};
 
@@ -47,12 +47,14 @@ fn run_bootstrap_build_with_cache_policy(
     ensure_bootstrap_subset_resolved(&resolved)?;
 
     run_compile_resolved(
-        input.clone(),
-        output_dir.clone(),
-        false,
-        None,
-        None,
-        None,
+        CompileInvocation {
+            input: input.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+            packaging_mode: None,
+        },
         &resolved,
         cache_policy,
     )?;

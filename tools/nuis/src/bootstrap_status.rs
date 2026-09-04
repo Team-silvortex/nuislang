@@ -513,25 +513,22 @@ mod tests {
         include_str!("../../../docs/reference/nuis-self-hosting-readiness.toml");
 
     #[test]
-    fn checked_in_manifest_is_valid_and_names_the_weakest_real_gate() {
+    fn checked_in_manifest_closes_bounded_migration_entry_readiness() {
         let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         assert_eq!(report.gates.len(), REQUIRED_GATES.len());
-        assert_eq!(report.closed_gate_count(), 3);
-        assert!(!report.ready());
+        assert_eq!(report.closed_gate_count(), 5);
+        assert!(report.ready());
         assert!(report.migration_active());
         assert_eq!(report.phase, "stage0-to-stage1-migration");
         assert_eq!(report.phase_status, "active");
-        assert_eq!(report.status(), "migration-active-open-readiness-gates");
+        assert_eq!(report.status(), "migration-active-readiness-closed");
         assert_eq!(report.completion_window_start, "gamma-0.5.*");
         assert_eq!(report.completion_window_end, "gamma-0.10.*");
-        assert_eq!(
-            report.next_gate().map(|gate| gate.id.as_str()),
-            Some("stage-neutral-ir-boundary")
-        );
+        assert!(report.next_gate().is_none());
     }
 
     #[test]
-    fn renderers_expose_readiness_without_claiming_migration_ready() {
+    fn renderers_expose_closed_preparation_readiness() {
         let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         let path = Path::new("docs/reference/nuis-self-hosting-readiness.toml");
         let json = render_bootstrap_readiness_json(path, &report);
@@ -540,14 +537,15 @@ mod tests {
         assert!(json.contains("\"phase\":\"stage0-to-stage1-migration\""));
         assert!(json.contains("\"phase_status\":\"active\""));
         assert!(json.contains("\"migration_active\":true"));
-        assert!(json.contains("\"ready\":false"));
+        assert!(json.contains("\"ready\":true"));
         assert!(json.contains("\"gate_count\":5"));
+        assert!(json.contains("\"next_gate\":null"));
         assert!(json.contains("\"completion_window_start\":\"gamma-0.5.*\""));
         assert!(json.contains("\"completion_window_end\":\"gamma-0.10.*\""));
         assert!(text.contains("phase: stage0-to-stage1-migration"));
         assert!(text.contains("phase_status: active"));
-        assert!(text.contains("status: migration-active-open-readiness-gates"));
-        assert!(text.contains("gates: 3/5"));
+        assert!(text.contains("status: migration-active-readiness-closed"));
+        assert!(text.contains("gates: 5/5"));
     }
 
     #[test]
@@ -564,7 +562,7 @@ mod tests {
     #[test]
     fn stable_status_requires_exactly_one_hundred_progress() {
         let invalid = CHECKED_IN_MANIFEST.replacen(
-            "status = \"usable\"\nprogress = 99",
+            "status = \"stable\"\nprogress = 100",
             "status = \"stable\"\nprogress = 99",
             1,
         );
@@ -574,7 +572,11 @@ mod tests {
 
     #[test]
     fn next_gate_follows_status_progress_coordinate_order() {
-        let adjusted = CHECKED_IN_MANIFEST.replacen("progress = 99", "progress = 94", 1);
+        let adjusted = CHECKED_IN_MANIFEST.replacen(
+            "id = \"compiler-data-model\"\ncoordinate = \"standard-library/std/compiler-data-model\"\nstatus = \"stable\"\nprogress = 100",
+            "id = \"compiler-data-model\"\ncoordinate = \"standard-library/std/compiler-data-model\"\nstatus = \"usable\"\nprogress = 94",
+            1,
+        );
         let report = parse_bootstrap_readiness(&adjusted).expect("manifest parses");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
@@ -584,15 +586,7 @@ mod tests {
 
     #[test]
     fn completed_manifest_has_stable_null_next_gate_shape() {
-        let complete = CHECKED_IN_MANIFEST
-            .replace("status = \"usable\"", "status = \"stable\"")
-            .replace("progress = 94", "progress = 100")
-            .replace("progress = 95", "progress = 100")
-            .replace("progress = 96", "progress = 100")
-            .replace("progress = 97", "progress = 100")
-            .replace("progress = 98", "progress = 100");
-        let complete = complete.replace("progress = 99", "progress = 100");
-        let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
+        let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);
         assert!(report.ready());
         assert_eq!(report.status(), "migration-active-readiness-closed");

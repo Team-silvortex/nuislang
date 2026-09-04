@@ -133,12 +133,14 @@ fn load_project_with_galaxy_provider(
                 provider_id: "project.locked-cache".to_owned(),
                 provider_kind: "locked-resolution-cache".to_owned(),
                 root: cache_root.clone(),
+                trust_policy: None,
             }
         }
         _ => crate::stdlib_registry::GalaxyResolutionProviderDescriptor {
             provider_id: "official.workspace".to_owned(),
             provider_kind: "workspace-layout".to_owned(),
             root: crate::stdlib_registry::resolve_stdlib_root()?,
+            trust_policy: None,
         },
     };
     let provider_resolution = crate::stdlib_registry::resolve_galaxy_dependencies_with_provider(

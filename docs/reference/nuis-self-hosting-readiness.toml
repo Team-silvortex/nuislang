@@ -16,29 +16,29 @@ required_before = "beta-0.10.0"
 next_action = "preserve v8 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability or scalar export"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
 expected_artifact = "nuis-bootstrap-language-subset-v8, nuisc bootstrap-check, twenty-one exact scalar exports, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
-blocker = "none for subset v8; chunked individual aggregate projection and aggregate backedge lowering remain independent readiness gates"
+blocker = "none for subset v8; future language or scalar-export growth requires a new protocol version"
 
 [[gates]]
 id = "compiler-data-model"
 coordinate = "standard-library/std/compiler-data-model"
-status = "usable"
-progress = 99
+status = "stable"
+progress = 100
 required_before = "beta-0.10.0"
-next_action = "forward one complete v10 CompilerAggregateArena through a nested Nuis helper while preserving registry provenance, stable indices, canonical identity, and atomic failure"
+next_action = "preserve the bounded v11 owned-arena ABI and frozen v8 import ceiling while candidate-native object materialization and wider compiler source coverage advance separately"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-data-model-v10 with one registered 24-byte CompilerChunkedPayload projected across three aggregate pages, exact v9/v10 identities, atomic failures, and native exit 130"
-blocker = "v10 closes individual payloads larger than sixteen bytes, but collection indices remain bounded to sixteen, defining-module provenance and nested full-arena forwarding are incomplete, and general aggregate loop backedges remain open"
+expected_artifact = "nuis-compiler-data-model-v11 forwards the complete registered three-object arena through two Nuis helper boundaries with exact v9/v10 identities, fail-closed registry provenance, atomic failures, and native exit 130"
+blocker = "none for the bounded bootstrap data-model gate; sixteen-entry collections, 128-byte aggregate payloads, general defining-module provenance, and aggregate loop backedges remain later growth work"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
-status = "usable"
-progress = 99
+status = "stable"
+progress = 100
 required_before = "beta-0.10.0"
-next_action = "preserve dual AST/NIR production selection while extending structural pagination or a third registered derived encoding without changing the canonical v1 bundle"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff_v2 -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_production -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1 -- --test-threads=1"
-expected_artifact = "AST and NIR derived stages selected in source order with exact source, transform, payload, checkpoint, recovery, and 2/2 semantic identities beside the canonical v1 bundle"
-blocker = "the real candidate closes generic two-encoding production selection, but production still binds only two structural pages per projection and general aggregate loop backedges remain open"
+next_action = "preserve production-v11 and its additive three-page successor while complete-stream pagination or a third registered derived encoding evolves under a new protocol"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_structural_pagination -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate pure_nuis_candidate_produces_an_attested_equivalent_stage1_component -j 1 -- --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate two_uncached_clean_candidates_bind_one_reproducibility_aggregate -j 1 -- --test-threads=1"
+expected_artifact = "nuis-compiler-candidate-structural-pagination-v1 binds canonical candidate-owned AST/NIR three-page results, complete third cursors, independent host replay, predecessor continuity, and false authority"
+blocker = "none for the bounded producer-neutral three-page migration gate; complete-stream pagination, a third derived encoding, and general aggregate loop backedges remain later slices"
 
 [[gates]]
 id = "stage0-stage1-driver"

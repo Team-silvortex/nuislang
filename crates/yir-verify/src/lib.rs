@@ -308,7 +308,7 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
     Ok(())
 }
 
-fn reverse_reachable_nodes<'a>(reverse_edges: &'a [Vec<usize>], target: usize) -> HashSet<usize> {
+fn reverse_reachable_nodes(reverse_edges: &[Vec<usize>], target: usize) -> HashSet<usize> {
     let mut stack = reverse_edges[target].clone();
     let mut reachable = HashSet::new();
     while let Some(current) = stack.pop() {

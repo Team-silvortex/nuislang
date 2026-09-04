@@ -82,7 +82,7 @@ pub(crate) fn emit_owned_struct_return(
     body: &mut Vec<String>,
     next_reg: &mut usize,
 ) -> bool {
-    if scalar_leaf_count(&LlvmValueRef::Struct(value.clone())).is_none() {
+    if !can_emit_owned_struct_return(value) {
         return false;
     }
     let mut state = LlvmLoweringState {
@@ -108,6 +108,10 @@ pub(crate) fn emit_owned_struct_return(
     *body = state.body;
     *next_reg = state.next_reg;
     true
+}
+
+pub(crate) fn can_emit_owned_struct_return(value: &StructLlvmValueRef) -> bool {
+    scalar_leaf_count(&LlvmValueRef::Struct(value.clone())).is_some()
 }
 
 pub(crate) fn materialize_owned_variant_storage(

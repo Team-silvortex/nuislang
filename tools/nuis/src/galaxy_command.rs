@@ -162,11 +162,23 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             provider_root,
             provider_id,
             provider_kind,
+            trust_registry,
+            trust_state,
         } => {
+            let trust_policy =
+                trust_registry
+                    .zip(trust_state)
+                    .map(|(registry_path, state_path)| {
+                        nuisc::stdlib_registry::GalaxyResolutionProviderTrustPolicy {
+                            registry_path,
+                            state_path,
+                        }
+                    });
             let descriptor = nuisc::stdlib_registry::GalaxyResolutionProviderDescriptor {
                 provider_id,
                 provider_kind,
                 root: provider_root,
+                trust_policy,
             };
             let resolved = galaxy::resolve_project_deps_with_provider(&input, &descriptor)?;
             println!("resolved galaxy dependencies through registered provider");
@@ -209,6 +221,25 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
                 "  candidate_set_signers: {}",
                 resolved.provider.candidate_set.signer_ids.join(",")
             );
+            if let Some(trust) = &resolved.provider.candidate_set.trust {
+                println!("  trust_contract: {}", trust.contract);
+                println!("  trust_status: {}", trust.status);
+                println!("  trust_registry_generation: {}", trust.registry_generation);
+                println!("  trust_registry_sha256: {}", trust.registry_sha256);
+                println!(
+                    "  trust_highest_candidate_generation: {}",
+                    trust.highest_candidate_generation
+                );
+                println!("  trust_state_sha256: {}", trust.state_sha256);
+                println!(
+                    "  trust_active_signers: {}",
+                    trust.active_signer_ids.join(",")
+                );
+                println!(
+                    "  trust_revoked_signers: {}",
+                    trust.revoked_signer_ids.join(",")
+                );
+            }
             println!("  candidates: {}", resolved.provider.candidate_count);
             println!("  selected: {}", resolved.provider.selected_count);
             println!("  lock: {}", resolved.lock.path.display());

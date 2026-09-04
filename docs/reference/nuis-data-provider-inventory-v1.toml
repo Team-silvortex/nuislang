@@ -1,0 +1,60 @@
+protocol = "nuis-data-provider-inventory-v1"
+status = "cpu-memory-reference-executable"
+scope = "provider-neutral-data-fabric"
+
+[registration]
+manifest_field = "provider_capabilities"
+record_contract = "nuis-provider-capability-record-v1"
+manifest_contract = "nuis-provider-capability-manifest-v1"
+registry_contract = "nuis-provider-capability-registry-v1"
+selection_contract = "nuis-provider-capability-selection-v1"
+manifest_hash = "fnv1a64:d9930501cc045ea0"
+manifest_entry_count = 1
+ownership = "nustar-package"
+generation = "build-time-static"
+
+[record]
+package_id = "official.data"
+provider_id = "data.cpu-memory.reference.v1"
+bundle_id = "data.host.bundle.v1"
+provider_family = "data:host"
+priority = 100
+capabilities = [
+  "clock.fabric-monotonic",
+  "completion.verified",
+  "glm.owned-transfer",
+  "memory.cpu",
+  "movement.copy",
+  "residency.host",
+]
+
+[selection]
+ordering = "priority-desc-provider-id-asc"
+requirements_are_order_independent = true
+duplicate_requirements = "reject"
+unsupported_requirements = "reject"
+invalid_registry = "reject"
+explicit_requirements = [
+  "completion.verified",
+  "memory.cpu",
+  "movement.copy",
+]
+explicit_selection_hash = "fnv1a64:80daf599c694cf56"
+default_family_selection_hash = "fnv1a64:d0e7db5a3ab8fb6b"
+
+[execution]
+runner_adapter = "data.host.provider-worker-native"
+execution_contract = "nuis-provider-worker-native-execution-v1"
+reference_path = "cpu-memory"
+output = "hash-verified-provider-output"
+completion = "worker-output-verified"
+glm_release = "released-at-graph-close"
+clock = "nuis-provider-completion-clock-v1"
+
+[boundary]
+compiler_provider_branches = 0
+runtime_selector_provider_branches = 0
+physical_dpu_claimed = false
+physical_ipu_claimed = false
+physical_rdma_claimed = false
+next = "register one physical provider through the same open record and bundle contracts"

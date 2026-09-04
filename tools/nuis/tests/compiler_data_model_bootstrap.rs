@@ -88,6 +88,8 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
         "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_get_text",
         "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_get_source_span",
         "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_identity",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_forward_checked",
+        "@nuis_fn_StdCompilerPayloadRegistry.compiler_aggregate_arena_forward",
     ] {
         assert_file_contains(&llvm_path, symbol);
     }

@@ -109,7 +109,7 @@ pub(crate) fn print_help() {
     println!("    nuis galaxy init [project-dir] [--framework <name>]");
     println!("    nuis galaxy check [project-dir|galaxy.toml]");
     println!("    nuis galaxy doctor [project-dir|nuis.toml]");
-    println!("    nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]");
+    println!("    nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>] [--trust-registry <file> --trust-state <file>]");
     println!("    nuis galaxy lock-deps [project-dir|nuis.toml]");
     println!("    nuis galaxy verify-lock [project-dir|nuis.toml]");
     println!("    nuis galaxy sync-deps [project-dir|nuis.toml]");

@@ -223,6 +223,7 @@ pub(crate) fn append_provider_bundle_evidence(out: &mut String, provider_family:
     ));
     push(out, "provider_bundle_package_id", bundle.package_id);
     push(out, "provider_bundle_id", bundle.bundle_id);
+    crate::provider_capability_registry::append_provider_capability_evidence(out, provider_family);
 }
 
 #[cfg(unix)]

@@ -1,4 +1,8 @@
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
 
 use crate::registry::{
     domain_contract, manifest_path, NustarDomainRegistration, NustarPackageIndexEntry,
@@ -101,6 +105,9 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
     let mut seen_provider_families = BTreeSet::new();
     let mut seen_provider_adapter_kinds = BTreeSet::new();
     let mut seen_provider_rust_consts = BTreeSet::new();
+    let mut seen_provider_capability_ids = BTreeSet::new();
+    let mut provider_bundle_owners = BTreeMap::new();
+    let mut provider_capability_rows = Vec::new();
     let mut seen_code_asset_ids = BTreeSet::new();
     let mut seen_code_asset_paths = BTreeSet::new();
     let mut linker_manifests = Vec::new();
@@ -128,6 +135,14 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
         match crate::registry::provider_bundle_registrations(&manifest) {
             Ok(registrations) => {
                 for registration in registrations {
+                    provider_bundle_owners
+                        .entry(registration.bundle_id.clone())
+                        .or_insert_with(|| {
+                            (
+                                registration.package_id.clone(),
+                                registration.provider_family.clone(),
+                            )
+                        });
                     for (label, value, inserted) in [
                         (
                             "bundle id",
@@ -166,6 +181,33 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
             }
             Err(error) => issues.push(NustarRegistryIssue {
                 kind: NustarRegistryIssueKind::ProviderBundleContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: error,
+            }),
+        }
+        match crate::registry::provider_capability_registrations(&manifest) {
+            Ok(registrations) => {
+                for registration in registrations {
+                    if !seen_provider_capability_ids.insert(registration.provider_id.clone()) {
+                        issues.push(NustarRegistryIssue {
+                            kind: NustarRegistryIssueKind::ProviderCapabilityContractMismatch,
+                            package: Some(manifest.package_id.clone()),
+                            domain: Some(manifest.domain_family.clone()),
+                            manifest_path: Some(manifest_path.display().to_string()),
+                            message: format!(
+                                "provider capability id `{}` is duplicated across the registry",
+                                registration.provider_id
+                            ),
+                        });
+                    }
+                    provider_capability_rows
+                        .push((registration, manifest_path.display().to_string()));
+                }
+            }
+            Err(error) => issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::ProviderCapabilityContractMismatch,
                 package: Some(manifest.package_id.clone()),
                 domain: Some(manifest.domain_family.clone()),
                 manifest_path: Some(manifest_path.display().to_string()),
@@ -348,6 +390,27 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
             &manifest,
             &manifest_path,
         ));
+    }
+
+    for (registration, manifest_path) in provider_capability_rows {
+        let expected = provider_bundle_owners.get(&registration.bundle_id);
+        if expected
+            != Some(&(
+                registration.package_id.clone(),
+                registration.provider_family.clone(),
+            ))
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::ProviderCapabilityContractMismatch,
+                package: Some(registration.package_id.clone()),
+                domain: Some(registration.provider_family.clone()),
+                manifest_path: Some(manifest_path),
+                message: format!(
+                    "provider capability `{}` does not bind an owning bundle `{}` with family `{}`",
+                    registration.provider_id, registration.bundle_id, registration.provider_family
+                ),
+            });
+        }
     }
 
     if let Err(error) = crate::registry::linker_resolver_registrations(&linker_manifests) {

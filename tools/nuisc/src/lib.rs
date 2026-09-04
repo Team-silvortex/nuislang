@@ -136,6 +136,7 @@ mod registry_load;
 mod registry_manifest_parse;
 mod registry_project_check_render;
 mod registry_provider_bundle;
+mod registry_provider_capability;
 mod registry_scheduler_summary;
 mod registry_support_usage;
 mod registry_types;

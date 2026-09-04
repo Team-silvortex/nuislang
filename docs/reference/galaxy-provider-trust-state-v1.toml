@@ -1,0 +1,94 @@
+protocol = "nuis-galaxy-provider-trust-state-v1"
+status = "implemented"
+scope = "provider-neutral-candidate-set-signer-trust-and-monotonic-generation"
+
+[registry]
+protocol = "nuis-galaxy-provider-trust-registry-v1"
+encoding = "canonical-utf8-lf-toml-subset"
+location = "explicit-caller-owned-file-outside-provider-root"
+provider_identity = ["provider_id", "provider_kind"]
+generation = "nonzero-monotonic-u64"
+signer_statuses = ["active", "revoked"]
+signer_identity = "ed25519:sha256:<public-key-sha256>"
+minimum_active_signers = 1
+maximum_signers = 64
+maximum_bytes = 1048576
+
+[state]
+encoding = "canonical-utf8-lf-toml-subset"
+location = "explicit-caller-owned-file-outside-provider-root"
+permissions_unix = "owner-only"
+control_file_permissions_unix = "not-group-or-other-writable"
+control_parent_permissions_unix = "not-group-or-other-writable"
+path_fields = false
+self_identity = "sha256"
+self_identity_preimage = "canonical-state-with-empty-state_sha256-field"
+bound_fields = [
+  "provider_id",
+  "provider_kind",
+  "registry_generation",
+  "registry_sha256",
+  "highest_candidate_generation",
+  "candidate_response_sha256",
+  "ordered_active_and_revoked_signers",
+]
+
+[admission]
+candidate_protocol = "nuis-galaxy-candidate-set-v1"
+trusted_status = "verified-trusted-candidate-set"
+provider_resolution_status = "resolved-trusted-provider-closure"
+unanchored_status = "verified-signed-untrusted-exact-only"
+range_requires_trusted_status = true
+exact_without_policy_remains_supported = true
+all_candidate_signers_must_be_active = true
+unknown_signer_fails_closed = true
+revoked_signer_fails_closed = true
+
+[transition]
+order = [
+  "validate-provider-and-confined-input-paths",
+  "verify-index-and-canonical-candidate-identities",
+  "verify-every-ed25519-signature",
+  "parse-canonical-external-trust-registry",
+  "authorize-every-signer-and-reject-revocation",
+  "acquire-cross-process-state-lock",
+  "reject-registry-rollback-or-same-generation-fork",
+  "reject-candidate-rollback-or-same-generation-fork",
+  "write-and-sync-same-directory-temporary",
+  "atomically-rename-and-sync-parent",
+  "reread-and-verify-canonical-state",
+  "run-bounded-dependency-solver",
+]
+candidate_generation_advance = "strictly-greater-or-identical-replay"
+candidate_same_generation = "response-sha256-must-match"
+registry_generation_advance = "strictly-greater-or-identical-replay"
+registry_same_generation = "registry-sha256-must-match"
+stale_lock_recovery_ms = 30000
+
+[isolation]
+provider_may_not_contain_registry = true
+provider_may_not_contain_state = true
+registry_and_state_must_be_distinct = true
+symlink_control_files_rejected = true
+trust_paths_in_protocol = false
+trust_fields_in_resolution_lock = false
+trust_fields_in_addressed_cache = false
+equivalent_dependency_closure_bytes_unchanged = true
+
+[cli]
+command = "nuis galaxy resolve-deps <project> --provider-root <dir> --trust-registry <file> --trust-state <file>"
+paired_arguments = ["--trust-registry", "--trust-state"]
+
+[open_boundary]
+remote_discovery = false
+remote_download_transport = false
+registry_distribution = false
+os_protected_anchor_backend = false
+cache_garbage_collection = false
+
+[validation]
+commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuisc stdlib_registry_provider -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis galaxy::deps_provider_tests -j 1 -- --test-threads=1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis cli::galaxy_trust_tests -j 1 -- --test-threads=1",
+]

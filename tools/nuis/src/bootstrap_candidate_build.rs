@@ -4,28 +4,32 @@ use std::{
 };
 
 use nuis_artifact::{
-    build_compiler_candidate_production, build_compiler_diagnostic_report,
-    build_compiler_stage_handoff, build_compiler_stage_handoff_v2,
-    build_compiler_stage_semantic_differential, build_compiler_stage_transformations,
-    materialize_compiler_stage_transformation_payloads, parse_compiler_component_differential,
-    parse_compiler_component_representation_differential, promote_compiler_component_candidate,
-    read_compiler_candidate_execution, read_compiler_candidate_production,
+    build_compiler_candidate_production, build_compiler_candidate_structural_pagination,
+    build_compiler_diagnostic_report, build_compiler_stage_handoff,
+    build_compiler_stage_handoff_v2, build_compiler_stage_semantic_differential,
+    build_compiler_stage_transformations, materialize_compiler_stage_transformation_payloads,
+    parse_compiler_candidate_structural_pagination_result_bytes,
+    parse_compiler_component_differential, parse_compiler_component_representation_differential,
+    promote_compiler_component_candidate, read_compiler_candidate_execution,
+    read_compiler_candidate_production, read_compiler_candidate_structural_pagination,
     read_compiler_component_build, read_compiler_diagnostic_report, read_compiler_stage_handoff,
     read_compiler_stage_handoff_v2, read_compiler_stage_semantic_differential,
     read_compiler_stage_transformations, render_compiler_candidate_production,
-    render_compiler_component_build, render_compiler_diagnostic_report,
-    render_compiler_stage_handoff, render_compiler_stage_handoff_v2,
-    render_compiler_stage_semantic_differential, render_compiler_stage_transformations,
-    CompilerCandidateProductionInput, CompilerComponentCandidatePromotionInput,
+    render_compiler_candidate_structural_pagination, render_compiler_component_build,
+    render_compiler_diagnostic_report, render_compiler_stage_handoff,
+    render_compiler_stage_handoff_v2, render_compiler_stage_semantic_differential,
+    render_compiler_stage_transformations, CompilerCandidateProductionInput,
+    CompilerCandidateStructuralPaginationInput, CompilerComponentCandidatePromotionInput,
     CompilerDiagnosticReportInput, CompilerStageHandoffV2Input, CompilerStageKind,
     CompilerStagePayloadInput, CompilerStageSemanticDifferentialInput,
     CompilerStageTransformationRecordInput, CompilerStageTransformationsInput,
     COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_PRODUCTION_FILE,
-    COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
-    COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE, COMPILER_DIAGNOSTIC_REPORT_FILE,
-    COMPILER_STAGE_HANDOFF_V2_FILE, COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE,
-    COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT, COMPILER_STAGE_TRANSFORMATION_FILE,
-    COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_FILE,
+    COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_RESULT_FILE, COMPILER_COMPONENT_BUILD_FILE,
+    COMPILER_COMPONENT_DIFFERENTIAL_FILE, COMPILER_COMPONENT_REPRESENTATION_DIFFERENTIAL_FILE,
+    COMPILER_DIAGNOSTIC_REPORT_FILE, COMPILER_STAGE_HANDOFF_V2_FILE,
+    COMPILER_STAGE_SEMANTIC_DIFFERENTIAL_FILE, COMPILER_STAGE_STRUCTURED_RECORD_CONTRACT,
+    COMPILER_STAGE_TRANSFORMATION_FILE, COMPILER_STAGE_TRANSFORMATION_OUTPUT_ENCODING,
 };
 
 use crate::{
@@ -281,6 +285,60 @@ fn handle_bootstrap_candidate_build_with_cache(
         &verified_payloads,
     )
     .map_err(|error| format!("failed to verify candidate production proof: {error}"))?;
+    let pagination_result_path =
+        candidate_dir.join(COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_RESULT_FILE);
+    fs::write(
+        &pagination_result_path,
+        &adapter.structural_pagination.result_source,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write candidate structural pagination result `{}`: {error}",
+            pagination_result_path.display()
+        )
+    })?;
+    let pagination_result_source = fs::read(&pagination_result_path).map_err(|error| {
+        format!(
+            "failed to reread candidate structural pagination result `{}`: {error}",
+            pagination_result_path.display()
+        )
+    })?;
+    let pagination_result = parse_compiler_candidate_structural_pagination_result_bytes(
+        &pagination_result_source,
+        &pagination_result_path,
+    )
+    .map_err(|error| format!("failed to verify structural pagination result: {error}"))?;
+    if pagination_result != adapter.structural_pagination.result {
+        return Err(
+            "candidate structural pagination result changed after materialization".to_owned(),
+        );
+    }
+    let pagination_input = CompilerCandidateStructuralPaginationInput {
+        candidate: &verified_candidate,
+        production: &verified_production,
+        payloads: &verified_payloads,
+        adapter: &adapter.adapter,
+        result_source: &pagination_result_source,
+        result: &pagination_result,
+    };
+    let pagination = build_compiler_candidate_structural_pagination(&pagination_input)
+        .map_err(|error| format!("failed to attest structural pagination successor: {error}"))?;
+    let pagination_path = candidate_dir.join(COMPILER_CANDIDATE_STRUCTURAL_PAGINATION_FILE);
+    fs::write(
+        &pagination_path,
+        render_compiler_candidate_structural_pagination(&pagination),
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write structural pagination successor `{}`: {error}",
+            pagination_path.display()
+        )
+    })?;
+    let verified_pagination =
+        read_compiler_candidate_structural_pagination(&pagination_path, &pagination_input)
+            .map_err(|error| {
+                format!("failed to verify structural pagination successor: {error}")
+            })?;
 
     let report_path = output_dir.join(COMPILER_COMPONENT_DIFFERENTIAL_FILE);
     nuisc::run(nuisc::CommandKind::BootstrapDiff {
@@ -378,6 +436,16 @@ fn handle_bootstrap_candidate_build_with_cache(
         );
     }
     println!("  production_sha256: {}", verified_production.proof_sha256);
+    for projection in &verified_pagination.projections {
+        println!(
+            "  {}_third_page_identity: {}",
+            projection.kind, projection.third_page_identity
+        );
+    }
+    println!(
+        "  structural_pagination_sha256: {}",
+        verified_pagination.proof_sha256
+    );
     println!("  differential: {}", differential.verdict);
     println!("  replacement_authorized: false");
     println!(
@@ -385,6 +453,10 @@ fn handle_bootstrap_candidate_build_with_cache(
         candidate_dir.join(COMPILER_COMPONENT_BUILD_FILE).display()
     );
     println!("  production_record: {}", production_path.display());
+    println!(
+        "  structural_pagination_record: {}",
+        pagination_path.display()
+    );
     println!("  differential_record: {}", report_path.display());
     Ok(())
 }

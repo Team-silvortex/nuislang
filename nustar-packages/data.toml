@@ -30,6 +30,7 @@ support_profile_slots = ["bind_core", "window_offset", "uplink_len", "downlink_l
 capability_tags = ["fabric-plane", "packet-layout", "cross-domain-marker", "window-transfer", "handle-table"]
 default_lanes = ["data.bind_core=control", "data.handle_table=control", "data.marker=control", "data.immutable_window=uplink", "data.output_pipe=uplink", "data.copy_window=downlink", "data.input_pipe=downlink", "data.move=fabric"]
 provider_bundles = ["nuis-provider-bundle-manifest-entry-v1|data.host.bundle.v1|data:host|data.host.provider-worker-native|provider-worker-native-runner|provider_runner_native::PROVIDER_BUNDLE"]
+provider_capabilities = ["nuis-provider-capability-record-v1|data.cpu-memory.reference.v1|data.host.bundle.v1|data:host|100|clock.fabric-monotonic,completion.verified,glm.owned-transfer,memory.cpu,movement.copy,residency.host"]
 profiles = ["aot"]
 resource_families = ["cpu", "shader", "kernel", "network", "npu", "data"]
 unit_types = ["FabricPlane", "StagingPlane", "PipePlane", "DataWorker"]

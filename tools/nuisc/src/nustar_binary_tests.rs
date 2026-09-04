@@ -94,6 +94,7 @@ fn make_manifest(domain: &str) -> NustarPackageManifest {
         capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         provider_bundles: Vec::new(),
+        provider_capabilities: Vec::new(),
         code_assets: Vec::new(),
         clock_domain_id: format!("{domain}.clock.local.v1"),
         clock_kind: "local-monotonic".to_owned(),
@@ -138,6 +139,26 @@ fn binary_manifest_round_trip_preserves_provider_bundle_registrations() {
     let decoded = decode(&encoded, Path::new("provider-bundle-round-trip.nustar"))
         .expect("provider bundle binary");
     assert_eq!(decoded.manifest.provider_bundles, manifest.provider_bundles);
+}
+
+#[test]
+fn binary_manifest_round_trip_preserves_provider_capability_registrations() {
+    let mut manifest = make_manifest("data");
+    manifest.abi_capabilities = vec!["data.abi.v1:op:data.*".to_owned()];
+    manifest.provider_capabilities = vec![
+        "nuis-provider-capability-record-v1|data.cpu-memory.reference.v1|data.host.bundle.v1|data:host|100|memory.cpu,movement.copy"
+            .to_owned(),
+    ];
+    let binary = default_binary(manifest.clone(), vec![1, 2, 3]);
+    let decoded = decode(
+        &encode(&binary),
+        Path::new("provider-capability-round-trip.nustar"),
+    )
+    .expect("provider capability binary");
+    assert_eq!(
+        decoded.manifest.provider_capabilities,
+        manifest.provider_capabilities
+    );
 }
 
 #[test]

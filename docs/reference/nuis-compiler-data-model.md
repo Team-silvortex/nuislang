@@ -1,8 +1,10 @@
 # Nuis Compiler Data Model
 
-`nuis-compiler-data-model-v10` is the current compiler-owned data boundary
+`nuis-compiler-data-model-v11` is the current compiler-owned data boundary
 written in Nuis itself. Its machine-readable contract is
-[nuis-compiler-data-model-v10.toml](nuis-compiler-data-model-v10.toml). The
+[nuis-compiler-data-model-v11.toml](nuis-compiler-data-model-v11.toml). The
+chunked aggregate predecessor remains frozen in
+[nuis-compiler-data-model-v10.toml](nuis-compiler-data-model-v10.toml), and the
 registered aggregate predecessor remains frozen in
 [nuis-compiler-data-model-v9.toml](nuis-compiler-data-model-v9.toml). The
 paged typed-text predecessor remains frozen in
@@ -33,6 +35,23 @@ FFI, or host-language layouts.
 
 This is a bootstrap contract, not the final collection API for every Nuis
 program.
+
+## V11 Surface
+
+V11 closes the bounded complete-arena call boundary without widening subset v8:
+
+- `compiler_aggregate_arena_forward` captures the exact registry and complete
+  arena identities, then passes both owned aggregates through
+  `compiler_aggregate_arena_forward_checked` and revalidates them on return.
+- The native fixture forwards the complete three-object, 44-byte, three-page
+  v10 arena before projecting its chunked value. Stable indices, page bytes,
+  registry identity `1593840720`, and complete identity `551151124` remain
+  unchanged.
+- Forwarding that same arena with the valid but incomplete v9 registry fails
+  with code `3`. Re-reading the input under its correct registry produces the
+  unchanged identity, so failure remains atomic.
+- Both boundaries use ordinary Nuis owned-aggregate calls. No host collection,
+  pointer identity, FFI, new import, new data type, or scalar export is added.
 
 ## V10 Surface
 
@@ -322,15 +341,16 @@ pins open-record versus completed-record and partial structural-line boundaries.
 
 `StdCompilerProjection` consumes the first AST and NIR structural pages,
 serializes an opaque eight-lane scanner cursor, and resumes both into a second
-page over this foundation. It does not claim that the bounded v10 model parses a
+page over this foundation. It does not claim that the bounded v11 model parses a
 complete source file or stores an unbounded page sequence.
 
 ## Honest Boundary
 
-V10 proves owned token materialization, canonical re-emission, complete token
+V11 proves owned token materialization, canonical re-emission, complete token
 pagination, deterministic multi-page maps, bounded arena object storage, and
 registered typed text, source-span, and 24-byte chunked projection across
-logical payload pages,
+logical payload pages. It also proves that the complete registered arena and
+its registry survive two nested owned helper boundaries without identity drift,
 but it is not
 yet an unbounded compiler heap:
 
@@ -340,18 +360,17 @@ yet an unbounded compiler heap:
 - `CompilerVector` remains `i64`-specific and bounded to sixteen values.
 - `CompilerMap` remains `i64`-specific and bounded to sixteen entries.
 - `CompilerArena` remains a sixteen-object, four-`i64` envelope.
-- One `CompilerText` remains limited to sixteen bytes, while the v10 aggregate
+- One `CompilerText` remains limited to sixteen bytes, while the v11 aggregate
   payload column is bounded to 128 bytes across eight logical pages.
 - Registration is generic, but typed codecs currently cover only
   `CompilerText`, `CompilerSourceSpan`, and canonical chunked bytes.
-- Generic helper specialization still needs defining-module provenance.
-- Forwarding the complete aggregate arena through another nested helper remains
-  outside the current wide scalar-leaf lowering proof.
+- Generic helper specialization still needs defining-module provenance in the
+  general case; the concrete compiler arena path now preserves it explicitly.
 - Arbitrary aggregate loop-carried state remains a lowering gap; fixed chunks
   avoid pretending otherwise.
 
-The readiness gate is therefore not yet `stable/100`. The next data-model step
-is forwarding the complete registered aggregate through a nested helper,
-followed by broader structural paging without weakening
+The bounded self-hosting readiness gate is now `stable/100`; this is not an
+unbounded heap or replacement authorization. Future growth can add broader
+structural paging and aggregate loop backedges without weakening
 canonical UTF-8, stable indices, fail-closed errors, host-layout independence,
 or the frozen v8 import ceiling.

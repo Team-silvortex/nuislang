@@ -187,6 +187,7 @@ dependencies = [
  "nuis-runtime",
  "nuis-semantics",
  "nuisc",
+ "sha2",
 ]
 
 [[package]]
