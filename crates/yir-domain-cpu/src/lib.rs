@@ -13,6 +13,7 @@ mod describe_loops_control;
 mod describe_post_control;
 mod describe_scalar_memory;
 mod execute_host;
+mod execute_loops;
 mod execute_memory;
 mod execute_scalar;
 mod execute_tasks;
@@ -22,14 +23,19 @@ mod runtime_helpers;
 #[cfg(test)]
 mod tests_loop_describe;
 #[cfg(test)]
+mod tests_loop_effect_execution;
+#[cfg(test)]
 mod tests_mutex_lifecycle;
 #[cfg(test)]
 mod tests_owned_struct_layout;
+#[cfg(test)]
+mod tests_scalar_logic;
 
 use branch_effect::{execute_cpu_branch_effect_action, CPU_BRANCH_EFFECT_ACTIONS};
 use carry_payload::*;
 use describe::describe_cpu_node;
 use execute_host::execute_cpu_host_node;
+use execute_loops::{evaluate_i64_loop_final, render_loop_effect_action};
 use execute_memory::execute_cpu_memory_node;
 use execute_scalar::execute_cpu_scalar_node;
 use execute_tasks::execute_cpu_task_node;
@@ -122,6 +128,7 @@ impl RegisteredMod for CpuMod {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
+                let final_current = evaluate_i64_loop_final(node, state)?;
                 let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
                 let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
                 state.push_resource_event(
@@ -131,7 +138,7 @@ impl RegisteredMod for CpuMod {
                         node.resource, resource.kind.raw, initial, cmp, limit, step_kind, step
                     ),
                 );
-                Ok(Value::Unit)
+                Ok(Value::Int(final_current))
             }
             "loop_while_i64_chain" | "loop_while_scalar_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
@@ -626,14 +633,12 @@ impl RegisteredMod for CpuMod {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
-                let action_args = node.op.args[8..]
-                    .iter()
-                    .map(|name| state.expect_value(name).cloned())
-                    .collect::<Result<Vec<_>, _>>()?;
+                let final_current = evaluate_i64_loop_final(node, state)?;
+                let action = render_loop_effect_action(node, state, &initial)?;
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_effect @{} [{}]: {} {} {}, step {} {}, action {}.{}({:?})",
+                        "effect cpu.loop_while_i64_effect @{} [{}]: {} {} {}, step {} {}, action {}",
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -641,12 +646,10 @@ impl RegisteredMod for CpuMod {
                         limit,
                         node.op.args[4],
                         step,
-                        node.op.args[5],
-                        node.op.args[6],
-                        action_args
+                        action
                     ),
                 );
-                Ok(Value::Unit)
+                Ok(Value::Int(final_current))
             }
             "loop_while_i64_effect_flow" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();

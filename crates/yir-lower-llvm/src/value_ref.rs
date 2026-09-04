@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
 use super::{
-    fresh_reg, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, MutexPermitLlvmValueRef,
-    NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
+    fresh_reg, DomainResultLlvmValueRef, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
+    MutexPermitLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
     ThreadLlvmValueRef,
 };
+use yir_core::YirResultFamily;
 
 pub(crate) fn get_i64<'a>(
     registers: &'a BTreeMap<String, LlvmValueRef>,
@@ -68,14 +69,22 @@ pub(crate) fn get_struct<'a>(
     }
 }
 
-pub(crate) fn get_network_result<'a>(
+pub(crate) fn get_domain_result<'a>(
     registers: &'a BTreeMap<String, LlvmValueRef>,
     name: &str,
-) -> Option<&'a NetworkResultLlvmValueRef> {
+) -> Option<&'a DomainResultLlvmValueRef> {
     match registers.get(name) {
-        Some(LlvmValueRef::NetworkResult(result)) => Some(result),
+        Some(LlvmValueRef::DomainResult(result)) => Some(result),
         _ => None,
     }
+}
+
+pub(crate) fn get_domain_result_for_family<'a>(
+    registers: &'a BTreeMap<String, LlvmValueRef>,
+    name: &str,
+    family: YirResultFamily,
+) -> Option<&'a DomainResultLlvmValueRef> {
+    get_domain_result(registers, name).filter(|result| result.family == family)
 }
 
 pub(crate) fn get_task<'a>(

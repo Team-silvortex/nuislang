@@ -104,7 +104,7 @@ pub use nustar_provider::{
 use param_lowering::lower_cpu_param_node;
 use preclassified_lowering::{
     lower_cpu_aggregate_node, lower_cpu_literal_node, lower_cpu_pointer_node,
-    lower_network_observer_node,
+    lower_domain_result_observer_node,
 };
 use print_lowering::lower_cpu_print_node;
 use return_lowering::{lower_cpu_return_node, ReturnLoweringOutcome};
@@ -117,10 +117,10 @@ use static_lowering::lower_cpu_static_node;
 use topology::topological_order;
 pub(crate) use types::{
     CpuCallScalarKind, CpuHelperSignature, CpuLoopScalarKind, CpuOwnedExternalBufferAbi,
-    EmittedCpuFunction, LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
-    MutexPermitLlvmValueRef, MutexScalarKind, NetworkResultLlvmValueRef, StructLlvmValueRef,
-    TaskLlvmValueRef, TaskResultLlvmValueRef, TaskThunkArgument, ThreadLlvmValueRef,
-    VariantUnionLlvmValueRef,
+    DomainResultLlvmValueRef, EmittedCpuFunction, LlvmLoweringState, LlvmValueRef,
+    MutexGuardLlvmValueRef, MutexLlvmValueRef, MutexPermitLlvmValueRef, MutexScalarKind,
+    StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef, TaskThunkArgument,
+    ThreadLlvmValueRef, VariantUnionLlvmValueRef,
 };
 use value_ref::coerce_to_i64;
 pub fn emit_module(module: &YirModule) -> Result<String, String> {

@@ -18,8 +18,8 @@ The current top-level modules are:
 * [witsage](witsage/README.md)
   official classical ML Galaxy built on `core + std`
 * [ns-nova](ns-nova/README.md)
-  rendering/application framework layer and the first place where real checked-in
-  `.ns` source modules are already accumulating
+  real-time world-engine/application layer and the first place where real checked-in
+  `.ns` engine source modules are already accumulating
 
 ## Relationship
 
@@ -37,7 +37,7 @@ Read that as:
 * `std` should add practical systems helpers without hiding execution semantics
 * `pixelmagic` should hold image/resource contracts and shader-facing image prep on top of those lower layers
 * `witsage` should hold classical ML contracts and kernel-facing model plans on top of those lower layers
-* `ns-nova` should build a GPU-first application/rendering framework on top of those lower layers
+* `ns-nova` should build a GPU-first real-time world engine on top of those lower layers
 
 ## Current Reality
 
@@ -133,9 +133,9 @@ Asset view by layer:
   - see
     [stdlib/witsage/README.md](witsage/README.md)
 * `ns-nova`
-  - current future framework/source-asset layer
-  - currently important as an official GUI/rendering galaxy, but intentionally
-    behind AOT, `std`, PixelMagic, and WitSage hardening
+  - current real-time world-engine/source-asset layer
+  - the Nuis counterpart to Unreal Engine in architectural role, while remaining
+    independently designed and registry-composed
   - declared through
     [stdlib/ns-nova/module.toml](ns-nova/module.toml)
     with `11` checked-in source modules
@@ -157,8 +157,8 @@ Current asset types:
   dataset/statistics/model-plan/pipeline modules and future kernel-facing
   classical ML contracts
 * `ns-nova`
-  framework-oriented runtime/blueprint/recipe modules across `core`, `ui`, and
-  `scene`, still mostly contract/source-asset oriented
+  engine-oriented runtime/blueprint/recipe modules across `core`, `ui`, and
+  `scene`, now including a bounded native lifecycle loop and typed frame-result handle
 
 Current boundaries:
 
@@ -167,8 +167,8 @@ Current boundaries:
 * `std` is broadening quickly, but most surfaces are still explicitly host-backed
 * `pixelmagic` and `witsage` are the current official pressure tests for
   shader/kernel cooperation
-* `ns-nova` remains deliberately later-stage because it depends on the lower
-  AOT, library, shader, kernel, and future runtime layers
+* `ns-nova` remains deliberately later-stage because its continuous world loop
+  depends on the lower AOT, library, shader, kernel, and future runtime layers
 
 Current early-beta priority order:
 
@@ -177,8 +177,8 @@ Current early-beta priority order:
    useful for real CLI examples
 3. use PixelMagic to pressure registered shader execution and output carriers
 4. use WitSage to pressure registered kernel/model execution and fan-in carriers
-5. let `ns-nova` stay mostly contract/source-asset oriented until the lower
-   AOT and official Galaxy layers are less soft
+5. grow `ns-nova` through bounded executable slices without coupling it to any
+   one renderer, provider, window adapter, or host ABI
 
 ## Read In This Order
 

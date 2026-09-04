@@ -877,6 +877,10 @@ fn exposes_result_probe_states_for_state_helpers() {
     let data_moved = Operation::parse("data.is_moved", vec!["data_result".to_owned()]).unwrap();
     let network_closed =
         Operation::parse("network.is_closed", vec!["network_result".to_owned()]).unwrap();
+    let network_send_ready =
+        Operation::parse("network.is_send_ready", vec!["network_result".to_owned()]).unwrap();
+    let network_recv_ready =
+        Operation::parse("network.is_recv_ready", vec!["network_result".to_owned()]).unwrap();
 
     assert_eq!(
         task_completed.result_role(),
@@ -897,5 +901,13 @@ fn exposes_result_probe_states_for_state_helpers() {
     assert_eq!(
         network_closed.result_probe_state(),
         Some(YirResultState::Network(NetworkFlowState::Closed))
+    );
+    assert_eq!(
+        network_send_ready.result_role(),
+        Some(YirResultRole::StateProbe)
+    );
+    assert_eq!(
+        network_recv_ready.result_role(),
+        Some(YirResultRole::StateProbe)
     );
 }

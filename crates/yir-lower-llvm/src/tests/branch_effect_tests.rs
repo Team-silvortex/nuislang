@@ -179,3 +179,40 @@ fn owned_pointer_actions_drop_the_unselected_owner_and_merge_with_phi() {
     assert!(llvm.contains("phi ptr"));
     assert_eq!(llvm.matches("call void @free(ptr").count(), 3);
 }
+
+#[test]
+fn conditional_present_preserves_control_flow_at_the_host_adapter_boundary() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "ready", "cpu.const_bool", vec!["true"]);
+    push_cpu_const_i64(&mut module, "frame", "41");
+    push_cpu_node(
+        &mut module,
+        "conditional_present",
+        "cpu.branch_effect",
+        vec![
+            "ready",
+            "unit",
+            "1",
+            "cpu",
+            "present_frame",
+            "unit",
+            "1",
+            "value_read",
+            "frame",
+            "0",
+        ],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("ready", "conditional_present"),
+            ("frame", "conditional_present"),
+        ],
+    );
+
+    let llvm = emit_module(&module).expect("conditional present should lower");
+    assert!(llvm.contains("branch_effect_then"));
+    assert!(llvm.contains("branch_effect_else"));
+    assert!(llvm.contains("cpu.present_frame frame remains a host-adapter boundary"));
+    assert!(!llvm.contains("deferred lowering for cpu.branch_effect"));
+}

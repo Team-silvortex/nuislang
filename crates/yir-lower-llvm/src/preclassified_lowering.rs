@@ -1,11 +1,11 @@
-use yir_core::Node;
+use yir_core::{Node, YirResultFamily, YirResultRole};
 
 use super::{
     facts::propagate_known_facts,
     fresh_global, fresh_reg, llvm_c_string_bytes,
-    value_ref::{coerce_to_i64, get_network_result, get_struct},
+    value_ref::{coerce_to_i64, get_domain_result_for_family, get_struct},
     variant_select::{emit_variant_is_value, variant_field_value, variant_parent_name},
-    KnownFacts, LlvmLoweringState, LlvmValueRef, NetworkResultLlvmValueRef, StructLlvmValueRef,
+    DomainResultLlvmValueRef, KnownFacts, LlvmLoweringState, LlvmValueRef, StructLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -352,78 +352,98 @@ pub(crate) fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState)
     }
 }
 
-pub(crate) fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
-    match node.op.instruction.as_str() {
-        "observe" => {
-            let Some(value_ref) = state.registers.get(&node.op.args[0]).cloned() else {
+pub(crate) fn lower_domain_result_observer_node(
+    node: &Node,
+    state: &mut LlvmLoweringState,
+) -> bool {
+    let Some(family) = node.op.result_family() else {
+        return false;
+    };
+    if family == YirResultFamily::Task {
+        return false;
+    }
+
+    match node.op.result_role() {
+        Some(YirResultRole::Entry) if node.op.instruction == "observe" => {
+            let source_name = &node.op.args[0];
+            let value = state.registers.get(source_name).cloned().map(Box::new);
+            if value.is_none() {
                 state.body.push(format!(
-                    "  ; deferred lowering for network.observe `{}` because its input is outside the current CPU LLVM slice",
-                    node.name
+                    "  ; projected {family}.observe `{}` state `{}` into the CPU LLVM slice; payload `{source_name}` remains provider-owned",
+                    node.name, node.op.args[1]
                 ));
-                return true;
-            };
+            } else {
+                propagate_known_facts(source_name, &node.name, &mut state.facts);
+            }
             state.registers.insert(
                 node.name.clone(),
-                LlvmValueRef::NetworkResult(NetworkResultLlvmValueRef {
+                LlvmValueRef::DomainResult(DomainResultLlvmValueRef {
+                    family,
                     state: node.op.args[1].clone(),
-                    value: Box::new(value_ref),
+                    value,
                 }),
             );
-            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
-        "is_config_ready" | "is_send_ready" | "is_recv_ready" | "is_connect_ready"
-        | "is_accept_ready" | "is_closed" => {
-            let Some(result) = get_network_result(&state.registers, &node.op.args[0]) else {
+        Some(YirResultRole::StateProbe) => {
+            let result_name = &node.op.args[0];
+            let Some(result) =
+                get_domain_result_for_family(&state.registers, result_name, family).cloned()
+            else {
                 state.body.push(format!(
-                    "  ; deferred lowering for network.{} `{}` because its result is outside the current CPU LLVM slice",
-                    node.op.instruction, node.name
+                    "  ; deferred lowering for {} `{}` because its {family} result is outside the current CPU LLVM slice",
+                    node.op.full_name(), node.name
                 ));
                 return true;
             };
-            let wanted_state = match node.op.instruction.as_str() {
-                "is_config_ready" => "config_ready",
-                "is_send_ready" => "send_ready",
-                "is_recv_ready" => "recv_ready",
-                "is_connect_ready" => "connect_ready",
-                "is_accept_ready" => "accept_ready",
-                "is_closed" => "closed",
-                _ => unreachable!(),
+            let Some(wanted_state) = node.op.result_probe_state() else {
+                return false;
             };
-            let i1 = if result.state == wanted_state {
-                "true".to_owned()
-            } else {
-                "false".to_owned()
-            };
+            let ready = result.state == wanted_state.to_string();
+            let i1 = ready.to_string();
             let widened = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  ; projected {family} result state `{}` through {}",
+                result.state,
+                node.op.full_name()
+            ));
             state
                 .body
                 .push(format!("  {widened} = zext i1 {i1} to i64"));
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Bool {
-                    i1: i1.clone(),
+                    i1,
                     i64: widened.clone(),
                 },
             );
-            state.facts.record_bool(node.name.clone(), i1 == "true");
+            state.facts.record_bool(node.name.clone(), ready);
             state.last_cpu_value = Some(widened);
             true
         }
-        "value" => {
-            let Some(result) = get_network_result(&state.registers, &node.op.args[0]) else {
+        Some(YirResultRole::PayloadExtractor) => {
+            let result_name = &node.op.args[0];
+            let Some(result) =
+                get_domain_result_for_family(&state.registers, result_name, family).cloned()
+            else {
                 state.body.push(format!(
-                    "  ; deferred lowering for network.value `{}` because its result is outside the current CPU LLVM slice",
-                    node.name
+                    "  ; deferred lowering for {} `{}` because its {family} result is outside the current CPU LLVM slice",
+                    node.op.full_name(), node.name
                 ));
                 return true;
             };
-            let value_ref = (*result.value).clone();
+            let Some(value_ref) = result.value.map(|value| *value) else {
+                state.body.push(format!(
+                    "  ; deferred lowering for {} `{}` because its payload remains {family}-provider-owned",
+                    node.op.full_name(), node.name
+                ));
+                return true;
+            };
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
             }
-            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
+            propagate_known_facts(result_name, &node.name, &mut state.facts);
             true
         }
         _ => false,

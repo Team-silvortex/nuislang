@@ -111,6 +111,15 @@ fn cpu_registers_branch_action_result_and_access_contracts() {
         [yir_core::BranchEffectAccess::ResourceOwn]
     );
 
+    let present = registry
+        .branch_effect_action_capability("cpu", "present_frame")
+        .expect("registered present action");
+    assert_eq!(present.result, yir_core::BranchEffectResult::Unit);
+    assert_eq!(
+        present.operand_accesses,
+        [yir_core::BranchEffectAccess::ValueRead]
+    );
+
     let planned = registry
         .plan_branch_effect_action("cpu", "load_value", vec!["head".to_owned()])
         .expect("registry-backed branch action plan");
@@ -124,6 +133,65 @@ fn cpu_registers_branch_action_result_and_access_contracts() {
         .plan_branch_effect_action("cpu", "free", Vec::new())
         .unwrap_err()
         .contains("expects 1 operands, got 0"));
+}
+
+#[test]
+fn branch_effect_presents_a_frame_only_when_selected() {
+    let registry = branch_registry();
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "conditional_present",
+        "cpu.branch_effect",
+        vec![
+            "ready",
+            "unit",
+            "1",
+            "cpu",
+            "present_frame",
+            "unit",
+            "1",
+            "value_read",
+            "frame",
+            "0",
+        ],
+    );
+    let mut state = ExecutionState::default();
+    state.values.insert("ready".to_owned(), Value::Bool(true));
+    state.values.insert(
+        "frame".to_owned(),
+        Value::DataWindow(yir_core::DataWindow {
+            base: Box::new(Value::Frame(yir_core::FrameSurface {
+                width: 2,
+                height: 1,
+                rows: vec!["##".to_owned()],
+            })),
+            offset: 0,
+            len: 1,
+            immutable: true,
+        }),
+    );
+
+    assert_eq!(
+        registry
+            .execute_branch_effect_node(&node, &resource, &mut state)
+            .unwrap()
+            .unwrap(),
+        Value::Unit
+    );
+    assert!(
+        state
+            .events
+            .iter()
+            .any(|event| event.contains("effect cpu.present_frame")
+                && event.contains("frame[2x1] ##"))
+    );
+
+    state.events.clear();
+    state.values.insert("ready".to_owned(), Value::Bool(false));
+    registry
+        .execute_branch_effect_node(&node, &resource, &mut state)
+        .unwrap();
+    assert!(state.events.is_empty());
 }
 
 #[test]

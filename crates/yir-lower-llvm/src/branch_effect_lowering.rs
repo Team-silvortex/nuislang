@@ -137,6 +137,7 @@ pub fn default_branch_effect_llvm_emitters() -> BranchEffectLlvmEmitterRegistry 
 pub fn register_cpu_branch_effect_llvm_emitters(registry: &mut BranchEffectLlvmEmitterRegistry) {
     registry.register("cpu", "load_value", emit_cpu_load_value);
     registry.register("cpu", "free", emit_cpu_free);
+    registry.register("cpu", "present_frame", emit_cpu_present_frame);
     registry.register("cpu", "take_ptr_drop_other", emit_cpu_take_ptr_drop_other);
     registry.register(
         "cpu",
@@ -332,6 +333,23 @@ fn emit_cpu_free(
     }
     let pointer = context.pointer_operand(action, 0)?;
     context.push(format!("  call void @free(ptr {pointer})"));
+    Ok(BranchEffectLlvmValue::Unit)
+}
+
+fn emit_cpu_present_frame(
+    action: &BranchEffectAction<'_>,
+    _node: &Node,
+    context: &mut BranchEffectLlvmEmitContext<'_>,
+) -> Result<BranchEffectLlvmValue, String> {
+    if action.result != BranchEffectResult::Unit
+        || !matches!(action.operands.as_slice(), [operand] if operand.access == BranchEffectAccess::ValueRead)
+    {
+        return Err("cpu.present_frame branch action has an incompatible contract".to_owned());
+    }
+    context.push(format!(
+        "  ; cpu.present_frame {} remains a host-adapter boundary",
+        action.operands[0].value
+    ));
     Ok(BranchEffectLlvmValue::Unit)
 }
 

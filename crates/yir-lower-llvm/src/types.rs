@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use yir_core::YirResultFamily;
 
 use super::KnownFacts;
 
@@ -28,7 +29,7 @@ pub(crate) enum LlvmValueRef {
     Mutex(MutexLlvmValueRef),
     MutexPermit(MutexPermitLlvmValueRef),
     MutexGuard(MutexGuardLlvmValueRef),
-    NetworkResult(NetworkResultLlvmValueRef),
+    DomainResult(DomainResultLlvmValueRef),
     Struct(StructLlvmValueRef),
     VariantUnion(VariantUnionLlvmValueRef),
     Ptr(String),
@@ -78,9 +79,10 @@ pub(crate) struct VariantUnionLlvmValueRef {
     pub(crate) variants: BTreeMap<String, StructLlvmValueRef>,
 }
 #[derive(Clone)]
-pub(crate) struct NetworkResultLlvmValueRef {
+pub(crate) struct DomainResultLlvmValueRef {
+    pub(crate) family: YirResultFamily,
     pub(crate) state: String,
-    pub(crate) value: Box<LlvmValueRef>,
+    pub(crate) value: Option<Box<LlvmValueRef>>,
 }
 #[derive(Clone)]
 pub(crate) struct TaskLlvmValueRef {

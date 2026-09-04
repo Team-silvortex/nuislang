@@ -50,6 +50,22 @@ fn folds_known_i64_bitwise_for_lazy_const_select() {
 }
 
 #[test]
+fn preserves_bool_logic_for_lazy_const_select() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "lhs", "cpu.const_bool", vec!["true"]);
+    push_cpu_node(&mut module, "rhs", "cpu.const_bool", vec!["false"]);
+    push_cpu_node(&mut module, "enabled", "cpu.or", vec!["lhs", "rhs"]);
+    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
+    push_deps(&mut module, &[("lhs", "enabled"), ("rhs", "enabled")]);
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("or i1"));
+    assert!(llvm_ir.contains("zext i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
 fn does_not_fold_oversized_i64_shift_for_lazy_const_select() {
     let mut module = module_with_cpu0();
     for (name, value) in [("lhs", "1"), ("shift", "64"), ("expected", "0")] {

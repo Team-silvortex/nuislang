@@ -133,8 +133,9 @@ pub(crate) fn begin_loop_effect_action(
                 ));
                 Ok(LoopEffectCleanup::OwnedResult(result))
             } else {
+                let ignored_result = fresh_reg(next_reg);
                 body.push(format!(
-                    "  call {} @nuis_fn_{callee}({})",
+                    "  {ignored_result} = call {} @nuis_fn_{callee}({})",
                     cpu_scalar_kind_llvm_type(signature.ret),
                     lowered.join(", ")
                 ));

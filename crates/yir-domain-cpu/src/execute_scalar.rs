@@ -8,7 +8,10 @@ pub(crate) fn execute_cpu_scalar_node(
 ) -> Result<Option<Value>, String> {
     let value = match node.op.instruction.as_str() {
         "neg" => Ok(Value::Int(-state.expect_int(&node.op.args[0])?)),
-        "not" => Ok(Value::Int(!state.expect_int(&node.op.args[0])?)),
+        "not" => match state.expect_value(&node.op.args[0])? {
+            Value::Bool(value) => Ok(Value::Bool(!value)),
+            _ => Ok(Value::Int(!state.expect_int(&node.op.args[0])?)),
+        },
         "add" => {
             if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_int(&node.op.args[0]),
@@ -150,26 +153,25 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs == rhs) as i64))
+                Ok(Value::Bool(lhs == rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_i32(&node.op.args[0]),
                 state.expect_i32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs == rhs) as i64))
+                Ok(Value::Bool(lhs == rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs == rhs) as i64))
+                Ok(Value::Bool(lhs == rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f64(&node.op.args[0]),
                 state.expect_f64(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs == rhs) as i64))
+                Ok(Value::Bool(lhs == rhs))
             } else {
-                Ok(Value::Int(
-                    (state.expect_bool(&node.op.args[0])? == state.expect_bool(&node.op.args[1])?)
-                        as i64,
+                Ok(Value::Bool(
+                    state.expect_bool(&node.op.args[0])? == state.expect_bool(&node.op.args[1])?,
                 ))
             }
         }
@@ -187,26 +189,25 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs != rhs) as i64))
+                Ok(Value::Bool(lhs != rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_i32(&node.op.args[0]),
                 state.expect_i32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs != rhs) as i64))
+                Ok(Value::Bool(lhs != rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs != rhs) as i64))
+                Ok(Value::Bool(lhs != rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f64(&node.op.args[0]),
                 state.expect_f64(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs != rhs) as i64))
+                Ok(Value::Bool(lhs != rhs))
             } else {
-                Ok(Value::Int(
-                    (state.expect_bool(&node.op.args[0])? != state.expect_bool(&node.op.args[1])?)
-                        as i64,
+                Ok(Value::Bool(
+                    state.expect_bool(&node.op.args[0])? != state.expect_bool(&node.op.args[1])?,
                 ))
             }
         }
@@ -215,21 +216,20 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs < rhs) as i64))
+                Ok(Value::Bool(lhs < rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs < rhs) as i64))
+                Ok(Value::Bool(lhs < rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f64(&node.op.args[0]),
                 state.expect_f64(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs < rhs) as i64))
+                Ok(Value::Bool(lhs < rhs))
             } else {
-                Ok(Value::Int(
-                    (state.expect_i32(&node.op.args[0])? < state.expect_i32(&node.op.args[1])?)
-                        as i64,
+                Ok(Value::Bool(
+                    state.expect_i32(&node.op.args[0])? < state.expect_i32(&node.op.args[1])?,
                 ))
             }
         }
@@ -247,21 +247,20 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs > rhs) as i64))
+                Ok(Value::Bool(lhs > rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs > rhs) as i64))
+                Ok(Value::Bool(lhs > rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f64(&node.op.args[0]),
                 state.expect_f64(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs > rhs) as i64))
+                Ok(Value::Bool(lhs > rhs))
             } else {
-                Ok(Value::Int(
-                    (state.expect_i32(&node.op.args[0])? > state.expect_i32(&node.op.args[1])?)
-                        as i64,
+                Ok(Value::Bool(
+                    state.expect_i32(&node.op.args[0])? > state.expect_i32(&node.op.args[1])?,
                 ))
             }
         }
@@ -279,21 +278,20 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs <= rhs) as i64))
+                Ok(Value::Bool(lhs <= rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs <= rhs) as i64))
+                Ok(Value::Bool(lhs <= rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f64(&node.op.args[0]),
                 state.expect_f64(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs <= rhs) as i64))
+                Ok(Value::Bool(lhs <= rhs))
             } else {
-                Ok(Value::Int(
-                    (state.expect_i32(&node.op.args[0])? <= state.expect_i32(&node.op.args[1])?)
-                        as i64,
+                Ok(Value::Bool(
+                    state.expect_i32(&node.op.args[0])? <= state.expect_i32(&node.op.args[1])?,
                 ))
             }
         }
@@ -302,33 +300,50 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs >= rhs) as i64))
+                Ok(Value::Bool(lhs >= rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs >= rhs) as i64))
+                Ok(Value::Bool(lhs >= rhs))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f64(&node.op.args[0]),
                 state.expect_f64(&node.op.args[1]),
             ) {
-                Ok(Value::Int((lhs >= rhs) as i64))
+                Ok(Value::Bool(lhs >= rhs))
             } else {
-                Ok(Value::Int(
-                    (state.expect_i32(&node.op.args[0])? >= state.expect_i32(&node.op.args[1])?)
-                        as i64,
+                Ok(Value::Bool(
+                    state.expect_i32(&node.op.args[0])? >= state.expect_i32(&node.op.args[1])?,
                 ))
             }
         }
-        "and" => Ok(Value::Int(
-            state.expect_int(&node.op.args[0])? & state.expect_int(&node.op.args[1])?,
-        )),
-        "or" => Ok(Value::Int(
-            state.expect_int(&node.op.args[0])? | state.expect_int(&node.op.args[1])?,
-        )),
-        "xor" => Ok(Value::Int(
-            state.expect_int(&node.op.args[0])? ^ state.expect_int(&node.op.args[1])?,
-        )),
+        "and" => match (
+            state.expect_value(&node.op.args[0])?,
+            state.expect_value(&node.op.args[1])?,
+        ) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs && *rhs)),
+            _ => Ok(Value::Int(
+                state.expect_int(&node.op.args[0])? & state.expect_int(&node.op.args[1])?,
+            )),
+        },
+        "or" => match (
+            state.expect_value(&node.op.args[0])?,
+            state.expect_value(&node.op.args[1])?,
+        ) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs || *rhs)),
+            _ => Ok(Value::Int(
+                state.expect_int(&node.op.args[0])? | state.expect_int(&node.op.args[1])?,
+            )),
+        },
+        "xor" => match (
+            state.expect_value(&node.op.args[0])?,
+            state.expect_value(&node.op.args[1])?,
+        ) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs ^ *rhs)),
+            _ => Ok(Value::Int(
+                state.expect_int(&node.op.args[0])? ^ state.expect_int(&node.op.args[1])?,
+            )),
+        },
         "shl" => {
             let lhs = state.expect_int(&node.op.args[0])?;
             let rhs = state.expect_int(&node.op.args[1])?;

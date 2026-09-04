@@ -62,7 +62,13 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 body.push(format!("  {cmp} = icmp slt i64 {lhs}, {rhs}"));
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: reg.clone(),
+                    },
+                );
                 record_known_i64_comparison(node, facts, |lhs, rhs| lhs < rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
@@ -202,7 +208,13 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 body.push(format!("  {cmp} = icmp sgt i64 {lhs}, {rhs}"));
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: reg.clone(),
+                    },
+                );
                 record_known_i64_comparison(node, facts, |lhs, rhs| lhs > rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
@@ -342,7 +354,13 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 body.push(format!("  {cmp} = icmp sle i64 {lhs}, {rhs}"));
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: reg.clone(),
+                    },
+                );
                 record_known_i64_comparison(node, facts, |lhs, rhs| lhs <= rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
@@ -410,7 +428,13 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 body.push(format!("  {cmp} = icmp sge i64 {lhs}, {rhs}"));
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: reg.clone(),
+                    },
+                );
                 record_known_i64_comparison(node, facts, |lhs, rhs| lhs >= rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (

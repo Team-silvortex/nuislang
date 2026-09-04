@@ -470,8 +470,8 @@ The `beta-0.1` calibration baseline is:
   blocks stale admission before mutation. `official.cffi` now owns two generated GNU resolver providers and four version rows; Nuisc validates and preserves them, Nsld consumes a static build-time table, and runtime registry identity remains `0xc6631e590d61aca8`. Architecture and PE/COFF parity remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `usable/74`, optional;
   reference replay is bound while physical certification and adapters remain open
-* `standard-library/ns-nova/application-rendering-framework`: `active/38`, optional;
-  owned app/frame transitions plus a relocatable framework package and host-adaptive AOT showcase work; the loop remains open
+* `standard-library/ns-nova/application-rendering-framework`: `active/54`, optional;
+  owned transitions, bounded native loop, typed result handles, conditional presentation, and provider-neutral state projection work; loop-carried app state and provider-issued completion remain open
 
 These scores describe the new beta slices only. Existing `stable/100` cells
 remain evidence that their narrower protocol milestone closed; they are not a

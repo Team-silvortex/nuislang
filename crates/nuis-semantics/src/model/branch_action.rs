@@ -12,6 +12,7 @@ impl NirExpr {
         let (module, instruction, operands) = match self {
             Self::LoadValue(pointer) => ("cpu", "load_value", vec![pointer.as_ref()]),
             Self::Free(pointer) => ("cpu", "free", vec![pointer.as_ref()]),
+            Self::CpuPresentFrame(frame) => ("cpu", "present_frame", vec![frame.as_ref()]),
             _ => return None,
         };
         Some(NirBranchEffectAction {
@@ -33,5 +34,16 @@ mod tests {
         assert_eq!((action.module, action.instruction), ("cpu", "load_value"));
         assert!(matches!(action.operands.as_slice(), [NirExpr::Var(name)] if name == "head"));
         assert!(NirExpr::Int(1).branch_effect_action().is_none());
+    }
+
+    #[test]
+    fn exposes_present_frame_as_a_registered_branch_action() {
+        let expr = NirExpr::CpuPresentFrame(Box::new(NirExpr::Var("frame".to_owned())));
+        let action = expr.branch_effect_action().expect("present branch action");
+        assert_eq!(
+            (action.module, action.instruction),
+            ("cpu", "present_frame")
+        );
+        assert!(matches!(action.operands.as_slice(), [NirExpr::Var(name)] if name == "frame"));
     }
 }

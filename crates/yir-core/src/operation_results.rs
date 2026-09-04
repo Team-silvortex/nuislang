@@ -26,6 +26,8 @@ impl Operation {
             | SemanticOp::NetworkAccept
             | SemanticOp::NetworkClose
             | SemanticOp::NetworkIsConfigReady
+            | SemanticOp::NetworkIsSendReady
+            | SemanticOp::NetworkIsRecvReady
             | SemanticOp::NetworkIsConnectReady
             | SemanticOp::NetworkIsAcceptReady
             | SemanticOp::NetworkIsClosed
@@ -55,6 +57,8 @@ impl Operation {
             | SemanticOp::ShaderIsFrameReady
             | SemanticOp::KernelIsConfigReady
             | SemanticOp::NetworkIsConfigReady
+            | SemanticOp::NetworkIsSendReady
+            | SemanticOp::NetworkIsRecvReady
             | SemanticOp::NetworkIsConnectReady
             | SemanticOp::NetworkIsAcceptReady
             | SemanticOp::NetworkIsClosed => Some(YirResultRole::StateProbe),

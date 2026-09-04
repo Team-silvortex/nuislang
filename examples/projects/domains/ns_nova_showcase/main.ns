@@ -40,15 +40,12 @@ mod cpu Main {
     );
   }
 
-  fn main() {
-    cpu_bind_core(0);
-    cpu_window(640, 400, "NS Nova Showcase");
-
+  fn render_showcase_frame(frame_index: i64) -> i64 {
     let opened: NovaAppState = NovaAppRuntime.open(640, 400, 60, 0);
     let frame: NovaFrameTransaction =
       NovaAppRuntime.begin_frame(opened, cpu_tick_i64(0, 1));
     let packet: PixelMagicRenderSurfacePacket =
-      lower_showcase_packet(4101 + frame.frame_index, 160, 120, frame.frame_index);
+      lower_showcase_packet(4101 + frame_index, 160, 120, frame_index);
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
@@ -57,16 +54,35 @@ mod cpu Main {
       shader_result(shader_profile_render("PixelMagicRenderSurface", gpu_packet));
     let render_ready: bool = shader_frame_ready(render_result);
     let render_ready_flag: i64 = if render_ready { 1 } else { 0 };
+    let completion: NovaFrameResultHandle = NovaAppRuntime.capture_frame_result(
+      frame,
+      render_ready_flag,
+      cpu_tick_i64(0, 1)
+    );
     let host_frame: HostFrameWindow =
       data_profile_send_downlink("FabricPlane", shader_value(render_result));
     let submitted: NovaFrameTransaction =
-      NovaAppRuntime.submit_frame(frame, render_ready_flag);
+      NovaAppRuntime.submit_frame(frame, completion);
 
-    print(submitted.present_requested);
-    cpu_present_frame(host_frame);
+    if submitted.present_requested == 1 {
+      cpu_present_frame(host_frame);
+    }
     let committed: NovaAppState = NovaAppRuntime.commit_frame(submitted);
+    return committed.presented_frames;
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+    cpu_window(640, 400, "NS Nova Showcase");
+
+    let opened: NovaAppState = NovaAppRuntime.open(640, 400, 60, 0);
+    let frame_index: i64 = 0;
+    while frame_index < 3 {
+      render_showcase_frame(frame_index);
+      let frame_index: i64 = frame_index + 1;
+    }
     let closed: NovaAppState =
-      NovaAppRuntime.close(committed, cpu_tick_i64(1, 1));
-    print(NovaAppRuntime.summary(closed));
+      NovaAppRuntime.close(opened, cpu_tick_i64(0, 1));
+    print(NovaAppRuntime.summary(closed) + frame_index);
   }
 }

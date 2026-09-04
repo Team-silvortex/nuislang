@@ -22,7 +22,17 @@ mod cpu NovaAppRuntime {
     pub presented_frames: i64,
     pub dropped_frames: i64,
     pub render_ready: i64,
-    pub present_requested: i64
+    pub present_requested: i64,
+    pub completion_token: i64,
+    pub completion_tick: i64
+  }
+
+  pub struct NovaFrameResultHandle {
+    pub token: i64,
+    pub frame_index: i64,
+    pub completion_tick: i64,
+    pub provider_ready: i64,
+    pub consumed: i64
   }
 
   pub fn status_running() -> i64 {
@@ -94,15 +104,52 @@ mod cpu NovaAppRuntime {
       presented_frames: state.presented_frames,
       dropped_frames: state.dropped_frames,
       render_ready: 0,
-      present_requested: 0
+      present_requested: 0,
+      completion_token: 0,
+      completion_tick: observed_tick
     };
+  }
+
+  pub fn capture_frame_result(
+    frame: NovaFrameTransaction,
+    provider_ready: i64,
+    completion_tick: i64
+  ) -> NovaFrameResultHandle {
+    let completed: bool =
+      frame.phase == phase_begun() &&
+      provider_ready == 1 &&
+      completion_tick >= frame.begin_tick;
+    let token: i64 = if completed {
+      completion_tick + frame.frame_index + 1
+    } else {
+      0
+    };
+    return NovaFrameResultHandle {
+      token: token,
+      frame_index: frame.frame_index,
+      completion_tick: completion_tick,
+      provider_ready: provider_ready,
+      consumed: 0
+    };
+  }
+
+  pub fn frame_result_ready(
+    frame: NovaFrameTransaction,
+    result: NovaFrameResultHandle
+  ) -> bool {
+    return
+      result.token > 0 &&
+      result.frame_index == frame.frame_index &&
+      result.completion_tick >= frame.begin_tick &&
+      result.provider_ready == 1 &&
+      result.consumed == 0;
   }
 
   pub fn submit_frame(
     frame: NovaFrameTransaction,
-    render_ready: i64
+    result: NovaFrameResultHandle
   ) -> NovaFrameTransaction {
-    let accepted: bool = frame.phase == phase_begun() && render_ready == 1;
+    let accepted: bool = frame_result_ready(frame, result);
     return NovaFrameTransaction {
       phase: if accepted { phase_submitted() } else { phase_rejected() },
       width: frame.width,
@@ -113,8 +160,10 @@ mod cpu NovaAppRuntime {
       deadline_tick: frame.deadline_tick,
       presented_frames: frame.presented_frames,
       dropped_frames: frame.dropped_frames,
-      render_ready: render_ready,
-      present_requested: if accepted { 1 } else { 0 }
+      render_ready: result.provider_ready,
+      present_requested: if accepted { 1 } else { 0 },
+      completion_token: if accepted { result.token } else { 0 },
+      completion_tick: result.completion_tick
     };
   }
 
@@ -122,7 +171,8 @@ mod cpu NovaAppRuntime {
     let presented: bool =
       frame.phase == phase_submitted() &&
       frame.present_requested == 1 &&
-      frame.render_ready == 1;
+      frame.render_ready == 1 &&
+      frame.completion_token > 0;
     return NovaAppState {
       status: status_running(),
       width: frame.width,

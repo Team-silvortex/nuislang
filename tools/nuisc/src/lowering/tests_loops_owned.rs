@@ -128,7 +128,7 @@ fn lowers_scoped_helper_with_inner_owned_loop_into_outer_loop_call() {
     assert!(
         llvm_ir.contains("define i64 @nuis_fn_scoped_work(ptr %arg0, i64 %arg0_len, i64 %arg1)")
     );
-    assert!(llvm_ir.contains("call i64 @nuis_fn_scoped_work(ptr %"));
+    assert!(llvm_ir.contains(" = call i64 @nuis_fn_scoped_work(ptr %"));
     assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_blob_copy_v1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.loop_while_i64_effect"));
 }

@@ -91,6 +91,30 @@ impl fmt::Display for TaskLifecycleState {
     }
 }
 
+impl fmt::Display for YirResultFamily {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Task => f.write_str("task"),
+            Self::Data => f.write_str("data"),
+            Self::Shader => f.write_str("shader"),
+            Self::Kernel => f.write_str("kernel"),
+            Self::Network => f.write_str("network"),
+        }
+    }
+}
+
+impl fmt::Display for YirResultState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Task(state) => write!(f, "{state}"),
+            Self::Data(state) => write!(f, "{state}"),
+            Self::Shader(state) => write!(f, "{state}"),
+            Self::Kernel(state) => write!(f, "{state}"),
+            Self::Network(state) => write!(f, "{state}"),
+        }
+    }
+}
+
 impl Value {
     pub fn result_family(&self) -> Option<YirResultFamily> {
         match self {

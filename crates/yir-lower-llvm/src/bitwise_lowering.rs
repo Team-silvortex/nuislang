@@ -2,7 +2,11 @@ use std::collections::BTreeMap;
 
 use yir_core::Node;
 
-use super::{fresh_reg, value_ref::get_i64, KnownFacts, LlvmValueRef};
+use super::{
+    fresh_reg,
+    value_ref::{get_bool, get_i64},
+    KnownFacts, LlvmValueRef,
+};
 
 pub(crate) fn lower_cpu_bitwise_node(
     node: &Node,
@@ -17,6 +21,22 @@ pub(crate) fn lower_cpu_bitwise_node(
     }
 
     if node.op.instruction == "not" {
+        if let Some(input) = get_bool(registers, &node.op.args[0]) {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = xor i1 {input}, true"));
+            let packed = fresh_reg(next_reg);
+            body.push(format!("  {packed} = zext i1 {reg} to i64"));
+            registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Bool {
+                    i1: reg,
+                    i64: packed.clone(),
+                },
+            );
+            record_known_bool_not(node, facts);
+            *last_cpu_value = Some(packed);
+            return Ok(true);
+        }
         let Some(input) = get_i64(registers, &node.op.args[0]) else {
             body.push(format!(
                 "  ; deferred lowering for cpu.not `{}` because its input is outside the current CPU LLVM slice",
@@ -41,6 +61,28 @@ pub(crate) fn lower_cpu_bitwise_node(
         _ => return Ok(false),
     };
 
+    if matches!(node.op.instruction.as_str(), "and" | "or" | "xor") {
+        if let (Some(lhs), Some(rhs)) = (
+            get_bool(registers, &node.op.args[0]),
+            get_bool(registers, &node.op.args[1]),
+        ) {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = {llvm_op} i1 {lhs}, {rhs}"));
+            let packed = fresh_reg(next_reg);
+            body.push(format!("  {packed} = zext i1 {reg} to i64"));
+            registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Bool {
+                    i1: reg,
+                    i64: packed.clone(),
+                },
+            );
+            record_known_bool_bitwise(node, facts);
+            *last_cpu_value = Some(packed);
+            return Ok(true);
+        }
+    }
+
     let (Some(lhs), Some(rhs)) = (
         get_i64(registers, &node.op.args[0]),
         get_i64(registers, &node.op.args[1]),
@@ -57,6 +99,28 @@ pub(crate) fn lower_cpu_bitwise_node(
     record_known_i64_bitwise(node, facts);
     *last_cpu_value = Some(reg);
     Ok(true)
+}
+
+fn record_known_bool_not(node: &Node, facts: &mut KnownFacts) {
+    if let Some(input) = facts.get_bool(&node.op.args[0]) {
+        facts.record_bool(node.name.clone(), !input);
+    }
+}
+
+fn record_known_bool_bitwise(node: &Node, facts: &mut KnownFacts) {
+    let (Some(lhs), Some(rhs)) = (
+        facts.get_bool(&node.op.args[0]),
+        facts.get_bool(&node.op.args[1]),
+    ) else {
+        return;
+    };
+    let value = match node.op.instruction.as_str() {
+        "and" => lhs && rhs,
+        "or" => lhs || rhs,
+        "xor" => lhs ^ rhs,
+        _ => return,
+    };
+    facts.record_bool(node.name.clone(), value);
 }
 
 fn record_known_i64_not(node: &Node, facts: &mut KnownFacts) {

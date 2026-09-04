@@ -2,14 +2,17 @@
 
 `ns-nova` is the third major standard-library module of `nuis`.
 
-Its role is similar to what `Flutter` means to `Dart`, but for the `nuis` execution model:
-it should turn heterogeneous execution, data-plane orchestration, and inline shader capability
-into a native GPU-first application and rendering framework.
+Its ecosystem role is the Nuis counterpart to Unreal Engine: a native real-time
+world engine that turns heterogeneous execution, data-plane orchestration, and
+inline shader capability into applications, simulations, spatial interfaces,
+and games. This describes its architectural role, not API or asset compatibility
+with Unreal Engine.
 
 Target character:
 
-* native GPU cross-platform 2D/3D rendering framework
-* engine-style driver/runtime surface rather than only a widget kit
+* native GPU cross-platform 2D/3D real-time world engine
+* world loop, scene, rendering, input, audio, physics, and resource orchestration
+  rather than only a widget kit
 * built on `nuis` domain composition:
   `cpu` for orchestration,
   `data` for exchange,
@@ -43,6 +46,10 @@ Current state:
 * this repository now treats `ns-nova` as a standard-library/framework layer target, not as a separate future repository by default
 * `lib/app_runtime.ns` now owns the first reusable application and frame lifecycle in Nuis source
 * `examples/projects/domains/ns_nova_showcase` composes that lifecycle with PixelMagic, Data, and Shader as separate Galaxy/Nustar owners
+* lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
+* Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
+* the showcase owns a bounded three-frame loop in Nuis source and passes each
+  frame through `NovaFrameResultHandle` before submission and conditional presentation
 * the showcase now carries checked `galaxy.toml` and `ns-nova.toml` manifests whose package inputs are project-owned relative paths; Galaxy dependencies remain registry-resolved rather than embedded as host paths
 * `nuis galaxy init --framework ns-nova` now emits an `ns-nova.toml` profile that carries framework-level assembly metadata, including the standard `ns-nova-selection-v1` selection contract for relational controls such as `list`, `table`, `tree`, `inspector`, and `outline`
 * `ns-nova.toml` now also carries `ns-nova-family-v1` and `ns-nova-render-v1` scaffolding so projects can declare whether they currently lean toward `core`, `ui`, or future `scene` layers
@@ -91,9 +98,11 @@ First source modules:
 
 Current limitation:
 
-* the first lifecycle is a one-frame prototype, not a stable interactive event loop
-* conditional `cpu_present_frame` branches are not yet lowered, so the reference
-  slice records readiness and uses the existing unconditional host presentation path
+* the current lifecycle is a bounded three-frame validation loop, not a stable
+  interactive world loop; aggregate `NovaAppState` is not yet carried between iterations
+* conditional `cpu_present_frame` now consumes the Shader-derived
+  `submitted.present_requested` predicate through a runtime-owned result handle;
+  the token is not yet issued by a live Shader/Data provider completion bridge
 * the framework does not yet own a renderer; PixelMagic remains an independent
   project-level composition dependency in the showcase
 * the current checked AOT window shell is the replaceable Apple bootstrap adapter;
@@ -111,6 +120,8 @@ The current shortest route is:
 It proves:
 
 * explicit import of the reusable Nova lifecycle
+* a bounded Nuis-owned update loop lowered to native LLVM control flow
+* typed frame-result capture, validation, submission, and conditional presentation
 * independent PixelMagic shader ownership
 * registered Data transfer through `FabricPlane`
 * automatic CPU, Data, and Shader ABI recommendation

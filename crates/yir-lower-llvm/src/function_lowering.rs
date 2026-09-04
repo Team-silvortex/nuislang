@@ -112,7 +112,7 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
-        if resource.kind.is_family("network") && lower_network_observer_node(node, &mut state) {
+        if lower_domain_result_observer_node(node, &mut state) {
             continue;
         }
 

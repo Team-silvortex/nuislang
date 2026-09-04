@@ -1,4 +1,6 @@
 use super::support::*;
+use crate::{lower_domain_result_observer_node, KnownFacts, LlvmLoweringState, LlvmValueRef};
+use yir_core::YirResultFamily;
 
 #[test]
 fn folds_known_variant_is_for_lazy_const_select() {
@@ -130,6 +132,96 @@ fn folds_known_network_state_for_lazy_const_select() {
     assert!(!llvm_ir.contains("select i1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
     assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
+fn projects_domain_result_states_without_forging_provider_payloads() {
+    for (family, observe, probe, value, state_name) in [
+        (
+            YirResultFamily::Data,
+            "data.observe",
+            "data.is_windowed",
+            "data.value",
+            "windowed",
+        ),
+        (
+            YirResultFamily::Shader,
+            "shader.observe",
+            "shader.is_frame_ready",
+            "shader.value",
+            "frame_ready",
+        ),
+        (
+            YirResultFamily::Kernel,
+            "kernel.observe",
+            "kernel.is_config_ready",
+            "kernel.value",
+            "config_ready",
+        ),
+        (
+            YirResultFamily::Network,
+            "network.observe",
+            "network.is_send_ready",
+            "network.value",
+            "send_ready",
+        ),
+    ] {
+        let mut state = empty_lowering_state();
+        let observed_result = result_node("result", observe, vec!["provider_value", state_name]);
+        assert!(lower_domain_result_observer_node(
+            &observed_result,
+            &mut state
+        ));
+        let Some(LlvmValueRef::DomainResult(result)) = state.registers.get("result") else {
+            panic!("{family} observer should produce a domain result handle");
+        };
+        assert_eq!(result.family, family);
+        assert_eq!(result.state, state_name);
+        assert!(result.value.is_none());
+
+        let probe_node = result_node("ready", probe, vec!["result"]);
+        assert!(lower_domain_result_observer_node(&probe_node, &mut state));
+        assert!(matches!(
+            state.registers.get("ready"),
+            Some(LlvmValueRef::Bool { i1, .. }) if i1 == "true"
+        ));
+
+        let value_node = result_node("payload", value, vec!["result"]);
+        assert!(lower_domain_result_observer_node(&value_node, &mut state));
+        assert!(!state.registers.contains_key("payload"));
+        assert!(state
+            .body
+            .iter()
+            .any(|line| line.contains("payload remains") && line.contains("provider-owned")));
+    }
+}
+
+fn result_node(name: &str, operation: &str, args: Vec<&str>) -> Node {
+    Node {
+        name: name.to_owned(),
+        resource: "domain0".to_owned(),
+        op: Operation::parse(
+            operation,
+            args.into_iter().map(str::to_owned).collect::<Vec<_>>(),
+        )
+        .unwrap(),
+    }
+}
+
+fn empty_lowering_state() -> LlvmLoweringState {
+    LlvmLoweringState {
+        body: Vec::new(),
+        globals: Vec::new(),
+        registers: BTreeMap::new(),
+        delayed_registers: BTreeMap::new(),
+        facts: KnownFacts::new(),
+        buffer_lengths: BTreeMap::new(),
+        next_reg: 0,
+        next_global: 0,
+        next_block: 0,
+        last_cpu_value: None,
+        ends_with_terminal_return: false,
+    }
 }
 
 #[test]
