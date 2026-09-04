@@ -36,13 +36,30 @@ use execute_effects::execute_shader_effect_node;
 use flow_state::parse_shader_flow_state;
 use parse_ball_packet::parse_ball_packet;
 use render_pass::draw_render_pass_surface;
-use yir_core::{ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, Value};
+use yir_core::{
+    ExecutionState, InstructionSemantics, Node, ProviderCompletionRegistration, RegisteredMod,
+    Resource, Value, YirResultFamily,
+};
 
 pub struct ShaderMod;
 
 impl RegisteredMod for ShaderMod {
     fn module_name(&self) -> &'static str {
         "shader"
+    }
+
+    fn provider_completion_registration(
+        &self,
+        node: &Node,
+    ) -> Option<ProviderCompletionRegistration> {
+        matches!(
+            node.op.instruction.as_str(),
+            "begin_pass" | "draw_instanced"
+        )
+        .then_some(ProviderCompletionRegistration::new(
+            YirResultFamily::Shader,
+            "shader.clock.frame.v1",
+        ))
     }
 
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {

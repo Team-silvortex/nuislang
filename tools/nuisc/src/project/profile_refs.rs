@@ -126,6 +126,7 @@ pub(super) fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(),
 }
 
 pub(super) fn stitch_shader_profile_edges(module: &mut YirModule) {
+    bind_shader_profile_modules(module);
     let pass_kind_nodes = module
         .nodes
         .iter()
@@ -168,6 +169,36 @@ pub(super) fn stitch_shader_profile_edges(module: &mut YirModule) {
                 draw,
             );
         }
+    }
+}
+
+fn bind_shader_profile_modules(module: &mut YirModule) {
+    let node_names = module
+        .nodes
+        .iter()
+        .map(|node| node.name.clone())
+        .collect::<BTreeSet<_>>();
+    let bindings = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderBeginPass))
+        .filter_map(|node| {
+            let pipeline = node.op.args.get(1)?;
+            let prefix = pipeline.strip_suffix("_profile_pipe")?;
+            let shader_module = format!("{prefix}_profile_wgsl");
+            node_names
+                .contains(&shader_module)
+                .then(|| (node.name.clone(), shader_module))
+        })
+        .collect::<Vec<_>>();
+
+    for (begin_pass, shader_module) in bindings {
+        if let Some(node) = module.nodes.iter_mut().find(|node| node.name == begin_pass) {
+            if node.op.args.len() == 3 {
+                node.op.args.push(shader_module.clone());
+            }
+        }
+        push_edge_if_missing(module, EdgeKind::Dep, &shader_module, &begin_pass);
     }
 }
 

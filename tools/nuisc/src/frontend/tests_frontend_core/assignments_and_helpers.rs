@@ -390,3 +390,30 @@ fn suggests_similar_imported_helper_function_name_for_unknown_call() {
         "{error}"
     );
 }
+
+#[test]
+fn lowers_i64_xor_builtin_to_the_generic_binary_contract() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return i64_xor(6, 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+
+    assert!(matches!(
+        main.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Binary {
+            op: NirBinaryOp::Xor,
+            ..
+        }))]
+    ));
+}

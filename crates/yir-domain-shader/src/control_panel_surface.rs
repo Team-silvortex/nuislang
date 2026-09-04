@@ -177,5 +177,6 @@ pub(crate) fn draw_control_panel_surface(
         width,
         height,
         rows,
+        rgba8: None,
     })
 }

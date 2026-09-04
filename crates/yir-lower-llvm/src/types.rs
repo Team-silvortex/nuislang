@@ -128,6 +128,7 @@ pub(crate) struct LlvmLoweringState {
     pub(crate) body: Vec<String>,
     pub(crate) globals: Vec<String>,
     pub(crate) registers: BTreeMap<String, LlvmValueRef>,
+    pub(crate) provider_completion_sources: BTreeMap<String, (YirResultFamily, String)>,
     pub(crate) delayed_registers: BTreeMap<String, String>,
     pub(crate) facts: KnownFacts,
     pub(crate) buffer_lengths: BTreeMap<String, String>,

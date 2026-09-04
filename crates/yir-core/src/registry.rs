@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     BranchEffectAction, BranchEffectActionCapability, ExecutionState, Node,
-    PlannedBranchEffectAction, PlannedBranchEffectOperand, Resource, Value,
+    PlannedBranchEffectAction, PlannedBranchEffectOperand, Resource, Value, YirResultFamily,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,8 +27,49 @@ impl InstructionSemantics {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProviderCompletionRegistration {
+    pub family: YirResultFamily,
+    pub clock_domain: &'static str,
+    pub evidence_policy: ProviderCompletionEvidencePolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderCompletionEvidencePolicy {
+    RuntimeOrderAllowed,
+    PhysicalFenceRequired,
+}
+
+impl ProviderCompletionRegistration {
+    pub const fn new(family: YirResultFamily, clock_domain: &'static str) -> Self {
+        Self {
+            family,
+            clock_domain,
+            evidence_policy: ProviderCompletionEvidencePolicy::RuntimeOrderAllowed,
+        }
+    }
+
+    pub const fn physical_fence_required(
+        family: YirResultFamily,
+        clock_domain: &'static str,
+    ) -> Self {
+        Self {
+            family,
+            clock_domain,
+            evidence_policy: ProviderCompletionEvidencePolicy::PhysicalFenceRequired,
+        }
+    }
+}
+
 pub trait RegisteredMod: Send + Sync {
     fn module_name(&self) -> &'static str;
+
+    fn provider_completion_registration(
+        &self,
+        _node: &Node,
+    ) -> Option<ProviderCompletionRegistration> {
+        None
+    }
 
     fn branch_effect_action_capabilities(&self) -> &'static [BranchEffectActionCapability] {
         &[]
@@ -78,6 +119,19 @@ impl ModRegistry {
 
     pub fn lookup(&self, name: &str) -> Option<&dyn RegisteredMod> {
         self.mods.get(name).map(|module| module.as_ref())
+    }
+
+    pub fn provider_completion_registration(
+        &self,
+        node: &Node,
+    ) -> Option<ProviderCompletionRegistration> {
+        self.lookup(&node.op.module)?
+            .provider_completion_registration(node)
+    }
+
+    pub fn provider_completion_family(&self, node: &Node) -> Option<YirResultFamily> {
+        self.provider_completion_registration(node)
+            .map(|registration| registration.family)
     }
 
     pub fn branch_effect_action_capability(

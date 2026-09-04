@@ -170,6 +170,7 @@ pub(super) fn render_nir_binary_op(op: NirBinaryOp) -> &'static str {
     match op {
         NirBinaryOp::And => "&&",
         NirBinaryOp::Or => "||",
+        NirBinaryOp::Xor => "^",
         NirBinaryOp::Add => "+",
         NirBinaryOp::Sub => "-",
         NirBinaryOp::Mul => "*",

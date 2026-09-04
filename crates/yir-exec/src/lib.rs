@@ -1,7 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::{ExecutionState, ModRegistry, Node, Resource, Value, YirModule};
-use yir_verify::{default_registry, verify_module_with_registry};
+use yir_core::{
+    ExecutionState, FrameSurface, ModRegistry, Node, ProviderCompletionWitness, Value, YirModule,
+};
+use yir_verify::default_registry;
+
+mod execution_engine;
 
 #[derive(Debug, Default)]
 pub struct ExecutionTrace {
@@ -9,6 +13,8 @@ pub struct ExecutionTrace {
     pub lane_events: BTreeMap<String, Vec<String>>,
     pub lane_steps: BTreeMap<String, Vec<String>>,
     pub values: BTreeMap<String, Value>,
+    pub presented_frames: Vec<FrameSurface>,
+    pub provider_completion_witnesses: BTreeMap<String, ProviderCompletionWitness>,
 }
 
 pub fn execute_module(module: &YirModule) -> Result<ExecutionTrace, String> {
@@ -20,102 +26,7 @@ pub fn execute_module_with_registry(
     module: &YirModule,
     registry: &ModRegistry,
 ) -> Result<ExecutionTrace, String> {
-    verify_module_with_registry(module, registry)?;
-
-    let resources = module
-        .resources
-        .iter()
-        .map(|resource| (resource.name.clone(), resource))
-        .collect::<BTreeMap<String, &Resource>>();
-    let order = topological_order(module)?;
-    let nodes_by_name = module
-        .nodes
-        .iter()
-        .map(|node| (node.name.clone(), node))
-        .collect::<BTreeMap<_, _>>();
-
-    let mut state = ExecutionState::default();
-    let mut lane_steps = BTreeMap::<String, Vec<String>>::new();
-    let mut delayed = BTreeMap::<String, String>::new();
-
-    for node_name in order {
-        let node = module
-            .nodes
-            .iter()
-            .find(|node| node.name == node_name)
-            .ok_or_else(|| format!("execution order references unknown node `{node_name}`"))?;
-        let resource = resources.get(&node.resource).copied().ok_or_else(|| {
-            format!(
-                "node `{}` references unknown resource `{}`",
-                node.name, node.resource
-            )
-        })?;
-
-        let module_impl = registry.lookup(&node.op.module).ok_or_else(|| {
-            format!(
-                "node `{}` references unregistered mod `{}`",
-                node.name, node.op.module
-            )
-        })?;
-        let lane_name = module
-            .node_lanes
-            .get(&node.name)
-            .map(|lane| format!("{}@{}", node.resource, lane))
-            .unwrap_or_else(|| resource.kind.family().to_owned());
-        state.current_lane = Some(lane_name.clone());
-
-        lane_steps
-            .entry(lane_name.clone())
-            .or_default()
-            .push(format!(
-                "{} @{} -> {}",
-                node.op.full_name(),
-                node.resource,
-                node.name
-            ));
-        if node.op.module == "cpu" && node.op.instruction == "select" {
-            match execute_lazy_select(node, &mut state, &mut delayed, &nodes_by_name)? {
-                LazySelectOutcome::Handled(value) => {
-                    state.values.insert(node.name.clone(), value);
-                    continue;
-                }
-                LazySelectOutcome::UseRegisteredExecutor => {}
-            }
-        }
-        if let Some((input, reason)) = first_delayed_input(node, &delayed) {
-            delayed.insert(
-                node.name.clone(),
-                format!("depends on delayed `{input}`: {reason}"),
-            );
-            continue;
-        }
-        let executed = match registry.execute_branch_effect_node(node, resource, &mut state)? {
-            Some(value) => Ok(value),
-            None => module_impl.execute(node, resource, &mut state),
-        };
-        match executed {
-            Ok(value) => {
-                state.values.insert(node.name.clone(), value);
-            }
-            Err(error) if is_delayable_variant_error(node, &error) => {
-                delayed.insert(node.name.clone(), error);
-            }
-            Err(error) => return Err(error),
-        }
-    }
-
-    if let Some((name, error)) = delayed.iter().next() {
-        return Err(format!(
-            "node `{name}` was never selected by a lazy branch: {error}"
-        ));
-    }
-
-    Ok(ExecutionTrace {
-        events: state.events,
-        lane_events: state.lane_events,
-        lane_steps,
-        values: state.values,
-    })
+    execution_engine::execute_module_with_registry(module, registry)
 }
 
 enum LazySelectOutcome {
@@ -259,7 +170,10 @@ mod tests {
     use super::*;
     use yir_core::{
         BranchEffectAction, BranchEffectActionCapability, BranchEffectResult, Edge, EdgeKind,
-        InstructionSemantics, Operation, RegisteredMod, ResourceKind,
+        InstructionSemantics, Operation, ProviderCompletionClockKind,
+        ProviderCompletionRegistration, ProviderPhysicalCompletion, RegisteredMod, Resource,
+        ResourceKind, YirFunction, YirFunctionParameter, YirFunctionResult, YirFunctionRole,
+        YirResultFamily, YirValueOwnership,
     };
 
     const PROBE_ACTIONS: &[BranchEffectActionCapability] = &[
@@ -317,6 +231,58 @@ mod tests {
                 "right" => Ok(Value::Int(73)),
                 other => Err(format!("unknown probe action `{other}`")),
             }
+        }
+    }
+
+    struct PhysicalProbeMod;
+
+    impl RegisteredMod for PhysicalProbeMod {
+        fn module_name(&self) -> &'static str {
+            "physical"
+        }
+
+        fn provider_completion_registration(
+            &self,
+            node: &Node,
+        ) -> Option<ProviderCompletionRegistration> {
+            (node.op.instruction == "submit").then_some(
+                ProviderCompletionRegistration::physical_fence_required(
+                    YirResultFamily::Shader,
+                    "shader.clock.frame.v1",
+                ),
+            )
+        }
+
+        fn describe(
+            &self,
+            node: &Node,
+            _resource: &Resource,
+        ) -> Result<InstructionSemantics, String> {
+            match node.op.instruction.as_str() {
+                "submit" if node.op.args.len() == 1 => Ok(InstructionSemantics::effect(Vec::new())),
+                _ => Err(format!("invalid physical probe node `{}`", node.name)),
+            }
+        }
+
+        fn execute(
+            &self,
+            node: &Node,
+            _resource: &Resource,
+            state: &mut ExecutionState,
+        ) -> Result<Value, String> {
+            let source_clock = node.op.args[0]
+                .parse::<i64>()
+                .map_err(|_| "physical probe clock is invalid".to_owned())?;
+            state.stage_provider_physical_completion(
+                node,
+                ProviderPhysicalCompletion::new(
+                    "shader.clock.frame.v1",
+                    "probe.monotonic.v1",
+                    "probe.queue-fence.completed",
+                    source_clock,
+                )?,
+            )?;
+            Ok(Value::Int(source_clock))
         }
     }
 
@@ -403,6 +369,295 @@ mod tests {
         let trace = execute_module_with_registry(&module, &registry)
             .expect("registered probe action should execute through composition");
         assert_eq!(trace.values.get("selected"), Some(&Value::Int(73)));
+    }
+
+    #[test]
+    fn registered_shader_completion_issues_an_implicit_receipt_after_execution() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "shader0".to_owned(),
+            kind: ResourceKind::parse("shader.reference"),
+        });
+        let shader_node = |name: &str, instruction: &str, args: &[&str]| Node {
+            name: name.to_owned(),
+            resource: "shader0".to_owned(),
+            op: Operation::parse(
+                &format!("shader.{instruction}"),
+                args.iter().map(|arg| (*arg).to_owned()).collect(),
+            )
+            .unwrap(),
+        };
+        module.nodes.extend([
+            shader_node("target", "target", &["rgba8", "8", "8"]),
+            shader_node("pipeline", "pipeline", &["flat", "triangle"]),
+            shader_node("viewport", "viewport", &["8", "8"]),
+            shader_node("pass", "begin_pass", &["target", "pipeline", "viewport"]),
+            shader_node("result", "observe", &["pass", "pass_ready"]),
+            shader_node("token", "completion_token", &["result"]),
+            shader_node("clock", "completion_clock", &["result"]),
+            shader_node("root", "completion_root", &["result"]),
+        ]);
+        module.edges.extend([
+            dep("target", "pass"),
+            dep("pipeline", "pass"),
+            dep("viewport", "pass"),
+            dep("pass", "result"),
+            dep("result", "token"),
+            dep("result", "clock"),
+            dep("result", "root"),
+        ]);
+
+        let trace = execute_module(&module).expect("registered completion should execute");
+        let expected = yir_core::issue_provider_completion_receipt(
+            yir_core::YirResultFamily::Shader,
+            "shader0",
+            "pass",
+            "pass_ready",
+            1,
+        );
+        assert_eq!(trace.values.get("token"), Some(&Value::Int(expected.token)));
+        assert_eq!(trace.values.get("clock"), Some(&Value::Int(1)));
+        assert_eq!(trace.values.get("root"), Some(&Value::Int(expected.root)));
+    }
+
+    #[test]
+    fn registered_provider_imports_ordered_physical_fences_transactionally() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "shader0".to_owned(),
+            kind: ResourceKind::parse("shader.reference"),
+        });
+        module.nodes.extend([
+            Node {
+                name: "submit0".to_owned(),
+                resource: "shader0".to_owned(),
+                op: Operation::parse("physical.submit", vec!["100".to_owned()]).unwrap(),
+            },
+            Node {
+                name: "submit1".to_owned(),
+                resource: "shader0".to_owned(),
+                op: Operation::parse("physical.submit", vec!["101".to_owned()]).unwrap(),
+            },
+        ]);
+        module.edges.push(dep("submit0", "submit1"));
+        let mut registry = ModRegistry::new();
+        registry.register(PhysicalProbeMod);
+
+        let trace = execute_module_with_registry(&module, &registry)
+            .expect("registered physical provider should execute");
+        let first = &trace.provider_completion_witnesses["submit0"];
+        let second = &trace.provider_completion_witnesses["submit1"];
+        assert_eq!(first.completion_clock, 1);
+        assert_eq!(second.completion_clock, 2);
+        assert_eq!(
+            second.clock_kind,
+            ProviderCompletionClockKind::PhysicalFence
+        );
+        assert_eq!(second.physical_source_clock, Some(101));
+
+        module.nodes.push(Node {
+            name: "submit2".to_owned(),
+            resource: "shader0".to_owned(),
+            op: Operation::parse("physical.submit", vec!["100".to_owned()]).unwrap(),
+        });
+        module.edges.push(dep("submit1", "submit2"));
+        let error = execute_module_with_registry(&module, &registry).unwrap_err();
+        assert!(error.contains("clock 100 is stale"));
+    }
+
+    #[test]
+    fn registered_function_call_executes_with_bound_parameters() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(cpu_resource());
+        module.nodes.extend([
+            cpu_node("inc_param", "param_i64", &["0"]),
+            cpu_node("inc_one", "const_i64", &["1"]),
+            cpu_node("inc_value", "add", &["inc_param", "inc_one"]),
+            cpu_node("inc_return", "return_i64", &["inc_value"]),
+            cpu_node("main_input", "const_i64", &["41"]),
+            cpu_node("main_call", "call_i64", &["increment", "main_input"]),
+            cpu_node("main_return", "return_i64", &["main_call"]),
+        ]);
+        module.edges.extend([
+            dep("inc_param", "inc_value"),
+            dep("inc_one", "inc_value"),
+            dep("inc_value", "inc_return"),
+            dep("main_input", "main_call"),
+            dep("main_call", "main_return"),
+        ]);
+        module.functions.extend([
+            YirFunction {
+                name: "increment".to_owned(),
+                domain: "cpu".to_owned(),
+                role: YirFunctionRole::Helper,
+                parameters: vec![YirFunctionParameter {
+                    name: "value".to_owned(),
+                    ty: "i64".to_owned(),
+                    ownership: YirValueOwnership::Value,
+                    node: "inc_param".to_owned(),
+                }],
+                result: Some(YirFunctionResult {
+                    ty: "i64".to_owned(),
+                    ownership: YirValueOwnership::Value,
+                    node: "inc_return".to_owned(),
+                }),
+                body_nodes: vec![
+                    "inc_param".to_owned(),
+                    "inc_one".to_owned(),
+                    "inc_value".to_owned(),
+                    "inc_return".to_owned(),
+                ],
+            },
+            YirFunction {
+                name: "main".to_owned(),
+                domain: "cpu".to_owned(),
+                role: YirFunctionRole::Entry,
+                parameters: Vec::new(),
+                result: Some(YirFunctionResult {
+                    ty: "i64".to_owned(),
+                    ownership: YirValueOwnership::Value,
+                    node: "main_return".to_owned(),
+                }),
+                body_nodes: vec![
+                    "main_input".to_owned(),
+                    "main_call".to_owned(),
+                    "main_return".to_owned(),
+                ],
+            },
+        ]);
+
+        let trace = execute_module(&module).expect("registered helper call should execute");
+        assert_eq!(trace.values.get("main_call"), Some(&Value::Int(42)));
+        assert!(!trace.values.contains_key("inc_param"));
+        assert_eq!(
+            trace
+                .events
+                .iter()
+                .filter(|event| event.contains("effect cpu.return_i64"))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn scoped_owned_struct_loop_executes_helper_and_carries_result() {
+        let layout = "Counter{value:i64}";
+        let mut module = YirModule::new("0.1");
+        module.resources.push(cpu_resource());
+        module.nodes.extend([
+            cpu_node("bump_value", "param_i64", &["0"]),
+            cpu_node("bump_current", "param_i64", &["1"]),
+            cpu_node("bump_one", "const_i64", &["1"]),
+            cpu_node("bump_next", "add", &["bump_value", "bump_one"]),
+            cpu_node("bump_struct", "struct", &["Counter", "value=bump_next"]),
+            cpu_node("bump_return", "return_owned_struct", &["bump_struct"]),
+            cpu_node("initial", "const_i64", &["0"]),
+            cpu_node("limit", "const_i64", &["3"]),
+            cpu_node("step", "const_i64", &["1"]),
+            cpu_node("carry", "const_i64", &["0"]),
+            cpu_node(
+                "loop",
+                "loop_while_i64_effect",
+                &[
+                    "initial",
+                    "limit",
+                    "step",
+                    "lt",
+                    "add",
+                    "cpu",
+                    "scoped_call_owned_struct_return",
+                    "5",
+                    "bump",
+                    "loop_result",
+                    layout,
+                    "$owned_struct_carry:0:carry",
+                    "$current",
+                ],
+            ),
+            cpu_node("loop_result", "loop_owned_struct_result", &["loop", layout]),
+            cpu_node("main_return", "return_i64", &["loop"]),
+        ]);
+        module.edges.extend([
+            dep("bump_value", "bump_next"),
+            dep("bump_one", "bump_next"),
+            dep("bump_next", "bump_struct"),
+            dep("bump_struct", "bump_return"),
+            dep("initial", "loop"),
+            dep("limit", "loop"),
+            dep("step", "loop"),
+            dep("carry", "loop"),
+            dep("loop", "loop_result"),
+            dep("loop", "main_return"),
+        ]);
+        module.functions.extend([
+            YirFunction {
+                name: "bump".to_owned(),
+                domain: "cpu".to_owned(),
+                role: YirFunctionRole::Helper,
+                parameters: vec![
+                    YirFunctionParameter {
+                        name: "value".to_owned(),
+                        ty: "i64".to_owned(),
+                        ownership: YirValueOwnership::Value,
+                        node: "bump_value".to_owned(),
+                    },
+                    YirFunctionParameter {
+                        name: "current".to_owned(),
+                        ty: "i64".to_owned(),
+                        ownership: YirValueOwnership::Value,
+                        node: "bump_current".to_owned(),
+                    },
+                ],
+                result: Some(YirFunctionResult {
+                    ty: "Counter".to_owned(),
+                    ownership: YirValueOwnership::Owned,
+                    node: "bump_return".to_owned(),
+                }),
+                body_nodes: vec![
+                    "bump_value".to_owned(),
+                    "bump_current".to_owned(),
+                    "bump_one".to_owned(),
+                    "bump_next".to_owned(),
+                    "bump_struct".to_owned(),
+                    "bump_return".to_owned(),
+                ],
+            },
+            YirFunction {
+                name: "main".to_owned(),
+                domain: "cpu".to_owned(),
+                role: YirFunctionRole::Entry,
+                parameters: Vec::new(),
+                result: Some(YirFunctionResult {
+                    ty: "i64".to_owned(),
+                    ownership: YirValueOwnership::Value,
+                    node: "main_return".to_owned(),
+                }),
+                body_nodes: vec![
+                    "initial".to_owned(),
+                    "limit".to_owned(),
+                    "step".to_owned(),
+                    "carry".to_owned(),
+                    "loop".to_owned(),
+                    "loop_result".to_owned(),
+                    "main_return".to_owned(),
+                ],
+            },
+        ]);
+
+        let trace = execute_module(&module).expect("scoped aggregate loop should execute");
+        assert_eq!(trace.values.get("loop"), Some(&Value::Int(3)));
+        let Value::Struct(counter) = &trace.values["loop_result"] else {
+            panic!("loop result should be a Counter struct");
+        };
+        assert_eq!(counter.fields, vec![("value".to_owned(), Value::Int(3))]);
+        assert_eq!(
+            trace
+                .events
+                .iter()
+                .filter(|event| event.contains("effect cpu.return_owned_struct"))
+                .count(),
+            3
+        );
     }
 
     #[test]

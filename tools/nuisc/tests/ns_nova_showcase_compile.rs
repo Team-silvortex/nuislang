@@ -44,6 +44,14 @@ fn builds_ns_nova_showcase_window_aot_bundle() {
     assert!(manifest.contains("official.shader"));
     assert!(output_dir.join("ns_nova_showcase").is_file());
 
+    let yir = fs::read_to_string(output_dir.join("ns_nova_showcase.yir"))
+        .expect("NS Nova YIR should exist");
+    let ppm = yir_runtime_host::render_module_to_ppm_bytes(&yir, 1)
+        .expect("registered Shader renderer should export the NS Nova frame");
+    let header = b"P6\n160 120\n255\n";
+    assert!(ppm.starts_with(header));
+    assert_eq!(ppm.len(), header.len() + 160 * 120 * 3);
+
     fs::remove_dir_all(output_dir).expect("temporary NS Nova output should be removable");
 }
 

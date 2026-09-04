@@ -129,18 +129,35 @@ fn compiles_ns_nova_lifecycle_with_pixelmagic_rendering() {
             .any(|arg| yir_core::parse_loop_owned_struct_carry(arg)
                 .is_ok_and(|carry| carry.is_some()))
     );
-    assert!(artifacts
+    let inline_shader = artifacts
         .yir
         .nodes
         .iter()
-        .any(|node| { node.op.module == "shader" && node.op.instruction == "inline_wgsl" }));
+        .find(|node| {
+            node.op.module == "shader"
+                && node.op.instruction == "inline_wgsl"
+                && node.op.args.first().map(String::as_str) == Some("pixelmagic_render_demo")
+        })
+        .expect("showcase should materialize its inline WGSL module");
+    let render_pass = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.full_name() == "shader.begin_pass")
+        .expect("showcase should lower a render pass");
+    assert_eq!(render_pass.op.args.get(3), Some(&inline_shader.name));
+    assert!(artifacts.yir.edges.iter().any(|edge| {
+        edge.kind == yir_core::EdgeKind::Dep
+            && edge.from == inline_shader.name
+            && edge.to == render_pass.name
+    }));
     let observed_frame = artifacts
         .yir
         .nodes
         .iter()
         .find(|node| node.op.full_name() == "shader.observe")
         .expect("showcase should observe the rendered frame through the shader provider");
-    assert_eq!(observed_frame.op.args.len(), 3);
+    assert_eq!(observed_frame.op.args.len(), 2);
     for instruction in ["completion_token", "completion_clock", "completion_root"] {
         assert!(artifacts.yir.nodes.iter().any(|node| {
             node.op.module == "shader"
@@ -180,6 +197,12 @@ fn compiles_ns_nova_lifecycle_with_pixelmagic_rendering() {
     assert!(artifacts
         .llvm_ir
         .contains("provider-issued shader completion receipt"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("registered provider completion observed by shader.observe"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("atomicrmw add ptr @nuis_provider_completion_clock_v1"));
     assert!(artifacts
         .llvm_ir
         .contains("projected shader result state `frame_ready` through shader.is_frame_ready"));

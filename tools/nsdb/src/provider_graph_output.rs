@@ -8,6 +8,7 @@ use crate::{
     provider_sample_payload::PixelMagicNativeOutputSummary,
 };
 use std::collections::BTreeMap;
+use yir_core::{ProviderPhysicalCompletion, PROVIDER_PHYSICAL_COMPLETION_CONTRACT};
 
 pub(crate) const PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT: &str =
     "nuis-provider-graph-output-ownership-v1";
@@ -153,6 +154,7 @@ pub(crate) fn bind_provider_completion_evidence(
     summary: &mut PixelMagicNativeOutputSummary,
     close: &ProviderGraphOutputCloseReceipt,
 ) -> Result<(), String> {
+    let physical_completion = physical_completion_from_summary(summary)?;
     let session_sequence = summary
         .session_request_sequence
         .parse::<usize>()
@@ -192,10 +194,17 @@ pub(crate) fn bind_provider_completion_evidence(
         return Err("provider completion release set does not match GLM output handles".to_owned());
     }
 
-    let completion_clock = format!(
-        "{PROVIDER_COMPLETION_CLOCK_CONTRACT}:domain={}:session={session_sequence}:worker={worker_sequence}",
-        summary.session_lease_id
-    );
+    let completion_clock = match physical_completion.as_ref() {
+        Some(completion) => format!(
+            "{PROVIDER_COMPLETION_CLOCK_CONTRACT}:domain={}:session={session_sequence}:worker={worker_sequence}:physical={}",
+            summary.session_lease_id,
+            completion.to_wire()
+        ),
+        None => format!(
+            "{PROVIDER_COMPLETION_CLOCK_CONTRACT}:domain={}:session={session_sequence}:worker={worker_sequence}",
+            summary.session_lease_id
+        ),
+    };
     let completion_hash = fnv1a64_hex(
         format!(
             "{completion_clock}:{}:{}:{}:{}:{}",
@@ -228,11 +237,33 @@ pub(crate) fn bind_provider_completion_evidence(
     summary.completion_evidence_contract = PROVIDER_COMPLETION_EVIDENCE_CONTRACT.to_owned();
     summary.completion_clock_evidence = completion_clock;
     summary.completion_token = completion_token;
-    summary.completion_status = "worker-output-verified".to_owned();
+    summary.completion_status = if physical_completion.is_some() {
+        "physical-fence-and-worker-output-verified"
+    } else {
+        "worker-output-verified"
+    }
+    .to_owned();
     summary.glm_release_contract = PROVIDER_GLM_RELEASE_EVIDENCE_CONTRACT.to_owned();
     summary.glm_release_token = format!("glm-release:{release_hash}");
     summary.glm_release_status = "released-at-graph-close".to_owned();
     Ok(())
+}
+
+fn physical_completion_from_summary(
+    summary: &PixelMagicNativeOutputSummary,
+) -> Result<Option<ProviderPhysicalCompletion>, String> {
+    match summary.completion_evidence_contract.as_str() {
+        "none" | "pending" => Ok(None),
+        PROVIDER_PHYSICAL_COMPLETION_CONTRACT => {
+            if summary.completion_status != "physical-fence-observed" {
+                return Err("provider physical completion status is not fence-observed".to_owned());
+            }
+            ProviderPhysicalCompletion::parse(&summary.completion_clock_evidence).map(Some)
+        }
+        other => Err(format!(
+            "provider output has unsupported pre-bound completion contract `{other}`"
+        )),
+    }
 }
 
 #[cfg(unix)]

@@ -375,6 +375,7 @@ fn lower_binary(
     let instruction = match op {
         NirBinaryOp::And => "and",
         NirBinaryOp::Or => "or",
+        NirBinaryOp::Xor => "xor",
         NirBinaryOp::Add => "add",
         NirBinaryOp::Sub => "sub",
         NirBinaryOp::Mul => "mul",

@@ -17,3 +17,6 @@ yir-core = { path = "../../crates/yir-core" }
 yir-lower-llvm = { path = "../../crates/yir-lower-llvm" }
 yir-syntax = { path = "../../crates/yir-syntax" }
 yir-verify = { path = "../../crates/yir-verify" }
+
+[dev-dependencies]
+yir-runtime-host = { path = "../../crates/yir-runtime-host" }

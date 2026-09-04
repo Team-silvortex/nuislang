@@ -89,6 +89,7 @@ pub(crate) fn emit_owned_struct_return(
         body: std::mem::take(body),
         globals: Vec::new(),
         registers: std::collections::BTreeMap::new(),
+        provider_completion_sources: std::collections::BTreeMap::new(),
         delayed_registers: std::collections::BTreeMap::new(),
         facts: super::KnownFacts::new(),
         buffer_lengths: std::collections::BTreeMap::new(),

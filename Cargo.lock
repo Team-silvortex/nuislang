@@ -163,6 +163,11 @@ dependencies = [
  "ed25519-dalek",
  "libc",
  "nuisc",
+ "yir-core",
+ "yir-domain-shader",
+ "yir-exec",
+ "yir-runtime-host",
+ "yir-verify",
 ]
 
 [[package]]
@@ -234,6 +239,7 @@ dependencies = [
  "nuis-semantics",
  "yir-core",
  "yir-lower-llvm",
+ "yir-runtime-host",
  "yir-syntax",
  "yir-verify",
 ]

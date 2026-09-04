@@ -184,6 +184,7 @@ pub(crate) fn lower_cpu_return_node(
                 body: std::mem::take(body),
                 globals: Vec::new(),
                 registers: BTreeMap::new(),
+                provider_completion_sources: BTreeMap::new(),
                 delayed_registers: BTreeMap::new(),
                 facts: super::KnownFacts::new(),
                 buffer_lengths: BTreeMap::new(),

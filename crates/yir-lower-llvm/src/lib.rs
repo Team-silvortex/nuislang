@@ -8,7 +8,7 @@
     clippy::obfuscated_if_else
 )]
 use std::collections::{BTreeMap, BTreeSet};
-use yir_core::{CpuLlvmLoweringClass, ModRegistry, Node, Resource, YirModule};
+use yir_core::{CpuLlvmLoweringClass, ModRegistry, Node, Resource, YirModule, YirResultFamily};
 use yir_verify::{default_registry, verify_module_with_registry};
 mod async_resource_lowering;
 mod bitwise_lowering;
@@ -185,6 +185,15 @@ pub fn emit_module_with_registries(
         .iter()
         .map(|function| (function.name.as_str(), function))
         .collect::<BTreeMap<_, _>>();
+    let provider_completion_sources = module
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            yir_registry
+                .provider_completion_family(node)
+                .map(|family| (node.name.clone(), (family, node.resource.clone())))
+        })
+        .collect::<BTreeMap<_, _>>();
     let mut global_counter = 0usize;
     let mut globals = Vec::new();
     let mut helper_defs = Vec::new();
@@ -336,6 +345,7 @@ pub fn emit_module_with_registries(
             &param_bindings,
             &param_buffer_lengths,
             &helper_signatures,
+            &provider_completion_sources,
             emitter_registry,
             helper_signatures
                 .get(function_name)
@@ -392,6 +402,7 @@ pub fn emit_module_with_registries(
         &BTreeMap::new(),
         &BTreeMap::new(),
         &helper_signatures,
+        &provider_completion_sources,
         emitter_registry,
         CpuCallScalarKind::I64,
         &mut global_counter,
@@ -404,6 +415,7 @@ pub fn emit_module_with_registries(
     Ok(format!(
         "; yir version: {}\n\
 {}\n\
+@nuis_provider_completion_clock_v1 = internal global i64 0, align 8\n\
 %cpu.node = type {{ i64, ptr }}\n\
 declare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare void @llvm.assume(i1)\ndeclare void @llvm.trap()\ndeclare i32 @puts(ptr)\ndeclare i64 @nuis_host_text_lift(ptr)\ndeclare ptr @nuis_host_text_ptr(i64)\ndeclare i64 @nuis_host_owned_utf8_validate_v1(ptr)\ndeclare i64 @nuis_host_owned_object_validate_v1(ptr)\n\
 declare void @nuis_debug_print_bool(i32)\ndeclare void @nuis_debug_print_i32(i32)\ndeclare void @nuis_debug_print_i64(i64)\ndeclare void @nuis_debug_print_f32(float)\ndeclare void @nuis_debug_print_f64(double)\n\n\

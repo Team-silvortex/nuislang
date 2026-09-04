@@ -559,6 +559,15 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
             variant,
             field
         ),
+        NirExpr::Binary {
+            op: NirBinaryOp::Xor,
+            lhs,
+            rhs,
+        } => format!(
+            "i64_xor({}, {})",
+            render_nir_expr(lhs),
+            render_nir_expr(rhs)
+        ),
         NirExpr::Binary { op, lhs, rhs } => format!(
             "({} {} {})",
             render_nir_expr(lhs),

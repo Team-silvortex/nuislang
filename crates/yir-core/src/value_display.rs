@@ -444,14 +444,29 @@ impl fmt::Display for RenderPass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "pass[target={}, pipeline={}, viewport={}]",
-            self.target, self.pipeline, self.viewport
+            "pass[target={}, pipeline={}, viewport={}, shader_module={}]",
+            self.target,
+            self.pipeline,
+            self.viewport,
+            self.shader_module
+                .as_ref()
+                .map(|module| module.entry.as_str())
+                .unwrap_or("none")
         )
     }
 }
 
 impl fmt::Display for FrameSurface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(rgba8) = &self.rgba8 {
+            return write!(
+                f,
+                "frame[{}x{}; rgba8_bytes={}]",
+                self.width,
+                self.height,
+                rgba8.len()
+            );
+        }
         write!(f, "frame[{}x{}] ", self.width, self.height)?;
         for (index, row) in self.rows.iter().enumerate() {
             if index > 0 {

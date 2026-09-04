@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
 
-use yir_core::{Node, SemanticOp, YirModule};
+use yir_core::{ModRegistry, Node, SemanticOp, YirModule};
 
-pub(crate) fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
+pub(crate) fn verify_result_state_nodes(
+    module: &YirModule,
+    registry: &ModRegistry,
+) -> Result<(), String> {
     let nodes = module
         .nodes
         .iter()
@@ -129,7 +132,14 @@ pub(crate) fn verify_result_state_nodes(module: &YirModule) -> Result<(), String
             | SemanticOp::ResultCompletionRoot => {
                 require_expected_result_source(&nodes, node)?;
                 let source = observe_source_node(&nodes, node)?;
-                if source.op.args.len() != 3 {
+                if source.op.args.len() == 3 {
+                    continue;
+                }
+                let provider_source = observe_source_node(&nodes, source)?;
+                let expected_family = node.op.result_family();
+                if provider_source.resource != source.resource
+                    || registry.provider_completion_family(provider_source) != expected_family
+                {
                     return Err(format!(
                         "node `{}` projects provider completion metadata from receipt-less `{}`",
                         node.name, source.name

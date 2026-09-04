@@ -164,6 +164,7 @@ fn branch_effect_presents_a_frame_only_when_selected() {
                 width: 2,
                 height: 1,
                 rows: vec!["##".to_owned()],
+                rgba8: None,
             })),
             offset: 0,
             len: 1,
@@ -185,6 +186,8 @@ fn branch_effect_presents_a_frame_only_when_selected() {
             .any(|event| event.contains("effect cpu.present_frame")
                 && event.contains("frame[2x1] ##"))
     );
+    assert_eq!(state.presented_frames().len(), 1);
+    assert_eq!(state.presented_frames()[0].width, 2);
 
     state.events.clear();
     state.values.insert("ready".to_owned(), Value::Bool(false));
@@ -192,6 +195,7 @@ fn branch_effect_presents_a_frame_only_when_selected() {
         .execute_branch_effect_node(&node, &resource, &mut state)
         .unwrap();
     assert!(state.events.is_empty());
+    assert_eq!(state.presented_frames().len(), 1);
 }
 
 #[test]

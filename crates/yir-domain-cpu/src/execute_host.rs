@@ -248,6 +248,9 @@ pub(crate) fn execute_cpu_host_node(
         }
         "present_frame" => {
             let frame = unwrap_present_frame_payload(state.expect_value(&node.op.args[0])?.clone());
+            if let Value::Frame(surface) = &frame {
+                state.record_presented_frame(surface.clone());
+            }
             state.push_resource_event(
                 resource,
                 format!(

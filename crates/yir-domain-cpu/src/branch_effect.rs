@@ -74,6 +74,9 @@ pub(super) fn execute_cpu_branch_effect_action(
         "present_frame" => {
             let frame =
                 unwrap_present_frame_payload(state.expect_value(action.operands[0].value)?.clone());
+            if let Value::Frame(surface) = &frame {
+                state.record_presented_frame(surface.clone());
+            }
             state.push_resource_event(
                 resource,
                 format!(

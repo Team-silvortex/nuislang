@@ -388,8 +388,33 @@ pub(crate) fn lower_domain_result_observer_node(
             } else {
                 propagate_known_facts(source_name, &node.name, &mut state.facts);
             }
-            let receipt = node.op.args.get(2).and_then(|clock_name| {
-                let completion_clock = get_i64(&state.registers, clock_name)?.to_owned();
+            let receipt = (|| {
+                let completion_clock = match node.op.args.get(2) {
+                    Some(clock_name) => get_i64(&state.registers, clock_name)?.to_owned(),
+                    None => {
+                        let registered = state.provider_completion_sources.get(source_name);
+                        if !matches!(
+                            registered,
+                            Some((registered_family, resource))
+                                if *registered_family == family && resource == &node.resource
+                        ) {
+                            return None;
+                        }
+                        let previous = fresh_reg(&mut state.next_reg);
+                        let observed = fresh_reg(&mut state.next_reg);
+                        state.body.push(format!(
+                            "  ; registered provider completion observed by {family}.observe `{}`",
+                            node.name
+                        ));
+                        state.body.push(format!(
+                            "  {previous} = atomicrmw add ptr @nuis_provider_completion_clock_v1, i64 1 monotonic"
+                        ));
+                        state
+                            .body
+                            .push(format!("  {observed} = add i64 {previous}, 1"));
+                        observed
+                    }
+                };
                 let root = provider_completion_receipt_root(
                     family,
                     &node.resource,
@@ -415,7 +440,7 @@ pub(crate) fn lower_domain_result_observer_node(
                     completion_clock,
                     root: root.to_string(),
                 })
-            });
+            })();
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::DomainResult(DomainResultLlvmValueRef {

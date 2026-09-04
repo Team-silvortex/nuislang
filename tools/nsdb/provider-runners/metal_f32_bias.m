@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <limits.h>
+#include <mach/mach_time.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -308,6 +309,7 @@ int main(int argc, const char *argv[]) {
         if (command.status != MTLCommandBufferStatusCompleted) {
             return fail([NSString stringWithFormat:@"Metal command failed: %@", command.error]);
         }
+        uint64_t completionClock = mach_continuous_time();
         const char *protocol = copyU32
             ? "nuis-metal-u32-copy-provider-runner-v1"
             : (u32Mode ? "nuis-metal-u32-canonical-provider-runner-v1"
@@ -316,6 +318,12 @@ int main(int argc, const char *argv[]) {
         printf("protocol=%s\nstatus=ready\n", protocol);
         printf("device=%s\n", device.name.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)outputLength);
+        printf("completion_contract=nuis-yir-provider-physical-completion-v1\n");
+        printf("completion_status=fence-observed\n");
+        printf("completion_target_clock_domain=shader.clock.frame.v1\n");
+        printf("completion_source_clock_domain=apple.mach-continuous.v1\n");
+        printf("completion_fence_source=metal.command-buffer.completed\n");
+        printf("completion_source_clock=%llu\n", (unsigned long long)completionClock);
         if (!emitOutputs(outputBuffers, outputLength, outputDescriptorList)) {
             return fail(@"Metal f32 output carrier write failed");
         }

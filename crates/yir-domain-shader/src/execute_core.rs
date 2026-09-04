@@ -9,9 +9,10 @@ use super::{
 };
 use yir_core::{
     issue_observe_completion_receipt, project_provider_completion_receipt, BlendState, DepthState,
-    ExecutionState, IndexBuffer, Node, RasterState, RenderPass, RenderPipeline, RenderStateSet,
-    Resource, SamplerState, ShaderBinding, ShaderBindingSet, ShaderFlowState, ShaderResultHandle,
-    StructValue, SurfaceTarget, Value, VertexBuffer, VertexLayout, Viewport, YirResultFamily,
+    ExecutionState, IndexBuffer, InlineShaderModule, Node, RasterState, RenderPass, RenderPipeline,
+    RenderStateSet, Resource, SamplerState, ShaderBinding, ShaderBindingSet, ShaderFlowState,
+    ShaderResultHandle, StructValue, SurfaceTarget, Value, VertexBuffer, VertexLayout, Viewport,
+    YirResultFamily,
 };
 
 pub(crate) fn execute_shader_core_node(
@@ -456,11 +457,58 @@ fn execute_begin_pass(node: &Node, state: &ExecutionState) -> Result<Value, Stri
             ))
         }
     };
+    let shader_module = node
+        .op
+        .args
+        .get(3)
+        .map(|name| expect_inline_shader_module(node, state, name))
+        .transpose()?;
     Ok(Value::RenderPass(RenderPass {
         target,
         pipeline,
         viewport,
+        shader_module,
     }))
+}
+
+fn expect_inline_shader_module(
+    node: &Node,
+    state: &ExecutionState,
+    name: &str,
+) -> Result<InlineShaderModule, String> {
+    let Value::Struct(module) = state.expect_value(name)? else {
+        return Err(format!(
+            "shader.begin_pass expects inline shader module value, got {}",
+            state.expect_value(name)?
+        ));
+    };
+    if module.type_name != "ShaderInlineWgsl" {
+        return Err(format!(
+            "node `{}` expects ShaderInlineWgsl module, got `{}`",
+            node.name, module.type_name
+        ));
+    }
+    let symbol = |field_name: &str| {
+        module
+            .fields
+            .iter()
+            .find(|(name, _)| name == field_name)
+            .and_then(|(_, value)| match value {
+                Value::Symbol(value) => Some(value.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                format!(
+                    "node `{}` inline shader module is missing symbol field `{field_name}`",
+                    node.name
+                )
+            })
+    };
+    Ok(InlineShaderModule {
+        language: "wgsl".to_owned(),
+        entry: symbol("entry")?,
+        source: symbol("source")?,
+    })
 }
 
 fn execute_observe(node: &Node, state: &ExecutionState) -> Result<Value, String> {

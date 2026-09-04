@@ -35,6 +35,7 @@ pub(crate) fn draw_ball_surface(value: &Value) -> Result<FrameSurface, String> {
         width,
         height,
         rows,
+        rgba8: None,
     })
 }
 
@@ -85,6 +86,7 @@ pub(crate) fn draw_ball_surface_with_size(
         width,
         height,
         rows,
+        rgba8: None,
     })
 }
 
@@ -135,5 +137,6 @@ pub(crate) fn draw_sphere_surface_with_size(
         width,
         height,
         rows,
+        rgba8: None,
     })
 }

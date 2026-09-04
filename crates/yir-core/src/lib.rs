@@ -234,6 +234,12 @@ pub struct ExecutionState {
     pub shared_mutex_values: BTreeMap<String, Value>,
     pub shared_mutex_release_epochs: BTreeMap<String, u64>,
     pub shared_mutex_permit_cardinalities: BTreeMap<String, i64>,
+    presented_frames: Vec<FrameSurface>,
+    provider_completion_witnesses: BTreeMap<String, ProviderCompletionWitness>,
+    pending_provider_completions: BTreeSet<String>,
+    staged_provider_physical_completions: BTreeMap<String, ProviderPhysicalCompletion>,
+    next_provider_completion_clocks: BTreeMap<String, i64>,
+    provider_physical_clock_frontiers: BTreeMap<(String, String), i64>,
 }
 
 impl ExecutionState {
@@ -454,6 +460,14 @@ impl ExecutionState {
             )
             .or_default()
             .push(event);
+    }
+
+    pub fn record_presented_frame(&mut self, frame: FrameSurface) {
+        self.presented_frames.push(frame);
+    }
+
+    pub fn presented_frames(&self) -> &[FrameSurface] {
+        &self.presented_frames
     }
 
     pub fn alloc_heap_node(&mut self, value: i64, next: Option<usize>) -> usize {

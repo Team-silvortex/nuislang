@@ -153,10 +153,20 @@ pub(super) fn ast_expr_from_nir(expr: NirExpr) -> super::AstExpr {
             base: Box::new(ast_expr_from_nir(*base)),
             field,
         },
+        NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Xor,
+            lhs,
+            rhs,
+        } => super::AstExpr::Call {
+            callee: "i64_xor".to_owned(),
+            generic_args: Vec::new(),
+            args: vec![ast_expr_from_nir(*lhs), ast_expr_from_nir(*rhs)],
+        },
         NirExpr::Binary { op, lhs, rhs } => super::AstExpr::Binary {
             op: match op {
                 nuis_semantics::model::NirBinaryOp::And => nuis_semantics::model::AstBinaryOp::And,
                 nuis_semantics::model::NirBinaryOp::Or => nuis_semantics::model::AstBinaryOp::Or,
+                nuis_semantics::model::NirBinaryOp::Xor => unreachable!(),
                 nuis_semantics::model::NirBinaryOp::Add => nuis_semantics::model::AstBinaryOp::Add,
                 nuis_semantics::model::NirBinaryOp::Sub => nuis_semantics::model::AstBinaryOp::Sub,
                 nuis_semantics::model::NirBinaryOp::Mul => nuis_semantics::model::AstBinaryOp::Mul,

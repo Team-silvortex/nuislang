@@ -243,36 +243,23 @@ fn execute(
             request.buffer.layout, request.kernel.operation
         ));
     };
+    let output_kind = if is_gray8_invert(request) || is_gray8_threshold(request) {
+        "pixelmagic-image-bytes"
+    } else if is_f32_argmax(request) {
+        "provider-scalar-u32"
+    } else if is_u32_compute(request) {
+        "provider-tensor-u32"
+    } else {
+        "provider-tensor-f32"
+    };
+    let mut summary =
+        metal_native_output_summary(request.kernel.id.clone(), output_kind, &execution, None);
+    summary.completion_evidence_contract =
+        yir_core::PROVIDER_PHYSICAL_COMPLETION_CONTRACT.to_owned();
+    summary.completion_clock_evidence = execution.physical_completion.to_wire();
+    summary.completion_status = "physical-fence-observed".to_owned();
     Ok(ProviderRequestExecution {
-        summary: if is_gray8_invert(request) || is_gray8_threshold(request) {
-            metal_native_output_summary(
-                request.kernel.id.clone(),
-                "pixelmagic-image-bytes",
-                &execution,
-                None,
-            )
-        } else if is_f32_argmax(request) {
-            metal_native_output_summary(
-                request.kernel.id.clone(),
-                "provider-scalar-u32",
-                &execution,
-                None,
-            )
-        } else if is_u32_compute(request) {
-            metal_native_output_summary(
-                request.kernel.id.clone(),
-                "provider-tensor-u32",
-                &execution,
-                None,
-            )
-        } else {
-            metal_native_output_summary(
-                request.kernel.id.clone(),
-                "provider-tensor-f32",
-                &execution,
-                None,
-            )
-        },
+        summary,
         output_payload: execution.output_payload,
         transferable_output: execution.transferable_output,
         additional_outputs: Vec::new(),

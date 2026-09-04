@@ -262,6 +262,14 @@ pub struct RenderPass {
     pub target: SurfaceTarget,
     pub pipeline: RenderPipeline,
     pub viewport: Viewport,
+    pub shader_module: Option<InlineShaderModule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlineShaderModule {
+    pub language: String,
+    pub entry: String,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,6 +277,31 @@ pub struct FrameSurface {
     pub width: usize,
     pub height: usize,
     pub rows: Vec<String>,
+    pub rgba8: Option<Vec<u8>>,
+}
+
+impl FrameSurface {
+    pub fn from_rgba8(width: usize, height: usize, rgba8: Vec<u8>) -> Result<Self, String> {
+        let expected = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| "RGBA8 frame dimensions overflow".to_owned())?;
+        if rgba8.len() != expected {
+            return Err(format!(
+                "RGBA8 frame byte count is {}, expected {} for {}x{}",
+                rgba8.len(),
+                expected,
+                width,
+                height
+            ));
+        }
+        Ok(Self {
+            width,
+            height,
+            rows: Vec::new(),
+            rgba8: Some(rgba8),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

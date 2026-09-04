@@ -178,7 +178,7 @@ pub fn verify_module_with_registry(
     ensure_acyclic(module)?;
     verify_glm_protocol(module)?;
     verify_data_fabric_protocol(module, &resources)?;
-    verify_result_state_nodes(module)?;
+    verify_result_state_nodes(module, registry)?;
     verify_scheduler_contract_nodes(module, &resources, &nodes)?;
     verify_project_type_contract_nodes(module)?;
     verify_lowering_contract_nodes(module)?;

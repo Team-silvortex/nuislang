@@ -260,6 +260,52 @@ fn lowers_provider_completion_receipts_for_all_domain_results() {
     }
 }
 
+#[test]
+fn lowers_implicit_receipt_only_for_a_registered_provider_source() {
+    let mut registered = empty_lowering_state();
+    registered.provider_completion_sources.insert(
+        "provider_value".to_owned(),
+        (YirResultFamily::Shader, "domain0".to_owned()),
+    );
+    let observed = result_node(
+        "result",
+        "shader.observe",
+        vec!["provider_value", "frame_ready"],
+    );
+    assert!(lower_domain_result_observer_node(
+        &observed,
+        &mut registered
+    ));
+    let Some(LlvmValueRef::DomainResult(result)) = registered.registers.get("result") else {
+        panic!("registered shader observer should produce a result");
+    };
+    assert_eq!(
+        result
+            .receipt
+            .as_ref()
+            .map(|receipt| receipt.completion_clock.as_str()),
+        Some("%2")
+    );
+    assert!(registered
+        .body
+        .iter()
+        .any(|line| line.contains("atomicrmw add ptr @nuis_provider_completion_clock_v1")));
+
+    let mut unregistered = empty_lowering_state();
+    assert!(lower_domain_result_observer_node(
+        &observed,
+        &mut unregistered
+    ));
+    let Some(LlvmValueRef::DomainResult(result)) = unregistered.registers.get("result") else {
+        panic!("receipt-less shader observer should still produce a result");
+    };
+    assert!(result.receipt.is_none());
+    assert!(!unregistered
+        .body
+        .iter()
+        .any(|line| line.contains("nuis_provider_completion_clock_v1")));
+}
+
 fn family_observe_state(family: YirResultFamily) -> &'static str {
     match family {
         YirResultFamily::Data => "ready",
@@ -287,6 +333,7 @@ fn empty_lowering_state() -> LlvmLoweringState {
         body: Vec::new(),
         globals: Vec::new(),
         registers: BTreeMap::new(),
+        provider_completion_sources: BTreeMap::new(),
         delayed_registers: BTreeMap::new(),
         facts: KnownFacts::new(),
         buffer_lengths: BTreeMap::new(),

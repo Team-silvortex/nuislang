@@ -1,6 +1,7 @@
 use std::{ptr, slice};
 
-use yir_core::Value;
+use yir_core::ModRegistry;
+use yir_exec::ExecutionTrace;
 
 #[repr(C)]
 pub struct NuisRenderedBuffer {
@@ -9,17 +10,24 @@ pub struct NuisRenderedBuffer {
 }
 
 pub fn render_module_to_ppm_bytes(module_source: &str, scale: usize) -> Result<Vec<u8>, String> {
+    let registry = yir_verify::default_registry();
+    let trace = execute_module_source_with_registry(module_source, &registry)?;
+    render_trace_to_ppm_bytes(&trace, scale)
+}
+
+pub fn execute_module_source_with_registry(
+    module_source: &str,
+    registry: &ModRegistry,
+) -> Result<ExecutionTrace, String> {
     let module = yir_syntax::parse_module(module_source)?;
-    yir_verify::verify_module(&module)?;
-    let trace = yir_exec::execute_module(&module)?;
+    yir_exec::execute_module_with_registry(&module, registry)
+}
+
+pub fn render_trace_to_ppm_bytes(trace: &ExecutionTrace, scale: usize) -> Result<Vec<u8>, String> {
     let frame = trace
-        .values
-        .values()
-        .find_map(|value| match value {
-            Value::Frame(frame) => Some(frame),
-            _ => None,
-        })
-        .ok_or_else(|| "no frame value found in executed YIR graph".to_owned())?;
+        .presented_frames
+        .last()
+        .ok_or_else(|| "executed YIR graph did not present a frame".to_owned())?;
     let image = yir_host_render::rasterize_frame(frame, scale);
     Ok(image.to_ppm())
 }
@@ -84,5 +92,32 @@ pub unsafe extern "C" fn nuis_rendered_buffer_reset(out_buffer: *mut NuisRendere
     unsafe {
         (*out_buffer).ptr = ptr::null_mut();
         (*out_buffer).len = 0;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use yir_core::{FrameSurface, Value};
+
+    #[test]
+    fn renderer_requires_a_structurally_presented_frame() {
+        let frame = FrameSurface {
+            width: 1,
+            height: 1,
+            rows: vec!["#".to_owned()],
+            rgba8: None,
+        };
+        let mut trace = ExecutionTrace::default();
+        trace
+            .values
+            .insert("unpresented".to_owned(), Value::Frame(frame.clone()));
+        assert!(render_trace_to_ppm_bytes(&trace, 1)
+            .unwrap_err()
+            .contains("did not present a frame"));
+
+        trace.presented_frames.push(frame);
+        let ppm = render_trace_to_ppm_bytes(&trace, 1).unwrap();
+        assert!(ppm.starts_with(b"P6\n1 1\n255\n"));
     }
 }

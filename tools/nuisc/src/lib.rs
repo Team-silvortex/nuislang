@@ -144,6 +144,7 @@ mod registry_validation;
 pub mod render;
 mod shader_canonical_compute;
 mod shader_msl_emitter;
+pub mod shader_msl_render_emitter;
 pub mod shader_source;
 mod shader_spirv_emitter;
 mod stage_handoff;

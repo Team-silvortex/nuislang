@@ -629,6 +629,30 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 step: *step,
             }
         }
+        "i64_xor" => {
+            let [lhs, rhs] = args else {
+                return Err("i64_xor(...) expects 2 args".to_owned());
+            };
+            NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Xor,
+                lhs: Box::new(lower_expr(
+                    lhs,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+                rhs: Box::new(lower_expr(
+                    rhs,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+            }
+        }
         "cpu_present_frame" => {
             let [frame] = args else {
                 return Err("cpu_present_frame(...) expects 1 arg".to_owned());

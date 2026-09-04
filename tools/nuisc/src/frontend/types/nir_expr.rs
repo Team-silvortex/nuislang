@@ -512,6 +512,16 @@ pub(crate) fn infer_nir_expr_type(
                         None
                     }
                 }
+                NirBinaryOp::Xor => {
+                    if compatible_types(&lhs_ty, &rhs_ty)
+                        && lhs_ty == i64_type()
+                        && rhs_ty == i64_type()
+                    {
+                        Some(i64_type())
+                    } else {
+                        None
+                    }
+                }
                 NirBinaryOp::Add
                 | NirBinaryOp::Sub
                 | NirBinaryOp::Mul

@@ -68,6 +68,22 @@ mod cpu NovaAppRuntime {
     return width > 0 && height > 0 && target_fps > 0;
   }
 
+  /// Rebuilds the nuis-yir-provider-completion-receipt-v1 token in Nuis code.
+  pub fn completion_receipt_token(root: i64, completion_tick: i64) -> i64 {
+    let mixed: i64 = i64_xor(root, completion_tick);
+    let positive: i64 = if mixed > 0 { mixed } else { 1 };
+    return if positive % 2 == 0 { positive + 1 } else { positive };
+  }
+
+  pub fn completion_receipt_matches(
+    token: i64,
+    completion_tick: i64,
+    root: i64
+  ) -> bool {
+    return token > 0 && completion_tick >= 0 && root > 0 &&
+      token == completion_receipt_token(root, completion_tick);
+  }
+
   pub fn open(
     width: i64,
     height: i64,
@@ -115,7 +131,7 @@ mod cpu NovaAppRuntime {
       present_requested: 0,
       completion_token: 0,
       completion_tick: observed_tick,
-      completion_root: 0
+      completion_root: state.last_completion_root
     };
   }
 
@@ -131,7 +147,9 @@ mod cpu NovaAppRuntime {
       provider_ready == 1 &&
       provider_token > 0 &&
       completion_root > 0 &&
-      completion_tick >= frame.begin_tick;
+      completion_tick >= frame.begin_tick &&
+      completion_receipt_matches(provider_token, completion_tick, completion_root) &&
+      (frame.completion_root == 0 || frame.completion_root == completion_root);
     return NovaFrameResultHandle {
       token: if completed { provider_token } else { 0 },
       frame_index: frame.frame_index,
@@ -151,6 +169,8 @@ mod cpu NovaAppRuntime {
       result.root > 0 &&
       result.frame_index == frame.frame_index &&
       result.completion_tick >= frame.begin_tick &&
+      completion_receipt_matches(result.token, result.completion_tick, result.root) &&
+      (frame.completion_root == 0 || frame.completion_root == result.root) &&
       result.provider_ready == 1 &&
       result.consumed == 0;
   }

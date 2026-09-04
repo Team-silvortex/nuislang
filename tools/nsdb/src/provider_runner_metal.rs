@@ -33,6 +33,7 @@ use std::{
     process::{Command, Stdio},
     time::SystemTime,
 };
+use yir_core::{ProviderPhysicalCompletion, PROVIDER_PHYSICAL_COMPLETION_CONTRACT};
 
 #[cfg(target_os = "macos")]
 const METAL_GRAY8_UNARY_SOURCE: &str = include_str!("../provider-runners/metal_gray8_unary.m");
@@ -99,6 +100,7 @@ pub(crate) struct MetalProviderExecution {
     pub(crate) output_device_retention_status: String,
     pub(crate) output_payload: ProviderOutputPayload,
     pub(crate) transferable_output: Option<PreparedProviderCarrierChannel>,
+    pub(crate) physical_completion: ProviderPhysicalCompletion,
 }
 
 pub(crate) fn execute_gray8_invert(
@@ -600,6 +602,25 @@ fn parse_metal_runner_output_with_payload(
     if output_payload.as_bytes().len() != declared_bytes {
         return Err("Metal provider runner output byte count mismatch".to_owned());
     }
+    if field("completion_contract") != Some(PROVIDER_PHYSICAL_COMPLETION_CONTRACT) {
+        return Err("Metal provider runner returned an unsupported completion contract".to_owned());
+    }
+    if field("completion_status") != Some("fence-observed") {
+        return Err("Metal provider runner did not report a completed fence".to_owned());
+    }
+    let completion_clock = field("completion_source_clock")
+        .ok_or_else(|| "Metal provider runner omitted completion clock".to_owned())?
+        .parse::<i64>()
+        .map_err(|_| "Metal provider runner completion clock is invalid".to_owned())?;
+    let physical_completion = ProviderPhysicalCompletion::new(
+        field("completion_target_clock_domain")
+            .ok_or_else(|| "Metal provider runner omitted target clock domain".to_owned())?,
+        field("completion_source_clock_domain")
+            .ok_or_else(|| "Metal provider runner omitted source clock domain".to_owned())?,
+        field("completion_fence_source")
+            .ok_or_else(|| "Metal provider runner omitted fence source".to_owned())?,
+        completion_clock,
+    )?;
     Ok(MetalProviderExecution {
         contract: expected_contract,
         status: "metal-command-buffer-completed",
@@ -615,6 +636,7 @@ fn parse_metal_runner_output_with_payload(
         output_device_retention_status: "unsupported".to_owned(),
         output_payload,
         transferable_output: None,
+        physical_completion,
     })
 }
 

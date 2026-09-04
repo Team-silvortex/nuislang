@@ -59,11 +59,7 @@ pub(crate) fn describe_shader_node(
             2,
             "shader.pack_ball_state <name> <resource> <color> <speed>",
         ),
-        "begin_pass" => describe_fixed_pure_deps(
-            node,
-            3,
-            "shader.begin_pass <name> <resource> <target> <pipeline> <viewport>",
-        ),
+        "begin_pass" => describe_begin_pass(node),
         "observe" => describe_observe(node),
         "is_pass_ready" | "is_frame_ready" | "value" | "completion_token" | "completion_clock"
         | "completion_root" => describe_result_access(node),
@@ -118,6 +114,16 @@ fn require_shader_resource(node: &Node, resource: &Resource) -> Result<(), Strin
             node.name, resource.name, resource.kind.raw
         ))
     }
+}
+
+fn describe_begin_pass(node: &Node) -> Result<InstructionSemantics, String> {
+    if !matches!(node.op.args.len(), 3 | 4) {
+        return Err(format!(
+            "node `{}` expects `shader.begin_pass <name> <resource> <target> <pipeline> <viewport> [shader_module]`",
+            node.name
+        ));
+    }
+    Ok(InstructionSemantics::pure(node.op.args.clone()))
 }
 
 fn describe_target_config(node: &Node) -> Result<InstructionSemantics, String> {

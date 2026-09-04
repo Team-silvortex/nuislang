@@ -159,6 +159,54 @@ fn rejects_completion_projection_from_receipt_less_observe() {
     assert!(error.contains("receipt-less"));
 }
 
+#[test]
+fn accepts_completion_projection_from_registered_shader_provider() {
+    let module = shader_completion_receipt_module();
+    verify_module(&module).unwrap();
+}
+
+fn shader_completion_receipt_module() -> YirModule {
+    YirModule {
+        version: "0.1".to_owned(),
+        resources: vec![Resource {
+            name: "shader0".to_owned(),
+            kind: ResourceKind::parse("shader.reference"),
+        }],
+        nodes: vec![
+            node("target", "shader0", "shader.target", &["rgba8", "8", "8"]),
+            node(
+                "pipeline",
+                "shader0",
+                "shader.pipeline",
+                &["flat", "triangle"],
+            ),
+            node("viewport", "shader0", "shader.viewport", &["8", "8"]),
+            node(
+                "pass",
+                "shader0",
+                "shader.begin_pass",
+                &["target", "pipeline", "viewport"],
+            ),
+            node(
+                "result",
+                "shader0",
+                "shader.observe",
+                &["pass", "pass_ready"],
+            ),
+            node("token", "shader0", "shader.completion_token", &["result"]),
+        ],
+        edges: vec![
+            dep("target", "pass"),
+            dep("pipeline", "pass"),
+            dep("viewport", "pass"),
+            dep("pass", "result"),
+            dep("result", "token"),
+        ],
+        node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
+    }
+}
+
 fn data_completion_receipt_module(with_clock: bool) -> YirModule {
     let mut observe_args = vec!["pipe", "moved"];
     if with_clock {

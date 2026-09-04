@@ -104,6 +104,7 @@ pub(in crate::lowering) fn eval_const_i64_with_env(
             match op {
                 NirBinaryOp::And => Some(i64::from(lhs != 0 && rhs != 0)),
                 NirBinaryOp::Or => Some(i64::from(lhs != 0 || rhs != 0)),
+                NirBinaryOp::Xor => Some(lhs ^ rhs),
                 NirBinaryOp::Add => Some(lhs + rhs),
                 NirBinaryOp::Sub => Some(lhs - rhs),
                 NirBinaryOp::Mul => Some(lhs * rhs),

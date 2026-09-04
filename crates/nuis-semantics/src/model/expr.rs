@@ -602,6 +602,7 @@ pub enum NirExpr {
 pub enum NirBinaryOp {
     And,
     Or,
+    Xor,
     Add,
     Sub,
     Mul,

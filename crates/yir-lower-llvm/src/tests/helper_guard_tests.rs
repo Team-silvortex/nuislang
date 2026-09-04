@@ -704,6 +704,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         &param_bindings,
         &BTreeMap::new(),
         &BTreeMap::new(),
+        &BTreeMap::new(),
         &branch_effect_emitters,
         CpuCallScalarKind::I32,
         &mut global_counter,
