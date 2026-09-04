@@ -470,8 +470,8 @@ The `beta-0.1` calibration baseline is:
   blocks stale admission before mutation. `official.cffi` now owns two generated GNU resolver providers and four version rows; Nuisc validates and preserves them, Nsld consumes a static build-time table, and runtime registry identity remains `0xc6631e590d61aca8`. Architecture and PE/COFF parity remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `usable/74`, optional;
   reference replay is bound while physical certification and adapters remain open
-* `standard-library/ns-nova/application-rendering-framework`: `active/96`, optional;
-  compiled PixelMagic WGSL is now bound to each render pass and lowered through a bounded MSL 2.4 path; three real M2 draw commands return 160x120 RGBA8 frames with same-command physical fences, while production provider registration, resource bindings, and continuous event dispatch remain open
+* `standard-library/ns-nova/application-rendering-framework`: `active/98`, optional;
+  compiled PixelMagic WGSL is now projected automatically from verified project YIR into a content-addressed MSL contribution and a registration-resolved provider request; code-asset descriptor v2 binds the ordered vertex/fragment entries, and a real NS Nova AOT run reaches the persistent Nuis worker, returning a verified 160x120 RGBA8 frame plus a same-command Metal fence. Live framework consumption of that worker result, shader resource bindings, and continuous event dispatch remain open
 
 These scores describe the new beta slices only. Existing `stable/100` cells
 remain evidence that their narrower protocol milestone closed; they are not a
@@ -1862,8 +1862,8 @@ The provider-neutral `nuis-provider-code-asset-descriptor-v1` now carries
 format, target, visible entry, package-relative path, byte length, digest
 contract, and content hash through both single and collection requests.
 Partial descriptors, absolute or traversing paths, and malformed FNV bindings
-fail closed. `nuis-kernel-code-asset-registry-v1` is now the single authority
-for the CUDA PTX bytes, target, entry, package-relative file name, and digest
+fail closed. Additive `nuis-provider-code-asset-descriptor-v2` preserves the scalar primary entry and adds a bounded unique entry set; raster assets bind vertex/fragment symbols to one byte identity and reject entry drift before provider handoff.
+`nuis-kernel-code-asset-registry-v1` is now the single authority for the CUDA PTX bytes, target, entry, package-relative file name, and digest
 contract. The asset also owns its minimum compute capability. The bytes are
 now produced by `nuis-kernel-ptx-emitter-registry-v1`, which consumes a
 `nuis-kernel-yir-codegen-table-v1`. Normal AOT reparses and verifies its

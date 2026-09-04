@@ -8,8 +8,8 @@ use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_code_asset_contribution::{
     kernel_asset_contribution, registered_asset_contribution, render_code_asset_contribution_table,
-    required_registered_asset_contribution, shader_sidecar_contribution,
-    DomainCodeAssetContribution,
+    required_registered_asset_contribution, shader_render_asset_contribution,
+    shader_sidecar_contribution, DomainCodeAssetContribution,
 };
 use crate::aot_domain_payload_blob::encode_domain_build_unit_payload_blob;
 use crate::aot_domain_render::render_domain_build_unit_host_bridge_stub;
@@ -23,16 +23,22 @@ use crate::aot_shader_sidecar::render_domain_build_unit_shader_ir_sidecar;
 use crate::kernel_codegen_table::{
     render_codegen_table, KernelYirCodegenTable, KERNEL_YIR_CODEGEN_TABLE_CONTRACT,
 };
+use crate::shader_render_codegen_table::{
+    render_codegen_table as render_shader_codegen_table,
+    validate_codegen_table as validate_shader_codegen_table, ShaderRenderCodegenTable,
+};
 
 pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
     output_dir: &Path,
     units: &mut [BuildManifestDomainBuildUnit],
     kernel_codegen_table: Option<&KernelYirCodegenTable>,
+    shader_render_codegen_table: Option<&ShaderRenderCodegenTable>,
     required_code_assets: &[String],
 ) -> Result<Vec<(String, PathBuf)>, String> {
     let mut artifacts = Vec::new();
     let mut code_asset_contributions = Vec::<DomainCodeAssetContribution>::new();
     let mut wrote_kernel_codegen_table = false;
+    let mut wrote_shader_render_codegen_table = false;
     for unit in units {
         if unit.domain_family == "cpu" {
             continue;
@@ -133,6 +139,32 @@ pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
                 code_asset_contributions.push(contribution);
             }
             artifacts.push(code_asset);
+        }
+        if unit.domain_family == "shader" && !wrote_shader_render_codegen_table {
+            if let Some(table) = shader_render_codegen_table {
+                validate_shader_codegen_table(table)?;
+                if unit.selected_lowering_target.as_deref() != Some(table.lowering_target.as_str())
+                {
+                    return Err(
+                        "AOT Shader render codegen target does not match its build unit".to_owned(),
+                    );
+                }
+                for (index, asset) in table.assets.iter().enumerate() {
+                    let path = output_dir.join(&asset.file_name);
+                    fs::write(&path, asset.source.as_bytes()).map_err(|error| {
+                        format!("failed to write `{}`: {error}", path.display())
+                    })?;
+                    code_asset_contributions
+                        .push(shader_render_asset_contribution(unit, asset, &path)?);
+                    artifacts.push((format!("domain_code_asset_shader_render_{index}"), path));
+                }
+                let table_path = output_dir.join("nuis.domain.shader.render-codegen-table.toml");
+                fs::write(&table_path, render_shader_codegen_table(table)?).map_err(|error| {
+                    format!("failed to write `{}`: {error}", table_path.display())
+                })?;
+                artifacts.push(("domain_codegen_table_shader_render".to_owned(), table_path));
+                wrote_shader_render_codegen_table = true;
+            }
         }
         for (kind, path, registration) in write_registered_nustar_code_assets(output_dir, unit)? {
             code_asset_contributions.push(registered_asset_contribution(
@@ -393,6 +425,7 @@ mod tests {
             &output_dir,
             &mut units,
             None,
+            None,
             &[],
         )
         .unwrap();
@@ -473,6 +506,7 @@ mod tests {
         let artifacts = write_domain_build_unit_stubs_with_kernel_codegen_table(
             &output_dir,
             &mut units,
+            None,
             None,
             &[],
         )
@@ -606,6 +640,7 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             &output_dir,
             &mut units,
             Some(&table),
+            None,
             &[],
         )
         .unwrap();
@@ -673,6 +708,7 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
         let artifacts = write_domain_build_unit_stubs_with_kernel_codegen_table(
             &output_dir,
             &mut units,
+            None,
             None,
             &[
                 "shader.witsage.vector-bias.metal".to_owned(),

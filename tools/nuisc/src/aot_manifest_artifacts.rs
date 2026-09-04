@@ -11,6 +11,10 @@ use crate::aot_domain_index_render::{
 use crate::aot_manifest_types::CompileArtifacts;
 use crate::kernel_codegen_table::{table_from_compiled_project_yir, KernelYirCodegenTable};
 use crate::linker::{self, LinkPlanDomainUnit, LinkPlanLifecycle};
+use crate::shader_render_codegen_table::{
+    table_from_compiled_project_yir as shader_render_table_from_compiled_project_yir,
+    ShaderRenderCodegenTable,
+};
 
 pub(crate) struct BuildManifestArtifactSet {
     pub(crate) artifacts: Vec<(String, PathBuf)>,
@@ -57,10 +61,13 @@ pub(crate) fn prepare_build_manifest_artifacts(
         ]);
     }
     let kernel_codegen_table = load_project_kernel_codegen_table(written, domain_build_units)?;
+    let shader_render_codegen_table =
+        load_project_shader_render_codegen_table(written, domain_build_units)?;
     artifacts.extend(write_domain_build_unit_stubs_with_kernel_codegen_table(
         output_dir,
         domain_build_units,
         kernel_codegen_table.as_ref(),
+        shader_render_codegen_table.as_ref(),
         required_code_assets,
     )?);
 
@@ -153,6 +160,28 @@ fn load_project_kernel_codegen_table(
     let source = std::fs::read_to_string(&written.yir_path)
         .map_err(|error| format!("failed to read `{}`: {error}", written.yir_path))?;
     table_from_compiled_project_yir(&source, lowering_target).map(Some)
+}
+
+fn load_project_shader_render_codegen_table(
+    written: &CompileArtifacts,
+    domain_build_units: &[BuildManifestDomainBuildUnit],
+) -> Result<Option<ShaderRenderCodegenTable>, String> {
+    let Some(lowering_target) = domain_build_units
+        .iter()
+        .find(|unit| {
+            unit.domain_family == "shader"
+                && matches!(
+                    unit.selected_lowering_target.as_deref(),
+                    Some("metal.apple-silicon-gpu" | "metal.mac-discrete-or-integrated-gpu")
+                )
+        })
+        .and_then(|unit| unit.selected_lowering_target.as_deref())
+    else {
+        return Ok(None);
+    };
+    let source = std::fs::read_to_string(&written.yir_path)
+        .map_err(|error| format!("failed to read `{}`: {error}", written.yir_path))?;
+    shader_render_table_from_compiled_project_yir(&source, lowering_target)
 }
 
 fn render_clock_protocol(

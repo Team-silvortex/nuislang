@@ -1,5 +1,4 @@
 use crate::{
-    provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT,
     provider_edge_transport::PROVIDER_EDGE_TRANSPORT_CONTRACT,
     provider_request::{
         provider_request_collection_from_evidence, provider_request_from_evidence, ProviderRequest,
@@ -317,10 +316,7 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
     }
     if let Some(asset) = &request.code_asset {
         for (name, value) in [
-            (
-                "descriptor_contract",
-                PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT.to_owned(),
-            ),
+            ("descriptor_contract", asset.descriptor_contract.clone()),
             ("id", asset.id.clone()),
             ("format", asset.format.clone()),
             ("target", asset.target.clone()),
@@ -331,6 +327,16 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
             ("content_hash", asset.content_hash.clone()),
         ] {
             push_toml_string(out, &format!("provider_code_asset_{name}"), &value);
+        }
+        if asset.descriptor_contract
+            == crate::provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT
+        {
+            push_toml_string(
+                out,
+                "provider_code_asset_entry_count",
+                &asset.entries.len().to_string(),
+            );
+            push_toml_string(out, "provider_code_asset_entries", &asset.entries.join(","));
         }
     }
     if !request.output_comparisons.is_empty() {

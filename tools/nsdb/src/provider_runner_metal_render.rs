@@ -1,12 +1,29 @@
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
 use std::{fs, path::PathBuf, time::SystemTime};
 
+#[cfg(target_os = "macos")]
+use crate::provider_process_adapter::{
+    ProviderProcessAdapterCache, ResolvedProviderProcessAdapter,
+};
 use crate::provider_runner_metal::MetalProviderExecution;
+use std::path::Path;
 
 #[cfg(target_os = "macos")]
 const METAL_RGBA8_RENDER_SOURCE: &str = include_str!("../provider-runners/metal_rgba8_render.m");
-const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v1";
+pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v1";
 
+#[cfg(target_os = "macos")]
+pub(crate) fn prepare_rgba8_render_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+    crate::provider_runner_metal::prepare_metal_worker_invocation(
+        cache,
+        METAL_RGBA8_RENDER_SOURCE,
+        METAL_RGBA8_RENDER_CONTRACT,
+    )
+}
+
+#[cfg(test)]
 pub(crate) fn execute_rgba8_render(
     msl_source: &str,
     vertex_entry: &str,
@@ -17,9 +34,34 @@ pub(crate) fn execute_rgba8_render(
     execute_rgba8_render_platform(msl_source, vertex_entry, fragment_entry, width, height)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
 fn execute_rgba8_render_platform(
     msl_source: &str,
+    vertex_entry: &str,
+    fragment_entry: &str,
+    width: usize,
+    height: usize,
+) -> Result<MetalProviderExecution, String> {
+    if width == 0 || height == 0 {
+        return Err("Metal RGBA8 render dimensions must be positive".to_owned());
+    }
+    let source = TempMslSource::materialize(msl_source)?;
+    execute_rgba8_render_asset_platform(&source.path, vertex_entry, fragment_entry, width, height)
+}
+
+pub(crate) fn execute_rgba8_render_asset(
+    msl_path: &Path,
+    vertex_entry: &str,
+    fragment_entry: &str,
+    width: usize,
+    height: usize,
+) -> Result<MetalProviderExecution, String> {
+    execute_rgba8_render_asset_platform(msl_path, vertex_entry, fragment_entry, width, height)
+}
+
+#[cfg(target_os = "macos")]
+fn execute_rgba8_render_asset_platform(
+    msl_path: &Path,
     vertex_entry: &str,
     fragment_entry: &str,
     width: usize,
@@ -32,9 +74,8 @@ fn execute_rgba8_render_platform(
         .checked_mul(height)
         .and_then(|pixels| pixels.checked_mul(4))
         .ok_or_else(|| "Metal RGBA8 render byte count overflow".to_owned())?;
-    let source = TempMslSource::materialize(msl_source)?;
     crate::provider_runner_metal::execute_metal_platform(
-        source.path.as_os_str(),
+        msl_path.as_os_str(),
         &[
             vertex_entry.to_owned(),
             fragment_entry.to_owned(),
@@ -49,6 +90,17 @@ fn execute_rgba8_render_platform(
 }
 
 #[cfg(not(target_os = "macos"))]
+fn execute_rgba8_render_asset_platform(
+    _msl_path: &Path,
+    _vertex_entry: &str,
+    _fragment_entry: &str,
+    _width: usize,
+    _height: usize,
+) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
+#[cfg(all(test, not(target_os = "macos")))]
 fn execute_rgba8_render_platform(
     _msl_source: &str,
     _vertex_entry: &str,
@@ -59,12 +111,12 @@ fn execute_rgba8_render_platform(
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
 struct TempMslSource {
     path: PathBuf,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
 impl TempMslSource {
     fn materialize(source: &str) -> Result<Self, String> {
         let nonce = SystemTime::now()
@@ -81,7 +133,7 @@ impl TempMslSource {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
 impl Drop for TempMslSource {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);

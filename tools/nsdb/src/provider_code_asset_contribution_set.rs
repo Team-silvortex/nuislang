@@ -144,11 +144,18 @@ fn validate_requests(
             .iter()
             .filter(|asset| asset.id == row.asset_id)
             .collect::<Vec<_>>();
-        if assets
+        let repeated_entries = assets.iter().all(|asset| {
+            asset.descriptor_contract == super::PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT
+                && asset.entries == row.entries
+        });
+        let partitioned_entries = assets.iter().all(|asset| {
+            asset.descriptor_contract == super::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT
+                && asset.entries.len() == 1
+        }) && assets
             .iter()
-            .map(|asset| asset.entry.as_str())
-            .collect::<Vec<_>>()
-            != row.entries
+            .flat_map(|asset| asset.entries.iter().map(String::as_str))
+            .eq(row.entries.iter().map(String::as_str));
+        if !(repeated_entries || partitioned_entries)
             || assets.iter().any(|asset| {
                 asset.format != row.format
                     || asset.target != row.target

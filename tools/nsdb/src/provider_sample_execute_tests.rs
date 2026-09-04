@@ -39,7 +39,7 @@ materialization_status = "provider-sample-materialized"
     );
     fs::write(
         output_dir.join("nuis.nsdb.device-provider-samples.toml"),
-        manifest,
+        &manifest,
     )
     .unwrap();
 
@@ -133,7 +133,7 @@ materialization_status = "provider-sample-materialized"
     );
     fs::write(
         output_dir.join("nuis.nsdb.device-provider-samples.toml"),
-        manifest,
+        &manifest,
     )
     .unwrap();
 

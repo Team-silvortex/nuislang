@@ -115,7 +115,7 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 22] {
+fn registrations() -> [DeviceSampleInputRegistration; 23] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
@@ -127,6 +127,7 @@ fn registrations() -> [DeviceSampleInputRegistration; 22] {
         crate::artifact_device_sample_shader_metal::mul_registration(),
         crate::artifact_device_sample_shader_metal::xor_registration(),
         crate::artifact_device_sample_shader_metal::chain_registration(),
+        crate::artifact_device_sample_shader_render::registration(),
         crate::artifact_device_sample_shader_vulkan::registration(),
         crate::artifact_device_sample_shader_vulkan::add_registration(),
         crate::artifact_device_sample_shader_vulkan::add_pair_registration(),
@@ -340,5 +341,17 @@ mod tests {
         assert!(chain.contains("provider_request_1_input_binding_0_source=dependency"));
         assert!(chain.contains("provider_request_1_code_asset_id=shader.metal.xor-u32.msl"));
         assert!(chain.contains("provider_code_asset_identity_set_count=2"));
+
+        let project_render = enrich_registered_input_evidence(
+            "metal",
+            "apple-silicon-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=project-render",
+        )
+        .unwrap();
+        assert!(project_render
+            .contains("provider_sample_registration_id=official.shader.project-render"));
+        assert!(project_render.contains(
+            "provider_shader_render_projection_contract=nuis-shader-render-provider-projection-v1"
+        ));
     }
 }

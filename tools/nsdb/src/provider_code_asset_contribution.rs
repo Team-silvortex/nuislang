@@ -277,12 +277,19 @@ fn validate_requests(row: &ContributionRow, requests: &[ProviderRequest]) -> Res
         .filter_map(|request| request.code_asset.as_ref())
         .filter(|asset| asset.id == row.asset_id)
         .collect::<Vec<_>>();
+    let repeated_entries = selected.iter().all(|asset| {
+        asset.descriptor_contract == super::PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT
+            && asset.entries == row.entries
+    });
+    let partitioned_entries = selected.iter().all(|asset| {
+        asset.descriptor_contract == super::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT
+            && asset.entries.len() == 1
+    }) && selected
+        .iter()
+        .flat_map(|asset| asset.entries.iter().map(String::as_str))
+        .eq(row.entries.iter().map(String::as_str));
     if selected.len() != requests.len()
-        || selected
-            .iter()
-            .map(|asset| asset.entry.as_str())
-            .collect::<Vec<_>>()
-            != row.entries
+        || !(repeated_entries || partitioned_entries)
         || selected.iter().any(|asset| {
             asset.format != row.format
                 || asset.target != row.target

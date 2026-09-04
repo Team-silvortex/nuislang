@@ -69,7 +69,6 @@ mod provider_result_projection;
 mod provider_runner_coreml;
 mod provider_runner_cuda;
 mod provider_runner_metal;
-#[cfg(test)]
 mod provider_runner_metal_render;
 mod provider_runner_metal_u32;
 mod provider_runner_native;

@@ -12,14 +12,18 @@ pub(crate) mod selection_payload;
 
 pub(crate) const PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-code-asset-descriptor-v1";
+pub(crate) const PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT: &str =
+    "nuis-provider-code-asset-descriptor-v2";
 pub(crate) const CODE_ASSET_FNV1A64_DIGEST_CONTRACT: &str = "nuis-code-asset-digest-fnv1a64-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderCodeAssetDescriptor {
+    pub(crate) descriptor_contract: String,
     pub(crate) id: String,
     pub(crate) format: String,
     pub(crate) target: String,
     pub(crate) entry: String,
+    pub(crate) entries: Vec<String>,
     pub(crate) path: String,
     pub(crate) byte_length: usize,
     pub(crate) digest_contract: String,
@@ -34,12 +38,30 @@ pub(crate) fn parse_code_asset(
     let Some(contract) = fields.get(&contract_key) else {
         return (!fields.keys().any(|key| key.starts_with(prefix))).then_some(None);
     };
-    (contract == PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT).then_some(())?;
+    matches!(
+        contract.as_str(),
+        PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT | PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT
+    )
+    .then_some(())?;
+    let entry = field(fields, prefix, "entry")?.clone();
+    let entries = if contract == PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT {
+        (!fields.contains_key(&format!("{prefix}entry_count"))
+            && !fields.contains_key(&format!("{prefix}entries")))
+        .then_some(vec![entry.clone()])?
+    } else {
+        let count = field(fields, prefix, "entry_count")?
+            .parse::<usize>()
+            .ok()?;
+        let entries = parse_entries(field(fields, prefix, "entries")?)?;
+        (entries.len() == count).then_some(entries)?
+    };
     let asset = ProviderCodeAssetDescriptor {
+        descriptor_contract: contract.clone(),
         id: field(fields, prefix, "id")?.clone(),
         format: field(fields, prefix, "format")?.clone(),
         target: field(fields, prefix, "target")?.clone(),
-        entry: field(fields, prefix, "entry")?.clone(),
+        entry,
+        entries,
         path: field(fields, prefix, "path")?.clone(),
         byte_length: field(fields, prefix, "byte_length")?.parse().ok()?,
         digest_contract: field(fields, prefix, "digest_contract")?.clone(),
@@ -49,14 +71,31 @@ pub(crate) fn parse_code_asset(
 }
 
 fn validate_code_asset(asset: &ProviderCodeAssetDescriptor) -> bool {
-    token_is_valid(&asset.id)
+    matches!(
+        asset.descriptor_contract.as_str(),
+        PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT | PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT
+    ) && token_is_valid(&asset.id)
         && token_is_valid(&asset.format)
         && token_is_valid(&asset.target)
         && symbol_is_valid(&asset.entry)
+        && (1..=64).contains(&asset.entries.len())
+        && asset.entries.first() == Some(&asset.entry)
+        && asset.entries.iter().all(|entry| symbol_is_valid(entry))
+        && asset
+            .entries
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            == asset.entries.len()
         && relative_asset_path_is_valid(&asset.path)
         && asset.byte_length > 0
         && asset.digest_contract == CODE_ASSET_FNV1A64_DIGEST_CONTRACT
         && fnv1a64_hash_is_valid(&asset.content_hash)
+}
+
+fn parse_entries(value: &str) -> Option<Vec<String>> {
+    let entries = value.split(',').map(str::to_owned).collect::<Vec<_>>();
+    (!entries.is_empty() && entries.iter().all(|entry| !entry.is_empty())).then_some(entries)
 }
 
 fn token_is_valid(value: &str) -> bool {
@@ -128,6 +167,41 @@ mod tests {
         assert_eq!(asset.format, "ptx");
         assert_eq!(asset.target, "sm_80");
         assert_eq!(asset.entry, "nuis_kernel_vector_add_f32");
+        assert_eq!(asset.entries, ["nuis_kernel_vector_add_f32"]);
+    }
+
+    #[test]
+    fn parses_multi_entry_descriptor_v2() {
+        let mut fields = descriptor("render.metal");
+        fields.insert(
+            "asset_descriptor_contract".to_owned(),
+            PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT.to_owned(),
+        );
+        fields.insert("asset_entry".to_owned(), "vs_main".to_owned());
+        fields.insert("asset_entry_count".to_owned(), "2".to_owned());
+        fields.insert("asset_entries".to_owned(), "vs_main,fs_main".to_owned());
+
+        let asset = parse_code_asset(&fields, "asset_")
+            .expect("valid v2 descriptor")
+            .expect("present descriptor");
+        assert_eq!(asset.entry, "vs_main");
+        assert_eq!(asset.entries, ["vs_main", "fs_main"]);
+    }
+
+    #[test]
+    fn rejects_drifted_multi_entry_descriptor_v2() {
+        let mut fields = descriptor("render.metal");
+        fields.insert(
+            "asset_descriptor_contract".to_owned(),
+            PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT.to_owned(),
+        );
+        fields.insert("asset_entry".to_owned(), "vs_main".to_owned());
+        fields.insert("asset_entry_count".to_owned(), "2".to_owned());
+        fields.insert("asset_entries".to_owned(), "fs_main,vs_main".to_owned());
+        assert!(parse_code_asset(&fields, "asset_").is_none());
+
+        fields.insert("asset_entries".to_owned(), "vs_main,vs_main".to_owned());
+        assert!(parse_code_asset(&fields, "asset_").is_none());
     }
 
     #[test]

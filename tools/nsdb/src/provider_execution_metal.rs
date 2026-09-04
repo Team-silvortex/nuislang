@@ -35,7 +35,18 @@ fn prepare_worker_adapter(
     inputs: &[PreparedProviderInput],
 ) -> Result<Option<PreparedProviderExecutionAdapter>, String> {
     validate_metal_input_count(output_dir, request, inputs.len())?;
-    let (prepared, arguments) = if is_gray8_invert(request) {
+    let (prepared, arguments) = if is_rgba8_render(request) {
+        let render = validated_metal_render_request(output_dir, request)?;
+        (
+            crate::provider_runner_metal_render::prepare_rgba8_render_worker_invocation(cache)?,
+            vec![
+                format!("literal:{}", render.vertex_entry),
+                format!("literal:{}", render.fragment_entry),
+                format!("literal:{}", render.width),
+                format!("literal:{}", render.height),
+            ],
+        )
+    } else if is_gray8_invert(request) {
         let max_value = request
             .scalar_u8("max_value")
             .ok_or_else(|| "Metal provider request is missing u8 scalar `max_value`".to_owned())?;
@@ -120,7 +131,24 @@ fn execute(
     worker_receipt: &mut ProviderWorkerDispatchReceipt,
 ) -> Result<ProviderRequestExecution, String> {
     validate_metal_input_count(output_dir, request, inputs.len())?;
-    let execution = if is_gray8_invert(request) {
+    let execution = if is_rgba8_render(request) {
+        let render = validated_metal_render_request(output_dir, request)?;
+        if uses_process_adapter(worker_receipt) {
+            crate::provider_runner_metal::parse_metal_worker_output(
+                &worker_receipt.worker_output_payload,
+                crate::provider_runner_metal_render::METAL_RGBA8_RENDER_CONTRACT,
+                worker_receipt.worker_output_result.take(),
+            )?
+        } else {
+            crate::provider_runner_metal_render::execute_rgba8_render_asset(
+                &render.code_asset_path,
+                &render.vertex_entry,
+                &render.fragment_entry,
+                render.width,
+                render.height,
+            )?
+        }
+    } else if is_gray8_invert(request) {
         let max_value = request
             .scalar_u8("max_value")
             .ok_or_else(|| "Metal provider request is missing u8 scalar `max_value`".to_owned())?;
@@ -243,7 +271,9 @@ fn execute(
             request.buffer.layout, request.kernel.operation
         ));
     };
-    let output_kind = if is_gray8_invert(request) || is_gray8_threshold(request) {
+    let output_kind = if is_rgba8_render(request) {
+        "provider-frame-rgba8"
+    } else if is_gray8_invert(request) || is_gray8_threshold(request) {
         "pixelmagic-image-bytes"
     } else if is_f32_argmax(request) {
         "provider-scalar-u32"
@@ -291,7 +321,7 @@ fn validated_metal_code_asset(
     let asset = request
         .code_asset
         .as_ref()
-        .ok_or_else(|| "Metal f32 request is missing its code asset".to_owned())?;
+        .ok_or_else(|| "Metal request is missing its code asset".to_owned())?;
     if asset.format != "metal-source"
         || !matches!(
             asset.target.as_str(),
@@ -303,6 +333,100 @@ fn validated_metal_code_asset(
     }
     let path = crate::provider_process_adapter::validate_provider_code_asset(output_dir, request)?;
     Ok((path, asset.entry.clone()))
+}
+
+struct ValidatedMetalRenderRequest {
+    code_asset_path: std::path::PathBuf,
+    vertex_entry: String,
+    fragment_entry: String,
+    width: usize,
+    height: usize,
+}
+
+fn validated_metal_render_request(
+    output_dir: &Path,
+    request: &ProviderRequest,
+) -> Result<ValidatedMetalRenderRequest, String> {
+    if !is_rgba8_render(request) || request.input_bindings.len() != 1 {
+        return Err("Metal RGBA8 render request shape is incompatible".to_owned());
+    }
+    let (code_asset_path, vertex_entry) = validated_metal_code_asset(output_dir, request)?;
+    let asset = request
+        .code_asset
+        .as_ref()
+        .expect("validated Metal render code asset");
+    let input = &request.input_bindings[0];
+    if input.element_type != "u8"
+        || input.layout != "tensor-contiguous"
+        || input.shape.as_slice() != [asset.byte_length]
+        || input.row_stride_bytes != asset.byte_length
+        || input.byte_length != asset.byte_length
+        || input.payload_path != asset.path
+        || input.content_hash != asset.content_hash
+    {
+        return Err(
+            "Metal RGBA8 render input must be the verified MSL code asset capability".to_owned(),
+        );
+    }
+    let fragment_entry = request
+        .kernel
+        .scalar_bindings
+        .iter()
+        .find(|binding| binding.name == "fragment_entry" && binding.value_type == "symbol")
+        .map(|binding| binding.value.as_str())
+        .filter(|entry| valid_metal_symbol(entry))
+        .ok_or_else(|| {
+            "Metal RGBA8 render request is missing symbol scalar `fragment_entry`".to_owned()
+        })?
+        .to_owned();
+    if asset.entries.as_slice() != [vertex_entry.as_str(), fragment_entry.as_str()] {
+        return Err(
+            "Metal RGBA8 render entries must match the complete verified code asset entry set"
+                .to_owned(),
+        );
+    }
+    let output = &request.output_bindings[0];
+    let [width, height] = output.shape.as_slice() else {
+        return Err("Metal RGBA8 render output must have a two-dimensional shape".to_owned());
+    };
+    let row_stride = width
+        .checked_mul(4)
+        .ok_or_else(|| "Metal RGBA8 render row stride overflow".to_owned())?;
+    let byte_length = row_stride
+        .checked_mul(*height)
+        .ok_or_else(|| "Metal RGBA8 render output length overflow".to_owned())?;
+    if output.element_type != "u8"
+        || output.layout != "image-2d-row-major:pixel-format=rgba8"
+        || output.row_stride_bytes != row_stride
+        || output.byte_length != byte_length
+        || request.kernel.dispatch != [*width, *height, 1]
+    {
+        return Err("Metal RGBA8 render output descriptor is incompatible".to_owned());
+    }
+    Ok(ValidatedMetalRenderRequest {
+        code_asset_path,
+        vertex_entry,
+        fragment_entry,
+        width: *width,
+        height: *height,
+    })
+}
+
+fn valid_metal_symbol(value: &str) -> bool {
+    value
+        .bytes()
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
+fn is_rgba8_render(request: &ProviderRequest) -> bool {
+    request.kernel.operation == "render-rgba8"
+        && request.output_bindings.len() == 1
+        && request.output_bindings[0].element_type == "u8"
+        && request.output_bindings[0].layout == "image-2d-row-major:pixel-format=rgba8"
 }
 
 fn is_gray8_invert(request: &ProviderRequest) -> bool {
@@ -366,6 +490,17 @@ fn validate_metal_input_count(
     request: &ProviderRequest,
     input_count: usize,
 ) -> Result<(), String> {
+    if is_rgba8_render(request) {
+        validated_metal_render_request(output_dir, request)?;
+        return (input_count == 1 && request.input_bindings.len() == 1)
+            .then_some(())
+            .ok_or_else(|| {
+                format!(
+                    "Metal RGBA8 render `{}` requires one verified code asset input",
+                    request.kernel.id
+                )
+            });
+    }
     if is_u32_compute(request) {
         let (path, entry) = validated_metal_code_asset(output_dir, request)?;
         let (expected_inputs, expected_outputs) = metal_u32_buffer_counts(&path, &entry)?;

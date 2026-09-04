@@ -10,6 +10,7 @@ use crate::{
     aot_toml::{escape_toml_string, render_string_array},
     kernel_codegen_table::KernelYirCodegenTable,
     registry::NustarCodeAssetRegistration,
+    shader_render_codegen_table::ShaderRenderCodeAsset,
 };
 
 pub(crate) const DOMAIN_CODE_ASSET_CONTRIBUTION_TABLE_CONTRACT: &str =
@@ -57,6 +58,30 @@ pub(crate) fn shader_sidecar_contribution(
         bytes,
     )
     .map(Some)
+}
+
+pub(crate) fn shader_render_asset_contribution(
+    unit: &BuildManifestDomainBuildUnit,
+    asset: &ShaderRenderCodeAsset,
+    path: &Path,
+) -> Result<DomainCodeAssetContribution, String> {
+    if unit.domain_family != "shader"
+        || unit.selected_lowering_target.as_deref() != Some(asset.target.as_str())
+    {
+        return Err(format!(
+            "generated Shader render asset `{}` does not belong to AOT unit `{}`",
+            asset.asset_id, unit.package_id
+        ));
+    }
+    contribution(
+        unit,
+        asset.asset_id.clone(),
+        asset.format,
+        &asset.target,
+        path,
+        asset.entries.clone(),
+        asset.source.as_bytes(),
+    )
 }
 
 pub(crate) fn kernel_asset_contribution(

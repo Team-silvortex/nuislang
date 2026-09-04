@@ -388,10 +388,13 @@ fn u32_request(
         }],
         model_asset: None,
         code_asset: Some(ProviderCodeAssetDescriptor {
+            descriptor_contract:
+                crate::provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT.to_owned(),
             id: asset_id.to_owned(),
             format: VULKAN_SPIRV_FORMAT.to_owned(),
             target: VULKAN_SPIRV_TARGET.to_owned(),
             entry: entry.to_owned(),
+            entries: vec![entry.to_owned()],
             path: path.to_owned(),
             byte_length: spirv.len(),
             digest_contract: CODE_ASSET_FNV1A64_DIGEST_CONTRACT.to_owned(),

@@ -237,7 +237,7 @@ fn validate_project_identity_item(
     {
         return false;
     }
-    shared_descriptors_match(partition, &entries)
+    project_descriptors_match(partition, &entries)
 }
 
 fn validate_descriptor_identity_item(
@@ -252,16 +252,10 @@ fn validate_descriptor_identity_item(
     else {
         return false;
     };
-    let entries = partition
-        .iter()
-        .filter_map(|request| {
-            request
-                .code_asset
-                .as_ref()
-                .map(|asset| asset.entry.as_str())
-        })
-        .collect::<Vec<_>>();
-    shared_descriptors_match(partition, &entries)
+    let Some(entries) = descriptor_partition_entries(partition) else {
+        return false;
+    };
+    descriptor_partition_matches(partition, &entries)
         && item.identity_hash
             == descriptor_code_asset_identity_hash(
                 &item.asset_id,
@@ -275,7 +269,7 @@ fn validate_descriptor_identity_item(
             )
 }
 
-fn shared_descriptors_match(partition: &[&ProviderRequest], entries: &[impl AsRef<str>]) -> bool {
+fn project_descriptors_match(partition: &[&ProviderRequest], entries: &[impl AsRef<str>]) -> bool {
     let Some(first) = partition
         .first()
         .and_then(|request| request.code_asset.as_ref())
@@ -288,6 +282,7 @@ fn shared_descriptors_match(partition: &[&ProviderRequest], entries: &[impl AsRe
         .all(|(request, expected_entry)| {
             request.code_asset.as_ref().is_some_and(|asset| {
                 asset.entry == expected_entry.as_ref()
+                    && asset.entries.as_slice() == [expected_entry.as_ref()]
                     && asset.format == first.format
                     && asset.target == first.target
                     && asset.path == first.path
@@ -296,6 +291,69 @@ fn shared_descriptors_match(partition: &[&ProviderRequest], entries: &[impl AsRe
                     && asset.content_hash == first.content_hash
             })
         })
+}
+
+fn descriptor_partition_entries<'a>(partition: &[&'a ProviderRequest]) -> Option<Vec<&'a str>> {
+    let assets = partition
+        .iter()
+        .map(|request| request.code_asset.as_ref())
+        .collect::<Option<Vec<_>>>()?;
+    let first = assets.first()?;
+    let entries: Vec<&'a str> = if assets.iter().all(|asset| {
+        asset.descriptor_contract
+            == crate::provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_V2_CONTRACT
+            && asset.entries == first.entries
+    }) {
+        first.entries.iter().map(String::as_str).collect()
+    } else if assets.iter().all(|asset| {
+        asset.descriptor_contract
+            == crate::provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT
+            && asset.entries.len() == 1
+    }) {
+        assets
+            .iter()
+            .flat_map(|asset| asset.entries.iter().map(String::as_str))
+            .collect()
+    } else {
+        return None;
+    };
+    ((1..=64).contains(&entries.len())
+        && entries.iter().copied().collect::<BTreeSet<_>>().len() == entries.len())
+    .then_some(entries)
+}
+
+fn descriptor_partition_matches(partition: &[&ProviderRequest], entries: &[&str]) -> bool {
+    let Some(first) = partition
+        .first()
+        .and_then(|request| request.code_asset.as_ref())
+    else {
+        return false;
+    };
+    let same_metadata = partition.iter().all(|request| {
+        request.code_asset.as_ref().is_some_and(|asset| {
+            asset.format == first.format
+                && asset.target == first.target
+                && asset.path == first.path
+                && asset.byte_length == first.byte_length
+                && asset.digest_contract == first.digest_contract
+                && asset.content_hash == first.content_hash
+        })
+    });
+    let repeated_set = partition.iter().all(|request| {
+        request.code_asset.as_ref().is_some_and(|asset| {
+            asset
+                .entries
+                .iter()
+                .map(String::as_str)
+                .eq(entries.iter().copied())
+        })
+    });
+    let partitioned_set = partition
+        .iter()
+        .filter_map(|request| request.code_asset.as_ref())
+        .flat_map(|asset| asset.entries.iter().map(String::as_str))
+        .eq(entries.iter().copied());
+    same_metadata && (repeated_set || partitioned_set)
 }
 
 fn validate_primary_compatibility(

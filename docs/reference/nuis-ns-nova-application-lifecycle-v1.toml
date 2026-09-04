@@ -1,6 +1,6 @@
 schema = "nuis-ns-nova-application-lifecycle-v1"
 status = "active"
-progress = 96
+progress = 98
 owner = "nuis.ns-nova"
 runtime_module = "stdlib/ns-nova/lib/app_runtime.ns"
 reference_project = "examples/projects/domains/ns_nova_showcase"
@@ -70,6 +70,12 @@ metal_physical_clock_order_status = "two-live-command-buffers-monotonic-verified
 physical_present_gate_status = "three-frame-same-command-metal-raster-and-fence-verified"
 inline_shader_module_binding_status = "pixelmagic-profile-module-bound-to-render-pass-verified"
 canonical_metal_raster_lowering_status = "bounded-wgsl-vertex-fragment-to-msl24-verified"
+project_render_codegen_table_status = "compiled-yir-to-content-addressed-msl-verified"
+project_render_request_projection_status = "run-artifact-registration-resolved-verified"
+multi_entry_code_asset_status = "descriptor-v2-vertex-fragment-identity-verified"
+production_metal_raster_provider_status = "registered-request-through-nuis-worker-verified"
+metal_render_code_asset_input_status = "hash-bound-capability-fd-verified"
+production_metal_aot_execution_status = "160x120-rgba8-worker-fence-verified"
 reference_function_execution_status = "function-table-bound-helper-and-aggregate-loop-verified"
 yir_dependency_inference_status = "explicit-result-edge-cycle-guard-verified"
 aot_graph_status = "acyclic-after-text-roundtrip-verified"
@@ -111,9 +117,13 @@ compiled_inline_shader_module_binding = true
 canonical_wgsl_to_msl_raster_lowering = true
 same_command_gpu_frame_and_fence = true
 physical_gpu_frame_rasterization = true
-production_metal_raster_provider_registration = false
+production_metal_raster_provider_registration = true
+automatic_project_render_codegen = true
+automatic_provider_request_projection = true
+multi_entry_code_asset_descriptor = true
+production_worker_result_presentation = false
 resource_bound_gpu_rasterization = false
 
 [next_slice]
-action = "promote the integration-registered Metal raster adapter into the production provider registry, then add resource-bound texture and buffer inputs without coupling NS Nova, PixelMagic, or Nuisc"
-validation = "select the production provider through registration, render a resource-bound PixelMagic frame, export the exact same command buffer's RGBA8 pixels and physical fence, preserve fail-closed evidence checks, and retain a symmetric non-Metal provider boundary"
+action = "bind the registered worker's RGBA8 result and physical completion into NovaFrameResultHandle so the live NS Nova lifecycle, rather than an embedded YIR framebuffer path, owns presentation"
+validation = "run the compiled NS Nova project through automatic render contribution and request projection, consume the worker-returned 160x120 RGBA8 frame and physical fence in the application lifecycle, reject asset or receipt drift, and retain a symmetric non-Metal provider boundary"

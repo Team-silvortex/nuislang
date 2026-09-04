@@ -34,6 +34,7 @@ pub fn render_relocated_unpacked_build_manifest(
         output_dir,
         &mut domain_build_units,
         None,
+        None,
         &required_code_assets,
     )?;
     let bridge_registry_path = write_domain_bridge_registry(output_dir, &domain_build_units)?;
