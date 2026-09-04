@@ -285,9 +285,11 @@ pub(super) fn render_shader_nir_expr(value: &NirExpr) -> Option<String> {
         NirExpr::ShaderInlineWgsl { entry, source } => {
             render_shader_inline_wgsl_expr(entry, source)
         }
-        NirExpr::ShaderResult { value, .. } => {
-            format!("shader_result({})", render_nir_expr(value))
-        }
+        NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        } => render_result_expr("shader_result", value, completion_clock.as_deref()),
         NirExpr::ShaderPassReady(result) => {
             format!("shader_pass_ready({})", render_nir_expr(result))
         }

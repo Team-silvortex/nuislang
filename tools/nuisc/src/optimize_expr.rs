@@ -301,14 +301,22 @@ pub(super) fn simplify_expr(
                 a || b || c || d || e || f,
             )
         }
-        NirExpr::KernelResult { value, state } => {
-            let (value, changed) = simplify_expr(*value, env, inline_templates, active_inline);
+        NirExpr::KernelResult {
+            value,
+            state,
+            completion_clock,
+        } => {
+            let (value, value_changed) =
+                simplify_expr(*value, env, inline_templates, active_inline);
+            let (completion_clock, clock_changed) =
+                simplify_optional_box_expr(completion_clock, env, inline_templates, active_inline);
             (
                 NirExpr::KernelResult {
                     value: Box::new(value),
                     state,
+                    completion_clock,
                 },
-                changed,
+                value_changed || clock_changed,
             )
         }
         NirExpr::KernelConfigReady(inner) => {
@@ -319,12 +327,35 @@ pub(super) fn simplify_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::KernelValue(Box::new(inner)), changed)
         }
-        NirExpr::ShaderResult { value, state } => {
-            let (value, changed) = simplify_expr(*value, env, inline_templates, active_inline);
+        NirExpr::ShaderResult {
+            value,
+            state,
+            completion_clock,
+        } => {
+            let (value, value_changed) =
+                simplify_expr(*value, env, inline_templates, active_inline);
+            let (completion_clock, clock_changed) =
+                simplify_optional_box_expr(completion_clock, env, inline_templates, active_inline);
             (
                 NirExpr::ShaderResult {
                     value: Box::new(value),
                     state,
+                    completion_clock,
+                },
+                value_changed || clock_changed,
+            )
+        }
+        NirExpr::ResultCompletionReceipt {
+            family,
+            field,
+            result,
+        } => {
+            let (result, changed) = simplify_expr(*result, env, inline_templates, active_inline);
+            (
+                NirExpr::ResultCompletionReceipt {
+                    family,
+                    field,
+                    result: Box::new(result),
                 },
                 changed,
             )
@@ -340,6 +371,24 @@ pub(super) fn simplify_expr(
         NirExpr::ShaderValue(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::ShaderValue(Box::new(inner)), changed)
+        }
+        NirExpr::NetworkResult {
+            value,
+            state,
+            completion_clock,
+        } => {
+            let (value, value_changed) =
+                simplify_expr(*value, env, inline_templates, active_inline);
+            let (completion_clock, clock_changed) =
+                simplify_optional_box_expr(completion_clock, env, inline_templates, active_inline);
+            (
+                NirExpr::NetworkResult {
+                    value: Box::new(value),
+                    state,
+                    completion_clock,
+                },
+                value_changed || clock_changed,
+            )
         }
         NirExpr::ShaderBeginPass {
             target,

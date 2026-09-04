@@ -285,6 +285,59 @@ fn substitute_inline_params(expr: &NirExpr, substitutions: &BTreeMap<String, Nir
             lhs: Box::new(substitute_inline_params(lhs, substitutions)),
             rhs: Box::new(substitute_inline_params(rhs, substitutions)),
         },
+        NirExpr::DataResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::DataResult {
+            value: Box::new(substitute_inline_params(value, substitutions)),
+            state: *state,
+            completion_clock: completion_clock
+                .as_deref()
+                .map(|clock| Box::new(substitute_inline_params(clock, substitutions))),
+        },
+        NirExpr::ShaderResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::ShaderResult {
+            value: Box::new(substitute_inline_params(value, substitutions)),
+            state: *state,
+            completion_clock: completion_clock
+                .as_deref()
+                .map(|clock| Box::new(substitute_inline_params(clock, substitutions))),
+        },
+        NirExpr::KernelResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::KernelResult {
+            value: Box::new(substitute_inline_params(value, substitutions)),
+            state: *state,
+            completion_clock: completion_clock
+                .as_deref()
+                .map(|clock| Box::new(substitute_inline_params(clock, substitutions))),
+        },
+        NirExpr::NetworkResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::NetworkResult {
+            value: Box::new(substitute_inline_params(value, substitutions)),
+            state: *state,
+            completion_clock: completion_clock
+                .as_deref()
+                .map(|clock| Box::new(substitute_inline_params(clock, substitutions))),
+        },
+        NirExpr::ResultCompletionReceipt {
+            family,
+            field,
+            result,
+        } => NirExpr::ResultCompletionReceipt {
+            family: *family,
+            field: *field,
+            result: Box::new(substitute_inline_params(result, substitutions)),
+        },
         other => other.clone(),
     }
 }

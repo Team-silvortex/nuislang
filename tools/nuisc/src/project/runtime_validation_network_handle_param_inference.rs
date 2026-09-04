@@ -201,21 +201,50 @@ fn infer_network_param_requirements_in_expr(
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
-        | NirExpr::IsNull(inner) => infer_network_param_requirements_in_expr(
-            inner,
-            requirements,
-            function_requirements,
-            bindings,
-        )?,
-        NirExpr::DataResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::NetworkResult { value, .. }
-        | NirExpr::KernelResult { value, .. } => infer_network_param_requirements_in_expr(
+        | NirExpr::IsNull(inner)
+        | NirExpr::ResultCompletionReceipt { result: inner, .. } => {
+            infer_network_param_requirements_in_expr(
+                inner,
+                requirements,
+                function_requirements,
+                bindings,
+            )?
+        }
+        NirExpr::DataResult {
             value,
-            requirements,
-            function_requirements,
-            bindings,
-        )?,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            infer_network_param_requirements_in_expr(
+                value,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            if let Some(clock) = completion_clock {
+                infer_network_param_requirements_in_expr(
+                    clock,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+        }
         NirExpr::AllocNode { value, next } => {
             infer_network_param_requirements_in_expr(
                 value,

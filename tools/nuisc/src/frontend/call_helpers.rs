@@ -5,7 +5,7 @@ use nuis_semantics::model::{
 };
 
 use super::{
-    async_parameter_violation_detail, compatible_types, ensure_result_like, expr_type,
+    async_parameter_violation_detail, compatible_types, ensure_result_like, expr_type, i64_type,
     infer_nir_expr_address_class, infer_nir_expr_type, infer_result_stage,
     lower_nested_expr_with_async_and_consts, render_type_name, FunctionSignature, ModuleConstValue,
     NestedExprWithConstsInput,
@@ -407,7 +407,8 @@ pub(super) struct ResultWrapperCallInput<'a> {
     pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
     pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
     pub(super) family: NirResultFamily,
-    pub(super) build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
+    pub(super) build:
+        fn(Box<NirExpr>, NirResultStage, Option<Box<NirExpr>>) -> Result<NirExpr, String>,
     pub(super) expected_shape: &'a str,
 }
 
@@ -427,8 +428,10 @@ pub(super) fn lower_result_wrapper_call_with_consts(
         build,
         expected_shape,
     } = input;
-    let [value] = args else {
-        return Err(format!("{name}(...) expects 1 arg"));
+    let (value, completion_clock) = match args {
+        [value] => (value, None),
+        [value, completion_clock] => (value, Some(completion_clock)),
+        _ => return Err(format!("{name}(...) expects 1 or 2 args")),
     };
     let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
         name,
@@ -454,7 +457,22 @@ pub(super) fn lower_result_wrapper_call_with_consts(
         .ok_or_else(|| format!("{name}(...) could not infer payload type for result wrapper"))?;
     validate_result_stage_payload(stage, &payload)
         .map_err(|error| format!("{name}(...): {error}"))?;
-    build(Box::new(lowered), stage)
+    let completion_clock = completion_clock
+        .map(|clock| {
+            lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+                expr: clock,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                expected: Some(&i64_type()),
+            })
+            .map(Box::new)
+        })
+        .transpose()?;
+    build(Box::new(lowered), stage, completion_clock)
 }
 
 fn validate_result_stage_payload(

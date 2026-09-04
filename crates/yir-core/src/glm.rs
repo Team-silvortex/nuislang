@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::{
     owned_select_tree_conditions, owned_select_tree_scalar_args, owned_select_tree_transfers,
-    parse_branch_effect_args, parse_branch_owned_call_args, parse_owned_select_tree_args,
-    Operation, SemanticOp,
+    parse_branch_effect_args, parse_branch_owned_call_args, parse_loop_owned_struct_carry,
+    parse_owned_select_tree_args, Operation, SemanticOp,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -444,6 +444,7 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
         Some("owned_bytes_copy_drop") => 8,
         Some("scoped_call") => 9,
         Some("scoped_call_owned_return") => 10,
+        Some("scoped_call_owned_struct_return") => 11,
         _ => op.args.len(),
     };
     let mut moves_owned = false;
@@ -451,7 +452,13 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
         if operand == "$current" {
             continue;
         }
-        let (input, class, mode) = if let Some(input) = operand.strip_prefix("copy_owned:") {
+        let carried = parse_loop_owned_struct_carry(operand)
+            .ok()
+            .flatten()
+            .map(|(_, input)| input);
+        let (input, class, mode) = if let Some(input) = carried {
+            (input, GlmValueClass::Val, GlmUseMode::Read)
+        } else if let Some(input) = operand.strip_prefix("copy_owned:") {
             (input, GlmValueClass::Res, GlmUseMode::Read)
         } else if let Some(input) = operand.strip_prefix("move_owned:") {
             moves_owned = true;

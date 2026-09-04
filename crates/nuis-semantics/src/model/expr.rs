@@ -78,6 +78,7 @@ pub enum NirExpr {
     DataResult {
         value: Box<NirExpr>,
         state: NirDataFlowState,
+        completion_clock: Option<Box<NirExpr>>,
     },
     DataReady(Box<NirExpr>),
     DataMoved(Box<NirExpr>),
@@ -316,6 +317,7 @@ pub enum NirExpr {
     NetworkResult {
         value: Box<NirExpr>,
         state: NirNetworkFlowState,
+        completion_clock: Option<Box<NirExpr>>,
     },
     NetworkConfigReady(Box<NirExpr>),
     NetworkSendReady(Box<NirExpr>),
@@ -334,6 +336,7 @@ pub enum NirExpr {
     KernelResult {
         value: Box<NirExpr>,
         state: NirKernelFlowState,
+        completion_clock: Option<Box<NirExpr>>,
     },
     KernelConfigReady(Box<NirExpr>),
     KernelValue(Box<NirExpr>),
@@ -492,6 +495,12 @@ pub enum NirExpr {
     ShaderResult {
         value: Box<NirExpr>,
         state: NirShaderFlowState,
+        completion_clock: Option<Box<NirExpr>>,
+    },
+    ResultCompletionReceipt {
+        family: NirResultFamily,
+        field: NirCompletionReceiptField,
+        result: Box<NirExpr>,
     },
     ShaderPassReady(Box<NirExpr>),
     ShaderFrameReady(Box<NirExpr>),

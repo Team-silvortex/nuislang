@@ -171,6 +171,7 @@ fn network_owned_handle_provenance_accepts_network_result_wrapped_helper_return(
             vec![NirStmt::Return(Some(NirExpr::NetworkResult {
                 value: Box::new(open_tcp_stream_expr()),
                 state: NirNetworkFlowState::ConfigReady,
+                completion_clock: None,
             }))],
         ),
         private_fn(
@@ -219,6 +220,7 @@ fn network_owned_handle_provenance_rejects_network_result_wrapped_listener_retur
                     args: vec![NirExpr::Int(9000), NirExpr::Int(125), NirExpr::Int(150)],
                 }),
                 state: NirNetworkFlowState::ConfigReady,
+                completion_clock: None,
             }))],
         ),
         private_fn(

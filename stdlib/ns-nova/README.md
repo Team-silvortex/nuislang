@@ -50,6 +50,12 @@ Current state:
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
   frame through `NovaFrameResultHandle` before submission and conditional presentation
+* that loop carries and rebinds one aggregate `NovaAppState` across all three
+  frame-helper calls through the generic recursive-scalar aggregate backedge ABI
+* Shader observe issues the shared YIR provider token/clock/root receipt; the
+  runtime validates and preserves that identity without synthesizing its own token
+* a pure-Nuis kernel receipt test crosses NIR, YIR, LLVM, system linking, and
+  final native execution while using the same family-neutral contract
 * the showcase now carries checked `galaxy.toml` and `ns-nova.toml` manifests whose package inputs are project-owned relative paths; Galaxy dependencies remain registry-resolved rather than embedded as host paths
 * `nuis galaxy init --framework ns-nova` now emits an `ns-nova.toml` profile that carries framework-level assembly metadata, including the standard `ns-nova-selection-v1` selection contract for relational controls such as `list`, `table`, `tree`, `inspector`, and `outline`
 * `ns-nova.toml` now also carries `ns-nova-family-v1` and `ns-nova-render-v1` scaffolding so projects can declare whether they currently lean toward `core`, `ui`, or future `scene` layers
@@ -99,10 +105,13 @@ First source modules:
 Current limitation:
 
 * the current lifecycle is a bounded three-frame validation loop, not a stable
-  interactive world loop; aggregate `NovaAppState` is not yet carried between iterations
+  interactive world loop; aggregate `NovaAppState` carry is native, but continuous
+  event dispatch and an unbounded scheduler-owned world loop remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;
-  the token is not yet issued by a live Shader/Data provider completion bridge
+  its receipt is provider-domain-issued, but its clock still comes from the planned
+  frame deadline rather than a live post-dispatch renderer completion fence
+* YIR text round-tripping preserves the aggregate loop result as an explicit output edge, so the checked window AOT graph remains acyclic
 * the framework does not yet own a renderer; PixelMagic remains an independent
   project-level composition dependency in the showcase
 * the current checked AOT window shell is the replaceable Apple bootstrap adapter;
@@ -121,7 +130,9 @@ It proves:
 
 * explicit import of the reusable Nova lifecycle
 * a bounded Nuis-owned update loop lowered to native LLVM control flow
+* recursive scalar aggregate application state carried across every loop backedge
 * typed frame-result capture, validation, submission, and conditional presentation
+* provider-issued token/clock/root identity preserved into carried application state
 * independent PixelMagic shader ownership
 * registered Data transfer through `FabricPlane`
 * automatic CPU, Data, and Shader ABI recommendation

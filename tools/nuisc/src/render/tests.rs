@@ -1,7 +1,28 @@
 use super::*;
+use nuis_semantics::model::{NirCompletionReceiptField, NirResultFamily, NirShaderFlowState};
 use yir_core::{
     YirFunction, YirFunctionParameter, YirFunctionResult, YirFunctionRole, YirValueOwnership,
 };
+
+#[test]
+fn renders_clocked_provider_result_and_receipt_projection() {
+    let result = NirExpr::ShaderResult {
+        value: Box::new(NirExpr::Var("frame".to_owned())),
+        state: NirShaderFlowState::FrameReady,
+        completion_clock: Some(Box::new(NirExpr::Int(17))),
+    };
+    assert_eq!(render_nir_expr(&result), "shader_result(frame, 17)");
+
+    let projection = NirExpr::ResultCompletionReceipt {
+        family: NirResultFamily::Shader,
+        field: NirCompletionReceiptField::Root,
+        result: Box::new(result),
+    };
+    assert_eq!(
+        render_nir_expr(&projection),
+        "shader_completion_root(shader_result(frame, 17))"
+    );
+}
 
 #[test]
 fn renders_mutable_and_reassigned_ast_locals() {

@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::ProviderCompletionReceipt;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bool(bool),
@@ -113,6 +115,7 @@ pub struct DataCoreBinding {
 pub struct DataResultHandle {
     pub state: DataFlowState,
     pub value: Box<Value>,
+    pub receipt: Option<ProviderCompletionReceipt>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +129,7 @@ pub enum DataFlowState {
 pub struct ShaderResultHandle {
     pub state: ShaderFlowState,
     pub value: Box<Value>,
+    pub receipt: Option<ProviderCompletionReceipt>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,6 +142,7 @@ pub enum ShaderFlowState {
 pub struct KernelResultHandle {
     pub state: KernelFlowState,
     pub value: Box<Value>,
+    pub receipt: Option<ProviderCompletionReceipt>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,6 +154,7 @@ pub enum KernelFlowState {
 pub struct NetworkResultHandle {
     pub state: NetworkFlowState,
     pub value: Box<Value>,
+    pub receipt: Option<ProviderCompletionReceipt>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

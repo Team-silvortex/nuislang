@@ -1,6 +1,7 @@
 use yir_core::{
-    ExecutionState, InstructionSemantics, NetworkFlowState, NetworkResultHandle, Node,
-    RegisteredMod, Resource, Value,
+    issue_observe_completion_receipt, project_provider_completion_receipt, ExecutionState,
+    InstructionSemantics, NetworkFlowState, NetworkResultHandle, Node, RegisteredMod, Resource,
+    Value, YirResultFamily,
 };
 
 pub struct NetworkMod;
@@ -45,9 +46,9 @@ impl RegisteredMod for NetworkMod {
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
             "observe" => {
-                if node.op.args.len() != 2 {
+                if !matches!(node.op.args.len(), 2 | 3) {
                     return Err(format!(
-                        "node `{}` expects `network.observe <name> <resource> <input> <state>`",
+                        "node `{}` expects `network.observe <name> <resource> <input> <state> [completion-clock]`",
                         node.name
                     ));
                 }
@@ -57,7 +58,11 @@ impl RegisteredMod for NetworkMod {
                         node.name
                     )
                 })?;
-                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+                let mut deps = vec![node.op.args[0].clone()];
+                if let Some(clock) = node.op.args.get(2) {
+                    deps.push(clock.clone());
+                }
+                Ok(InstructionSemantics::pure(deps))
             }
             "connect" => {
                 if node.op.args.len() != 3 {
@@ -87,7 +92,8 @@ impl RegisteredMod for NetworkMod {
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "is_config_ready" | "is_send_ready" | "is_recv_ready" | "is_connect_ready"
-            | "is_accept_ready" | "is_closed" | "value" => {
+            | "is_accept_ready" | "is_closed" | "value" | "completion_token"
+            | "completion_clock" | "completion_root" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `network.{} <name> <resource> <result>`",
@@ -142,6 +148,11 @@ impl RegisteredMod for NetworkMod {
                 Ok(Value::NetworkResult(NetworkResultHandle {
                     state: flow,
                     value: Box::new(value),
+                    receipt: issue_observe_completion_receipt(
+                        node,
+                        state,
+                        YirResultFamily::Network,
+                    )?,
                 }))
             }
             "connect" => {
@@ -149,6 +160,7 @@ impl RegisteredMod for NetworkMod {
                 Ok(Value::NetworkResult(NetworkResultHandle {
                     state: NetworkFlowState::ConnectReady,
                     value: Box::new(value),
+                    receipt: None,
                 }))
             }
             "accept" => {
@@ -156,6 +168,7 @@ impl RegisteredMod for NetworkMod {
                 Ok(Value::NetworkResult(NetworkResultHandle {
                     state: NetworkFlowState::AcceptReady,
                     value: Box::new(value),
+                    receipt: None,
                 }))
             }
             "close" => {
@@ -163,6 +176,7 @@ impl RegisteredMod for NetworkMod {
                 Ok(Value::NetworkResult(NetworkResultHandle {
                     state: NetworkFlowState::Closed,
                     value: Box::new(value),
+                    receipt: None,
                 }))
             }
             "is_config_ready" => {
@@ -210,6 +224,10 @@ impl RegisteredMod for NetworkMod {
             "value" => {
                 let result = state.expect_network_result(&node.op.args[0])?;
                 Ok((*result.value).clone())
+            }
+            "completion_token" | "completion_clock" | "completion_root" => {
+                let result = state.expect_network_result(&node.op.args[0])?;
+                project_provider_completion_receipt(result.receipt.as_ref(), &node.op.instruction)
             }
             other => Err(format!(
                 "unsupported network instruction `{other}` for node `{}`",

@@ -1,10 +1,24 @@
 use super::*;
 
+enum ScopedLoopResult<'a> {
+    None,
+    OwnedBytes(&'a str),
+    OwnedStruct {
+        binding: &'a str,
+        ty: &'a NirTypeRef,
+        layout: String,
+    },
+}
+
 pub(super) fn collect_scoped_loop_helper_functions(module: &NirModule) -> BTreeSet<String> {
+    let aggregate_helpers = direct_calls::collect_aggregate_param_direct_call_functions(module);
     let eligible = module
         .functions
         .iter()
-        .filter(|function| direct_calls::supports_direct_call_signature(function))
+        .filter(|function| {
+            direct_calls::supports_direct_call_signature(function)
+                || aggregate_helpers.contains(&function.name)
+        })
         .map(|function| function.name.as_str())
         .collect::<BTreeSet<_>>();
     let mut helpers = BTreeSet::new();
@@ -58,14 +72,16 @@ pub(super) fn lower_scoped_call_while(
     let Some((action, counted_body)) = body.split_first() else {
         return Ok(false);
     };
-    let (callee, args, owned_result_binding) = match action {
+    let (callee, args, result_binding) = match action {
         NirStmt::Expr(NirExpr::Call { callee, args }) => (callee, args, None),
         NirStmt::Let {
             name,
             ty: Some(ty),
             value: NirExpr::Call { callee, args },
-        } if ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty() => {
-            (callee, args, Some(name.as_str()))
+        } if (ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty())
+            || state.struct_defs.contains_key(ty.name.as_str()) =>
+        {
+            (callee, args, Some((name.as_str(), ty)))
         }
         _ => return Ok(false),
     };
@@ -97,22 +113,44 @@ pub(super) fn lower_scoped_call_while(
         .return_type
         .as_ref()
         .is_some_and(|ty| ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty());
-    if returns_owned_bytes != owned_result_binding.is_some() {
-        return Err(format!(
-            "scoped loop helper `{callee}` with owned Bytes return requires `let <owner>: Bytes = {callee}(...)` rebinding"
-        ));
-    }
-    if let Some(owner) = owned_result_binding {
-        if !bindings.contains_key(owner)
-            || !args.iter().any(
-                |arg| matches!(arg, NirExpr::Move(source) if matches!(source.as_ref(), NirExpr::Var(name) if name == owner)),
-            )
+    let owned_struct_layout = function_owned_struct_layout(function, state).filter(|_| {
+        function
+            .return_type
+            .as_ref()
+            .is_some_and(|ty| state.struct_defs.contains_key(ty.name.as_str()))
+    });
+    let result = match (result_binding, returns_owned_bytes, owned_struct_layout) {
+        (None, false, None) => ScopedLoopResult::None,
+        (Some((binding, ty)), true, None)
+            if ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty() =>
         {
+            ScopedLoopResult::OwnedBytes(binding)
+        }
+        (Some((binding, ty)), false, Some(layout))
+            if function
+                .return_type
+                .as_ref()
+                .is_some_and(|returned| returned.render() == ty.render()) =>
+        {
+            ScopedLoopResult::OwnedStruct {
+                binding,
+                ty,
+                layout,
+            }
+        }
+        (None, true, None) => {
             return Err(format!(
-                "scoped owned Bytes return from `{callee}` must rebind the same named owner moved into the helper"
+                "scoped loop helper `{callee}` with owned Bytes return requires `let <owner>: Bytes = {callee}(...)` rebinding"
             ));
         }
-    }
+        (None, false, Some(_)) => {
+            return Err(format!(
+                "scoped loop helper `{callee}` with aggregate return requires same-name state rebinding"
+            ));
+        }
+        _ => return Ok(false),
+    };
+    validate_loop_result_rebinding(&result, function, args, bindings, callee)?;
 
     let Some(initial) = bindings.get(&prepared.binding_name).cloned() else {
         return Err(format!(
@@ -128,21 +166,50 @@ pub(super) fn lower_scoped_call_while(
             && matches!(arg, NirExpr::Move(source) if matches!(source.as_ref(), NirExpr::Var(_)))
     });
     if has_owned_move
-        && !returns_owned_bytes
+        && !matches!(&result, ScopedLoopResult::OwnedBytes(_))
         && !counted_loop_runs_exactly_once(&prepared, const_bindings)
     {
         return Err(format!(
             "scoped loop helper `{callee}` can only move owned Bytes through a loop statically proven to execute exactly once"
         ));
     }
-    let owned_result = owned_result_binding.map(|_| next_name(state, "loop_owned_result"));
+    let owned_result = match &result {
+        ScopedLoopResult::None => None,
+        ScopedLoopResult::OwnedBytes(_) => Some(next_name(state, "loop_owned_result")),
+        ScopedLoopResult::OwnedStruct { .. } => Some(next_name(state, "loop_owned_struct_result")),
+    };
     let mut action_args = vec![callee.clone()];
     if let Some(result) = &owned_result {
         action_args.push(result.clone());
     }
+    if let ScopedLoopResult::OwnedStruct { layout, .. } = &result {
+        action_args.push(layout.clone());
+    }
+    let mut carried_struct_leaf = 0usize;
     for (param, arg) in function.params.iter().zip(args) {
         if matches!(arg, NirExpr::Var(name) if name == &prepared.binding_name) {
             action_args.push("$current".to_owned());
+        } else if state.struct_defs.contains_key(param.ty.name.as_str()) {
+            let lowered = lower_expr(arg, state, bindings)?;
+            let flattened = direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?;
+            let carried = matches!(
+                (&result, arg),
+                (
+                    ScopedLoopResult::OwnedStruct { binding, ty, .. },
+                    NirExpr::Var(name)
+                ) if name == binding && param.ty.render() == ty.render()
+            );
+            for input in flattened {
+                if carried {
+                    action_args.push(yir_core::encode_loop_owned_struct_carry(
+                        carried_struct_leaf,
+                        &input,
+                    ));
+                    carried_struct_leaf += 1;
+                } else {
+                    action_args.push(input);
+                }
+            }
         } else if let NirExpr::CopyBufferOwned(source) = arg {
             action_args.push(format!(
                 "copy_owned:{}",
@@ -177,10 +244,10 @@ pub(super) fn lower_scoped_call_while(
         render_loop_compare(prepared.compare).to_owned(),
         step_kind.to_owned(),
         "cpu".to_owned(),
-        if owned_result.is_some() {
-            "scoped_call_owned_return"
-        } else {
-            "scoped_call"
+        match &result {
+            ScopedLoopResult::None => "scoped_call",
+            ScopedLoopResult::OwnedBytes(_) => "scoped_call_owned_return",
+            ScopedLoopResult::OwnedStruct { .. } => "scoped_call_owned_struct_return",
         }
         .to_owned(),
         action_args.len().to_string(),
@@ -197,10 +264,14 @@ pub(super) fn lower_scoped_call_while(
         },
     });
     for input in node_args {
-        let dependency = input
-            .strip_prefix("copy_owned:")
-            .or_else(|| input.strip_prefix("move_owned:"))
-            .unwrap_or(&input);
+        let dependency = yir_core::parse_loop_owned_struct_carry(&input)?
+            .map(|(_, dependency)| dependency)
+            .unwrap_or_else(|| {
+                input
+                    .strip_prefix("copy_owned:")
+                    .or_else(|| input.strip_prefix("move_owned:"))
+                    .unwrap_or(&input)
+            });
         if state.yir.nodes.iter().any(|node| node.name == dependency) {
             push_dep_edges(state, dependency, &name);
         }
@@ -224,20 +295,74 @@ pub(super) fn lower_scoped_call_while(
     }
     body_lowering::chain_statement_effect(state, &name);
     bindings.insert(prepared.binding_name, name.clone());
-    if let (Some(owner), Some(result)) = (owned_result_binding, owned_result) {
+    if let Some(result_name) = owned_result {
+        let (owner, instruction, args) = match &result {
+            ScopedLoopResult::None => unreachable!("result projection requires an owner"),
+            ScopedLoopResult::OwnedBytes(owner) => {
+                (*owner, "loop_owned_result", vec![name.clone()])
+            }
+            ScopedLoopResult::OwnedStruct {
+                binding, layout, ..
+            } => (
+                *binding,
+                "loop_owned_struct_result",
+                vec![name.clone(), layout.clone()],
+            ),
+        };
         state.yir.nodes.push(Node {
-            name: result.clone(),
+            name: result_name.clone(),
             resource: "cpu0".to_owned(),
             op: Operation {
                 module: "cpu".to_owned(),
-                instruction: "loop_owned_result".to_owned(),
-                args: vec![name.clone()],
+                instruction: instruction.to_owned(),
+                args,
             },
         });
-        push_dep_edges(state, &name, &result);
-        bindings.insert(owner.to_owned(), result);
+        push_dep_edges(state, &name, &result_name);
+        bindings.insert(owner.to_owned(), result_name);
     }
     Ok(true)
+}
+
+fn validate_loop_result_rebinding(
+    result: &ScopedLoopResult<'_>,
+    function: &NirFunction,
+    args: &[NirExpr],
+    bindings: &BTreeMap<String, String>,
+    callee: &str,
+) -> Result<(), String> {
+    match result {
+        ScopedLoopResult::None => Ok(()),
+        ScopedLoopResult::OwnedBytes(owner) => {
+            if bindings.contains_key(*owner)
+                && args.iter().any(
+                    |arg| matches!(arg, NirExpr::Move(source) if matches!(source.as_ref(), NirExpr::Var(name) if name == owner)),
+                )
+            {
+                return Ok(());
+            }
+            Err(format!(
+                "scoped owned Bytes return from `{callee}` must rebind the same named owner moved into the helper"
+            ))
+        }
+        ScopedLoopResult::OwnedStruct { binding, ty, .. } => {
+            let matching_inputs = function
+                .params
+                .iter()
+                .zip(args)
+                .filter(|(param, arg)| {
+                    param.ty.render() == ty.render()
+                        && matches!(arg, NirExpr::Var(name) if name == binding)
+                })
+                .count();
+            if bindings.contains_key(*binding) && matching_inputs == 1 {
+                return Ok(());
+            }
+            Err(format!(
+                "scoped aggregate return from `{callee}` must rebind exactly one same-typed state argument named `{binding}`"
+            ))
+        }
+    }
 }
 
 fn counted_loop_runs_exactly_once(

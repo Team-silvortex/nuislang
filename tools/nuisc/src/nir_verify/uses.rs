@@ -160,9 +160,9 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::KernelCol(inner)
         | NirExpr::KernelRelu(inner)
         | NirExpr::KernelReduceSum(inner) => verify_expr_uses(inner, moved)?,
-        NirExpr::KernelReduceMax(inner)
-        | NirExpr::KernelReduceMean(inner)
-        | NirExpr::NetworkResult { value: inner, .. } => verify_expr_uses(inner, moved)?,
+        NirExpr::KernelReduceMax(inner) | NirExpr::KernelReduceMean(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
         NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
             verify_expr_uses(inner, moved)?
         }
@@ -325,9 +325,32 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr_uses(inner, moved)?
         }
-        NirExpr::DataResult { value: inner, .. }
-        | NirExpr::ShaderResult { value: inner, .. }
-        | NirExpr::KernelResult { value: inner, .. } => verify_expr_uses(inner, moved)?,
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            verify_expr_uses(value, moved)?;
+            if let Some(clock) = completion_clock {
+                verify_expr_uses(clock, moved)?;
+            }
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => verify_expr_uses(result, moved)?,
         NirExpr::DataFreezeWindow(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::DataReadWindow { window, index } => {
             verify_expr_uses(window, moved)?;

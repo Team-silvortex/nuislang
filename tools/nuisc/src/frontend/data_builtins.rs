@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
-    AstExpr, NirExpr, NirResultFamily, NirResultStage, NirStructDef, NirTypeRef, NirWindowMode,
+    AstExpr, NirCompletionReceiptField, NirExpr, NirResultFamily, NirResultStage, NirStructDef,
+    NirTypeRef, NirWindowMode,
 };
 
 use super::{
@@ -93,8 +94,12 @@ pub(super) fn lower_data_builtin_call(
             signatures,
             struct_table,
             family: NirResultFamily::Data,
-            build: |value, stage| match stage {
-                NirResultStage::Data(state) => Ok(NirExpr::DataResult { value, state }),
+            build: |value, stage, completion_clock| match stage {
+                NirResultStage::Data(state) => Ok(NirExpr::DataResult {
+                    value,
+                    state,
+                    completion_clock,
+                }),
                 other => Err(format!(
                     "expected data result stage, found `{}`",
                     other.render()
@@ -150,6 +155,29 @@ pub(super) fn lower_data_builtin_call(
             family: NirResultFamily::Data,
             build: |expr| NirExpr::DataValue(Box::new(expr)),
         })?,
+        "data_completion_token" | "data_completion_clock" | "data_completion_root" => {
+            let field = match callee {
+                "data_completion_token" => NirCompletionReceiptField::Token,
+                "data_completion_clock" => NirCompletionReceiptField::Clock,
+                _ => NirCompletionReceiptField::Root,
+            };
+            lower_result_observer_call_with_consts(ResultObserverCallInput {
+                name: callee,
+                args,
+                current_domain,
+                current_function_is_async: false,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                family: NirResultFamily::Data,
+                build: |expr| NirExpr::ResultCompletionReceipt {
+                    family: NirResultFamily::Data,
+                    field,
+                    result: Box::new(expr),
+                },
+            })?
+        }
         "data_copy_window" => {
             let [input, offset, len] = args else {
                 return Err("data_copy_window(...) expects 3 args".to_owned());

@@ -200,6 +200,16 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
             }
             Ok(InstructionSemantics::pure(node.op.args.clone()))
         }
+        "loop_owned_struct_result" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `cpu.loop_owned_struct_result <loop> <layout>`",
+                    node.name
+                ));
+            }
+            yir_core::parse_owned_struct_layout(&node.op.args[1])?;
+            Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+        }
         "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64"
         | "param_buffer_ref" | "param_node_ref" | "param_owned_bytes" => {
             if node.op.args.len() != 1 {

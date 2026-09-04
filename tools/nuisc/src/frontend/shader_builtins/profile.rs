@@ -1,6 +1,8 @@
 use crate::frontend::is_host_execution_domain;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirResultStage};
+use nuis_semantics::model::{
+    AstExpr, NirCompletionReceiptField, NirExpr, NirResultFamily, NirResultStage,
+};
 
 use super::super::{
     i64_type, lower_expr, lower_result_observer_call_with_consts,
@@ -40,8 +42,12 @@ pub(super) fn lower_shader_profile_builtin_call(
             signatures,
             struct_table,
             family: NirResultFamily::Shader,
-            build: |value, stage| match stage {
-                NirResultStage::Shader(state) => Ok(NirExpr::ShaderResult { value, state }),
+            build: |value, stage, completion_clock| match stage {
+                NirResultStage::Shader(state) => Ok(NirExpr::ShaderResult {
+                    value,
+                    state,
+                    completion_clock,
+                }),
                 other => Err(format!(
                     "expected shader result stage, found `{}`",
                     other.render()
@@ -85,6 +91,29 @@ pub(super) fn lower_shader_profile_builtin_call(
             family: NirResultFamily::Shader,
             build: |expr| NirExpr::ShaderValue(Box::new(expr)),
         })?,
+        "shader_completion_token" | "shader_completion_clock" | "shader_completion_root" => {
+            let field = match callee {
+                "shader_completion_token" => NirCompletionReceiptField::Token,
+                "shader_completion_clock" => NirCompletionReceiptField::Clock,
+                _ => NirCompletionReceiptField::Root,
+            };
+            lower_result_observer_call_with_consts(ResultObserverCallInput {
+                name: callee,
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                family: NirResultFamily::Shader,
+                build: |expr| NirExpr::ResultCompletionReceipt {
+                    family: NirResultFamily::Shader,
+                    field,
+                    result: Box::new(expr),
+                },
+            })?
+        }
         "shader_profile_color_seed" => {
             let [unit, base, delta] = args else {
                 return Err("shader_profile_color_seed(...) expects 3 args".to_owned());

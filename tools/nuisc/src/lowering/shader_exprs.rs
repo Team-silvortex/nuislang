@@ -211,11 +211,16 @@ pub(super) fn lower_shader_expr(
         NirExpr::ShaderInlineWgsl { entry, source } => {
             Some(lower_shader_inline_wgsl(entry, source, state))
         }
-        NirExpr::ShaderResult { value, state: flow } => Some(lower_result_observe_node(
+        NirExpr::ShaderResult {
+            value,
+            state: flow,
+            completion_clock,
+        } => Some(lower_result_observe_node(
             state,
             bindings,
             ResultLoweringDomain::Shader,
             value,
+            completion_clock.as_deref(),
             "shader_result",
             flow.render(),
         )),

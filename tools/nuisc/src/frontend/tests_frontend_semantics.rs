@@ -1,6 +1,7 @@
 use super::parse_nuis_module;
 use nuis_semantics::model::{
-    NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
+    NirCompletionReceiptField, NirDataFlowState, NirExpr, NirKernelFlowState, NirResultFamily,
+    NirShaderFlowState, NirStmt,
 };
 
 #[path = "tests_frontend_semantics/async_boundaries.rs"]

@@ -111,12 +111,21 @@ pub(super) fn flatten_direct_call_arguments(
     }
     let mut flattened = Vec::new();
     for (param, arg) in function.params.iter().zip(args) {
-        if direct_call_scalar_kind(&param.ty).is_some() {
-            flattened.push(arg.clone());
-        } else {
-            flatten_struct_argument(&param.ty, arg, state, &mut flattened)?;
-        }
+        flattened.extend(flatten_direct_call_argument(&param.ty, arg, state)?);
     }
+    Ok(flattened)
+}
+
+pub(in crate::lowering) fn flatten_direct_call_argument(
+    ty: &NirTypeRef,
+    arg: &str,
+    state: &mut LoweringState<'_>,
+) -> Result<Vec<String>, String> {
+    if direct_call_scalar_kind(ty).is_some() {
+        return Ok(vec![arg.to_owned()]);
+    }
+    let mut flattened = Vec::new();
+    flatten_struct_argument(ty, arg, state, &mut flattened)?;
     Ok(flattened)
 }
 

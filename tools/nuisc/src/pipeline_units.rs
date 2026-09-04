@@ -335,7 +335,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::KernelSort(inner)
         | NirExpr::KernelSortAxis { input: inner, .. }
         | NirExpr::KernelTopkAxis { input: inner, .. }
-        | NirExpr::NetworkResult { value: inner, .. }
+        | NirExpr::ResultCompletionReceipt { result: inner, .. }
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -452,10 +452,30 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(index, units);
             collect_instantiated_units_expr(value, units);
         }
-        NirExpr::DataResult { value: input, .. }
-        | NirExpr::ShaderResult { value: input, .. }
-        | NirExpr::KernelResult { value: input, .. } => {
-            collect_instantiated_units_expr(input, units)
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            collect_instantiated_units_expr(value, units);
+            if let Some(clock) = completion_clock {
+                collect_instantiated_units_expr(clock, units);
+            }
         }
         NirExpr::DataReadWindow { window, index } => {
             collect_instantiated_units_expr(window, units);

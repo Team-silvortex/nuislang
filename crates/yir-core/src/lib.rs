@@ -7,6 +7,7 @@ mod dynamic_pattern_carry;
 pub mod ffi;
 mod glm;
 pub mod loop_carry_contract;
+mod loop_owned_struct;
 mod module_graph;
 mod mutex_contract;
 mod operation_results;
@@ -14,6 +15,7 @@ mod operation_semantics;
 mod owned_select_tree;
 mod owned_struct_layout;
 mod registry;
+mod result_receipt;
 mod value_display;
 mod value_types;
 
@@ -22,11 +24,13 @@ pub use branch_effect::*;
 pub use data_mod::{DataMod, LegacyFabricMod};
 pub use dynamic_pattern_carry::*;
 pub use glm::*;
+pub use loop_owned_struct::*;
 pub use module_graph::*;
 pub use mutex_contract::*;
 pub use owned_select_tree::*;
 pub use owned_struct_layout::*;
 pub use registry::*;
+pub use result_receipt::*;
 pub use value_types::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +118,9 @@ pub enum SemanticOp {
     NetworkIsAcceptReady,
     NetworkIsClosed,
     NetworkValue,
+    ResultCompletionToken,
+    ResultCompletionClock,
+    ResultCompletionRoot,
     ShaderBeginPass,
     ShaderDrawInstanced,
     ShaderPipeline,
@@ -188,6 +195,9 @@ pub enum YirResultRole {
     Entry,
     StateProbe,
     PayloadExtractor,
+    CompletionToken,
+    CompletionClock,
+    CompletionRoot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

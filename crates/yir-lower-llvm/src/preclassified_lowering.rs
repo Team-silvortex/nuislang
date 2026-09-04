@@ -1,11 +1,12 @@
-use yir_core::{Node, YirResultFamily, YirResultRole};
+use yir_core::{provider_completion_receipt_root, Node, YirResultFamily, YirResultRole};
 
 use super::{
     facts::propagate_known_facts,
     fresh_global, fresh_reg, llvm_c_string_bytes,
-    value_ref::{coerce_to_i64, get_domain_result_for_family, get_struct},
+    value_ref::{coerce_to_i64, get_domain_result_for_family, get_i64, get_struct},
     variant_select::{emit_variant_is_value, variant_field_value, variant_parent_name},
-    DomainResultLlvmValueRef, KnownFacts, LlvmLoweringState, LlvmValueRef, StructLlvmValueRef,
+    DomainCompletionReceiptLlvmValueRef, DomainResultLlvmValueRef, KnownFacts, LlvmLoweringState,
+    LlvmValueRef, StructLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -160,6 +161,18 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
                 state
                     .facts
                     .record_variant_type(node.name.clone(), node.op.args[0].clone());
+            }
+            true
+        }
+        "loop_owned_struct_result" => {
+            if !matches!(
+                state.registers.get(&node.name),
+                Some(LlvmValueRef::Struct(_))
+            ) {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.loop_owned_struct_result `{}` because its loop result is unavailable",
+                    node.name
+                ));
             }
             true
         }
@@ -375,12 +388,41 @@ pub(crate) fn lower_domain_result_observer_node(
             } else {
                 propagate_known_facts(source_name, &node.name, &mut state.facts);
             }
+            let receipt = node.op.args.get(2).and_then(|clock_name| {
+                let completion_clock = get_i64(&state.registers, clock_name)?.to_owned();
+                let root = provider_completion_receipt_root(
+                    family,
+                    &node.resource,
+                    source_name,
+                    &node.op.args[1],
+                );
+                let mixed = fresh_reg(&mut state.next_reg);
+                let masked = fresh_reg(&mut state.next_reg);
+                let token = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  ; provider-issued {family} completion receipt `{}`",
+                    node.name
+                ));
+                state
+                    .body
+                    .push(format!("  {mixed} = xor i64 {completion_clock}, {root}"));
+                state
+                    .body
+                    .push(format!("  {masked} = and i64 {mixed}, {}", i64::MAX));
+                state.body.push(format!("  {token} = or i64 {masked}, 1"));
+                Some(DomainCompletionReceiptLlvmValueRef {
+                    token,
+                    completion_clock,
+                    root: root.to_string(),
+                })
+            });
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::DomainResult(DomainResultLlvmValueRef {
                     family,
                     state: node.op.args[1].clone(),
                     value,
+                    receipt,
                 }),
             );
             true
@@ -444,6 +486,44 @@ pub(crate) fn lower_domain_result_observer_node(
                 state.last_cpu_value = Some(as_i64);
             }
             propagate_known_facts(result_name, &node.name, &mut state.facts);
+            true
+        }
+        Some(
+            role @ (YirResultRole::CompletionToken
+            | YirResultRole::CompletionClock
+            | YirResultRole::CompletionRoot),
+        ) => {
+            let result_name = &node.op.args[0];
+            let Some(result) =
+                get_domain_result_for_family(&state.registers, result_name, family).cloned()
+            else {
+                state.body.push(format!(
+                    "  ; deferred lowering for {} `{}` because its {family} result is outside the current CPU LLVM slice",
+                    node.op.full_name(), node.name
+                ));
+                return true;
+            };
+            let Some(receipt) = result.receipt else {
+                state.body.push(format!(
+                    "  ; deferred lowering for {} `{}` because `{result_name}` has no provider completion receipt",
+                    node.op.full_name(), node.name
+                ));
+                return true;
+            };
+            let value = match role {
+                YirResultRole::CompletionToken => receipt.token,
+                YirResultRole::CompletionClock => receipt.completion_clock,
+                YirResultRole::CompletionRoot => receipt.root,
+                _ => unreachable!(),
+            };
+            state.body.push(format!(
+                "  ; projected {family} provider completion receipt through {}",
+                node.op.full_name()
+            ));
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::I64(value.clone()));
+            state.last_cpu_value = Some(value);
             true
         }
         _ => false,

@@ -407,10 +407,34 @@ pub(in crate::lowering) fn expr_contains_async_loop_primitive(expr: &NirExpr) ->
         | NirExpr::CastF32ToI64(inner)
         | NirExpr::CastI64ToF64(inner)
         | NirExpr::CastF64ToI64(inner) => expr_contains_async_loop_primitive(inner),
-        NirExpr::DataResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::NetworkResult { value, .. }
-        | NirExpr::KernelResult { value, .. } => expr_contains_async_loop_primitive(value),
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            expr_contains_async_loop_primitive(value)
+                || completion_clock
+                    .as_deref()
+                    .is_some_and(expr_contains_async_loop_primitive)
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => {
+            expr_contains_async_loop_primitive(result)
+        }
         NirExpr::AllocNode { value, next } => {
             expr_contains_async_loop_primitive(value) || expr_contains_async_loop_primitive(next)
         }

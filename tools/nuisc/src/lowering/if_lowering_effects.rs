@@ -105,11 +105,33 @@ pub(super) fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool
         | NirExpr::KernelReshape { input: inner, .. }
         | NirExpr::KernelBroadcast { input: inner, .. }
         | NirExpr::KernelSort(inner)
-        | NirExpr::DataResult { value: inner, .. }
-        | NirExpr::ShaderResult { value: inner, .. }
-        | NirExpr::KernelResult { value: inner, .. }
-        | NirExpr::NetworkResult { value: inner, .. } => {
+        | NirExpr::ResultCompletionReceipt { result: inner, .. } => {
             expr_contains_conditional_effect_primitive(inner)
+        }
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            expr_contains_conditional_effect_primitive(value)
+                || completion_clock
+                    .as_deref()
+                    .is_some_and(expr_contains_conditional_effect_primitive)
         }
         NirExpr::Binary { lhs, rhs, .. }
         | NirExpr::KernelMatmul { lhs, rhs }

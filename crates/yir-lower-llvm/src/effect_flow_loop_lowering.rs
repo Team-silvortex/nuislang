@@ -146,6 +146,7 @@ pub(crate) fn lower_cpu_effect_flow_loop_node(
         buffer_lengths,
         helper_signatures,
         &BTreeMap::new(),
+        &BTreeMap::new(),
         &current,
         next_reg,
     )?;

@@ -2,6 +2,20 @@ use super::*;
 
 impl Operation {
     pub fn result_family(&self) -> Option<YirResultFamily> {
+        if matches!(
+            self.semantic_op(),
+            SemanticOp::ResultCompletionToken
+                | SemanticOp::ResultCompletionClock
+                | SemanticOp::ResultCompletionRoot
+        ) {
+            return match self.domain_family() {
+                OperationDomainFamily::Data => Some(YirResultFamily::Data),
+                OperationDomainFamily::Shader => Some(YirResultFamily::Shader),
+                OperationDomainFamily::Kernel => Some(YirResultFamily::Kernel),
+                OperationDomainFamily::Network => Some(YirResultFamily::Network),
+                _ => None,
+            };
+        }
         match self.semantic_op() {
             SemanticOp::CpuJoinResult
             | SemanticOp::CpuTaskCompleted
@@ -67,11 +81,28 @@ impl Operation {
             | SemanticOp::ShaderValue
             | SemanticOp::KernelValue
             | SemanticOp::NetworkValue => Some(YirResultRole::PayloadExtractor),
+            SemanticOp::ResultCompletionToken => Some(YirResultRole::CompletionToken),
+            SemanticOp::ResultCompletionClock => Some(YirResultRole::CompletionClock),
+            SemanticOp::ResultCompletionRoot => Some(YirResultRole::CompletionRoot),
             _ => None,
         }
     }
 
     pub fn result_source_semantic_op(&self) -> Option<SemanticOp> {
+        if matches!(
+            self.semantic_op(),
+            SemanticOp::ResultCompletionToken
+                | SemanticOp::ResultCompletionClock
+                | SemanticOp::ResultCompletionRoot
+        ) {
+            return match self.result_family()? {
+                YirResultFamily::Task => None,
+                YirResultFamily::Data => Some(SemanticOp::DataObserve),
+                YirResultFamily::Shader => Some(SemanticOp::ShaderObserve),
+                YirResultFamily::Kernel => Some(SemanticOp::KernelObserve),
+                YirResultFamily::Network => Some(SemanticOp::NetworkObserve),
+            };
+        }
         match self.semantic_op() {
             SemanticOp::CpuTaskCompleted
             | SemanticOp::CpuTaskTimedOut
@@ -265,6 +296,9 @@ fn semantic_op_display_name(op: SemanticOp) -> &'static str {
         SemanticOp::NetworkIsAcceptReady => ("network", "is_accept_ready"),
         SemanticOp::NetworkIsClosed => ("network", "is_closed"),
         SemanticOp::NetworkValue => ("network", "value"),
+        SemanticOp::ResultCompletionToken => ("result", "completion_token"),
+        SemanticOp::ResultCompletionClock => ("result", "completion_clock"),
+        SemanticOp::ResultCompletionRoot => ("result", "completion_root"),
         SemanticOp::DataBindCore => ("data", "bind_core"),
         SemanticOp::DataMarker => ("data", "marker"),
         SemanticOp::DataHandleTable => ("data", "handle_table"),

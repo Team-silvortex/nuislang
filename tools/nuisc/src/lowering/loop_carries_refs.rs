@@ -289,11 +289,33 @@ pub(in crate::lowering) fn expr_contains_loop_variant_name(
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .any(|(_, value)| expr_contains_loop_variant_name(value, binding_name, carries)),
-        NirExpr::DataResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::NetworkResult { value, .. }
-        | NirExpr::KernelResult { value, .. } => {
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
             expr_contains_loop_variant_name(value, binding_name, carries)
+                || completion_clock.as_deref().is_some_and(|clock| {
+                    expr_contains_loop_variant_name(clock, binding_name, carries)
+                })
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => {
+            expr_contains_loop_variant_name(result, binding_name, carries)
         }
         _ => false,
     }

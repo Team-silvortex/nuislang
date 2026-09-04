@@ -28,11 +28,16 @@ pub(super) fn lower_data_cpu_expr(
         NirExpr::DataMarker(tag) => Some(Ok(lower_data_marker(tag, state))),
         NirExpr::DataOutputPipe(value) => Some(lower_data_output_pipe(value, state, bindings)),
         NirExpr::DataInputPipe(pipe) => Some(lower_data_input_pipe(pipe, state, bindings)),
-        NirExpr::DataResult { value, state: flow } => Some(lower_result_observe_node(
+        NirExpr::DataResult {
+            value,
+            state: flow,
+            completion_clock,
+        } => Some(lower_result_observe_node(
             state,
             bindings,
             ResultLoweringDomain::Data,
             value,
+            completion_clock.as_deref(),
             "data_result",
             flow.render(),
         )),

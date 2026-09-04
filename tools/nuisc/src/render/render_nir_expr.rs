@@ -71,7 +71,11 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::DataMarker(tag) => format!("data_marker(\"{}\")", escape_debug(tag)),
         NirExpr::DataOutputPipe(value) => format!("data_output_pipe({})", render_nir_expr(value)),
         NirExpr::DataInputPipe(value) => format!("data_input_pipe({})", render_nir_expr(value)),
-        NirExpr::DataResult { value, .. } => format!("data_result({})", render_nir_expr(value)),
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        } => render_result_expr("data_result", value, completion_clock.as_deref()),
         NirExpr::DataReady(result) => format!("data_ready({})", render_nir_expr(result)),
         NirExpr::DataMoved(result) => format!("data_moved({})", render_nir_expr(result)),
         NirExpr::DataWindowed(result) => format!("data_windowed({})", render_nir_expr(result)),
@@ -325,9 +329,11 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(unit)
             )
         }
-        NirExpr::NetworkResult { value, .. } => {
-            format!("network_result({})", render_nir_expr(value))
-        }
+        NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        } => render_result_expr("network_result", value, completion_clock.as_deref()),
         NirExpr::NetworkConfigReady(result) => {
             format!("network_config_ready({})", render_nir_expr(result))
         }
@@ -341,6 +347,16 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
             format!("network_accept_ready({})", render_nir_expr(result))
         }
         NirExpr::NetworkValue(result) => format!("network_value({})", render_nir_expr(result)),
+        NirExpr::ResultCompletionReceipt {
+            family,
+            field,
+            result,
+        } => format!(
+            "{}_{}({})",
+            family.domain_name(),
+            field.instruction(),
+            render_nir_expr(result)
+        ),
         NirExpr::DataProfileSendUplink { unit, input } => format!(
             "data_profile_send_uplink(\"{}\", {})",
             escape_debug(unit),
@@ -550,5 +566,16 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(rhs)
         ),
         _ => unreachable!("render_nir_expr pre-dispatch should handle this expression family"),
+    }
+}
+
+fn render_result_expr(callee: &str, value: &NirExpr, completion_clock: Option<&NirExpr>) -> String {
+    match completion_clock {
+        Some(clock) => format!(
+            "{callee}({}, {})",
+            render_nir_expr(value),
+            render_nir_expr(clock)
+        ),
+        None => format!("{callee}({})", render_nir_expr(value)),
     }
 }

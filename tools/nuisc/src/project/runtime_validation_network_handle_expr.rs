@@ -68,7 +68,8 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
-        | NirExpr::IsNull(inner) => {
+        | NirExpr::IsNull(inner)
+        | NirExpr::ResultCompletionReceipt { result: inner, .. } => {
             validate_network_owned_handle_provenance_in_expr(
                 inner,
                 from,
@@ -78,10 +79,26 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
                 function_return_kinds,
             )?;
         }
-        NirExpr::DataResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::NetworkResult { value, .. }
-        | NirExpr::KernelResult { value, .. } => {
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
             validate_network_owned_handle_provenance_in_expr(
                 value,
                 from,
@@ -90,6 +107,16 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
                 function_requirements,
                 function_return_kinds,
             )?;
+            if let Some(clock) = completion_clock {
+                validate_network_owned_handle_provenance_in_expr(
+                    clock,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
+            }
         }
         NirExpr::AllocNode { value, next } => {
             validate_network_owned_handle_provenance_in_expr(

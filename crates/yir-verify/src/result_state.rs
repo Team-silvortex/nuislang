@@ -124,6 +124,18 @@ pub(crate) fn verify_result_state_nodes(module: &YirModule) -> Result<(), String
             SemanticOp::NetworkIsRecvReady => {
                 require_observe_source(&nodes, node, SemanticOp::NetworkObserve)?;
             }
+            SemanticOp::ResultCompletionToken
+            | SemanticOp::ResultCompletionClock
+            | SemanticOp::ResultCompletionRoot => {
+                require_expected_result_source(&nodes, node)?;
+                let source = observe_source_node(&nodes, node)?;
+                if source.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` projects provider completion metadata from receipt-less `{}`",
+                        node.name, source.name
+                    ));
+                }
+            }
             _ if node.op.result_source_semantic_op().is_some() => {
                 require_expected_result_source(&nodes, node)?;
             }
@@ -301,6 +313,9 @@ fn semantic_op_name(op: SemanticOp) -> &'static str {
         SemanticOp::NetworkIsAcceptReady => "network.is_accept_ready",
         SemanticOp::NetworkIsClosed => "network.is_closed",
         SemanticOp::NetworkValue => "network.value",
+        SemanticOp::ResultCompletionToken => "result.completion_token",
+        SemanticOp::ResultCompletionClock => "result.completion_clock",
+        SemanticOp::ResultCompletionRoot => "result.completion_root",
         SemanticOp::DataBindCore => "data.bind_core",
         SemanticOp::DataMarker => "data.marker",
         SemanticOp::DataHandleTable => "data.handle_table",

@@ -1,8 +1,6 @@
 use super::{expr_is_fixed_readable_carry_source, verify_nir_module};
 use crate::frontend::parse_nuis_module;
-use nuis_semantics::model::{
-    NirBinaryOp, NirDataFlowState, NirExpr, NirFunction, NirModule, NirStmt, NirVisibility,
-};
+use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt, NirVisibility};
 
 fn module_with_body(body: Vec<NirStmt>) -> NirModule {
     NirModule {
@@ -1773,17 +1771,17 @@ fn data_read_window_accepts_immutable_window_source() {
 
 #[test]
 fn data_read_window_accepts_data_value_of_window_result() {
-    let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataReadWindow {
-        window: Box::new(NirExpr::DataValue(Box::new(NirExpr::DataResult {
-            value: Box::new(NirExpr::DataImmutableWindow {
-                input: Box::new(NirExpr::Int(7)),
-                offset: Box::new(NirExpr::Int(0)),
-                len: Box::new(NirExpr::Int(1)),
-            }),
-            state: NirDataFlowState::Windowed,
-        }))),
-        index: Box::new(NirExpr::Int(0)),
-    })]);
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main { fn main() -> i64 {
+            let window: DataResult<Window<i64>> =
+              data_result(data_freeze_window(data_copy_window(7, 0, 1)));
+            return data_read_window(data_value(window), 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
 
     verify_nir_module(&module).unwrap();
 }

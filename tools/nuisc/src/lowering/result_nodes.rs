@@ -62,22 +62,33 @@ pub(super) fn lower_result_observe_node(
     bindings: &BTreeMap<String, String>,
     domain: ResultLoweringDomain,
     input: &NirExpr,
+    completion_clock: Option<&NirExpr>,
     prefix: &str,
     observed_state: &str,
 ) -> Result<String, String> {
     domain.ensure_resource(state.yir);
     let input_name = lower_expr(input, state, bindings)?;
     let name = next_name(state, prefix);
+    let completion_clock_name = completion_clock
+        .map(|clock| lower_expr(clock, state, bindings))
+        .transpose()?;
+    let mut args = vec![input_name.clone(), observed_state.to_owned()];
+    if let Some(clock) = &completion_clock_name {
+        args.push(clock.clone());
+    }
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: domain.resource_name().to_owned(),
         op: Operation {
             module: domain.module_name().to_owned(),
             instruction: "observe".to_owned(),
-            args: vec![input_name.clone(), observed_state.to_owned()],
+            args,
         },
     });
     push_dep_edges(state, &input_name, &name);
+    if let Some(clock) = completion_clock_name {
+        push_dep_edges(state, &clock, &name);
+    }
     Ok(name)
 }
 
@@ -143,6 +154,12 @@ pub(super) fn lower_task_result_observer_node(
         (YirResultRole::PayloadExtractor, Some(_)) => {
             return Err("task payload extractor must not carry an explicit result state".to_owned())
         }
+        (
+            YirResultRole::CompletionToken
+            | YirResultRole::CompletionClock
+            | YirResultRole::CompletionRoot,
+            _,
+        ) => return Err("task results do not carry provider completion receipts".to_owned()),
     };
     lower_cpu_unary_value_effect(state, bindings, input, prefix, instruction)
 }

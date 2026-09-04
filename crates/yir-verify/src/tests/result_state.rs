@@ -146,5 +146,60 @@ fn rejects_task_value_without_join_result_source() {
     assert!(error.contains("expects `cpu.join_result` input"));
 }
 
+#[test]
+fn accepts_clocked_provider_completion_receipt_projection() {
+    let module = data_completion_receipt_module(true);
+    verify_module(&module).unwrap();
+}
+
+#[test]
+fn rejects_completion_projection_from_receipt_less_observe() {
+    let module = data_completion_receipt_module(false);
+    let error = verify_module(&module).unwrap_err();
+    assert!(error.contains("receipt-less"));
+}
+
+fn data_completion_receipt_module(with_clock: bool) -> YirModule {
+    let mut observe_args = vec!["pipe", "moved"];
+    if with_clock {
+        observe_args.push("clock");
+    }
+    let mut nodes = vec![
+        node("value", "cpu0", "cpu.const_i64", &["7"]),
+        node("clock", "cpu0", "cpu.const_i64", &["23"]),
+        node("pipe", "fabric0", "data.output_pipe", &["value"]),
+        node("result", "fabric0", "data.observe", &observe_args),
+        node("token", "fabric0", "data.completion_token", &["result"]),
+    ];
+    if !with_clock {
+        nodes.remove(1);
+    }
+    let mut edges = vec![
+        xfer("value", "pipe"),
+        dep("pipe", "result"),
+        dep("result", "token"),
+    ];
+    if with_clock {
+        edges.push(xfer("clock", "result"));
+    }
+    YirModule {
+        version: "0.1".to_owned(),
+        resources: vec![
+            Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            },
+            Resource {
+                name: "fabric0".to_owned(),
+                kind: ResourceKind::parse("data.fabric"),
+            },
+        ],
+        nodes,
+        edges,
+        node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
+    }
+}
+
 #[path = "result_network_state.rs"]
 mod result_network_state;

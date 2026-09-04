@@ -103,10 +103,32 @@ fn expr_references_any_name(expr: &NirExpr, names: &BTreeSet<String>) -> bool {
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .any(|(_, value)| expr_references_any_name(value, names)),
-        NirExpr::DataResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::NetworkResult { value, .. }
-        | NirExpr::KernelResult { value, .. } => expr_references_any_name(value, names),
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            expr_references_any_name(value, names)
+                || completion_clock
+                    .as_deref()
+                    .is_some_and(|clock| expr_references_any_name(clock, names))
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => expr_references_any_name(result, names),
         _ => false,
     }
 }

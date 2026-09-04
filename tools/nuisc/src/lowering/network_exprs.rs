@@ -102,11 +102,16 @@ pub(super) fn lower_network_expr(
             unit,
             "protocol_header_bytes",
         )),
-        NirExpr::NetworkResult { value, state: flow } => Some(lower_result_observe_node(
+        NirExpr::NetworkResult {
+            value,
+            state: flow,
+            completion_clock,
+        } => Some(lower_result_observe_node(
             state,
             bindings,
             ResultLoweringDomain::Network,
             value,
+            completion_clock.as_deref(),
             "network_result",
             flow.render(),
         )),

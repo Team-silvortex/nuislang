@@ -273,6 +273,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
             params: vec![CpuCallScalarKind::F32],
             mutex_permit_params: vec![None],
             ret: CpuCallScalarKind::F32,
+            owned_struct_return: false,
             owned_external_buffer_return: None,
         },
     )
@@ -288,6 +289,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
             params: vec![CpuCallScalarKind::Bool, CpuCallScalarKind::F64],
             mutex_permit_params: vec![None, None],
             ret: CpuCallScalarKind::F64,
+            owned_struct_return: false,
             owned_external_buffer_return: None,
         },
     )

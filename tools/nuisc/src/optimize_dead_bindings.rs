@@ -299,7 +299,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
-        | NirExpr::NetworkResult { value: inner, .. }
+        | NirExpr::ResultCompletionReceipt { result: inner, .. }
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => collect_used_vars_expr(inner, out),
         NirExpr::KernelMatmul { lhs, rhs } => {
@@ -413,10 +413,32 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             collect_used_vars_expr(index, out);
             collect_used_vars_expr(value, out);
         }
-        NirExpr::DataResult { value, .. }
-        | NirExpr::KernelResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::DataProfileSendUplink { input: value, .. }
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            collect_used_vars_expr(value, out);
+            if let Some(clock) = completion_clock {
+                collect_used_vars_expr(clock, out);
+            }
+        }
+        NirExpr::DataProfileSendUplink { input: value, .. }
         | NirExpr::DataProfileSendDownlink { input: value, .. }
         | NirExpr::ShaderProfileRender { packet: value, .. } => collect_used_vars_expr(value, out),
         NirExpr::DataCopyWindow { input, offset, len }

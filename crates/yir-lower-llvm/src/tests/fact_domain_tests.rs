@@ -1,6 +1,6 @@
 use super::support::*;
 use crate::{lower_domain_result_observer_node, KnownFacts, LlvmLoweringState, LlvmValueRef};
-use yir_core::YirResultFamily;
+use yir_core::{provider_completion_receipt_root, YirResultFamily};
 
 #[test]
 fn folds_known_variant_is_for_lazy_const_select() {
@@ -193,6 +193,80 @@ fn projects_domain_result_states_without_forging_provider_payloads() {
             .body
             .iter()
             .any(|line| line.contains("payload remains") && line.contains("provider-owned")));
+    }
+}
+
+#[test]
+fn lowers_provider_completion_receipts_for_all_domain_results() {
+    for (family, observe, domain) in [
+        (YirResultFamily::Data, "data.observe", "data"),
+        (YirResultFamily::Shader, "shader.observe", "shader"),
+        (YirResultFamily::Kernel, "kernel.observe", "kernel"),
+        (YirResultFamily::Network, "network.observe", "network"),
+    ] {
+        let mut state = empty_lowering_state();
+        state
+            .registers
+            .insert("clock".to_owned(), LlvmValueRef::I64("23".to_owned()));
+        let observed_result = result_node(
+            "result",
+            observe,
+            vec!["provider_value", family_observe_state(family), "clock"],
+        );
+        assert!(lower_domain_result_observer_node(
+            &observed_result,
+            &mut state
+        ));
+
+        let expected_root = provider_completion_receipt_root(
+            family,
+            "domain0",
+            "provider_value",
+            family_observe_state(family),
+        );
+        let Some(LlvmValueRef::DomainResult(result)) = state.registers.get("result") else {
+            panic!("{family} observer should produce a domain result handle");
+        };
+        let receipt = result
+            .receipt
+            .as_ref()
+            .expect("clocked observer should produce a provider receipt");
+        assert_eq!(receipt.completion_clock, "23");
+        assert_eq!(receipt.root, expected_root.to_string());
+
+        for (instruction, expected) in [
+            ("completion_token", receipt.token.clone()),
+            ("completion_clock", receipt.completion_clock.clone()),
+            ("completion_root", receipt.root.clone()),
+        ] {
+            let projection = result_node(
+                instruction,
+                &format!("{domain}.{instruction}"),
+                vec!["result"],
+            );
+            assert!(lower_domain_result_observer_node(&projection, &mut state));
+            assert!(matches!(
+                state.registers.get(instruction),
+                Some(LlvmValueRef::I64(actual)) if actual == &expected
+            ));
+        }
+        assert!(state.body.iter().any(|line| {
+            line.contains(&format!("provider-issued {family} completion receipt"))
+        }));
+        assert!(!state
+            .body
+            .iter()
+            .any(|line| line.contains("deferred lowering")));
+    }
+}
+
+fn family_observe_state(family: YirResultFamily) -> &'static str {
+    match family {
+        YirResultFamily::Data => "ready",
+        YirResultFamily::Shader => "frame_ready",
+        YirResultFamily::Kernel => "config_ready",
+        YirResultFamily::Network => "send_ready",
+        YirResultFamily::Task => unreachable!("task results do not use provider receipts"),
     }
 }
 

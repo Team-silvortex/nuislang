@@ -35,6 +35,7 @@ mod loop_chain_result;
 mod loop_effect_action;
 mod loop_expr;
 mod loop_flow_control_lowering;
+mod loop_owned_struct_lowering;
 mod loop_scalar;
 mod memory_lowering;
 mod mutex_capability_lowering;
@@ -117,10 +118,10 @@ use static_lowering::lower_cpu_static_node;
 use topology::topological_order;
 pub(crate) use types::{
     CpuCallScalarKind, CpuHelperSignature, CpuLoopScalarKind, CpuOwnedExternalBufferAbi,
-    DomainResultLlvmValueRef, EmittedCpuFunction, LlvmLoweringState, LlvmValueRef,
-    MutexGuardLlvmValueRef, MutexLlvmValueRef, MutexPermitLlvmValueRef, MutexScalarKind,
-    StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef, TaskThunkArgument,
-    ThreadLlvmValueRef, VariantUnionLlvmValueRef,
+    DomainCompletionReceiptLlvmValueRef, DomainResultLlvmValueRef, EmittedCpuFunction,
+    LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
+    MutexPermitLlvmValueRef, MutexScalarKind, StructLlvmValueRef, TaskLlvmValueRef,
+    TaskResultLlvmValueRef, TaskThunkArgument, ThreadLlvmValueRef, VariantUnionLlvmValueRef,
 };
 use value_ref::coerce_to_i64;
 pub fn emit_module(module: &YirModule) -> Result<String, String> {
@@ -266,6 +267,7 @@ pub fn emit_module_with_registries(
                     })
                     .collect(),
                 ret,
+                owned_struct_return: return_node.op.instruction == "return_owned_struct",
                 owned_external_buffer_return,
             },
         );

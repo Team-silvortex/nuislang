@@ -268,13 +268,24 @@ pub(in crate::lowering) fn substitute_branch_binding(
             len: Box::new(substitute_branch_binding(len, binding_name, binding_value)),
             fill: Box::new(substitute_branch_binding(fill, binding_name, binding_value)),
         },
-        NirExpr::NetworkResult { value, state } => NirExpr::NetworkResult {
+        NirExpr::NetworkResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::NetworkResult {
             value: Box::new(substitute_branch_binding(
                 value,
                 binding_name,
                 binding_value,
             )),
             state: *state,
+            completion_clock: completion_clock.as_deref().map(|clock| {
+                Box::new(substitute_branch_binding(
+                    clock,
+                    binding_name,
+                    binding_value,
+                ))
+            }),
         },
         NirExpr::NetworkConfigReady(inner) => NirExpr::NetworkConfigReady(Box::new(
             substitute_branch_binding(inner, binding_name, binding_value),
@@ -293,13 +304,24 @@ pub(in crate::lowering) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
-        NirExpr::DataResult { value, state } => NirExpr::DataResult {
+        NirExpr::DataResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::DataResult {
             value: Box::new(substitute_branch_binding(
                 value,
                 binding_name,
                 binding_value,
             )),
             state: *state,
+            completion_clock: completion_clock.as_deref().map(|clock| {
+                Box::new(substitute_branch_binding(
+                    clock,
+                    binding_name,
+                    binding_value,
+                ))
+            }),
         },
         NirExpr::DataReady(inner) => NirExpr::DataReady(Box::new(substitute_branch_binding(
             inner,
@@ -321,13 +343,24 @@ pub(in crate::lowering) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
-        NirExpr::KernelResult { value, state } => NirExpr::KernelResult {
+        NirExpr::KernelResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::KernelResult {
             value: Box::new(substitute_branch_binding(
                 value,
                 binding_name,
                 binding_value,
             )),
             state: *state,
+            completion_clock: completion_clock.as_deref().map(|clock| {
+                Box::new(substitute_branch_binding(
+                    clock,
+                    binding_name,
+                    binding_value,
+                ))
+            }),
         },
         NirExpr::KernelConfigReady(inner) => NirExpr::KernelConfigReady(Box::new(
             substitute_branch_binding(inner, binding_name, binding_value),
@@ -337,13 +370,24 @@ pub(in crate::lowering) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
-        NirExpr::ShaderResult { value, state } => NirExpr::ShaderResult {
+        NirExpr::ShaderResult {
+            value,
+            state,
+            completion_clock,
+        } => NirExpr::ShaderResult {
             value: Box::new(substitute_branch_binding(
                 value,
                 binding_name,
                 binding_value,
             )),
             state: *state,
+            completion_clock: completion_clock.as_deref().map(|clock| {
+                Box::new(substitute_branch_binding(
+                    clock,
+                    binding_name,
+                    binding_value,
+                ))
+            }),
         },
         NirExpr::ShaderPassReady(inner) => NirExpr::ShaderPassReady(Box::new(
             substitute_branch_binding(inner, binding_name, binding_value),
@@ -356,6 +400,19 @@ pub(in crate::lowering) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
+        NirExpr::ResultCompletionReceipt {
+            family,
+            field,
+            result,
+        } => NirExpr::ResultCompletionReceipt {
+            family: *family,
+            field: *field,
+            result: Box::new(substitute_branch_binding(
+                result,
+                binding_name,
+                binding_value,
+            )),
+        },
         _ => expr.clone(),
     }
 }

@@ -83,6 +83,13 @@ pub(crate) struct DomainResultLlvmValueRef {
     pub(crate) family: YirResultFamily,
     pub(crate) state: String,
     pub(crate) value: Option<Box<LlvmValueRef>>,
+    pub(crate) receipt: Option<DomainCompletionReceiptLlvmValueRef>,
+}
+#[derive(Clone)]
+pub(crate) struct DomainCompletionReceiptLlvmValueRef {
+    pub(crate) token: String,
+    pub(crate) completion_clock: String,
+    pub(crate) root: String,
 }
 #[derive(Clone)]
 pub(crate) struct TaskLlvmValueRef {
@@ -174,5 +181,6 @@ pub(crate) struct CpuHelperSignature {
     pub(crate) params: Vec<CpuCallScalarKind>,
     pub(crate) mutex_permit_params: Vec<Option<MutexScalarKind>>,
     pub(crate) ret: CpuCallScalarKind,
+    pub(crate) owned_struct_return: bool,
     pub(crate) owned_external_buffer_return: Option<CpuOwnedExternalBufferAbi>,
 }

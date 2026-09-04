@@ -5,8 +5,8 @@ use std::{
 
 use nuis_semantics::model::{
     nir_expr_effect_class, NirBinaryOp, NirEnumDef, NirExpr, NirExprEffectClass, NirFunction,
-    NirKernelMapOp, NirModule, NirMutexCapabilityOp, NirScalarKind, NirStmt, NirStructDef,
-    NirTypeRef,
+    NirKernelMapOp, NirModule, NirMutexCapabilityOp, NirResultFamily, NirScalarKind, NirStmt,
+    NirStructDef, NirTypeRef,
 };
 use yir_core::{
     encode_dynamic_pattern_payload_carry_trailer, DynamicPatternPayloadCarryContract,
@@ -230,6 +230,25 @@ fn lower_expr(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
+    if let NirExpr::ResultCompletionReceipt {
+        family,
+        field,
+        result,
+    } = expr
+    {
+        let domain = ResultLoweringDomain::from_result_family(*family).ok_or_else(|| {
+            "task results do not use provider completion receipt projections".to_owned()
+        })?;
+        let prefix = format!("{}_{}", family.domain_name(), field.instruction());
+        return lower_result_unary_value_effect(
+            state,
+            bindings,
+            domain,
+            result,
+            &prefix,
+            field.instruction(),
+        );
+    }
     if let Some(lowered) = lower_data_cpu_expr(expr, state, bindings) {
         return lowered;
     }
@@ -462,6 +481,9 @@ fn lower_expr(
         | NirExpr::VariantIs { .. }
         | NirExpr::VariantFieldAccess { .. } => lower_core_expr(expr, state, bindings)
             .expect("core expr family must be handled by lower_core_expr"),
+        NirExpr::ResultCompletionReceipt { .. } => {
+            unreachable!("provider completion receipt projections are handled before dispatch")
+        }
     }
 }
 

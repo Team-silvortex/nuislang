@@ -1,6 +1,8 @@
 use crate::frontend::is_host_execution_domain;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirResultStage};
+use nuis_semantics::model::{
+    AstExpr, NirCompletionReceiptField, NirExpr, NirResultFamily, NirResultStage,
+};
 
 use super::super::{
     lower_result_observer_call_with_consts, lower_result_wrapper_call_with_consts,
@@ -83,8 +85,12 @@ pub(super) fn lower_kernel_profile_builtin_call(
             signatures,
             struct_table,
             family: NirResultFamily::Kernel,
-            build: |value, stage| match stage {
-                NirResultStage::Kernel(state) => Ok(NirExpr::KernelResult { value, state }),
+            build: |value, stage, completion_clock| match stage {
+                NirResultStage::Kernel(state) => Ok(NirExpr::KernelResult {
+                    value,
+                    state,
+                    completion_clock,
+                }),
                 other => Err(format!(
                     "expected kernel result stage, found `{}`",
                     other.render()
@@ -116,6 +122,29 @@ pub(super) fn lower_kernel_profile_builtin_call(
             family: NirResultFamily::Kernel,
             build: |expr| NirExpr::KernelValue(Box::new(expr)),
         })?,
+        "kernel_completion_token" | "kernel_completion_clock" | "kernel_completion_root" => {
+            let field = match callee {
+                "kernel_completion_token" => NirCompletionReceiptField::Token,
+                "kernel_completion_clock" => NirCompletionReceiptField::Clock,
+                _ => NirCompletionReceiptField::Root,
+            };
+            lower_result_observer_call_with_consts(ResultObserverCallInput {
+                name: callee,
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                family: NirResultFamily::Kernel,
+                build: |expr| NirExpr::ResultCompletionReceipt {
+                    family: NirResultFamily::Kernel,
+                    field,
+                    result: Box::new(expr),
+                },
+            })?
+        }
         _ => return Ok(None),
     };
     Ok(Some(expr))

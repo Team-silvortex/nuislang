@@ -146,7 +146,8 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::KernelSortAxis { .. }
         | NirExpr::KernelTopk { .. }
         | NirExpr::KernelTopkAxis { .. }
-        | NirExpr::ShaderResult { .. } => NirExprEffectClass::DomainReadOnly,
+        | NirExpr::ShaderResult { .. }
+        | NirExpr::ResultCompletionReceipt { .. } => NirExprEffectClass::DomainReadOnly,
         NirExpr::CpuWindow { .. }
         | NirExpr::CpuSpawn { .. }
         | NirExpr::CpuThreadSpawn { .. }

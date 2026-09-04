@@ -9,6 +9,16 @@ pub(super) enum ResultLoweringDomain {
 }
 
 impl ResultLoweringDomain {
+    pub(super) fn from_result_family(family: NirResultFamily) -> Option<Self> {
+        match family {
+            NirResultFamily::Task => None,
+            NirResultFamily::Data => Some(Self::Data),
+            NirResultFamily::Shader => Some(Self::Shader),
+            NirResultFamily::Kernel => Some(Self::Kernel),
+            NirResultFamily::Network => Some(Self::Network),
+        }
+    }
+
     pub(super) fn module_name(self) -> &'static str {
         match self {
             Self::Data => "data",

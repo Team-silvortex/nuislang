@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use yir_core::{
     Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirFunction, YirFunctionParameter,
@@ -402,6 +402,11 @@ fn cpu_const_opcode(args: &[String]) -> String {
 }
 
 fn synthesize_dependency_edges(module: &mut YirModule) {
+    let explicit_edges = module
+        .edges
+        .iter()
+        .map(|edge| (edge.from.clone(), edge.to.clone()))
+        .collect::<BTreeSet<_>>();
     let resource_families = module
         .resources
         .iter()
@@ -432,6 +437,9 @@ fn synthesize_dependency_edges(module: &mut YirModule) {
             } else {
                 EdgeKind::CrossDomainExchange
             };
+            if explicit_edges.contains(&(node.name.clone(), arg.clone())) {
+                continue;
+            }
             let exists = module
                 .edges
                 .iter()

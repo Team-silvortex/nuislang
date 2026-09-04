@@ -380,6 +380,7 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::ShaderResult { value, .. } => expr_type(value, bindings, signatures, struct_table)
             .map(|inner| make_result_type(NirResultFamily::Shader, inner)),
         NirExpr::ShaderPassReady(_) | NirExpr::ShaderFrameReady(_) => Some(bool_type()),
+        NirExpr::ResultCompletionReceipt { .. } => Some(i64_type()),
         NirExpr::ShaderValue(result) => {
             result_payload_type(result, bindings, signatures, struct_table)
         }

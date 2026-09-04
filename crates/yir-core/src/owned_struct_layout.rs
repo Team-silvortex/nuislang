@@ -46,6 +46,20 @@ pub fn parse_owned_struct_layout(source: &str) -> Result<OwnedStructLayout, Stri
     Ok(parsed)
 }
 
+pub fn owned_struct_scalar_leaf_count(layout: &OwnedStructLayout) -> usize {
+    if layout.fields.is_empty() {
+        return 1;
+    }
+    layout
+        .fields
+        .iter()
+        .map(|(_, field)| match field {
+            OwnedStructFieldLayout::Scalar(_) => 1,
+            OwnedStructFieldLayout::Struct(nested) => owned_struct_scalar_leaf_count(nested),
+        })
+        .sum()
+}
+
 struct OwnedStructLayoutParser<'a> {
     source: &'a [u8],
     position: usize,
@@ -177,5 +191,12 @@ mod tests {
         assert!(parse_owned_struct_layout("Summary{score:i64}tail").is_err());
         assert!(parse_owned_struct_layout("Summary{score:i64").is_err());
         assert!(parse_owned_struct_layout("").is_err());
+    }
+
+    #[test]
+    fn counts_nested_scalar_layout_leaves() {
+        let layout =
+            parse_owned_struct_layout("Outer{ready:bool;inner:Inner{x:i64;y:f32}}").unwrap();
+        assert_eq!(owned_struct_scalar_leaf_count(&layout), 3);
     }
 }

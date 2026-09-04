@@ -86,10 +86,32 @@ pub(crate) fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             f(index);
             f(value);
         }
-        NirExpr::DataResult { value: input, .. }
-        | NirExpr::NetworkResult { value: input, .. }
-        | NirExpr::ShaderResult { value: input, .. }
-        | NirExpr::KernelResult { value: input, .. } => f(input),
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            f(value);
+            if let Some(clock) = completion_clock {
+                f(clock);
+            }
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => f(result),
         NirExpr::DataReadWindow { window, index } => {
             f(window);
             f(index);

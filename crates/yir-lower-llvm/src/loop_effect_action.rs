@@ -14,6 +14,7 @@ pub(crate) enum LoopEffectCleanup {
     None,
     OwnedBlob(String),
     OwnedResult(String),
+    OwnedStructResult(String),
 }
 
 pub(crate) fn begin_loop_effect_action(
@@ -24,6 +25,7 @@ pub(crate) fn begin_loop_effect_action(
     buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     owned_move_overrides: &BTreeMap<String, String>,
+    scalar_overrides: &BTreeMap<String, LlvmValueRef>,
     current: &str,
     next_reg: &mut usize,
 ) -> Result<LoopEffectCleanup, String> {
@@ -68,18 +70,31 @@ pub(crate) fn begin_loop_effect_action(
             ));
             Ok(LoopEffectCleanup::OwnedBlob(blob))
         }
-        ("cpu", "scoped_call" | "scoped_call_owned_return") => {
+        (
+            "cpu",
+            "scoped_call"
+            | "scoped_call_owned_return"
+            | "scoped_call_owned_struct_return",
+        ) => {
             let (callee, action_tail) = action_args.split_first().ok_or_else(|| {
                 format!(
                     "cpu.loop_while_i64_effect `{}` has a scoped call without a callee",
                     node.name
                 )
             })?;
-            let returns_owned = action_instruction == "scoped_call_owned_return";
-            let operands = if returns_owned {
+            let returns_owned_bytes = action_instruction == "scoped_call_owned_return";
+            let returns_owned_struct = action_instruction == "scoped_call_owned_struct_return";
+            let operands = if returns_owned_bytes {
                 action_tail.get(1..).ok_or_else(|| {
                     format!(
                         "cpu.loop_while_i64_effect `{}` has an owned scoped call without a result projection",
+                        node.name
+                    )
+                })?
+            } else if returns_owned_struct {
+                action_tail.get(2..).ok_or_else(|| {
+                    format!(
+                        "cpu.loop_while_i64_effect `{}` has an aggregate scoped call without result/layout metadata",
                         node.name
                     )
                 })?
@@ -92,7 +107,9 @@ pub(crate) fn begin_loop_effect_action(
                     node.name
                 )
             })?;
-            if (signature.ret == CpuCallScalarKind::OwnedBytes) != returns_owned {
+            if (signature.ret == CpuCallScalarKind::OwnedBytes) != returns_owned_bytes
+                || signature.owned_struct_return != returns_owned_struct
+            {
                 return Err(format!(
                     "cpu.loop_while_i64_effect `{}` scoped helper `{callee}` has mismatched owned return action",
                     node.name
@@ -117,6 +134,7 @@ pub(crate) fn begin_loop_effect_action(
                         registers,
                         buffer_lengths,
                         owned_move_overrides,
+                        scalar_overrides,
                         body,
                         next_reg,
                     )
@@ -125,13 +143,20 @@ pub(crate) fn begin_loop_effect_action(
                 .into_iter()
                 .flatten()
                 .collect::<Vec<_>>();
-            if returns_owned {
+            if returns_owned_bytes {
                 let result = fresh_reg(next_reg);
                 body.push(format!(
                     "  {result} = call ptr @nuis_fn_{callee}({})",
                     lowered.join(", ")
                 ));
                 Ok(LoopEffectCleanup::OwnedResult(result))
+            } else if returns_owned_struct {
+                let result = fresh_reg(next_reg);
+                body.push(format!(
+                    "  {result} = call i64 @nuis_fn_{callee}({})",
+                    lowered.join(", ")
+                ));
+                Ok(LoopEffectCleanup::OwnedStructResult(result))
             } else {
                 let ignored_result = fresh_reg(next_reg);
                 body.push(format!(
@@ -158,6 +183,7 @@ pub(crate) fn finish_loop_effect_action(cleanup: &LoopEffectCleanup, body: &mut 
             "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {blob})"
         )),
         LoopEffectCleanup::OwnedResult(_) => {}
+        LoopEffectCleanup::OwnedStructResult(_) => {}
     }
 }
 
@@ -168,9 +194,25 @@ fn lower_scoped_operand(
     registers: &BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &BTreeMap<String, String>,
     owned_move_overrides: &BTreeMap<String, String>,
+    scalar_overrides: &BTreeMap<String, LlvmValueRef>,
     body: &mut Vec<String>,
     next_reg: &mut usize,
 ) -> Result<Vec<String>, String> {
+    if let Some(value) = scalar_overrides.get(operand) {
+        let value = match (kind, value) {
+            (CpuCallScalarKind::Bool, LlvmValueRef::Bool { i1, .. }) => i1,
+            (CpuCallScalarKind::I32, LlvmValueRef::I32(value))
+            | (CpuCallScalarKind::I64, LlvmValueRef::I64(value))
+            | (CpuCallScalarKind::F32, LlvmValueRef::F32(value))
+            | (CpuCallScalarKind::F64, LlvmValueRef::F64(value)) => value,
+            _ => {
+                return Err(format!(
+                    "scoped aggregate carry `{operand}` does not match its helper parameter"
+                ))
+            }
+        };
+        return Ok(vec![format!("{} {value}", cpu_scalar_kind_llvm_type(kind))]);
+    }
     if kind == CpuCallScalarKind::BorrowedBuffer {
         let ptr = get_ptr(registers, operand)
             .ok_or_else(|| format!("cannot lower scoped buffer `{operand}`"))?;

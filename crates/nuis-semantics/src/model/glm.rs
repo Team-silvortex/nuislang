@@ -360,6 +360,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderBindSet { .. }
         | NirExpr::ShaderInlineWgsl { .. }
         | NirExpr::ShaderResult { .. }
+        | NirExpr::ResultCompletionReceipt { .. }
         | NirExpr::ShaderPassReady(_)
         | NirExpr::ShaderFrameReady(_)
         | NirExpr::ShaderValue(_)

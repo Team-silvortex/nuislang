@@ -72,7 +72,7 @@ proving `4/4` semantic equivalence. Persistent Galaxy signer trust and rollback
 protection have closed the package-resolution coordinate at `stable/100`; both
 the readiness manifest and global bootstrap-first tensor can now leave the
 bounded preparation gate. The next global tensor task is
-`standard-library/ns-nova/application-rendering-framework` at `active/54`.
+`standard-library/ns-nova/application-rendering-framework` at `active/70`.
 Its first Nuis-owned app/frame lifecycle now composes with PixelMagic, Data, and
 Shader in a host-adaptive project, compiles through NIR/YIR, emits an Apple arm64
 window AOT executable, reaches window/Fabric boot, and passes a relocatable
@@ -80,9 +80,13 @@ framework-Galaxy/profile check without compiler special cases. Conditional
 presentation now uses the generic registered branch-effect path and real LLVM
 CFG. A shared YIR result-family projection now carries verified Shader readiness
 through `submit_frame` into that predicate without forging its provider-owned
-frame payload. The showcase now lowers a bounded three-frame Nuis loop and routes
-each frame through a typed runtime-owned result handle. Loop-carried aggregate
-app state, a provider-issued completion receipt, continuous event dispatch,
+frame payload. The showcase now lowers a bounded three-frame Nuis loop, carries
+one aggregate application state through every frame-helper backedge, and routes
+each frame through a typed runtime-owned result handle. Shader observe now issues
+the shared YIR token/clock/root completion receipt, ns-nova validates and preserves
+that identity without a local token formula, and a pure-Nuis kernel receipt reaches
+a native executable. YIR text round-tripping now preserves explicit result edges without
+inventing a reverse loop dependency, and the full window AOT graph is checked acyclic. A live post-dispatch renderer clock, continuous event dispatch,
 renderer ownership, and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are
 preserved, while physical DPU/IPU/RDMA certification is deferred until suitable

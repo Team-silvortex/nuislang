@@ -484,7 +484,7 @@ pub(crate) fn lower_cpu_call_node(
     Ok(true)
 }
 
-fn unpack_immediate_owned_struct(
+pub(crate) fn unpack_immediate_owned_struct(
     pointer_bits: &str,
     template: &super::StructLlvmValueRef,
     body: &mut Vec<String>,

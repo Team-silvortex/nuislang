@@ -106,6 +106,14 @@ pub(super) fn render_loop_effect_action(
                 "cpu.scoped_call_owned_return {callee} -> {result}({operands:?})"
             ))
         }
+        ("cpu", "scoped_call_owned_struct_return", arity) if arity >= 4 => {
+            let callee = &args[8];
+            let result = &args[9];
+            let operands = resolve_scoped_operands(&args[11..], state, current)?;
+            Ok(format!(
+                "cpu.scoped_call_owned_struct_return {callee} -> {result}({operands:?})"
+            ))
+        }
         (module, instruction, _) => Err(format!(
             "node `{}` references unregistered loop action `{module}.{instruction}`",
             node.name
@@ -177,10 +185,16 @@ fn resolve_scoped_operands(
             if operand == "$current" {
                 return Ok(current.clone());
             }
-            let value_name = operand
+            let value_name = if let Some(input) = operand
                 .strip_prefix("copy_owned:")
                 .or_else(|| operand.strip_prefix("move_owned:"))
-                .unwrap_or(operand);
+            {
+                input
+            } else if let Some((_, input)) = yir_core::parse_loop_owned_struct_carry(operand)? {
+                input
+            } else {
+                operand
+            };
             state.expect_value(value_name).cloned()
         })
         .collect()

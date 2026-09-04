@@ -767,18 +767,22 @@ fn exposes_result_family_state_and_payload_from_values() {
     let data = Value::DataResult(DataResultHandle {
         state: DataFlowState::Windowed,
         value: Box::new(Value::Int(11)),
+        receipt: None,
     });
     let shader = Value::ShaderResult(ShaderResultHandle {
         state: ShaderFlowState::FrameReady,
         value: Box::new(Value::Int(13)),
+        receipt: None,
     });
     let kernel = Value::KernelResult(KernelResultHandle {
         state: KernelFlowState::ConfigReady,
         value: Box::new(Value::Int(17)),
+        receipt: None,
     });
     let network = Value::NetworkResult(NetworkResultHandle {
         state: NetworkFlowState::AcceptReady,
         value: Box::new(Value::Int(19)),
+        receipt: None,
     });
 
     assert_eq!(task.result_family(), Some(YirResultFamily::Task));
@@ -910,4 +914,33 @@ fn exposes_result_probe_states_for_state_helpers() {
         network_recv_ready.result_role(),
         Some(YirResultRole::StateProbe)
     );
+}
+
+#[test]
+fn exposes_provider_completion_receipt_roles_for_all_domain_results() {
+    for (family, domain, observe) in [
+        (YirResultFamily::Data, "data", SemanticOp::DataObserve),
+        (YirResultFamily::Shader, "shader", SemanticOp::ShaderObserve),
+        (YirResultFamily::Kernel, "kernel", SemanticOp::KernelObserve),
+        (
+            YirResultFamily::Network,
+            "network",
+            SemanticOp::NetworkObserve,
+        ),
+    ] {
+        for (instruction, role) in [
+            ("completion_token", YirResultRole::CompletionToken),
+            ("completion_clock", YirResultRole::CompletionClock),
+            ("completion_root", YirResultRole::CompletionRoot),
+        ] {
+            let operation = Operation::parse(
+                &format!("{domain}.{instruction}"),
+                vec!["result".to_owned()],
+            )
+            .unwrap();
+            assert_eq!(operation.result_family(), Some(family));
+            assert_eq!(operation.result_role(), Some(role));
+            assert_eq!(operation.result_source_semantic_op(), Some(observe));
+        }
+    }
 }

@@ -11,9 +11,11 @@ pub(super) fn render_kernel_nir_expr(value: &NirExpr) -> Option<String> {
         NirExpr::KernelProfileBatchLanesRef { unit } => {
             format!("kernel_profile_batch_lanes(\"{}\")", escape_debug(unit))
         }
-        NirExpr::KernelResult { value, .. } => {
-            format!("kernel_result({})", render_nir_expr(value))
-        }
+        NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => render_result_expr("kernel_result", value, completion_clock.as_deref()),
         NirExpr::KernelConfigReady(result) => {
             format!("kernel_config_ready({})", render_nir_expr(result))
         }

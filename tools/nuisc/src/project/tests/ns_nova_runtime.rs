@@ -63,7 +63,6 @@ fn compiles_ns_nova_lifecycle_with_pixelmagic_rendering() {
         .find(|function| function.name == "render_showcase_frame")
         .unwrap();
     for name in [
-        "opened",
         "frame",
         "gpu_packet",
         "render_result",
@@ -113,13 +112,42 @@ fn compiles_ns_nova_lifecycle_with_pixelmagic_rendering() {
         .expect("showcase should lower its bounded update loop through a scoped frame helper");
     assert_eq!(
         &update_loop.op.args[3..7],
-        ["lt", "add", "cpu", "scoped_call"]
+        ["lt", "add", "cpu", "scoped_call_owned_struct_return"]
+    );
+    let app_result = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "loop_owned_struct_result")
+        .expect("bounded update loop should expose its carried application state");
+    assert_eq!(app_result.op.args[0], update_loop.name);
+    assert!(
+        update_loop
+            .op
+            .args
+            .iter()
+            .any(|arg| yir_core::parse_loop_owned_struct_carry(arg)
+                .is_ok_and(|carry| carry.is_some()))
     );
     assert!(artifacts
         .yir
         .nodes
         .iter()
         .any(|node| { node.op.module == "shader" && node.op.instruction == "inline_wgsl" }));
+    let observed_frame = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.full_name() == "shader.observe")
+        .expect("showcase should observe the rendered frame through the shader provider");
+    assert_eq!(observed_frame.op.args.len(), 3);
+    for instruction in ["completion_token", "completion_clock", "completion_root"] {
+        assert!(artifacts.yir.nodes.iter().any(|node| {
+            node.op.module == "shader"
+                && node.op.instruction == instruction
+                && node.op.args.first() == Some(&observed_frame.name)
+        }));
+    }
     let present = artifacts
         .yir
         .nodes
@@ -151,6 +179,9 @@ fn compiles_ns_nova_lifecycle_with_pixelmagic_rendering() {
     assert!(artifacts.llvm_ir.contains("projected shader.observe"));
     assert!(artifacts
         .llvm_ir
+        .contains("provider-issued shader completion receipt"));
+    assert!(artifacts
+        .llvm_ir
         .contains("projected shader result state `frame_ready` through shader.is_frame_ready"));
     assert!(artifacts
         .llvm_ir
@@ -158,9 +189,21 @@ fn compiles_ns_nova_lifecycle_with_pixelmagic_rendering() {
     assert!(!artifacts
         .llvm_ir
         .contains("deferred lowering for shader.is_frame_ready"));
+    for instruction in [
+        "shader.completion_token",
+        "shader.completion_clock",
+        "shader.completion_root",
+    ] {
+        assert!(!artifacts
+            .llvm_ir
+            .contains(&format!("deferred lowering for {instruction}")));
+    }
     assert!(!artifacts
         .llvm_ir
         .contains("deferred lowering for cpu.call_owned_struct"));
+    assert!(!artifacts
+        .llvm_ir
+        .contains("deferred lowering for cpu.loop_owned_struct_result"));
     assert!(!artifacts
         .yir
         .nodes

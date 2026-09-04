@@ -8,7 +8,10 @@ mod cpu NovaAppRuntime {
     pub frame_index: i64,
     pub timeline_tick: i64,
     pub presented_frames: i64,
-    pub dropped_frames: i64
+    pub dropped_frames: i64,
+    pub last_completion_token: i64,
+    pub last_completion_tick: i64,
+    pub last_completion_root: i64
   }
 
   pub struct NovaFrameTransaction {
@@ -24,13 +27,15 @@ mod cpu NovaAppRuntime {
     pub render_ready: i64,
     pub present_requested: i64,
     pub completion_token: i64,
-    pub completion_tick: i64
+    pub completion_tick: i64,
+    pub completion_root: i64
   }
 
   pub struct NovaFrameResultHandle {
     pub token: i64,
     pub frame_index: i64,
     pub completion_tick: i64,
+    pub root: i64,
     pub provider_ready: i64,
     pub consumed: i64
   }
@@ -82,7 +87,10 @@ mod cpu NovaAppRuntime {
       frame_index: 0,
       timeline_tick: initial_tick,
       presented_frames: 0,
-      dropped_frames: 0
+      dropped_frames: 0,
+      last_completion_token: 0,
+      last_completion_tick: initial_tick,
+      last_completion_root: 0
     };
   }
 
@@ -106,28 +114,29 @@ mod cpu NovaAppRuntime {
       render_ready: 0,
       present_requested: 0,
       completion_token: 0,
-      completion_tick: observed_tick
+      completion_tick: observed_tick,
+      completion_root: 0
     };
   }
 
   pub fn capture_frame_result(
     frame: NovaFrameTransaction,
     provider_ready: i64,
-    completion_tick: i64
+    provider_token: i64,
+    completion_tick: i64,
+    completion_root: i64
   ) -> NovaFrameResultHandle {
     let completed: bool =
       frame.phase == phase_begun() &&
       provider_ready == 1 &&
+      provider_token > 0 &&
+      completion_root > 0 &&
       completion_tick >= frame.begin_tick;
-    let token: i64 = if completed {
-      completion_tick + frame.frame_index + 1
-    } else {
-      0
-    };
     return NovaFrameResultHandle {
-      token: token,
+      token: if completed { provider_token } else { 0 },
       frame_index: frame.frame_index,
       completion_tick: completion_tick,
+      root: if completed { completion_root } else { 0 },
       provider_ready: provider_ready,
       consumed: 0
     };
@@ -139,6 +148,7 @@ mod cpu NovaAppRuntime {
   ) -> bool {
     return
       result.token > 0 &&
+      result.root > 0 &&
       result.frame_index == frame.frame_index &&
       result.completion_tick >= frame.begin_tick &&
       result.provider_ready == 1 &&
@@ -163,7 +173,8 @@ mod cpu NovaAppRuntime {
       render_ready: result.provider_ready,
       present_requested: if accepted { 1 } else { 0 },
       completion_token: if accepted { result.token } else { 0 },
-      completion_tick: result.completion_tick
+      completion_tick: result.completion_tick,
+      completion_root: if accepted { result.root } else { 0 }
     };
   }
 
@@ -172,16 +183,20 @@ mod cpu NovaAppRuntime {
       frame.phase == phase_submitted() &&
       frame.present_requested == 1 &&
       frame.render_ready == 1 &&
-      frame.completion_token > 0;
+      frame.completion_token > 0 &&
+      frame.completion_root > 0;
     return NovaAppState {
       status: status_running(),
       width: frame.width,
       height: frame.height,
       target_fps: frame.target_fps,
       frame_index: frame.frame_index + 1,
-      timeline_tick: frame.deadline_tick,
+      timeline_tick: if presented { frame.completion_tick } else { frame.deadline_tick },
       presented_frames: frame.presented_frames + if presented { 1 } else { 0 },
-      dropped_frames: frame.dropped_frames + if presented { 0 } else { 1 }
+      dropped_frames: frame.dropped_frames + if presented { 0 } else { 1 },
+      last_completion_token: if presented { frame.completion_token } else { 0 },
+      last_completion_tick: frame.completion_tick,
+      last_completion_root: if presented { frame.completion_root } else { 0 }
     };
   }
 
@@ -194,7 +209,10 @@ mod cpu NovaAppRuntime {
       frame_index: state.frame_index,
       timeline_tick: observed_tick,
       presented_frames: state.presented_frames,
-      dropped_frames: state.dropped_frames
+      dropped_frames: state.dropped_frames,
+      last_completion_token: state.last_completion_token,
+      last_completion_tick: state.last_completion_tick,
+      last_completion_root: state.last_completion_root
     };
   }
 
@@ -206,6 +224,9 @@ mod cpu NovaAppRuntime {
       state.frame_index +
       state.timeline_tick +
       state.presented_frames +
-      state.dropped_frames;
+      state.dropped_frames +
+      state.last_completion_token +
+      state.last_completion_tick +
+      state.last_completion_root;
   }
 }

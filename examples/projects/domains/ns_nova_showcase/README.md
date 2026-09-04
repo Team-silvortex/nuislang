@@ -12,7 +12,10 @@ The slice currently proves:
 * registered Data transport through `FabricPlane`
 * conditional presentation driven by Shader readiness through a shared YIR result-state projection
 * a bounded three-frame Nuis update loop lowered through a scoped frame helper
-* runtime-owned `NovaFrameResultHandle` capture and validation before submission
+* one aggregate `NovaAppState` carried and rebound through all three loop iterations
+* runtime-owned `NovaFrameResultHandle` validation of Shader-issued token, clock,
+  and root identity before submission
+* acyclic YIR text round-tripping for the aggregate loop result edge
 * automatic host ABI selection without platform entries in `nuis.toml`
 * a relocatable `galaxy.toml` plus an explicit `ns-nova.toml` framework profile
 
@@ -25,7 +28,6 @@ cargo run -p nuis -- build examples/projects/domains/ns_nova_showcase build/ns-n
 ```
 
 This is a bounded lifecycle proof, not a claim of a stable interactive world loop.
-The current helper uses frame-local state rather than carrying one aggregate app
-state through every iteration. Continuous event dispatch, provider-issued Shader
-completion receipts, provider-neutral window adapters, and full backend payload
-execution remain active work.
+The current helper carries aggregate application state through every iteration,
+but continuous event dispatch, live post-dispatch Shader completion clocks,
+provider-neutral window adapters, and full backend payload execution remain active work.

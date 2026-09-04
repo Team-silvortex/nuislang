@@ -194,9 +194,7 @@ pub(super) fn verify_expr_tree(
             data_bindings,
             task_result_facts,
         )?,
-        NirExpr::KernelReduceMax(inner)
-        | NirExpr::KernelReduceMean(inner)
-        | NirExpr::NetworkResult { value: inner, .. } => verify_expr(
+        NirExpr::KernelReduceMax(inner) | NirExpr::KernelReduceMean(inner) => verify_expr(
             inner,
             moved,
             borrows,
@@ -349,10 +347,47 @@ pub(super) fn verify_expr_tree(
             data_bindings,
             task_result_facts,
         )?,
-        NirExpr::DataResult { value: inner, .. }
-        | NirExpr::ShaderResult { value: inner, .. }
-        | NirExpr::KernelResult { value: inner, .. } => verify_expr(
-            inner,
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            verify_expr(
+                value,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            if let Some(clock) = completion_clock {
+                verify_expr(
+                    clock,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    data_bindings,
+                    task_result_facts,
+                )?;
+            }
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => verify_expr(
+            result,
             moved,
             borrows,
             borrow_bindings,

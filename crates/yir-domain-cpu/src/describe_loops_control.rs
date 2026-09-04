@@ -76,6 +76,32 @@ pub(super) fn describe_cpu_loops_control_node(
                             .to_owned()
                     })
                     .collect(),
+                ("cpu", "scoped_call_owned_struct_return", arity) if arity >= 4 => {
+                    let layout = yir_core::parse_owned_struct_layout(&node.op.args[10])?;
+                    let expected_carries = yir_core::owned_struct_scalar_leaf_count(&layout);
+                    let mut carry_indices = Vec::new();
+                    let mut inputs = Vec::new();
+                    for arg in &node.op.args[11..] {
+                        if arg == "$current" {
+                            continue;
+                        }
+                        if let Some((index, input)) = yir_core::parse_loop_owned_struct_carry(arg)?
+                        {
+                            carry_indices.push(index);
+                            inputs.push(input.to_owned());
+                        } else {
+                            inputs.push(arg.clone());
+                        }
+                    }
+                    carry_indices.sort_unstable();
+                    if carry_indices != (0..expected_carries).collect::<Vec<_>>() {
+                        return Err(format!(
+                            "node `{}` aggregate loop action must carry each of its {expected_carries} layout leaves exactly once",
+                            node.name
+                        ));
+                    }
+                    inputs
+                }
                 (module, instruction, _) => {
                     return Err(format!(
                         "node `{}` references unregistered loop action `{module}.{instruction}`",

@@ -73,7 +73,7 @@ fn lowers_explicit_kernel_result_helpers_from_tensor_reductions() {
     assert!(function.body.iter().any(|stmt| match stmt {
         NirStmt::Let {
             ty: Some(ty),
-            value: NirExpr::KernelResult { value, state },
+            value: NirExpr::KernelResult { value, state, .. },
             ..
         } => {
             ty.render() == "KernelResult<i64>"

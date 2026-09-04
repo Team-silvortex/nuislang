@@ -138,6 +138,53 @@ fn invariant_while_let_payload_runs_as_a_native_binary() {
 }
 
 #[test]
+fn aggregate_state_runs_across_a_scoped_call_loop_backedge() {
+    let status = compile_and_run(
+        "aggregate_loop_backedge",
+        r#"
+        mod cpu Main {
+          struct Pair {
+            left: i64,
+            right: i64
+          }
+
+          struct State {
+            ready: bool,
+            count: i64,
+            pair: Pair
+          }
+
+          fn advance(state: State, iteration: i64) -> State {
+            return State {
+              ready: state.ready,
+              count: state.count + 1,
+              pair: Pair {
+                left: state.pair.left + iteration + 1,
+                right: state.pair.right + 1
+              }
+            };
+          }
+
+          fn main() -> i64 {
+            let state: State = State {
+              ready: true,
+              count: 0,
+              pair: Pair { left: 1, right: 2 }
+            };
+            let iteration: i64 = 0;
+            while iteration < 3 {
+              let state: State = advance(state, iteration);
+              let iteration: i64 = iteration + 1;
+            }
+            return state.count + state.pair.left + state.pair.right;
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(15));
+}
+
+#[test]
 fn invariant_while_let_mismatch_skips_the_native_loop() {
     let status = compile_and_run(
         "invariant_while_let_mismatch",

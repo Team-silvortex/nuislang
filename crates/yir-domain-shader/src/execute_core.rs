@@ -8,10 +8,10 @@ use super::{
     },
 };
 use yir_core::{
-    BlendState, DepthState, ExecutionState, IndexBuffer, Node, RasterState, RenderPass,
-    RenderPipeline, RenderStateSet, Resource, SamplerState, ShaderBinding, ShaderBindingSet,
-    ShaderFlowState, ShaderResultHandle, StructValue, SurfaceTarget, Value, VertexBuffer,
-    VertexLayout, Viewport,
+    issue_observe_completion_receipt, project_provider_completion_receipt, BlendState, DepthState,
+    ExecutionState, IndexBuffer, Node, RasterState, RenderPass, RenderPipeline, RenderStateSet,
+    Resource, SamplerState, ShaderBinding, ShaderBindingSet, ShaderFlowState, ShaderResultHandle,
+    StructValue, SurfaceTarget, Value, VertexBuffer, VertexLayout, Viewport, YirResultFamily,
 };
 
 pub(crate) fn execute_shader_core_node(
@@ -123,6 +123,10 @@ pub(crate) fn execute_shader_core_node(
         "value" => {
             let result = state.expect_shader_result(&node.op.args[0])?;
             Ok((*result.value).clone())
+        }
+        "completion_token" | "completion_clock" | "completion_root" => {
+            let result = state.expect_shader_result(&node.op.args[0])?;
+            project_provider_completion_receipt(result.receipt.as_ref(), &node.op.instruction)
         }
         "sample" | "sample_nearest" => execute_sample(node, state),
         "sample_uv" | "sample_uv_nearest" | "sample_uv_linear" => execute_sample_uv(node, state),
@@ -465,6 +469,7 @@ fn execute_observe(node: &Node, state: &ExecutionState) -> Result<Value, String>
     Ok(Value::ShaderResult(ShaderResultHandle {
         state: flow,
         value: Box::new(value),
+        receipt: issue_observe_completion_receipt(node, state, YirResultFamily::Shader)?,
     }))
 }
 

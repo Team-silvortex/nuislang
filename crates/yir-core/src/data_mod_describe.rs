@@ -21,7 +21,8 @@ pub(crate) fn describe_data_node(
         "output_pipe" => describe_single_effect(node, "data.output_pipe <name> <resource> <input>"),
         "input_pipe" => describe_single_effect(node, "data.input_pipe <name> <resource> <pipe>"),
         "observe" => describe_observe(node),
-        "is_ready" | "is_moved" | "is_windowed" | "value" => describe_result_access(node),
+        "is_ready" | "is_moved" | "is_windowed" | "value" | "completion_token"
+        | "completion_clock" | "completion_root" => describe_result_access(node),
         "handle_table" => describe_handle_table(node),
         "provider_request_ingress" => describe_provider_request_ingress(node),
         "bind_core" => describe_bind_core(node),
@@ -109,9 +110,9 @@ fn describe_single_effect(node: &Node, usage: &str) -> Result<InstructionSemanti
 }
 
 fn describe_observe(node: &Node) -> Result<InstructionSemantics, String> {
-    if node.op.args.len() != 2 {
+    if !matches!(node.op.args.len(), 2 | 3) {
         return Err(format!(
-            "node `{}` expects `data.observe <name> <resource> <input> <state>`",
+            "node `{}` expects `data.observe <name> <resource> <input> <state> [completion-clock]`",
             node.name
         ));
     }
@@ -121,7 +122,11 @@ fn describe_observe(node: &Node) -> Result<InstructionSemantics, String> {
             node.name
         )
     })?;
-    Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+    let mut deps = vec![node.op.args[0].clone()];
+    if let Some(clock) = node.op.args.get(2) {
+        deps.push(clock.clone());
+    }
+    Ok(InstructionSemantics::pure(deps))
 }
 
 fn describe_result_access(node: &Node) -> Result<InstructionSemantics, String> {

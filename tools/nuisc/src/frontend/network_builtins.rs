@@ -3,7 +3,8 @@ use crate::frontend::is_host_execution_domain;
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
-    AstExpr, NirExpr, NirResultFamily, NirResultStage, NirStructDef, NirTypeRef,
+    AstExpr, NirCompletionReceiptField, NirExpr, NirResultFamily, NirResultStage, NirStructDef,
+    NirTypeRef,
 };
 
 use super::{
@@ -332,8 +333,12 @@ pub(super) fn lower_network_builtin_call(
             signatures,
             struct_table,
             family: NirResultFamily::Network,
-            build: |value, stage| match stage {
-                NirResultStage::Network(state) => Ok(NirExpr::NetworkResult { value, state }),
+            build: |value, stage, completion_clock| match stage {
+                NirResultStage::Network(state) => Ok(NirExpr::NetworkResult {
+                    value,
+                    state,
+                    completion_clock,
+                }),
                 other => Err(format!(
                     "expected network result stage, found `{}`",
                     other.render()
@@ -405,6 +410,29 @@ pub(super) fn lower_network_builtin_call(
             family: NirResultFamily::Network,
             build: |expr| NirExpr::NetworkValue(Box::new(expr)),
         })?,
+        "network_completion_token" | "network_completion_clock" | "network_completion_root" => {
+            let field = match callee {
+                "network_completion_token" => NirCompletionReceiptField::Token,
+                "network_completion_clock" => NirCompletionReceiptField::Clock,
+                _ => NirCompletionReceiptField::Root,
+            };
+            lower_result_observer_call_with_consts(ResultObserverCallInput {
+                name: callee,
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                family: NirResultFamily::Network,
+                build: |expr| NirExpr::ResultCompletionReceipt {
+                    family: NirResultFamily::Network,
+                    field,
+                    result: Box::new(expr),
+                },
+            })?
+        }
         _ => return Ok(None),
     };
     Ok(Some(expr))

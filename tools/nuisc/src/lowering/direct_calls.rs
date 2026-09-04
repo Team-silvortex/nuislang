@@ -20,6 +20,7 @@ mod control_boundaries;
 #[path = "direct_calls/kinds.rs"]
 mod kinds;
 pub(super) use aggregate_params::collect_aggregate_param_direct_call_functions;
+pub(super) use aggregate_params::flatten_direct_call_argument;
 use aggregate_params::{flatten_direct_call_arguments, lower_direct_call_parameters};
 pub(super) use control_boundaries::collect_guarded_loop_direct_call_functions;
 pub(super) use kinds::{
@@ -398,11 +399,33 @@ fn expr_collect_called_functions(
         | NirExpr::NetworkRecvReady(value)
         | NirExpr::NetworkAcceptReady(value)
         | NirExpr::NetworkValue(value)
-        | NirExpr::DataResult { value, .. }
-        | NirExpr::KernelResult { value, .. }
-        | NirExpr::ShaderResult { value, .. }
-        | NirExpr::NetworkResult { value, .. } => {
+        | NirExpr::ResultCompletionReceipt { result: value, .. } => {
             expr_collect_called_functions(value, eligible_names, called);
+        }
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            expr_collect_called_functions(value, eligible_names, called);
+            if let Some(clock) = completion_clock {
+                expr_collect_called_functions(clock, eligible_names, called);
+            }
         }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {

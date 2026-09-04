@@ -32,10 +32,34 @@ pub(super) fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> boo
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => expr_uses_shader_profile_render(inner, unit),
-        NirExpr::DataResult { value: input, .. } | NirExpr::ShaderResult { value: input, .. } => {
-            expr_uses_shader_profile_render(input, unit)
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
         }
-        NirExpr::KernelResult { value: input, .. } => expr_uses_shader_profile_render(input, unit),
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => {
+            expr_uses_shader_profile_render(value, unit)
+                || completion_clock
+                    .as_deref()
+                    .is_some_and(|clock| expr_uses_shader_profile_render(clock, unit))
+        }
+        NirExpr::ResultCompletionReceipt { result, .. } => {
+            expr_uses_shader_profile_render(result, unit)
+        }
         NirExpr::AllocNode { value, next } => {
             expr_uses_shader_profile_render(value, unit)
                 || expr_uses_shader_profile_render(next, unit)

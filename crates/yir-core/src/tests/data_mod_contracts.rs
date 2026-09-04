@@ -1,7 +1,73 @@
 use crate::{
     DataFabricPrimitive, DataMod, DataWindow, ExecutionState, Node, Operation, RegisteredMod,
-    Resource, ResourceKind, Value,
+    Resource, ResourceKind, Value, YirResultFamily,
 };
+
+#[test]
+fn data_observe_issues_and_projects_provider_completion_receipt() {
+    let resource = Resource {
+        name: "fabric0".to_owned(),
+        kind: ResourceKind::parse("data.fabric"),
+    };
+    let data_mod = DataMod;
+    let mut state = ExecutionState::default();
+    state.bind_value("payload", Value::Int(11));
+    state.bind_value("clock", Value::Int(23));
+
+    let observed = data_mod
+        .execute(
+            &Node {
+                name: "result".to_owned(),
+                resource: "fabric0".to_owned(),
+                op: Operation::parse(
+                    "data.observe",
+                    vec!["payload".to_owned(), "ready".to_owned(), "clock".to_owned()],
+                )
+                .unwrap(),
+            },
+            &resource,
+            &mut state,
+        )
+        .unwrap();
+    let Value::DataResult(handle) = &observed else {
+        panic!("data.observe should produce a data result handle");
+    };
+    let receipt = handle
+        .receipt
+        .expect("clocked observe should carry a receipt");
+    assert_eq!(receipt.completion_clock, 23);
+    assert_eq!(
+        receipt,
+        crate::issue_provider_completion_receipt(
+            YirResultFamily::Data,
+            "fabric0",
+            "payload",
+            "ready",
+            23,
+        )
+    );
+    state.bind_value("result", observed);
+
+    for (instruction, expected) in [
+        ("completion_token", receipt.token),
+        ("completion_clock", receipt.completion_clock),
+        ("completion_root", receipt.root),
+    ] {
+        let projected = data_mod
+            .execute(
+                &Node {
+                    name: instruction.to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(&format!("data.{instruction}"), vec!["result".to_owned()])
+                        .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+        assert_eq!(projected, Value::Int(expected));
+    }
+}
 
 #[test]
 fn freeing_live_link_target_is_rejected_in_execution_state() {

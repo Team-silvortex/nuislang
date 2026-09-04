@@ -222,6 +222,33 @@ impl NirResultFamily {
     pub fn supports_stage(self, stage: NirResultStage) -> bool {
         self == stage.family()
     }
+
+    pub fn domain_name(self) -> &'static str {
+        match self {
+            Self::Task => "cpu",
+            Self::Data => "data",
+            Self::Shader => "shader",
+            Self::Kernel => "kernel",
+            Self::Network => "network",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirCompletionReceiptField {
+    Token,
+    Clock,
+    Root,
+}
+
+impl NirCompletionReceiptField {
+    pub fn instruction(self) -> &'static str {
+        match self {
+            Self::Token => "completion_token",
+            Self::Clock => "completion_clock",
+            Self::Root => "completion_root",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

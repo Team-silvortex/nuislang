@@ -5,6 +5,7 @@ use yir_core::Node;
 use super::{
     fresh_block, fresh_reg,
     loop_effect_action::{begin_loop_effect_action, finish_loop_effect_action, LoopEffectCleanup},
+    loop_owned_struct_lowering::prepare_owned_struct_loop_carry,
     value_ref::coerce_to_i64,
     CpuHelperSignature, LlvmValueRef,
 };
@@ -89,6 +90,13 @@ pub(crate) fn lower_cpu_simple_loop_node(
             } else {
                 None
             };
+            let owned_struct_carry = prepare_owned_struct_loop_carry(
+                node,
+                body,
+                registers,
+                helper_signatures,
+                next_reg,
+            )?;
             let loop_slot = fresh_reg(next_reg);
             body.push(format!("  {loop_slot} = alloca i64"));
             body.push(format!("  store i64 {initial}, ptr {loop_slot}"));
@@ -133,6 +141,10 @@ pub(crate) fn lower_cpu_simple_loop_node(
             }
             let effect_cleanup = (node.op.instruction == "loop_while_i64_effect")
                 .then(|| {
+                    let scalar_overrides = owned_struct_carry
+                        .as_ref()
+                        .map(|carry| carry.load_operand_overrides(body, next_reg))
+                        .unwrap_or_default();
                     begin_loop_effect_action(
                         node,
                         5,
@@ -141,6 +153,7 @@ pub(crate) fn lower_cpu_simple_loop_node(
                         buffer_lengths,
                         helper_signatures,
                         &owned_move_overrides,
+                        &scalar_overrides,
                         &current,
                         next_reg,
                     )
@@ -170,6 +183,11 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 {
                     body.push(format!("  store ptr {blob}, ptr {slot}"));
                 }
+                if let (LoopEffectCleanup::OwnedStructResult(pointer_bits), Some(carry)) =
+                    (&cleanup, &owned_struct_carry)
+                {
+                    carry.store_return(pointer_bits, body, next_reg)?;
+                }
                 finish_loop_effect_action(&cleanup, body);
             }
             body.push(format!("  br label %{loop_cond}"));
@@ -179,6 +197,10 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 let blob = fresh_reg(next_reg);
                 body.push(format!("  {blob} = load ptr, ptr {slot}"));
                 registers.insert(result, LlvmValueRef::OwnedBytes { blob });
+            }
+            if let Some(carry) = owned_struct_carry {
+                let (result, value) = carry.finish(body, next_reg)?;
+                registers.insert(result, LlvmValueRef::Struct(value));
             }
             *last_cpu_value = Some(current);
         }

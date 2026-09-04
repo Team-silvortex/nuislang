@@ -1,6 +1,6 @@
 schema = "nuis-ns-nova-application-lifecycle-v1"
 status = "active"
-progress = 54
+progress = 70
 owner = "nuis.ns-nova"
 runtime_module = "stdlib/ns-nova/lib/app_runtime.ns"
 reference_project = "examples/projects/domains/ns_nova_showcase"
@@ -21,13 +21,15 @@ validate_result = "NovaAppRuntime.frame_result_ready"
 submit = "NovaAppRuntime.submit_frame"
 commit = "NovaAppRuntime.commit_frame"
 phases = ["begun", "submitted", "rejected"]
-order = ["open", "begin-frame", "submit-frame", "present-or-drop", "commit-frame", "close"]
+order = ["open", "begin-frame", "capture-result", "validate-result", "submit-frame", "present-or-drop", "commit-frame", "close"]
 
 [clock]
 tick_semantics = "abstract-monotonic-step"
 deadline_rule = "begin-tick-plus-one-when-running"
 target_fps_role = "scheduler-intent"
 scale_owner = "registered-clock-bridge"
+completion_receipt_contract = "nuis-yir-provider-completion-receipt-v1"
+completion_identity = ["token", "completion-clock", "root"]
 
 [composition]
 framework_owner = "real-time-world-lifecycle-and-scheduling"
@@ -48,7 +50,12 @@ bounded_launch_status = "window-and-fabric-boot-observed"
 conditional_present_status = "cross-domain-result-state-projection-verified"
 result_state_projection = "yir-family-contract-to-cpu-cfg"
 bounded_update_loop_status = "three-frame-nuis-update-loop-verified"
-runtime_result_handle_status = "typed-capture-validate-submit-verified"
+aggregate_state_carry_status = "recursive-scalar-aggregate-backedge-native-verified"
+runtime_result_handle_status = "provider-token-clock-root-capture-validate-submit-verified"
+provider_completion_receipt_status = "generic-yir-family-aot-native-verified"
+native_receipt_execution_status = "kernel-provider-final-binary-verified"
+yir_dependency_inference_status = "explicit-result-edge-cycle-guard-verified"
+aot_graph_status = "acyclic-after-text-roundtrip-verified"
 stable_interactive_loop_claimed = false
 backend_execution_closure_claimed = false
 dynamic_shader_ready_bridge_claimed = false
@@ -66,13 +73,16 @@ conditional_present_lowering = true
 cross_domain_result_state_projection = true
 bounded_update_loop = true
 runtime_owned_result_handle = true
+provider_issued_completion_receipt = true
+receipt_identity_carried_in_application_state = true
 dynamic_cross_domain_present_predicate = false
-loop_carried_application_state = false
+loop_carried_application_state = true
 framework_owned_renderer = false
 continuous_event_loop = false
 cross_host_window_adapter = false
-native_bool_aggregate_abi = false
+native_bool_aggregate_abi = true
+live_backend_completion_clock = false
 
 [next_slice]
-action = "carry aggregate application state across the world loop and bind NovaFrameResultHandle to a provider-issued completion receipt"
-validation = "compile and execute a bounded multi-frame AOT slice whose state advances across iterations and whose presentation gate consumes a live registered provider receipt"
+action = "bind the generic provider receipt to a real registered renderer submission completion instead of a caller-supplied frame deadline"
+validation = "execute a bounded PixelMagic backend submission whose post-dispatch completion clock issues token/root identity, rejects mismatched receipts, and gates presentation without renderer-specific compiler logic"

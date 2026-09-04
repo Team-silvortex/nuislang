@@ -142,6 +142,59 @@ fn lowers_explicit_shader_result_helpers() {
 }
 
 #[test]
+fn lowers_clocked_shader_result_and_provider_receipt_projections() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let frame_result: ShaderResult<Frame> = shader_result(shader_profile_render(
+              "SurfaceShader",
+              shader_profile_packet("SurfaceShader", 1, 2, 3)
+            ), 17);
+            let token: i64 = shader_completion_token(frame_result);
+            let clock: i64 = shader_completion_clock(frame_result);
+            let root: i64 = shader_completion_root(frame_result);
+            return token + clock + root;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let body = &module.functions[0].body;
+    assert!(matches!(
+        &body[0],
+        NirStmt::Let {
+            value: NirExpr::ShaderResult {
+                completion_clock: Some(clock),
+                ..
+            },
+            ..
+        } if matches!(clock.as_ref(), NirExpr::Int(17))
+    ));
+    for (index, field) in [
+        NirCompletionReceiptField::Token,
+        NirCompletionReceiptField::Clock,
+        NirCompletionReceiptField::Root,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert!(matches!(
+            &body[index + 1],
+            NirStmt::Let {
+                value: NirExpr::ResultCompletionReceipt {
+                    family: NirResultFamily::Shader,
+                    field: actual,
+                    ..
+                },
+                ..
+            } if *actual == field
+        ));
+    }
+}
+
+#[test]
 fn lowers_shader_texture_sampling_builtins() {
     let module = parse_nuis_module(
         r#"

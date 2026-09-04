@@ -123,6 +123,27 @@ impl Operation {
             (OperationDomainFamily::Network, "is_accept_ready") => SemanticOp::NetworkIsAcceptReady,
             (OperationDomainFamily::Network, "is_closed") => SemanticOp::NetworkIsClosed,
             (OperationDomainFamily::Network, "value") => SemanticOp::NetworkValue,
+            (
+                OperationDomainFamily::Data
+                | OperationDomainFamily::Shader
+                | OperationDomainFamily::Kernel
+                | OperationDomainFamily::Network,
+                "completion_token",
+            ) => SemanticOp::ResultCompletionToken,
+            (
+                OperationDomainFamily::Data
+                | OperationDomainFamily::Shader
+                | OperationDomainFamily::Kernel
+                | OperationDomainFamily::Network,
+                "completion_clock",
+            ) => SemanticOp::ResultCompletionClock,
+            (
+                OperationDomainFamily::Data
+                | OperationDomainFamily::Shader
+                | OperationDomainFamily::Kernel
+                | OperationDomainFamily::Network,
+                "completion_root",
+            ) => SemanticOp::ResultCompletionRoot,
             _ => SemanticOp::Other,
         }
     }
@@ -259,6 +280,9 @@ impl Operation {
             SemanticOp::NetworkIsAcceptReady => "network.is_accept_ready",
             SemanticOp::NetworkIsClosed => "network.is_closed",
             SemanticOp::NetworkValue => "network.value",
+            SemanticOp::ResultCompletionToken => "result.completion_token",
+            SemanticOp::ResultCompletionClock => "result.completion_clock",
+            SemanticOp::ResultCompletionRoot => "result.completion_root",
             SemanticOp::DataBindCore => "data.bind_core",
             SemanticOp::DataMarker => "data.marker",
             SemanticOp::DataHandleTable => "data.handle_table",
@@ -283,9 +307,12 @@ impl Operation {
         match self.instruction.as_str() {
             "text" | "const_bool" | "const_i32" | "const" | "const_i64" | "const_f32"
             | "const_f64" | "null" => CpuLlvmLoweringClass::Literal,
-            "struct" | "field" | "variant_is" | "variant_field" | "async_value" => {
-                CpuLlvmLoweringClass::Aggregate
-            }
+            "struct"
+            | "field"
+            | "variant_is"
+            | "variant_field"
+            | "async_value"
+            | "loop_owned_struct_result" => CpuLlvmLoweringClass::Aggregate,
             "borrow" | "borrow_end" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
             "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32" | "sub_f32"
             | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64" | "div" | "div_i32"

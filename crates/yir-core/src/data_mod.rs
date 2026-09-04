@@ -137,6 +137,7 @@ impl RegisteredMod for DataMod {
                 Ok(Value::DataResult(DataResultHandle {
                     state: flow,
                     value: Box::new(value),
+                    receipt: issue_observe_completion_receipt(node, state, YirResultFamily::Data)?,
                 }))
             }
             "is_ready" => {
@@ -154,6 +155,10 @@ impl RegisteredMod for DataMod {
             "value" => {
                 let result = state.expect_data_result(&node.op.args[0])?;
                 Ok((*result.value).clone())
+            }
+            "completion_token" | "completion_clock" | "completion_root" => {
+                let result = state.expect_data_result(&node.op.args[0])?;
+                project_provider_completion_receipt(result.receipt.as_ref(), &node.op.instruction)
             }
             "handle_table" => {
                 let mut entries = Vec::with_capacity(node.op.args.len());

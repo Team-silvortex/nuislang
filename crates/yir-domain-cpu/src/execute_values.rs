@@ -160,6 +160,9 @@ pub(crate) fn execute_cpu_value_node(
         "param_buffer_ref" | "param_node_ref" => Ok(Value::Pointer(None)),
         "param_owned_bytes" => Ok(Value::OwnedBytes(Vec::new())),
         "loop_owned_result" => Ok(Value::OwnedBytes(Vec::new())),
+        "loop_owned_struct_result" => {
+            default_owned_layout_value(parse_owned_struct_layout(&node.op.args[1])?)
+        }
         "call_bool"
         | "call_i32"
         | "call_i64"

@@ -19,14 +19,26 @@ pub(super) fn simplify_data_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             Some((NirExpr::DataInputPipe(Box::new(inner)), changed))
         }
-        NirExpr::DataResult { value, state } => {
-            let (value, changed) = simplify_expr(*value, env, inline_templates, active_inline);
+        NirExpr::DataResult {
+            value,
+            state,
+            completion_clock,
+        } => {
+            let (value, value_changed) =
+                simplify_expr(*value, env, inline_templates, active_inline);
+            let (completion_clock, clock_changed) = super::simplify_optional_box_expr(
+                completion_clock,
+                env,
+                inline_templates,
+                active_inline,
+            );
             Some((
                 NirExpr::DataResult {
                     value: Box::new(value),
                     state,
+                    completion_clock,
                 },
-                changed,
+                value_changed || clock_changed,
             ))
         }
         NirExpr::DataReady(inner) => {

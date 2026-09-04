@@ -11,8 +11,9 @@ use tensor_ops::{
     sort_rows, sort_tensor_flat, topk_cols, topk_rows, topk_tensor_flat, transpose,
 };
 use yir_core::{
-    ExecutionState, InstructionSemantics, KernelFlowState, KernelResultHandle, Node, RegisteredMod,
-    Resource, TensorValue, Value,
+    issue_observe_completion_receipt, project_provider_completion_receipt, ExecutionState,
+    InstructionSemantics, KernelFlowState, KernelResultHandle, Node, RegisteredMod, Resource,
+    TensorValue, Value, YirResultFamily,
 };
 
 pub struct KernelMod;
@@ -131,6 +132,7 @@ fn execute_kernel_node(
             Ok(Value::KernelResult(KernelResultHandle {
                 state: flow,
                 value: Box::new(value),
+                receipt: issue_observe_completion_receipt(node, state, YirResultFamily::Kernel)?,
             }))
         }
         "is_config_ready" => {
@@ -143,6 +145,10 @@ fn execute_kernel_node(
         "value" => {
             let result = state.expect_kernel_result(&node.op.args[0])?;
             Ok((*result.value).clone())
+        }
+        "completion_token" | "completion_clock" | "completion_root" => {
+            let result = state.expect_kernel_result(&node.op.args[0])?;
+            project_provider_completion_receipt(result.receipt.as_ref(), &node.op.instruction)
         }
         "tensor" => Ok(Value::Tensor(parse_tensor_literal(node)?)),
         "fill" => {

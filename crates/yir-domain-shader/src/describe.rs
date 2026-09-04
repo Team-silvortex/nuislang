@@ -65,7 +65,8 @@ pub(crate) fn describe_shader_node(
             "shader.begin_pass <name> <resource> <target> <pipeline> <viewport>",
         ),
         "observe" => describe_observe(node),
-        "is_pass_ready" | "is_frame_ready" | "value" => describe_result_access(node),
+        "is_pass_ready" | "is_frame_ready" | "value" | "completion_token" | "completion_clock"
+        | "completion_root" => describe_result_access(node),
         "uniform"
         | "storage"
         | "attachment"
@@ -312,14 +313,23 @@ fn describe_texture2d(node: &Node) -> Result<InstructionSemantics, String> {
 }
 
 fn describe_observe(node: &Node) -> Result<InstructionSemantics, String> {
-    expect_arg_count(node, 2, "shader.observe <name> <resource> <input> <state>")?;
+    if !matches!(node.op.args.len(), 2 | 3) {
+        return Err(format!(
+            "node `{}` expects `shader.observe <name> <resource> <input> <state> [completion-clock]`",
+            node.name
+        ));
+    }
     parse_shader_flow_state(&node.op.args[1]).map_err(|error| {
         format!(
             "node `{}` has invalid shader observe state: {error}",
             node.name
         )
     })?;
-    Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+    let mut deps = vec![node.op.args[0].clone()];
+    if let Some(clock) = node.op.args.get(2) {
+        deps.push(clock.clone());
+    }
+    Ok(InstructionSemantics::pure(deps))
 }
 
 fn describe_result_access(node: &Node) -> Result<InstructionSemantics, String> {

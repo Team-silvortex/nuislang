@@ -24,11 +24,16 @@ pub(super) fn lower_kernel_expr(
             unit,
             "batch_lanes",
         )),
-        NirExpr::KernelResult { value, state: flow } => Some(lower_result_observe_node(
+        NirExpr::KernelResult {
+            value,
+            state: flow,
+            completion_clock,
+        } => Some(lower_result_observe_node(
             state,
             bindings,
             ResultLoweringDomain::Kernel,
             value,
+            completion_clock.as_deref(),
             "kernel_result",
             flow.render(),
         )),

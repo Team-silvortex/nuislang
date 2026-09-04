@@ -19,7 +19,8 @@ pub(crate) fn describe_kernel_node(
         "const_f64" => describe_typed_const::<f64>(node, "f64"),
         "target_config" => describe_target_config(node),
         "observe" => describe_observe(node),
-        "is_config_ready" | "value" => describe_kernel_result_access(node),
+        "is_config_ready" | "value" | "completion_token" | "completion_clock"
+        | "completion_root" => describe_kernel_result_access(node),
         "tensor" => describe_tensor_literal(node),
         "fill" => describe_fill(node),
         "splat" => describe_splat(node),
@@ -109,14 +110,23 @@ fn describe_target_config(node: &Node) -> Result<InstructionSemantics, String> {
 }
 
 fn describe_observe(node: &Node) -> Result<InstructionSemantics, String> {
-    expect_arg_count(node, 2, "kernel.observe <name> <resource> <input> <state>")?;
+    if !matches!(node.op.args.len(), 2 | 3) {
+        return Err(format!(
+            "node `{}` expects `kernel.observe <name> <resource> <input> <state> [completion-clock]`",
+            node.name
+        ));
+    }
     parse_kernel_flow_state(&node.op.args[1]).map_err(|error| {
         format!(
             "node `{}` has invalid kernel observe state: {error}",
             node.name
         )
     })?;
-    Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+    let mut deps = vec![node.op.args[0].clone()];
+    if let Some(clock) = node.op.args.get(2) {
+        deps.push(clock.clone());
+    }
+    Ok(InstructionSemantics::pure(deps))
 }
 
 fn describe_kernel_result_access(node: &Node) -> Result<InstructionSemantics, String> {

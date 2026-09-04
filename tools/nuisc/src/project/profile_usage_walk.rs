@@ -79,10 +79,27 @@ pub(in crate::project) fn expr_walk_any(
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner)
         | NirExpr::FieldAccess { base: inner, .. } => predicate(inner),
-        NirExpr::DataResult { value: inner, .. }
-        | NirExpr::ShaderResult { value: inner, .. }
-        | NirExpr::NetworkResult { value: inner, .. } => predicate(inner),
-        NirExpr::KernelResult { value: inner, .. } => predicate(inner),
+        NirExpr::DataResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::ShaderResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::NetworkResult {
+            value,
+            completion_clock,
+            ..
+        }
+        | NirExpr::KernelResult {
+            value,
+            completion_clock,
+            ..
+        } => predicate(value) || completion_clock.as_deref().is_some_and(predicate),
+        NirExpr::ResultCompletionReceipt { result, .. } => predicate(result),
         NirExpr::AllocNode { value, next } => predicate(value) || predicate(next),
         NirExpr::AllocBuffer { len, fill } => predicate(len) || predicate(fill),
         NirExpr::LoadAt { buffer, index } => predicate(buffer) || predicate(index),
