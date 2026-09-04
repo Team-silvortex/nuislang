@@ -121,6 +121,7 @@ mod tests {
             [
                 "clock.fabric-monotonic",
                 "completion.verified",
+                "execution.reference",
                 "glm.owned-transfer",
                 "memory.cpu",
                 "movement.copy",

@@ -127,6 +127,7 @@ mod final_executable_macho_symbol_resolution;
 mod final_executable_output;
 mod final_executable_output_backend;
 mod final_executable_output_code_asset;
+mod final_executable_output_conformance;
 mod final_executable_output_handoff;
 mod final_executable_output_nsdb_handoff;
 mod final_executable_output_selection;

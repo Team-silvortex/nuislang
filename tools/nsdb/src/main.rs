@@ -30,6 +30,10 @@ mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
 mod provider_completion_trust_registry;
+#[allow(dead_code)]
+mod provider_conformance_capsule;
+#[cfg(test)]
+mod provider_conformance_capsule_tests;
 mod provider_edge_staging_registry;
 mod provider_edge_transport;
 #[cfg(unix)]

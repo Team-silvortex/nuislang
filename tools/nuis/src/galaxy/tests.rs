@@ -1,8 +1,8 @@
 use super::bundle::decode_bundle;
 use super::manifest::escape;
 use super::{
-    parse_manifest, parse_ns_nova_manifest, render_manifest, render_ns_nova_manifest,
-    GalaxyManifest, NsNovaManifest, GALAXY_BUNDLE_VERSION, GALAXY_MAGIC,
+    default_manifest, parse_manifest, parse_ns_nova_manifest, render_manifest,
+    render_ns_nova_manifest, GalaxyManifest, NsNovaManifest, GALAXY_BUNDLE_VERSION, GALAXY_MAGIC,
 };
 use std::path::Path;
 
@@ -47,6 +47,63 @@ fn renders_without_framework_line_when_absent() {
     assert!(!rendered.contains("\nframework = "));
     let parsed = parse_manifest(&rendered, Path::new("galaxy.toml")).unwrap();
     assert_eq!(parsed.framework, None);
+}
+
+#[test]
+fn default_manifest_packages_only_project_owned_modules() {
+    let root = Path::new("portable-nova");
+    let main_source = "mod cpu Main { fn main() {} }";
+    let runtime_source = "mod cpu NovaAppRuntime { fn open() {} }";
+    let project = nuisc::project::LoadedProject {
+        root: root.to_path_buf(),
+        manifest_path: root.join("nuis.toml"),
+        manifest: nuisc::project::NuisProjectManifest {
+            name: "portable_nova".to_owned(),
+            entry: "main.ns".to_owned(),
+            packaging_mode: None,
+            artifact_provider_metadata: Vec::new(),
+            code_assets: Vec::new(),
+            modules: vec!["main.ns".to_owned()],
+            tests: Vec::new(),
+            links: Vec::new(),
+            abi_requirements: Vec::new(),
+            galaxy_dependencies: Vec::new(),
+            galaxy_imports: Vec::new(),
+        },
+        entry_path: root.join("main.ns"),
+        entry_source: main_source.to_owned(),
+        modules: vec![
+            nuisc::project::ProjectModule {
+                path: root.join("main.ns"),
+                ast: nuisc::frontend::parse_nuis_ast(main_source).expect("parse local module"),
+                origin: nuisc::project::ProjectModuleOrigin::LocalProject {
+                    manifest_spec: "main.ns".to_owned(),
+                },
+            },
+            nuisc::project::ProjectModule {
+                path: Path::new("dependency-cache/ns-nova/lib/app_runtime.ns").to_path_buf(),
+                ast: nuisc::frontend::parse_nuis_ast(runtime_source)
+                    .expect("parse dependency module"),
+                origin: nuisc::project::ProjectModuleOrigin::ExplicitGalaxyImport {
+                    galaxy: "ns-nova".to_owned(),
+                    package_id: "nuis.ns-nova".to_owned(),
+                    library_module: "lib/app_runtime.ns".to_owned(),
+                    import_policy: "manual-only".to_owned(),
+                },
+            },
+        ],
+        resolved_galaxies: Vec::new(),
+    };
+
+    let manifest = default_manifest(&project, Some("ns-nova")).expect("default manifest");
+    assert_eq!(
+        manifest.include,
+        vec!["main.ns", "ns-nova.toml", "nuis.toml"]
+    );
+    assert!(manifest
+        .include
+        .iter()
+        .all(|entry| !Path::new(entry).is_absolute()));
 }
 
 #[test]

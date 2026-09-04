@@ -1,5 +1,5 @@
 protocol = "nuis-data-provider-inventory-v1"
-status = "cpu-memory-reference-executable"
+status = "cpu-memory-reference-available"
 scope = "provider-neutral-data-fabric"
 
 [registration]
@@ -8,7 +8,7 @@ record_contract = "nuis-provider-capability-record-v1"
 manifest_contract = "nuis-provider-capability-manifest-v1"
 registry_contract = "nuis-provider-capability-registry-v1"
 selection_contract = "nuis-provider-capability-selection-v1"
-manifest_hash = "fnv1a64:d9930501cc045ea0"
+manifest_hash = "fnv1a64:4e27319a33087b95"
 manifest_entry_count = 1
 ownership = "nustar-package"
 generation = "build-time-static"
@@ -22,6 +22,7 @@ priority = 100
 capabilities = [
   "clock.fabric-monotonic",
   "completion.verified",
+  "execution.reference",
   "glm.owned-transfer",
   "memory.cpu",
   "movement.copy",
@@ -34,13 +35,24 @@ requirements_are_order_independent = true
 duplicate_requirements = "reject"
 unsupported_requirements = "reject"
 invalid_registry = "reject"
+matching_but_unavailable = "reject-provider-unavailable"
 explicit_requirements = [
   "completion.verified",
+  "execution.reference",
   "memory.cpu",
   "movement.copy",
 ]
-explicit_selection_hash = "fnv1a64:80daf599c694cf56"
-default_family_selection_hash = "fnv1a64:d0e7db5a3ab8fb6b"
+explicit_selection_hash = "fnv1a64:a5de1600823540c6"
+default_family_selection_hash = "fnv1a64:01cb51b49b12a49e"
+
+[availability]
+contract = "nuis-provider-capability-availability-v1"
+bundle_contract = "nuis-provider-bundle-availability-v1"
+probe_status = "native-provider-worker-available"
+status = "available"
+offline_selection = "skip-unavailable-by-priority"
+physical_requirement = "execution.physical"
+physical_without_registered_provider = "reject-unsupported"
 
 [execution]
 runner_adapter = "data.host.provider-worker-native"
@@ -52,9 +64,11 @@ glm_release = "released-at-graph-close"
 clock = "nuis-provider-completion-clock-v1"
 
 [boundary]
+conformance_protocol = "nuis-data-provider-conformance-v1"
 compiler_provider_branches = 0
 runtime_selector_provider_branches = 0
 physical_dpu_claimed = false
 physical_ipu_claimed = false
 physical_rdma_claimed = false
-next = "register one physical provider through the same open record and bundle contracts"
+hardware_absent_strategy = "reference-execution-plus-offline-contract-validation"
+next = "admit future remote physical-provider certification receipts without adding compiler or runtime provider branches"

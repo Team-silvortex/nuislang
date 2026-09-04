@@ -1,0 +1,10 @@
+name = "ns_nova_showcase"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "fabric_plane.ns"]
+galaxy = ["ns-nova=workspace", "pixelmagic=workspace"]
+galaxy_imports = ["ns-nova:lib/app_runtime.ns"]
+links = [
+  "cpu.Main -> shader.PixelMagicRenderSurface via data.FabricPlane",
+  "shader.PixelMagicRenderSurface -> cpu.Main via data.FabricPlane"
+]

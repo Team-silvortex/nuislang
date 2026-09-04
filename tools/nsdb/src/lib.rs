@@ -23,6 +23,9 @@ mod provider_completion_projection;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
 mod provider_completion_trust_registry;
+mod provider_conformance_capsule;
+#[cfg(test)]
+mod provider_conformance_capsule_tests;
 mod provider_edge_staging_registry;
 mod provider_edge_transport;
 #[cfg(unix)]
@@ -102,6 +105,13 @@ pub use model::{
     CompiledCodeAssetSelectionEvidence, CompiledCodeAssetSelectionItem,
     FinalImageBindingProofClaim, PayloadExecutionHandoffPersistSummary,
     PayloadExecutionHandoffRecord, PayloadExecutionProviderCompletion,
+};
+pub use provider_conformance_capsule::{
+    data_reference_conformance_capsule, replay_provider_conformance_capsule,
+    ProviderConformanceCapsule, ProviderConformanceLifecycleEvidence,
+    ProviderConformanceObservation, ProviderConformanceReplayEvidence,
+    PROVIDER_CONFORMANCE_CAPSULE_CONTRACT, PROVIDER_CONFORMANCE_EXECUTION_AUTHORITY,
+    PROVIDER_CONFORMANCE_REPLAY_CONTRACT,
 };
 pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
 pub use provider_sample_materialize::{

@@ -41,25 +41,28 @@ Design principles:
 Current state:
 
 * this repository now treats `ns-nova` as a standard-library/framework layer target, not as a separate future repository by default
-* the current real-time demo path in `window_controls_demo_project` is the execution direction `ns-nova` should eventually absorb and abstract
+* `lib/app_runtime.ns` now owns the first reusable application and frame lifecycle in Nuis source
+* `examples/projects/domains/ns_nova_showcase` composes that lifecycle with PixelMagic, Data, and Shader as separate Galaxy/Nustar owners
+* the showcase now carries checked `galaxy.toml` and `ns-nova.toml` manifests whose package inputs are project-owned relative paths; Galaxy dependencies remain registry-resolved rather than embedded as host paths
 * `nuis galaxy init --framework ns-nova` now emits an `ns-nova.toml` profile that carries framework-level assembly metadata, including the standard `ns-nova-selection-v1` selection contract for relational controls such as `list`, `table`, `tree`, `inspector`, and `outline`
 * `ns-nova.toml` now also carries `ns-nova-family-v1` and `ns-nova-render-v1` scaffolding so projects can declare whether they currently lean toward `core`, `ui`, or future `scene` layers
-* the `stdlib/ns-nova/*` tree now starts carrying real `.ns` source modules as canonical builder/state examples, even though full crate-style import wiring is not finished yet
+* host ABI selection remains project-driven and automatic; the framework source does not select Metal, Vulkan, or a host OS
 
 Current source-asset status:
 
 * this is currently the only `stdlib` layer that already declares a canonical
   checked-in source set through
   [module.toml](module.toml)
-* the current first project library module is
+* the initial score-oriented project library module is
   [lib/nova_contracts.ns](lib/nova_contracts.ns)
-  which exposes the initial `NovaContracts` helper surface for project-level
-  framework contracts
-* that library module currently uses `library_import_policy = "manual-only"`
+* the first executable lifecycle module is
+  [lib/app_runtime.ns](lib/app_runtime.ns), which exposes owned
+  `NovaAppState` and `NovaFrameTransaction` transitions
+* both library modules currently use `library_import_policy = "manual-only"`
   so it is declared and discoverable through project metadata, but it is not
   auto-injected into project scope by default
 * projects may still opt into it explicitly through
-  `galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]`
+  `galaxy_imports = ["ns-nova:lib/app_runtime.ns"]`
 * duplicate `galaxy_imports` entries are rejected during manifest loading, so
   this opt-in should be listed at most once
 * that manifest currently lists `11` source modules
@@ -88,18 +91,39 @@ First source modules:
 
 Current limitation:
 
-* these files are the first canonical `ns-nova` source assets inside `stdlib`
-* they are not yet imported automatically through a crate-like `use ns-nova ...` flow
-* today they should be read as library-source anchors and compileable templates while project/dependency import management catches up
+* the first lifecycle is a one-frame prototype, not a stable interactive event loop
+* conditional `cpu_present_frame` branches are not yet lowered, so the reference
+  slice records readiness and uses the existing unconditional host presentation path
+* the framework does not yet own a renderer; PixelMagic remains an independent
+  project-level composition dependency in the showcase
+* the current checked AOT window shell is the replaceable Apple bootstrap adapter;
+  non-Apple window adapters and backend execution closure remain open
+
+The machine-readable honesty boundary is
+[nuis-ns-nova-application-lifecycle-v1.toml](../../docs/reference/nuis-ns-nova-application-lifecycle-v1.toml).
+
+## First Executable Slice
+
+The current shortest route is:
+
+* [examples/projects/domains/ns_nova_showcase](../../examples/projects/domains/ns_nova_showcase)
+
+It proves:
+
+* explicit import of the reusable Nova lifecycle
+* independent PixelMagic shader ownership
+* registered Data transfer through `FabricPlane`
+* automatic CPU, Data, and Shader ABI recommendation
+* project compilation and Apple arm64 window AOT packaging
 
 ## Relationship To `window_controls_demo`
 
-The current canonical project route is still:
+The older broad stress route remains:
 
 * [examples/projects/window_controls_demo](../../examples/projects/window_controls_demo)
 
-That project is not “obsolete because recipes now exist”. It is still the main
-truth source for the fully assembled end-to-end path.
+That project is not obsolete. It remains the detailed control/scene stress
+fixture, while `ns_nova_showcase` is now the smaller framework front door.
 
 The current migration split is:
 
@@ -119,6 +143,7 @@ The current migration split is:
 
 So the rule of thumb is:
 
-* read `examples/projects/window_controls_demo` for current complete workflow
+* read `examples/projects/domains/ns_nova_showcase` for the current shortest workflow
+* read `examples/projects/window_controls_demo` for the broad stress workflow
 * read `stdlib/ns-nova/*recipe.ns` for the pieces that have already become
   reusable source assets

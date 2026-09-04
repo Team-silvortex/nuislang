@@ -119,3 +119,10 @@ required = false
 coordinates = [
   "heterogeneous-runtime/data/provider-neutral-data-fabric",
 ]
+
+[[milestones]]
+id = "beta-0.10-ns-nova-application"
+required = false
+coordinates = [
+  "standard-library/ns-nova/application-rendering-framework",
+]

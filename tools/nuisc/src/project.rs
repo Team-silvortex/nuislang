@@ -165,6 +165,8 @@ mod tests {
     mod galaxy_resolution_lock;
     #[path = "multidomain_async.rs"]
     mod multidomain_async;
+    #[path = "ns_nova_runtime.rs"]
+    mod ns_nova_runtime;
     #[path = "packet_data_contracts.rs"]
     mod packet_data_contracts;
     #[path = "planning_kernel.rs"]

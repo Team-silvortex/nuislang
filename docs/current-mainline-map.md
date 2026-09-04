@@ -58,8 +58,12 @@ Short rule:
   [reference/nuis-compiler-candidate-structural-pagination-v1.toml](reference/nuis-compiler-candidate-structural-pagination-v1.toml)
 * current Galaxy provider signer trust and monotonic state boundary:
   [reference/galaxy-provider-trust-state-v1.toml](reference/galaxy-provider-trust-state-v1.toml)
-* current open Data provider inventory and executable CPU-memory reference:
+* current probe-gated Data inventory and executable CPU-memory reference:
   [reference/nuis-data-provider-inventory-v1.toml](reference/nuis-data-provider-inventory-v1.toml)
+* current hardware-free Data conformance capsule, completion binding, and Nsld lifecycle gate:
+  [reference/nuis-data-provider-conformance-v1.toml](reference/nuis-data-provider-conformance-v1.toml)
+* current ns-nova owned application lifecycle and first GPU application slice:
+  [reference/nuis-ns-nova-application-lifecycle-v1.toml](reference/nuis-ns-nova-application-lifecycle-v1.toml)
 * current production-bound candidate compile capability:
   [reference/nuis-compiler-candidate-compile-capability.md](reference/nuis-compiler-candidate-compile-capability.md)
 * current direct stage1 front-end compile capability:

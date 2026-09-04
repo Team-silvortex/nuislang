@@ -728,12 +728,20 @@ mod cpu Main {
         .modules
         .iter()
         .any(|module| module.ast.unit == "NovaContracts"));
+    assert!(!project
+        .modules
+        .iter()
+        .any(|module| module.ast.unit == "NovaAppRuntime"));
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
         "library\tns-nova\tlib/nova_contracts.ns\timport_policy=manual-only\tauto_injectable=false\tvisible=false"
     ));
+    assert!(imports_index.contains(
+        "library\tns-nova\tlib/app_runtime.ns\timport_policy=manual-only\tauto_injectable=false\tvisible=false"
+    ));
     assert!(!imports_index.contains("visible\tcpu\tNovaContracts"));
+    assert!(!imports_index.contains("visible\tcpu\tNovaAppRuntime"));
 
     let artifacts = crate::pipeline::compile_project(root.as_path()).unwrap();
     assert!(artifacts

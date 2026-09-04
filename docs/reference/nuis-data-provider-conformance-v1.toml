@@ -1,0 +1,77 @@
+protocol = "nuis-data-provider-conformance-v1"
+status = "offline-reference-lifecycle-verified"
+scope = "provider-neutral-data-fabric"
+
+[capsule]
+contract = "nuis-provider-conformance-capsule-v1"
+scenario_contract = "nuis-data-reference-copy-conformance-v1"
+scenario_id = "data.copy.binary-octets.v1"
+package_id = "official.data"
+provider_id = "data.cpu-memory.reference.v1"
+bundle_id = "data.host.bundle.v1"
+provider_family = "data:host"
+capability_selection_hash = "fnv1a64:6d712122a1132927"
+requirements = [
+  "clock.fabric-monotonic",
+  "completion.verified",
+  "execution.reference",
+  "glm.owned-transfer",
+  "memory.cpu",
+  "movement.copy",
+  "residency.host",
+]
+input_hex = "000102037f80feff"
+input_hash = "fnv1a64:1c3b67c65206fb6d"
+input_byte_length = 8
+expected_output_hex = "000102037f80feff"
+expected_output_hash = "fnv1a64:1c3b67c65206fb6d"
+expected_output_byte_length = 8
+clock_order = "submission-before-completion-before-release"
+glm_order = "owned-transfer-release-after-completion"
+completion_rule = "byte-length-and-fnv1a64-equal"
+execution_authority = "conformance-only"
+physical_execution_claimed = false
+capsule_hash = "fnv1a64:82270e31b99f2c0b"
+
+[reference_replay]
+contract = "nuis-provider-conformance-replay-v1"
+tick_policy = "immutable-reference-vector"
+submission_tick = 1
+completion_tick = 2
+release_tick = 3
+clock_status = "monotonic"
+glm_status = "released-after-completion"
+completion_status = "verified"
+execution_authority = "conformance-only"
+physical_execution_claimed = false
+replay_hash = "fnv1a64:7ee93c8f8a4ae011"
+
+[lifecycle_binding]
+completion_projection = "nuis-provider-completion-evidence-collection-v1"
+completion_record_hash_binding = "verified"
+completion_set_hash_binding = "verified"
+nsld_validation = "provider-neutral-fail-closed"
+nsld_final_output_projection = "nested-conformance-evidence"
+capsule_hash = "fnv1a64:82270e31b99f2c0b"
+replay_hash = "fnv1a64:7ee93c8f8a4ae011"
+execution_authority = "conformance-only"
+physical_execution_claimed = false
+
+[failure_policy]
+capsule_drift = "reject"
+output_hash_or_length_drift = "reject"
+non_monotonic_clock = "reject"
+reference_tick_drift = "reject"
+missing_glm_release = "reject"
+physical_execution_claim = "reject"
+unavailable_registered_provider = "reject"
+lifecycle_identity_or_authority_drift = "reject"
+
+[boundary]
+hardware_required = false
+path_free = true
+compiler_provider_branches = 0
+runtime_selector_provider_branches = 0
+grants_execution_authority = false
+grants_physical_certification = false
+next = "define a path-free physical-provider certification receipt and remote admission boundary without manufacturing local hardware evidence"

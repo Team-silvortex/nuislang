@@ -6,6 +6,8 @@ depends_on = ["core", "std"]
 summary = "GPU-first native rendering and application framework built on nuis heterogeneous execution."
 
 surfaces = [
+  "contract.ns-nova.application-lifecycle.v1",
+  "contract.ns-nova.frame-transaction.v1",
   "surface.ns-nova.renderer.v1",
   "surface.ns-nova.scene-frame-graph.v1",
   "surface.ns-nova.window-input-lifecycle.v1",
@@ -14,7 +16,8 @@ surfaces = [
 ]
 
 library_modules = [
-  "lib/nova_contracts.ns"
+  "lib/nova_contracts.ns",
+  "lib/app_runtime.ns"
 ]
 
 library_import_policy = "manual-only"

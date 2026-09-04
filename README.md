@@ -32,8 +32,8 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and implementation drift across `26/26` registered coordinates and
-`815/815` passing drift checks. The compiler data model, stage-neutral boundary,
+manifest, and implementation drift across `27/27` registered coordinates and
+`826/826` passing drift checks. The compiler data model, stage-neutral boundary,
 bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
 bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
 forwarding, chunked typed payload projection, and canonical reversible active
@@ -72,10 +72,15 @@ proving `4/4` semantic equivalence. Persistent Galaxy signer trust and rollback
 protection have closed the package-resolution coordinate at `stable/100`; both
 the readiness manifest and global bootstrap-first tensor can now leave the
 bounded preparation gate. The next global tensor task is
-`heterogeneous-runtime/data/provider-neutral-data-fabric`. That lane now has a
-capability-ranked, build-time-generated provider inventory and an executable
-CPU-memory reference provider; physical DPU/IPU/RDMA providers remain the next
-honest boundary.
+`standard-library/ns-nova/application-rendering-framework` at `active/38`.
+Its first Nuis-owned app/frame lifecycle now composes with PixelMagic, Data, and
+Shader in a host-adaptive project, compiles through NIR/YIR, emits an Apple arm64
+window AOT bundle, reaches window/Fabric boot, and passes a relocatable
+framework-Galaxy/profile check without compiler special cases. A continuous framework-owned loop, conditional presentation lowering,
+renderer ownership, and cross-host window adapters remain open. The prior Data
+lane stays `usable/74`: its hardware-free reference and conformance closure are
+preserved, while physical DPU/IPU/RDMA certification is deferred until suitable
+hardware is available rather than blocking the current mainline.
 Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
 shared by CPU execution and LLVM lowering; the common `nuis-runtime`
 blob/aggregate shim also carries the shader result-enum bundle through native

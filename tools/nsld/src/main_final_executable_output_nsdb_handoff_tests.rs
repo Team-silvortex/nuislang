@@ -238,6 +238,12 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     );
     assert_eq!(
         merged_output.final_output_nsdb_provider_completions[0]
+            .conformance
+            .status,
+        "not-applicable"
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completions[0]
             .record_hash
             .len(),
         64
@@ -246,6 +252,9 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(merged_output_json
         .contains("\"final_output_nsdb_first_provider_family\":\"metal:apple-silicon-gpu\""));
     assert!(merged_output_json.contains("\"final_output_nsdb_provider_completions\":[{"));
+    assert!(merged_output_json.contains(
+        "\"conformance\":{\"capsule_contract\":\"nuis-provider-conformance-capsule-v1\",\"status\":\"not-applicable\""
+    ));
     assert!(merged_output_json.contains(
         "\"final_output_nsdb_provider_completion_digest_contract\":\"nuis-provider-completion-digest-sha256-authority-v1\""
     ));

@@ -119,10 +119,16 @@ mod tests {
             .iter()
             .any(|coordinate| coordinate == "standard-library/witsage/classical-ml-lane"));
         assert!(coverage
+            .manifest_backed_coordinates
+            .iter()
+            .any(|coordinate| {
+                coordinate == "standard-library/ns-nova/application-rendering-framework"
+            }));
+        assert!(coverage
             .manifest_untracked_modules
             .iter()
             .any(|module| module == "core"));
-        assert!(coverage
+        assert!(!coverage
             .manifest_untracked_modules
             .iter()
             .any(|module| module == "ns-nova"));

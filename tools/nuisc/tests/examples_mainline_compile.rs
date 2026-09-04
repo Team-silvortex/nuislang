@@ -104,6 +104,7 @@ fn compiles_official_galaxy_mainline_examples() {
         "../../examples/projects/domains/pixelmagic_analysis_demo",
         "../../examples/projects/domains/witsage_kernel_demo",
         "../../examples/projects/domains/witsage_classifier_demo",
+        "../../examples/projects/domains/ns_nova_showcase",
     ] {
         compile_project(path);
     }

@@ -1,0 +1,72 @@
+use cpu NovaAppRuntime;
+use cpu PixelMagicContracts;
+use data FabricPlane;
+use shader PixelMagicRenderSurface;
+
+mod cpu Main {
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type ShaderPacketWindow = Window<PixelMagicRenderSurfacePacket>;
+  type HostFrameWindow = Window<Frame>;
+  type FrameStatus = ShaderResult<Frame>;
+
+  fn lower_showcase_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    frame_index: i64
+  ) -> PixelMagicRenderSurfacePacket {
+    let op_kind: i64 = PixelMagicContracts.invert_op_kind();
+    let color_seed: i64 = shader_profile_color_seed(
+      "PixelMagicRenderSurface",
+      PixelMagicContracts.shader_color_seed_base(source_handle, op_kind, frame_index),
+      0
+    );
+    let speed_seed: i64 = shader_profile_speed_seed(
+      "PixelMagicRenderSurface",
+      frame_index,
+      2,
+      PixelMagicContracts.shader_speed_seed_base(width, 24)
+    );
+    let radius_seed: i64 = shader_profile_radius_seed(
+      "PixelMagicRenderSurface",
+      PixelMagicContracts.shader_radius_seed_base(height, frame_index, op_kind),
+      0
+    );
+    return shader_profile_packet(
+      "PixelMagicRenderSurface",
+      color_seed,
+      speed_seed,
+      radius_seed
+    );
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+    cpu_window(640, 400, "NS Nova Showcase");
+
+    let opened: NovaAppState = NovaAppRuntime.open(640, 400, 60, 0);
+    let frame: NovaFrameTransaction =
+      NovaAppRuntime.begin_frame(opened, cpu_tick_i64(0, 1));
+    let packet: PixelMagicRenderSurfacePacket =
+      lower_showcase_packet(4101 + frame.frame_index, 160, 120, frame.frame_index);
+
+    data_profile_bind_core("FabricPlane");
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
+    let gpu_packet: ShaderPacketWindow = data_profile_send_uplink("FabricPlane", packet);
+    let render_result: FrameStatus =
+      shader_result(shader_profile_render("PixelMagicRenderSurface", gpu_packet));
+    let render_ready: bool = shader_frame_ready(render_result);
+    let render_ready_flag: i64 = if render_ready { 1 } else { 0 };
+    let host_frame: HostFrameWindow =
+      data_profile_send_downlink("FabricPlane", shader_value(render_result));
+    let submitted: NovaFrameTransaction =
+      NovaAppRuntime.submit_frame(frame, render_ready_flag);
+
+    print(submitted.present_requested);
+    cpu_present_frame(host_frame);
+    let committed: NovaAppState = NovaAppRuntime.commit_frame(submitted);
+    let closed: NovaAppState =
+      NovaAppRuntime.close(committed, cpu_tick_i64(1, 1));
+    print(NovaAppRuntime.summary(closed));
+  }
+}

@@ -74,6 +74,9 @@ mod cpu Main {
     assert!(imports_index.contains(
         "library\tns-nova\tlib/nova_contracts.ns\timport_policy=manual-only\tauto_injectable=false\tvisible=true"
     ));
+    assert!(imports_index.contains(
+        "library\tns-nova\tlib/app_runtime.ns\timport_policy=manual-only\tauto_injectable=false\tvisible=false"
+    ));
     assert!(imports_index.contains("visible\tcpu\tNovaContracts\tdoc_items="));
     assert!(imports_index.contains(
         "use\tcpu.Main\tcpu.NovaContracts\tresolution=local-visible:galaxy-explicit-import:galaxy=ns-nova\tpackage=nuis.ns-nova\tlibrary_module=lib/nova_contracts.ns\timport_policy=manual-only"

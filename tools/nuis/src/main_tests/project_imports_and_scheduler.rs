@@ -27,8 +27,9 @@ mod cpu Main {
 
     assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
     assert!(json.contains("\"explicit_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
-    assert!(json.contains("\"hidden_manual_only_library_modules_count\":0"));
-    assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
+    assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
+    assert!(json.contains("\"suggested_galaxy_imports_count\":1"));
+    assert!(json.contains("ns-nova:lib/app_runtime.ns"));
     assert!(json.contains("\"visible\":true"));
     assert!(json.contains("\"explicit\":true"));
     assert!(json.contains("\"source_kind\":\"galaxy-explicit-import\""));
@@ -57,17 +58,21 @@ mod cpu Main {
     let applied = apply_suggested_project_imports(&project_root).expect("apply imports");
     assert_eq!(
         applied.applied,
-        vec!["ns-nova:lib/nova_contracts.ns".to_owned()]
+        vec![
+            "ns-nova:lib/nova_contracts.ns".to_owned(),
+            "ns-nova:lib/app_runtime.ns".to_owned(),
+        ]
     );
-    assert_eq!(applied.total_explicit_galaxy_imports, 1);
+    assert_eq!(applied.total_explicit_galaxy_imports, 2);
     assert!(applied.manifest_updated);
 
     let manifest = fs::read_to_string(project_root.join("nuis.toml")).expect("read manifest");
     assert!(manifest.contains("galaxy_imports = ["));
     assert!(manifest.contains("\"ns-nova:lib/nova_contracts.ns\""));
+    assert!(manifest.contains("\"ns-nova:lib/app_runtime.ns\""));
 
     let json = render_project_imports_json(&project_root).expect("render imports json");
-    assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
+    assert!(json.contains("\"explicit_galaxy_imports_count\":2"));
     assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
 }
 
@@ -99,14 +104,18 @@ mod cpu Main {
     let applied = apply_suggested_project_imports(&project_root).expect("apply imports");
     assert_eq!(
         applied.applied,
-        vec!["ns-nova:lib/nova_contracts.ns".to_owned()]
+        vec![
+            "ns-nova:lib/nova_contracts.ns".to_owned(),
+            "ns-nova:lib/app_runtime.ns".to_owned(),
+        ]
     );
-    assert_eq!(applied.total_explicit_galaxy_imports, 2);
+    assert_eq!(applied.total_explicit_galaxy_imports, 3);
     assert!(applied.manifest_updated);
 
     let manifest = fs::read_to_string(project_root.join("nuis.toml")).expect("read manifest");
     assert!(manifest.contains("\"pixelmagic:lib/image_contracts.ns\""));
     assert!(manifest.contains("\"ns-nova:lib/nova_contracts.ns\""));
+    assert!(manifest.contains("\"ns-nova:lib/app_runtime.ns\""));
     assert!(manifest.contains("galaxy_imports = ["));
 
     let pixelmagic_pos = manifest
@@ -145,10 +154,10 @@ mod cpu Main {
     assert!(json.contains("\"kind\":\"project_imports_apply\""));
     assert!(json.contains("\"action\":\"apply_suggested\""));
     assert!(json.contains("\"manifest_updated\":true"));
-    assert!(json.contains("\"applied_galaxy_imports_count\":1"));
-    assert!(json.contains("\"applied_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
-    assert!(json.contains("\"total_explicit_galaxy_imports\":1"));
-    assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
+    assert!(json.contains("\"applied_galaxy_imports_count\":2"));
+    assert!(json.contains("\"applied_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\",\"ns-nova:lib/app_runtime.ns\"]"));
+    assert!(json.contains("\"total_explicit_galaxy_imports\":2"));
+    assert!(json.contains("\"explicit_galaxy_imports_count\":2"));
     assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
 }
 
@@ -161,7 +170,10 @@ name = "imports_apply_json_noop"
 entry = "main.ns"
 modules = ["main.ns"]
 galaxy = ["ns-nova=workspace"]
-galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]
+galaxy_imports = [
+  "ns-nova:lib/nova_contracts.ns",
+  "ns-nova:lib/app_runtime.ns",
+]
 "#
         .trim_start(),
         r#"
@@ -183,7 +195,7 @@ mod cpu Main {
     assert!(json.contains("\"manifest_updated\":false"));
     assert!(json.contains("\"applied_galaxy_imports_count\":0"));
     assert!(json.contains("\"applied_galaxy_imports\":[]"));
-    assert!(json.contains("\"total_explicit_galaxy_imports\":1"));
+    assert!(json.contains("\"total_explicit_galaxy_imports\":2"));
     assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
 }
 

@@ -45,6 +45,8 @@ Start in this order:
   - [galaxy-provider-trust-state-v1.toml](galaxy-provider-trust-state-v1.toml)
   - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
   - [nuis-data-provider-inventory-v1.toml](nuis-data-provider-inventory-v1.toml)
+  - [nuis-data-provider-conformance-v1.toml](nuis-data-provider-conformance-v1.toml)
+  - [nuis-ns-nova-application-lifecycle-v1.toml](nuis-ns-nova-application-lifecycle-v1.toml)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
   - [nsld-executable-finalizer-registry.md](nsld-executable-finalizer-registry.md)

@@ -139,14 +139,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "heterogeneous-runtime/data/provider-neutral-data-fabric"
+        "standard-library/ns-nova/application-rendering-framework"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("all bootstrap-critical cells are stable at 100/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "heterogeneous-runtime/data/provider-neutral-data-fabric"
+        "standard-library/ns-nova/application-rendering-framework"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -187,7 +187,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "heterogeneous-runtime/data/provider-neutral-data-fabric"
+        "standard-library/ns-nova/application-rendering-framework"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -567,7 +567,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: heterogeneous-runtime/data/provider-neutral-data-fabric"
+        "weakest_bootstrap_task_card_common_ancestor_path: standard-library/ns-nova/application-rendering-framework"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));

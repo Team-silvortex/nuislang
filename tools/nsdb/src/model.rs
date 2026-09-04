@@ -107,6 +107,7 @@ pub struct PayloadExecutionProviderCompletion {
     pub code_asset_identity_set_status: String,
     pub code_asset_identity_set_count: usize,
     pub code_asset_identity_set_root_hash: String,
+    pub conformance: crate::provider_conformance_capsule::ProviderConformanceLifecycleEvidence,
     pub compiled_code_asset_selection: CompiledCodeAssetSelectionEvidence,
     pub request_completion_contract: String,
     pub request_completion_status: String,

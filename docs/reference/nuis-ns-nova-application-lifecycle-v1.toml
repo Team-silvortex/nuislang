@@ -1,0 +1,65 @@
+schema = "nuis-ns-nova-application-lifecycle-v1"
+status = "active"
+progress = 38
+owner = "nuis.ns-nova"
+runtime_module = "stdlib/ns-nova/lib/app_runtime.ns"
+reference_project = "examples/projects/domains/ns_nova_showcase"
+
+[application]
+state_type = "NovaAppState"
+open = "NovaAppRuntime.open"
+close = "NovaAppRuntime.close"
+statuses = ["running", "stopped", "invalid"]
+ownership = "owned-state-transition"
+
+[frame]
+transaction_type = "NovaFrameTransaction"
+begin = "NovaAppRuntime.begin_frame"
+submit = "NovaAppRuntime.submit_frame"
+commit = "NovaAppRuntime.commit_frame"
+phases = ["begun", "submitted", "rejected"]
+order = ["open", "begin-frame", "submit-frame", "present-or-drop", "commit-frame", "close"]
+
+[clock]
+tick_semantics = "abstract-monotonic-step"
+deadline_rule = "begin-tick-plus-one-when-running"
+target_fps_role = "scheduler-intent"
+scale_owner = "registered-clock-bridge"
+
+[composition]
+framework_owner = "application-and-frame-lifecycle"
+pixelmagic_owner = "image-and-shader-surface"
+data_owner = "typed-window-transfer"
+shader_owner = "provider-selected-rendering"
+host_owner = "replaceable-window-adapter"
+compiler_special_cases = 0
+
+[reference_slice]
+galaxies = ["ns-nova", "pixelmagic"]
+domains = ["cpu", "data", "shader"]
+abi_policy = "host-auto-recommended"
+packaging_mode = "window-aot-bundle"
+compile_status = "verified"
+aot_status = "verified-on-apple-arm64-host"
+bounded_launch_status = "window-and-fabric-boot-observed"
+stable_interactive_loop_claimed = false
+backend_execution_closure_claimed = false
+
+[framework_package]
+galaxy_manifest = "examples/projects/domains/ns_nova_showcase/galaxy.toml"
+profile_manifest = "examples/projects/domains/ns_nova_showcase/ns-nova.toml"
+package_check_status = "verified"
+include_paths = "project-owned-relative-only"
+dependency_policy = "galaxy-resolution-not-source-embedding"
+relocatable_claimed = true
+
+[current_limits]
+conditional_present_lowering = false
+framework_owned_renderer = false
+continuous_event_loop = false
+cross_host_window_adapter = false
+native_bool_aggregate_abi = false
+
+[next_slice]
+action = "add a framework-owned lifecycle loop and provider-neutral presentation surface"
+validation = "compile, AOT package, launch, present one frame, and close without host-specific framework logic"

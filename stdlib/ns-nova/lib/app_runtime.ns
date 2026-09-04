@@ -1,0 +1,161 @@
+/// Provider-neutral NS Nova application and frame lifecycle.
+mod cpu NovaAppRuntime {
+  pub struct NovaAppState {
+    pub status: i64,
+    pub width: i64,
+    pub height: i64,
+    pub target_fps: i64,
+    pub frame_index: i64,
+    pub timeline_tick: i64,
+    pub presented_frames: i64,
+    pub dropped_frames: i64
+  }
+
+  pub struct NovaFrameTransaction {
+    pub phase: i64,
+    pub width: i64,
+    pub height: i64,
+    pub target_fps: i64,
+    pub frame_index: i64,
+    pub begin_tick: i64,
+    pub deadline_tick: i64,
+    pub presented_frames: i64,
+    pub dropped_frames: i64,
+    pub render_ready: i64,
+    pub present_requested: i64
+  }
+
+  pub fn status_running() -> i64 {
+    return 1;
+  }
+
+  pub fn status_stopped() -> i64 {
+    return 2;
+  }
+
+  pub fn status_invalid() -> i64 {
+    return 3;
+  }
+
+  pub fn phase_begun() -> i64 {
+    return 1;
+  }
+
+  pub fn phase_submitted() -> i64 {
+    return 2;
+  }
+
+  pub fn phase_rejected() -> i64 {
+    return 3;
+  }
+
+  pub fn valid_config(width: i64, height: i64, target_fps: i64) -> bool {
+    return width > 0 && height > 0 && target_fps > 0;
+  }
+
+  pub fn open(
+    width: i64,
+    height: i64,
+    target_fps: i64,
+    initial_tick: i64
+  ) -> NovaAppState {
+    let status: i64 = if valid_config(width, height, target_fps) {
+      status_running()
+    } else {
+      status_invalid()
+    };
+    return NovaAppState {
+      status: status,
+      width: width,
+      height: height,
+      target_fps: target_fps,
+      frame_index: 0,
+      timeline_tick: initial_tick,
+      presented_frames: 0,
+      dropped_frames: 0
+    };
+  }
+
+  pub fn begin_frame(
+    state: NovaAppState,
+    observed_tick: i64
+  ) -> NovaFrameTransaction {
+    let running: bool = state.status == status_running();
+    let interval: i64 = if running { 1 } else { 0 };
+    let phase: i64 = if running { phase_begun() } else { phase_rejected() };
+    return NovaFrameTransaction {
+      phase: phase,
+      width: state.width,
+      height: state.height,
+      target_fps: state.target_fps,
+      frame_index: state.frame_index,
+      begin_tick: observed_tick,
+      deadline_tick: observed_tick + interval,
+      presented_frames: state.presented_frames,
+      dropped_frames: state.dropped_frames,
+      render_ready: 0,
+      present_requested: 0
+    };
+  }
+
+  pub fn submit_frame(
+    frame: NovaFrameTransaction,
+    render_ready: i64
+  ) -> NovaFrameTransaction {
+    let accepted: bool = frame.phase == phase_begun() && render_ready == 1;
+    return NovaFrameTransaction {
+      phase: if accepted { phase_submitted() } else { phase_rejected() },
+      width: frame.width,
+      height: frame.height,
+      target_fps: frame.target_fps,
+      frame_index: frame.frame_index,
+      begin_tick: frame.begin_tick,
+      deadline_tick: frame.deadline_tick,
+      presented_frames: frame.presented_frames,
+      dropped_frames: frame.dropped_frames,
+      render_ready: render_ready,
+      present_requested: if accepted { 1 } else { 0 }
+    };
+  }
+
+  pub fn commit_frame(frame: NovaFrameTransaction) -> NovaAppState {
+    let presented: bool =
+      frame.phase == phase_submitted() &&
+      frame.present_requested == 1 &&
+      frame.render_ready == 1;
+    return NovaAppState {
+      status: status_running(),
+      width: frame.width,
+      height: frame.height,
+      target_fps: frame.target_fps,
+      frame_index: frame.frame_index + 1,
+      timeline_tick: frame.deadline_tick,
+      presented_frames: frame.presented_frames + if presented { 1 } else { 0 },
+      dropped_frames: frame.dropped_frames + if presented { 0 } else { 1 }
+    };
+  }
+
+  pub fn close(state: NovaAppState, observed_tick: i64) -> NovaAppState {
+    return NovaAppState {
+      status: status_stopped(),
+      width: state.width,
+      height: state.height,
+      target_fps: state.target_fps,
+      frame_index: state.frame_index,
+      timeline_tick: observed_tick,
+      presented_frames: state.presented_frames,
+      dropped_frames: state.dropped_frames
+    };
+  }
+
+  pub fn summary(state: NovaAppState) -> i64 {
+    return state.status +
+      state.width +
+      state.height +
+      state.target_fps +
+      state.frame_index +
+      state.timeline_tick +
+      state.presented_frames +
+      state.dropped_frames;
+  }
+}

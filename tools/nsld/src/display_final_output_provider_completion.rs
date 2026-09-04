@@ -43,5 +43,18 @@ pub(crate) fn display_provider_completions(report: &NsldFinalExecutableOutputRep
                 .join(","),
             completion.record_hash
         );
+        let conformance = &completion.conformance;
+        if conformance.status == "verified" {
+            println!(
+                "    provider_conformance: {} {} {} {} {} {} physical_execution_claimed={}",
+                conformance.capsule_contract,
+                conformance.capsule_hash,
+                conformance.replay_contract,
+                conformance.replay_hash,
+                conformance.execution_authority,
+                conformance.provider_family,
+                conformance.physical_execution_claimed,
+            );
+        }
     }
 }

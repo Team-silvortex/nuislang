@@ -416,7 +416,15 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
     let mut required = BTreeSet::new();
     required.insert(project.manifest_path.clone());
     for module in &project.modules {
-        required.insert(module.path.clone());
+        if matches!(
+            &module.origin,
+            nuisc::project::ProjectModuleOrigin::LocalProject { .. }
+        ) {
+            required.insert(module.path.clone());
+        }
+    }
+    if manifest.framework.as_deref() == Some("ns-nova") {
+        required.insert(root.join("ns-nova.toml"));
     }
     for path in &required {
         if !include_files.iter().any(|item| item == path) {
@@ -449,10 +457,22 @@ fn default_manifest(
 ) -> Result<GalaxyManifest, String> {
     let mut include = vec!["nuis.toml".to_owned()];
     for module in &project.modules {
+        if !matches!(
+            &module.origin,
+            nuisc::project::ProjectModuleOrigin::LocalProject { .. }
+        ) {
+            continue;
+        }
         let relative = module
             .path
             .strip_prefix(&project.root)
-            .unwrap_or(module.path.as_path())
+            .map_err(|_| {
+                format!(
+                    "project-local module `{}` is outside project root `{}`",
+                    module.path.display(),
+                    project.root.display()
+                )
+            })?
             .display()
             .to_string();
         if !include.iter().any(|item| item == &relative) {

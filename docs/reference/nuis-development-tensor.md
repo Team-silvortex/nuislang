@@ -468,9 +468,10 @@ The `beta-0.1` calibration baseline is:
   only admitted bytes on apply. Explicit requests atomically persist path-free
   owner-private selection JSON; valid `cos` signature drift keeps ELF bytes but
   blocks stale admission before mutation. `official.cffi` now owns two generated GNU resolver providers and four version rows; Nuisc validates and preserves them, Nsld consumes a static build-time table, and runtime registry identity remains `0xc6631e590d61aca8`. Architecture and PE/COFF parity remain open
-* `heterogeneous-runtime/data/provider-neutral-data-fabric`: `usable/55`,
-  optional; an open capability-ranked CPU-memory reference provider executes,
-  while physical DPU/IPU/RDMA adapters and completion evidence remain open
+* `heterogeneous-runtime/data/provider-neutral-data-fabric`: `usable/74`, optional;
+  reference replay is bound while physical certification and adapters remain open
+* `standard-library/ns-nova/application-rendering-framework`: `active/38`, optional;
+  owned app/frame transitions plus a relocatable framework package and host-adaptive AOT showcase work; the loop remains open
 
 These scores describe the new beta slices only. Existing `stable/100` cells
 remain evidence that their narrower protocol milestone closed; they are not a
@@ -577,15 +578,14 @@ current `standard-library/*/*` tensor cells, and reports:
 * `manifest_missing_modules`
 * `manifest_untracked_modules`
 
-This is intentionally advisory during early beta. A manifest module such as `core` or
-`ns-nova` can be reported as untracked without failing coverage, because not
-every official galaxy is ready to become a tensor cell at the same time.
+This is intentionally advisory during early beta. A manifest module such as `core`
+can remain untracked because not every official galaxy needs a tensor cell at once.
 
 The useful invariant is narrower:
 
-`if a standard-library tensor cell claims progress for std, PixelMagic, or
-WitSage, the dev tensor can now verify that the matching official stdlib module
-manifest still exists`
+`if a standard-library tensor cell claims progress for std, PixelMagic,
+WitSage, or ns-nova, the dev tensor can verify that the matching official
+stdlib module manifest still exists`
 
 ## Milestone-Owned Coordinate Coverage
 

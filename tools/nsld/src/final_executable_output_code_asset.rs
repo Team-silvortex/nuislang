@@ -110,6 +110,7 @@ mod tests {
             code_asset_identity_set_status: "verified".to_owned(),
             code_asset_identity_set_count: 1,
             code_asset_identity_set_root_hash: "0x0123456789abcdef".to_owned(),
+            conformance: Default::default(),
             compiled_code_asset_selection: nsdb::CompiledCodeAssetSelectionEvidence {
                 contract: "nuis-provider-code-asset-contribution-selection-v1".to_owned(),
                 status: "verified".to_owned(),

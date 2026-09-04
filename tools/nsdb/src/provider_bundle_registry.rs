@@ -12,6 +12,8 @@ pub(crate) const PROVIDER_BUNDLE_MANIFEST_ENTRY_CONTRACT: &str =
     nuisc::registry::NUSTAR_PROVIDER_BUNDLE_ENTRY_CONTRACT;
 pub(crate) const SELECTED_PROVIDER_BUNDLE_SET_CONTRACT: &str =
     "nuis-selected-provider-bundle-set-v1";
+pub(crate) const PROVIDER_BUNDLE_AVAILABILITY_CONTRACT: &str =
+    "nuis-provider-bundle-availability-v1";
 
 #[derive(Clone, Copy)]
 pub(crate) struct ProviderBundleRegistration {
@@ -39,6 +41,15 @@ pub(crate) struct ProviderBundleEvidence {
     pub(crate) manifest_entry_count: usize,
     pub(crate) package_id: &'static str,
     pub(crate) bundle_id: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ProviderBundleAvailabilityEvidence {
+    pub(crate) contract: &'static str,
+    pub(crate) bundle_id: &'static str,
+    pub(crate) provider_family: &'static str,
+    pub(crate) probe_status: &'static str,
+    pub(crate) status: &'static str,
 }
 
 pub(crate) struct SelectedProviderBundleSetEvidence {
@@ -96,6 +107,35 @@ pub(crate) fn provider_bundle_evidence(provider_family: &str) -> Option<Provider
             manifest_entry_count: PROVIDER_BUNDLE_MANIFEST_ENTRY_COUNT,
             package_id: entry.package_id,
             bundle_id: entry.bundle_id,
+        })
+}
+
+pub(crate) fn provider_bundle_availability(
+    bundle_id: &str,
+    provider_family: &str,
+) -> Option<ProviderBundleAvailabilityEvidence> {
+    if !provider_bundle_manifest_is_valid() {
+        return None;
+    }
+    provider_bundle_manifest_entries()
+        .find(|(entry, bundle)| {
+            provider_bundle_entry_is_valid(entry, bundle)
+                && entry.bundle_id == bundle_id
+                && entry.provider_family == provider_family
+        })
+        .map(|(entry, bundle)| {
+            let probe_status = (bundle.runner_profile.probe_status)();
+            ProviderBundleAvailabilityEvidence {
+                contract: PROVIDER_BUNDLE_AVAILABILITY_CONTRACT,
+                bundle_id: entry.bundle_id,
+                provider_family: entry.provider_family,
+                probe_status,
+                status: if probe_status == bundle.runner_profile.available_probe_status {
+                    "available"
+                } else {
+                    "unavailable"
+                },
+            }
         })
 }
 
@@ -398,5 +438,21 @@ mod tests {
             bundle.execution_adapter.adapter_kind,
             "cuda-ptx-real-device-runner"
         );
+    }
+
+    #[test]
+    fn native_data_bundle_reports_probe_bound_availability() {
+        let evidence = provider_bundle_availability("data.host.bundle.v1", "data:host").unwrap();
+
+        assert_eq!(evidence.contract, PROVIDER_BUNDLE_AVAILABILITY_CONTRACT);
+        assert_eq!(evidence.bundle_id, "data.host.bundle.v1");
+        assert_eq!(evidence.provider_family, "data:host");
+        if cfg!(unix) {
+            assert_eq!(evidence.probe_status, "native-provider-worker-available");
+            assert_eq!(evidence.status, "available");
+        } else {
+            assert_eq!(evidence.probe_status, "native-provider-worker-unavailable");
+            assert_eq!(evidence.status, "unavailable");
+        }
     }
 }

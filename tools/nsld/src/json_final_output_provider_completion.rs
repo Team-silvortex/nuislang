@@ -30,6 +30,7 @@ pub(crate) fn provider_completion_records_json(report: &NsldFinalExecutableOutpu
                 json_string_field("glm_release_contract", &completion.glm_release_contract),
                 json_string_field("glm_release_tokens", &completion.glm_release_tokens),
                 json_string_field("glm_release_status", &completion.glm_release_status),
+                conformance_json(&completion.conformance),
                 json_string_field(
                     "code_asset_identity_contract",
                     &completion.code_asset_identity_contract,
@@ -162,4 +163,31 @@ pub(crate) fn provider_completion_records_json(report: &NsldFinalExecutableOutpu
         .collect::<Vec<_>>()
         .join(",");
     format!("\"final_output_nsdb_provider_completions\":[{records}]")
+}
+
+fn conformance_json(evidence: &nsdb::ProviderConformanceLifecycleEvidence) -> String {
+    let fields = [
+        json_string_field("capsule_contract", &evidence.capsule_contract),
+        json_string_field("status", &evidence.status),
+        json_string_field("scenario_contract", &evidence.scenario_contract),
+        json_string_field("scenario_id", &evidence.scenario_id),
+        json_string_field("package_id", &evidence.package_id),
+        json_string_field("provider_id", &evidence.provider_id),
+        json_string_field("bundle_id", &evidence.bundle_id),
+        json_string_field("provider_family", &evidence.provider_family),
+        json_string_field(
+            "capability_selection_hash",
+            &evidence.capability_selection_hash,
+        ),
+        json_string_field("capsule_hash", &evidence.capsule_hash),
+        json_string_field("replay_contract", &evidence.replay_contract),
+        json_string_field("replay_status", &evidence.replay_status),
+        json_string_field("replay_hash", &evidence.replay_hash),
+        json_string_field("execution_authority", &evidence.execution_authority),
+        json_bool_field(
+            "physical_execution_claimed",
+            evidence.physical_execution_claimed,
+        ),
+    ];
+    format!("\"conformance\":{{{}}}", fields.join(","))
 }

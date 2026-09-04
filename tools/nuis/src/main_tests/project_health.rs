@@ -26,6 +26,27 @@ fn visible_galaxy_library_module_count(project_root: &Path) -> usize {
 }
 
 #[test]
+fn checked_in_ns_nova_showcase_is_a_relocatable_framework_galaxy() {
+    let project_root = repo_root().join("examples/projects/domains/ns_nova_showcase");
+    let checked = galaxy::check(&project_root).expect("check NS Nova showcase Galaxy");
+    let profile = galaxy::inspect_ns_nova_profile(&project_root)
+        .expect("inspect NS Nova profile")
+        .expect("NS Nova profile exists");
+
+    assert_eq!(checked.manifest.framework.as_deref(), Some("ns-nova"));
+    assert_eq!(profile.render_owner_unit.as_deref(), Some("cpu.Main"));
+    assert_eq!(
+        profile.render_surface_unit.as_deref(),
+        Some("shader.PixelMagicRenderSurface")
+    );
+    assert!(checked
+        .manifest
+        .include
+        .iter()
+        .all(|entry| !Path::new(entry).is_absolute()));
+}
+
+#[test]
 fn project_check_summary_json_fields_report_all_green() {
     let project = nuisc::project::load_project(
         &repo_root().join("examples/projects/domains/net_session_recipe_demo"),
@@ -206,9 +227,9 @@ mod cpu Main {
     assert!(json.contains("\"surface.std.cli-report-file-contracts.v1\""));
     assert!(json.contains("\"galaxy_records\":[{"));
     assert!(json.contains("\"galaxy_imports_count\":0"));
-    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
+    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":2"));
     assert!(json.contains(
-        "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\",\"ns-nova:lib/app_runtime.ns\"]"
     ));
     assert!(json.contains("\"tests\":[{"));
     assert!(json.contains("\"exists\":true"));
@@ -513,8 +534,10 @@ mod cpu Main {
     assert!(json.contains("\"surface.std.collections.v1\""));
     assert!(json.contains("\"galaxy_records\":[{"));
     assert!(json.contains("\"galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
-    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":0"));
-    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules\":[]"));
+    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
+    assert!(json.contains(
+        "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/app_runtime.ns\"]"
+    ));
     assert!(json.contains("\"next_steps\":["));
     assert!(json.contains("some declared project tests are missing on disk"));
     assert!(json.contains("\"tests\":[{"));
@@ -616,14 +639,15 @@ mod cpu Main {
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
     assert!(json.contains("\"surface.std.collections.v1\""));
     assert!(json.contains("\"galaxy_records\":[{"));
-    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
+    assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":2"));
     assert!(json.contains(
-        "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\",\"ns-nova:lib/app_runtime.ns\"]"
     ));
     assert!(json.contains("manual-only galaxy library modules"));
     assert!(json.contains("nuis project-imports --apply-suggested <project-dir>"));
     assert!(json.contains("galaxy_imports = [...]"));
     assert!(json.contains("ns-nova:lib/nova_contracts.ns"));
+    assert!(json.contains("ns-nova:lib/app_runtime.ns"));
 }
 
 #[test]
@@ -656,14 +680,14 @@ mod cpu Main {
         "\"visible_library_modules_count\":{expected_visible_library_modules}"
     )));
     assert!(json.contains("\"std:lib/report_contracts.ns\""));
-    assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
+    assert!(json.contains("\"hidden_manual_only_library_modules_count\":2"));
     assert!(
-        json.contains("\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]")
+        json.contains("\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\",\"ns-nova:lib/app_runtime.ns\"]")
     );
-    assert!(json.contains("\"suggested_galaxy_imports_count\":1"));
-    assert!(json.contains("\"suggested_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
+    assert!(json.contains("\"suggested_galaxy_imports_count\":2"));
+    assert!(json.contains("\"suggested_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\",\"ns-nova:lib/app_runtime.ns\"]"));
     assert!(json.contains(
-            "\"suggested_manifest_snippet\":\"galaxy_imports = [\\\"ns-nova:lib/nova_contracts.ns\\\"]\""
+            "\"suggested_manifest_snippet\":\"galaxy_imports = [\\\"ns-nova:lib/nova_contracts.ns\\\", \\\"ns-nova:lib/app_runtime.ns\\\"]\""
         ));
     assert!(json.contains("\"library_records\":[{"));
     assert!(json.contains("\"import_policy\":\"manual-only\""));

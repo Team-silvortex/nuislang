@@ -97,6 +97,11 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             &replay_summary.provider_completions,
         )
         .err();
+    let conformance_error =
+        crate::final_executable_output_conformance::validate_provider_conformance_evidence(
+            &replay_summary.provider_completions,
+        )
+        .err();
     report.final_output_nsdb_provider_completions = replay_summary
         .provider_completions
         .into_iter()
@@ -121,6 +126,7 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             code_asset_identity_set_status: completion.code_asset_identity_set_status,
             code_asset_identity_set_count: completion.code_asset_identity_set_count,
             code_asset_identity_set_root_hash: completion.code_asset_identity_set_root_hash,
+            conformance: completion.conformance,
             compiled_code_asset_selection: completion.compiled_code_asset_selection,
             request_completion_contract: completion.request_completion_contract,
             request_completion_status: completion.request_completion_status,
@@ -147,7 +153,12 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
     if compiled_selection_error.is_some() {
         report.final_output_nsdb_replay_ready = false;
         report.final_output_nsdb_replay_status = "compiled-code-asset-selection-invalid".to_owned();
+    } else if conformance_error.is_some() {
+        report.final_output_nsdb_replay_ready = false;
+        report.final_output_nsdb_replay_status =
+            "provider-conformance-lifecycle-invalid".to_owned();
     }
+    let provider_completion_error = compiled_selection_error.or(conformance_error);
     report.final_output_nsdb_replay_command = report.final_output_nsdb_replay_ready.then(|| {
         format!(
             "nsdb replay {} --json",
@@ -176,7 +187,7 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
     } else {
         replay_summary
             .first_blocker
-            .or(compiled_selection_error)
+            .or(provider_completion_error)
             .or_else(|| report.final_output_nsdb_handoff_error.clone())
             .or_else(|| Some("final-output-nsdb-replay-not-ready".to_owned()))
     };

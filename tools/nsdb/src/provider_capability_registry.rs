@@ -8,6 +8,8 @@ pub(crate) const PROVIDER_CAPABILITY_RECORD_CONTRACT: &str =
     nuisc::registry::NUSTAR_PROVIDER_CAPABILITY_ENTRY_CONTRACT;
 pub(crate) const PROVIDER_CAPABILITY_SELECTION_CONTRACT: &str =
     "nuis-provider-capability-selection-v1";
+pub(crate) const PROVIDER_CAPABILITY_AVAILABILITY_CONTRACT: &str =
+    "nuis-provider-capability-availability-v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ProviderCapabilityManifestEntry {
@@ -34,6 +36,9 @@ pub(crate) struct ProviderCapabilitySelectionEvidence {
     pub(crate) priority: u16,
     pub(crate) capabilities: String,
     pub(crate) requirements: String,
+    pub(crate) availability_contract: &'static str,
+    pub(crate) probe_status: &'static str,
+    pub(crate) availability_status: &'static str,
     pub(crate) selection_hash: String,
 }
 
@@ -50,10 +55,11 @@ pub(crate) fn select_provider_capability(
         return Err("provider-capability-selection:registry-invalid".to_owned());
     }
     let requirements = canonical_requirements(required_capabilities)?;
-    let entry = select_best_provider(
+    let matching_entry = select_best_provider(
         PROVIDER_CAPABILITY_MANIFEST_ENTRIES,
         provider_family,
         &requirements,
+        |_| true,
     )
     .ok_or_else(|| {
         format!(
@@ -61,10 +67,27 @@ pub(crate) fn select_provider_capability(
             requirements.join(",")
         )
     })?;
+    let entry = select_best_provider(
+        PROVIDER_CAPABILITY_MANIFEST_ENTRIES,
+        provider_family,
+        &requirements,
+        provider_entry_is_available,
+    )
+    .ok_or_else(|| {
+        let availability = provider_entry_availability(matching_entry)
+            .map(|evidence| evidence.probe_status)
+            .unwrap_or("probe-unregistered");
+        format!(
+            "provider-capability-selection:provider-unavailable:{provider_family}:{}:{availability}",
+            requirements.join(",")
+        )
+    })?;
+    let availability = provider_entry_availability(entry)
+        .ok_or_else(|| "provider-capability-selection:availability-unregistered".to_owned())?;
     let capabilities = entry.capabilities.join(",");
     let requirements = requirements.join(",");
     let canonical = format!(
-        "{PROVIDER_CAPABILITY_SELECTION_CONTRACT}\n{}\n{}|{}|{}|{}|{}|{}\nrequirements|{}\n",
+        "{PROVIDER_CAPABILITY_SELECTION_CONTRACT}\n{}\n{}|{}|{}|{}|{}|{}\nrequirements|{}\n{}|{}|{}\n",
         PROVIDER_CAPABILITY_MANIFEST_HASH,
         entry.package_id,
         entry.provider_id,
@@ -73,6 +96,9 @@ pub(crate) fn select_provider_capability(
         entry.priority,
         capabilities,
         requirements,
+        PROVIDER_CAPABILITY_AVAILABILITY_CONTRACT,
+        availability.probe_status,
+        availability.status,
     );
     Ok(ProviderCapabilitySelectionEvidence {
         registry_contract: PROVIDER_CAPABILITY_REGISTRY_CONTRACT,
@@ -88,6 +114,9 @@ pub(crate) fn select_provider_capability(
         priority: entry.priority,
         capabilities,
         requirements,
+        availability_contract: PROVIDER_CAPABILITY_AVAILABILITY_CONTRACT,
+        probe_status: availability.probe_status,
+        availability_status: availability.status,
         selection_hash: format!("fnv1a64:{:016x}", fnv1a64(canonical.as_bytes())),
     })
 }
@@ -150,8 +179,27 @@ pub(crate) fn append_provider_capability_evidence(out: &mut String, provider_fam
     );
     push(
         out,
+        "provider_capability_availability_contract",
+        selection.availability_contract,
+    );
+    push(
+        out,
+        "provider_capability_probe_status",
+        selection.probe_status,
+    );
+    push(
+        out,
+        "provider_capability_availability_status",
+        selection.availability_status,
+    );
+    push(
+        out,
         "provider_capability_selection_hash",
         &selection.selection_hash,
+    );
+    crate::provider_conformance_capsule::append_provider_conformance_capsule_evidence(
+        out,
+        provider_family,
     );
 }
 
@@ -174,11 +222,13 @@ fn select_best_provider<'a>(
     entries: &'a [ProviderCapabilityManifestEntry],
     provider_family: &str,
     requirements: &[String],
+    mut is_available: impl FnMut(&ProviderCapabilityManifestEntry) -> bool,
 ) -> Option<&'a ProviderCapabilityManifestEntry> {
     entries
         .iter()
         .filter(|entry| {
             entry.provider_family == provider_family
+                && is_available(entry)
                 && requirements
                     .iter()
                     .all(|required| entry.capabilities.binary_search(&required.as_str()).is_ok())
@@ -188,6 +238,19 @@ fn select_best_provider<'a>(
                 .cmp(&lhs.priority)
                 .then_with(|| lhs.provider_id.cmp(rhs.provider_id))
         })
+}
+
+fn provider_entry_availability(
+    entry: &ProviderCapabilityManifestEntry,
+) -> Option<crate::provider_bundle_registry::ProviderBundleAvailabilityEvidence> {
+    crate::provider_bundle_registry::provider_bundle_availability(
+        entry.bundle_id,
+        entry.provider_family,
+    )
+}
+
+fn provider_entry_is_available(entry: &ProviderCapabilityManifestEntry) -> bool {
+    provider_entry_availability(entry).is_some_and(|evidence| evidence.status == "available")
 }
 
 fn provider_capability_manifest_is_valid() -> bool {
@@ -280,29 +343,56 @@ mod tests {
         capabilities: &["memory.cpu", "movement.copy"],
     };
 
+    #[cfg(unix)]
     #[test]
     fn generated_inventory_selects_cpu_memory_reference_by_open_capabilities() {
         assert!(provider_capability_manifest_is_valid());
         let first = select_provider_capability(
             "data:host",
-            &["movement.copy", "memory.cpu", "completion.verified"],
+            &[
+                "movement.copy",
+                "execution.reference",
+                "memory.cpu",
+                "completion.verified",
+            ],
         )
         .unwrap();
         let reordered = select_provider_capability(
             "data:host",
-            &["completion.verified", "memory.cpu", "movement.copy"],
+            &[
+                "completion.verified",
+                "memory.cpu",
+                "movement.copy",
+                "execution.reference",
+            ],
         )
         .unwrap();
 
         assert_eq!(first.provider_id, "data.cpu-memory.reference.v1");
         assert_eq!(first.bundle_id, "data.host.bundle.v1");
-        assert_eq!(first.manifest_hash, "fnv1a64:d9930501cc045ea0");
-        assert_eq!(first.selection_hash, "fnv1a64:80daf599c694cf56");
+        assert_eq!(first.manifest_hash, "fnv1a64:4e27319a33087b95");
+        assert_eq!(first.selection_hash, "fnv1a64:a5de1600823540c6");
         assert_eq!(first.selection_hash, reordered.selection_hash);
         assert_eq!(
             first.requirements,
-            "completion.verified,memory.cpu,movement.copy"
+            "completion.verified,execution.reference,memory.cpu,movement.copy"
         );
+        assert_eq!(
+            first.availability_contract,
+            PROVIDER_CAPABILITY_AVAILABILITY_CONTRACT
+        );
+        assert_eq!(first.probe_status, "native-provider-worker-available");
+        assert_eq!(first.availability_status, "available");
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn generated_inventory_rejects_unavailable_cpu_memory_reference() {
+        let error = select_provider_capability("data:host", &["execution.reference"])
+            .expect_err("the Unix native worker must not be selected on another host");
+
+        assert!(error.contains("provider-unavailable"));
+        assert!(error.contains("native-provider-worker-unavailable"));
     }
 
     #[test]
@@ -310,10 +400,24 @@ mod tests {
         let requirements = vec!["memory.cpu".to_owned()];
         let forward_entries = [LOW, HIGH_LATE, HIGH];
         let reverse_entries = [HIGH, HIGH_LATE, LOW];
-        let forward = select_best_provider(&forward_entries, "data:host", &requirements).unwrap();
-        let reverse = select_best_provider(&reverse_entries, "data:host", &requirements).unwrap();
+        let forward =
+            select_best_provider(&forward_entries, "data:host", &requirements, |_| true).unwrap();
+        let reverse =
+            select_best_provider(&reverse_entries, "data:host", &requirements, |_| true).unwrap();
         assert_eq!(forward.provider_id, HIGH.provider_id);
         assert_eq!(reverse.provider_id, HIGH.provider_id);
+    }
+
+    #[test]
+    fn selector_skips_unavailable_higher_priority_provider() {
+        let requirements = vec!["memory.cpu".to_owned()];
+        let entries = [LOW, HIGH];
+        let selected = select_best_provider(&entries, "data:host", &requirements, |entry| {
+            entry.provider_id != HIGH.provider_id
+        })
+        .unwrap();
+
+        assert_eq!(selected.provider_id, LOW.provider_id);
     }
 
     #[test]
@@ -326,5 +430,10 @@ mod tests {
         assert!(select_provider_capability("data:host", &["memory.quantum"])
             .unwrap_err()
             .contains("unsupported"));
+        assert!(
+            select_provider_capability("data:host", &["execution.physical"])
+                .unwrap_err()
+                .contains("unsupported")
+        );
     }
 }

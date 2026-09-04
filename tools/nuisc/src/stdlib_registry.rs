@@ -400,6 +400,8 @@ mod tests {
         assert_eq!(
             manifest.surfaces,
             vec![
+                "contract.ns-nova.application-lifecycle.v1".to_owned(),
+                "contract.ns-nova.frame-transaction.v1".to_owned(),
                 "surface.ns-nova.renderer.v1".to_owned(),
                 "surface.ns-nova.scene-frame-graph.v1".to_owned(),
                 "surface.ns-nova.window-input-lifecycle.v1".to_owned(),

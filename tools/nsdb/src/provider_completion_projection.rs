@@ -31,6 +31,7 @@ pub(crate) fn public_completion(
         code_asset_identity_set_status: evidence.code_asset_identity_set_status.clone(),
         code_asset_identity_set_count: evidence.code_asset_identity_set_count,
         code_asset_identity_set_root_hash: evidence.code_asset_identity_set_root_hash.clone(),
+        conformance: evidence.conformance.clone(),
         compiled_code_asset_selection: evidence.compiled_code_asset_selection.clone(),
         request_completion_contract: requests.contract.clone(),
         request_completion_status: requests.status.clone(),

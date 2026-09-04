@@ -108,6 +108,9 @@ Practical shader rule:
   [pixelmagic_pipeline_demo](pixelmagic_pipeline_demo)
 * the first checked-in `PixelMagic` single-binary render scaffold is:
   [pixelmagic_render_demo](pixelmagic_render_demo)
+* the first checked-in `ns-nova` application lifecycle and PixelMagic render
+  composition, including its relocatable framework package/profile boundary, is:
+  [ns_nova_showcase](ns_nova_showcase)
 * the first checked-in `WitSage` report-file workload that reuses the std host
   report lane is:
   [witsage_report_file_demo](witsage_report_file_demo)

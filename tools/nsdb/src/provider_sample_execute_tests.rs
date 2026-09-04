@@ -196,16 +196,46 @@ materialization_status = "provider-sample-materialized"
     assert!(payload.contains(
         "provider_capability_manifest_contract = \"nuis-provider-capability-manifest-v1\""
     ));
-    assert!(payload.contains("provider_capability_manifest_hash = \"fnv1a64:d9930501cc045ea0\""));
+    assert!(payload.contains("provider_capability_manifest_hash = \"fnv1a64:4e27319a33087b95\""));
     assert!(payload.contains("provider_capability_manifest_entry_count = 1"));
     assert!(payload
         .contains("provider_capability_record_contract = \"nuis-provider-capability-record-v1\""));
     assert!(payload.contains("provider_capability_provider_id = \"data.cpu-memory.reference.v1\""));
     assert!(payload.contains("provider_capability_priority = 100"));
     assert!(payload.contains(
-        "provider_capability_values = \"clock.fabric-monotonic,completion.verified,glm.owned-transfer,memory.cpu,movement.copy,residency.host\""
+        "provider_capability_values = \"clock.fabric-monotonic,completion.verified,execution.reference,glm.owned-transfer,memory.cpu,movement.copy,residency.host\""
     ));
-    assert!(payload.contains("provider_capability_selection_hash = \"fnv1a64:d0e7db5a3ab8fb6b\""));
+    assert!(payload.contains(
+        "provider_capability_availability_contract = \"nuis-provider-capability-availability-v1\""
+    ));
+    assert!(
+        payload.contains("provider_capability_probe_status = \"native-provider-worker-available\"")
+    );
+    assert!(payload.contains("provider_capability_availability_status = \"available\""));
+    assert!(payload.contains("provider_capability_selection_hash = \"fnv1a64:01cb51b49b12a49e\""));
+    assert!(payload.contains(
+        "provider_conformance_capsule_contract = \"nuis-provider-conformance-capsule-v1\""
+    ));
+    assert!(payload.contains(
+        "provider_conformance_scenario_contract = \"nuis-data-reference-copy-conformance-v1\""
+    ));
+    assert!(payload
+        .contains("provider_conformance_capability_selection_hash = \"fnv1a64:6d712122a1132927\""));
+    assert!(payload
+        .contains("provider_conformance_expected_output_hash = \"fnv1a64:1c3b67c65206fb6d\""));
+    assert!(payload.contains("provider_conformance_physical_execution_claimed = false"));
+    assert!(payload.contains("provider_conformance_capsule_hash = \"fnv1a64:82270e31b99f2c0b\""));
+    assert!(payload.contains(
+        "provider_conformance_replay_contract = \"nuis-provider-conformance-replay-v1\""
+    ));
+    assert!(payload.contains("provider_conformance_replay_submission_tick = 1"));
+    assert!(payload.contains("provider_conformance_replay_completion_tick = 2"));
+    assert!(payload.contains("provider_conformance_replay_release_tick = 3"));
+    assert!(
+        payload.contains("provider_conformance_replay_execution_authority = \"conformance-only\"")
+    );
+    assert!(payload.contains("provider_conformance_replay_physical_execution_claimed = false"));
+    assert!(payload.contains("provider_conformance_replay_hash = \"fnv1a64:7ee93c8f8a4ae011\""));
     assert!(payload.contains(
         "native_output_worker_execution_capsule_invocation_mode = \"nuis-provider-worker-process-adapter-v5\""
     ));
