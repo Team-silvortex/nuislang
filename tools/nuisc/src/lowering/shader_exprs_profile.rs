@@ -111,6 +111,7 @@ pub(in crate::lowering) fn lower_shader_profile_render(
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
     let expanded = NirExpr::ShaderDrawInstanced {
+        binding_set: None,
         pass: Box::new(NirExpr::ShaderBeginPass {
             target: Box::new(NirExpr::ShaderProfileTargetRef {
                 unit: unit.to_owned(),

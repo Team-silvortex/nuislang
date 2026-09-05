@@ -76,3 +76,79 @@ fn offline_defaults_and_runtime_counts_share_validation() {
         .unwrap_err()
         .contains("duplicate"));
 }
+
+#[test]
+fn uniform_upload_requires_exact_compiled_slot_and_typed_runtime_bytes() {
+    let mut original = request();
+    original.kernel.scalar_bindings.push(ProviderScalarBinding {
+        name: "fragment_uniform_slot".to_owned(),
+        value_type: "u64".to_owned(),
+        value: "2".to_owned(),
+    });
+    let mut arguments = ShaderDrawArguments {
+        width: 2,
+        height: 2,
+        vertex_count: 3,
+        instance_count: 1,
+    }
+    .to_dispatch();
+    let uniform = ShaderFragmentUniform {
+        slot: 2,
+        bytes: [0; 16],
+    };
+    uniform.bind_dispatch(&mut arguments).unwrap();
+    let mut request = original.clone();
+    assert_eq!(
+        prepare_runtime_arguments(&mut request, Some(&arguments)).unwrap(),
+        arguments
+    );
+    assert_eq!(
+        uniform_upload(&request).unwrap(),
+        format!("2:{}", "00".repeat(16))
+    );
+    for case in 0..6 {
+        let mut request = original.clone();
+        let mut invalid = arguments.clone();
+        match case {
+            0 => invalid.resources.clear(),
+            1 => {
+                invalid
+                    .resources
+                    .get_mut("fragment.uniform.2")
+                    .unwrap()
+                    .element_type = "u32".to_owned();
+            }
+            2 => {
+                invalid
+                    .resources
+                    .get_mut("fragment.uniform.2")
+                    .unwrap()
+                    .shape = vec![2, 2];
+            }
+            3 => {
+                invalid
+                    .resources
+                    .get_mut("fragment.uniform.2")
+                    .unwrap()
+                    .bytes[..4]
+                    .copy_from_slice(&f32::INFINITY.to_le_bytes());
+            }
+            4 => {
+                request.kernel.scalar_bindings.clear();
+            }
+            _ => {
+                invalid.contract = "unknown".to_owned();
+            }
+        }
+        let before = request.clone();
+        assert!(prepare_runtime_arguments(&mut request, Some(&invalid)).is_err());
+        assert_eq!(
+            request, before,
+            "failed admission must not mutate request authority"
+        );
+    }
+    assert!(
+        prepare_runtime_arguments(&mut original, None).is_err(),
+        "no invented offline uniform defaults"
+    );
+}

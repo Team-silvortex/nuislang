@@ -51,6 +51,12 @@ Current source-asset status:
   [lib/pipeline_surface.ns](lib/pipeline_surface.ns),
   so the domain demos can consume stdlib-owned shader profiles instead of
   carrying project-local `surface_shader.ns` copies
+* `PixelMagicRenderSurface` now declares a group-zero, slot-two fragment
+  `vec4<f32>` tint. Supply four finite f32 values with
+  `shader_uniform_binding(2, tint)` in the optional fifth `BindingSet` operand of
+  `shader_draw_instanced`. A white `(1.0, 1.0, 1.0, 1.0)` tint preserves the prior
+  surface colors. The NS Nova showcase verifies real M2 upload and identity-bound
+  replay; larger buffers/textures and non-Metal resource parity remain open
 * that helper surface now covers both image-op packet shaping and the first
   shader-facing packet / consumer / pipeline scoring helpers, so projects can
   depend on one stable auto-injected entry point while deeper recipe modules

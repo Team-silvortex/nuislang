@@ -209,7 +209,10 @@ pub(crate) fn normalize_inline_wgsl_source(source: &str) -> Result<String, Strin
             continue;
         }
 
-        if depth == 0 && starts_with_keyword(&chars, index, "binding") {
+        if depth == 0
+            && starts_with_keyword(&chars, index, "binding")
+            && (index == 0 || chars[index - 1] != '@')
+        {
             let original = index;
             index += "binding".chars().count();
             while chars.get(index).is_some_and(|ch| ch.is_whitespace()) {

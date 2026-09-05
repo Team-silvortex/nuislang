@@ -315,11 +315,15 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             if let NirExpr::ShaderDrawInstanced {
                 vertex_count,
                 instance_count,
+                binding_set,
                 ..
             } = expr
             {
                 verify_expr_uses(vertex_count, moved)?;
                 verify_expr_uses(instance_count, moved)?;
+                if let Some(set) = binding_set {
+                    verify_expr_uses(set, moved)?;
+                }
             }
         }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {

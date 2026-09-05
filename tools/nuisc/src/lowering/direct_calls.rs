@@ -492,11 +492,15 @@ fn expr_collect_called_functions(
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
             expr_collect_called_functions(pass, eligible_names, called);
             expr_collect_called_functions(packet, eligible_names, called);
             expr_collect_called_functions(vertex_count, eligible_names, called);
             expr_collect_called_functions(instance_count, eligible_names, called);
+            if let Some(set) = binding_set {
+                expr_collect_called_functions(set, eligible_names, called);
+            }
         }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {

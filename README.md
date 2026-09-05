@@ -33,7 +33,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `27/27` registered coordinates and
-`873/873` passing drift checks. The compiler data model, stage-neutral boundary,
+`880/880` passing drift checks. The compiler data model, stage-neutral boundary,
 bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
 bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
 forwarding, chunked typed payload projection, and canonical reversible active
@@ -98,10 +98,15 @@ come from the render pass rather than an ASCII preview's minimum size. CPU-only
 reference rendering remains available. Typed IPC v2 now carries runtime vertex
 and instance counts from the Nuis loop into registered device dispatch and
 hash-bound replay. On M2, `3/2/3` vertices produce full/clear/full frames while
-retaining live/replay equality and adapter cache reuse. Unknown
-bindings or unsupported pass projections fail closed; code-asset authority and
-output extents remain fixed. The canonical vertex emitter rejects unsupported
-body changes instead of substituting fullscreen geometry. Typed resource uploads, whole-app session
+retaining live/replay equality and adapter cache reuse. A Nuis-owned four-f32 tuple
+now reaches a real immutable fragment uniform: the first/third frames have matching
+coverage but change from red to blue. Optional draw bindings survive NIR ownership
+checks, optimization, and YIR lowering. Shader owns type/shape/finite-value checks;
+the registered adapter admits the compiled slot, and Metal reflection checks the
+actual read-only float4 buffer before a 16-byte upload. The bounded IPC envelope
+and replay bind slot, type, shape, little-endian bytes, and content identity without
+accepting pointers or paths. Unsupported bindings fail closed. Code-asset authority
+and output extents remain fixed; large buffers/textures, whole-app session
 continuity, self-contained host-runner injection,
 and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are

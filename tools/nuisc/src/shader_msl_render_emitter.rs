@@ -24,14 +24,10 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
         return Err("canonical inline WGSL render profile entry must be an identifier".to_owned());
     }
 
-    let source = crate::shader_source::strip_comments_preserving_shape(source);
+    let source = crate::shader_source::normalize_inline_wgsl_source(source)?;
+    let source = crate::shader_source::strip_comments_preserving_shape(&source);
     let summary = crate::shader_source::summarize_inline_wgsl_source(&source)?;
-    if !summary.bindings.is_empty() {
-        return Err(
-            "canonical inline WGSL render lowering does not yet support resource bindings"
-                .to_owned(),
-        );
-    }
+    let uniform = fragment_uniform(&source, &summary)?;
     let vertex_entry = unique_stage_entry(&summary, "vertex")?;
     let fragment_entry = unique_stage_entry(&summary, "fragment")?;
     if summary.stages.len() != 2 {
@@ -52,12 +48,51 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
         &vertex_entry,
         &fragment_entry,
         &fragment_statements,
+        uniform,
     );
     Ok(LoweredMslRenderModule {
         source,
         vertex_entry,
         fragment_entry,
     })
+}
+
+fn fragment_uniform<'a>(
+    source: &str,
+    summary: &'a crate::shader_source::InlineWgslSummary,
+) -> Result<Option<(u32, &'a str)>, String> {
+    let binding = match summary.bindings.as_slice() {
+        [] => return Ok(None),
+        [binding] => binding,
+        _ => return Err("canonical render supports at most one fragment uniform".to_owned()),
+    };
+    let compact_type = binding
+        .ty
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
+    if binding.group != 0
+        || binding.binding > 30
+        || binding.kind != "uniform"
+        || binding.address_space.as_deref() != Some("uniform")
+        || compact_type != "vec4<f32>"
+        || !valid_ident(&binding.name)
+        || matches!(binding.name.as_str(), "uv" | "input")
+    {
+        return Err("canonical render requires group-zero fragment vec4<f32> uniform".to_owned());
+    }
+    let compact = source
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
+    let declaration = format!(
+        "@group(0)@binding({})var<uniform>{}:vec4<f32>;",
+        binding.binding, binding.name
+    );
+    if compact.matches(&declaration).count() != 1 {
+        return Err("unsupported fragment uniform declaration or initializer".to_owned());
+    }
+    Ok(Some((binding.binding, &binding.name)))
 }
 
 fn unique_stage_entry(
@@ -281,7 +316,18 @@ fn render_msl(
     vertex_entry: &str,
     fragment_entry: &str,
     fragment_statements: &[String],
+    uniform: Option<(u32, &str)>,
 ) -> String {
+    let (uniform_metadata, uniform_parameter) = match uniform {
+        Some((slot, name)) => (
+            format!(
+                "{}{slot}\n",
+                yir_domain_shader::FRAGMENT_UNIFORM_CAPABILITY_MARKER
+            ),
+            format!(", constant float4& {name} [[buffer({slot})]]"),
+        ),
+        None => (String::new(), String::new()),
+    };
     let fragment_body = fragment_statements
         .iter()
         .map(|statement| format!("    {statement}\n"))
@@ -292,7 +338,7 @@ fn render_msl(
          // nuis-module-profile-lowering-target {target}\n\
          // nuis-module-lowering-target msl:metal-gpu\n\
          // nuis-module-native-ir msl2.4\n\
-         #include <metal_stdlib>\n\
+         {uniform_metadata}#include <metal_stdlib>\n\
          using namespace metal;\n\
          \n\
          struct NuisRasterOut {{\n\
@@ -309,7 +355,7 @@ fn render_msl(
              return out;\n\
          }}\n\
          \n\
-         fragment float4 {fragment_entry}(NuisRasterOut input [[stage_in]]) {{\n\
+         fragment float4 {fragment_entry}(NuisRasterOut input [[stage_in]]{uniform_parameter}) {{\n\
              float2 uv = input.uv;\n\
 {fragment_body}\
          }}\n"

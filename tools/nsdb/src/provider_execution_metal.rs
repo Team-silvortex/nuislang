@@ -50,6 +50,7 @@ fn prepare_worker_adapter(
                 format!("literal:{}", render.height),
                 format!("literal:{}", render.vertex_count),
                 format!("literal:{}", render.instance_count),
+                format!("literal:{}", render.uniform_upload),
             ],
         )
     } else if is_gray8_invert(request) {
@@ -152,8 +153,8 @@ fn execute(
                 &render.fragment_entry,
                 render.width,
                 render.height,
-                render.vertex_count,
-                render.instance_count,
+                (render.vertex_count, render.instance_count),
+                &render.uniform_upload,
             )?
         }
     } else if is_gray8_invert(request) {
@@ -351,6 +352,7 @@ struct ValidatedMetalRenderRequest {
     height: usize,
     vertex_count: usize,
     instance_count: usize,
+    uniform_upload: String,
 }
 
 fn validated_metal_render_request(
@@ -414,6 +416,14 @@ fn validated_metal_render_request(
         return Err("Metal RGBA8 render output descriptor is incompatible".to_owned());
     }
     let (vertex_count, instance_count) = draw::render_draw_counts(request)?;
+    let source = std::fs::read_to_string(&code_asset_path)
+        .map_err(|error| format!("failed to read Metal resource capability: {error}"))?;
+    if yir_domain_shader::fragment_uniform_capability(&source)? != draw::uniform_slot(request)? {
+        return Err(
+            "Metal fragment uniform capability differs from verified code asset".to_owned(),
+        );
+    }
+    let uniform_upload = draw::uniform_upload(request)?;
     Ok(ValidatedMetalRenderRequest {
         code_asset_path,
         vertex_entry,
@@ -422,6 +432,7 @@ fn validated_metal_render_request(
         height: *height,
         vertex_count,
         instance_count,
+        uniform_upload,
     })
 }
 

@@ -212,3 +212,48 @@ fn unbound_draw_keeps_reference_execution_and_does_not_consume_provider_frame() 
     assert_eq!(state.events.len(), 1);
     assert!(!state.events[0].contains("rgba8_bytes"));
 }
+
+#[test]
+fn replay_uniform_identity_is_checked_before_consuming_frame() {
+    for case in 0..3 {
+        let (adapter, mut node, resource, mut state) = fixture();
+        let uniform = yir_domain_shader::ShaderFragmentUniform {
+            slot: 2,
+            bytes: [0; 16],
+        };
+        {
+            let mut source = adapter.state.lock().unwrap();
+            let ProviderResultSource::Replay(queue) = &mut *source else {
+                unreachable!()
+            };
+            uniform
+                .bind_dispatch(&mut queue.frames.front_mut().unwrap().arguments)
+                .unwrap();
+        }
+        let Value::RenderPass(pass) = state.expect_value("pass").unwrap() else {
+            unreachable!()
+        };
+        let mut values = vec![Value::F32(0.0); 4];
+        if case == 0 {
+            values[0] = Value::F32(1.0);
+        }
+        if case == 2 {
+            values[0] = Value::Int(0);
+        }
+        state.bind_value(
+            "bindings",
+            Value::BindingSet(yir_core::ShaderBindingSet {
+                pipeline: pass.pipeline.clone(),
+                bindings: vec![yir_core::ShaderBinding {
+                    kind: "uniform_binding".to_owned(),
+                    slot: if case == 1 { 3 } else { 2 },
+                    value: Box::new(Value::Tuple(values)),
+                }],
+            }),
+        );
+        node.op.args.push("bindings".to_owned());
+        assert!(adapter.execute(&node, &resource, &mut state).is_err());
+        assert_eq!(remaining(&adapter), 1);
+        assert!(state.events.is_empty());
+    }
+}

@@ -29,12 +29,16 @@ impl ShaderDrawArguments {
                 ("instance_count".to_owned(), self.instance_count),
             ]
             .into(),
+            resources: Default::default(),
         }
     }
 
     pub fn from_dispatch(arguments: &DispatchArguments) -> Result<Self, String> {
         arguments.to_wire()?;
-        if arguments.contract != SHADER_UNBOUND_DRAW_CONTRACT || arguments.scalars.len() != 4 {
+        if arguments.contract != SHADER_UNBOUND_DRAW_CONTRACT
+            || arguments.scalars.len() != 4
+            || !arguments.resources.is_empty()
+        {
             return Err("unsupported shader runtime argument contract or field count".to_owned());
         }
         let scalar = |name: &str| {
@@ -67,6 +71,7 @@ pub struct ShaderDrawDescriptor {
     pub(crate) vertex_count: u64,
     pub(crate) instance_count: u64,
     pub(crate) unbound_rgba8_triangle_strip: bool,
+    pub(crate) fragment_uniform: Option<crate::ShaderFragmentUniform>,
 }
 
 impl ShaderDrawDescriptor {
@@ -83,6 +88,7 @@ impl ShaderDrawDescriptor {
             vertex_count: 0,
             instance_count: 0,
             unbound_rgba8_triangle_strip: false,
+            fragment_uniform: None,
         })
     }
 
@@ -102,13 +108,17 @@ impl ShaderDrawDescriptor {
         if !self.unbound_rgba8_triangle_strip {
             return Err("provider draw requires unbound rgba8_unorm triangle_strip; resource bindings or other pass formats/topologies are unsupported".to_owned());
         }
-        Ok(ShaderDrawArguments {
+        let mut arguments = ShaderDrawArguments {
             width: self.width,
             height: self.height,
             vertex_count: self.vertex_count,
             instance_count: self.instance_count,
         }
-        .to_dispatch())
+        .to_dispatch();
+        if let Some(uniform) = self.fragment_uniform {
+            uniform.bind_dispatch(&mut arguments)?;
+        }
+        Ok(arguments)
     }
 }
 

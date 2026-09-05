@@ -93,7 +93,9 @@ pub(crate) fn execute_shader_core_node(
             filter: node.op.args[0].clone(),
             address_mode: node.op.args[1].clone(),
         })),
-        "uniform" | "storage" | "attachment" => execute_generic_binding(node, state),
+        "uniform" | "uniform_binding" | "storage" | "attachment" => {
+            execute_generic_binding(node, state)
+        }
         "texture_binding"
         | "sampler_binding"
         | "vertex_layout_binding"

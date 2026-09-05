@@ -215,11 +215,15 @@ pub(crate) fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
             f(pass);
             f(packet);
             f(vertex_count);
             f(instance_count);
+            if let Some(set) = binding_set {
+                f(set);
+            }
         }
         _ => {}
     }

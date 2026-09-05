@@ -64,6 +64,7 @@ pub(crate) fn describe_shader_node(
         "is_pass_ready" | "is_frame_ready" | "value" | "completion_token" | "completion_clock"
         | "completion_root" => describe_result_access(node),
         "uniform"
+        | "uniform_binding"
         | "storage"
         | "attachment"
         | "texture_binding"

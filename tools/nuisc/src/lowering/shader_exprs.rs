@@ -260,11 +260,13 @@ pub(super) fn lower_shader_expr(
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => Some(lower_shader_draw_instanced(
             pass,
             packet,
             vertex_count,
             instance_count,
+            binding_set.as_deref(),
             state,
             bindings,
         )),

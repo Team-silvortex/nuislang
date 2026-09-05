@@ -410,10 +410,32 @@ pub(super) fn lower_shader_runtime_builtin_call(
             }
         }
         "shader_draw_instanced" => {
-            let [pass, packet, vertex_count, instance_count] = args else {
-                return Err("shader_draw_instanced(...) expects 4 args".to_owned());
+            let (pass, packet, vertex_count, instance_count, binding_set) = match args {
+                [pass, packet, vertices, instances] => (pass, packet, vertices, instances, None),
+                [pass, packet, vertices, instances, set] => {
+                    (pass, packet, vertices, instances, Some(set))
+                }
+                _ => {
+                    return Err(
+                        "shader_draw_instanced(...) expects 4 args or 5 with a BindingSet"
+                            .to_owned(),
+                    )
+                }
             };
             NirExpr::ShaderDrawInstanced {
+                binding_set: binding_set
+                    .map(|set| {
+                        lower_expr(
+                            set,
+                            current_domain,
+                            bindings,
+                            signatures,
+                            struct_table,
+                            Some(&named_type("BindingSet")),
+                        )
+                        .map(Box::new)
+                    })
+                    .transpose()?,
                 pass: Box::new(lower_expr(
                     pass,
                     current_domain,
@@ -465,6 +487,7 @@ pub(super) fn lower_shader_runtime_builtin_call(
                 );
             };
             NirExpr::ShaderDrawInstanced {
+                binding_set: None,
                 pass: Box::new(lower_expr(
                     pass,
                     current_domain,

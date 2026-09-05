@@ -516,11 +516,15 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
             collect_used_vars_expr(pass, out);
             collect_used_vars_expr(packet, out);
             collect_used_vars_expr(vertex_count, out);
             collect_used_vars_expr(instance_count, out);
+            if let Some(set) = binding_set {
+                collect_used_vars_expr(set, out);
+            }
         }
         NirExpr::MethodCall { receiver, args, .. } => {
             collect_used_vars_expr(receiver, out);

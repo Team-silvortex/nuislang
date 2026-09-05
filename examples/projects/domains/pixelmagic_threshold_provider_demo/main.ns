@@ -54,8 +54,15 @@ mod cpu Main {
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
     let gpu_packet: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", lowered);
+    let tint: (f32, f32, f32, f32) = (1.0, 1.0, 1.0, 1.0);
+    let uniform: Binding = shader_uniform_binding(2, tint);
+    let pipeline: Pipeline = shader_profile_pipeline("PixelMagicRenderSurface");
+    let bindings: BindingSet = shader_bind_set(pipeline, uniform);
+    let pass: Pass = shader_profile_begin_pass("PixelMagicRenderSurface");
+    let vertices: i64 = shader_profile_vertex_count("PixelMagicRenderSurface");
+    let instances: i64 = shader_profile_instance_count("PixelMagicRenderSurface");
     let render_result: FrameStatus =
-      shader_result(shader_profile_render("PixelMagicRenderSurface", gpu_packet));
+      shader_result(shader_draw_instanced(pass, gpu_packet, vertices, instances, bindings));
     let render_ready: bool = shader_frame_ready(render_result);
     let host_frame: HostFrameWindow =
       data_profile_send_downlink("FabricPlane", shader_value(render_result));

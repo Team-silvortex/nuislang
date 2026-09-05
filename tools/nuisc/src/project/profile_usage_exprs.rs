@@ -151,11 +151,15 @@ pub(super) fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> boo
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
             expr_uses_shader_profile_render(pass, unit)
                 || expr_uses_shader_profile_render(packet, unit)
                 || expr_uses_shader_profile_render(vertex_count, unit)
                 || expr_uses_shader_profile_render(instance_count, unit)
+                || binding_set
+                    .as_ref()
+                    .is_some_and(|set| expr_uses_shader_profile_render(set, unit))
         }
         _ => false,
     }

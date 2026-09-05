@@ -1,6 +1,6 @@
 use crate::provider_request::{ProviderRequest, ProviderScalarBinding};
 use yir_core::provider_runtime_ipc::DispatchArguments;
-use yir_domain_shader::ShaderDrawArguments;
+use yir_domain_shader::{ShaderDrawArguments, ShaderFragmentUniform, SHADER_UNBOUND_DRAW_CONTRACT};
 
 pub(super) fn prepare_runtime_arguments(
     request: &mut ProviderRequest,
@@ -13,8 +13,23 @@ pub(super) fn prepare_runtime_arguments(
         return Err("Metal draw output must be two-dimensional".to_owned());
     };
     let (vertex_count, instance_count) = render_draw_counts(request)?;
+    let admitted_slot = uniform_slot(request)?;
+    let uniform = arguments
+        .map(ShaderFragmentUniform::from_dispatch)
+        .transpose()?
+        .flatten();
+    if uniform.map(|uniform| uniform.slot) != admitted_slot {
+        return Err(
+            "Metal fragment uniform is missing or differs from admitted code capability".to_owned(),
+        );
+    }
     let draw = match arguments {
-        Some(arguments) => ShaderDrawArguments::from_dispatch(arguments)?,
+        Some(arguments) => {
+            let mut scalars = arguments.clone();
+            scalars.contract = SHADER_UNBOUND_DRAW_CONTRACT.to_owned();
+            scalars.resources.clear();
+            ShaderDrawArguments::from_dispatch(&scalars)?
+        }
         None => ShaderDrawArguments {
             width: *width,
             height: *height,
@@ -26,7 +41,19 @@ pub(super) fn prepare_runtime_arguments(
         return Err("Metal runtime draw dimensions differ from admitted output".to_owned());
     }
     validate_counts(draw.vertex_count, draw.instance_count)?;
-    // Runtime scalars cannot replace the admitted code asset, entry set, or output capability.
+    if request
+        .kernel
+        .scalar_bindings
+        .iter()
+        .any(|binding| binding.name == "fragment_uniform_bytes")
+    {
+        return Err("Metal fragment uniform bytes must come from this runtime dispatch".to_owned());
+    }
+    let mut result = draw.to_dispatch();
+    if let Some(uniform) = uniform {
+        uniform.bind_dispatch(&mut result)?;
+    }
+    // Runtime inputs cannot replace the admitted code asset, entry set, or output capability.
     for (name, value) in [
         ("vertex_count", draw.vertex_count),
         ("instance_count", draw.instance_count),
@@ -41,7 +68,74 @@ pub(super) fn prepare_runtime_arguments(
             value: value.to_string(),
         });
     }
-    Ok(draw.to_dispatch())
+    if let Some(uniform) = uniform {
+        request.kernel.scalar_bindings.push(ProviderScalarBinding {
+            name: "fragment_uniform_bytes".to_owned(),
+            value_type: "symbol".to_owned(),
+            value: uniform
+                .bytes
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect(),
+        });
+    }
+    Ok(result)
+}
+
+pub(super) fn uniform_slot(request: &ProviderRequest) -> Result<Option<usize>, String> {
+    let Some(binding) = unique_scalar(request, "fragment_uniform_slot")? else {
+        return Ok(None);
+    };
+    let slot = binding
+        .value
+        .parse::<usize>()
+        .map_err(|_| "invalid Metal uniform slot")?;
+    if binding.value_type != "u64" || slot > 30 || binding.value != slot.to_string() {
+        return Err("invalid Metal uniform slot type or range".to_owned());
+    }
+    Ok(Some(slot))
+}
+
+pub(super) fn uniform_upload(request: &ProviderRequest) -> Result<String, String> {
+    let slot = uniform_slot(request)?;
+    let bytes = unique_scalar(request, "fragment_uniform_bytes")?;
+    match (slot, bytes) {
+        (None, None) => Ok("none".to_owned()),
+        (Some(slot), Some(bytes)) if bytes.value_type == "symbol" => {
+            let hex = &bytes.value;
+            if hex.len() != 32
+                || !hex
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err("invalid Metal uniform bytes".to_owned());
+            }
+            let mut data = [0; 16];
+            for (index, byte) in data.iter_mut().enumerate() {
+                *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16)
+                    .map_err(|_| "invalid uniform byte")?;
+            }
+            ShaderFragmentUniform { slot, bytes: data }.validate()?;
+            Ok(format!("{slot}:{hex}"))
+        }
+        _ => Err("Metal uniform requires both admitted slot and runtime bytes".to_owned()),
+    }
+}
+
+fn unique_scalar<'a>(
+    request: &'a ProviderRequest,
+    name: &str,
+) -> Result<Option<&'a ProviderScalarBinding>, String> {
+    let mut bindings = request
+        .kernel
+        .scalar_bindings
+        .iter()
+        .filter(|binding| binding.name == name);
+    let binding = bindings.next();
+    if bindings.next().is_some() {
+        return Err(format!("duplicate Metal scalar `{name}`"));
+    }
+    Ok(binding)
 }
 
 pub(super) fn render_draw_counts(request: &ProviderRequest) -> Result<(usize, usize), String> {

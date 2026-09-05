@@ -2,6 +2,41 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "runtime-small-immutable-resource-contract",
+        path: "crates/yir-core/src/provider_runtime_resource.rs",
+        required_patterns: &["pub struct DispatchResource", "immutable-le", "self.bytes.len() > 64", "runtime resource content identity mismatch"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-fragment-uniform-contract",
+        path: "crates/yir-domain-shader/src/fragment_uniform.rs",
+        required_patterns: &["nuis-shader-fragment-uniform-v1", "pub struct ShaderFragmentUniform", "uniform_tuple", "fragment_uniform_capability", "without implicit conversion"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-uniform-front-to-yir-regression",
+        path: "tools/nuisc/src/lowering/tests_async_runtime/domain_primitives.rs",
+        required_patterns: &["typed_uniform_draw_survives_nir_optimization_and_yir_verification", "simplify_nir_module", "verify_nir_module", "draw.op.args.len(), 5"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-uniform-lowering-reflection-regression",
+        path: "tools/nuisc/src/shader_msl_render_emitter_tests.rs",
+        required_patterns: &["lowers_one_typed_fragment_uniform_into_content_bound_msl_reflection", "native_binding_normalization_is_idempotent_before_resource_reflection", "constant float4& tint [[buffer(2)]]"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "metal-immutable-uniform-upload",
+        path: "tools/nsdb/provider-runners/metal_rgba8_render.m",
+        required_patterns: &["nuis-metal-rgba8-render-provider-runner-v3", "MTLArgumentAccessReadOnly", "MTLDataTypeFloat4", "newBufferWithBytes:uniformValues", "setFragmentBuffer:uniformBuffer"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "runtime-uniform-replay-identity-regression",
+        path: "crates/yir-runtime-host/src/provider_result_draw_tests.rs",
+        required_patterns: &["replay_uniform_identity_is_checked_before_consuming_frame", "ShaderFragmentUniform", "remaining(&adapter), 1"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "ns-nova-real-tint-pixel-regression",
+        path: "tools/nuis/src/artifact_device_sample_shader_render_tests.rs",
+        required_patterns: &["Nuis-owned uniform bytes must change actual GPU pixels", "compiled tint uniform must switch identical coverage from red to blue", "offline execution must not invent runtime uniform data", "differs from admitted code capability"],
+    },
+    DevTensorDriftCheckSpec {
         id: "shader-canonical-vertex-rejects-substitution",
         path: "tools/nuisc/src/shader_msl_render_emitter_tests.rs",
         required_patterns: &[

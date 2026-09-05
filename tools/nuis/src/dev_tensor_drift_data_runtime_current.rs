@@ -130,7 +130,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
             "multi_target_provider_result_schedule = false",
             "provider_result_payload_tamper_rejection = true",
             "self_contained_host_runner_result_injection = false",
-            "resource_bound_gpu_rasterization = false",
+            "resource_bound_gpu_rasterization = true",
             "dynamic_cross_domain_present_predicate = false",
             "loop_carried_application_state = true",
             "aggregate_state_carry_status = \"recursive-scalar-aggregate-backedge-native-verified\"",
@@ -274,7 +274,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         required_patterns: &[
             "LoweredMslRenderModule",
             "lower_canonical_inline_wgsl_render_for_profile",
-            "does not yet support resource bindings",
+            "requires group-zero fragment vec4<f32> uniform",
             "refusing to substitute fullscreen geometry",
             "nuis-module-native-ir msl2.4",
             "vertex_id",

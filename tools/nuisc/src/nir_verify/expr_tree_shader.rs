@@ -304,9 +304,20 @@ pub(super) fn verify_shader_expr_tree(
             if let NirExpr::ShaderDrawInstanced {
                 vertex_count,
                 instance_count,
+                binding_set,
                 ..
             } = expr
             {
+                if let Some(set) = binding_set {
+                    verify_expr(
+                        set,
+                        moved,
+                        borrows,
+                        borrow_bindings,
+                        data_bindings,
+                        task_result_facts,
+                    )?;
+                }
                 verify_expr(
                     vertex_count,
                     moved,

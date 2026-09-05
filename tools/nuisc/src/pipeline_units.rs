@@ -406,9 +406,20 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         NirExpr::ShaderProfileRender { packet, .. } => {
             collect_instantiated_units_expr(packet, units);
         }
-        NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+            binding_set,
+        } => {
             collect_instantiated_units_expr(pass, units);
             collect_instantiated_units_expr(packet, units);
+            collect_instantiated_units_expr(vertex_count, units);
+            collect_instantiated_units_expr(instance_count, units);
+            if let Some(set) = binding_set {
+                collect_instantiated_units_expr(set, units);
+            }
         }
         NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }

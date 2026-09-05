@@ -260,3 +260,77 @@ fn empty_and_overflowing_extents_fail_before_any_rasterization() {
         assert_shared_rejection(&node, &resource, &mut state);
     }
 }
+
+#[test]
+fn typed_uniform_is_an_owned_f32_snapshot_without_reference_rasterization() {
+    let (mut node, resource, mut state) = fixture();
+    let binding = ShaderBinding {
+        kind: "uniform_binding".to_owned(),
+        slot: 2,
+        value: Box::new(Value::Tuple(vec![Value::F32(1.0); 4])),
+    };
+    let pipeline = pass(&mut state).pipeline.clone();
+    state.bind_value(
+        "bindings",
+        Value::BindingSet(ShaderBindingSet {
+            pipeline,
+            bindings: vec![binding],
+        }),
+    );
+    node.op.args.push("bindings".to_owned());
+    let arguments = ShaderMod
+        .validate_draw_instanced(&node, &resource, &state)
+        .unwrap()
+        .provider_arguments()
+        .unwrap();
+    let uniform = crate::ShaderFragmentUniform::from_dispatch(&arguments)
+        .unwrap()
+        .unwrap();
+    assert_eq!(uniform.slot, 2);
+    assert_eq!(
+        uniform.bytes,
+        [1.0f32; 4]
+            .into_iter()
+            .flat_map(f32::to_le_bytes)
+            .collect::<Vec<_>>()
+            .as_slice()
+    );
+    let Value::BindingSet(bindings) = state.values.get_mut("bindings").unwrap() else {
+        unreachable!()
+    };
+    *bindings.bindings[0].value = Value::Unit;
+    assert!(ShaderMod
+        .validate_draw_instanced(&node, &resource, &state)
+        .is_err());
+    assert_eq!(
+        crate::ShaderFragmentUniform::from_dispatch(&arguments).unwrap(),
+        Some(uniform)
+    );
+    assert!(state.events.is_empty());
+}
+
+#[test]
+fn uniform_shape_type_slot_and_pipeline_fail_before_draw() {
+    for case in 0..6 {
+        let (mut node, resource, mut state) = fixture();
+        let mut bindings = ShaderBindingSet {
+            pipeline: pass(&mut state).pipeline.clone(),
+            bindings: vec![ShaderBinding {
+                kind: "uniform_binding".to_owned(),
+                slot: 2,
+                value: Box::new(Value::Tuple(vec![Value::F32(1.0); 4])),
+            }],
+        };
+        match case {
+            0 => bindings.bindings[0].slot = 31,
+            1 => *bindings.bindings[0].value = Value::Tuple(vec![Value::F32(1.0); 3]),
+            2 => *bindings.bindings[0].value = Value::Tuple(vec![Value::Int(1); 4]),
+            3 => *bindings.bindings[0].value = Value::Tuple(vec![Value::F32(f32::NAN); 4]),
+            4 => bindings.bindings.push(bindings.bindings[0].clone()),
+            _ => bindings.pipeline.topology = "other".to_owned(),
+        }
+        state.bind_value("bindings", Value::BindingSet(bindings));
+        node.op.args.push("bindings".to_owned());
+        assert_shared_rejection(&node, &resource, &mut state);
+    }
+}

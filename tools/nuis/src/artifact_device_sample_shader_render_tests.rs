@@ -185,7 +185,7 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .expect("child-driven lifecycle IPC");
     assert!(status.success());
     assert_eq!(invocation_count, 3);
-    let runtime_stream_path = prepared.stream_path;
+    let runtime_stream_path = prepared.stream_path.clone();
     let runtime_stream = fs::read_to_string(&runtime_stream_path)
         .expect("Nsdb should persist the provider-neutral runtime result stream");
     assert!(runtime_stream.contains("schema = \"nuis-provider-runtime-result-stream-v2\""));
@@ -201,9 +201,32 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .collect::<Vec<_>>();
     assert_eq!(
         observed_arguments,
-        [(3, 1), (2, 2), (3, 3)].map(|(vertices, instances)| format!(
-            "nuis-shader-unbound-draw-v1|height:u64:120|instance_count:u64:{instances}|vertex_count:u64:{vertices}|width:u64:160"
-        ))
+        [(3, 1), (2, 2), (3, 3)].map(|(vertices, instances)| {
+            let mut arguments = yir_domain_shader::ShaderDrawArguments {
+                width: 160,
+                height: 120,
+                vertex_count: vertices,
+                instance_count: instances,
+            }
+            .to_dispatch();
+            let tint: [f32; 4] = [
+                if instances == 1 { 1.0 } else { 0.0 },
+                0.0,
+                if instances == 3 { 1.0 } else { 0.0 },
+                1.0,
+            ];
+            let bytes = tint
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect::<Vec<_>>();
+            yir_domain_shader::ShaderFragmentUniform {
+                slot: 2,
+                bytes: bytes.try_into().unwrap(),
+            }
+            .bind_dispatch(&mut arguments)
+            .unwrap();
+            arguments.to_wire().unwrap()
+        })
     );
     assert!(runtime_stream.contains("frame_count = 3"));
     assert!(runtime_stream.contains("module = \"shader\""));
@@ -256,9 +279,34 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         "two vertices must leave the cleared target, not render fixed geometry"
     );
     assert!(
-        first_rgba == last_rgba,
-        "the same three-vertex coverage is deterministic"
+        first_rgba != last_rgba,
+        "Nuis-owned uniform bytes must change actual GPU pixels at the same coverage"
     );
+    assert!(
+        first_rgba
+            .chunks_exact(4)
+            .zip(last_rgba.chunks_exact(4))
+            .all(|(red, blue)| red[0] > 0
+                && red[1] == 0
+                && red[2] == 0
+                && red[3] == 255
+                && blue[0] == 0
+                && blue[1] == 0
+                && blue[2] == red[0]
+                && blue[3] == 255),
+        "compiled tint uniform must switch identical coverage from red to blue"
+    );
+
+    let changed_resource_only =
+        observed_arguments[2].replace("instance_count:u64:3", "instance_count:u64:1");
+    let uniform_drift = runtime_stream.replacen(observed_arguments[0], &changed_resource_only, 1);
+    fs::write(&runtime_stream_path, uniform_drift).unwrap();
+    let error = yir_runtime_host::execute_module_source_with_provider_result_stream(
+        &yir_source,
+        &runtime_stream_path,
+    )
+    .expect_err("even valid rehashed uniform bytes must remain bound to stream identity");
+    assert!(error.contains("stream identity mismatch"));
 
     fs::write(
         &runtime_stream_path,
@@ -338,6 +386,31 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .expect("runtime-session provider output should remain materializable");
     assert_eq!(materialized.materialized_record_count, 1);
 
+    let offline_error = nsdb::execute_provider_samples(&output_dir, Some(PROVIDER_FAMILY))
+        .err()
+        .expect("offline execution must not invent runtime uniform data");
+    assert!(
+        offline_error.contains("fragment uniform is missing"),
+        "{offline_error}"
+    );
+    child
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    fs::write(
+        &manifest_path,
+        manifest.replace("fragment_uniform_slot:u64:2", "fragment_uniform_slot:u64:3"),
+    )
+    .unwrap();
+    let error = prepared.run_command(&mut child).unwrap_err();
+    assert!(
+        error.contains("differs from admitted code capability"),
+        "{error}"
+    );
+    assert_eq!(
+        fs::read_to_string(&runtime_stream_path).unwrap(),
+        runtime_stream
+    );
+
     let asset_path = evidence_field(evidence, "provider_request_0_code_asset_path");
     let alias_path = "unbound-project-render.metal";
     fs::copy(output_dir.join(asset_path), output_dir.join(alias_path)).unwrap();
@@ -346,11 +419,15 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         &format!("provider_request_0_input_binding_0_payload_path={alias_path}"),
     );
     fs::write(&manifest_path, drifted).unwrap();
-    let error = match nsdb::execute_provider_samples(&output_dir, Some(PROVIDER_FAMILY)) {
-        Ok(_) => panic!("an alias outside the compiled code asset binding must fail closed"),
-        Err(error) => error,
-    };
-    assert!(error.contains("verified MSL code asset capability"));
+    let error = prepared.run_command(&mut child).unwrap_err();
+    assert!(
+        error.contains("verified MSL code asset capability"),
+        "{error}"
+    );
+    assert_eq!(
+        fs::read_to_string(&runtime_stream_path).unwrap(),
+        runtime_stream
+    );
 
     fs::remove_dir_all(output_dir).unwrap();
 }

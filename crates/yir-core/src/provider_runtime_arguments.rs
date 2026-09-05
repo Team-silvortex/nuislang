@@ -1,15 +1,24 @@
 use std::collections::BTreeMap;
 
-/// Bounded, canonical scalar inputs. Domain semantics belong to the registered adapter.
+#[path = "provider_runtime_resource.rs"]
+mod resource;
+pub use resource::DispatchResource;
+
+/// Bounded, canonical inputs. Domain semantics belong to the registered adapter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DispatchArguments {
     pub contract: String,
     pub scalars: BTreeMap<String, u64>,
+    pub resources: BTreeMap<String, DispatchResource>,
 }
 
 impl DispatchArguments {
     pub fn to_wire(&self) -> Result<String, String> {
-        if !identifier(&self.contract) || self.scalars.is_empty() || self.scalars.len() > 8 {
+        if !identifier(&self.contract)
+            || self.scalars.is_empty()
+            || self.scalars.len() > 8
+            || self.resources.len() > 4
+        {
             return Err("runtime dispatch argument contract or count is invalid".to_owned());
         }
         let mut wire = self.contract.clone();
@@ -18,6 +27,12 @@ impl DispatchArguments {
                 return Err("runtime dispatch argument name is invalid".to_owned());
             }
             wire.push_str(&format!("|{name}:u64:{value}"));
+        }
+        for (name, resource) in &self.resources {
+            if !identifier(name) || self.scalars.contains_key(name) {
+                return Err("runtime resource name is invalid or duplicated".to_owned());
+            }
+            wire.push_str(&format!("|{name}:{}", resource.to_wire()?));
         }
         if wire.len() > 256 {
             return Err("runtime dispatch arguments exceed wire limit".to_owned());
@@ -32,7 +47,17 @@ impl DispatchArguments {
         let mut fields = wire.split('|');
         let contract = fields.next().unwrap_or_default().to_owned();
         let mut scalars = BTreeMap::new();
+        let mut resources = BTreeMap::new();
         for field in fields {
+            if let Some((name, value)) = field.split_once(":immutable-le:") {
+                if resources
+                    .insert(name.to_owned(), DispatchResource::parse(value)?)
+                    .is_some()
+                {
+                    return Err("runtime resource is duplicated".to_owned());
+                }
+                continue;
+            }
             let (name, value) = field
                 .split_once(":u64:")
                 .ok_or("runtime dispatch argument type is invalid")?;
@@ -43,7 +68,11 @@ impl DispatchArguments {
                 return Err("runtime dispatch argument is duplicated".to_owned());
             }
         }
-        let arguments = Self { contract, scalars };
+        let arguments = Self {
+            contract,
+            scalars,
+            resources,
+        };
         if arguments.to_wire()? != wire {
             return Err("runtime dispatch arguments are not canonical".to_owned());
         }
@@ -82,5 +111,42 @@ mod tests {
             assert!(DispatchArguments::parse(invalid).is_err(), "{invalid}");
         }
         assert!(DispatchArguments::parse(&"x".repeat(257)).is_err());
+    }
+
+    #[test]
+    fn immutable_resource_roundtrip_binds_type_shape_bytes_and_hash() {
+        let mut arguments = DispatchArguments::parse("example.v1|count:u64:3").unwrap();
+        let resource = DispatchResource {
+            element_type: "f32".to_owned(),
+            shape: vec![4],
+            bytes: [1.0f32, 0.0, 0.0, 1.0]
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect(),
+        };
+        arguments
+            .resources
+            .insert("fragment.uniform.2".to_owned(), resource);
+        let wire = arguments.to_wire().unwrap();
+        assert_eq!(DispatchArguments::parse(&wire).unwrap(), arguments);
+        for invalid in [
+            wire.replace(":f32:4:", ":u8:4:"),
+            wire.replace(":f32:4:", ":f32:5:"),
+            wire.replace("0000803f", "00000000"),
+            wire.replace("0000803f", "0000803F"),
+            wire.replace(":f32:4:", ":f32:04:"),
+            wire.replace(":immutable-le:", ":mutable-le:"),
+            format!("{wire}|{}", wire.split('|').next_back().unwrap()),
+        ] {
+            assert!(DispatchArguments::parse(&invalid).is_err(), "{invalid}");
+        }
+        for shape in [vec![], vec![0], vec![usize::MAX, usize::MAX], vec![1; 5]] {
+            arguments
+                .resources
+                .get_mut("fragment.uniform.2")
+                .unwrap()
+                .shape = shape;
+            assert!(arguments.to_wire().is_err());
+        }
     }
 }

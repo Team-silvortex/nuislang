@@ -13,6 +13,7 @@ The slice currently proves:
 * conditional presentation driven by Shader readiness through a shared YIR result-state projection
 * a bounded three-frame Nuis update loop lowered through a scoped frame helper
 * profile-derived runtime vertex counts `3/2/3` and instance counts `1/2/3`
+* a Nuis-owned `(f32, f32, f32, f32)` tint uploaded as a read-only fragment uniform
 * one aggregate `NovaAppState` carried and rebound through all three loop iterations
 * runtime-owned `NovaFrameResultHandle` validation of Shader-issued token, clock,
   and root identity before submission
@@ -32,16 +33,29 @@ This is a bounded lifecycle proof, not a claim of a stable interactive world loo
 The current helper carries aggregate application state through every iteration.
 The separate-process M2 regression sends each validated draw through registered
 provider IPC v2, observes a same-command Metal completion, and binds canonical
-runtime scalars into result-stream v2 replay. The three-vertex frames have matching
-pixels; the two-vertex frame stays cleared because no triangle is formed.
+runtime scalars and immutable resource bytes into result-stream v2 replay. The
+three-vertex frames have matching coverage but red/blue pixels selected by Nuis
+tint values; the two-vertex frame stays cleared because no triangle is formed.
 Replay matches live output. Noncanonical vertex-body changes are rejected by
 the bounded emitter rather than silently replaced with fullscreen geometry.
 
-This is an unbound `rgba8_unorm` / `triangle_strip` projection with fixed admitted
+This is a procedural `rgba8_unorm` / `triangle_strip` projection with fixed admitted
 dimensions. The current Metal adapter admits 1-4 vertices and 1-256 instances;
-resource bindings are rejected rather than ignored. Packet values are still
-validated for the CPU reference path, not uploaded as GPU uniforms. The existing
+one group-zero `vec4<f32>` fragment uniform is admitted at its compiled slot.
+`shader_draw_instanced(pass, packet, vertices, instances, bindings)` carries an
+optional `BindingSet`; `shader_uniform_binding(2, tint)` matches the PixelMagic
+profile's `binding(0, 2)` declaration. Only four finite f32 values are accepted,
+copied as 16 little-endian bytes, with no implicit casts, pointers, or file paths.
+Code-asset identity and native Metal reflection both constrain the binding.
+Type, shape, slot, bytes, and content hash are part of dispatch/replay identity.
+The unchanged 256-byte argument budget is not a bulk-resource transport.
+
+Legacy packet values are validated for the structural CPU reference preview, not
+uploaded as GPU uniforms; that preview is not a WGSL pixel-equivalence oracle.
+The real-pixel proof executes a runtime child after an AOT build, not a standalone
+interactive window binary with self-contained provider injection. The existing
 Metal OS adapter remains a native compatibility bridge. Continuous event dispatch,
-typed GPU resources, self-contained runner injection, and cross-host window
-adapters remain active work. Old IPC/result-stream v1 artifacts require a rebuild
-and rerun; there is no silent unbound replay fallback.
+large buffers/textures, self-contained runner injection, and cross-host window
+adapters remain active work. Rebuild artifacts after the profile and Metal runner
+v3 changes. Offline rendering cannot invent required uniform data, and unsupported
+resource contracts never fall back to an unbound replay.

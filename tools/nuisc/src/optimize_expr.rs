@@ -412,6 +412,7 @@ pub(super) fn simplify_expr(
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
             let (pass, a) = simplify_expr(*pass, env, inline_templates, active_inline);
             let (packet, b) = simplify_expr(*packet, env, inline_templates, active_inline);
@@ -419,14 +420,22 @@ pub(super) fn simplify_expr(
                 simplify_expr(*vertex_count, env, inline_templates, active_inline);
             let (instance_count, d) =
                 simplify_expr(*instance_count, env, inline_templates, active_inline);
+            let (binding_set, e) = match binding_set {
+                Some(set) => {
+                    let (set, changed) = simplify_expr(*set, env, inline_templates, active_inline);
+                    (Some(Box::new(set)), changed)
+                }
+                None => (None, false),
+            };
             (
                 NirExpr::ShaderDrawInstanced {
                     pass: Box::new(pass),
                     packet: Box::new(packet),
                     vertex_count: Box::new(vertex_count),
                     instance_count: Box::new(instance_count),
+                    binding_set,
                 },
-                a || b || c || d,
+                a || b || c || d || e,
             )
         }
         NirExpr::ShaderProfileRender { unit, packet } => {

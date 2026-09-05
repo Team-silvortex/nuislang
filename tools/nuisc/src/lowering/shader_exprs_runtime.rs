@@ -166,6 +166,7 @@ pub(in crate::lowering) fn lower_shader_draw_instanced(
     packet: &NirExpr,
     vertex_count: &NirExpr,
     instance_count: &NirExpr,
+    binding_set: Option<&NirExpr>,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
@@ -174,6 +175,16 @@ pub(in crate::lowering) fn lower_shader_draw_instanced(
     let packet_name = lower_expr(packet, state, bindings)?;
     let vertex_count_name = lower_expr(vertex_count, state, bindings)?;
     let instance_count_name = lower_expr(instance_count, state, bindings)?;
+    let binding_set_name = binding_set
+        .map(|set| lower_expr(set, state, bindings))
+        .transpose()?;
+    let mut args = vec![
+        pass_name.clone(),
+        packet_name.clone(),
+        vertex_count_name.clone(),
+        instance_count_name.clone(),
+    ];
+    args.extend(binding_set_name.iter().cloned());
     let name = next_name(state, "shader_draw_instanced");
     state.yir.nodes.push(Node {
         name: name.clone(),
@@ -181,17 +192,15 @@ pub(in crate::lowering) fn lower_shader_draw_instanced(
         op: Operation {
             module: "shader".to_owned(),
             instruction: "draw_instanced".to_owned(),
-            args: vec![
-                pass_name.clone(),
-                packet_name.clone(),
-                vertex_count_name.clone(),
-                instance_count_name.clone(),
-            ],
+            args,
         },
     });
     push_dep_edges(state, &pass_name, &name);
     push_xfer_edge(state, &packet_name, &name);
     push_xfer_edge(state, &vertex_count_name, &name);
     push_xfer_edge(state, &instance_count_name, &name);
+    if let Some(set) = binding_set_name {
+        push_dep_edges(state, &set, &name);
+    }
     Ok(name)
 }

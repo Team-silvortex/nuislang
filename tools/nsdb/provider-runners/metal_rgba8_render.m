@@ -1,6 +1,8 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <limits.h>
+#include <math.h>
+#include <string.h>
 #include <mach/mach_time.h>
 #include <unistd.h>
 
@@ -60,10 +62,38 @@ static BOOL parseDimension(const char *raw, NSUInteger *value) {
     return YES;
 }
 
+static BOOL parseUniform(const char *raw, BOOL *present, NSUInteger *slot, float values[4]) {
+    *present = strcmp(raw, "none") != 0;
+    if (!*present) return YES;
+    char *end = NULL;
+    unsigned long parsed = strtoul(raw, &end, 10);
+    if (end == raw || *end != ':' || parsed > 30 || strlen(end + 1) != 32) return NO;
+    *slot = parsed;
+    const char *hex = end + 1;
+    uint8_t bytes[16];
+    for (NSUInteger i = 0; i < 16; i++) {
+        unsigned int value = 0;
+        for (NSUInteger j = 0; j < 2; j++) {
+            char c = hex[i * 2 + j];
+            if (c >= '0' && c <= '9') value = value * 16 + c - '0';
+            else if (c >= 'a' && c <= 'f') value = value * 16 + c - 'a' + 10;
+            else return NO;
+        }
+        bytes[i] = value;
+    }
+    for (NSUInteger i = 0; i < 4; i++) {
+        uint32_t bits = (uint32_t)bytes[i * 4] | ((uint32_t)bytes[i * 4 + 1] << 8) |
+                        ((uint32_t)bytes[i * 4 + 2] << 16) | ((uint32_t)bytes[i * 4 + 3] << 24);
+        memcpy(&values[i], &bits, sizeof(bits));
+        if (!isfinite(values[i])) return NO;
+    }
+    return YES;
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc != 8) {
-            return fail(@"usage: metal_rgba8_render <msl-source> <vertex> <fragment> <width> <height> <vertices> <instances>");
+        if (argc != 9) {
+            return fail(@"usage: metal_rgba8_render <msl-source> <vertex> <fragment> <width> <height> <vertices> <instances> <uniform-slot:hex|none>");
         }
         NSUInteger width = 0;
         NSUInteger height = 0;
@@ -76,6 +106,12 @@ int main(int argc, const char *argv[]) {
         if (!parseDimension(argv[6], &vertexCount) || vertexCount > 4 ||
             !parseDimension(argv[7], &instanceCount) || instanceCount > 256) {
             return fail(@"invalid Metal unbound draw counts");
+        }
+        BOOL hasUniform = NO;
+        NSUInteger uniformSlot = 0;
+        float uniformValues[4] = {0};
+        if (!parseUniform(argv[8], &hasUniform, &uniformSlot, uniformValues)) {
+            return fail(@"invalid immutable fragment f32x4 uniform");
         }
 
         NSError *error = nil;
@@ -105,10 +141,29 @@ int main(int argc, const char *argv[]) {
         pipelineDescriptor.vertexFunction = vertex;
         pipelineDescriptor.fragmentFunction = fragment;
         pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
+        MTLRenderPipelineReflection *reflection = nil;
         id<MTLRenderPipelineState> pipeline =
-            [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+            [device newRenderPipelineStateWithDescriptor:pipelineDescriptor
+                options:MTLPipelineOptionArgumentInfo | MTLPipelineOptionBufferTypeInfo
+                reflection:&reflection error:&error];
         if (pipeline == nil) {
             return fail([NSString stringWithFormat:@"Metal render pipeline unavailable: %@", error]);
+        }
+        if (reflection == nil || reflection.vertexArguments.count != 0 ||
+            reflection.fragmentArguments.count != (hasUniform ? 1 : 0)) {
+            return fail(@"Metal render resource reflection differs from admitted binding count");
+        }
+        id<MTLBuffer> uniformBuffer = nil;
+        if (hasUniform) {
+            MTLArgument *argument = reflection.fragmentArguments[0];
+            if (argument.type != MTLArgumentTypeBuffer || argument.index != uniformSlot ||
+                argument.access != MTLArgumentAccessReadOnly || argument.bufferDataSize != 16 ||
+                argument.bufferDataType != MTLDataTypeFloat4) {
+                return fail(@"Metal render uniform reflection differs from f32x4 capability");
+            }
+            uniformBuffer = [device newBufferWithBytes:uniformValues length:sizeof(uniformValues)
+                                             options:MTLResourceStorageModeShared];
+            if (uniformBuffer == nil) return fail(@"Metal fragment uniform allocation failed");
         }
 
         MTLTextureDescriptor *textureDescriptor =
@@ -134,6 +189,7 @@ int main(int argc, const char *argv[]) {
             [command renderCommandEncoderWithDescriptor:renderPass];
         if (encoder == nil) return fail(@"Metal render encoder unavailable");
         [encoder setRenderPipelineState:pipeline];
+        if (hasUniform) [encoder setFragmentBuffer:uniformBuffer offset:0 atIndex:uniformSlot];
         [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0
                    vertexCount:vertexCount instanceCount:instanceCount];
         [encoder endEncoding];
@@ -151,7 +207,8 @@ int main(int argc, const char *argv[]) {
               mipmapLevel:0];
         uint64_t completionClock = mach_continuous_time();
 
-        printf("protocol=nuis-metal-rgba8-render-provider-runner-v2\n");
+        printf("protocol=nuis-metal-rgba8-render-provider-runner-v3\n");
+        printf("fragment_uniform_bytes=%u\n", hasUniform ? 16 : 0);
         printf("vertex_count=%lu\ninstance_count=%lu\n",
                (unsigned long)vertexCount, (unsigned long)instanceCount);
         printf("status=ready\ndevice=%s\noutput_bytes=%lu\n",

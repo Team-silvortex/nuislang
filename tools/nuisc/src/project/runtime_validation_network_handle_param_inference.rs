@@ -539,7 +539,16 @@ fn infer_network_param_requirements_in_expr(
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
+            if let Some(set) = binding_set {
+                infer_network_param_requirements_in_expr(
+                    set,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
             infer_network_param_requirements_in_expr(
                 pass,
                 requirements,

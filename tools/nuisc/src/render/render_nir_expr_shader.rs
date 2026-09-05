@@ -312,12 +312,17 @@ pub(super) fn render_shader_nir_expr(value: &NirExpr) -> Option<String> {
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => format!(
-            "shader_draw_instanced({}, {}, {}, {})",
+            "shader_draw_instanced({}, {}, {}, {}{})",
             render_nir_expr(pass),
             render_nir_expr(packet),
             render_nir_expr(vertex_count),
-            render_nir_expr(instance_count)
+            render_nir_expr(instance_count),
+            binding_set
+                .as_ref()
+                .map(|set| format!(", {}", render_nir_expr(set)))
+                .unwrap_or_default()
         ),
         NirExpr::ShaderProfileRender { unit, packet } => format!(
             "shader_profile_render(\"{}\", {})",

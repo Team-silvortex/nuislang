@@ -10,7 +10,7 @@ use std::path::Path;
 
 #[cfg(target_os = "macos")]
 const METAL_RGBA8_RENDER_SOURCE: &str = include_str!("../provider-runners/metal_rgba8_render.m");
-pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v2";
+pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v3";
 
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_rgba8_render_worker_invocation(
@@ -52,8 +52,8 @@ fn execute_rgba8_render_platform(
         fragment_entry,
         width,
         height,
-        4,
-        1,
+        (4, 1),
+        "none",
     )
 }
 
@@ -63,8 +63,8 @@ pub(crate) fn execute_rgba8_render_asset(
     fragment_entry: &str,
     width: usize,
     height: usize,
-    vertex_count: usize,
-    instance_count: usize,
+    counts: (usize, usize),
+    uniform_upload: &str,
 ) -> Result<MetalProviderExecution, String> {
     execute_rgba8_render_asset_platform(
         msl_path,
@@ -72,8 +72,8 @@ pub(crate) fn execute_rgba8_render_asset(
         fragment_entry,
         width,
         height,
-        vertex_count,
-        instance_count,
+        counts,
+        uniform_upload,
     )
 }
 
@@ -84,9 +84,10 @@ fn execute_rgba8_render_asset_platform(
     fragment_entry: &str,
     width: usize,
     height: usize,
-    vertex_count: usize,
-    instance_count: usize,
+    counts: (usize, usize),
+    uniform_upload: &str,
 ) -> Result<MetalProviderExecution, String> {
+    let (vertex_count, instance_count) = counts;
     if width == 0 || height == 0 {
         return Err("Metal RGBA8 render dimensions must be positive".to_owned());
     }
@@ -106,6 +107,7 @@ fn execute_rgba8_render_asset_platform(
             height.to_string(),
             vertex_count.to_string(),
             instance_count.to_string(),
+            uniform_upload.to_owned(),
         ],
         METAL_RGBA8_RENDER_CONTRACT,
         METAL_RGBA8_RENDER_SOURCE,
@@ -121,8 +123,8 @@ fn execute_rgba8_render_asset_platform(
     _fragment_entry: &str,
     _width: usize,
     _height: usize,
-    _vertex_count: usize,
-    _instance_count: usize,
+    _counts: (usize, usize),
+    _uniform_upload: &str,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }

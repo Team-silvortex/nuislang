@@ -515,6 +515,7 @@ pub enum NirExpr {
         packet: Box<NirExpr>,
         vertex_count: Box<NirExpr>,
         instance_count: Box<NirExpr>,
+        binding_set: Option<Box<NirExpr>>,
     },
     ShaderProfileRender {
         unit: String,

@@ -121,3 +121,55 @@ fn rejects_unregistered_target_and_nested_fragment_control_flow() {
     .unwrap_err()
     .contains("nested blocks"));
 }
+
+#[test]
+fn lowers_one_typed_fragment_uniform_into_content_bound_msl_reflection() {
+    let source = format!("@group(0) @binding(2) var<uniform> tint: vec4<f32>;\n{RASTER_WGSL}")
+        .replace(
+            "vec4<f32>(luma, luma + glow, luma, 1.0)",
+            "vec4<f32>(luma * tint.x, luma * tint.y, luma * tint.z, tint.w)",
+        );
+    let lowered =
+        lower_canonical_inline_wgsl_render_for_profile(&source, "demo", "metal.apple-silicon-gpu")
+            .unwrap();
+    assert!(lowered
+        .source
+        .contains("constant float4& tint [[buffer(2)]]"));
+    assert!(lowered.source.contains("luma * tint.x"));
+    assert_eq!(
+        yir_domain_shader::fragment_uniform_capability(&lowered.source).unwrap(),
+        Some(2)
+    );
+    for invalid in [
+        source.replace("@group(0)", "@group(1)"),
+        source.replace("@binding(2)", "@binding(31)"),
+        source.replace("var<uniform>", "var<storage, read_write>"),
+        source.replace("tint: vec4<f32>;", "tint: vec4<u32>;"),
+        source.replace("tint: vec4<f32>;", "tint: vec4<f32> = vec4<f32>(1.0);"),
+        format!("@group(0) @binding(3) var<uniform> other: vec4<f32>;\n{source}"),
+    ] {
+        assert!(lower_canonical_inline_wgsl_render_for_profile(
+            &invalid,
+            "demo",
+            "metal.apple-silicon-gpu"
+        )
+        .is_err());
+    }
+}
+
+#[test]
+fn native_binding_normalization_is_idempotent_before_resource_reflection() {
+    let source = format!("binding(0, 2) var<uniform> tint: vec4<f32>;\n{RASTER_WGSL}");
+    let normalized = crate::shader_source::normalize_inline_wgsl_source(&source).unwrap();
+    assert_eq!(
+        crate::shader_source::normalize_inline_wgsl_source(&normalized).unwrap(),
+        normalized
+    );
+    let lowered =
+        lower_canonical_inline_wgsl_render_for_profile(&source, "demo", "metal.apple-silicon-gpu")
+            .unwrap();
+    assert_eq!(
+        yir_domain_shader::fragment_uniform_capability(&lowered.source).unwrap(),
+        Some(2)
+    );
+}

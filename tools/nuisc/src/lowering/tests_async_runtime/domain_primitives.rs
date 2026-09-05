@@ -1,6 +1,45 @@
 use super::*;
 
 #[test]
+fn typed_uniform_draw_survives_nir_optimization_and_yir_verification() {
+    let mut module = parse_nuis_module(r#"
+        mod cpu Main {
+          fn main() {
+            let pipe: Pipeline = shader_pipeline("ball", "triangle_strip");
+            let pass: Pass = shader_begin_pass(shader_target("rgba8_unorm", 2, 2), pipe, shader_viewport(2, 2));
+            let color: (f32, f32, f32, f32) = (1.0, 0.0, 0.0, 1.0);
+            let uniform: Binding = shader_uniform_binding(2, color);
+            let set: BindingSet = shader_bind_set(pipe, uniform);
+            let packet: (i64, i64) = (1, 2);
+            let frame: Frame = shader_draw_instanced(pass, packet, 3, 1, set);
+            print(frame);
+          }
+        }
+    "#).unwrap();
+    crate::nir_verify::verify_nir_module(&module).unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    crate::nir_verify::verify_nir_module(&module).unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    yir_verify::verify_module(&yir).unwrap();
+    let draw = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.full_name() == "shader.draw_instanced")
+        .unwrap();
+    assert_eq!(draw.op.args.len(), 5);
+    let set = yir
+        .nodes
+        .iter()
+        .find(|node| node.name == draw.op.args[4])
+        .unwrap();
+    assert_eq!(set.op.full_name(), "shader.bind_set");
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.full_name() == "shader.uniform_binding"));
+}
+
+#[test]
 fn lowers_data_result_primitives_into_data_nodes() {
     let module = parse_nuis_module(
         r#"

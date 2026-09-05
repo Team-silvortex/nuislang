@@ -18,6 +18,8 @@ mod shader PixelMagicRenderSurface {
     let profile_view: Viewport = shader_viewport(160, 120);
     let profile_pipe: Pipeline = shader_pipeline("pixelmagic_render_demo", "triangle_strip");
     let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_render_demo", wgsl {
+      binding(0, 2) var<uniform> tint: vec4<f32>;
+
       struct VsOut {
         builtin(position) pos: vec4<f32>,
         location(0) uv: vec2<f32>,
@@ -38,7 +40,7 @@ mod shader PixelMagicRenderSurface {
         fn fs_main(location(0) uv: vec2<f32>) -> location(0) vec4<f32> {
           let luma: f32 = 0.18 + uv.x * 0.37 + uv.y * 0.23;
           let glow: f32 = 0.08 + uv.x * 0.11;
-          return vec4<f32>(luma, luma + glow, luma, 1.0);
+          return vec4<f32>(luma * tint.x, (luma + glow) * tint.y, luma * tint.z, tint.w);
         }
       }
     });

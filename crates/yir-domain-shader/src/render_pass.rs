@@ -53,15 +53,33 @@ pub(crate) fn prepare_render_pass<'a>(
     }
     let vertex_count = usize::try_from(vertex_count)
         .map_err(|_| "shader.draw_instanced vertex count exceeds host range")?;
-    let geometry = bindings.map(resolve_geometry_inputs).transpose()?;
+    if bindings.is_some_and(|bindings| bindings.pipeline != pass.pipeline) {
+        return Err("shader.draw_instanced binding pipeline differs from pass".to_owned());
+    }
+    let uniform_only = bindings.is_some_and(|bindings| {
+        !bindings.bindings.is_empty()
+            && bindings
+                .bindings
+                .iter()
+                .all(|binding| matches!(binding.kind.as_str(), "uniform" | "uniform_binding"))
+    });
+    let geometry = bindings
+        .filter(|_| !uniform_only)
+        .map(resolve_geometry_inputs)
+        .transpose()?;
     let width = pass.viewport.width.min(pass.target.width);
     let height = pass.viewport.height.min(pass.target.height);
     let mut descriptor = ShaderDrawDescriptor::new(width, height)?;
     descriptor.vertex_count = vertex_count as u64;
     descriptor.instance_count = instance_count as u64;
-    descriptor.unbound_rgba8_triangle_strip = bindings.is_none()
+    descriptor.unbound_rgba8_triangle_strip = (bindings.is_none() || uniform_only)
         && pass.target.format == "rgba8_unorm"
         && pass.pipeline.topology == "triangle_strip";
+    if uniform_only {
+        descriptor.fragment_uniform = Some(crate::ShaderFragmentUniform::from_bindings(
+            bindings.unwrap(),
+        )?);
+    }
     if let Some(geometry) = &geometry {
         let expected_elements = geometry
             .vertex_layout

@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 #[path = "provider_runtime_arguments.rs"]
 mod arguments;
-pub use arguments::DispatchArguments;
+pub use arguments::{DispatchArguments, DispatchResource};
 
 pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v2";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";

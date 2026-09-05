@@ -14,6 +14,7 @@ nuis-artifact = { path = "../../crates/nuis-artifact" }
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuis-semantics = { path = "../../crates/nuis-semantics" }
 yir-core = { path = "../../crates/yir-core" }
+yir-domain-shader = { path = "../../crates/yir-domain-shader" }
 yir-lower-llvm = { path = "../../crates/yir-lower-llvm" }
 yir-syntax = { path = "../../crates/yir-syntax" }
 yir-verify = { path = "../../crates/yir-verify" }

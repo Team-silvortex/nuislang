@@ -75,3 +75,34 @@ fn target_admission_rejects_protocol_and_field_injection() {
     .write_to(&mut Vec::new())
     .is_err());
 }
+
+#[test]
+fn dispatch_roundtrips_owned_immutable_resources_without_new_carrier_authority() {
+    let mut arguments = DispatchArguments::parse("test.v1|count:u64:4").unwrap();
+    arguments.resources.insert(
+        "input.2".to_owned(),
+        DispatchResource {
+            element_type: "f32".to_owned(),
+            shape: vec![4],
+            bytes: vec![0; 16],
+        },
+    );
+    let message = Message::Dispatch {
+        sequence: 0,
+        target: DispatchTarget {
+            source_yir_fnv1a64: hash_bytes(b"source"),
+            module: "test".to_owned(),
+            instruction: "draw".to_owned(),
+            node: "frame".to_owned(),
+            resource: "device".to_owned(),
+        },
+        arguments,
+    };
+    let mut wire = Vec::new();
+    message.write_to(&mut wire).unwrap();
+    assert_eq!(Message::read_from(&mut wire.as_slice()).unwrap(), message);
+    *wire.last_mut().unwrap() = b'1';
+    assert!(Message::read_from(&mut wire.as_slice())
+        .unwrap_err()
+        .contains("identity mismatch"));
+}

@@ -193,6 +193,7 @@ dependencies = [
  "nuis-semantics",
  "nuisc",
  "sha2",
+ "yir-domain-shader",
  "yir-runtime-host",
 ]
 
@@ -239,6 +240,7 @@ dependencies = [
  "nuis-runtime",
  "nuis-semantics",
  "yir-core",
+ "yir-domain-shader",
  "yir-lower-llvm",
  "yir-runtime-host",
  "yir-syntax",

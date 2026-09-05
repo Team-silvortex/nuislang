@@ -18,6 +18,20 @@ fn projects_ns_nova_inline_render_into_content_addressed_msl() {
         .source
         .contains("vertex NuisRasterOut vs_main"));
     assert!(table.assets[0].source.contains("fragment float4 fs_main"));
+    assert!(table.assets[0]
+        .source
+        .contains("constant float4& tint [[buffer(2)]]"));
+    assert_eq!(
+        yir_domain_shader::fragment_uniform_capability(&table.assets[0].source).unwrap(),
+        Some(2)
+    );
+    let draw = project
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.name == table.passes[0].result_node)
+        .unwrap();
+    assert_eq!(draw.op.args.len(), 5);
     assert_eq!(table.passes[0].width, 160);
     assert_eq!(table.passes[0].height, 120);
     assert!(!table.passes[0].result_node.is_empty());

@@ -157,11 +157,13 @@ pub(in crate::project) fn expr_walk_any(
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
             predicate(pass)
                 || predicate(packet)
                 || predicate(vertex_count)
                 || predicate(instance_count)
+                || binding_set.as_ref().is_some_and(|set| predicate(set))
         }
         NirExpr::ShaderProfileRender { packet, .. } => predicate(packet),
         _ => false,

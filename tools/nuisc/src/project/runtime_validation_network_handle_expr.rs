@@ -555,7 +555,18 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
             packet,
             vertex_count,
             instance_count,
+            binding_set,
         } => {
+            if let Some(set) = binding_set {
+                validate_network_owned_handle_provenance_in_expr(
+                    set,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
+            }
             validate_network_owned_handle_provenance_in_expr(
                 pass,
                 from,

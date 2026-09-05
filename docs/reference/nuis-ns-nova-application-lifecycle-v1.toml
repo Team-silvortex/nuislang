@@ -111,7 +111,8 @@ provider_draw_event_source = "returned-provider-frame"
 provider_frame_extent_source = "validated-render-pass-target-viewport"
 
 [runtime_arguments]
-contract = "nuis-shader-unbound-draw-v1"
+contract = "nuis-shader-fragment-uniform-v1"
+unbound_contract = "nuis-shader-unbound-draw-v1"
 wire_owner = "yir-core"
 semantic_owner = "shader-nustar"
 admission_owner = "registered-execution-adapter"
@@ -122,15 +123,40 @@ result_stream_contract = "nuis-provider-runtime-result-stream-v2"
 replay_identity = "source-target-canonical-arguments-frame-bytes-and-completion"
 legacy_v1_policy = "reject-rebuild-and-rerun"
 width_height_policy = "must-match-admitted-output-capability"
-current_projection = "unbound-rgba8_unorm-triangle_strip"
+current_projection = "procedural-rgba8_unorm-triangle_strip-with-optional-immutable-fragment-uniform"
 metal_vertex_count_range = [1, 4]
 metal_instance_count_range = [1, 256]
 unsupported_resource_policy = "reject-before-dispatch-or-replay-consumption"
 code_asset_policy = "runtime-scalars-cannot-replace-verified-code-or-entry-set"
 live_vertex_counts = [3, 2, 3]
 live_instance_counts = [1, 2, 3]
-live_pixel_coverage = "three-vertex-full-frames-match-two-vertex-frame-stays-cleared"
+live_pixel_coverage = "three-vertex-coverage-matches-red-to-blue-tint-two-vertex-frame-stays-cleared"
 noncanonical_vertex_body_policy = "reject-rather-than-substitute-fullscreen-geometry"
+
+[runtime_resources]
+contract = "nuis-shader-fragment-uniform-v1"
+source_type = "Nuis-tuple-of-four-f32-values"
+source_representation = "tuple-or-canonical-indexed-Tuple-aggregate"
+binding = "optional-fifth-draw-operand-BindingSet"
+nir_contract = "binding-set-traversed-by-ownership-optimizer-call-profile-and-lowering-passes"
+wgsl_declaration = "binding(0, slot) var<uniform> name: vec4<f32>"
+max_bindings = 1
+slot_range = [0, 30]
+element_type = "f32"
+shape = [4]
+layout = "immutable-contiguous-little-endian"
+byte_length = 16
+finite_values_only = true
+implicit_conversion = false
+request_argument_limit_bytes = 256
+capability_source = "compiler-reflection-inside-verified-code-asset"
+native_validation = "Metal-read-only-float4-buffer-reflection"
+device_upload = "owned-MTLBuffer-before-draw-held-through-command-completion"
+runner_contract = "nuis-metal-rgba8-render-provider-runner-v3"
+replay_identity = "canonical-resource-name-type-shape-bytes-and-fnv1a64-plus-stream-hash"
+pointer_or_path_authority = false
+offline_default_policy = "reject-missing-runtime-uniform"
+pixel_evidence = "red-clear-blue-live-and-replay-byte-equality"
 
 [framework_package]
 galaxy_manifest = "examples/projects/domains/ns_nova_showcase/galaxy.toml"
@@ -178,12 +204,14 @@ single_runtime_result_target = true
 multi_target_provider_result_schedule = false
 provider_result_payload_tamper_rejection = true
 self_contained_host_runner_result_injection = false
-resource_bound_gpu_rasterization = false
+resource_bound_gpu_rasterization = true
+immutable_f32x4_fragment_uniform = true
+large_resource_upload_carrier = false
 runtime_draw_scalar_binding = true
 runtime_draw_argument_replay_validation = true
 dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "add a registered typed immutable resource binding with content identity and bounded upload, without encoding backend policy in the shared IPC or lifecycle"
-validation = "prove changed Nuis-owned resource bytes affect the real GPU frame, bind the exact type/shape/bytes into dispatch and replay, and reject mismatched resource or code authority before execution; retain dynamic count coverage, live/replay equality, single-worker cache reuse, physical completion, and per-graph GLM release"
+action = "extend resource admission to a bounded immutable texture or buffer carrier without widening the small control envelope or encoding backend policy in the shared lifecycle"
+validation = "prove a larger Nuis-owned typed resource changes real device output with identity-bound replay and lifetime release; reject extent, layout, content and code-capability drift; retain red-clear-blue uniform coverage, live/replay equality, single-worker cache reuse, physical completion, and per-graph GLM release"

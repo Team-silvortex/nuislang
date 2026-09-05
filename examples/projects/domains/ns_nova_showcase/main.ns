@@ -57,8 +57,14 @@ mod cpu Main {
       shader_profile_vertex_count("PixelMagicRenderSurface") - 1 - frame_index % 2;
     let instance_count: i64 =
       shader_profile_instance_count("PixelMagicRenderSurface") + frame_index;
+    let red: f32 = if frame_index == 0 { 1.0 } else { 0.0 };
+    let blue: f32 = if frame_index == 2 { 1.0 } else { 0.0 };
+    let tint: (f32, f32, f32, f32) = (red, 0.0, blue, 1.0);
+    let uniform: Binding = shader_uniform_binding(2, tint);
+    let pipeline: Pipeline = shader_profile_pipeline("PixelMagicRenderSurface");
+    let bindings: BindingSet = shader_bind_set(pipeline, uniform);
     let render_result: FrameStatus =
-      shader_result(shader_draw_instanced(pass, gpu_packet, vertex_count, instance_count));
+      shader_result(shader_draw_instanced(pass, gpu_packet, vertex_count, instance_count, bindings));
     let render_ready: bool = shader_frame_ready(render_result);
     let render_ready_flag: i64 = if render_ready { 1 } else { 0 };
     let completion: NovaFrameResultHandle = NovaAppRuntime.capture_frame_result(
