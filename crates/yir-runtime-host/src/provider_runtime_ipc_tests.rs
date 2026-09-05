@@ -21,6 +21,7 @@ fn fixture() -> (DispatchTarget, Node, DispatchFrame) {
     };
     let frame = DispatchFrame {
         sequence: 0,
+        arguments: DispatchArguments::parse("test.v1|count:u64:4").unwrap(),
         request_id: "render".to_owned(),
         provider_family: "test:device".to_owned(),
         element_type: "u8".to_owned(),
@@ -42,8 +43,10 @@ fn fixture() -> (DispatchTarget, Node, DispatchFrame) {
 
 #[test]
 fn live_client_requires_matching_sequence_layout_and_close_receipt() {
-    for case in 0..4 {
+    for case in 0..5 {
         let (target, node, mut frame) = fixture();
+        let arguments = frame.arguments.clone();
+        let expected_arguments = arguments.clone();
         let (client, mut peer) = UnixStream::pair().unwrap();
         client
             .set_read_timeout(Some(Duration::from_secs(2)))
@@ -55,16 +58,20 @@ fn live_client_requires_matching_sequence_layout_and_close_receipt() {
         if case == 1 {
             frame.shape = vec![2, 1];
         }
+        if case == 4 {
+            frame.arguments.scalars.insert("count".to_owned(), 3);
+        }
         let worker = thread::spawn(move || {
             assert_eq!(
                 Message::read_from(&mut peer).unwrap(),
                 Message::Dispatch {
                     sequence: 0,
-                    target: expected
+                    target: expected,
+                    arguments: expected_arguments,
                 }
             );
             Message::Frame(frame).write_to(&mut peer).unwrap();
-            if case >= 2 {
+            if (2..4).contains(&case) {
                 assert_eq!(Message::read_from(&mut peer).unwrap(), Message::Finish(1));
                 Message::Closed(if case == 2 { 0 } else { 1 })
                     .write_to(&mut peer)
@@ -76,8 +83,8 @@ fn live_client_requires_matching_sequence_layout_and_close_receipt() {
             target,
             sequence: 0,
         };
-        let result = client.take(&node);
-        if case < 2 {
+        let result = client.take(&node, &arguments);
+        if case < 2 || case == 4 {
             assert!(result.is_err());
             assert_eq!(client.sequence, 0);
         } else {
@@ -90,7 +97,7 @@ fn live_client_requires_matching_sequence_layout_and_close_receipt() {
 
 #[test]
 fn live_client_rejects_disconnect_and_wrong_target() {
-    let (target, node, _) = fixture();
+    let (target, node, frame) = fixture();
     let (stream, peer) = UnixStream::pair().unwrap();
     let mut client = ProviderRuntimeClient {
         stream,
@@ -101,8 +108,8 @@ fn live_client_rejects_disconnect_and_wrong_target() {
         name: "other".to_owned(),
         ..node.clone()
     };
-    assert!(client.take(&wrong).is_err());
+    assert!(client.take(&wrong, &frame.arguments).is_err());
     assert_eq!(client.sequence, 0);
     drop(peer);
-    assert!(client.take(&node).is_err());
+    assert!(client.take(&node, &frame.arguments).is_err());
 }

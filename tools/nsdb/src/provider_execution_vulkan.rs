@@ -27,6 +27,7 @@ const VULKAN_SPIRV_TARGET: &str = "vulkan1.3-spirv1.6";
 
 pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
     ProviderExecutionAdapterRegistration {
+        prepare_runtime_arguments: None,
         registry_contract: PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT,
         adapter_kind: "vulkan-spirv-real-device-runner",
         requires_worker_descriptors: true,

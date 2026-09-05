@@ -10,7 +10,8 @@ mod shader_source_tests;
 
 pub(crate) use shader_source_normalize::normalize_inline_wgsl_source;
 pub(crate) use shader_source_summary::{
-    summarize_inline_wgsl_source, InlineWgslBindingSummary, InlineWgslSummary,
+    strip_comments_preserving_shape, summarize_inline_wgsl_source, InlineWgslBindingSummary,
+    InlineWgslSummary,
 };
 
 use shader_source_syntax::{

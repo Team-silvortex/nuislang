@@ -25,6 +25,60 @@ fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 "#;
 
 #[test]
+fn rejects_vertex_semantics_that_the_canonical_emitter_would_discard() {
+    for source in [
+        RASTER_WGSL.replace("x * 2.0 - 1.0", "x * 0.5 - 1.0"),
+        RASTER_WGSL.replace("vec2<f32>(x, y)", "vec2<f32>(y, x)"),
+        RASTER_WGSL.replace("return out;", "out.pos.x = 0.0; return out;"),
+    ] {
+        let error = lower_canonical_inline_wgsl_render_for_profile(
+            &source,
+            "demo",
+            "metal.apple-silicon-gpu",
+        )
+        .unwrap_err();
+        assert!(error.contains("refusing to substitute fullscreen geometry"));
+    }
+}
+
+#[test]
+fn canonical_vertex_comments_do_not_change_lowering_or_fake_entry_detection() {
+    let commented = format!(
+        "// fn vs_main {{ discarded comment }}\n{}",
+        RASTER_WGSL.replace(
+            "return out;",
+            "/* nested /* comment */ supported */ return out;"
+        )
+    );
+    assert_eq!(
+        lower_canonical_inline_wgsl_render_for_profile(
+            &commented,
+            "demo",
+            "metal.apple-silicon-gpu"
+        )
+        .unwrap(),
+        lower_canonical_inline_wgsl_render_for_profile(
+            RASTER_WGSL,
+            "demo",
+            "metal.apple-silicon-gpu"
+        )
+        .unwrap()
+    );
+}
+
+#[test]
+fn rejects_vertex_input_semantics_drift() {
+    let source = RASTER_WGSL.replace("builtin(vertex_index)", "builtin(instance_index)");
+    assert!(lower_canonical_inline_wgsl_render_for_profile(
+        &source,
+        "demo",
+        "metal.apple-silicon-gpu"
+    )
+    .unwrap_err()
+    .contains("expected vertex_index input"));
+}
+
+#[test]
 fn lowers_canonical_fullscreen_wgsl_to_msl() {
     let module = lower_canonical_inline_wgsl_render_for_profile(
         RASTER_WGSL,

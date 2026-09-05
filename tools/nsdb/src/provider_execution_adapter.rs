@@ -55,10 +55,17 @@ pub(crate) struct ProviderExecutionAdapterRegistration {
     pub(crate) registry_contract: &'static str,
     pub(crate) adapter_kind: &'static str,
     pub(crate) requires_worker_descriptors: bool,
+    pub(crate) prepare_runtime_arguments: Option<PrepareRuntimeArguments>,
     #[cfg(unix)]
     pub(crate) prepare_worker_adapter: Option<PrepareProviderWorkerAdapter>,
     pub(crate) execute: ExecuteProviderRequest,
 }
+
+pub(crate) type PrepareRuntimeArguments =
+    fn(
+        request: &mut ProviderRequest,
+        arguments: Option<&yir_core::provider_runtime_ipc::DispatchArguments>,
+    ) -> Result<yir_core::provider_runtime_ipc::DispatchArguments, String>;
 
 pub(crate) fn select_provider_execution_adapter(
     adapter_kind: &str,

@@ -1,5 +1,5 @@
-use super::parse_ball_packet;
 use super::surface_primitives::sphere_palette;
+use super::{ball_packet::BallPacket, parse_ball_packet};
 use yir_core::{FrameSurface, Value};
 
 pub(crate) fn draw_ball_surface(value: &Value) -> Result<FrameSurface, String> {
@@ -40,12 +40,10 @@ pub(crate) fn draw_ball_surface(value: &Value) -> Result<FrameSurface, String> {
 }
 
 pub(crate) fn draw_ball_surface_with_size(
-    value: &Value,
+    packet: &BallPacket,
     width: usize,
     height: usize,
-) -> Result<FrameSurface, String> {
-    let packet = parse_ball_packet(value, "shader.draw_ball")?;
-
+) -> FrameSurface {
     let width = width.max(8);
     let height = height.max(8);
     let radius = (0.72f32 * packet.radius_scale).clamp(0.18, 0.95);
@@ -82,12 +80,12 @@ pub(crate) fn draw_ball_surface_with_size(
         rows.push(row);
     }
 
-    Ok(FrameSurface {
+    FrameSurface {
         width,
         height,
         rows,
         rgba8: None,
-    })
+    }
 }
 
 pub(crate) fn draw_sphere_surface_with_size(
@@ -95,9 +93,17 @@ pub(crate) fn draw_sphere_surface_with_size(
     width: usize,
     height: usize,
 ) -> Result<FrameSurface, String> {
+    let packet = parse_ball_packet(value, "shader.draw_sphere")?;
+    Ok(draw_sphere_packet_with_size(&packet, width, height))
+}
+
+pub(crate) fn draw_sphere_packet_with_size(
+    packet: &BallPacket,
+    width: usize,
+    height: usize,
+) -> FrameSurface {
     let width = width.max(8);
     let height = height.max(8);
-    let packet = parse_ball_packet(value, "shader.draw_sphere")?;
 
     let radius = (0.72f32 * packet.radius_scale).clamp(0.18, 0.95);
     let offset_x = (packet.speed * 0.03).sin() * 0.22;
@@ -133,10 +139,10 @@ pub(crate) fn draw_sphere_surface_with_size(
         rows.push(row);
     }
 
-    Ok(FrameSurface {
+    FrameSurface {
         width,
         height,
         rows,
         rgba8: None,
-    })
+    }
 }

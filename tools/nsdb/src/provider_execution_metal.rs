@@ -15,11 +15,15 @@ use crate::{
 };
 use std::path::Path;
 
+#[path = "provider_execution_metal_draw.rs"]
+mod draw;
+
 pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
     ProviderExecutionAdapterRegistration {
         registry_contract: PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT,
         adapter_kind: "metal-real-device-runner",
         requires_worker_descriptors: true,
+        prepare_runtime_arguments: Some(draw::prepare_runtime_arguments),
         #[cfg(target_os = "macos")]
         prepare_worker_adapter: Some(prepare_worker_adapter),
         #[cfg(all(unix, not(target_os = "macos")))]
@@ -44,6 +48,8 @@ fn prepare_worker_adapter(
                 format!("literal:{}", render.fragment_entry),
                 format!("literal:{}", render.width),
                 format!("literal:{}", render.height),
+                format!("literal:{}", render.vertex_count),
+                format!("literal:{}", render.instance_count),
             ],
         )
     } else if is_gray8_invert(request) {
@@ -146,6 +152,8 @@ fn execute(
                 &render.fragment_entry,
                 render.width,
                 render.height,
+                render.vertex_count,
+                render.instance_count,
             )?
         }
     } else if is_gray8_invert(request) {
@@ -341,6 +349,8 @@ struct ValidatedMetalRenderRequest {
     fragment_entry: String,
     width: usize,
     height: usize,
+    vertex_count: usize,
+    instance_count: usize,
 }
 
 fn validated_metal_render_request(
@@ -403,12 +413,15 @@ fn validated_metal_render_request(
     {
         return Err("Metal RGBA8 render output descriptor is incompatible".to_owned());
     }
+    let (vertex_count, instance_count) = draw::render_draw_counts(request)?;
     Ok(ValidatedMetalRenderRequest {
         code_asset_path,
         vertex_entry,
         fragment_entry,
         width: *width,
         height: *height,
+        vertex_count,
+        instance_count,
     })
 }
 

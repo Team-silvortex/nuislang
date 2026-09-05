@@ -10,7 +10,7 @@ use std::path::Path;
 
 #[cfg(target_os = "macos")]
 const METAL_RGBA8_RENDER_SOURCE: &str = include_str!("../provider-runners/metal_rgba8_render.m");
-pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v1";
+pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v2";
 
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_rgba8_render_worker_invocation(
@@ -46,7 +46,15 @@ fn execute_rgba8_render_platform(
         return Err("Metal RGBA8 render dimensions must be positive".to_owned());
     }
     let source = TempMslSource::materialize(msl_source)?;
-    execute_rgba8_render_asset_platform(&source.path, vertex_entry, fragment_entry, width, height)
+    execute_rgba8_render_asset_platform(
+        &source.path,
+        vertex_entry,
+        fragment_entry,
+        width,
+        height,
+        4,
+        1,
+    )
 }
 
 pub(crate) fn execute_rgba8_render_asset(
@@ -55,8 +63,18 @@ pub(crate) fn execute_rgba8_render_asset(
     fragment_entry: &str,
     width: usize,
     height: usize,
+    vertex_count: usize,
+    instance_count: usize,
 ) -> Result<MetalProviderExecution, String> {
-    execute_rgba8_render_asset_platform(msl_path, vertex_entry, fragment_entry, width, height)
+    execute_rgba8_render_asset_platform(
+        msl_path,
+        vertex_entry,
+        fragment_entry,
+        width,
+        height,
+        vertex_count,
+        instance_count,
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -66,9 +84,14 @@ fn execute_rgba8_render_asset_platform(
     fragment_entry: &str,
     width: usize,
     height: usize,
+    vertex_count: usize,
+    instance_count: usize,
 ) -> Result<MetalProviderExecution, String> {
     if width == 0 || height == 0 {
         return Err("Metal RGBA8 render dimensions must be positive".to_owned());
+    }
+    if !(1..=4).contains(&vertex_count) || !(1..=256).contains(&instance_count) {
+        return Err("Metal unbound draw count exceeds admitted budget".to_owned());
     }
     let output_byte_len = width
         .checked_mul(height)
@@ -81,6 +104,8 @@ fn execute_rgba8_render_asset_platform(
             fragment_entry.to_owned(),
             width.to_string(),
             height.to_string(),
+            vertex_count.to_string(),
+            instance_count.to_string(),
         ],
         METAL_RGBA8_RENDER_CONTRACT,
         METAL_RGBA8_RENDER_SOURCE,
@@ -96,6 +121,8 @@ fn execute_rgba8_render_asset_platform(
     _fragment_entry: &str,
     _width: usize,
     _height: usize,
+    _vertex_count: usize,
+    _instance_count: usize,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }

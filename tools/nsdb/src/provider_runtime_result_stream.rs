@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const PROVIDER_RUNTIME_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v1";
+pub const PROVIDER_RUNTIME_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v2";
 pub const PROVIDER_RUNTIME_RESULT_STREAM_FILE_NAME: &str =
     "nuis.runtime.provider-result-stream.toml";
 const PAYLOAD_PREFIX: &str = "nuis.runtime.provider-result.";
@@ -95,6 +95,7 @@ pub fn provider_runtime_result_targets(
 }
 
 pub(crate) struct ProviderRuntimeResult {
+    pub(crate) arguments: yir_core::provider_runtime_ipc::DispatchArguments,
     pub(crate) source_yir_fnv1a64: String,
     pub(crate) provider_family: String,
     pub(crate) request_id: String,
@@ -115,6 +116,7 @@ impl ProviderRuntimeResult {
         provider_family: &str,
         request: &ProviderRequest,
         execution: &ProviderRequestExecution,
+        arguments: Option<&yir_core::provider_runtime_ipc::DispatchArguments>,
     ) -> Result<Option<Self>, String> {
         let Some(binding) = request.runtime_result_binding.as_ref() else {
             return Ok(None);
@@ -142,6 +144,9 @@ impl ProviderRuntimeResult {
         }
         yir_core::ProviderPhysicalCompletion::parse(&execution.summary.completion_clock_evidence)?;
         Ok(Some(Self {
+            arguments: arguments
+                .ok_or("runtime result lacks validated dispatch arguments")?
+                .clone(),
             source_yir_fnv1a64: binding.source_yir_fnv1a64.clone(),
             provider_family: provider_family.to_owned(),
             request_id: request.kernel.id.clone(),
@@ -199,6 +204,11 @@ pub(crate) fn persist_provider_runtime_results(
     for record in &records {
         let result = record.result;
         manifest.push_str("\n[[frame]]\n");
+        push_string(
+            &mut manifest,
+            "dispatch_arguments",
+            &result.arguments.to_wire()?,
+        );
         for (name, value) in [
             ("request_id", result.request_id.as_str()),
             ("provider_family", result.provider_family.as_str()),
@@ -260,11 +270,19 @@ fn stream_hash(source_yir_fnv1a64: &str, records: &[RuntimeResultRecord<'_>]) ->
             record.payload_hash,
             result.completion_wire,
         ));
+        material.push('\n');
+        material.push_str(
+            &result
+                .arguments
+                .to_wire()
+                .expect("validated runtime arguments"),
+        );
     }
     fnv1a64_hex(material.as_bytes())
 }
 
 fn validate_result(result: &ProviderRuntimeResult) -> Result<(), String> {
+    result.arguments.to_wire()?;
     if !valid_hash(&result.source_yir_fnv1a64)
         || result.provider_family.is_empty()
         || result.request_id.is_empty()

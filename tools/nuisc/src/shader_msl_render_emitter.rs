@@ -24,7 +24,8 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
         return Err("canonical inline WGSL render profile entry must be an identifier".to_owned());
     }
 
-    let summary = crate::shader_source::summarize_inline_wgsl_source(source)?;
+    let source = crate::shader_source::strip_comments_preserving_shape(source);
+    let summary = crate::shader_source::summarize_inline_wgsl_source(&source)?;
     if !summary.bindings.is_empty() {
         return Err(
             "canonical inline WGSL render lowering does not yet support resource bindings"
@@ -40,9 +41,10 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
         );
     }
 
-    let vertex_body = function_body(source, &vertex_entry)?;
+    let vertex_body = function_body(&source, &vertex_entry)?;
+    validate_fullscreen_vertex_signature(&source, &vertex_entry)?;
     validate_fullscreen_vertex_body(vertex_body)?;
-    let fragment_body = function_body(source, &fragment_entry)?;
+    let fragment_body = function_body(&source, &fragment_entry)?;
     let fragment_statements = lower_fragment_body(fragment_body)?;
     let source = render_msl(
         profile_entry,
@@ -119,13 +121,41 @@ fn function_body<'a>(source: &'a str, entry: &str) -> Result<&'a str, String> {
     ))
 }
 
+fn validate_fullscreen_vertex_signature(source: &str, entry: &str) -> Result<(), String> {
+    let marker = format!("fn {entry}");
+    let start = source
+        .find(&marker)
+        .ok_or("canonical vertex function is missing")?;
+    let header = source[start..].split('{').next().unwrap_or_default();
+    let compact = header
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>();
+    if compact != format!("fn{entry}(@builtin(vertex_index)vid:u32)->VsOut") {
+        return Err(
+            "unsupported canonical vertex signature; expected vertex_index input".to_owned(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_fullscreen_vertex_body(body: &str) -> Result<(), String> {
-    for required in ["vid", ".pos", ".uv", "return"] {
-        if !body.contains(required) {
-            return Err(format!(
-                "canonical fullscreen WGSL vertex stage is missing `{required}`"
-            ));
-        }
+    let canonical = concat!(
+        "varout:VsOut;",
+        "letx:f32=f32((vid<<1u)&2u);",
+        "lety:f32=f32(vid&2u);",
+        "out.pos=vec4<f32>(x*2.0-1.0,y*-2.0+1.0,0.0,1.0);",
+        "out.uv=vec2<f32>(x,y);returnout;"
+    );
+    let observed = body
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>();
+    if observed != canonical {
+        return Err(
+            "unsupported noncanonical WGSL vertex body; refusing to substitute fullscreen geometry"
+                .to_owned(),
+        );
     }
     Ok(())
 }

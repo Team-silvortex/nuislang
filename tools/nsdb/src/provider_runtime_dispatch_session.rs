@@ -238,12 +238,12 @@ impl ProviderRuntimeDispatchSession {
         adapter: &ProviderRunnerAdapter,
         runtime_invocation_count: usize,
     ) -> Result<NativeProviderOutputs, String> {
-        let mut outputs = self.execute_graph(output_dir, record, adapter)?;
+        let mut outputs = self.execute_graph(output_dir, record, adapter, None)?;
         let mut invocation_count = usize::from(!outputs.native_outputs.is_empty());
         let mut observations = runtime_dispatch_observations(0, &outputs.native_outputs)?;
         if !outputs.runtime_results.is_empty() {
             for invocation in 1..runtime_invocation_count {
-                let mut repeated = self.execute_graph(output_dir, record, adapter)?;
+                let mut repeated = self.execute_graph(output_dir, record, adapter, None)?;
                 observations.extend(runtime_dispatch_observations(
                     invocation,
                     &repeated.native_outputs,
@@ -267,15 +267,19 @@ impl ProviderRuntimeDispatchSession {
         output_dir: &Path,
         record: &NsdbDeviceProviderSampleRecordInfo,
         adapter: &ProviderRunnerAdapter,
+        runtime_arguments: Option<(
+            &yir_core::provider_runtime_ipc::DispatchTarget,
+            &yir_core::provider_runtime_ipc::DispatchArguments,
+        )>,
     ) -> Result<NativeProviderOutputs, String> {
         #[cfg(not(unix))]
         {
-            let _ = (output_dir, record, adapter);
+            let _ = (output_dir, record, adapter, runtime_arguments);
             Ok(NativeProviderOutputs::empty())
         }
         #[cfg(unix)]
         {
-            self.execute_graph_unix(output_dir, record, adapter)
+            self.execute_graph_unix(output_dir, record, adapter, runtime_arguments)
         }
     }
 
@@ -285,6 +289,10 @@ impl ProviderRuntimeDispatchSession {
         output_dir: &Path,
         record: &NsdbDeviceProviderSampleRecordInfo,
         adapter: &ProviderRunnerAdapter,
+        runtime_arguments: Option<(
+            &yir_core::provider_runtime_ipc::DispatchTarget,
+            &yir_core::provider_runtime_ipc::DispatchArguments,
+        )>,
     ) -> Result<NativeProviderOutputs, String> {
         if select_provider_execution_adapter(adapter.kind).is_none() {
             return Ok(NativeProviderOutputs::empty());
@@ -306,6 +314,11 @@ impl ProviderRuntimeDispatchSession {
                 &record.input_evidence,
                 &collection.requests,
             )?;
+        let arguments = prepare_runtime_request_arguments(
+            &mut collection.requests,
+            adapter,
+            runtime_arguments,
+        )?;
         let code_asset_identity = collection.code_asset_identity.clone();
         let compiled_code_asset_selection = collection.compiled_code_asset_selection.clone();
         let mut completed = CompletedProviderOutputs::new();
@@ -371,8 +384,12 @@ impl ProviderRuntimeDispatchSession {
             session.complete_request(&request.kernel.id)?;
             bind_session_output(&mut execution.summary, &session_request);
             bind_output_binding_summary(&mut execution.summary, request);
-            let runtime_result =
-                ProviderRuntimeResult::from_execution(provider_family, request, &execution)?;
+            let runtime_result = ProviderRuntimeResult::from_execution(
+                provider_family,
+                request,
+                &execution,
+                arguments.get(&request.kernel.id),
+            )?;
             bind_output_comparisons(output_dir, request, &mut execution)?;
             let primary_binding = request
                 .output_bindings
@@ -424,6 +441,58 @@ impl ProviderRuntimeDispatchSession {
             Ok(())
         }
     }
+}
+
+#[cfg(unix)]
+fn prepare_runtime_request_arguments(
+    requests: &mut [ProviderRequest],
+    adapter: &ProviderRunnerAdapter,
+    supplied: Option<(
+        &yir_core::provider_runtime_ipc::DispatchTarget,
+        &yir_core::provider_runtime_ipc::DispatchArguments,
+    )>,
+) -> Result<BTreeMap<String, yir_core::provider_runtime_ipc::DispatchArguments>, String> {
+    let mut prepared = BTreeMap::new();
+    // Preflight the whole collection before starting any dependency or opening a worker.
+    for request in requests {
+        let Some(binding) = request.runtime_result_binding.as_ref() else {
+            continue;
+        };
+        let arguments = match supplied {
+            Some((target, arguments))
+                if binding.source_yir_fnv1a64 == target.source_yir_fnv1a64
+                    && binding.module == target.module
+                    && binding.instruction == target.instruction
+                    && binding.node == target.node
+                    && binding.resource == target.resource =>
+            {
+                Some(arguments)
+            }
+            Some(_) => {
+                return Err("runtime argument target does not match admitted request".to_owned())
+            }
+            None => None,
+        };
+        let request_adapter = request
+            .adapter_binding
+            .as_ref()
+            .map(|binding| select_provider_runner_adapter(&binding.provider_family));
+        let prepare =
+            select_provider_execution_adapter(request_adapter.as_ref().unwrap_or(adapter).kind)
+                .and_then(|adapter| adapter.prepare_runtime_arguments)
+                .ok_or("registered provider does not support runtime argument binding")?;
+        let arguments = prepare(request, arguments)?;
+        if prepared
+            .insert(request.kernel.id.clone(), arguments)
+            .is_some()
+        {
+            return Err("runtime request identity is duplicated".to_owned());
+        }
+    }
+    if supplied.is_some() && prepared.len() != 1 {
+        return Err("runtime arguments require exactly one admitted request".to_owned());
+    }
+    Ok(prepared)
 }
 
 fn declares_provider_request_contract(input_evidence: &str) -> bool {

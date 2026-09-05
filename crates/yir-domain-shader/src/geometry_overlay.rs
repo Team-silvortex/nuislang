@@ -1,9 +1,9 @@
 use yir_core::{FrameSurface, IndexBuffer, ShaderBindingSet, Value, VertexBuffer, VertexLayout};
 
-pub(crate) struct GeometryInputs {
-    pub(crate) vertex_layout: VertexLayout,
-    pub(crate) vertex_buffer: VertexBuffer,
-    pub(crate) index_buffer: Option<IndexBuffer>,
+pub(crate) struct GeometryInputs<'a> {
+    pub(crate) vertex_layout: &'a VertexLayout,
+    pub(crate) vertex_buffer: &'a VertexBuffer,
+    pub(crate) index_buffer: Option<&'a IndexBuffer>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,14 +16,14 @@ enum VertexAttributeKind {
 
 pub(crate) fn resolve_geometry_inputs(
     bindings: &ShaderBindingSet,
-) -> Result<GeometryInputs, String> {
+) -> Result<GeometryInputs<'_>, String> {
     let vertex_layout = bindings
         .bindings
         .iter()
         .find(|binding| binding.kind == "vertex_layout_binding")
         .ok_or_else(|| "shader.draw_instanced bind_set is missing vertex_layout_binding".to_owned())
         .and_then(|binding| match binding.value.as_ref() {
-            Value::VertexLayout(layout) => Ok(layout.clone()),
+            Value::VertexLayout(layout) => Ok(layout),
             other => Err(format!(
                 "shader.draw_instanced expected vertex_layout binding, got {}",
                 other
@@ -35,7 +35,7 @@ pub(crate) fn resolve_geometry_inputs(
         .find(|binding| binding.kind == "vertex_binding")
         .ok_or_else(|| "shader.draw_instanced bind_set is missing vertex_binding".to_owned())
         .and_then(|binding| match binding.value.as_ref() {
-            Value::VertexBuffer(buffer) => Ok(buffer.clone()),
+            Value::VertexBuffer(buffer) => Ok(buffer),
             other => Err(format!(
                 "shader.draw_instanced expected vertex_buffer binding, got {}",
                 other
@@ -47,7 +47,7 @@ pub(crate) fn resolve_geometry_inputs(
         .iter()
         .find(|binding| binding.kind == "index_binding")
         .map(|binding| match binding.value.as_ref() {
-            Value::IndexBuffer(buffer) => Ok(buffer.clone()),
+            Value::IndexBuffer(buffer) => Ok(buffer),
             other => Err(format!(
                 "shader.draw_instanced expected index_buffer binding, got {}",
                 other
@@ -64,7 +64,7 @@ pub(crate) fn resolve_geometry_inputs(
 
 pub(crate) fn render_geometry_overlay(
     frame: &mut FrameSurface,
-    geometry: &GeometryInputs,
+    geometry: &GeometryInputs<'_>,
     vertex_count: usize,
     topology: &str,
 ) {
@@ -159,7 +159,7 @@ fn draw_topology_edges(rows: &mut [Vec<char>], samples: &[(usize, usize, char)],
     }
 }
 
-fn referenced_vertex_indices(geometry: &GeometryInputs, vertex_count: usize) -> Vec<usize> {
+fn referenced_vertex_indices(geometry: &GeometryInputs<'_>, vertex_count: usize) -> Vec<usize> {
     if let Some(index_buffer) = &geometry.index_buffer {
         index_buffer
             .indices
@@ -179,7 +179,7 @@ struct VertexSample {
 }
 
 fn interpret_vertex(
-    geometry: &GeometryInputs,
+    geometry: &GeometryInputs<'_>,
     attributes: &[VertexAttributeKind],
     vertex_index: usize,
 ) -> Option<VertexSample> {

@@ -188,7 +188,23 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     let runtime_stream_path = prepared.stream_path;
     let runtime_stream = fs::read_to_string(&runtime_stream_path)
         .expect("Nsdb should persist the provider-neutral runtime result stream");
-    assert!(runtime_stream.contains("schema = \"nuis-provider-runtime-result-stream-v1\""));
+    assert!(runtime_stream.contains("schema = \"nuis-provider-runtime-result-stream-v2\""));
+    assert!(runtime_stream.contains("vertex_count:u64:2"));
+    assert!(runtime_stream.contains("vertex_count:u64:3"));
+    assert!(runtime_stream.contains("instance_count:u64:1"));
+    assert!(runtime_stream.contains("instance_count:u64:2"));
+    assert!(runtime_stream.contains("instance_count:u64:3"));
+    let observed_arguments = runtime_stream
+        .lines()
+        .filter_map(|line| line.strip_prefix("dispatch_arguments = \""))
+        .map(|value| value.trim_end_matches('"'))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        observed_arguments,
+        [(3, 1), (2, 2), (3, 3)].map(|(vertices, instances)| format!(
+            "nuis-shader-unbound-draw-v1|height:u64:120|instance_count:u64:{instances}|vertex_count:u64:{vertices}|width:u64:160"
+        ))
+    );
     assert!(runtime_stream.contains("frame_count = 3"));
     assert!(runtime_stream.contains("module = \"shader\""));
     assert!(runtime_stream.contains("instruction = \"draw_instanced\""));
@@ -201,12 +217,21 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .find(|path| path.extension().and_then(|value| value.to_str()) == Some("yir"))
         .expect("compiled project YIR");
     let yir_source = fs::read_to_string(yir_path).unwrap();
-    let ppm = yir_runtime_host::render_module_to_ppm_bytes_with_provider_result_stream(
+    let trace = yir_runtime_host::execute_module_source_with_provider_result_stream(
         &yir_source,
-        1,
         &runtime_stream_path,
     )
     .expect("NS Nova lifecycle should consume all three physical provider frames");
+    let draw_events = trace
+        .events
+        .iter()
+        .filter(|event| event.starts_with("effect shader.draw_instanced "))
+        .collect::<Vec<_>>();
+    assert_eq!(draw_events.len(), 3);
+    assert!(draw_events
+        .iter()
+        .all(|event| event.ends_with("frame[160x120; rgba8_bytes=76800]")));
+    let ppm = yir_runtime_host::render_trace_to_ppm_bytes(&trace, 1).unwrap();
     let ppm_header = b"P6\n160 120\n255\n";
     assert!(ppm.starts_with(ppm_header));
     let last_rgba = fs::read(output_dir.join("nuis.runtime.provider-result.0002.bin")).unwrap();
@@ -217,6 +242,36 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .collect::<Vec<_>>();
     assert_eq!(&ppm[ppm_header.len()..], expected_rgb.as_slice());
     assert_eq!(fs::read(output_dir.join("live.ppm")).unwrap(), ppm);
+
+    let first_rgba = fs::read(output_dir.join("nuis.runtime.provider-result.0000.bin")).unwrap();
+    let second_rgba = fs::read(output_dir.join("nuis.runtime.provider-result.0001.bin")).unwrap();
+    assert!(
+        first_rgba != second_rgba,
+        "runtime vertex count must change actual device coverage"
+    );
+    assert!(
+        second_rgba
+            .chunks_exact(4)
+            .all(|pixel| pixel == [0, 0, 0, 255]),
+        "two vertices must leave the cleared target, not render fixed geometry"
+    );
+    assert!(
+        first_rgba == last_rgba,
+        "the same three-vertex coverage is deterministic"
+    );
+
+    fs::write(
+        &runtime_stream_path,
+        runtime_stream.replacen("vertex_count:u64:3", "vertex_count:u64:4", 1),
+    )
+    .unwrap();
+    let error = yir_runtime_host::execute_module_source_with_provider_result_stream(
+        &yir_source,
+        &runtime_stream_path,
+    )
+    .expect_err("persisted dispatch input drift must break stream identity");
+    assert!(error.contains("stream identity mismatch"));
+    fs::write(&runtime_stream_path, &runtime_stream).unwrap();
 
     let first_frame = output_dir.join("nuis.runtime.provider-result.0000.bin");
     let mut drifted_frame = fs::read(&first_frame).unwrap();

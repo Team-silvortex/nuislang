@@ -23,7 +23,7 @@ use std::{
     path::Path,
 };
 use yir_core::provider_runtime_ipc::{
-    DispatchFrame, DispatchTarget, Message, MAX_DISPATCHES, MAX_PAYLOAD_BYTES,
+    DispatchArguments, DispatchFrame, DispatchTarget, Message, MAX_DISPATCHES, MAX_PAYLOAD_BYTES,
 };
 
 /// Serve one bounded lifecycle. Device work starts only after a validated Dispatch message.
@@ -34,8 +34,8 @@ pub fn serve_runtime_provider_session(
     let (record, target, adapter) = admit_target(output_dir)?;
     Message::Hello(target.clone()).write_to(stream)?;
     let mut session = ProviderRuntimeDispatchSession::open(output_dir);
-    let execution = dispatch_loop(stream, &target, || {
-        session.execute_graph(output_dir, &record, &adapter)
+    let execution = dispatch_loop(stream, &target, |arguments| {
+        session.execute_graph(output_dir, &record, &adapter, Some((&target, arguments)))
     });
     let close = session.close();
     let result = execution.and_then(|(count, outputs)| {
@@ -140,7 +140,7 @@ fn admit_target(
 fn dispatch_loop(
     stream: &mut (impl Read + Write),
     target: &DispatchTarget,
-    mut execute: impl FnMut() -> Result<NativeProviderOutputs, String>,
+    mut execute: impl FnMut(&DispatchArguments) -> Result<NativeProviderOutputs, String>,
 ) -> Result<(usize, NativeProviderOutputs), String> {
     let mut count = 0;
     let mut retained = NativeProviderOutputs::empty();
@@ -151,11 +151,12 @@ fn dispatch_loop(
             Message::Dispatch {
                 sequence,
                 target: requested,
+                arguments,
             } => {
                 if requested != *target || sequence != count || count >= MAX_DISPATCHES {
                     return Err("runtime IPC request target or sequence mismatch".to_owned());
                 }
-                let mut outputs = execute()?;
+                let mut outputs = execute(&arguments)?;
                 let [result] = outputs.runtime_results.as_slice() else {
                     return Err("runtime IPC graph must return exactly one bound result".to_owned());
                 };
@@ -164,6 +165,7 @@ fn dispatch_loop(
                     || result.instruction != target.instruction
                     || result.node != target.node
                     || result.resource != target.resource
+                    || result.arguments != arguments
                 {
                     return Err("runtime IPC result target drift".to_owned());
                 }
@@ -177,6 +179,7 @@ fn dispatch_loop(
                     .ok_or("runtime IPC replay storage budget exceeded")?;
                 let reply = Message::Frame(DispatchFrame {
                     sequence,
+                    arguments: result.arguments.clone(),
                     request_id: result.request_id.clone(),
                     provider_family: result.provider_family.clone(),
                     element_type: result.element_type.clone(),

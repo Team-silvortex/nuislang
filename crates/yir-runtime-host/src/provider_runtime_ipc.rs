@@ -3,7 +3,9 @@ use super::provider_result_stream::{
 };
 use std::{os::unix::net::UnixStream, path::Path, time::Duration};
 use yir_core::{
-    provider_runtime_ipc::{hash_bytes, DispatchTarget, Message, MAX_DISPATCHES},
+    provider_runtime_ipc::{
+        hash_bytes, DispatchArguments, DispatchTarget, Message, MAX_DISPATCHES,
+    },
     Node,
 };
 
@@ -52,13 +54,18 @@ impl ProviderRuntimeClient {
         self.target.matches(node)
     }
 
-    pub(super) fn take(&mut self, node: &Node) -> Result<ProviderResultFrame, String> {
+    pub(super) fn take(
+        &mut self,
+        node: &Node,
+        arguments: &DispatchArguments,
+    ) -> Result<ProviderResultFrame, String> {
         if !self.targets(node) || self.sequence >= MAX_DISPATCHES {
             return Err("runtime IPC target or invocation limit rejected".to_owned());
         }
         Message::Dispatch {
             sequence: self.sequence,
             target: self.target.clone(),
+            arguments: arguments.clone(),
         }
         .write_to(&mut self.stream)?;
         let frame = match Message::read_from(&mut self.stream)? {
@@ -68,6 +75,9 @@ impl ProviderRuntimeClient {
             }
             _ => return Err("runtime IPC reply sequence or message mismatch".to_owned()),
         };
+        if frame.arguments != *arguments {
+            return Err("runtime IPC reply dispatch arguments mismatch".to_owned());
+        }
         if frame.element_type != "u8"
             || frame.layout != "image-2d-row-major:pixel-format=rgba8"
             || frame.shape.len() != 2

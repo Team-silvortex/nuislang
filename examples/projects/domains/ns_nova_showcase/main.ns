@@ -52,8 +52,13 @@ mod cpu Main {
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
     let gpu_packet: ShaderPacketWindow = data_profile_send_uplink("FabricPlane", packet);
+    let pass: Pass = shader_profile_begin_pass("PixelMagicRenderSurface");
+    let vertex_count: i64 =
+      shader_profile_vertex_count("PixelMagicRenderSurface") - 1 - frame_index % 2;
+    let instance_count: i64 =
+      shader_profile_instance_count("PixelMagicRenderSurface") + frame_index;
     let render_result: FrameStatus =
-      shader_result(shader_profile_render("PixelMagicRenderSurface", gpu_packet));
+      shader_result(shader_draw_instanced(pass, gpu_packet, vertex_count, instance_count));
     let render_ready: bool = shader_frame_ready(render_result);
     let render_ready_flag: i64 = if render_ready { 1 } else { 0 };
     let completion: NovaFrameResultHandle = NovaAppRuntime.capture_frame_result(

@@ -1,21 +1,20 @@
+use super::ball_packet::BallPacket;
 use super::control_panel_extended_summary::draw_control_panel_extended_summary;
 use super::control_panel_layout::resolve_control_panel_layout;
 use super::control_panel_summary::draw_control_panel_summary;
 use super::control_panel_widgets::draw_control_panel_widgets;
-use super::parse_ball_packet;
 use super::scene_preview::draw_scene_preview;
 use super::surface_primitives::{
     control_panel_accent, draw_box, draw_card, fill_panel_background, fill_rect, put_text,
     BoxGlyphs,
 };
-use yir_core::{FrameSurface, Value};
+use yir_core::FrameSurface;
 
 pub(crate) fn draw_control_panel_surface(
-    value: &Value,
+    packet: &BallPacket,
     width: usize,
     height: usize,
-) -> Result<FrameSurface, String> {
-    let packet = parse_ball_packet(value, "shader.draw_instanced")?;
+) -> FrameSurface {
     let layout = resolve_control_panel_layout(
         width,
         height,
@@ -114,17 +113,17 @@ pub(crate) fn draw_control_panel_surface(
             '.'
         },
     );
-    draw_control_panel_summary(&mut rows, &layout, &packet);
+    draw_control_panel_summary(&mut rows, &layout, packet);
     draw_scene_preview(
         &mut rows,
         viewport_left,
         viewport_top,
         viewport_right,
         viewport_bottom,
-        &packet,
+        packet,
         accent,
     );
-    draw_control_panel_extended_summary(&mut rows, panel_top, panel_right, &packet);
+    draw_control_panel_extended_summary(&mut rows, panel_top, panel_right, packet);
     if layer_hidden {
         put_text(
             &mut rows,
@@ -167,16 +166,16 @@ pub(crate) fn draw_control_panel_surface(
         ),
     );
 
-    draw_control_panel_widgets(&mut rows, &packet, &layout, accent);
+    draw_control_panel_widgets(&mut rows, packet, &layout, accent);
 
     let rows = rows
         .into_iter()
         .map(|row| row.into_iter().collect::<String>())
         .collect::<Vec<_>>();
-    Ok(FrameSurface {
+    FrameSurface {
         width,
         height,
         rows,
         rgba8: None,
-    })
+    }
 }

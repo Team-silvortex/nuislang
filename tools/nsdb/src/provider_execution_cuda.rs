@@ -28,6 +28,7 @@ struct CudaDeviceSelectionEvidence {
 
 pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
     ProviderExecutionAdapterRegistration {
+        prepare_runtime_arguments: None,
         registry_contract: PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT,
         adapter_kind: "cuda-ptx-real-device-runner",
         requires_worker_descriptors: true,

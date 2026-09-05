@@ -18,6 +18,7 @@ use std::path::Path;
 
 pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
     ProviderExecutionAdapterRegistration {
+        prepare_runtime_arguments: None,
         registry_contract: PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT,
         adapter_kind: "coreml-real-device-runner",
         requires_worker_descriptors: true,

@@ -6,11 +6,12 @@ use std::{
 };
 
 use yir_core::{
-    ExecutionState, FrameSurface, InstructionSemantics, Node, ProviderCompletionRegistration,
-    ProviderPhysicalCompletion, RegisteredMod, Resource, Value,
+    provider_runtime_ipc::DispatchArguments, ExecutionState, FrameSurface, InstructionSemantics,
+    Node, ProviderCompletionRegistration, ProviderPhysicalCompletion, RegisteredMod, Resource,
+    Value,
 };
 
-pub const PROVIDER_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v1";
+pub const PROVIDER_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v2";
 pub const PROVIDER_RESULT_STREAM_ENV: &str = "NUIS_YIR_PROVIDER_RESULT_STREAM";
 const MAX_RUNTIME_RESULTS: usize = 256;
 
@@ -51,6 +52,7 @@ struct ProviderResultStream {
 }
 
 pub(super) struct ProviderResultFrame {
+    arguments: DispatchArguments,
     request_id: String,
     provider_family: String,
     module: String,
@@ -76,6 +78,7 @@ impl ProviderResultFrame {
     ) -> Result<Self, String> {
         let completion = ProviderPhysicalCompletion::parse(&frame.completion_wire)?;
         let result = Self {
+            arguments: frame.arguments,
             request_id: frame.request_id,
             provider_family: frame.provider_family,
             module: target.module.clone(),
@@ -111,11 +114,15 @@ impl ProviderResultSource {
             Self::Live(client) => client.targets(node),
         }
     }
-    fn take(&mut self, node: &Node) -> Result<ProviderResultFrame, String> {
+    fn take(
+        &mut self,
+        node: &Node,
+        arguments: &DispatchArguments,
+    ) -> Result<ProviderResultFrame, String> {
         match self {
-            Self::Replay(queue) => queue.take(node),
+            Self::Replay(queue) => queue.take(node, arguments),
             #[cfg(unix)]
-            Self::Live(client) => client.take(node),
+            Self::Live(client) => client.take(node, arguments),
         }
     }
     fn finish(&mut self) -> Result<(), String> {
@@ -207,8 +214,12 @@ impl ProviderResultQueue {
         ))
     }
 
-    fn take(&mut self, node: &Node) -> Result<ProviderResultFrame, String> {
-        let frame = self.frames.pop_front().ok_or_else(|| {
+    fn take(
+        &mut self,
+        node: &Node,
+        arguments: &DispatchArguments,
+    ) -> Result<ProviderResultFrame, String> {
+        let frame = self.frames.front().ok_or_else(|| {
             format!(
                 "provider runtime result stream is exhausted at `{}`",
                 node.name
@@ -231,7 +242,10 @@ impl ProviderResultQueue {
                 node.resource,
             ));
         }
-        Ok(frame)
+        if frame.arguments != *arguments {
+            return Err("provider runtime result dispatch arguments mismatch".to_owned());
+        }
+        Ok(self.frames.pop_front().expect("validated provider frame"))
     }
 
     fn ensure_consumed(&self) -> Result<(), String> {
@@ -286,37 +300,33 @@ impl RegisteredMod for ProviderResultShaderMod {
         resource: &Resource,
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
-        let value = yir_domain_shader::ShaderMod.execute(node, resource, state)?;
         let targets = self
             .state
             .lock()
             .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
             .targets(node);
         if !targets {
-            return Ok(value);
+            return yir_domain_shader::ShaderMod.execute(node, resource, state);
         }
-        let reference = match value {
-            Value::Frame(frame) => frame,
-            other => {
-                return Err(format!(
-                    "provider runtime result target `{}` produced {other}, not frame",
-                    node.name
-                ))
-            }
-        };
+        let descriptor =
+            yir_domain_shader::ShaderMod.validate_draw_instanced(node, resource, state)?;
+        let arguments = descriptor.provider_arguments()?;
         let frame = self
             .state
             .lock()
             .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
-            .take(node)?;
-        if frame.shape != [reference.width, reference.height] {
+            .take(node, &arguments)?;
+        if frame.shape != [descriptor.width(), descriptor.height()] {
             return Err(format!(
                 "provider runtime result dimensions for `{}` disagree with YIR",
                 node.name
             ));
         }
+        let surface =
+            FrameSurface::from_rgba8(descriptor.width(), descriptor.height(), frame.payload)?;
         state.stage_provider_physical_completion(node, frame.completion)?;
-        FrameSurface::from_rgba8(reference.width, reference.height, frame.payload).map(Value::Frame)
+        yir_domain_shader::ShaderMod.record_draw_instanced(node, resource, state, &surface);
+        Ok(Value::Frame(surface))
     }
 }
 
@@ -373,6 +383,7 @@ fn parse_frame(
     let completion_wire = string_field(fields, "completion_wire")?;
     let completion = ProviderPhysicalCompletion::parse(&completion_wire)?;
     let frame = ProviderResultFrame {
+        arguments: DispatchArguments::parse(&string_field(fields, "dispatch_arguments")?)?,
         request_id: string_field(fields, "request_id")?,
         provider_family: string_field(fields, "provider_family")?,
         module: string_field(fields, "module")?,
@@ -394,6 +405,7 @@ fn parse_frame(
 }
 
 fn validate_frame(frame: &ProviderResultFrame) -> Result<(), String> {
+    frame.arguments.to_wire()?;
     let strings = [
         frame.request_id.as_str(),
         frame.provider_family.as_str(),
@@ -442,6 +454,13 @@ fn stream_hash(source_yir_fnv1a64: &str, frames: &[ProviderResultFrame]) -> Stri
             frame.payload_hash,
             frame.completion_wire,
         ));
+        material.push('\n');
+        material.push_str(
+            &frame
+                .arguments
+                .to_wire()
+                .expect("validated runtime arguments"),
+        );
     }
     fnv1a64_hex(material.as_bytes())
 }
@@ -529,3 +548,7 @@ fn valid_hash(value: &str) -> bool {
         .strip_prefix("0x")
         .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
+
+#[cfg(all(test, unix))]
+#[path = "provider_result_draw_tests.rs"]
+mod draw_tests;

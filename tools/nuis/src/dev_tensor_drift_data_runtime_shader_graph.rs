@@ -2,6 +2,115 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "shader-canonical-vertex-rejects-substitution",
+        path: "tools/nuisc/src/shader_msl_render_emitter_tests.rs",
+        required_patterns: &[
+            "rejects_vertex_semantics_that_the_canonical_emitter_would_discard",
+            "canonical_vertex_comments_do_not_change_lowering_or_fake_entry_detection",
+            "refusing to substitute fullscreen geometry",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "runtime-dispatch-typed-scalar-wire",
+        path: "crates/yir-core/src/provider_runtime_arguments.rs",
+        required_patterns: &[
+            "pub struct DispatchArguments",
+            "BTreeMap<String, u64>",
+            "runtime dispatch arguments are not canonical",
+            "runtime dispatch argument is duplicated",
+            "arguments_are_typed_bounded_and_canonical",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "registered-runtime-argument-admission",
+        path: "tools/nsdb/src/provider_execution_adapter.rs",
+        required_patterns: &[
+            "prepare_runtime_arguments: Option<PrepareRuntimeArguments>",
+            "type PrepareRuntimeArguments",
+            "Option<&yir_core::provider_runtime_ipc::DispatchArguments>",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "metal-bounded-runtime-draw-arguments",
+        path: "tools/nsdb/src/provider_execution_metal_draw.rs",
+        required_patterns: &[
+            "prepare_runtime_arguments",
+            "ShaderDrawArguments::from_dispatch",
+            "Metal runtime draw dimensions differ from admitted output",
+            "render_draw_counts",
+            "Metal unbound draw count exceeds admitted vertex/instance budget",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "metal-runtime-draw-admission-regression",
+        path: "tools/nsdb/src/provider_execution_metal_draw_tests.rs",
+        required_patterns: &[
+            "runtime_draw_binding_changes_only_admitted_scalars",
+            "invalid_runtime_draw_binding_does_not_mutate_admitted_request",
+            "offline_defaults_and_runtime_counts_share_validation",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-dynamic-count-profile-provenance",
+        path: "tools/nuisc/src/project/shader_validation_flow_tests.rs",
+        required_patterns: &[
+            "dynamic_counts_retain_profile_value_provenance",
+            "unrelated_profile_operands_and_cycles_do_not_authorize_draw_counts",
+            "draw_count_uses_profile",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-registered-draw-validation",
+        path: "crates/yir-domain-shader/src/draw_request.rs",
+        required_patterns: &[
+            "pub struct ShaderDrawDescriptor",
+            "pub fn validate_draw_instanced",
+            "pub fn record_draw_instanced",
+            "describe_shader_node(node, resource)?",
+            "prepare_render_pass",
+            "empty or overflowing output dimensions",
+            "nuis-shader-unbound-draw-v1",
+            "pub fn provider_arguments",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-validated-reference-rasterization-boundary",
+        path: "crates/yir-domain-shader/src/render_pass.rs",
+        required_patterns: &[
+            "ValidatedRenderPass",
+            "rasterize_reference",
+            "Option<GeometryInputs<'a>>",
+            "ShaderDrawDescriptor::new",
+            "vertex layout size overflows",
+            "parse_ball_packet(packet, packet_operation)?",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-borrowed-draw-validation-regression",
+        path: "crates/yir-domain-shader/src/draw_request_tests.rs",
+        required_patterns: &[
+            "descriptor_uses_pass_extent_without_reference_rasterization_or_effects",
+            "reference_path_retains_pixels_and_emits_one_event",
+            "assert_shared_rejection",
+            "binding_validation_borrows_inputs_and_checks_geometry_bounds",
+            "empty_and_overflowing_extents_fail_before_any_rasterization",
+            "std::ptr::eq",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "runtime-provider-draw-without-cpu-reference-regression",
+        path: "crates/yir-runtime-host/src/provider_result_draw_tests.rs",
+        required_patterns: &[
+            "provider_frame_uses_pass_extent_not_ascii_preview_minimum_and_records_actual_pixels",
+            "invalid_request_fails_before_consuming_provider_result_or_emitting_draw",
+            "returned_dimension_drift_does_not_stage_completion_or_emit_draw",
+            "unbound_draw_keeps_reference_execution_and_does_not_consume_provider_frame",
+            "frame[1x1; rgba8_bytes=4]",
+            "replay_rejects_changed_runtime_counts_before_consuming_frame",
+            "unsupported_pass_projection_rejects_before_consuming_frame",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-shader-vulkan-device-sample-registration",
         path: "tools/nuis/src/artifact_device_sample_shader_vulkan.rs",
         required_patterns: &[

@@ -6,6 +6,7 @@ mod control_panel_summary;
 mod control_panel_surface;
 mod control_panel_widgets;
 mod describe;
+mod draw_request;
 mod execute_core;
 mod execute_effects;
 mod flow_state;
@@ -31,11 +32,11 @@ mod texture_sampling;
 use ball_packet::BallPacket;
 use control_panel_surface::draw_control_panel_surface;
 use describe::describe_shader_node;
+pub use draw_request::{ShaderDrawArguments, ShaderDrawDescriptor, SHADER_UNBOUND_DRAW_CONTRACT};
 use execute_core::execute_shader_core_node;
 use execute_effects::execute_shader_effect_node;
 use flow_state::parse_shader_flow_state;
 use parse_ball_packet::parse_ball_packet;
-use render_pass::draw_render_pass_surface;
 use yir_core::{
     ExecutionState, InstructionSemantics, Node, ProviderCompletionRegistration, RegisteredMod,
     Resource, Value, YirResultFamily,

@@ -4,6 +4,7 @@ use super::*;
 fn framed_ipc_rejects_corruption_truncation_and_unbounded_allocation() {
     let frame = Message::Frame(DispatchFrame {
         sequence: 2,
+        arguments: DispatchArguments::parse("test.v1|count:u64:4").unwrap(),
         request_id: "draw".to_owned(),
         provider_family: "test:device".to_owned(),
         element_type: "u8".to_owned(),
@@ -68,7 +69,8 @@ fn target_admission_rejects_protocol_and_field_injection() {
     };
     assert!(Message::Dispatch {
         sequence: 0,
-        target: injected
+        target: injected,
+        arguments: DispatchArguments::parse("test.v1|count:u64:4").unwrap(),
     }
     .write_to(&mut Vec::new())
     .is_err());

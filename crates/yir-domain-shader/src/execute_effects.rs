@@ -1,5 +1,6 @@
 use super::{
-    draw_render_pass_surface, frame_surface,
+    draw_request::execute_draw_instanced,
+    frame_surface,
     sphere_render::{draw_ball_surface, draw_sphere_surface_with_size},
 };
 use yir_core::{ExecutionState, FrameSurface, Node, Resource, Value};
@@ -76,52 +77,6 @@ fn execute_dispatch(
     Ok(value)
 }
 
-fn execute_draw_instanced(
-    node: &Node,
-    resource: &Resource,
-    state: &mut ExecutionState,
-) -> Result<Value, String> {
-    let pass = match state.expect_value(&node.op.args[0])?.clone() {
-        Value::RenderPass(pass) => pass,
-        other => {
-            return Err(format!(
-                "shader.draw_instanced expects render pass, got {}",
-                other
-            ))
-        }
-    };
-    let packet = unwrap_data_window(state.expect_value(&node.op.args[1])?.clone());
-    let vertex_count = resolve_draw_count(state, node, 2, "vertex_count")?;
-    let instance_count = resolve_draw_count(state, node, 3, "instance_count")?;
-    let bindings = match node.op.args.get(4) {
-        Some(name) => match state.expect_value(name)?.clone() {
-            Value::BindingSet(bindings) => Some(bindings),
-            other => {
-                return Err(format!(
-                    "shader.draw_instanced expects bind_set value, got {}",
-                    other
-                ))
-            }
-        },
-        None => None,
-    };
-    let frame = draw_render_pass_surface(
-        &pass,
-        &packet,
-        vertex_count,
-        instance_count,
-        bindings.as_ref(),
-    )?;
-    push_shader_event(
-        node,
-        resource,
-        state,
-        "draw_instanced",
-        &Value::Frame(frame.clone()),
-    );
-    Ok(Value::Frame(frame))
-}
-
 fn execute_draw_ball(
     node: &Node,
     resource: &Resource,
@@ -166,12 +121,12 @@ fn execute_print(
     Ok(Value::Unit)
 }
 
-fn push_shader_event(
+pub(crate) fn push_shader_event(
     node: &Node,
     resource: &Resource,
     state: &mut ExecutionState,
     instruction: &str,
-    value: &Value,
+    value: &impl std::fmt::Display,
 ) {
     state.push_resource_event(
         resource,
@@ -184,32 +139,4 @@ fn push_shader_event(
 
 fn draw_sphere_surface(value: &Value) -> Result<FrameSurface, String> {
     draw_sphere_surface_with_size(value, 48, 32)
-}
-
-fn unwrap_data_window(value: Value) -> Value {
-    match value {
-        Value::DataWindow(window) => (*window.base).clone(),
-        other => other,
-    }
-}
-
-fn resolve_draw_count(
-    state: &ExecutionState,
-    node: &Node,
-    index: usize,
-    label: &str,
-) -> Result<i64, String> {
-    let raw = &node.op.args[index];
-    if let Ok(value) = raw.parse::<i64>() {
-        return Ok(value);
-    }
-    match state.expect_value(raw)? {
-        Value::Int(value) => Ok(*value),
-        Value::I32(value) => Ok(*value as i64),
-        Value::Bool(value) => Ok(if *value { 1 } else { 0 }),
-        other => Err(format!(
-            "node `{}` expects integer-like {} value, got {}",
-            node.name, label, other
-        )),
-    }
 }

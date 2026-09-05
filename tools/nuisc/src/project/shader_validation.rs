@@ -286,6 +286,11 @@ pub(super) fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Re
         ));
     }
 
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
     let draws = module
         .nodes
         .iter()
@@ -293,12 +298,11 @@ pub(super) fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Re
             node.op
                 .is_shader_semantic_op(SemanticOp::ShaderDrawInstanced)
         })
-        .map(|node| node.name.as_str())
         .collect::<Vec<_>>();
     let draw_wired = draws.iter().any(|draw| {
-        has_edge_to(module, &vertex_count, draw)
-            && has_edge_to(module, &instance_count, draw)
-            && has_edge_to(module, &packet_field_count, draw)
+        draw_count_uses_profile(&nodes, draw, 2, &vertex_count)
+            && draw_count_uses_profile(&nodes, draw, 3, &instance_count)
+            && has_edge_to(module, &packet_field_count, &draw.name)
     });
     if !draw_wired {
         return Err(format!(
@@ -375,6 +379,37 @@ pub(super) fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
         .iter()
         .any(|edge| edge.from == from && edge.to == to)
 }
+
+fn draw_count_uses_profile<'a>(
+    nodes: &BTreeMap<&'a str, &'a yir_core::Node>,
+    draw: &'a yir_core::Node,
+    argument: usize,
+    profile: &str,
+) -> bool {
+    let Some(value) = draw.op.args.get(argument) else {
+        return false;
+    };
+    let mut pending = vec![value.as_str()];
+    let mut seen = BTreeSet::new();
+    while let Some(value) = pending.pop() {
+        if !seen.insert(value) {
+            continue;
+        }
+        let Some(node) = nodes.get(value) else {
+            continue;
+        };
+        if value == profile {
+            return true;
+        }
+        // Follow the count's value operands, never unrelated scheduling or packet edges.
+        pending.extend(node.op.args.iter().map(String::as_str));
+    }
+    false
+}
+
+#[cfg(test)]
+#[path = "shader_validation_flow_tests.rs"]
+mod flow_tests;
 
 pub(super) fn validate_shader_target_projection(
     project: &LoadedProject,

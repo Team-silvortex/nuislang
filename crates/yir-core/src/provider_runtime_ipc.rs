@@ -1,6 +1,10 @@
 use std::io::{Read, Write};
 
-pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v1";
+#[path = "provider_runtime_arguments.rs"]
+mod arguments;
+pub use arguments::DispatchArguments;
+
+pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v2";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";
 pub const MAX_DISPATCHES: usize = 256;
 pub const MAX_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
@@ -50,6 +54,7 @@ impl DispatchTarget {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DispatchFrame {
     pub sequence: usize,
+    pub arguments: DispatchArguments,
     pub request_id: String,
     pub provider_family: String,
     pub element_type: String,
@@ -66,6 +71,7 @@ pub enum Message {
     Dispatch {
         sequence: usize,
         target: DispatchTarget,
+        arguments: DispatchArguments,
     },
     Frame(DispatchFrame),
     Finish(usize),
@@ -83,10 +89,15 @@ impl Message {
                 fields.push("hello".to_owned());
                 fields.extend(target.fields().map(str::to_owned));
             }
-            Self::Dispatch { sequence, target } => {
+            Self::Dispatch {
+                sequence,
+                target,
+                arguments,
+            } => {
                 DispatchTarget::parse(&target.fields())?;
                 fields.extend(["dispatch".to_owned(), sequence.to_string()]);
                 fields.extend(target.fields().map(str::to_owned));
+                fields.push(arguments.to_wire()?);
             }
             Self::Frame(frame) => {
                 validate_frame(frame)?;
@@ -107,6 +118,7 @@ impl Message {
                     frame.payload.len().to_string(),
                     hash_bytes(&frame.payload),
                     frame.completion_wire.clone(),
+                    frame.arguments.to_wire()?,
                 ]);
                 payload = &frame.payload;
             }
@@ -148,14 +160,15 @@ impl Message {
             Some("hello") if fields.len() == 7 => {
                 Ok(Self::Hello(DispatchTarget::parse(&fields[2..])?))
             }
-            Some("dispatch") if fields.len() == 8 => Ok(Self::Dispatch {
+            Some("dispatch") if fields.len() == 9 => Ok(Self::Dispatch {
                 sequence: number(fields[2])?,
-                target: DispatchTarget::parse(&fields[3..])?,
+                target: DispatchTarget::parse(&fields[3..8])?,
+                arguments: DispatchArguments::parse(fields[8])?,
             }),
             Some("finish") if fields.len() == 3 => Ok(Self::Finish(number(fields[2])?)),
             Some("closed") if fields.len() == 3 => Ok(Self::Closed(number(fields[2])?)),
             Some("rejected") if fields.len() == 3 => Ok(Self::Rejected(fields[2].to_owned())),
-            Some("frame") if fields.len() == 12 => {
+            Some("frame") if fields.len() == 13 => {
                 let length = number(fields[9])?;
                 if length == 0 || length > MAX_PAYLOAD_BYTES {
                     return Err("runtime IPC payload size is invalid".to_owned());
@@ -167,6 +180,7 @@ impl Message {
                 }
                 let frame = DispatchFrame {
                     sequence: number(fields[2])?,
+                    arguments: DispatchArguments::parse(fields[12])?,
                     request_id: fields[3].to_owned(),
                     provider_family: fields[4].to_owned(),
                     element_type: fields[5].to_owned(),

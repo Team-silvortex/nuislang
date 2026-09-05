@@ -79,6 +79,7 @@ production_metal_aot_execution_status = "160x120-rgba8-worker-fence-verified"
 runtime_result_stream_status = "hash-bound-three-frame-rgba8-and-physical-fence-verified"
 run_artifact_runtime_result_preparation_status = "target-discovery-without-provider-preexecution-verified"
 child_lifecycle_ipc_status = "separate-process-three-live-draw-dispatches-and-replay-equivalence-verified"
+provider_draw_validation_status = "shared-borrowed-validation-without-reference-rasterization-verified"
 persistent_runtime_dispatch_session_status = "three-frame-single-session-single-worker-monotonic-sequence-verified"
 runtime_adapter_cache_status = "compiled-hit-hit-across-frame-dispatch-verified"
 reference_function_execution_status = "function-table-bound-helper-and-aggregate-loop-verified"
@@ -89,7 +90,7 @@ backend_execution_closure_claimed = false
 dynamic_shader_ready_bridge_claimed = false
 
 [runtime_ipc]
-contract = "nuis-yir-provider-runtime-ipc-v1"
+contract = "nuis-yir-provider-runtime-ipc-v2"
 contract_owner = "yir-core"
 transport = "private-unix-stream"
 dispatch_trigger = "child-yir-node-ipc"
@@ -103,7 +104,33 @@ max_payload_bytes = 16777216
 max_replay_bytes = 67108864
 invalid_message_policy = "reject-before-device-dispatch"
 disconnect_policy = "close-session-without-success-acknowledgement"
-per_draw_reference_validation_retained = true
+per_draw_reference_validation_retained = false
+registered_draw_validation_retained = true
+legacy_packet_validation_retained = true
+provider_draw_event_source = "returned-provider-frame"
+provider_frame_extent_source = "validated-render-pass-target-viewport"
+
+[runtime_arguments]
+contract = "nuis-shader-unbound-draw-v1"
+wire_owner = "yir-core"
+semantic_owner = "shader-nustar"
+admission_owner = "registered-execution-adapter"
+scalar_type = "u64"
+fields = ["width", "height", "vertex_count", "instance_count"]
+profile_provenance = "count-value-operand-dependency-not-direct-edge-only"
+result_stream_contract = "nuis-provider-runtime-result-stream-v2"
+replay_identity = "source-target-canonical-arguments-frame-bytes-and-completion"
+legacy_v1_policy = "reject-rebuild-and-rerun"
+width_height_policy = "must-match-admitted-output-capability"
+current_projection = "unbound-rgba8_unorm-triangle_strip"
+metal_vertex_count_range = [1, 4]
+metal_instance_count_range = [1, 256]
+unsupported_resource_policy = "reject-before-dispatch-or-replay-consumption"
+code_asset_policy = "runtime-scalars-cannot-replace-verified-code-or-entry-set"
+live_vertex_counts = [3, 2, 3]
+live_instance_counts = [1, 2, 3]
+live_pixel_coverage = "three-vertex-full-frames-match-two-vertex-frame-stays-cleared"
+noncanonical_vertex_body_policy = "reject-rather-than-substitute-fullscreen-geometry"
 
 [framework_package]
 galaxy_manifest = "examples/projects/domains/ns_nova_showcase/galaxy.toml"
@@ -152,7 +179,11 @@ multi_target_provider_result_schedule = false
 provider_result_payload_tamper_rejection = true
 self_contained_host_runner_result_injection = false
 resource_bound_gpu_rasterization = false
+runtime_draw_scalar_binding = true
+runtime_draw_argument_replay_validation = true
+dynamic_render_target_extent = false
+legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "replace per-draw reference rasterization with registered validation, then extend live lifecycle dispatch to runtime resource bindings and multiple targets without backend-specific framework branches"
-validation = "retain the separate-process three-frame live/replay equivalence regression, single worker and monotonic request clock, reject sequence/layout/source drift before presentation, and preserve graph GLM release and bounded cancellation; whole-app session continuity, self-contained injection, and non-Metal parity remain open"
+action = "add a registered typed immutable resource binding with content identity and bounded upload, without encoding backend policy in the shared IPC or lifecycle"
+validation = "prove changed Nuis-owned resource bytes affect the real GPU frame, bind the exact type/shape/bytes into dispatch and replay, and reject mismatched resource or code authority before execution; retain dynamic count coverage, live/replay equality, single-worker cache reuse, physical completion, and per-graph GLM release"

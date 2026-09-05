@@ -283,7 +283,7 @@ fn update_brace_depth(line: &str, mut depth: usize) -> usize {
     depth
 }
 
-fn strip_comments_preserving_shape(source: &str) -> String {
+pub(crate) fn strip_comments_preserving_shape(source: &str) -> String {
     let chars = source.chars().collect::<Vec<_>>();
     let mut out = String::with_capacity(source.len());
     let mut index = 0usize;

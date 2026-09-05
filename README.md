@@ -33,7 +33,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `27/27` registered coordinates and
-`863/863` passing drift checks. The compiler data model, stage-neutral boundary,
+`873/873` passing drift checks. The compiler data model, stage-neutral boundary,
 bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
 bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
 forwarding, chunked typed payload projection, and canonical reversible active
@@ -91,8 +91,18 @@ A separate-process runtime regression now requests three real Metal frames as th
 child reaches each YIR draw node through bounded provider-neutral IPC, rather than
 pre-executing the module. They share one Nsdb session, Nuis worker PID, and adapter
 cache while retaining independent graph-output release and physical completion;
-live pixels match the persisted replay byte-for-byte. Per-draw reference validation,
-whole-app session continuity, resource bindings, self-contained host-runner injection,
+live pixels match the persisted replay byte-for-byte. Bound live and replay draws
+now reuse Shader-owned borrowed request validation without rasterizing a CPU
+reference image; their events describe the returned RGBA8 frame, and dimensions
+come from the render pass rather than an ASCII preview's minimum size. CPU-only
+reference rendering remains available. Typed IPC v2 now carries runtime vertex
+and instance counts from the Nuis loop into registered device dispatch and
+hash-bound replay. On M2, `3/2/3` vertices produce full/clear/full frames while
+retaining live/replay equality and adapter cache reuse. Unknown
+bindings or unsupported pass projections fail closed; code-asset authority and
+output extents remain fixed. The canonical vertex emitter rejects unsupported
+body changes instead of substituting fullscreen geometry. Typed resource uploads, whole-app session
+continuity, self-contained host-runner injection,
 and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are
 preserved, while physical DPU/IPU/RDMA certification is deferred until suitable

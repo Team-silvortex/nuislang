@@ -62,14 +62,20 @@ static BOOL parseDimension(const char *raw, NSUInteger *value) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc != 6) {
-            return fail(@"usage: metal_rgba8_render <msl-source> <vertex> <fragment> <width> <height>");
+        if (argc != 8) {
+            return fail(@"usage: metal_rgba8_render <msl-source> <vertex> <fragment> <width> <height> <vertices> <instances>");
         }
         NSUInteger width = 0;
         NSUInteger height = 0;
+        NSUInteger vertexCount = 0;
+        NSUInteger instanceCount = 0;
         if (!parseDimension(argv[4], &width) || !parseDimension(argv[5], &height) ||
             width > NSUIntegerMax / 4 || height > NSUIntegerMax / (width * 4)) {
             return fail(@"invalid Metal RGBA8 render dimensions");
+        }
+        if (!parseDimension(argv[6], &vertexCount) || vertexCount > 4 ||
+            !parseDimension(argv[7], &instanceCount) || instanceCount > 256) {
+            return fail(@"invalid Metal unbound draw counts");
         }
 
         NSError *error = nil;
@@ -128,7 +134,8 @@ int main(int argc, const char *argv[]) {
             [command renderCommandEncoderWithDescriptor:renderPass];
         if (encoder == nil) return fail(@"Metal render encoder unavailable");
         [encoder setRenderPipelineState:pipeline];
-        [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+        [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0
+                   vertexCount:vertexCount instanceCount:instanceCount];
         [encoder endEncoding];
         [command commit];
         [command waitUntilCompleted];
@@ -144,7 +151,9 @@ int main(int argc, const char *argv[]) {
               mipmapLevel:0];
         uint64_t completionClock = mach_continuous_time();
 
-        printf("protocol=nuis-metal-rgba8-render-provider-runner-v1\n");
+        printf("protocol=nuis-metal-rgba8-render-provider-runner-v2\n");
+        printf("vertex_count=%lu\ninstance_count=%lu\n",
+               (unsigned long)vertexCount, (unsigned long)instanceCount);
         printf("status=ready\ndevice=%s\noutput_bytes=%lu\n",
                device.name.UTF8String, (unsigned long)byteCount);
         printf("completion_contract=nuis-yir-provider-physical-completion-v1\n");

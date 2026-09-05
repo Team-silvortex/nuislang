@@ -13,12 +13,12 @@ nuisc = { path = "../nuisc" }
 ed25519-dalek.workspace = true
 libc.workspace = true
 yir-core = { path = "../../crates/yir-core" }
+yir-domain-shader = { path = "../../crates/yir-domain-shader" }
 
 [build-dependencies]
 nuisc = { path = "../nuisc" }
 
 [dev-dependencies]
-yir-domain-shader = { path = "../../crates/yir-domain-shader" }
 yir-exec = { path = "../../crates/yir-exec" }
 yir-runtime-host = { path = "../../crates/yir-runtime-host" }
 yir-verify = { path = "../../crates/yir-verify" }
