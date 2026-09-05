@@ -1,0 +1,46 @@
+/// Packed RGBA8 image construction. Each Buffer element is one unsigned 32-bit pixel.
+mod cpu PixelMagicPixels {
+  /// Fills caller-owned storage; rejects invalid dimensions before changing any pixel.
+  pub fn fill_checkerboard(
+    pixels: ref Buffer,
+    width: i64,
+    height: i64,
+    tile_size: i64,
+    phase: i64
+  ) -> bool {
+    if width <= 0 || height <= 0 || width > 2048 || height > 2048 {
+      return false;
+    }
+    if tile_size <= 0 || tile_size > 2048 || phase < 0 || phase > 1 {
+      return false;
+    }
+    let count: i64 = width * height;
+    if pixels.len != count { return false; }
+    return fill_checkerboard_region(pixels, 0, count, width, tile_size, phase);
+  }
+
+  /// Fills a bounded pixel range; divide-and-conquer keeps recursion depth logarithmic.
+  pub fn fill_checkerboard_region(
+    pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
+  ) -> bool {
+    if width <= 0 || width > 2048 || tile_size <= 0 || tile_size > 2048 {
+      return false;
+    }
+    if phase < 0 || phase > 1 || start < 0 || start > end || end > pixels.len {
+      return false;
+    }
+    if pixels.len > 4194304 || pixels.len % width != 0 { return false; }
+    if start == end { return true; }
+    let x: i64 = start % width;
+    let y: i64 = start / width;
+    let alternate: bool = (x / tile_size + y / tile_size + phase) % 2 == 1;
+    // RGBA8 little-endian channel order, not the host Buffer's i64 memory layout.
+    let pixel: i64 = if alternate { 4294901760 } else { 4278190335 };
+    pixels[start] = pixel;
+    if end - start == 1 { return true; }
+    let middle: i64 = start + 1 + (end - start - 1) / 2;
+    let left: bool = fill_checkerboard_region(pixels, start + 1, middle, width, tile_size, phase);
+    let right: bool = fill_checkerboard_region(pixels, middle, end, width, tile_size, phase);
+    return left && right;
+  }
+}

@@ -14,7 +14,27 @@ pub(super) fn prepare_runtime_arguments(
     };
     let (vertex_count, instance_count) = render_draw_counts(request)?;
     let admitted_slot = uniform_slot(request)?;
+    let admitted_storage = super::storage::capability(request)?;
+    if admitted_slot.is_some() && admitted_storage.is_some() {
+        return Err("Metal render currently admits one fragment resource".to_owned());
+    }
+    let storage = admitted_storage
+        .map(|capability| {
+            let storage = yir_domain_shader::ShaderFragmentStorage::from_dispatch(
+                arguments.ok_or("Metal fragment storage requires runtime upload data")?,
+            )?;
+            if storage.capability != capability {
+                return Err(
+                    "Metal fragment storage slot or length differs from admitted code capability"
+                        .to_owned(),
+                );
+            }
+            storage.upload.payload()?;
+            Ok(storage)
+        })
+        .transpose()?;
     let uniform = arguments
+        .filter(|_| admitted_storage.is_none())
         .map(ShaderFragmentUniform::from_dispatch)
         .transpose()?
         .flatten();
@@ -28,6 +48,7 @@ pub(super) fn prepare_runtime_arguments(
             let mut scalars = arguments.clone();
             scalars.contract = SHADER_UNBOUND_DRAW_CONTRACT.to_owned();
             scalars.resources.clear();
+            scalars.uploads.clear();
             ShaderDrawArguments::from_dispatch(&scalars)?
         }
         None => ShaderDrawArguments {
@@ -46,12 +67,16 @@ pub(super) fn prepare_runtime_arguments(
         .scalar_bindings
         .iter()
         .any(|binding| binding.name == "fragment_uniform_bytes")
+        || !request.runtime_uploads.is_empty()
     {
         return Err("Metal fragment uniform bytes must come from this runtime dispatch".to_owned());
     }
     let mut result = draw.to_dispatch();
     if let Some(uniform) = uniform {
         uniform.bind_dispatch(&mut result)?;
+    }
+    if let Some(storage) = &storage {
+        storage.bind_dispatch(&mut result)?;
     }
     // Runtime inputs cannot replace the admitted code asset, entry set, or output capability.
     for (name, value) in [
@@ -79,6 +104,7 @@ pub(super) fn prepare_runtime_arguments(
                 .collect(),
         });
     }
+    request.runtime_uploads = result.uploads.clone();
     Ok(result)
 }
 
@@ -122,7 +148,7 @@ pub(super) fn uniform_upload(request: &ProviderRequest) -> Result<String, String
     }
 }
 
-fn unique_scalar<'a>(
+pub(super) fn unique_scalar<'a>(
     request: &'a ProviderRequest,
     name: &str,
 ) -> Result<Option<&'a ProviderScalarBinding>, String> {

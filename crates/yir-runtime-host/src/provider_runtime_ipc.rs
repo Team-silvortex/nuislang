@@ -75,7 +75,7 @@ impl ProviderRuntimeClient {
             }
             _ => return Err("runtime IPC reply sequence or message mismatch".to_owned()),
         };
-        if frame.arguments != *arguments {
+        if !frame.arguments.matches_identity(arguments)? {
             return Err("runtime IPC reply dispatch arguments mismatch".to_owned());
         }
         if frame.element_type != "u8"

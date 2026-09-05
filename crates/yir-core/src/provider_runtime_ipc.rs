@@ -2,9 +2,9 @@ use std::io::{Read, Write};
 
 #[path = "provider_runtime_arguments.rs"]
 mod arguments;
-pub use arguments::{DispatchArguments, DispatchResource};
+pub use arguments::{DispatchArguments, DispatchResource, DispatchUpload, MAX_UPLOAD_BYTES};
 
-pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v2";
+pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v3";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";
 pub const MAX_DISPATCHES: usize = 256;
 pub const MAX_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
@@ -83,6 +83,7 @@ impl Message {
     pub fn write_to(&self, writer: &mut impl Write) -> Result<(), String> {
         let mut fields = vec![CONTRACT.to_owned()];
         let mut payload: &[u8] = &[];
+        let mut uploads = Vec::new();
         match self {
             Self::Hello(target) => {
                 DispatchTarget::parse(&target.fields())?;
@@ -98,6 +99,9 @@ impl Message {
                 fields.extend(["dispatch".to_owned(), sequence.to_string()]);
                 fields.extend(target.fields().map(str::to_owned));
                 fields.push(arguments.to_wire()?);
+                for upload in arguments.uploads.values() {
+                    uploads.push(upload.payload()?);
+                }
             }
             Self::Frame(frame) => {
                 validate_frame(frame)?;
@@ -137,8 +141,15 @@ impl Message {
             .write_all(&(header.len() as u32).to_le_bytes())
             .and_then(|_| writer.write_all(header.as_bytes()))
             .and_then(|_| writer.write_all(payload))
-            .and_then(|_| writer.flush())
-            .map_err(|error| format!("runtime IPC write failed: {error}"))
+            .map_err(|error| format!("runtime IPC write failed: {error}"))?;
+        for bytes in uploads {
+            writer
+                .write_all(bytes)
+                .map_err(|error| format!("runtime upload write failed: {error}"))?;
+        }
+        writer
+            .flush()
+            .map_err(|error| format!("runtime IPC flush failed: {error}"))
     }
 
     pub fn read_from(reader: &mut impl Read) -> Result<Self, String> {
@@ -160,11 +171,22 @@ impl Message {
             Some("hello") if fields.len() == 7 => {
                 Ok(Self::Hello(DispatchTarget::parse(&fields[2..])?))
             }
-            Some("dispatch") if fields.len() == 9 => Ok(Self::Dispatch {
-                sequence: number(fields[2])?,
-                target: DispatchTarget::parse(&fields[3..8])?,
-                arguments: DispatchArguments::parse(fields[8])?,
-            }),
+            Some("dispatch") if fields.len() == 9 => {
+                let sequence = number(fields[2])?;
+                let target = DispatchTarget::parse(&fields[3..8])?;
+                let mut arguments = DispatchArguments::parse(fields[8])?;
+                if sequence >= MAX_DISPATCHES {
+                    return Err("runtime IPC dispatch sequence exceeds budget".to_owned());
+                }
+                for upload in arguments.uploads.values_mut() {
+                    upload.read_payload(reader)?;
+                }
+                Ok(Self::Dispatch {
+                    sequence,
+                    target,
+                    arguments,
+                })
+            }
             Some("finish") if fields.len() == 3 => Ok(Self::Finish(number(fields[2])?)),
             Some("closed") if fields.len() == 3 => Ok(Self::Closed(number(fields[2])?)),
             Some("rejected") if fields.len() == 3 => Ok(Self::Rejected(fields[2].to_owned())),

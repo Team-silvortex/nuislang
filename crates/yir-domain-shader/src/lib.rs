@@ -10,7 +10,12 @@ mod draw_request;
 mod execute_core;
 mod execute_effects;
 mod flow_state;
+mod fragment_storage;
 mod fragment_uniform;
+pub use fragment_storage::{
+    fragment_storage_capability, ShaderFragmentStorage, ShaderFragmentStorageCapability,
+    FRAGMENT_STORAGE_CAPABILITY_MARKER, SHADER_FRAGMENT_STORAGE_CONTRACT,
+};
 mod frame_surface;
 mod geometry_overlay;
 mod packet_helpers;

@@ -695,6 +695,7 @@ pub(super) fn lower_direct_call_helper_function(
         from: returned,
         to: return_name.clone(),
     });
+    control_boundaries::order_guarded_function_nodes(state, start_index);
     let body_nodes = state.yir.nodes[start_index..]
         .iter()
         .map(|node| node.name.clone())

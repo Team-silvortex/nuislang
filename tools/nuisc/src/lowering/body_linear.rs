@@ -138,7 +138,11 @@ pub(in crate::lowering) fn lower_inline_stmts(
             }
             NirStmt::Return(value) => {
                 let returned = match value {
-                    Some(value) => Some(lower_expr(value, state, bindings)?),
+                    Some(value) => {
+                        let lowered = lower_expr(value, state, bindings)?;
+                        chain_nonpure_expr_stmt(value, &lowered, state);
+                        Some(lowered)
+                    }
                     None => None,
                 };
                 return Ok(returned);

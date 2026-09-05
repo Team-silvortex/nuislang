@@ -165,7 +165,7 @@ fn dispatch_loop(
                     || result.instruction != target.instruction
                     || result.node != target.node
                     || result.resource != target.resource
-                    || result.arguments != arguments
+                    || !result.arguments.matches_identity(&arguments)?
                 {
                     return Err("runtime IPC result target drift".to_owned());
                 }

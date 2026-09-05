@@ -69,11 +69,14 @@ impl ShaderFragmentUniform {
     pub fn from_dispatch(arguments: &DispatchArguments) -> Result<Option<Self>, String> {
         if arguments.contract == crate::SHADER_UNBOUND_DRAW_CONTRACT
             && arguments.resources.is_empty()
+            && arguments.uploads.is_empty()
         {
             return Ok(None);
         }
         arguments.to_wire()?;
-        if arguments.contract != SHADER_FRAGMENT_UNIFORM_CONTRACT || arguments.resources.len() != 1
+        if arguments.contract != SHADER_FRAGMENT_UNIFORM_CONTRACT
+            || arguments.resources.len() != 1
+            || !arguments.uploads.is_empty()
         {
             return Err("unsupported fragment uniform argument contract or count".to_owned());
         }

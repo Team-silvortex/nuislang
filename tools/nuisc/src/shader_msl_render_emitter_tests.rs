@@ -173,3 +173,43 @@ fn native_binding_normalization_is_idempotent_before_resource_reflection() {
         Some(2)
     );
 }
+
+#[test]
+fn lowers_read_only_storage_with_checked_gpu_indexing_and_fixed_layout_reflection() {
+    let source = format!("binding(0, 3) var<storage, read> pixels: array<u32, 768>;\n{RASTER_WGSL}")
+        .replace("let luma: f32 = 0.18 + uv.x * 0.37 + uv.y * 0.23;",
+            "let index: u32 = u32(uv.x * 32.0); let pixel: u32 = pixels[index]; let luma: f32 = f32(pixel & 255u) / 255.0;");
+    let lowered =
+        lower_canonical_inline_wgsl_render_for_profile(&source, "image", "metal.apple-silicon-gpu")
+            .unwrap();
+    assert_eq!(
+        yir_domain_shader::fragment_storage_capability(&lowered.source).unwrap(),
+        Some(yir_domain_shader::ShaderFragmentStorageCapability {
+            slot: 3,
+            element_count: 768
+        })
+    );
+    assert!(lowered
+        .source
+        .contains("const device NuisFragmentStorage& pixels [[buffer(3)]]"));
+    assert!(lowered.source.contains("uint values[768]"));
+    assert!(lowered
+        .source
+        .contains("index < 768u ? buffer.values[index] : 0u"));
+    assert!(lowered.source.contains("nuis_storage_read(pixels, index)"));
+    for invalid in [
+        source.replace("storage, read", "storage, read_write"),
+        source.replace("array<u32, 768>", "array<u32>"),
+        source.replace("array<u32, 768>", "array<f32, 768>"),
+        source.replace("array<u32, 768>", "array<u32, 4194305>"),
+        source.replace("pixels[index]", "other[index]"),
+        source.replace("pixels[index]", "pixels[pixels[index]]"),
+    ] {
+        assert!(lower_canonical_inline_wgsl_render_for_profile(
+            &invalid,
+            "image",
+            "metal.apple-silicon-gpu"
+        )
+        .is_err());
+    }
+}

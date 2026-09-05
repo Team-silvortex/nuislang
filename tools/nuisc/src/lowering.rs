@@ -515,6 +515,9 @@ mod tests_direct_calls;
 #[path = "lowering/tests_doc_contracts.rs"]
 mod tests_doc_contracts;
 #[cfg(test)]
+#[path = "lowering/tests_guard_buffer_order.rs"]
+mod tests_guard_buffer_order;
+#[cfg(test)]
 #[path = "lowering/tests_guard_return_survivor.rs"]
 mod tests_guard_return_survivor;
 #[cfg(test)]

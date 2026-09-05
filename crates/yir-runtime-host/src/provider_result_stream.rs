@@ -242,7 +242,7 @@ impl ProviderResultQueue {
                 node.resource,
             ));
         }
-        if frame.arguments != *arguments {
+        if !frame.arguments.matches_identity(arguments)? {
             return Err("provider runtime result dispatch arguments mismatch".to_owned());
         }
         Ok(self.frames.pop_front().expect("validated provider frame"))

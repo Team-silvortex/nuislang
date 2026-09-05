@@ -154,10 +154,12 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=26\tvisible_libraries=26\tvisible_modules=27\tdocumented_visible_modules=26\tdocumented_visible_items="
+        "summary\tlibraries=28\tvisible_libraries=28\tvisible_modules=29\tdocumented_visible_modules=28\tdocumented_visible_items="
     ));
     for library in [
         "image_contracts.ns",
+        "pixels.ns",
+        "image_surface.ns",
         "shader_contracts.ns",
         "packet_bridge_surface.ns",
         "render_surface.ns",

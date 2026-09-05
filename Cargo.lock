@@ -193,6 +193,7 @@ dependencies = [
  "nuis-semantics",
  "nuisc",
  "sha2",
+ "yir-core",
  "yir-domain-shader",
  "yir-runtime-host",
 ]

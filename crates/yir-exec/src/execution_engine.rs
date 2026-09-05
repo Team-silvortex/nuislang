@@ -315,6 +315,21 @@ impl ExecutionEngine<'_> {
                 continue;
             }
             self.execute_named_node(node_name, &mut delayed)?;
+            let node = self.nodes_by_name[node_name.as_str()];
+            if node.op.module == "cpu" && node.op.instruction == "guard_return" {
+                let taken = match self.state.expect_value(&node.op.args[0])? {
+                    Value::Bool(value) => *value,
+                    Value::Int(value) => *value != 0,
+                    _ => {
+                        return Err(format!(
+                            "guard `{node_name}` requires a bool or i64 condition"
+                        ))
+                    }
+                };
+                if taken {
+                    return self.state.expect_value(&node.op.args[1]).cloned();
+                }
+            }
         }
         reject_remaining_delayed(&delayed)?;
         let result = function

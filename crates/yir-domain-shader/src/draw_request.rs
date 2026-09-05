@@ -30,6 +30,7 @@ impl ShaderDrawArguments {
             ]
             .into(),
             resources: Default::default(),
+            uploads: Default::default(),
         }
     }
 
@@ -38,6 +39,7 @@ impl ShaderDrawArguments {
         if arguments.contract != SHADER_UNBOUND_DRAW_CONTRACT
             || arguments.scalars.len() != 4
             || !arguments.resources.is_empty()
+            || !arguments.uploads.is_empty()
         {
             return Err("unsupported shader runtime argument contract or field count".to_owned());
         }
@@ -63,7 +65,7 @@ impl ShaderDrawArguments {
 }
 
 /// Validated output extent, without allocating or rasterizing a reference frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ShaderDrawDescriptor {
     width: usize,
     height: usize,
@@ -72,6 +74,7 @@ pub struct ShaderDrawDescriptor {
     pub(crate) instance_count: u64,
     pub(crate) unbound_rgba8_triangle_strip: bool,
     pub(crate) fragment_uniform: Option<crate::ShaderFragmentUniform>,
+    pub(crate) fragment_storage: Option<crate::ShaderFragmentStorage>,
 }
 
 impl ShaderDrawDescriptor {
@@ -89,6 +92,7 @@ impl ShaderDrawDescriptor {
             instance_count: 0,
             unbound_rgba8_triangle_strip: false,
             fragment_uniform: None,
+            fragment_storage: None,
         })
     }
 
@@ -117,6 +121,9 @@ impl ShaderDrawDescriptor {
         .to_dispatch();
         if let Some(uniform) = self.fragment_uniform {
             uniform.bind_dispatch(&mut arguments)?;
+        }
+        if let Some(storage) = &self.fragment_storage {
+            storage.bind_dispatch(&mut arguments)?;
         }
         Ok(arguments)
     }

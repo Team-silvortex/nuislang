@@ -566,7 +566,7 @@ fn execute_native_provider_request(
             adapter.adapter_id
         )
     })?;
-    let inputs = request
+    let mut inputs = request
         .input_bindings
         .iter()
         .map(|binding| {
@@ -584,6 +584,9 @@ fn execute_native_provider_request(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    for upload in request.runtime_uploads.values() {
+        inputs.push(PreparedProviderInput::from_runtime_upload(upload)?);
+    }
     let (adapter_output_roles, adapter_output_byte_lengths) = provider_output_manifest(request);
     let prepared_worker_adapter = execution_adapter
         .prepare_worker_adapter

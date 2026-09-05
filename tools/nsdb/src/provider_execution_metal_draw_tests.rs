@@ -78,6 +78,112 @@ fn offline_defaults_and_runtime_counts_share_validation() {
 }
 
 #[test]
+fn storage_admission_binds_layout_and_requires_owned_payload_before_mutating_request() {
+    let mut original = request();
+    for (name, value) in [
+        ("fragment_storage_slot", "3"),
+        ("fragment_storage_count", "768"),
+    ] {
+        original.kernel.scalar_bindings.push(ProviderScalarBinding {
+            name: name.to_owned(),
+            value_type: "u64".to_owned(),
+            value: value.to_owned(),
+        });
+    }
+    let mut arguments = ShaderDrawArguments {
+        width: 2,
+        height: 2,
+        vertex_count: 3,
+        instance_count: 1,
+    }
+    .to_dispatch();
+    let storage = yir_domain_shader::ShaderFragmentStorage {
+        capability: yir_domain_shader::ShaderFragmentStorageCapability {
+            slot: 3,
+            element_count: 768,
+        },
+        upload: yir_core::provider_runtime_ipc::DispatchUpload::new(
+            "u32",
+            vec![768],
+            vec![0; 3072],
+        )
+        .unwrap(),
+    };
+    storage.bind_dispatch(&mut arguments).unwrap();
+    let mut admitted = original.clone();
+    assert_eq!(
+        prepare_runtime_arguments(&mut admitted, Some(&arguments)).unwrap(),
+        arguments
+    );
+    assert!(super::super::storage::validate_upload(&admitted)
+        .unwrap()
+        .starts_with("3:768:0x"));
+    assert_eq!(admitted.input_bindings, original.input_bindings);
+    assert_eq!(admitted.code_asset, original.code_asset);
+    assert_eq!(
+        admitted.runtime_uploads["fragment.storage.3"]
+            .payload()
+            .unwrap()
+            .len(),
+        3072
+    );
+    for case in 0..7 {
+        let mut request = original.clone();
+        let mut invalid = arguments.clone();
+        match case {
+            0 => invalid.uploads.clear(),
+            1 => invalid = arguments.descriptor(),
+            2 => {
+                invalid
+                    .uploads
+                    .get_mut("fragment.storage.3")
+                    .unwrap()
+                    .element_type = "f32".to_owned();
+            }
+            3 => {
+                invalid.uploads.insert(
+                    "fragment.storage.3".to_owned(),
+                    yir_core::provider_runtime_ipc::DispatchUpload::new(
+                        "u32",
+                        vec![767],
+                        vec![0; 3068],
+                    )
+                    .unwrap(),
+                );
+            }
+            4 => {
+                let upload = invalid.uploads.remove("fragment.storage.3").unwrap();
+                invalid
+                    .uploads
+                    .insert("fragment.storage.4".to_owned(), upload);
+            }
+            5 => request.kernel.scalar_bindings.push(ProviderScalarBinding {
+                name: "fragment_storage_slot".to_owned(),
+                value_type: "u64".to_owned(),
+                value: "3".to_owned(),
+            }),
+            _ => invalid
+                .scalars
+                .insert("height".to_owned(), 3)
+                .map(|_| ())
+                .unwrap(),
+        }
+        let before = request.clone();
+        assert!(
+            prepare_runtime_arguments(&mut request, Some(&invalid)).is_err(),
+            "case {case}"
+        );
+        assert!(
+            request == before,
+            "invalid admission must not partially update request, case {case}"
+        );
+    }
+    assert!(prepare_runtime_arguments(&mut original.clone(), None)
+        .unwrap_err()
+        .contains("requires runtime upload data"));
+}
+
+#[test]
 fn uniform_upload_requires_exact_compiled_slot_and_typed_runtime_bytes() {
     let mut original = request();
     original.kernel.scalar_bindings.push(ProviderScalarBinding {

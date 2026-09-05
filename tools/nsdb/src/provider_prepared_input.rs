@@ -29,6 +29,26 @@ pub(crate) struct PreparedProviderInput {
 }
 
 impl PreparedProviderInput {
+    #[cfg(unix)]
+    pub(crate) fn from_runtime_upload(
+        upload: &yir_core::provider_runtime_ipc::DispatchUpload,
+    ) -> Result<Self, String> {
+        let bytes = upload.payload()?;
+        let adapter = select_provider_carrier_channel_adapter("inherited-fd")
+            .ok_or("runtime upload requires a registered descriptor carrier")?;
+        let channel = crate::provider_carrier_channel_registry::prepare_provider_carrier_channel(
+            adapter,
+            &[bytes],
+        )?;
+        Ok(Self {
+            artifact_input: None,
+            staging_adapter: None,
+            carrier: None,
+            direct_channel: Some(channel),
+            transport_receipt: None,
+        })
+    }
+
     pub(crate) fn new(
         output_dir: &Path,
         binding: &ProviderInputBinding,

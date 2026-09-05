@@ -1,0 +1,107 @@
+use cpu NovaAppRuntime;
+use cpu PixelMagicContracts;
+use cpu PixelMagicPixels;
+use data FabricPlane;
+use shader PixelMagicImageSurface;
+
+mod cpu Main {
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type ShaderPacketWindow = Window<PixelMagicImageSurfacePacket>;
+  type HostFrameWindow = Window<Frame>;
+  type FrameStatus = ShaderResult<Frame>;
+
+  fn lower_showcase_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    frame_index: i64
+  ) -> PixelMagicImageSurfacePacket {
+    let op_kind: i64 = PixelMagicContracts.invert_op_kind();
+    let color_seed: i64 = shader_profile_color_seed(
+      "PixelMagicImageSurface",
+      PixelMagicContracts.shader_color_seed_base(source_handle, op_kind, frame_index),
+      0
+    );
+    let speed_seed: i64 = shader_profile_speed_seed(
+      "PixelMagicImageSurface",
+      frame_index,
+      2,
+      PixelMagicContracts.shader_speed_seed_base(width, 24)
+    );
+    let radius_seed: i64 = shader_profile_radius_seed(
+      "PixelMagicImageSurface",
+      PixelMagicContracts.shader_radius_seed_base(height, frame_index, op_kind),
+      0
+    );
+    return shader_profile_packet(
+      "PixelMagicImageSurface",
+      color_seed,
+      speed_seed,
+      radius_seed
+    );
+  }
+
+  fn render_showcase_frame(
+    state: NovaAppState,
+    frame_index: i64
+  ) -> NovaAppState {
+    let frame: NovaFrameTransaction =
+      NovaAppRuntime.begin_frame(state, state.timeline_tick + 1);
+    let packet: PixelMagicImageSurfacePacket =
+      lower_showcase_packet(4101 + frame_index, 160, 120, frame_index);
+
+    data_profile_bind_core("FabricPlane");
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
+    let gpu_packet: ShaderPacketWindow = data_profile_send_uplink("FabricPlane", packet);
+    let pass: Pass = shader_profile_begin_pass("PixelMagicImageSurface");
+    let vertex_count: i64 =
+      shader_profile_vertex_count("PixelMagicImageSurface") - 1 - frame_index % 2;
+    let instance_count: i64 =
+      shader_profile_instance_count("PixelMagicImageSurface") + frame_index;
+    let pixels: ref Buffer = alloc_buffer(768, 0);
+    let filled: bool = PixelMagicPixels.fill_checkerboard(pixels, 32, 24, 4, frame_index / 2);
+    let snapshot: Bytes = copy_bytes(pixels);
+    pixels[0] = 0;
+    free(pixels);
+    if filled == false { return state; }
+    let storage: Binding = shader_storage_binding(3, snapshot);
+    let pipeline: Pipeline = shader_profile_pipeline("PixelMagicImageSurface");
+    let bindings: BindingSet = shader_bind_set(pipeline, storage);
+    let render_result: FrameStatus =
+      shader_result(shader_draw_instanced(pass, gpu_packet, vertex_count, instance_count, bindings));
+    let render_ready: bool = shader_frame_ready(render_result);
+    let render_ready_flag: i64 = if render_ready { 1 } else { 0 };
+    let completion: NovaFrameResultHandle = NovaAppRuntime.capture_frame_result(
+      frame,
+      render_ready_flag,
+      shader_completion_token(render_result),
+      shader_completion_clock(render_result),
+      shader_completion_root(render_result)
+    );
+    let host_frame: HostFrameWindow =
+      data_profile_send_downlink("FabricPlane", shader_value(render_result));
+    let submitted: NovaFrameTransaction =
+      NovaAppRuntime.submit_frame(frame, completion);
+
+    if submitted.present_requested == 1 {
+      cpu_present_frame(host_frame);
+    }
+    let committed: NovaAppState = NovaAppRuntime.commit_frame(submitted);
+    return committed;
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+    cpu_window(640, 400, "NS Nova Image Showcase");
+
+    let app: NovaAppState = NovaAppRuntime.open(640, 400, 60, 0);
+    let frame_index: i64 = 0;
+    while frame_index < 3 {
+      let app: NovaAppState = render_showcase_frame(app, frame_index);
+      let frame_index: i64 = frame_index + 1;
+    }
+    let closed: NovaAppState =
+      NovaAppRuntime.close(app, cpu_tick_i64(0, 1));
+    print(NovaAppRuntime.summary(closed) + frame_index);
+  }
+}

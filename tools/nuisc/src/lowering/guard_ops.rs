@@ -35,8 +35,9 @@ pub(super) fn lower_guard_return(
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: return_name,
-        to: name,
+        to: name.clone(),
     });
+    chain_statement_effect(state, &name);
 }
 
 pub(super) fn lower_guard_loop_continue(condition_name: String, state: &mut LoweringState<'_>) {

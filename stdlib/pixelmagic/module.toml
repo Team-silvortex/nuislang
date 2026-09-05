@@ -15,12 +15,16 @@ surfaces = [
   "surface.pixelmagic.shader.contracts.v1",
   "surface.pixelmagic.shader.packet-bridge.v1",
   "surface.pixelmagic.shader.render.v1",
+  "contract.pixelmagic.packed-rgba8-generation.v1",
+  "surface.pixelmagic.shader.image-storage.v1",
   "surface.pixelmagic.shader.texture.v1",
   "surface.pixelmagic.shader.pipeline.v1"
 ]
 
 library_modules = [
   "lib/image_contracts.ns",
+  "lib/pixels.ns",
+  "lib/image_surface.ns",
   "lib/shader_contracts.ns",
   "lib/packet_bridge_surface.ns",
   "lib/render_surface.ns",

@@ -46,6 +46,7 @@ impl PreparedRuntimeProviderResults {
 pub(crate) fn prepare_runtime_provider_results(
     output_dir: &Path,
 ) -> Result<Option<PreparedRuntimeProviderResults>, String> {
+    ensure_runtime_provider_manifest(output_dir)?;
     let targets = nsdb::provider_runtime_result_targets(output_dir, None)?;
     if targets.is_empty() {
         return Ok(None);
@@ -60,6 +61,38 @@ pub(crate) fn prepare_runtime_provider_results(
         target_count: targets.len(),
         output_dir: output_dir.to_owned(),
     }))
+}
+
+fn ensure_runtime_provider_manifest(output_dir: &Path) -> Result<(), String> {
+    let path = output_dir.join(crate::artifact_device_sample::DEVICE_PROVIDER_SAMPLE_FILE_NAME);
+    match fs::symlink_metadata(&path) {
+        // Keep existing evidence, including invalid evidence, for normal admission
+        // to validate. Startup must not silently repair a tampered registration.
+        Ok(_) => return Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(format!("cannot inspect runtime provider manifest: {error}")),
+    }
+    let plan = crate::load_link_plan_for_output_dir(output_dir);
+    let evidence =
+        crate::artifact_doctor_mirrors::collect_backend_artifact_payload_evidence(Some(output_dir));
+    let trace = crate::artifact_runtime_trace::HeteroRuntimeTraceSummary::from_link_plan(
+        plan.as_ref(),
+        &evidence,
+    );
+    if !trace.available() {
+        return Ok(());
+    }
+    let persisted = trace.persist_nsdb_trace(Some(output_dir));
+    if !persisted.provider_sample_manifest_persisted {
+        return Err(format!(
+            "runtime provider registration preparation failed: {}",
+            persisted
+                .provider_sample_manifest_error
+                .as_deref()
+                .unwrap_or("manifest not persisted")
+        ));
+    }
+    Ok(())
 }
 
 fn find_source_yir(output_dir: &Path, expected_hash: &str) -> Result<PathBuf, String> {

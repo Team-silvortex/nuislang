@@ -17,6 +17,8 @@ use std::path::Path;
 
 #[path = "provider_execution_metal_draw.rs"]
 mod draw;
+#[path = "provider_execution_metal_storage.rs"]
+mod storage;
 
 pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
     ProviderExecutionAdapterRegistration {
@@ -51,6 +53,12 @@ fn prepare_worker_adapter(
                 format!("literal:{}", render.vertex_count),
                 format!("literal:{}", render.instance_count),
                 format!("literal:{}", render.uniform_upload),
+                format!("literal:{}", render.storage_upload),
+                if request.runtime_uploads.is_empty() {
+                    "literal:none".to_owned()
+                } else {
+                    worker_descriptor_argument(&inputs[1], 1)?
+                },
             ],
         )
     } else if is_gray8_invert(request) {
@@ -120,7 +128,11 @@ fn prepare_worker_adapter(
                 inputs
                     .iter()
                     .enumerate()
-                    .skip(1)
+                    .skip(if is_rgba8_render(request) {
+                        inputs.len()
+                    } else {
+                        1
+                    })
                     .map(|(index, input)| worker_descriptor_argument(input, index))
                     .collect::<Result<Vec<_>, _>>()?,
             )
@@ -147,6 +159,12 @@ fn execute(
                 worker_receipt.worker_output_result.take(),
             )?
         } else {
+            if !request.runtime_uploads.is_empty() {
+                return Err(
+                    "Metal storage upload requires the registered worker descriptor path"
+                        .to_owned(),
+                );
+            }
             crate::provider_runner_metal_render::execute_rgba8_render_asset(
                 &render.code_asset_path,
                 &render.vertex_entry,
@@ -353,6 +371,7 @@ struct ValidatedMetalRenderRequest {
     vertex_count: usize,
     instance_count: usize,
     uniform_upload: String,
+    storage_upload: String,
 }
 
 fn validated_metal_render_request(
@@ -423,7 +442,16 @@ fn validated_metal_render_request(
             "Metal fragment uniform capability differs from verified code asset".to_owned(),
         );
     }
+    let storage_capability = storage::capability(request)?;
+    if yir_domain_shader::fragment_storage_capability(&source)? != storage_capability
+        || (storage_capability.is_some() && draw::uniform_slot(request)?.is_some())
+    {
+        return Err(
+            "Metal fragment storage capability differs from verified code asset".to_owned(),
+        );
+    }
     let uniform_upload = draw::uniform_upload(request)?;
+    let storage_upload = storage::validate_upload(request)?;
     Ok(ValidatedMetalRenderRequest {
         code_asset_path,
         vertex_entry,
@@ -433,6 +461,7 @@ fn validated_metal_render_request(
         vertex_count,
         instance_count,
         uniform_upload,
+        storage_upload,
     })
 }
 
@@ -516,7 +545,8 @@ fn validate_metal_input_count(
 ) -> Result<(), String> {
     if is_rgba8_render(request) {
         validated_metal_render_request(output_dir, request)?;
-        return (input_count == 1 && request.input_bindings.len() == 1)
+        return (input_count == 1 + request.runtime_uploads.len()
+            && request.input_bindings.len() == 1)
             .then_some(())
             .ok_or_else(|| {
                 format!(

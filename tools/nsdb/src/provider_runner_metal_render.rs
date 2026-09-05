@@ -10,7 +10,7 @@ use std::path::Path;
 
 #[cfg(target_os = "macos")]
 const METAL_RGBA8_RENDER_SOURCE: &str = include_str!("../provider-runners/metal_rgba8_render.m");
-pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v3";
+pub(crate) const METAL_RGBA8_RENDER_CONTRACT: &str = "nuis-metal-rgba8-render-provider-runner-v4";
 
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_rgba8_render_worker_invocation(
@@ -108,6 +108,8 @@ fn execute_rgba8_render_asset_platform(
             vertex_count.to_string(),
             instance_count.to_string(),
             uniform_upload.to_owned(),
+            "none".to_owned(),
+            "none".to_owned(),
         ],
         METAL_RGBA8_RENDER_CONTRACT,
         METAL_RGBA8_RENDER_SOURCE,

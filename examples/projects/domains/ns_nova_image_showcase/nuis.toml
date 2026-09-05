@@ -1,0 +1,11 @@
+name = "ns_nova_image_showcase"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "fabric_plane.ns"]
+galaxy = ["ns-nova=workspace", "pixelmagic=workspace"]
+galaxy_imports = ["ns-nova:lib/app_runtime.ns"]
+artifact_provider_metadata = ["@scope(domain=shader)|official.shader:provider-sample=project-render"]
+links = [
+  "cpu.Main -> shader.PixelMagicImageSurface via data.FabricPlane",
+  "shader.PixelMagicImageSurface -> cpu.Main via data.FabricPlane"
+]

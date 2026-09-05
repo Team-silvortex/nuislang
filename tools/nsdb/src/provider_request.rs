@@ -107,6 +107,8 @@ pub(crate) struct ProviderRuntimeResultBinding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderRequest {
+    // Populated only by a registered runtime-argument admission hook, never by artifact paths.
+    pub(crate) runtime_uploads: BTreeMap<String, yir_core::provider_runtime_ipc::DispatchUpload>,
     pub(crate) source: &'static str,
     pub(crate) buffer: ProviderBufferDescriptor,
     pub(crate) kernel: ProviderKernelDescriptor,
@@ -272,6 +274,7 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
     let max_value = fields.get("pixel_max_value")?.clone();
     validate_request(ProviderRequest {
         source: "legacy-pixelmagic-evidence",
+        runtime_uploads: BTreeMap::new(),
         buffer: ProviderBufferDescriptor {
             id: "input.pixels".to_owned(),
             element_type: "u8".to_owned(),
@@ -417,6 +420,7 @@ fn build_request(
     let runtime_result_binding = parse_runtime_result_binding(fields, runtime_result_prefix)?;
     validate_request(ProviderRequest {
         source,
+        runtime_uploads: BTreeMap::new(),
         buffer,
         kernel,
         output_bindings,

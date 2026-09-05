@@ -54,6 +54,8 @@ mod cpu Main {
         pixelmagic.library_modules,
         vec![
             "lib/image_contracts.ns".to_owned(),
+            "lib/pixels.ns".to_owned(),
+            "lib/image_surface.ns".to_owned(),
             "lib/shader_contracts.ns".to_owned(),
             "lib/packet_bridge_surface.ns".to_owned(),
             "lib/render_surface.ns".to_owned(),
@@ -144,7 +146,7 @@ mod cpu Main {
     assert!(galaxy_index
         .contains("summary\tgalaxies=3\tdocumented_galaxies=3\tdocumented_library_modules="));
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true"));
-    assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns, lib/packet_bridge_surface.ns, lib/render_surface.ns, lib/texture_surface.ns, lib/pipeline_surface.ns"));
+    assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/pixels.ns, lib/image_surface.ns, lib/shader_contracts.ns, lib/packet_bridge_surface.ns, lib/render_surface.ns, lib/texture_surface.ns, lib/pipeline_surface.ns"));
     assert!(galaxy_index.contains("core\tpackage=nuis.core\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/prelude_contracts.ns"));
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=19\tauto_injectable=true"));
@@ -159,12 +161,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=27\tdocumented_modules=26\tdocumented_items="));
+    assert!(docs_index.contains("summary\tmodules=29\tdocumented_modules=28\tdocumented_items="));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=26\tvisible_libraries=26\tvisible_modules=27\tdocumented_visible_modules=26\tdocumented_visible_items="
+        "summary\tlibraries=28\tvisible_libraries=28\tvisible_modules=29\tdocumented_visible_modules=28\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

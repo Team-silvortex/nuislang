@@ -15,6 +15,7 @@ use crate::bootstrap_component_replacement::{
 
 mod bootstrap_component;
 mod galaxy;
+mod run_artifact;
 mod support;
 
 use galaxy::parse_galaxy_args;
@@ -188,6 +189,7 @@ pub enum CommandKind {
     RunArtifact {
         input: PathBuf,
         json: bool,
+        frame_output: Option<PathBuf>,
     },
     DebugResume {
         input: PathBuf,
@@ -666,13 +668,7 @@ where
                 packaging_mode: parsed.packaging_mode,
             })
         }
-        "run-artifact" => {
-            let (input, json) = parse_required_json_input(
-                &mut args,
-                "usage: nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>",
-            )?;
-            Ok(CommandKind::RunArtifact { input, json })
-        }
+        "run-artifact" => run_artifact::parse(&mut args),
         "debug-resume" => {
             let parsed = parse_debug_resume_args(&mut args)?;
             Ok(CommandKind::DebugResume {

@@ -46,6 +46,14 @@ Current state:
 * this repository now treats `ns-nova` as a standard-library/framework layer target, not as a separate future repository by default
 * `lib/app_runtime.ns` now owns the first reusable application and frame lifecycle in Nuis source
 * `examples/projects/domains/ns_nova_showcase` composes that lifecycle with PixelMagic, Data, and Shader as separate Galaxy/Nustar owners
+* [ns_nova_image_showcase](../../examples/projects/domains/ns_nova_image_showcase)
+  extends the same lifecycle with Nuis-generated image snapshots and real Metal
+  RGB inversion. PixelMagic owns the image algorithm; shared IPC carries bounded
+  immutable bytes, while the registered Shader adapter owns GPU resource admission.
+  `nuis run-artifact --export-frame` now drives both examples through their compiled
+  host binary, not a test child. The native shell embeds the YIR lifecycle runtime;
+  fully native CPU lowering, self-contained provider injection and persistent
+  interactive sessions remain separate milestones
 * lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each

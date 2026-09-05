@@ -56,7 +56,19 @@ Current source-asset status:
   `shader_uniform_binding(2, tint)` in the optional fifth `BindingSet` operand of
   `shader_draw_instanced`. A white `(1.0, 1.0, 1.0, 1.0)` tint preserves the prior
   surface colors. The NS Nova showcase verifies real M2 upload and identity-bound
-  replay; larger buffers/textures and non-Metal resource parity remain open
+  replay; general textures and non-Metal resource parity remain open
+* [lib/pixels.ns](lib/pixels.ns) generates checked packed RGBA8 checkerboards in
+  Nuis-owned buffers. Invalid dimensions, tile sizes, phases, and ranges return
+  false before writing. The bounded range helper uses logarithmic-depth recursion
+  while general buffer-writing `while` lowering remains incomplete
+* [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
+  u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The
+  [image showcase](../../examples/projects/domains/ns_nova_image_showcase) frees
+  the original buffer before its 3,072-byte upload, verifies exact Metal pixels,
+  and binds replay to the input content. `run-artifact --export-frame` executes
+  this lifecycle in the compiled host with embedded YIR, without a test-only child.
+  This is a fixed-array slice, not a general texture/sampler API, fully native CPU
+  lowering or a standalone interactive app
 * that helper surface now covers both image-op packet shaping and the first
   shader-facing packet / consumer / pipeline scoring helpers, so projects can
   depend on one stable auto-injected entry point while deeper recipe modules

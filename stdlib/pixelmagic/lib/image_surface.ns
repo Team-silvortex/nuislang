@@ -1,0 +1,47 @@
+use data FabricPlane;
+
+/// A bounded 32x24 packed RGBA8 image pass. All image processing stays in inline Nuis shader code.
+mod shader PixelMagicImageSurface {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_color_slot: i64 = 0;
+    const packet_speed_slot: i64 = 1;
+    const packet_radius_slot: i64 = 2;
+    const packet_tag: i64 = 80;
+    const material_mode: i64 = 5;
+    const pass_kind: i64 = 1;
+    const packet_field_count: i64 = 6;
+    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+    let profile_view: Viewport = shader_viewport(160, 120);
+    let profile_pipe: Pipeline = shader_pipeline("pixelmagic_image_invert", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_image_invert", wgsl {
+      binding(0, 3) var<storage, read> pixels: array<u32, 768>;
+      struct VsOut {
+        builtin(position) pos: vec4<f32>,
+        location(0) uv: vec2<f32>,
+      };
+      stage vertex {
+        fn vs_main(builtin(vertex_index) vid: u32) -> VsOut {
+          var out: VsOut;
+          let x: f32 = f32((vid << 1u) & 2u);
+          let y: f32 = f32(vid & 2u);
+          out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+          out.uv = vec2<f32>(x, y);
+          return out;
+        }
+      }
+      stage fragment {
+        fn fs_main(location(0) uv: vec2<f32>) -> location(0) vec4<f32> {
+          let index: u32 = u32(uv.y * 24.0) * 32u + u32(uv.x * 32.0);
+          let pixel: u32 = pixels[index];
+          let red: f32 = 1.0 - f32(pixel & 255u) / 255.0;
+          let green: f32 = 1.0 - f32((pixel >> 8u) & 255u) / 255.0;
+          let blue: f32 = 1.0 - f32((pixel >> 16u) & 255u) / 255.0;
+          let alpha: f32 = f32((pixel >> 24u) & 255u) / 255.0;
+          return vec4<f32>(red, green, blue, alpha);
+        }
+      }
+    });
+  }
+}

@@ -3,6 +3,10 @@ const MSL_TARGETS: &[&str] = &[
     "metal.mac-discrete-or-integrated-gpu",
 ];
 
+#[path = "shader_msl_render_resource.rs"]
+mod resource;
+use resource::FragmentResource;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoweredMslRenderModule {
     pub source: String,
@@ -27,7 +31,7 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
     let source = crate::shader_source::normalize_inline_wgsl_source(source)?;
     let source = crate::shader_source::strip_comments_preserving_shape(&source);
     let summary = crate::shader_source::summarize_inline_wgsl_source(&source)?;
-    let uniform = fragment_uniform(&source, &summary)?;
+    let uniform = resource::parse(&source, &summary)?;
     let vertex_entry = unique_stage_entry(&summary, "vertex")?;
     let fragment_entry = unique_stage_entry(&summary, "fragment")?;
     if summary.stages.len() != 2 {
@@ -41,7 +45,7 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
     validate_fullscreen_vertex_signature(&source, &vertex_entry)?;
     validate_fullscreen_vertex_body(vertex_body)?;
     let fragment_body = function_body(&source, &fragment_entry)?;
-    let fragment_statements = lower_fragment_body(fragment_body)?;
+    let fragment_statements = lower_fragment_body(fragment_body, uniform)?;
     let source = render_msl(
         profile_entry,
         profile_lowering_target,
@@ -55,44 +59,6 @@ pub fn lower_canonical_inline_wgsl_render_for_profile(
         vertex_entry,
         fragment_entry,
     })
-}
-
-fn fragment_uniform<'a>(
-    source: &str,
-    summary: &'a crate::shader_source::InlineWgslSummary,
-) -> Result<Option<(u32, &'a str)>, String> {
-    let binding = match summary.bindings.as_slice() {
-        [] => return Ok(None),
-        [binding] => binding,
-        _ => return Err("canonical render supports at most one fragment uniform".to_owned()),
-    };
-    let compact_type = binding
-        .ty
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>();
-    if binding.group != 0
-        || binding.binding > 30
-        || binding.kind != "uniform"
-        || binding.address_space.as_deref() != Some("uniform")
-        || compact_type != "vec4<f32>"
-        || !valid_ident(&binding.name)
-        || matches!(binding.name.as_str(), "uv" | "input")
-    {
-        return Err("canonical render requires group-zero fragment vec4<f32> uniform".to_owned());
-    }
-    let compact = source
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>();
-    let declaration = format!(
-        "@group(0)@binding({})var<uniform>{}:vec4<f32>;",
-        binding.binding, binding.name
-    );
-    if compact.matches(&declaration).count() != 1 {
-        return Err("unsupported fragment uniform declaration or initializer".to_owned());
-    }
-    Ok(Some((binding.binding, &binding.name)))
 }
 
 fn unique_stage_entry(
@@ -195,7 +161,10 @@ fn validate_fullscreen_vertex_body(body: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn lower_fragment_body(body: &str) -> Result<Vec<String>, String> {
+fn lower_fragment_body(
+    body: &str,
+    resource: Option<FragmentResource<'_>>,
+) -> Result<Vec<String>, String> {
     if body.contains('{') || body.contains('}') {
         return Err("canonical WGSL fragment body must not contain nested blocks".to_owned());
     }
@@ -207,12 +176,12 @@ fn lower_fragment_body(body: &str) -> Result<Vec<String>, String> {
             continue;
         }
         if let Some(binding) = statement.strip_prefix("let ") {
-            lowered.push(lower_float_binding(binding)?);
+            lowered.push(lower_float_binding(binding, resource)?);
         } else if let Some(value) = statement.strip_prefix("return ") {
             if returned {
                 return Err("canonical WGSL fragment body has multiple returns".to_owned());
             }
-            let value = lower_fragment_return(value)?;
+            let value = lower_fragment_return(value, resource)?;
             lowered.push(format!("return {value};"));
             returned = true;
         } else {
@@ -227,7 +196,10 @@ fn lower_fragment_body(body: &str) -> Result<Vec<String>, String> {
     Ok(lowered)
 }
 
-fn lower_float_binding(binding: &str) -> Result<String, String> {
+fn lower_float_binding(
+    binding: &str,
+    resource: Option<FragmentResource<'_>>,
+) -> Result<String, String> {
     let (declaration, expression) = binding
         .split_once('=')
         .ok_or_else(|| "canonical WGSL fragment let binding must contain `=`".to_owned())?;
@@ -235,17 +207,21 @@ fn lower_float_binding(binding: &str) -> Result<String, String> {
         .split_once(':')
         .ok_or_else(|| "canonical WGSL fragment let binding must declare a type".to_owned())?;
     let name = name.trim();
-    if !valid_ident(name) || ty.trim() != "f32" {
+    if !valid_ident(name) || !matches!(ty.trim(), "f32" | "u32") {
         return Err(format!(
-            "canonical WGSL fragment binding `{}` must be a named f32",
+            "canonical WGSL fragment binding `{}` must be a named f32 or u32",
             declaration.trim()
         ));
     }
-    let expression = lower_scalar_expression(expression.trim())?;
-    Ok(format!("float {name} = {expression};"))
+    let expression = lower_scalar_expression(expression.trim(), resource)?;
+    let ty = if ty.trim() == "u32" { "uint" } else { "float" };
+    Ok(format!("{ty} {name} = {expression};"))
 }
 
-fn lower_fragment_return(value: &str) -> Result<String, String> {
+fn lower_fragment_return(
+    value: &str,
+    resource: Option<FragmentResource<'_>>,
+) -> Result<String, String> {
     let arguments = value
         .trim()
         .strip_prefix("vec4<f32>(")
@@ -257,23 +233,46 @@ fn lower_fragment_return(value: &str) -> Result<String, String> {
     }
     let components = components
         .into_iter()
-        .map(lower_scalar_expression)
+        .map(|component| lower_scalar_expression(component, resource))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("float4({})", components.join(", ")))
 }
 
-fn lower_scalar_expression(expression: &str) -> Result<String, String> {
+fn lower_scalar_expression(
+    expression: &str,
+    resource: Option<FragmentResource<'_>>,
+) -> Result<String, String> {
     if expression.is_empty()
         || expression.chars().any(|ch| {
             !(ch.is_ascii_alphanumeric()
-                || matches!(ch, '_' | '.' | '+' | '-' | '*' | '/' | '(' | ')' | ' '))
+                || matches!(
+                    ch,
+                    '_' | '.'
+                        | '+'
+                        | '-'
+                        | '*'
+                        | '/'
+                        | '('
+                        | ')'
+                        | ' '
+                        | '['
+                        | ']'
+                        | '&'
+                        | '|'
+                        | '<'
+                        | '>'
+                        | '%'
+                        | ','
+                ))
         })
     {
         return Err(format!(
             "unsupported canonical WGSL scalar expression `{expression}`"
         ));
     }
-    Ok(expression.replace("f32(", "float("))
+    Ok(resource::lower_reads(expression, resource)?
+        .replace("f32(", "float(")
+        .replace("u32(", "uint("))
 }
 
 fn split_top_level(source: &str, separator: char) -> Result<Vec<&str>, String> {
@@ -316,18 +315,13 @@ fn render_msl(
     vertex_entry: &str,
     fragment_entry: &str,
     fragment_statements: &[String],
-    uniform: Option<(u32, &str)>,
+    uniform: Option<FragmentResource<'_>>,
 ) -> String {
     let (uniform_metadata, uniform_parameter) = match uniform {
-        Some((slot, name)) => (
-            format!(
-                "{}{slot}\n",
-                yir_domain_shader::FRAGMENT_UNIFORM_CAPABILITY_MARKER
-            ),
-            format!(", constant float4& {name} [[buffer({slot})]]"),
-        ),
+        Some(resource) => (resource.metadata(), resource.parameter()),
         None => (String::new(), String::new()),
     };
+    let resource_prelude = uniform.map(FragmentResource::prelude).unwrap_or_default();
     let fragment_body = fragment_statements
         .iter()
         .map(|statement| format!("    {statement}\n"))
@@ -341,7 +335,7 @@ fn render_msl(
          {uniform_metadata}#include <metal_stdlib>\n\
          using namespace metal;\n\
          \n\
-         struct NuisRasterOut {{\n\
+         {resource_prelude}struct NuisRasterOut {{\n\
              float4 position [[position]];\n\
              float2 uv [[user(locn0)]];\n\
          }};\n\

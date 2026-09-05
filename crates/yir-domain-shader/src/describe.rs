@@ -66,6 +66,7 @@ pub(crate) fn describe_shader_node(
         "uniform"
         | "uniform_binding"
         | "storage"
+        | "storage_binding"
         | "attachment"
         | "texture_binding"
         | "sampler_binding"

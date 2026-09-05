@@ -353,6 +353,7 @@ fn u32_request(
 ) -> ProviderRequest {
     ProviderRequest {
         source: "test",
+        runtime_uploads: Default::default(),
         buffer: ProviderBufferDescriptor {
             id: "input.values".to_owned(),
             element_type: "u32".to_owned(),

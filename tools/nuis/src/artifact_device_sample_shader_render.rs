@@ -126,7 +126,7 @@ pub(crate) fn resolve_project_render_evidence(
             pass,
             selection,
             &table.source_fnv1a64,
-            compiled_fragment_uniform_slot(output_dir, selection)?,
+            compiled_fragment_resource_capabilities(output_dir, selection)?,
         )?);
     }
     let ordered_selections = ordered_request_selections(&table, &selections)?;
@@ -209,7 +209,7 @@ fn render_request(
     pass: &RenderPass,
     asset: &SelectedCodeAssetContribution,
     source_yir_fnv1a64: &str,
-    uniform_slot: Option<usize>,
+    uniform_capability: String,
 ) -> Result<String, String> {
     let prefix = format!("provider_request_{index}_");
     let [vertex_entry, fragment_entry] = asset.entries.as_slice() else {
@@ -230,9 +230,6 @@ fn render_request(
     } else {
         format!("output.frame.{index}")
     };
-    let uniform_capability = uniform_slot
-        .map(|slot| format!(",fragment_uniform_slot:u64:{slot}"))
-        .unwrap_or_default();
     Ok(format!(
         "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.shader.module;{prefix}buffer_element_type=u8;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape={asset_bytes};{prefix}buffer_row_stride_bytes={asset_bytes};{prefix}buffer_byte_length={asset_bytes};{prefix}buffer_payload_path={asset_path};{prefix}buffer_content_hash={asset_hash};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=shader.render.rgba8.{index};{prefix}kernel_operation=render-rgba8;{prefix}kernel_input_buffer=input.shader.module;{prefix}kernel_output_buffer={output};{prefix}kernel_dispatch={width}x{height}x1;{prefix}kernel_scalar_bindings=fragment_entry:symbol:{fragment_entry}{uniform_capability};{prefix}code_asset_descriptor_contract={DESCRIPTOR_CONTRACT};{prefix}code_asset_id={asset_id};{prefix}code_asset_format={asset_format};{prefix}code_asset_target={asset_target};{prefix}code_asset_entry={vertex_entry};{prefix}code_asset_entry_count=2;{prefix}code_asset_entries={vertex_entry},{fragment_entry};{prefix}code_asset_path={asset_path};{prefix}code_asset_byte_length={asset_bytes};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={asset_hash};{prefix}output_binding_contract=nuis-provider-output-binding-v2;{prefix}output_binding_count=1;{prefix}output_binding_0_role={output};{prefix}output_binding_0_buffer={output};{prefix}output_binding_0_element_type=u8;{prefix}output_binding_0_layout=image-2d-row-major:pixel-format=rgba8;{prefix}output_binding_0_shape={width}x{height};{prefix}output_binding_0_row_stride_bytes={row_stride};{prefix}output_binding_0_byte_length={output_length};{prefix}output_binding_0_comparison_id=none;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=0;{prefix}input_binding_contract=nuis-provider-input-binding-v2;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.shader.module;{prefix}input_binding_0_source=artifact;{prefix}input_binding_0_element_type=u8;{prefix}input_binding_0_layout=tensor-contiguous;{prefix}input_binding_0_shape={asset_bytes};{prefix}input_binding_0_row_stride_bytes={asset_bytes};{prefix}input_binding_0_byte_length={asset_bytes};{prefix}input_binding_0_content_hash={asset_hash};{prefix}input_binding_0_payload_path={asset_path};{prefix}input_binding_0_producer_request_id=none;{prefix}input_binding_0_producer_output_buffer=none;{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={PROVIDER_FAMILY};{prefix}adapter_binding_execution_requirement=real-device;{prefix}runtime_result_binding_contract={RUNTIME_RESULT_BINDING_CONTRACT};{prefix}runtime_result_source_yir_fnv1a64={source_hash};{prefix}runtime_result_module=shader;{prefix}runtime_result_instruction=draw_instanced;{prefix}runtime_result_node={result_node};{prefix}runtime_result_resource={result_resource}",
         asset_bytes = asset.byte_length,
@@ -249,18 +246,28 @@ fn render_request(
     ))
 }
 
-fn compiled_fragment_uniform_slot(
+fn compiled_fragment_resource_capabilities(
     output_dir: &Path,
     asset: &SelectedCodeAssetContribution,
-) -> Result<Option<usize>, String> {
+) -> Result<String, String> {
     let bytes = fs::read(output_dir.join(&asset.path))
         .map_err(|error| format!("failed to read render resource reflection: {error}"))?;
     if bytes.len() != asset.byte_length || fnv1a64_hex(&bytes) != asset.content_hash {
         return Err("render resource reflection code identity mismatch".to_owned());
     }
-    yir_domain_shader::fragment_uniform_capability(
-        std::str::from_utf8(&bytes).map_err(|_| "render resource reflection is not UTF-8")?,
-    )
+    let source =
+        std::str::from_utf8(&bytes).map_err(|_| "render resource reflection is not UTF-8")?;
+    let uniform = yir_domain_shader::fragment_uniform_capability(source)?;
+    let storage = yir_domain_shader::fragment_storage_capability(source)?;
+    match (uniform, storage) {
+        (None, None) => Ok(String::new()),
+        (Some(slot), None) => Ok(format!(",fragment_uniform_slot:u64:{slot}")),
+        (None, Some(storage)) => Ok(format!(
+            ",fragment_storage_slot:u64:{},fragment_storage_count:u64:{}",
+            storage.slot, storage.element_count
+        )),
+        _ => Err("render currently admits one fragment resource capability".to_owned()),
+    }
 }
 
 fn render_identity_evidence(selections: &[&SelectedCodeAssetContribution]) -> String {

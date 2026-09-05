@@ -135,12 +135,27 @@ fn rejects_render_table_source_version_drift() {
 #[cfg(target_os = "macos")]
 #[test]
 fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
+    execute_nova_projection(false);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn executes_ns_nova_owned_image_upload_and_invert_through_nuis_worker() {
+    execute_nova_projection(true);
+}
+
+#[cfg(target_os = "macos")]
+fn execute_nova_projection(image: bool) {
     let output_dir = temp_output_dir();
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
         .unwrap();
-    let project_root = workspace_root.join("examples/projects/domains/ns_nova_showcase");
+    let project_root = workspace_root.join(if image {
+        "examples/projects/domains/ns_nova_image_showcase"
+    } else {
+        "examples/projects/domains/ns_nova_showcase"
+    });
     crate::handle_build(project_root, output_dir.clone(), false, None, None, None)
         .expect("NS Nova showcase AOT build should succeed");
 
@@ -171,20 +186,20 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     assert!(!output_dir
         .join("nuis.runtime.provider-result.0000.bin")
         .exists());
-    let mut child = std::process::Command::new(std::env::current_exe().unwrap());
-    child
-        .args([
-            "--exact",
-            "artifact_device_sample_shader_render::tests::runtime_ipc_lifecycle_child",
-            "--nocapture",
-        ])
-        .env("NUIS_TEST_RUNTIME_IPC_YIR", &prepared.source_yir_path)
-        .env("NUIS_TEST_RUNTIME_IPC_PPM", output_dir.join("live.ppm"));
-    let (status, invocation_count) = prepared
-        .run_command(&mut child)
-        .expect("child-driven lifecycle IPC");
-    assert!(status.success());
-    assert_eq!(invocation_count, 3);
+    fs::remove_file(&manifest_path).unwrap();
+    assert!(
+        !manifest_path.exists(),
+        "cold launch must not require --json preparation"
+    );
+    crate::artifact_runtime_command::handle_run_artifact_with_frame_output(
+        output_dir.clone(),
+        false,
+        Some(output_dir.join("live.ppm")),
+    )
+    .expect("compiled AOT binary must drive the lifecycle through run-artifact");
+    assert!(manifest_path.is_file());
+    let binary = crate::artifact_runtime_command::resolve_run_artifact_binary_path(&output_dir)
+        .expect("compiled AOT executable");
     let runtime_stream_path = prepared.stream_path.clone();
     let runtime_stream = fs::read_to_string(&runtime_stream_path)
         .expect("Nsdb should persist the provider-neutral runtime result stream");
@@ -209,22 +224,39 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
                 instance_count: instances,
             }
             .to_dispatch();
-            let tint: [f32; 4] = [
-                if instances == 1 { 1.0 } else { 0.0 },
-                0.0,
-                if instances == 3 { 1.0 } else { 0.0 },
-                1.0,
-            ];
-            let bytes = tint
-                .into_iter()
-                .flat_map(f32::to_le_bytes)
-                .collect::<Vec<_>>();
-            yir_domain_shader::ShaderFragmentUniform {
-                slot: 2,
-                bytes: bytes.try_into().unwrap(),
+            if image {
+                let bytes = image_input(instances == 3);
+                let storage = yir_domain_shader::ShaderFragmentStorage {
+                    capability: yir_domain_shader::ShaderFragmentStorageCapability {
+                        slot: 3,
+                        element_count: 768,
+                    },
+                    upload: yir_core::provider_runtime_ipc::DispatchUpload::new(
+                        "u32",
+                        vec![768],
+                        bytes,
+                    )
+                    .unwrap(),
+                };
+                storage.bind_dispatch(&mut arguments).unwrap();
+            } else {
+                let tint: [f32; 4] = [
+                    if instances == 1 { 1.0 } else { 0.0 },
+                    0.0,
+                    if instances == 3 { 1.0 } else { 0.0 },
+                    1.0,
+                ];
+                let bytes = tint
+                    .into_iter()
+                    .flat_map(f32::to_le_bytes)
+                    .collect::<Vec<_>>();
+                yir_domain_shader::ShaderFragmentUniform {
+                    slot: 2,
+                    bytes: bytes.try_into().unwrap(),
+                }
+                .bind_dispatch(&mut arguments)
+                .unwrap();
             }
-            .bind_dispatch(&mut arguments)
-            .unwrap();
             arguments.to_wire().unwrap()
         })
     );
@@ -239,7 +271,7 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .map(|entry| entry.path())
         .find(|path| path.extension().and_then(|value| value.to_str()) == Some("yir"))
         .expect("compiled project YIR");
-    let yir_source = fs::read_to_string(yir_path).unwrap();
+    let yir_source = fs::read_to_string(&yir_path).unwrap();
     let trace = yir_runtime_host::execute_module_source_with_provider_result_stream(
         &yir_source,
         &runtime_stream_path,
@@ -266,6 +298,53 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     assert_eq!(&ppm[ppm_header.len()..], expected_rgb.as_slice());
     assert_eq!(fs::read(output_dir.join("live.ppm")).unwrap(), ppm);
 
+    let replay_output = output_dir.join("embedded-replay.ppm");
+    let hidden_yir = yir_path.with_extension("hidden-yir");
+    fs::rename(&yir_path, &hidden_yir).unwrap();
+    let replay = std::process::Command::new(&binary)
+        .arg("--export-frame")
+        .arg(&replay_output)
+        .env_remove(yir_runtime_host::PROVIDER_DISPATCH_SOCKET_ENV)
+        .env(
+            yir_runtime_host::PROVIDER_RESULT_STREAM_ENV,
+            &runtime_stream_path,
+        )
+        .output()
+        .unwrap();
+    fs::rename(hidden_yir, &yir_path).unwrap();
+    assert!(
+        replay.status.success(),
+        "{}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
+    assert_eq!(fs::read(&replay_output).unwrap(), ppm);
+    assert!(String::from_utf8_lossy(&replay.stdout).contains("embedded-yir-lifecycle"));
+
+    let unbound_output = output_dir.join("unbound.ppm");
+    let unbound = std::process::Command::new(&binary)
+        .arg("--export-frame")
+        .arg(&unbound_output)
+        .env_remove(yir_runtime_host::PROVIDER_DISPATCH_SOCKET_ENV)
+        .env_remove(yir_runtime_host::PROVIDER_RESULT_STREAM_ENV)
+        .output()
+        .unwrap();
+    assert!(!unbound.status.success());
+    assert!(String::from_utf8_lossy(&unbound.stderr).contains("exactly one registered provider"));
+    assert!(!unbound_output.exists());
+
+    let error = crate::artifact_runtime_command::handle_run_artifact_with_frame_output(
+        output_dir.clone(),
+        false,
+        Some(output_dir.join("live.ppm")),
+    )
+    .unwrap_err();
+    assert!(error.contains("already exists"));
+    assert_eq!(fs::read(output_dir.join("live.ppm")).unwrap(), ppm);
+    assert_eq!(
+        fs::read_to_string(&runtime_stream_path).unwrap(),
+        runtime_stream
+    );
+
     let first_rgba = fs::read(output_dir.join("nuis.runtime.provider-result.0000.bin")).unwrap();
     let second_rgba = fs::read(output_dir.join("nuis.runtime.provider-result.0001.bin")).unwrap();
     assert!(
@@ -280,22 +359,41 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     );
     assert!(
         first_rgba != last_rgba,
-        "Nuis-owned uniform bytes must change actual GPU pixels at the same coverage"
+        "Nuis-owned resource bytes must change actual GPU pixels at the same coverage"
     );
-    assert!(
-        first_rgba
-            .chunks_exact(4)
-            .zip(last_rgba.chunks_exact(4))
-            .all(|(red, blue)| red[0] > 0
-                && red[1] == 0
-                && red[2] == 0
-                && red[3] == 255
-                && blue[0] == 0
-                && blue[1] == 0
-                && blue[2] == red[0]
-                && blue[3] == 255),
-        "compiled tint uniform must switch identical coverage from red to blue"
-    );
+    if image {
+        for (frame, phase) in [(&first_rgba, false), (&last_rgba, true)] {
+            let input = image_input(phase);
+            for (index, pixel) in frame.chunks_exact(4).enumerate() {
+                let source_index = (index / 160 / 5 * 32 + index % 160 / 5) * 4;
+                let source = &input[source_index..source_index + 4];
+                assert_eq!(
+                    pixel,
+                    [255 - source[0], 255 - source[1], 255 - source[2], source[3]],
+                    "GPU must invert Nuis image pixel at output {index}, phase {phase}"
+                );
+            }
+        }
+        assert!(observed_arguments
+            .iter()
+            .all(|wire| wire.len() <= 256 && wire.contains("immutable-upload-le:u32:768:3072:")));
+        assert!(!runtime_stream.contains("0000803f"));
+    } else {
+        assert!(
+            first_rgba
+                .chunks_exact(4)
+                .zip(last_rgba.chunks_exact(4))
+                .all(|(red, blue)| red[0] > 0
+                    && red[1] == 0
+                    && red[2] == 0
+                    && red[3] == 255
+                    && blue[0] == 0
+                    && blue[1] == 0
+                    && blue[2] == red[0]
+                    && blue[3] == 255),
+            "compiled tint uniform must switch identical coverage from red to blue"
+        );
+    }
 
     let changed_resource_only =
         observed_arguments[2].replace("instance_count:u64:3", "instance_count:u64:1");
@@ -305,7 +403,7 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         &yir_source,
         &runtime_stream_path,
     )
-    .expect_err("even valid rehashed uniform bytes must remain bound to stream identity");
+    .expect_err("even valid rehashed resource bytes must remain bound to stream identity");
     assert!(error.contains("stream identity mismatch"));
 
     fs::write(
@@ -388,20 +486,32 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
 
     let offline_error = nsdb::execute_provider_samples(&output_dir, Some(PROVIDER_FAMILY))
         .err()
-        .expect("offline execution must not invent runtime uniform data");
+        .expect("offline execution must not invent runtime resource data");
     assert!(
-        offline_error.contains("fragment uniform is missing"),
+        offline_error.contains(if image {
+            "requires runtime upload data"
+        } else {
+            "fragment uniform is missing"
+        }),
         "{offline_error}"
     );
+    let mut child = std::process::Command::new(&binary);
     child
+        .arg("--export-frame")
+        .arg(output_dir.join("rejected.ppm"))
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     fs::write(
         &manifest_path,
-        manifest.replace("fragment_uniform_slot:u64:2", "fragment_uniform_slot:u64:3"),
+        if image {
+            manifest.replace("fragment_storage_slot:u64:3", "fragment_storage_slot:u64:4")
+        } else {
+            manifest.replace("fragment_uniform_slot:u64:2", "fragment_uniform_slot:u64:3")
+        },
     )
     .unwrap();
     let error = prepared.run_command(&mut child).unwrap_err();
+    assert!(!output_dir.join("rejected.ppm").exists());
     assert!(
         error.contains("differs from admitted code capability"),
         "{error}"
@@ -420,6 +530,7 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     );
     fs::write(&manifest_path, drifted).unwrap();
     let error = prepared.run_command(&mut child).unwrap_err();
+    assert!(!output_dir.join("rejected.ppm").exists());
     assert!(
         error.contains("verified MSL code asset capability"),
         "{error}"
@@ -433,17 +544,16 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
 }
 
 #[cfg(target_os = "macos")]
-#[test]
-fn runtime_ipc_lifecycle_child() {
-    let Some(path) = std::env::var_os("NUIS_TEST_RUNTIME_IPC_YIR") else {
-        return;
-    };
-    let source = fs::read_to_string(path).unwrap();
-    assert!(std::env::var_os(yir_runtime_host::PROVIDER_DISPATCH_SOCKET_ENV).is_some());
-    assert!(std::env::var_os(yir_runtime_host::PROVIDER_RESULT_STREAM_ENV).is_none());
-    let ppm = yir_runtime_host::render_module_to_ppm_bytes(&source, 1)
-        .expect("live Nuis lifecycle must request its own device frames");
-    fs::write(std::env::var_os("NUIS_TEST_RUNTIME_IPC_PPM").unwrap(), ppm).unwrap();
+fn image_input(phase: bool) -> Vec<u8> {
+    (0..768)
+        .flat_map(|index| {
+            if ((index % 32 / 4 + index / 32 / 4) % 2 == 1) != phase {
+                [0, 0, 255, 255]
+            } else {
+                [255, 0, 0, 255]
+            }
+        })
+        .collect()
 }
 
 #[cfg(target_os = "macos")]

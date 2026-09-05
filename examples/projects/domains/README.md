@@ -111,6 +111,10 @@ Practical shader rule:
 * the first checked-in `ns-nova` application lifecycle and PixelMagic render
   composition, including its relocatable framework package/profile boundary, is:
   [ns_nova_showcase](ns_nova_showcase)
+* the Nuis-owned image upload and inline GPU RGB-inversion companion is:
+  [ns_nova_image_showcase](ns_nova_image_showcase). Its AOT-build/runtime-child
+  regression preserves snapshot lifetime and replay identity; standalone
+  interactive execution remains open
 * the first checked-in `WitSage` report-file workload that reuses the std host
   report lane is:
   [witsage_report_file_demo](witsage_report_file_demo)

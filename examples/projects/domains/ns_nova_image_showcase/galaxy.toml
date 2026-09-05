@@ -1,0 +1,11 @@
+manifest_schema = "galaxy-manifest-v1"
+name = "ns_nova_image_showcase"
+version = "0.1.0"
+package_kind = "nuis-framework"
+framework = "ns-nova"
+project = "nuis.toml"
+summary = "First Nuis-native NS Nova application lifecycle and heterogeneous render slice."
+license = "UNLICENSED"
+repository = ""
+authors = []
+include = ["README.md", "fabric_plane.ns", "main.ns", "ns-nova.toml", "nuis.toml"]

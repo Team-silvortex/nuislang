@@ -17,6 +17,7 @@ use yir_lower_llvm::emit_module;
 use yir_verify::verify_module;
 
 mod host_ffi_stub;
+mod host_runtime_frame;
 mod host_text_runtime;
 
 use host_ffi_stub::render_host_ffi_stubs;
@@ -283,6 +284,10 @@ fn run() -> Result<(), String> {
         manifest.push(format!("host_stub={}", host_path.display()));
         if let Some(runtime_support) = &runtime_frame_support {
             manifest.push("runtime_bootstrap_mode=embedded_yir_tick".to_owned());
+            manifest.push(format!(
+                "frame_export_contract={}",
+                host_runtime_frame::FRAME_EXPORT_CONTRACT
+            ));
             manifest.push(format!(
                 "runtime_host_staticlib={}",
                 runtime_support.staticlib_path.display()
@@ -3249,51 +3254,14 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
     let mut owned_blob_runtime = String::new();
     append_c_shim_owned_blob_runtime(&mut owned_blob_runtime);
     let runtime_support = if runtime_mode {
-        format!(
-            r#"
-typedef struct {{
-    unsigned char *ptr;
-    uintptr_t len;
-}} NuisRenderedBuffer;
-
-extern int32_t nuis_render_embedded_yir_ppm(
-    const unsigned char *source_ptr,
-    uintptr_t source_len,
-    uintptr_t scale,
-    NuisRenderedBuffer *out_buffer
-);
-
-extern void nuis_rendered_buffer_free(unsigned char *ptr, uintptr_t len);
-extern void nuis_rendered_buffer_reset(NuisRenderedBuffer *out_buffer);
-
-static NSData *nuisGenerateRuntimeFrame(NSUInteger tick) {{
-    @autoreleasepool {{
-        setenv("NUIS_TICK", [[NSString stringWithFormat:@"%lu", (unsigned long)tick] UTF8String], 1);
-        static const unsigned char kNuisEmbeddedYirModule[] = {{{embedded_runtime_module_bytes}}};
-        NuisRenderedBuffer buffer;
-        nuis_rendered_buffer_reset(&buffer);
-        int32_t status = nuis_render_embedded_yir_ppm(
-            kNuisEmbeddedYirModule,
-            sizeof(kNuisEmbeddedYirModule),
-            {runtime_frame_scale},
-            &buffer
-        );
-        if (status != 0 || buffer.ptr == NULL || buffer.len == 0) {{
-            fprintf(stderr, "nuis: embedded runtime frame generation failed with status %d\n", status);
-            if (buffer.ptr != NULL) {{
-                nuis_rendered_buffer_free(buffer.ptr, buffer.len);
-            }}
-            return nil;
-        }}
-        NSData *data = [NSData dataWithBytes:buffer.ptr length:buffer.len];
-        nuis_rendered_buffer_free(buffer.ptr, buffer.len);
-        return data;
-    }}
-}}
-"#
-        )
+        host_runtime_frame::runtime_frame_source(embedded_runtime_module_bytes, runtime_frame_scale)
     } else {
         String::new()
+    };
+    let frame_export_entry = if runtime_mode {
+        host_runtime_frame::FRAME_EXPORT_ENTRY
+    } else {
+        host_runtime_frame::UNSUPPORTED_FRAME_EXPORT_ENTRY
     };
     let runtime_fields = if runtime_mode {
         r#"
@@ -3847,8 +3815,7 @@ static void nuis_stop_fabric_worker(void) {{
 @end
 
 int main(int argc, const char **argv) {{
-    (void)argc;
-    (void)argv;
+{frame_export_entry}
     nuis_yir_entry();
 {affinity_setup}
     nuis_dispatch_host_signal("boot", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");

@@ -33,7 +33,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `27/27` registered coordinates and
-`880/880` passing drift checks. The compiler data model, stage-neutral boundary,
+`890/890` passing drift checks. The compiler data model, stage-neutral boundary,
 bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
 bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
 forwarding, chunked typed payload projection, and canonical reversible active
@@ -87,15 +87,15 @@ the shared YIR token/clock/root completion receipt, ns-nova validates and preser
 that identity without a local token formula, and a pure-Nuis kernel receipt reaches
 a native executable. YIR text round-tripping now preserves explicit result edges without
 inventing a reverse loop dependency, and the full window AOT graph is checked acyclic.
-A separate-process runtime regression now requests three real Metal frames as the
-child reaches each YIR draw node through bounded provider-neutral IPC, rather than
+A compiled-binary runtime regression now requests three real Metal frames as the
+executable reaches each YIR draw node through bounded provider-neutral IPC, rather than
 pre-executing the module. They share one Nsdb session, Nuis worker PID, and adapter
 cache while retaining independent graph-output release and physical completion;
 live pixels match the persisted replay byte-for-byte. Bound live and replay draws
 now reuse Shader-owned borrowed request validation without rasterizing a CPU
 reference image; their events describe the returned RGBA8 frame, and dimensions
 come from the render pass rather than an ASCII preview's minimum size. CPU-only
-reference rendering remains available. Typed IPC v2 now carries runtime vertex
+reference rendering remains available. Typed IPC v3 carries runtime vertex
 and instance counts from the Nuis loop into registered device dispatch and
 hash-bound replay. On M2, `3/2/3` vertices produce full/clear/full frames while
 retaining live/replay equality and adapter cache reuse. A Nuis-owned four-f32 tuple
@@ -105,9 +105,27 @@ checks, optimization, and YIR lowering. Shader owns type/shape/finite-value chec
 the registered adapter admits the compiled slot, and Metal reflection checks the
 actual read-only float4 buffer before a 16-byte upload. The bounded IPC envelope
 and replay bind slot, type, shape, little-endian bytes, and content identity without
-accepting pointers or paths. Unsupported bindings fail closed. Code-asset authority
-and output extents remain fixed; large buffers/textures, whole-app session
-continuity, self-contained host-runner injection,
+accepting pointers or paths. The companion
+[image showcase](examples/projects/domains/ns_nova_image_showcase) now fills a
+32x24 RGBA8 image in Nuis, snapshots and frees its original Buffer, and uploads
+3,072 checked little-endian u32 bytes through a separate bounded binary carrier.
+Inline WGSL performs RGB inversion on Metal; fixed-array reflection and generated
+checked reads constrain the resource. The control argument limit stays 256 bytes,
+and replay retains content-bound descriptors rather than duplicate input images.
+The image regression checks every GPU pixel alongside the existing tint regression.
+It also exposed and fixed missing guard/call ordering and ignored function-local
+early returns in the YIR execution path. General buffer-writing `while` lowering
+remains incomplete, so image generation uses logarithmic-depth recursion.
+`nuis run-artifact --export-frame <new.ppm> <artifact-dir>` now runs the complete
+bounded lifecycle through the compiled native host, not a test executable, and
+exports its last frame without opening a window. The host embeds the YIR runtime;
+this is not yet fully native CPU execution or a self-contained Nsld image.
+It requires registered live IPC or explicit replay, never reference fallback.
+Exports refuse to overwrite existing files and do not create output on rejected
+dispatch. The same binary replays without reading the external YIR file.
+Unsupported bindings fail closed. Code-asset authority and output extents remain
+fixed; textures/samplers, mixed resources, whole-app session continuity,
+self-contained host-runner injection,
 and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are
 preserved, while physical DPU/IPU/RDMA certification is deferred until suitable

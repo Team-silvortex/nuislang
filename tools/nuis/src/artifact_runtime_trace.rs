@@ -61,6 +61,10 @@ pub(crate) struct HeteroRuntimeTraceSummary {
 }
 
 impl HeteroRuntimeTraceSummary {
+    pub(crate) fn available(&self) -> bool {
+        self.available
+    }
+
     pub(crate) fn from_link_plan(
         plan: Option<&nuisc::linker::LinkPlan>,
         payload_evidence: &BackendArtifactPayloadEvidence,

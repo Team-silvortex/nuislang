@@ -27,12 +27,13 @@ From the repository root:
 cargo run -p nuis -- galaxy check examples/projects/domains/ns_nova_showcase
 cargo run -p nuis -- check examples/projects/domains/ns_nova_showcase
 cargo run -p nuis -- build examples/projects/domains/ns_nova_showcase build/ns-nova-showcase
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -q -p nuis -- run-artifact --export-frame build/ns-nova-showcase/result.ppm build/ns-nova-showcase
 ```
 
 This is a bounded lifecycle proof, not a claim of a stable interactive world loop.
 The current helper carries aggregate application state through every iteration.
-The separate-process M2 regression sends each validated draw through registered
-provider IPC v2, observes a same-command Metal completion, and binds canonical
+The compiled-binary M2 regression sends each validated draw through registered
+provider IPC v3, observes a same-command Metal completion, and binds canonical
 runtime scalars and immutable resource bytes into result-stream v2 replay. The
 three-vertex frames have matching coverage but red/blue pixels selected by Nuis
 tint values; the two-vertex frame stays cleared because no triangle is formed.
@@ -52,10 +53,12 @@ The unchanged 256-byte argument budget is not a bulk-resource transport.
 
 Legacy packet values are validated for the structural CPU reference preview, not
 uploaded as GPU uniforms; that preview is not a WGSL pixel-equivalence oracle.
-The real-pixel proof executes a runtime child after an AOT build, not a standalone
-interactive window binary with self-contained provider injection. The existing
+`--export-frame` runs one complete embedded YIR lifecycle inside the compiled host
+binary and exports the last presented frame without opening a window. The output
+must be a new path. This replaces the test-only child, not the embedded interpreter
+with fully native CPU lowering or a self-contained provider session. The existing
 Metal OS adapter remains a native compatibility bridge. Continuous event dispatch,
-large buffers/textures, self-contained runner injection, and cross-host window
-adapters remain active work. Rebuild artifacts after the profile and Metal runner
-v3 changes. Offline rendering cannot invent required uniform data, and unsupported
-resource contracts never fall back to an unbound replay.
+textures, self-contained runner injection and cross-host windows remain active work;
+the image companion now covers one bounded immutable storage buffer. Rebuild old
+artifacts for the frame-export contract and Metal runner v4. Offline rendering cannot
+invent required uniform data, and unsupported resources never use an unbound replay.

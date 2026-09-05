@@ -34,9 +34,35 @@ pub(in crate::lowering) fn collect_guarded_loop_direct_call_functions(
         .filter(|function| !function.is_async)
         .filter(|function| reachable.contains(&function.name))
         .filter(|function| supports_direct_call_signature(function))
-        .filter(|function| stmts_contain_guarded_loop_boundary(&function.body, &pure_helpers))
+        // A guarded borrowed-buffer helper must return to its caller, not from it.
+        .filter(|function| {
+            stmts_contain_guarded_loop_boundary(&function.body, &pure_helpers)
+                || (function.params.iter().any(|param| param.ty.is_ref && param.ty.name == "Buffer")
+                    && !pure_helpers.contains(&function.name)
+                    && function.body.iter().any(|stmt| matches!(stmt,
+                        NirStmt::If { then_body, else_body, .. }
+                            if else_body.is_empty() && matches!(then_body.as_slice(), [NirStmt::Return(Some(_))])
+                    )))
+        })
         .map(|function| function.name.clone())
         .collect()
+}
+
+/// A guard is a control boundary even for pure operations that can trap.
+pub(super) fn order_guarded_function_nodes(state: &mut LoweringState<'_>, start: usize) {
+    let mut guard: Option<String> = None;
+    let mut edges = Vec::new();
+    for node in &state.yir.nodes[start..] {
+        if let Some(previous) = &guard {
+            edges.push((previous.clone(), node.name.clone()));
+        }
+        if node.op.module == "cpu" && node.op.instruction == "guard_return" {
+            guard = Some(node.name.clone());
+        }
+    }
+    for (from, to) in edges {
+        crate::lowering::edge_helpers::push_effect_edge(state, &from, &to);
+    }
 }
 
 fn stmts_contain_guarded_loop_boundary(stmts: &[NirStmt], pure_helpers: &BTreeSet<String>) -> bool {

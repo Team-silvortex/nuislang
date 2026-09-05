@@ -133,9 +133,9 @@ use std::{
     thread,
 };
 
-pub(crate) use artifact_doctor::{
-    collect_artifact_output_diagnostics, probe_artifact_doctor, run_build_output_self_check,
-};
+#[cfg(test)]
+pub(crate) use artifact_doctor::run_build_output_self_check;
+pub(crate) use artifact_doctor::{collect_artifact_output_diagnostics, probe_artifact_doctor};
 use artifact_doctor_render::append_artifact_output_diagnostic_json_fields;
 #[cfg(test)]
 pub(crate) use artifact_doctor_render::render_artifact_doctor_json;
@@ -606,7 +606,12 @@ fn run() -> Result<(), String> {
             target,
             packaging_mode,
         )?,
-        cli::CommandKind::RunArtifact { input, json } => handle_run_artifact(input, json)?,
+        cli::CommandKind::RunArtifact { input, json, frame_output } => {
+            match frame_output {
+                Some(output) => artifact_runtime_command::handle_run_artifact_with_frame_output(input, json, Some(output))?,
+                None => handle_run_artifact(input, json)?,
+            }
+        }
         cli::CommandKind::DebugResume {
             input,
             json,
@@ -678,31 +683,9 @@ fn sanitize_workflow_path_label(label: &str) -> String {
     }
 }
 
-fn handle_build(
-    input: std::path::PathBuf,
-    output_dir: std::path::PathBuf,
-    verbose_cache: bool,
-    cpu_abi: Option<String>,
-    target: Option<String>,
-    packaging_mode: Option<String>,
-) -> Result<(), String> {
-    nuisc::run(nuisc::CommandKind::Compile {
-        input,
-        output_dir: output_dir.clone(),
-        verbose_cache,
-        cpu_abi,
-        target,
-        packaging_mode,
-    })?;
-    let doctor = run_build_output_self_check(&output_dir)?;
-    if success_logs_enabled() {
-        println!("build: self-check");
-        println!("  ready_to_run: {}", doctor.ready_to_run);
-        println!("  recommended_next_step: {}", doctor.recommended_next_step);
-        println!("  recommended_command: {}", doctor.recommended_command);
-    }
-    Ok(())
-}
+#[path = "build_command.rs"]
+mod build_command;
+use build_command::handle_build;
 
 pub(crate) fn resolve_frontdoor_build_manifest_path(input: &Path) -> Result<PathBuf, String> {
     if input.file_name().and_then(|value| value.to_str()) == Some("nuis.build.manifest.toml") {

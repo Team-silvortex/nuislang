@@ -24,7 +24,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftC
     DevTensorDriftCheckSpec {
         id: "metal-immutable-uniform-upload",
         path: "tools/nsdb/provider-runners/metal_rgba8_render.m",
-        required_patterns: &["nuis-metal-rgba8-render-provider-runner-v3", "MTLArgumentAccessReadOnly", "MTLDataTypeFloat4", "newBufferWithBytes:uniformValues", "setFragmentBuffer:uniformBuffer"],
+        required_patterns: &["nuis-metal-rgba8-render-provider-runner-v4", "MTLArgumentAccessReadOnly", "MTLDataTypeFloat4", "newBufferWithBytes:uniformValues", "setFragmentBuffer:uniformBuffer"],
     },
     DevTensorDriftCheckSpec {
         id: "runtime-uniform-replay-identity-regression",
@@ -34,7 +34,42 @@ pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftC
     DevTensorDriftCheckSpec {
         id: "ns-nova-real-tint-pixel-regression",
         path: "tools/nuis/src/artifact_device_sample_shader_render_tests.rs",
-        required_patterns: &["Nuis-owned uniform bytes must change actual GPU pixels", "compiled tint uniform must switch identical coverage from red to blue", "offline execution must not invent runtime uniform data", "differs from admitted code capability"],
+        required_patterns: &["Nuis-owned resource bytes must change actual GPU pixels", "compiled tint uniform must switch identical coverage from red to blue", "offline execution must not invent runtime resource data", "differs from admitted code capability"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "runtime-bounded-immutable-upload-contract",
+        path: "crates/yir-core/src/provider_runtime_upload.rs",
+        required_patterns: &["pub struct DispatchUpload", "MAX_UPLOAD_BYTES", "immutable-upload-le", "runtime upload payload identity mismatch", "runtime upload payload is missing"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-storage-layout-and-snapshot-contract",
+        path: "crates/yir-domain-shader/src/fragment_storage.rs",
+        required_patterns: &["nuis-shader-fragment-storage-v1", "u32::try_from", "pixel.to_le_bytes()", "fragment storage layout differs from its upload", "failed binding must not mutate dispatch"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-storage-checked-read-lowering",
+        path: "tools/nuisc/src/shader_msl_render_resource.rs",
+        required_patterns: &["storage,read", "array<u32,", "const device NuisFragmentStorage&", "buffer.values[index] : 0u", "fragment array read must target the admitted resource", "requires group-zero fragment vec4<f32> uniform or read-only u32 storage"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "metal-owned-storage-carrier-upload",
+        path: "tools/nsdb/provider-runners/metal_rgba8_render.m",
+        required_patterns: &["readStorage", "NUISPFD1", "MTLArgumentAccessReadOnly", "MTLDataTypeUInt", "newBufferWithBytes:storage.bytes", "setFragmentBuffer:storageBuffer"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-nuis-owned-image-generation",
+        path: "stdlib/pixelmagic/lib/pixels.ns",
+        required_patterns: &["pub fn fill_checkerboard(", "pub fn fill_checkerboard_region(", "pixels[start] = pixel", "end > pixels.len", "pixels.len > 4194304"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "ns-nova-real-owned-image-regression",
+        path: "tools/nuis/src/artifact_device_sample_shader_render_tests.rs",
+        required_patterns: &["executes_ns_nova_owned_image_upload_and_invert_through_nuis_worker", "GPU must invert Nuis image pixel", "immutable-upload-le:u32:768:3072:", "live.ppm", "render_trace_to_ppm_bytes"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "guard-buffer-read-before-free-regression",
+        path: "tools/nuisc/src/lowering/tests_guard_buffer_order.rs",
+        required_patterns: &["guard_buffer_reads_precede_recursive_call_snapshot_and_free", "copy_bytes(buffer)", "free(buffer)", "yir_verify::verify_module"],
     },
     DevTensorDriftCheckSpec {
         id: "shader-canonical-vertex-rejects-substitution",
@@ -707,6 +742,31 @@ pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftC
             "nuis-provider-code-asset-contribution-selection-set-v1",
             "selected_count == 1",
             "validates_verified_or_not_applicable_selection",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "compiled-host-frame-export-launch",
+        path: "tools/nuis/src/artifact_runtime_launch.rs",
+        required_patterns: &[
+            "handle_run_artifact_with_frame_output", "frame_export::validate",
+            "--export-frame", "prepared.run_command", "frame_export::verify_output",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "embedded-yir-frame-export-boundary",
+        path: "crates/yir-runtime-host/src/frame_export.rs",
+        required_patterns: &[
+            "nuis-embedded-yir-frame-export-v1", "live == replay", "!cfg!(unix)",
+            "let bytes = render()?", ".create_new(true)",
+            "output_created_during_render_is_preserved", "failed_lifecycle_leaves_no_partial_frame",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "aot-embedded-frame-export-entry",
+        path: "tools/yir-pack-aot/src/host_runtime_frame.rs",
+        required_patterns: &[
+            "nuis-embedded-yir-frame-export-v1", "--export-frame", "nuis_export_embedded_yir_ppm",
+            "kNuisEmbeddedYirModule", "return frame_export_status", "UNSUPPORTED_FRAME_EXPORT_ENTRY",
         ],
     },
 ];

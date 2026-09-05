@@ -63,8 +63,15 @@ pub(crate) fn prepare_render_pass<'a>(
                 .iter()
                 .all(|binding| matches!(binding.kind.as_str(), "uniform" | "uniform_binding"))
     });
+    let storage_only = bindings.is_some_and(|bindings| {
+        !bindings.bindings.is_empty()
+            && bindings
+                .bindings
+                .iter()
+                .all(|binding| matches!(binding.kind.as_str(), "storage" | "storage_binding"))
+    });
     let geometry = bindings
-        .filter(|_| !uniform_only)
+        .filter(|_| !uniform_only && !storage_only)
         .map(resolve_geometry_inputs)
         .transpose()?;
     let width = pass.viewport.width.min(pass.target.width);
@@ -72,11 +79,16 @@ pub(crate) fn prepare_render_pass<'a>(
     let mut descriptor = ShaderDrawDescriptor::new(width, height)?;
     descriptor.vertex_count = vertex_count as u64;
     descriptor.instance_count = instance_count as u64;
-    descriptor.unbound_rgba8_triangle_strip = (bindings.is_none() || uniform_only)
+    descriptor.unbound_rgba8_triangle_strip = (bindings.is_none() || uniform_only || storage_only)
         && pass.target.format == "rgba8_unorm"
         && pass.pipeline.topology == "triangle_strip";
     if uniform_only {
         descriptor.fragment_uniform = Some(crate::ShaderFragmentUniform::from_bindings(
+            bindings.unwrap(),
+        )?);
+    }
+    if storage_only {
+        descriptor.fragment_storage = Some(crate::ShaderFragmentStorage::from_bindings(
             bindings.unwrap(),
         )?);
     }

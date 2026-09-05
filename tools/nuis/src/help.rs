@@ -32,7 +32,7 @@ pub(crate) fn print_help() {
     println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply --until-clean");
     println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply --until-clean --json");
     println!(
-        "    nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+        "    nuis run-artifact [--json | --export-frame PATH] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
     );
     println!(
         "    nuis debug-resume [--json] [--break-at TARGET | --break-phase PHASE --break-entry SYMBOL] [--save-cursor PATH] <artifact-output-dir|nuis.build.manifest.toml>"

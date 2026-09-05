@@ -4,12 +4,17 @@ use std::collections::BTreeMap;
 mod resource;
 pub use resource::DispatchResource;
 
+#[path = "provider_runtime_upload.rs"]
+mod upload;
+pub use upload::{DispatchUpload, MAX_UPLOAD_BYTES};
+
 /// Bounded, canonical inputs. Domain semantics belong to the registered adapter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DispatchArguments {
     pub contract: String,
     pub scalars: BTreeMap<String, u64>,
     pub resources: BTreeMap<String, DispatchResource>,
+    pub uploads: BTreeMap<String, DispatchUpload>,
 }
 
 impl DispatchArguments {
@@ -17,7 +22,7 @@ impl DispatchArguments {
         if !identifier(&self.contract)
             || self.scalars.is_empty()
             || self.scalars.len() > 8
-            || self.resources.len() > 4
+            || self.resources.len() + self.uploads.len() > 4
         {
             return Err("runtime dispatch argument contract or count is invalid".to_owned());
         }
@@ -34,6 +39,20 @@ impl DispatchArguments {
             }
             wire.push_str(&format!("|{name}:{}", resource.to_wire()?));
         }
+        let mut upload_bytes = 0usize;
+        for (name, upload) in &self.uploads {
+            if !identifier(name)
+                || self.scalars.contains_key(name)
+                || self.resources.contains_key(name)
+            {
+                return Err("runtime upload name is invalid or duplicated".to_owned());
+            }
+            wire.push_str(&format!("|{name}:{}", upload.to_wire()?));
+            upload_bytes = upload_bytes
+                .checked_add(upload.byte_length)
+                .filter(|bytes| *bytes <= MAX_UPLOAD_BYTES)
+                .ok_or("runtime upload total exceeds byte budget")?;
+        }
         if wire.len() > 256 {
             return Err("runtime dispatch arguments exceed wire limit".to_owned());
         }
@@ -48,7 +67,17 @@ impl DispatchArguments {
         let contract = fields.next().unwrap_or_default().to_owned();
         let mut scalars = BTreeMap::new();
         let mut resources = BTreeMap::new();
+        let mut uploads = BTreeMap::new();
         for field in fields {
+            if let Some((name, value)) = field.split_once(":immutable-upload-le:") {
+                if uploads
+                    .insert(name.to_owned(), DispatchUpload::parse(value)?)
+                    .is_some()
+                {
+                    return Err("runtime upload is duplicated".to_owned());
+                }
+                continue;
+            }
             if let Some((name, value)) = field.split_once(":immutable-le:") {
                 if resources
                     .insert(name.to_owned(), DispatchResource::parse(value)?)
@@ -72,11 +101,28 @@ impl DispatchArguments {
             contract,
             scalars,
             resources,
+            uploads,
         };
         if arguments.to_wire()? != wire {
             return Err("runtime dispatch arguments are not canonical".to_owned());
         }
         Ok(arguments)
+    }
+
+    /// Replay and replies retain identity, not another copy of the input payload.
+    pub fn descriptor(&self) -> Self {
+        Self {
+            uploads: self
+                .uploads
+                .iter()
+                .map(|(name, upload)| (name.clone(), upload.descriptor()))
+                .collect(),
+            ..self.clone()
+        }
+    }
+
+    pub fn matches_identity(&self, other: &Self) -> Result<bool, String> {
+        Ok(self.to_wire()? == other.to_wire()?)
     }
 }
 

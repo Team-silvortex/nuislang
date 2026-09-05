@@ -274,7 +274,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         required_patterns: &[
             "LoweredMslRenderModule",
             "lower_canonical_inline_wgsl_render_for_profile",
-            "requires group-zero fragment vec4<f32> uniform",
+            "shader_msl_render_resource.rs",
             "refusing to substitute fullscreen geometry",
             "nuis-module-native-ir msl2.4",
             "vertex_id",
@@ -477,7 +477,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
             "crate::render_run_artifact_json",
             "nuis-provider-code-asset-descriptor-v2",
             "prepare_runtime_provider_results",
-            "runtime_ipc_lifecycle_child",
+            "handle_run_artifact_with_frame_output",
             "child-yir-node-ipc",
             "frame_count = 3",
             "render_module_to_ppm_bytes_with_provider_result_stream",
@@ -523,7 +523,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         path: "tools/nuis/src/artifact_runtime_provider_results.rs",
         required_patterns: &[
             "provider_runtime_result_targets",
-            "find_source_yir",
+            "ensure_runtime_provider_manifest",
             "source_yir_path",
             "currently requires exactly one target",
             "ipc::run_command",
@@ -534,7 +534,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         id: "yir-provider-runtime-ipc-contract",
         path: "crates/yir-core/src/provider_runtime_ipc.rs",
         required_patterns: &[
-            "nuis-yir-provider-runtime-ipc-v2",
+            "nuis-yir-provider-runtime-ipc-v3",
             "MAX_DISPATCHES",
             "MAX_PAYLOAD_BYTES",
             "runtime IPC payload identity mismatch",

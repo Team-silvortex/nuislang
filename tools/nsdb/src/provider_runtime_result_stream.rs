@@ -146,7 +146,7 @@ impl ProviderRuntimeResult {
         Ok(Some(Self {
             arguments: arguments
                 .ok_or("runtime result lacks validated dispatch arguments")?
-                .clone(),
+                .descriptor(),
             source_yir_fnv1a64: binding.source_yir_fnv1a64.clone(),
             provider_family: provider_family.to_owned(),
             request_id: request.kernel.id.clone(),
