@@ -470,8 +470,8 @@ The `beta-0.1` calibration baseline is:
   blocks stale admission before mutation. `official.cffi` now owns two generated GNU resolver providers and four version rows; Nuisc validates and preserves them, Nsld consumes a static build-time table, and runtime registry identity remains `0xc6631e590d61aca8`. Architecture and PE/COFF parity remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `usable/74`, optional;
   reference replay is bound while physical certification and adapters remain open
-* `standard-library/ns-nova/application-rendering-framework`: `active/98`, optional;
-  compiled PixelMagic WGSL is now projected automatically from verified project YIR into a content-addressed MSL contribution and a registration-resolved provider request; code-asset descriptor v2 binds the ordered vertex/fragment entries, and a real NS Nova AOT run reaches the persistent Nuis worker, returning a verified 160x120 RGBA8 frame plus a same-command Metal fence. Live framework consumption of that worker result, shader resource bindings, and continuous event dispatch remain open
+* `standard-library/ns-nova/application-rendering-framework`: `active/99`, optional;
+  compiled PixelMagic WGSL is projected from verified project YIR into a content-addressed MSL contribution and a registration-resolved provider request. A separate-process regression now requests three real 160x120 RGBA8 frames when the child reaches each YIR draw node through `nuis-yir-provider-runtime-ipc-v1`, with no provider preexecution during preparation. One registered Nsdb session, worker PID, and adapter cache span request sequences `0/1/2`; each graph releases its GLM outputs and returns a same-command Metal completion. Live pixels equal the persisted replay byte-for-byte. Per-draw reference validation, whole-app session continuity, resource bindings, multi-target scheduling, self-contained injection, and non-Metal parity remain open
 
 These scores describe the new beta slices only. Existing `stable/100` cells
 remain evidence that their narrower protocol milestone closed; they are not a

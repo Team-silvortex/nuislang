@@ -282,10 +282,10 @@ struct ValidatedOutput {
 fn validate_output(source: &str, index: usize) -> Result<ValidatedOutput, String> {
     let value = |name| required(source, &format!("native_output_{index}_{name}"));
     let clock = value("completion_clock_evidence")?;
-    validate_clock(&clock)?;
+    let has_physical_completion = validate_clock(&clock)?;
     let completion_token = value("completion_token")?;
     if value("completion_evidence_contract")? != COMPLETION_CONTRACT
-        || value("completion_status")? != "worker-output-verified"
+        || !completion_status_matches(&value("completion_status")?, has_physical_completion)
     {
         return Err(format!(
             "provider completion output {index} completion contract is invalid"
@@ -348,7 +348,10 @@ fn validate_output(source: &str, index: usize) -> Result<ValidatedOutput, String
         value("output_handle_ownership_token")?,
         completion_token,
         release_token,
-        value("comparison_contract")?,
+        present(
+            source,
+            &format!("native_output_{index}_comparison_contract")
+        )?,
         value("comparison_status")?
     );
     Ok(ValidatedOutput {
@@ -359,7 +362,7 @@ fn validate_output(source: &str, index: usize) -> Result<ValidatedOutput, String
     })
 }
 
-fn validate_clock(clock: &str) -> Result<(), String> {
+fn validate_clock(clock: &str) -> Result<bool, String> {
     let clock = clock
         .strip_prefix(&format!("{COMPLETION_CLOCK_CONTRACT}:domain="))
         .ok_or_else(|| "provider completion clock contract mismatch".to_owned())?;
@@ -369,12 +372,32 @@ fn validate_clock(clock: &str) -> Result<(), String> {
     let (session, worker) = sequence
         .split_once(":worker=")
         .ok_or_else(|| "provider completion clock has no worker tick".to_owned())?;
-    if session.parse::<usize>().ok() != worker.parse::<usize>().ok()
-        || session.parse::<usize>().is_err()
-    {
+    let (worker, physical) = worker
+        .split_once(":physical=")
+        .map_or((worker, None), |(worker, physical)| {
+            (worker, Some(physical))
+        });
+    let session = session
+        .parse::<usize>()
+        .map_err(|_| "provider completion clock has an invalid session tick".to_owned())?;
+    let worker = worker
+        .parse::<usize>()
+        .map_err(|_| "provider completion clock has an invalid worker tick".to_owned())?;
+    if session != worker {
         return Err("provider completion clock session and worker ticks diverged".to_owned());
     }
-    Ok(())
+    let has_physical_completion = physical.is_some();
+    if let Some(physical) = physical {
+        yir_core::ProviderPhysicalCompletion::parse(physical)?;
+    }
+    Ok(has_physical_completion)
+}
+
+fn completion_status_matches(status: &str, has_physical_completion: bool) -> bool {
+    matches!(
+        (status, has_physical_completion),
+        ("worker-output-verified", false) | ("physical-fence-and-worker-output-verified", true)
+    )
 }
 
 fn release_manifest(roles: &str, buffers: &str) -> Result<String, String> {
@@ -612,7 +635,52 @@ fn push_toml_string(out: &mut String, key: &str, value: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_code_asset_identity, validate_code_asset_identity_set};
+    use super::{
+        completion_status_matches, present, validate_clock, validate_code_asset_identity,
+        validate_code_asset_identity_set,
+    };
+
+    #[test]
+    fn validates_logical_and_optional_physical_completion_clocks() {
+        let logical = "nuis-provider-completion-clock-v1:domain=provider-session:data:host:0x0123456789abcdef:session=2:worker=2";
+        let physical = format!(
+            "{logical}:physical={}",
+            yir_core::ProviderPhysicalCompletion::new(
+                "shader.runtime",
+                "apple.mach-continuous.v1",
+                "metal.command-buffer.completed",
+                42,
+            )
+            .unwrap()
+            .to_wire()
+        );
+
+        assert_eq!(validate_clock(logical), Ok(false));
+        assert_eq!(validate_clock(&physical), Ok(true));
+        assert!(validate_clock(&logical.replace("worker=2", "worker=1")).is_err());
+        assert!(validate_clock(&format!("{logical}:physical=invalid")).is_err());
+        assert!(completion_status_matches("worker-output-verified", false));
+        assert!(completion_status_matches(
+            "physical-fence-and-worker-output-verified",
+            true
+        ));
+        assert!(!completion_status_matches("worker-output-verified", true));
+        assert!(!completion_status_matches(
+            "physical-fence-and-worker-output-verified",
+            false
+        ));
+    }
+
+    #[test]
+    fn preserves_explicit_none_for_optional_completion_fields() {
+        let source = "native_output_0_comparison_contract = \"none\"\n";
+
+        assert_eq!(
+            present(source, "native_output_0_comparison_contract"),
+            Ok("none".to_owned())
+        );
+        assert!(present(source, "native_output_0_missing").is_err());
+    }
 
     #[test]
     fn validates_project_identity_and_explicit_not_applicable_state() {

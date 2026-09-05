@@ -64,7 +64,7 @@ pub(super) fn assert_provider_execution_evidence(provider_output_payload_path: &
         "native_output_1_output_carrier_mode = \"inherited-fd-output\"",
         "native_output_0_session_lease_contract = \"nuis-provider-session-lease-v1\"",
         "native_output_0_session_adapter_id = \"logical.request-process.v1\"",
-        "native_output_0_session_lifecycle_hooks = \"graph-open,request-begin,request-complete,graph-close\"",
+        "native_output_0_session_lifecycle_hooks = \"session-open,graph-open,request-begin,request-complete,graph-close,session-close\"",
         "native_output_3_session_request_sequence = \"3\"",
         "native_output_4_session_request_sequence = \"0\"",
         "native_output_5_session_request_sequence = \"4\"",

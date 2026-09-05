@@ -522,8 +522,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS: &[DevTensorDriftChec
                 "nuis-provider-session-lease-v1",
                 "nuis-provider-output-handle-v1",
                 "logical.request-process.v1",
-                "graph-open,request-begin,request-complete,graph-close",
-                "graph-lease-only",
+                "session-open,graph-open,request-begin,request-complete,graph-close,session-close",
+                "runtime-dispatch-session",
                 "glm:provider-session-output:",
                 "ProviderSessionOutputHandle",
                 "begin_request_with_output_roles",
@@ -535,7 +535,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS: &[DevTensorDriftChec
         },
         DevTensorDriftCheckSpec {
             id: "nsdb-provider-session-execution",
-            path: "tools/nsdb/src/provider_sample_execute.rs",
+            path: "tools/nsdb/src/provider_runtime_dispatch_session.rs",
             required_patterns: &[
                 "select_provider_session_adapter",
                 "ProviderSessionLease::open",
@@ -544,6 +544,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS: &[DevTensorDriftChec
                 "bind_session_output",
                 "graph_output_close",
                 "bind_provider_completion_evidence",
+                "execute_repeated",
+                "ProviderRuntimeDispatchSessionEvidence",
+                "runtime_dispatch_observations",
+                "ProviderWorkerLeaseManager",
+                "ProviderProcessAdapterCache",
             ],
         },
         DevTensorDriftCheckSpec {

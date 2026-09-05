@@ -400,7 +400,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "PayloadExecutionProviderCompletion",
             "provider_completion_digest_contract",
             "provider_completion_set_hash",
-            "provider_completion_collection_preserves_order_and_hashes_records",
+            "mod provider_completion_collection_tests",
         ],
     },
     DevTensorDriftCheckSpec {

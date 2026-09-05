@@ -74,6 +74,7 @@ mod provider_runner_metal_u32;
 mod provider_runner_native;
 mod provider_runner_registry;
 mod provider_runner_vulkan;
+mod provider_runtime_dispatch_session;
 mod provider_runtime_result_stream;
 mod provider_sample;
 mod provider_sample_artifact;

@@ -432,11 +432,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
     },
     DevTensorDriftCheckSpec {
         id: "nsdb-compiled-contribution-prelaunch-gate",
-        path: "tools/nsdb/src/provider_sample_execute.rs",
+        path: "tools/nsdb/src/provider_runtime_dispatch_session.rs",
         required_patterns: &[
             "validate_compiled_contribution_selection",
             "provider_request_collection_from_evidence",
-            "let mut worker_leases",
+            "worker_leases: ProviderWorkerLeaseManager",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -670,6 +670,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "native-output collection hash mismatch",
             "completion token mismatch",
             "GLM release token mismatch",
+            "physical-fence-and-worker-output-verified",
+            "ProviderPhysicalCompletion::parse",
+            "validates_logical_and_optional_physical_completion_clocks",
             "append_hash_material",
             "code_asset_identity_contract",
             "code_asset_identity_status",

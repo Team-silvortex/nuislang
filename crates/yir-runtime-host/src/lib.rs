@@ -1,8 +1,13 @@
 mod provider_result_stream;
+#[cfg(unix)]
+mod provider_runtime_ipc;
 
 use std::{path::Path, ptr, slice};
 
 pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
+#[cfg(unix)]
+pub use provider_runtime_ipc::execute_module_source_with_provider_ipc;
+pub use yir_core::provider_runtime_ipc::SOCKET_ENV as PROVIDER_DISPATCH_SOCKET_ENV;
 
 use yir_core::ModRegistry;
 use yir_exec::ExecutionTrace;
@@ -14,6 +19,16 @@ pub struct NuisRenderedBuffer {
 }
 
 pub fn render_module_to_ppm_bytes(module_source: &str, scale: usize) -> Result<Vec<u8>, String> {
+    #[cfg(unix)]
+    if let Some(path) = std::env::var_os(PROVIDER_DISPATCH_SOCKET_ENV) {
+        if std::env::var_os(PROVIDER_RESULT_STREAM_ENV).is_some() {
+            return Err(
+                "runtime provider source is ambiguous: both IPC and replay are set".to_owned(),
+            );
+        }
+        let trace = execute_module_source_with_provider_ipc(module_source, path)?;
+        return render_trace_to_ppm_bytes(&trace, scale);
+    }
     let trace = match std::env::var_os(PROVIDER_RESULT_STREAM_ENV) {
         Some(path) => execute_module_source_with_provider_result_stream(module_source, path)?,
         None => {

@@ -164,21 +164,27 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
             .expect("runtime result preparation")
             .expect("NS Nova runtime result target");
     assert_eq!(prepared.target_count, 1);
-    assert_eq!(prepared.invocation_count, 3);
-    let report = &prepared.report;
-    assert_eq!(report.output_payload_count, 1);
-    assert_eq!(
-        report.first_output_payload_native_output_kind,
-        "provider-frame-rgba8"
+    assert!(
+        !prepared.stream_path.exists(),
+        "preparation must not execute the provider"
     );
-    assert_eq!(
-        report.first_output_payload_native_output_bytes,
-        (160 * 120 * 4).to_string()
-    );
-    assert_eq!(
-        report.first_output_payload_native_execution_status,
-        "metal-command-buffer-completed"
-    );
+    assert!(!output_dir
+        .join("nuis.runtime.provider-result.0000.bin")
+        .exists());
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+    child
+        .args([
+            "--exact",
+            "artifact_device_sample_shader_render::tests::runtime_ipc_lifecycle_child",
+            "--nocapture",
+        ])
+        .env("NUIS_TEST_RUNTIME_IPC_YIR", &prepared.source_yir_path)
+        .env("NUIS_TEST_RUNTIME_IPC_PPM", output_dir.join("live.ppm"));
+    let (status, invocation_count) = prepared
+        .run_command(&mut child)
+        .expect("child-driven lifecycle IPC");
+    assert!(status.success());
+    assert_eq!(invocation_count, 3);
     let runtime_stream_path = prepared.stream_path;
     let runtime_stream = fs::read_to_string(&runtime_stream_path)
         .expect("Nsdb should persist the provider-neutral runtime result stream");
@@ -210,6 +216,7 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         .flat_map(|pixel| pixel[..3].iter().copied())
         .collect::<Vec<_>>();
     assert_eq!(&ppm[ppm_header.len()..], expected_rgb.as_slice());
+    assert_eq!(fs::read(output_dir.join("live.ppm")).unwrap(), ppm);
 
     let first_frame = output_dir.join("nuis.runtime.provider-result.0000.bin");
     let mut drifted_frame = fs::read(&first_frame).unwrap();
@@ -228,6 +235,53 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     .unwrap();
     assert!(payload.contains("nuis-provider-worker-process-adapter-v5"));
     assert!(payload.contains("metal.command-buffer.completed"));
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_trigger"),
+        "child-yir-node-ipc"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "native_output_kind"),
+        "provider-frame-rgba8"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "native_output_execution_status"),
+        "metal-command-buffer-completed"
+    );
+    assert_eq!(toml_string_field(&payload, "native_output_count"), "1");
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_contract"),
+        "nuis-provider-runtime-dispatch-session-v1"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_status"),
+        "verified"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_invocation_count"),
+        "3"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_worker_count"),
+        "1"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_lease_count"),
+        "1"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_request_sequences"),
+        "0,1,2"
+    );
+    assert_eq!(
+        toml_string_field(&payload, "runtime_dispatch_session_adapter_cache_statuses"),
+        "compiled,hit,hit"
+    );
+    assert!(
+        toml_string_field(&payload, "runtime_dispatch_session_evidence_hash").starts_with("0x")
+    );
+    let materialized = nsdb::materialize_provider_samples(&output_dir, Some(PROVIDER_FAMILY))
+        .expect("runtime-session provider output should remain materializable");
+    assert_eq!(materialized.materialized_record_count, 1);
 
     let asset_path = evidence_field(evidence, "provider_request_0_code_asset_path");
     let alias_path = "unbound-project-render.metal";
@@ -244,6 +298,20 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     assert!(error.contains("verified MSL code asset capability"));
 
     fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn runtime_ipc_lifecycle_child() {
+    let Some(path) = std::env::var_os("NUIS_TEST_RUNTIME_IPC_YIR") else {
+        return;
+    };
+    let source = fs::read_to_string(path).unwrap();
+    assert!(std::env::var_os(yir_runtime_host::PROVIDER_DISPATCH_SOCKET_ENV).is_some());
+    assert!(std::env::var_os(yir_runtime_host::PROVIDER_RESULT_STREAM_ENV).is_none());
+    let ppm = yir_runtime_host::render_module_to_ppm_bytes(&source, 1)
+        .expect("live Nuis lifecycle must request its own device frames");
+    fs::write(std::env::var_os("NUIS_TEST_RUNTIME_IPC_PPM").unwrap(), ppm).unwrap();
 }
 
 #[cfg(target_os = "macos")]
@@ -272,4 +340,16 @@ fn evidence_field<'a>(evidence: &'a str, key: &str) -> &'a str {
         .filter_map(|field| field.split_once('='))
         .find_map(|(candidate, value)| (candidate == key).then_some(value))
         .unwrap_or_else(|| panic!("missing evidence field `{key}`"))
+}
+
+#[cfg(target_os = "macos")]
+fn toml_string_field<'a>(source: &'a str, key: &str) -> &'a str {
+    let prefix = format!("{key} = \"");
+    source
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix(&prefix)
+                .and_then(|value| value.strip_suffix('"'))
+        })
+        .unwrap_or_else(|| panic!("missing TOML string field `{key}`"))
 }

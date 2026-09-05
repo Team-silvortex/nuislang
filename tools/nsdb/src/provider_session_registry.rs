@@ -18,8 +18,9 @@ pub(crate) struct ProviderSessionAdapter {
 const LOGICAL_REQUEST_PROCESS: ProviderSessionAdapter = ProviderSessionAdapter {
     adapter_id: "logical.request-process.v1",
     mode: "logical-request-process",
-    continuity: "graph-lease-only",
-    lifecycle_hooks: "graph-open,request-begin,request-complete,graph-close",
+    continuity: "runtime-dispatch-session",
+    lifecycle_hooks:
+        "session-open,graph-open,request-begin,request-complete,graph-close,session-close",
     device_handle_retention_status: "unsupported",
 };
 
@@ -173,7 +174,7 @@ mod tests {
     fn request_process_adapter_does_not_claim_device_retention() {
         let adapter =
             select_provider_session_adapter("real-device-provider-runner").expect("adapter");
-        assert_eq!(adapter.continuity, "graph-lease-only");
+        assert_eq!(adapter.continuity, "runtime-dispatch-session");
         assert_eq!(adapter.device_handle_retention_status, "unsupported");
         assert!(select_provider_session_adapter("host-fallback").is_none());
     }

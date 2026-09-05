@@ -294,19 +294,22 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         .transpose()?
         .flatten();
     let mut command = Command::new(&binary);
-    if let Some(prepared) = runtime_provider_results.as_ref() {
-        prepared.bind_to_command(&mut command);
-    }
     if cfg!(test) {
         command.stdout(Stdio::null()).stderr(Stdio::null());
     }
-    let status = command
-        .status()
-        .map_err(|error| format!("failed to run `{}`: {error}", binary.display()))?;
+    let (status, runtime_invocations) = match runtime_provider_results.as_ref() {
+        Some(prepared) => prepared.run_command(&mut command)?,
+        None => (
+            command
+                .status()
+                .map_err(|error| format!("failed to run `{}`: {error}", binary.display()))?,
+            0,
+        ),
+    };
     if success_logs_enabled() {
         println!("run-artifact: {}", binary.display());
         if let Some(prepared) = runtime_provider_results.as_ref() {
-            prepared.print_text();
+            prepared.print_text(runtime_invocations);
         }
         println!(
             "  exit_status: {}",

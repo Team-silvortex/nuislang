@@ -275,7 +275,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
         },
         DevTensorDriftCheckSpec {
             id: "nsdb-provider-worker-normal-execution",
-            path: "tools/nsdb/src/provider_sample_execute.rs",
+            path: "tools/nsdb/src/provider_runtime_dispatch_session.rs",
             required_patterns: &[
                 "ProviderWorkerLeaseManager::new",
                 "ProviderProcessAdapterCache::default",

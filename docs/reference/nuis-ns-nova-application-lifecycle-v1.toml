@@ -77,13 +77,33 @@ production_metal_raster_provider_status = "registered-request-through-nuis-worke
 metal_render_code_asset_input_status = "hash-bound-capability-fd-verified"
 production_metal_aot_execution_status = "160x120-rgba8-worker-fence-verified"
 runtime_result_stream_status = "hash-bound-three-frame-rgba8-and-physical-fence-verified"
-run_artifact_runtime_result_preparation_status = "dynamic-yir-node-invocation-count-and-child-env-binding-verified"
+run_artifact_runtime_result_preparation_status = "target-discovery-without-provider-preexecution-verified"
+child_lifecycle_ipc_status = "separate-process-three-live-draw-dispatches-and-replay-equivalence-verified"
+persistent_runtime_dispatch_session_status = "three-frame-single-session-single-worker-monotonic-sequence-verified"
+runtime_adapter_cache_status = "compiled-hit-hit-across-frame-dispatch-verified"
 reference_function_execution_status = "function-table-bound-helper-and-aggregate-loop-verified"
 yir_dependency_inference_status = "explicit-result-edge-cycle-guard-verified"
 aot_graph_status = "acyclic-after-text-roundtrip-verified"
 stable_interactive_loop_claimed = false
 backend_execution_closure_claimed = false
 dynamic_shader_ready_bridge_claimed = false
+
+[runtime_ipc]
+contract = "nuis-yir-provider-runtime-ipc-v1"
+contract_owner = "yir-core"
+transport = "private-unix-stream"
+dispatch_trigger = "child-yir-node-ipc"
+admission = "source-yir-hash-and-exact-registered-target"
+ordering = "hello-dispatch-frame-finish-closed"
+session_scope = "one-module-execution-with-independent-graph-glm-release"
+evidence_persistence = "after-matching-finish-and-session-close"
+max_dispatches = 256
+max_header_bytes = 4096
+max_payload_bytes = 16777216
+max_replay_bytes = 67108864
+invalid_message_policy = "reject-before-device-dispatch"
+disconnect_policy = "close-session-without-success-acknowledgement"
+per_draw_reference_validation_retained = true
 
 [framework_package]
 galaxy_manifest = "examples/projects/domains/ns_nova_showcase/galaxy.toml"
@@ -125,6 +145,8 @@ automatic_provider_request_projection = true
 multi_entry_code_asset_descriptor = true
 production_worker_result_presentation = true
 bounded_provider_result_stream = true
+persistent_runtime_dispatch_session = true
+child_driven_provider_dispatch = true
 single_runtime_result_target = true
 multi_target_provider_result_schedule = false
 provider_result_payload_tamper_rejection = true
@@ -132,5 +154,5 @@ self_contained_host_runner_result_injection = false
 resource_bound_gpu_rasterization = false
 
 [next_slice]
-action = "replace bounded precomputed provider results with a persistent registered runtime dispatch session owned by the NS Nova lifecycle, then extend the same protocol to resource-bound and non-Metal providers"
-validation = "drive repeated lifecycle ticks through live provider dispatch without replaying a reference execution, preserve one physical completion per returned frame, reject stream or resource drift, and keep framework, provider, and host-runner boundaries symmetric"
+action = "replace per-draw reference rasterization with registered validation, then extend live lifecycle dispatch to runtime resource bindings and multiple targets without backend-specific framework branches"
+validation = "retain the separate-process three-frame live/replay equivalence regression, single worker and monotonic request clock, reject sequence/layout/source drift before presentation, and preserve graph GLM release and bounded cancellation; whole-app session continuity, self-contained injection, and non-Metal parity remain open"

@@ -4,11 +4,11 @@ pub(crate) use crate::provider_sample_output_model::PixelMagicNativeOutputSummar
 pub(crate) type ProviderNativeOutputSummary = PixelMagicNativeOutputSummary;
 use crate::{
     model::NsdbDeviceProviderSampleRecordInfo,
-    provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_native_output_payload::{
         native_output_collection_hash, push_indexed_native_output, push_native_output_summary,
     },
     provider_request::provider_request_from_evidence,
+    provider_runtime_dispatch_session::NativeProviderOutputs,
     provider_sample_runner::{provider_execution_outcome_for_runner, ProviderSampleRunner},
     provider_transport_receipt_payload::push_transport_receipts,
 };
@@ -88,7 +88,6 @@ pub(crate) fn provider_output_payload(
         evidence_status: "deterministic-provider-output-anchor".to_owned(),
     }
 }
-
 pub(crate) fn provider_output_payload_from_record(
     record: &NsdbDeviceProviderSampleRecordInfo,
 ) -> Option<ProviderOutputPayload> {
@@ -99,7 +98,6 @@ pub(crate) fn provider_output_payload_from_record(
         evidence_status: record.provider_output_payload_evidence_status.clone(),
     })
 }
-
 pub(crate) fn provider_sample_status_for_payload(payload: &ProviderOutputPayload) -> &'static str {
     if payload.status == "real-device-output-payload-invalid" {
         "provider-execution-blocked"
@@ -107,7 +105,6 @@ pub(crate) fn provider_sample_status_for_payload(payload: &ProviderOutputPayload
         "provider-execution-ready"
     }
 }
-
 pub(crate) fn provider_validation_status_for_payload(
     payload: &ProviderOutputPayload,
 ) -> &'static str {
@@ -117,7 +114,6 @@ pub(crate) fn provider_validation_status_for_payload(
         "provider-execution-validated"
     }
 }
-
 pub(crate) fn provider_materialization_status_for_payload(
     payload: &ProviderOutputPayload,
 ) -> &'static str {
@@ -127,7 +123,6 @@ pub(crate) fn provider_materialization_status_for_payload(
         "provider-sample-materialized"
     }
 }
-
 pub(crate) fn provider_next_action_for_payload(payload: &ProviderOutputPayload) -> &'static str {
     if payload.status == "real-device-output-payload-invalid" {
         "repair-provider-output-payload"
@@ -135,7 +130,6 @@ pub(crate) fn provider_next_action_for_payload(payload: &ProviderOutputPayload) 
         "replay-device-sample"
     }
 }
-
 fn existing_provider_output_payload(
     output_dir: &Path,
     record: &NsdbDeviceProviderSampleRecordInfo,
@@ -204,12 +198,10 @@ fn validate_provider_output_payload(
 pub(crate) fn render_real_device_provider_output_payload(
     record: &NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-    native_outputs: &[PixelMagicNativeOutputSummary],
-    transport_receipts: &[ProviderEdgeTransportReceipt],
+    execution: &NativeProviderOutputs,
     result_projection_evidence: &str,
-    code_asset_identity: Option<&crate::provider_code_asset_identity::ProviderCodeAssetIdentity>,
-    compiled_code_asset_selection: Option<&crate::model::CompiledCodeAssetSelectionEvidence>,
 ) -> String {
+    let native_outputs = &execution.native_outputs;
     let mut out = render_provider_output_payload_header(
         record,
         "nsdb-execute-provider-samples",
@@ -247,16 +239,19 @@ pub(crate) fn render_real_device_provider_output_payload(
         "ready-for-comparison"
     };
     push_toml_string(&mut out, "comparison_status", comparison_status);
-    push_transport_receipts(&mut out, transport_receipts);
+    push_transport_receipts(&mut out, &execution.transport_receipts);
     out.push_str(result_projection_evidence);
     crate::provider_code_asset_identity::append_provider_output_identity(
         &mut out,
-        code_asset_identity,
+        execution.code_asset_identity.as_ref(),
     );
     crate::provider_code_asset::contribution::append_provider_output_selection(
         &mut out,
-        compiled_code_asset_selection,
+        execution.compiled_code_asset_selection.as_ref(),
     );
+    if let Some(evidence) = &execution.runtime_session_evidence {
+        evidence.append_payload_fields(&mut out);
+    }
     if let Some(summary) = native_outputs.first() {
         push_native_output_summary(&mut out, summary);
         push_toml_string(

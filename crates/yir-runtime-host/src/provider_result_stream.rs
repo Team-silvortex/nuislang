@@ -22,7 +22,17 @@ pub(super) fn execute_with_provider_result_stream(
     if fnv1a64_hex(module_source.as_bytes()) != stream.source_yir_fnv1a64 {
         return Err("provider runtime result stream belongs to a different YIR module".to_owned());
     }
-    let state = Arc::new(Mutex::new(ProviderResultQueue::new(stream.frames)?));
+    execute_with_provider_source(
+        module_source,
+        ProviderResultSource::Replay(ProviderResultQueue::new(stream.frames)?),
+    )
+}
+
+pub(super) fn execute_with_provider_source(
+    module_source: &str,
+    source: ProviderResultSource,
+) -> Result<yir_exec::ExecutionTrace, String> {
+    let state = Arc::new(Mutex::new(source));
     let mut registry = yir_verify::default_registry();
     registry.register(ProviderResultShaderMod {
         state: Arc::clone(&state),
@@ -31,7 +41,7 @@ pub(super) fn execute_with_provider_result_stream(
     state
         .lock()
         .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
-        .ensure_consumed()?;
+        .finish()?;
     Ok(trace)
 }
 
@@ -40,7 +50,7 @@ struct ProviderResultStream {
     frames: Vec<ProviderResultFrame>,
 }
 
-struct ProviderResultFrame {
+pub(super) struct ProviderResultFrame {
     request_id: String,
     provider_family: String,
     module: String,
@@ -56,6 +66,65 @@ struct ProviderResultFrame {
     payload: Vec<u8>,
     completion_wire: String,
     completion: ProviderPhysicalCompletion,
+}
+
+impl ProviderResultFrame {
+    #[cfg(unix)]
+    pub(super) fn from_ipc(
+        target: &yir_core::provider_runtime_ipc::DispatchTarget,
+        frame: yir_core::provider_runtime_ipc::DispatchFrame,
+    ) -> Result<Self, String> {
+        let completion = ProviderPhysicalCompletion::parse(&frame.completion_wire)?;
+        let result = Self {
+            request_id: frame.request_id,
+            provider_family: frame.provider_family,
+            module: target.module.clone(),
+            instruction: target.instruction.clone(),
+            node: target.node.clone(),
+            resource: target.resource.clone(),
+            element_type: frame.element_type,
+            layout: frame.layout,
+            shape: frame.shape,
+            row_stride_bytes: frame.row_stride_bytes,
+            payload_path: "ipc".to_owned(),
+            payload_hash: fnv1a64_hex(&frame.payload),
+            payload: frame.payload,
+            completion_wire: frame.completion_wire,
+            completion,
+        };
+        validate_frame(&result)?;
+        Ok(result)
+    }
+}
+
+pub(super) enum ProviderResultSource {
+    Replay(ProviderResultQueue),
+    #[cfg(unix)]
+    Live(super::provider_runtime_ipc::ProviderRuntimeClient),
+}
+
+impl ProviderResultSource {
+    fn targets(&self, node: &Node) -> bool {
+        match self {
+            Self::Replay(queue) => queue.targets(node),
+            #[cfg(unix)]
+            Self::Live(client) => client.targets(node),
+        }
+    }
+    fn take(&mut self, node: &Node) -> Result<ProviderResultFrame, String> {
+        match self {
+            Self::Replay(queue) => queue.take(node),
+            #[cfg(unix)]
+            Self::Live(client) => client.take(node),
+        }
+    }
+    fn finish(&mut self) -> Result<(), String> {
+        match self {
+            Self::Replay(queue) => queue.ensure_consumed(),
+            #[cfg(unix)]
+            Self::Live(client) => client.finish(),
+        }
+    }
 }
 
 impl ProviderResultStream {
@@ -95,7 +164,7 @@ impl ProviderResultStream {
     }
 }
 
-struct ProviderResultQueue {
+pub(super) struct ProviderResultQueue {
     frames: VecDeque<ProviderResultFrame>,
     targets: BTreeSet<(String, String, String, String)>,
 }
@@ -176,7 +245,7 @@ impl ProviderResultQueue {
 }
 
 struct ProviderResultShaderMod {
-    state: Arc<Mutex<ProviderResultQueue>>,
+    state: Arc<Mutex<ProviderResultSource>>,
 }
 
 impl RegisteredMod for ProviderResultShaderMod {

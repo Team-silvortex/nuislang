@@ -14,6 +14,7 @@ mod operation_results;
 mod operation_semantics;
 mod owned_select_tree;
 mod owned_struct_layout;
+pub mod provider_runtime_ipc;
 mod registry;
 mod result_receipt;
 mod value_display;

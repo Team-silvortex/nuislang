@@ -1,36 +1,11 @@
-#[cfg(unix)]
-use crate::provider_execution_adapter::{
-    select_provider_execution_adapter, ProviderRequestExecution,
-};
-#[cfg(unix)]
-use crate::provider_graph_output::completed_additional_worker_outputs;
-#[cfg(unix)]
-use crate::provider_worker_lease::{
-    ProviderWorkerAdapterLaunch, ProviderWorkerDispatchIdentity, ProviderWorkerLeaseManager,
-};
-#[cfg(unix)]
-use crate::provider_worker_summary::bind_worker_output;
 use crate::{
     final_image_provider_dispatch::{
         final_image_provider_dispatch_authority, validate_provider_families_against_final_image,
     },
-    provider_edge_transport::ProviderEdgeTransportReceipt,
-    provider_graph_output::{
-        bind_output_binding_summary, bind_provider_completion_evidence, CompletedProviderOutput,
-        CompletedProviderOutputs,
-    },
-    provider_output_comparison::{
-        bind_output_comparison_collection, compare_provider_output_collection,
-    },
-    provider_prepared_input::PreparedProviderInput,
-    provider_process_adapter::{
-        provider_output_manifest, validate_provider_code_asset, ProviderProcessAdapterCache,
-        PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
-    },
-    provider_request::{provider_request_collection_from_evidence, ProviderRequest},
     provider_runner_registry::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
     },
+    provider_runtime_dispatch_session::execute_native_provider_outputs,
     provider_runtime_result_stream::{persist_provider_runtime_results, ProviderRuntimeResult},
     provider_sample::{
         read_device_provider_sample_manifest_info, DEVICE_PROVIDER_SAMPLE_PROTOCOL,
@@ -41,12 +16,8 @@ use crate::{
         fnv1a64_hex, pixelmagic_native_output_summary, provider_output_payload_file_name,
         render_real_device_provider_output_payload, ProviderNativeOutputSummary,
     },
-    provider_session_registry::{
-        select_provider_session_adapter, ProviderSessionLease, ProviderSessionRequest,
-    },
-    provider_session_summary::bind_session_output,
 };
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{fs, path::Path};
 
 pub struct ProviderSampleExecuteReport {
     pub status: String,
@@ -415,13 +386,8 @@ fn write_provider_output_payload(
     runtime_invocation_count: usize,
 ) -> Result<WrittenProviderOutput, String> {
     let file_name = provider_output_payload_file_name(&record.provider_family);
-    let mut execution = execute_native_provider_outputs(output_dir, record, adapter)?;
-    if !execution.runtime_results.is_empty() {
-        for _ in 1..runtime_invocation_count {
-            let repeated = execute_native_provider_outputs(output_dir, record, adapter)?;
-            execution.runtime_results.extend(repeated.runtime_results);
-        }
-    }
+    let execution =
+        execute_native_provider_outputs(output_dir, record, adapter, runtime_invocation_count)?;
     let result_projection_evidence =
         crate::provider_result_projection::validate_and_render_result_projections(
             &record.input_evidence,
@@ -430,11 +396,8 @@ fn write_provider_output_payload(
     let content = render_real_device_provider_output_payload(
         record,
         adapter,
-        &execution.native_outputs,
-        &execution.transport_receipts,
+        &execution,
         &result_projection_evidence,
-        execution.code_asset_identity.as_ref(),
-        execution.compiled_code_asset_selection.as_ref(),
     );
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {
@@ -445,327 +408,6 @@ fn write_provider_output_payload(
         native_outputs: execution.native_outputs,
         runtime_results: execution.runtime_results,
     })
-}
-
-struct NativeProviderOutputs {
-    native_outputs: Vec<ProviderNativeOutputSummary>,
-    transport_receipts: Vec<ProviderEdgeTransportReceipt>,
-    code_asset_identity: Option<crate::provider_code_asset_identity::ProviderCodeAssetIdentity>,
-    compiled_code_asset_selection: Option<crate::model::CompiledCodeAssetSelectionEvidence>,
-    runtime_results: Vec<ProviderRuntimeResult>,
-}
-
-fn execute_native_provider_outputs(
-    output_dir: &Path,
-    record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
-    adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-) -> Result<NativeProviderOutputs, String> {
-    #[cfg(unix)]
-    if select_provider_execution_adapter(adapter.kind).is_none() {
-        return Ok(NativeProviderOutputs {
-            native_outputs: Vec::new(),
-            transport_receipts: Vec::new(),
-            code_asset_identity: None,
-            compiled_code_asset_selection: None,
-            runtime_results: Vec::new(),
-        });
-    }
-    #[cfg(not(unix))]
-    return Ok(NativeProviderOutputs {
-        native_outputs: Vec::new(),
-        transport_receipts: Vec::new(),
-        code_asset_identity: None,
-        compiled_code_asset_selection: None,
-        runtime_results: Vec::new(),
-    });
-    let Some(mut collection) = provider_request_collection_from_evidence(&record.input_evidence)
-    else {
-        if declares_provider_request_contract(&record.input_evidence) {
-            return Err(format!(
-                "provider request evidence for trace `{}` declares a request contract but failed validation",
-                record.trace_id
-            ));
-        }
-        return Ok(NativeProviderOutputs {
-            native_outputs: Vec::new(),
-            transport_receipts: Vec::new(),
-            code_asset_identity: None,
-            compiled_code_asset_selection: None,
-            runtime_results: Vec::new(),
-        });
-    };
-    collection.compiled_code_asset_selection =
-        crate::provider_code_asset::contribution::validate_compiled_contribution_selection(
-            output_dir,
-            &record.input_evidence,
-            &collection.requests,
-        )?;
-    let code_asset_identity = collection.code_asset_identity.clone();
-    let compiled_code_asset_selection = collection.compiled_code_asset_selection.clone();
-    let mut completed = CompletedProviderOutputs::new();
-    let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();
-    #[cfg(unix)]
-    let mut worker_leases = ProviderWorkerLeaseManager::new(output_dir);
-    #[cfg(unix)]
-    let mut process_adapter_cache = ProviderProcessAdapterCache::default();
-    let mut summaries = Vec::with_capacity(collection.requests.len());
-    let mut transport_receipts = Vec::new();
-    let mut runtime_results = Vec::new();
-    for request in &collection.requests {
-        if request.code_asset.is_some() {
-            validate_provider_code_asset(output_dir, request)?;
-        }
-        let request_adapter = request
-            .adapter_binding
-            .as_ref()
-            .map(|binding| select_provider_runner_adapter(&binding.provider_family));
-        let effective_adapter = request_adapter.as_ref().unwrap_or(adapter);
-        if request.adapter_binding.as_ref().is_some_and(|binding| {
-            binding.execution_requirement == "real-device" && !effective_adapter.real_device_capable
-        }) {
-            return Err(format!(
-                "provider request `{}` requires an unavailable real-device adapter",
-                request.kernel.id
-            ));
-        }
-        let session_adapter = select_provider_session_adapter(effective_adapter.execution_mode)
-            .ok_or_else(|| {
-                format!(
-                    "provider adapter `{}` has no registered session adapter",
-                    effective_adapter.adapter_id
-                )
-            })?;
-        let provider_family = request
-            .adapter_binding
-            .as_ref()
-            .map(|binding| binding.provider_family.as_str())
-            .unwrap_or(&record.provider_family);
-        let session = sessions
-            .entry(effective_adapter.adapter_id.to_owned())
-            .or_insert_with(|| {
-                ProviderSessionLease::open(&record.trace_id, provider_family, session_adapter)
-            });
-        let output_roles = request
-            .output_bindings
-            .iter()
-            .map(|binding| binding.role.clone())
-            .collect::<Vec<_>>();
-        let session_request =
-            session.begin_request_with_output_roles(&request.kernel.id, &output_roles)?;
-        let mut execution = execute_native_provider_request(
-            NativeProviderRequestContext {
-                output_dir,
-                record,
-                adapter: effective_adapter,
-                request,
-                completed: &completed,
-                provider_family,
-                session_request: &session_request,
-            },
-            #[cfg(unix)]
-            &mut worker_leases,
-            #[cfg(unix)]
-            &mut process_adapter_cache,
-        )?;
-        session.complete_request(&request.kernel.id)?;
-        bind_session_output(&mut execution.summary, &session_request);
-        bind_output_binding_summary(&mut execution.summary, request);
-        let runtime_result =
-            ProviderRuntimeResult::from_execution(provider_family, request, &execution)?;
-        let mut comparison_payloads = vec![(
-            request.output_bindings[0].buffer.as_str(),
-            execution.output_payload.as_bytes(),
-        )];
-        comparison_payloads.extend(
-            execution
-                .additional_outputs
-                .iter()
-                .map(|output| (output.buffer.as_str(), output.payload.as_bytes())),
-        );
-        let comparison_results = compare_provider_output_collection(
-            output_dir,
-            &request.output_comparisons,
-            &comparison_payloads,
-        )?;
-        bind_output_comparison_collection(
-            &mut execution.summary,
-            &comparison_results,
-            &request.kernel.output_buffer,
-        );
-        let primary_binding = request
-            .output_bindings
-            .first()
-            .expect("validated provider request has a primary output binding");
-        let primary_output = CompletedProviderOutput {
-            role: primary_binding.role.clone(),
-            buffer: primary_binding.buffer.clone(),
-            payload: execution.output_payload,
-            transferable: execution.transferable_output,
-        };
-        completed.insert(&request.kernel.id, primary_output)?;
-        for output in execution.additional_outputs {
-            completed.insert(&request.kernel.id, output)?;
-        }
-        summaries.push(execution.summary);
-        if let Some(runtime_result) = runtime_result {
-            runtime_results.push(runtime_result);
-        }
-        transport_receipts.extend(execution.transport_receipts);
-    }
-    let graph_output_close = completed.close();
-    for session in sessions.values_mut() {
-        session.close()?;
-    }
-    #[cfg(unix)]
-    worker_leases.close()?;
-    for summary in &mut summaries {
-        bind_provider_completion_evidence(summary, &graph_output_close)?;
-    }
-    Ok(NativeProviderOutputs {
-        native_outputs: summaries,
-        transport_receipts,
-        code_asset_identity,
-        compiled_code_asset_selection,
-        runtime_results,
-    })
-}
-
-fn declares_provider_request_contract(input_evidence: &str) -> bool {
-    input_evidence.split(';').any(|field| {
-        field.trim().split_once('=').is_some_and(|(name, _)| {
-            matches!(
-                name,
-                "provider_request_collection_contract"
-                    | "provider_buffer_descriptor_contract"
-                    | "provider_kernel_descriptor_contract"
-            )
-        })
-    })
-}
-
-struct NativeProviderRequestContext<'a> {
-    output_dir: &'a Path,
-    record: &'a crate::model::NsdbDeviceProviderSampleRecordInfo,
-    adapter: &'a crate::provider_runner_registry::ProviderRunnerAdapter,
-    request: &'a ProviderRequest,
-    completed: &'a CompletedProviderOutputs,
-    provider_family: &'a str,
-    session_request: &'a ProviderSessionRequest,
-}
-
-fn execute_native_provider_request(
-    context: NativeProviderRequestContext<'_>,
-    #[cfg(unix)] worker_leases: &mut ProviderWorkerLeaseManager,
-    #[cfg(unix)] process_adapter_cache: &mut ProviderProcessAdapterCache,
-) -> Result<ProviderRequestExecution, String> {
-    let NativeProviderRequestContext {
-        output_dir,
-        record,
-        adapter,
-        request,
-        completed,
-        provider_family,
-        session_request,
-    } = context;
-    #[cfg(unix)]
-    let execution_adapter = select_provider_execution_adapter(adapter.kind).ok_or_else(|| {
-        format!(
-            "provider adapter `{}` has no registered execution implementation",
-            adapter.adapter_id
-        )
-    })?;
-    let inputs = request
-        .input_bindings
-        .iter()
-        .map(|binding| {
-            let transport = request
-                .dependencies
-                .iter()
-                .find(|dependency| dependency.consumer_input_buffer == binding.name)
-                .and_then(|dependency| dependency.transport.as_ref());
-            PreparedProviderInput::new(
-                output_dir,
-                binding,
-                transport,
-                completed,
-                #[cfg(unix)]
-                execution_adapter.requires_worker_descriptors,
-                #[cfg(not(unix))]
-                false,
-            )
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let (adapter_output_roles, adapter_output_byte_lengths) = provider_output_manifest(request);
-    #[cfg(unix)]
-    let prepared_worker_adapter = execution_adapter
-        .prepare_worker_adapter
-        .map(|prepare| prepare(process_adapter_cache, output_dir, request, &inputs))
-        .transpose()?
-        .flatten();
-    #[cfg(unix)]
-    let worker_adapter_launch =
-        prepared_worker_adapter
-            .as_ref()
-            .map(|prepared| ProviderWorkerAdapterLaunch {
-                executable_path: &prepared.executable_path,
-                executable_hash: &prepared.executable_hash,
-                runner_contract: prepared.runner_contract,
-                cache_contract: PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
-                cache_identity: &prepared.cache_identity,
-                cache_status: prepared.cache_status,
-                arguments: &prepared.arguments,
-                output_roles: &adapter_output_roles,
-                output_byte_lengths: &adapter_output_byte_lengths,
-            });
-    #[cfg(unix)]
-    let mut worker_receipt = worker_leases.dispatch(
-        adapter.adapter_id,
-        provider_family,
-        ProviderWorkerDispatchIdentity {
-            lease_id: &session_request.lease_id,
-            sequence: session_request.sequence,
-        },
-        request,
-        &inputs,
-        worker_adapter_launch.as_ref(),
-    )?;
-    #[cfg(not(unix))]
-    return Err("native provider worker leases require a registered host transport".to_owned());
-    let mut request_execution = (execution_adapter.execute)(
-        &record.input_evidence,
-        provider_family,
-        output_dir,
-        request,
-        &inputs,
-        &mut worker_receipt,
-    )?;
-    if request_execution.summary.request_id != request.kernel.id {
-        return Err(format!(
-            "provider adapter `{}` returned output for request `{}` while executing `{}`",
-            adapter.adapter_id, request_execution.summary.request_id, request.kernel.id
-        ));
-    }
-    request_execution.transport_receipts = inputs
-        .into_iter()
-        .map(PreparedProviderInput::finish)
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect();
-    #[cfg(unix)]
-    bind_worker_output(
-        &mut request_execution.summary,
-        &worker_receipt,
-        worker_adapter_launch.as_ref(),
-    );
-    #[cfg(unix)]
-    {
-        request_execution.additional_outputs = completed_additional_worker_outputs(
-            request,
-            std::mem::take(&mut worker_receipt.additional_worker_outputs),
-        )?;
-    }
-    Ok(request_execution)
 }
 
 pub(crate) fn resolve_provider_payload_path(

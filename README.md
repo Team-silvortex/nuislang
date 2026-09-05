@@ -33,7 +33,7 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation drift across `27/27` registered coordinates and
-`829/829` passing drift checks. The compiler data model, stage-neutral boundary,
+`863/863` passing drift checks. The compiler data model, stage-neutral boundary,
 bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
 bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
 forwarding, chunked typed payload projection, and canonical reversible active
@@ -72,7 +72,7 @@ proving `4/4` semantic equivalence. Persistent Galaxy signer trust and rollback
 protection have closed the package-resolution coordinate at `stable/100`; both
 the readiness manifest and global bootstrap-first tensor can now leave the
 bounded preparation gate. The next global tensor task is
-`standard-library/ns-nova/application-rendering-framework` at `active/70`.
+`standard-library/ns-nova/application-rendering-framework` at `active/99`.
 Its first Nuis-owned app/frame lifecycle now composes with PixelMagic, Data, and
 Shader in a host-adaptive project, compiles through NIR/YIR, emits an Apple arm64
 window AOT executable, reaches window/Fabric boot, and passes a relocatable
@@ -86,8 +86,14 @@ each frame through a typed runtime-owned result handle. Shader observe now issue
 the shared YIR token/clock/root completion receipt, ns-nova validates and preserves
 that identity without a local token formula, and a pure-Nuis kernel receipt reaches
 a native executable. YIR text round-tripping now preserves explicit result edges without
-inventing a reverse loop dependency, and the full window AOT graph is checked acyclic. A live post-dispatch renderer clock, continuous event dispatch,
-renderer ownership, and cross-host window adapters remain open. The prior Data
+inventing a reverse loop dependency, and the full window AOT graph is checked acyclic.
+A separate-process runtime regression now requests three real Metal frames as the
+child reaches each YIR draw node through bounded provider-neutral IPC, rather than
+pre-executing the module. They share one Nsdb session, Nuis worker PID, and adapter
+cache while retaining independent graph-output release and physical completion;
+live pixels match the persisted replay byte-for-byte. Per-draw reference validation,
+whole-app session continuity, resource bindings, self-contained host-runner injection,
+and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are
 preserved, while physical DPU/IPU/RDMA certification is deferred until suitable
 hardware is available rather than blocking the current mainline.

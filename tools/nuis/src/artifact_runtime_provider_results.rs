@@ -1,33 +1,37 @@
 use std::{
-    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, ExitStatus},
 };
+
+#[cfg(unix)]
+#[path = "artifact_runtime_provider_ipc.rs"]
+mod ipc;
 
 pub(crate) struct PreparedRuntimeProviderResults {
     pub(crate) stream_path: PathBuf,
     pub(crate) source_yir_path: PathBuf,
     pub(crate) target_count: usize,
-    pub(crate) invocation_count: usize,
-    #[cfg(test)]
-    pub(crate) report: nsdb::ProviderSampleExecuteReport,
+    output_dir: PathBuf,
 }
 
 impl PreparedRuntimeProviderResults {
-    pub(crate) fn bind_to_command(&self, command: &mut Command) {
-        command.env(
-            yir_runtime_host::PROVIDER_RESULT_STREAM_ENV,
-            &self.stream_path,
-        );
+    pub(crate) fn run_command(&self, command: &mut Command) -> Result<(ExitStatus, usize), String> {
+        #[cfg(unix)]
+        {
+            ipc::run_command(&self.output_dir, command)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = command;
+            Err("runtime provider IPC requires a registered host transport".to_owned())
+        }
     }
 
-    pub(crate) fn print_text(&self) {
+    pub(crate) fn print_text(&self, invocation_count: usize) {
         println!("  runtime_provider_result_targets: {}", self.target_count);
-        println!(
-            "  runtime_provider_result_invocations: {}",
-            self.invocation_count
-        );
+        println!("  runtime_provider_result_invocations: {invocation_count}");
+        println!("  runtime_provider_dispatch_trigger: child-yir-node-ipc");
         println!(
             "  runtime_provider_result_source_yir: {}",
             self.source_yir_path.display()
@@ -46,81 +50,31 @@ pub(crate) fn prepare_runtime_provider_results(
     if targets.is_empty() {
         return Ok(None);
     }
-    if targets.len() != 1 {
-        return Err(
-            "bounded runtime provider result preparation currently requires exactly one target"
-                .to_owned(),
-        );
-    }
-    let source_hashes = targets
-        .iter()
-        .map(|target| target.source_yir_fnv1a64.as_str())
-        .collect::<BTreeSet<_>>();
-    if source_hashes.len() != 1 {
-        return Err("runtime provider targets mix source YIR identities".to_owned());
-    }
-    let source_hash = source_hashes
-        .first()
-        .expect("non-empty runtime target source set");
-    let (source_yir_path, source_yir) = find_source_yir(output_dir, source_hash)?;
-    let invocation_counts = targets
-        .iter()
-        .map(|target| {
-            yir_runtime_host::count_module_node_executions(
-                &source_yir,
-                &target.module,
-                &target.instruction,
-                &target.node,
-                &target.resource,
-            )
-        })
-        .collect::<Result<BTreeSet<_>, _>>()?;
-    if invocation_counts.len() != 1 {
-        return Err("runtime provider targets require different invocation counts".to_owned());
-    }
-    let invocation_count = *invocation_counts
-        .first()
-        .expect("non-empty runtime invocation count set");
-    let provider_families = targets
-        .iter()
-        .map(|target| target.provider_family.as_str())
-        .collect::<BTreeSet<_>>();
-    let provider_family_filter = (provider_families.len() == 1)
-        .then(|| *provider_families.first().expect("single provider family"));
-    let report = nsdb::execute_provider_samples_for_runtime(
-        output_dir,
-        provider_family_filter,
-        invocation_count,
-    )?;
-    if report.output_payload_count == 0 {
-        return Err("runtime provider execution produced no output payload".to_owned());
-    }
-    let stream_path = nsdb::provider_runtime_result_stream_path(output_dir);
-    if !stream_path.is_file() {
-        return Err("runtime provider execution did not persist its result stream".to_owned());
-    }
+    let [target] = targets.as_slice() else {
+        return Err("runtime provider dispatch currently requires exactly one target".to_owned());
+    };
+    let source_yir_path = find_source_yir(output_dir, &target.source_yir_fnv1a64)?;
     Ok(Some(PreparedRuntimeProviderResults {
-        stream_path,
+        stream_path: nsdb::provider_runtime_result_stream_path(output_dir),
         source_yir_path,
         target_count: targets.len(),
-        invocation_count,
-        #[cfg(test)]
-        report,
+        output_dir: output_dir.to_owned(),
     }))
 }
 
-fn find_source_yir(output_dir: &Path, expected_hash: &str) -> Result<(PathBuf, String), String> {
+fn find_source_yir(output_dir: &Path, expected_hash: &str) -> Result<PathBuf, String> {
     let mut matches = fs::read_dir(output_dir)
         .map_err(|error| format!("failed to enumerate runtime YIR artifacts: {error}"))?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("yir"))
-        .filter_map(|path| {
-            let source = fs::read_to_string(&path).ok()?;
-            (fnv1a64_hex(source.as_bytes()) == expected_hash).then_some((path, source))
+        .filter(|path| {
+            fs::read(path)
+                .ok()
+                .is_some_and(|source| fnv1a64_hex(&source) == expected_hash)
         })
         .collect::<Vec<_>>();
-    matches.sort_by(|left, right| left.0.cmp(&right.0));
+    matches.sort();
     matches
         .into_iter()
         .next()
