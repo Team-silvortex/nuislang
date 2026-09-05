@@ -66,6 +66,9 @@ mod provider_runner_metal_u32;
 mod provider_runner_native;
 mod provider_runner_registry;
 mod provider_runner_vulkan;
+mod provider_runtime_result_stream;
+#[cfg(test)]
+mod provider_runtime_result_stream_tests;
 mod provider_sample;
 mod provider_sample_artifact;
 mod provider_sample_execute;
@@ -114,7 +117,14 @@ pub use provider_conformance_capsule::{
     PROVIDER_CONFORMANCE_CAPSULE_CONTRACT, PROVIDER_CONFORMANCE_EXECUTION_AUTHORITY,
     PROVIDER_CONFORMANCE_REPLAY_CONTRACT,
 };
-pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
+pub use provider_runtime_result_stream::{
+    provider_runtime_result_stream_path, provider_runtime_result_targets,
+    ProviderRuntimeResultTarget, PROVIDER_RUNTIME_RESULT_STREAM_CONTRACT,
+    PROVIDER_RUNTIME_RESULT_STREAM_FILE_NAME,
+};
+pub use provider_sample_execute::{
+    execute_provider_samples, execute_provider_samples_for_runtime, ProviderSampleExecuteReport,
+};
 pub use provider_sample_materialize::{
     materialize_provider_samples, ProviderSampleMaterializeReport,
 };

@@ -29,6 +29,8 @@ pub(crate) const PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT: &str =
     "nuis-provider-output-comparison-collection-v1";
 pub(crate) const PROVIDER_REQUEST_DEPENDENCY_CONTRACT: &str = "nuis-provider-request-dependency-v1";
 pub(crate) const PROVIDER_REQUEST_COLLECTION_CONTRACT: &str = "nuis-provider-request-collection-v1";
+pub(crate) const PROVIDER_RUNTIME_RESULT_BINDING_CONTRACT: &str =
+    "nuis-provider-runtime-result-binding-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderBufferDescriptor {
@@ -95,6 +97,15 @@ pub(crate) struct ProviderRequestDependency {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProviderRuntimeResultBinding {
+    pub(crate) source_yir_fnv1a64: String,
+    pub(crate) module: String,
+    pub(crate) instruction: String,
+    pub(crate) node: String,
+    pub(crate) resource: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderRequest {
     pub(crate) source: &'static str,
     pub(crate) buffer: ProviderBufferDescriptor,
@@ -107,6 +118,7 @@ pub(crate) struct ProviderRequest {
     pub(crate) dependencies: Vec<ProviderRequestDependency>,
     pub(crate) input_bindings: Vec<ProviderInputBinding>,
     pub(crate) adapter_binding: Option<ProviderAdapterBinding>,
+    pub(crate) runtime_result_binding: Option<ProviderRuntimeResultBinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,6 +222,7 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
                     dependency_prefix: &format!("provider_request_{index}_dependency_"),
                     input_binding_prefix: &format!("provider_request_{index}_input_binding_"),
                     adapter_binding_prefix: &format!("provider_request_{index}_adapter_binding_"),
+                    runtime_result_prefix: &format!("provider_request_{index}_runtime_result_"),
                 },
             )
         })
@@ -245,6 +258,7 @@ fn parse_registered_request(input_evidence: &str) -> Option<ProviderRequest> {
             dependency_prefix: "provider_dependency_",
             input_binding_prefix: "provider_input_binding_",
             adapter_binding_prefix: "provider_adapter_binding_",
+            runtime_result_prefix: "provider_runtime_result_",
         },
     )
 }
@@ -319,6 +333,7 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
             producer_output_buffer: "none".to_owned(),
         }],
         adapter_binding: None,
+        runtime_result_binding: None,
     })
 }
 
@@ -333,6 +348,7 @@ struct ProviderRequestFieldLayout<'a> {
     dependency_prefix: &'a str,
     input_binding_prefix: &'a str,
     adapter_binding_prefix: &'a str,
+    runtime_result_prefix: &'a str,
 }
 
 fn build_request(
@@ -350,6 +366,7 @@ fn build_request(
         dependency_prefix,
         input_binding_prefix,
         adapter_binding_prefix,
+        runtime_result_prefix,
     } = layout;
     let buffer = ProviderBufferDescriptor {
         id: field(fields, buffer_prefix, "id")?.clone(),
@@ -397,6 +414,7 @@ fn build_request(
     let input_bindings =
         parse_input_bindings(fields, input_binding_prefix, &buffer, &dependencies)?;
     let adapter_binding = parse_adapter_binding(fields, adapter_binding_prefix)?;
+    let runtime_result_binding = parse_runtime_result_binding(fields, runtime_result_prefix)?;
     validate_request(ProviderRequest {
         source,
         buffer,
@@ -409,7 +427,25 @@ fn build_request(
         dependencies,
         input_bindings,
         adapter_binding,
+        runtime_result_binding,
     })
+}
+
+fn parse_runtime_result_binding(
+    fields: &BTreeMap<String, String>,
+    prefix: &str,
+) -> Option<Option<ProviderRuntimeResultBinding>> {
+    let Some(contract) = field(fields, prefix, "binding_contract") else {
+        return Some(None);
+    };
+    (contract == PROVIDER_RUNTIME_RESULT_BINDING_CONTRACT).then_some(())?;
+    Some(Some(ProviderRuntimeResultBinding {
+        source_yir_fnv1a64: field(fields, prefix, "source_yir_fnv1a64")?.clone(),
+        module: field(fields, prefix, "module")?.clone(),
+        instruction: field(fields, prefix, "instruction")?.clone(),
+        node: field(fields, prefix, "node")?.clone(),
+        resource: field(fields, prefix, "resource")?.clone(),
+    }))
 }
 
 fn parse_model_asset(
@@ -579,6 +615,16 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             && asset.output_feature == request.kernel.output_buffer
     });
     let output_bindings_valid = validate_output_bindings(&request);
+    let runtime_result_valid = request
+        .runtime_result_binding
+        .as_ref()
+        .is_none_or(|binding| {
+            valid_fnv1a64(&binding.source_yir_fnv1a64)
+                && valid_runtime_token(&binding.module)
+                && valid_runtime_token(&binding.instruction)
+                && valid_runtime_token(&binding.node)
+                && valid_runtime_token(&binding.resource)
+        });
     (request.buffer.id == request.kernel.input_buffer
         && !request.kernel.output_buffer.is_empty()
         && request.buffer.shape.iter().all(|dimension| *dimension > 0)
@@ -594,9 +640,24 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
         })
         && model_asset_valid
         && output_bindings_valid
+        && runtime_result_valid
         && validate_output_comparisons(&request.output_comparisons, &request.output_bindings)
         && validate_input_bindings(&request))
     .then_some(request)
+}
+
+fn valid_fnv1a64(value: &str) -> bool {
+    value
+        .strip_prefix("0x")
+        .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+fn valid_runtime_token(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 256
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 fn evidence_fields(input_evidence: &str) -> BTreeMap<String, String> {

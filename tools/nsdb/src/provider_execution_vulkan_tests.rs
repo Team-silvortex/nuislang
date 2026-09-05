@@ -431,6 +431,7 @@ fn u32_request(
             provider_family: VULKAN_PROVIDER_FAMILY.to_owned(),
             execution_requirement: "real-device".to_owned(),
         }),
+        runtime_result_binding: None,
     }
 }
 

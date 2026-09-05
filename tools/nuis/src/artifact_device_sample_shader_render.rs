@@ -26,6 +26,7 @@ const DESCRIPTOR_IDENTITY_CONTRACT: &str = "nuis-provider-code-asset-descriptor-
 const IDENTITY_SET_CONTRACT: &str = "nuis-provider-code-asset-identity-set-v1";
 const CONTRIBUTION_CONTRACT: &str = "nuis-nustar-code-asset-identity-contribution-v1";
 const DIGEST_CONTRACT: &str = "nuis-code-asset-digest-fnv1a64-v1";
+const RUNTIME_RESULT_BINDING_CONTRACT: &str = "nuis-provider-runtime-result-binding-v1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct RenderAsset {
@@ -42,6 +43,8 @@ struct RenderAsset {
 struct RenderPass {
     pass_node: String,
     module_node: String,
+    result_node: String,
+    result_resource: String,
     asset_id: String,
     target_format: String,
     width: usize,
@@ -117,7 +120,13 @@ pub(crate) fn resolve_project_render_evidence(
         let selection = selections
             .get(&asset.asset_id)
             .ok_or_else(|| format!("render asset `{}` lost its contribution", asset.asset_id))?;
-        requests.push(render_request(index, table.passes.len(), pass, selection)?);
+        requests.push(render_request(
+            index,
+            table.passes.len(),
+            pass,
+            selection,
+            &table.source_fnv1a64,
+        )?);
     }
     let ordered_selections = ordered_request_selections(&table, &selections)?;
     let selection_evidence = if ordered_selections.len() == 1 {
@@ -198,6 +207,7 @@ fn render_request(
     request_count: usize,
     pass: &RenderPass,
     asset: &SelectedCodeAssetContribution,
+    source_yir_fnv1a64: &str,
 ) -> Result<String, String> {
     let prefix = format!("provider_request_{index}_");
     let [vertex_entry, fragment_entry] = asset.entries.as_slice() else {
@@ -219,7 +229,7 @@ fn render_request(
         format!("output.frame.{index}")
     };
     Ok(format!(
-        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.shader.module;{prefix}buffer_element_type=u8;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape={asset_bytes};{prefix}buffer_row_stride_bytes={asset_bytes};{prefix}buffer_byte_length={asset_bytes};{prefix}buffer_payload_path={asset_path};{prefix}buffer_content_hash={asset_hash};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=shader.render.rgba8.{index};{prefix}kernel_operation=render-rgba8;{prefix}kernel_input_buffer=input.shader.module;{prefix}kernel_output_buffer={output};{prefix}kernel_dispatch={width}x{height}x1;{prefix}kernel_scalar_bindings=fragment_entry:symbol:{fragment_entry};{prefix}code_asset_descriptor_contract={DESCRIPTOR_CONTRACT};{prefix}code_asset_id={asset_id};{prefix}code_asset_format={asset_format};{prefix}code_asset_target={asset_target};{prefix}code_asset_entry={vertex_entry};{prefix}code_asset_entry_count=2;{prefix}code_asset_entries={vertex_entry},{fragment_entry};{prefix}code_asset_path={asset_path};{prefix}code_asset_byte_length={asset_bytes};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={asset_hash};{prefix}output_binding_contract=nuis-provider-output-binding-v2;{prefix}output_binding_count=1;{prefix}output_binding_0_role={output};{prefix}output_binding_0_buffer={output};{prefix}output_binding_0_element_type=u8;{prefix}output_binding_0_layout=image-2d-row-major:pixel-format=rgba8;{prefix}output_binding_0_shape={width}x{height};{prefix}output_binding_0_row_stride_bytes={row_stride};{prefix}output_binding_0_byte_length={output_length};{prefix}output_binding_0_comparison_id=none;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=0;{prefix}input_binding_contract=nuis-provider-input-binding-v2;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.shader.module;{prefix}input_binding_0_source=artifact;{prefix}input_binding_0_element_type=u8;{prefix}input_binding_0_layout=tensor-contiguous;{prefix}input_binding_0_shape={asset_bytes};{prefix}input_binding_0_row_stride_bytes={asset_bytes};{prefix}input_binding_0_byte_length={asset_bytes};{prefix}input_binding_0_content_hash={asset_hash};{prefix}input_binding_0_payload_path={asset_path};{prefix}input_binding_0_producer_request_id=none;{prefix}input_binding_0_producer_output_buffer=none;{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={PROVIDER_FAMILY};{prefix}adapter_binding_execution_requirement=real-device",
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.shader.module;{prefix}buffer_element_type=u8;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape={asset_bytes};{prefix}buffer_row_stride_bytes={asset_bytes};{prefix}buffer_byte_length={asset_bytes};{prefix}buffer_payload_path={asset_path};{prefix}buffer_content_hash={asset_hash};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=shader.render.rgba8.{index};{prefix}kernel_operation=render-rgba8;{prefix}kernel_input_buffer=input.shader.module;{prefix}kernel_output_buffer={output};{prefix}kernel_dispatch={width}x{height}x1;{prefix}kernel_scalar_bindings=fragment_entry:symbol:{fragment_entry};{prefix}code_asset_descriptor_contract={DESCRIPTOR_CONTRACT};{prefix}code_asset_id={asset_id};{prefix}code_asset_format={asset_format};{prefix}code_asset_target={asset_target};{prefix}code_asset_entry={vertex_entry};{prefix}code_asset_entry_count=2;{prefix}code_asset_entries={vertex_entry},{fragment_entry};{prefix}code_asset_path={asset_path};{prefix}code_asset_byte_length={asset_bytes};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={asset_hash};{prefix}output_binding_contract=nuis-provider-output-binding-v2;{prefix}output_binding_count=1;{prefix}output_binding_0_role={output};{prefix}output_binding_0_buffer={output};{prefix}output_binding_0_element_type=u8;{prefix}output_binding_0_layout=image-2d-row-major:pixel-format=rgba8;{prefix}output_binding_0_shape={width}x{height};{prefix}output_binding_0_row_stride_bytes={row_stride};{prefix}output_binding_0_byte_length={output_length};{prefix}output_binding_0_comparison_id=none;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=0;{prefix}input_binding_contract=nuis-provider-input-binding-v2;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.shader.module;{prefix}input_binding_0_source=artifact;{prefix}input_binding_0_element_type=u8;{prefix}input_binding_0_layout=tensor-contiguous;{prefix}input_binding_0_shape={asset_bytes};{prefix}input_binding_0_row_stride_bytes={asset_bytes};{prefix}input_binding_0_byte_length={asset_bytes};{prefix}input_binding_0_content_hash={asset_hash};{prefix}input_binding_0_payload_path={asset_path};{prefix}input_binding_0_producer_request_id=none;{prefix}input_binding_0_producer_output_buffer=none;{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={PROVIDER_FAMILY};{prefix}adapter_binding_execution_requirement=real-device;{prefix}runtime_result_binding_contract={RUNTIME_RESULT_BINDING_CONTRACT};{prefix}runtime_result_source_yir_fnv1a64={source_hash};{prefix}runtime_result_module=shader;{prefix}runtime_result_instruction=draw_instanced;{prefix}runtime_result_node={result_node};{prefix}runtime_result_resource={result_resource}",
         asset_bytes = asset.byte_length,
         asset_path = asset.path,
         asset_hash = asset.content_hash,
@@ -228,6 +238,9 @@ fn render_request(
         asset_id = asset.asset_id,
         asset_format = asset.format,
         asset_target = asset.target,
+        source_hash = source_yir_fnv1a64,
+        result_node = pass.result_node,
+        result_resource = pass.result_resource,
     ))
 }
 
@@ -353,6 +366,8 @@ fn parse_pass(fields: &Fields) -> Result<RenderPass, String> {
     Ok(RenderPass {
         pass_node: string_field(fields, "pass_node")?,
         module_node: string_field(fields, "module_node")?,
+        result_node: string_field(fields, "result_node")?,
+        result_resource: string_field(fields, "result_resource")?,
         asset_id: string_field(fields, "asset_id")?,
         target_format: string_field(fields, "target_format")?,
         width: usize_field(fields, "width")?,
@@ -411,6 +426,8 @@ fn validate_render_table(output_dir: &Path, table: &RenderTable) -> Result<(), S
     for pass in &table.passes {
         if !pass_nodes.insert(pass.pass_node.as_str())
             || pass.module_node.is_empty()
+            || !token_is_valid(&pass.result_node)
+            || !token_is_valid(&pass.result_resource)
             || !asset_ids.contains(pass.asset_id.as_str())
             || pass.target_format != "rgba8_unorm"
             || pass.width == 0

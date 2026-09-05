@@ -38,6 +38,7 @@ mod artifact_provider_metadata;
 mod artifact_runtime_command;
 mod artifact_runtime_dispatch_receipt;
 mod artifact_runtime_persistence;
+mod artifact_runtime_provider_results;
 mod artifact_runtime_trace;
 mod bootstrap_candidate_adapter;
 mod bootstrap_candidate_build;

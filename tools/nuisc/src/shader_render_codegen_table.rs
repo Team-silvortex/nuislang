@@ -27,6 +27,8 @@ pub struct ShaderRenderPassProjection {
     pub contract: &'static str,
     pub pass_node: String,
     pub module_node: String,
+    pub result_node: String,
+    pub result_resource: String,
     pub asset_id: String,
     pub target_format: String,
     pub width: usize,
@@ -76,6 +78,7 @@ pub fn table_from_compiled_project_yir(
     let mut assets = BTreeMap::<String, ShaderRenderCodeAsset>::new();
     let mut passes = Vec::with_capacity(render_passes.len());
     for pass in render_passes {
+        let result = unique_render_result_node(&module, &pass.name)?;
         let inline =
             required_shader_node(&nodes, &pass.op.args[3], "inline_wgsl", pass.name.as_str())?;
         let target = required_shader_node(&nodes, &pass.op.args[0], "target", pass.name.as_str())?;
@@ -122,6 +125,8 @@ pub fn table_from_compiled_project_yir(
             contract: SHADER_RENDER_PASS_PROJECTION_CONTRACT,
             pass_node: pass.name.clone(),
             module_node: inline.name.clone(),
+            result_node: result.name.clone(),
+            result_resource: result.resource.clone(),
             asset_id,
             target_format,
             width: target_width.min(viewport_width),
@@ -139,6 +144,25 @@ pub fn table_from_compiled_project_yir(
     };
     validate_codegen_table(&table)?;
     Ok(Some(table))
+}
+
+fn unique_render_result_node<'a>(
+    module: &'a yir_core::YirModule,
+    pass_node: &str,
+) -> Result<&'a yir_core::Node, String> {
+    let mut results = module.nodes.iter().filter(|node| {
+        node.op.full_name() == "shader.draw_instanced"
+            && node.op.args.first().is_some_and(|value| value == pass_node)
+    });
+    let result = results
+        .next()
+        .ok_or_else(|| format!("Shader render pass `{pass_node}` has no draw result projection"))?;
+    if results.next().is_some() {
+        return Err(format!(
+            "Shader render pass `{pass_node}` has ambiguous draw result projections"
+        ));
+    }
+    Ok(result)
 }
 
 fn required_shader_node<'a>(
@@ -203,6 +227,8 @@ pub fn validate_codegen_table(table: &ShaderRenderCodegenTable) -> Result<(), St
         if pass.contract != SHADER_RENDER_PASS_PROJECTION_CONTRACT
             || !pass_nodes.insert(pass.pass_node.as_str())
             || pass.module_node.is_empty()
+            || pass.result_node.is_empty()
+            || pass.result_resource.is_empty()
             || !asset_ids.contains(pass.asset_id.as_str())
             || pass.target_format != "rgba8_unorm"
             || pass.width == 0
@@ -244,10 +270,12 @@ pub fn render_codegen_table(table: &ShaderRenderCodegenTable) -> Result<String, 
     for pass in &table.passes {
         out.push_str("\n[[pass]]\n");
         out.push_str(&format!(
-            "contract = \"{}\"\npass_node = \"{}\"\nmodule_node = \"{}\"\nasset_id = \"{}\"\ntarget_format = \"{}\"\nwidth = {}\nheight = {}\n",
+            "contract = \"{}\"\npass_node = \"{}\"\nmodule_node = \"{}\"\nresult_node = \"{}\"\nresult_resource = \"{}\"\nasset_id = \"{}\"\ntarget_format = \"{}\"\nwidth = {}\nheight = {}\n",
             pass.contract,
             escape_toml_string(&pass.pass_node),
             escape_toml_string(&pass.module_node),
+            escape_toml_string(&pass.result_node),
+            escape_toml_string(&pass.result_resource),
             escape_toml_string(&pass.asset_id),
             escape_toml_string(&pass.target_format),
             pass.width,

@@ -283,7 +283,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "from_surfaces_with_backend_payload_evidence",
                 "HeteroRuntimeTraceSummary",
                 "persist_launch_evidence_nsdb_handoff",
-                "nuis-host-runner",
             ],
         },
     DevTensorDriftCheckSpec {

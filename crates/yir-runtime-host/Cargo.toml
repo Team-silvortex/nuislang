@@ -18,3 +18,4 @@ yir-host-render = { path = "../yir-host-render" }
 yir-syntax = { path = "../yir-syntax" }
 yir-verify = { path = "../yir-verify" }
 yir-core = { path = "../yir-core" }
+yir-domain-shader = { path = "../yir-domain-shader" }

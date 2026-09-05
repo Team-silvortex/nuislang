@@ -397,6 +397,9 @@ pub(super) fn lower_single_nested_expr_with_consts(
     })
 }
 
+type ResultWrapperBuilder =
+    fn(Box<NirExpr>, NirResultStage, Option<Box<NirExpr>>) -> Result<NirExpr, String>;
+
 pub(super) struct ResultWrapperCallInput<'a> {
     pub(super) name: &'a str,
     pub(super) args: &'a [AstExpr],
@@ -407,8 +410,7 @@ pub(super) struct ResultWrapperCallInput<'a> {
     pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
     pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
     pub(super) family: NirResultFamily,
-    pub(super) build:
-        fn(Box<NirExpr>, NirResultStage, Option<Box<NirExpr>>) -> Result<NirExpr, String>,
+    pub(super) build: ResultWrapperBuilder,
     pub(super) expected_shape: &'a str,
 }
 

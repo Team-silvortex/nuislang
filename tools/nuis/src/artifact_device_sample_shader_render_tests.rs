@@ -28,7 +28,7 @@ fn write_fixture(output_dir: &Path) -> (String, String) {
     fs::write(
         output_dir.join(TABLE_FILE_NAME),
         format!(
-            "schema = \"{TABLE_CONTRACT}\"\nsource_yir_version = \"0.1\"\nsource_fnv1a64 = \"{source_hash}\"\nlowering_target = \"metal.apple-silicon-gpu\"\nasset_count = 1\npass_count = 2\n\n[[asset]]\ncontract = \"{ASSET_CONTRACT}\"\nasset_id = \"{asset_id}\"\nfile_name = \"{path}\"\nformat = \"metal-source\"\ntarget = \"metal.apple-silicon-gpu\"\nentries = [\"vs_main\", \"fs_main\"]\nbyte_length = {}\ncontent_hash = \"{content_hash}\"\n\n[[pass]]\ncontract = \"{PASS_CONTRACT}\"\npass_node = \"render.first\"\nmodule_node = \"shader.inline.first\"\nasset_id = \"{asset_id}\"\ntarget_format = \"rgba8_unorm\"\nwidth = 32\nheight = 24\n\n[[pass]]\ncontract = \"{PASS_CONTRACT}\"\npass_node = \"render.second\"\nmodule_node = \"shader.inline.first\"\nasset_id = \"{asset_id}\"\ntarget_format = \"rgba8_unorm\"\nwidth = 16\nheight = 8\n",
+            "schema = \"{TABLE_CONTRACT}\"\nsource_yir_version = \"0.1\"\nsource_fnv1a64 = \"{source_hash}\"\nlowering_target = \"metal.apple-silicon-gpu\"\nasset_count = 1\npass_count = 2\n\n[[asset]]\ncontract = \"{ASSET_CONTRACT}\"\nasset_id = \"{asset_id}\"\nfile_name = \"{path}\"\nformat = \"metal-source\"\ntarget = \"metal.apple-silicon-gpu\"\nentries = [\"vs_main\", \"fs_main\"]\nbyte_length = {}\ncontent_hash = \"{content_hash}\"\n\n[[pass]]\ncontract = \"{PASS_CONTRACT}\"\npass_node = \"render.first\"\nmodule_node = \"shader.inline.first\"\nresult_node = \"draw.first\"\nresult_resource = \"shader0\"\nasset_id = \"{asset_id}\"\ntarget_format = \"rgba8_unorm\"\nwidth = 32\nheight = 24\n\n[[pass]]\ncontract = \"{PASS_CONTRACT}\"\npass_node = \"render.second\"\nmodule_node = \"shader.inline.first\"\nresult_node = \"draw.second\"\nresult_resource = \"shader0\"\nasset_id = \"{asset_id}\"\ntarget_format = \"rgba8_unorm\"\nwidth = 16\nheight = 8\n",
             source.len()
         ),
     )
@@ -86,6 +86,14 @@ fn projects_verified_render_table_into_open_provider_requests() {
     assert!(evidence.contains("provider_request_0_code_asset_entries=vs_main,fs_main"));
     assert!(evidence.contains("provider_request_0_output_binding_0_shape=32x24"));
     assert!(evidence.contains("provider_request_1_output_binding_0_shape=16x8"));
+    assert!(evidence.contains(
+        "provider_request_0_runtime_result_binding_contract=nuis-provider-runtime-result-binding-v1"
+    ));
+    assert!(evidence.contains("provider_request_0_runtime_result_node=draw.first"));
+    assert!(evidence.contains(&format!(
+        "provider_request_0_runtime_result_source_yir_fnv1a64={}",
+        fnv1a64_hex(b"yir 0.1\n")
+    )));
     assert!(evidence.contains("provider_code_asset_identity_set_count=1"));
     assert!(evidence.contains(&format!(
         "provider_code_asset_contribution_asset_id={asset_id}"
@@ -149,10 +157,15 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
     assert!(evidence.contains(
         "provider_request_0_code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v2"
     ));
-    assert!(nsdb::validate_provider_request_evidence(&evidence));
+    assert!(nsdb::validate_provider_request_evidence(evidence));
 
-    let report = nsdb::execute_provider_samples(&output_dir, Some(PROVIDER_FAMILY))
-        .expect("NS Nova render should execute through its registered Nuis worker path");
+    let prepared =
+        crate::artifact_runtime_provider_results::prepare_runtime_provider_results(&output_dir)
+            .expect("runtime result preparation")
+            .expect("NS Nova runtime result target");
+    assert_eq!(prepared.target_count, 1);
+    assert_eq!(prepared.invocation_count, 3);
+    let report = &prepared.report;
     assert_eq!(report.output_payload_count, 1);
     assert_eq!(
         report.first_output_payload_native_output_kind,
@@ -166,6 +179,49 @@ fn executes_ns_nova_aot_render_projection_through_nuis_worker() {
         report.first_output_payload_native_execution_status,
         "metal-command-buffer-completed"
     );
+    let runtime_stream_path = prepared.stream_path;
+    let runtime_stream = fs::read_to_string(&runtime_stream_path)
+        .expect("Nsdb should persist the provider-neutral runtime result stream");
+    assert!(runtime_stream.contains("schema = \"nuis-provider-runtime-result-stream-v1\""));
+    assert!(runtime_stream.contains("frame_count = 3"));
+    assert!(runtime_stream.contains("module = \"shader\""));
+    assert!(runtime_stream.contains("instruction = \"draw_instanced\""));
+    assert!(!runtime_stream.contains(&output_dir.display().to_string()));
+
+    let yir_path = fs::read_dir(&output_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().and_then(|value| value.to_str()) == Some("yir"))
+        .expect("compiled project YIR");
+    let yir_source = fs::read_to_string(yir_path).unwrap();
+    let ppm = yir_runtime_host::render_module_to_ppm_bytes_with_provider_result_stream(
+        &yir_source,
+        1,
+        &runtime_stream_path,
+    )
+    .expect("NS Nova lifecycle should consume all three physical provider frames");
+    let ppm_header = b"P6\n160 120\n255\n";
+    assert!(ppm.starts_with(ppm_header));
+    let last_rgba = fs::read(output_dir.join("nuis.runtime.provider-result.0002.bin")).unwrap();
+    assert_eq!(last_rgba.len(), 160 * 120 * 4);
+    let expected_rgb = last_rgba
+        .chunks_exact(4)
+        .flat_map(|pixel| pixel[..3].iter().copied())
+        .collect::<Vec<_>>();
+    assert_eq!(&ppm[ppm_header.len()..], expected_rgb.as_slice());
+
+    let first_frame = output_dir.join("nuis.runtime.provider-result.0000.bin");
+    let mut drifted_frame = fs::read(&first_frame).unwrap();
+    drifted_frame[0] ^= 0xff;
+    fs::write(&first_frame, drifted_frame).unwrap();
+    let error = yir_runtime_host::render_module_to_ppm_bytes_with_provider_result_stream(
+        &yir_source,
+        1,
+        &runtime_stream_path,
+    )
+    .expect_err("runtime result payload drift must fail before presentation");
+    assert!(error.contains("payload") && error.contains("identity mismatch"));
     let payload = fs::read_to_string(
         output_dir.join("nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml"),
     )

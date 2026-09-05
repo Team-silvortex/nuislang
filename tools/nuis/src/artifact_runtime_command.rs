@@ -2,6 +2,7 @@ use crate::{
     append_json_field_strings,
     artifact_doctor::{collect_artifact_output_diagnostics, probe_artifact_doctor},
     artifact_doctor_render::render_artifact_doctor_json,
+    artifact_host_runner::resolve_nuis_host_runner_program,
     artifact_launch_evidence::{
         optional_bool_text, print_launch_evidence_text, HostRunnerJsonSurface, HostRunnerOutput,
         RunArtifactLaunchEvidence,
@@ -16,7 +17,6 @@ use crate::{
     runtime_host_yir, success_logs_enabled,
 };
 use std::{
-    env,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -287,7 +287,16 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         return Ok(());
     }
     let binary = resolved_binary_result?;
+    let runtime_provider_results = doctor
+        .output_dir
+        .as_deref()
+        .map(crate::artifact_runtime_provider_results::prepare_runtime_provider_results)
+        .transpose()?
+        .flatten();
     let mut command = Command::new(&binary);
+    if let Some(prepared) = runtime_provider_results.as_ref() {
+        prepared.bind_to_command(&mut command);
+    }
     if cfg!(test) {
         command.stdout(Stdio::null()).stderr(Stdio::null());
     }
@@ -296,6 +305,9 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         .map_err(|error| format!("failed to run `{}`: {error}", binary.display()))?;
     if success_logs_enabled() {
         println!("run-artifact: {}", binary.display());
+        if let Some(prepared) = runtime_provider_results.as_ref() {
+            prepared.print_text();
+        }
         println!(
             "  exit_status: {}",
             status
@@ -438,26 +450,6 @@ fn try_run_nsld_host_runner(
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
     })
-}
-
-fn resolve_nuis_host_runner_program() -> PathBuf {
-    if let Some(path) = env::var_os("NUIS_HOST_RUNNER").map(PathBuf::from) {
-        return path;
-    }
-    if let Ok(current_exe) = env::current_exe() {
-        if let Some(dir) = current_exe.parent() {
-            let sibling = dir.join("nuis-host-runner");
-            if sibling.exists() {
-                return sibling;
-            }
-        }
-    }
-    let workspace_debug =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nuis-host-runner");
-    if workspace_debug.exists() {
-        return workspace_debug;
-    }
-    PathBuf::from("nuis-host-runner")
 }
 
 fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPlan>) {

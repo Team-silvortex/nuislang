@@ -20,6 +20,8 @@ fn projects_ns_nova_inline_render_into_content_addressed_msl() {
     assert!(table.assets[0].source.contains("fragment float4 fs_main"));
     assert_eq!(table.passes[0].width, 160);
     assert_eq!(table.passes[0].height, 120);
+    assert!(!table.passes[0].result_node.is_empty());
+    assert!(!table.passes[0].result_resource.is_empty());
     assert_eq!(table.passes[0].asset_id, table.assets[0].asset_id);
     assert!(table.assets[0]
         .file_name
@@ -28,6 +30,8 @@ fn projects_ns_nova_inline_render_into_content_addressed_msl() {
     let rendered = render_codegen_table(&table).unwrap();
     assert!(rendered.contains("schema = \"nuis-shader-render-codegen-table-v1\""));
     assert!(rendered.contains("entries = [\"vs_main\", \"fs_main\"]"));
+    assert!(rendered.contains("result_node = \""));
+    assert!(rendered.contains("result_resource = \""));
     assert!(rendered.contains("width = 160"));
     assert!(!include_str!("shader_render_codegen_table.rs").contains("PixelMagic"));
     assert!(!include_str!("shader_render_codegen_table.rs").contains("ns_nova"));

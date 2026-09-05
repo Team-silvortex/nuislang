@@ -2,7 +2,30 @@ use crate::{
     json_bool_field, json_field, json_optional_bool_field, json_optional_string_field,
     json_usize_field,
 };
-use std::path::PathBuf;
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
+
+pub(crate) fn resolve_nuis_host_runner_program() -> PathBuf {
+    if let Some(path) = env::var_os("NUIS_HOST_RUNNER").map(PathBuf::from) {
+        return path;
+    }
+    if let Ok(current_exe) = env::current_exe() {
+        if let Some(dir) = current_exe.parent() {
+            let sibling = dir.join("nuis-host-runner");
+            if sibling.exists() {
+                return sibling;
+            }
+        }
+    }
+    let workspace_debug =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nuis-host-runner");
+    if workspace_debug.exists() {
+        return workspace_debug;
+    }
+    PathBuf::from("nuis-host-runner")
+}
 
 pub(crate) struct HostRunnerOutput {
     pub(crate) program: PathBuf,

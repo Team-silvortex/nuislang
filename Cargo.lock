@@ -193,6 +193,7 @@ dependencies = [
  "nuis-semantics",
  "nuisc",
  "sha2",
+ "yir-runtime-host",
 ]
 
 [[package]]
@@ -539,6 +540,7 @@ name = "yir-runtime-host"
 version = "0.1.0"
 dependencies = [
  "yir-core",
+ "yir-domain-shader",
  "yir-exec",
  "yir-host-render",
  "yir-syntax",

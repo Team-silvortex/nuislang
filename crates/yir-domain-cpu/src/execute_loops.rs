@@ -164,7 +164,7 @@ fn modular_step_reaches(initial: i64, limit: i64, delta: i128) -> bool {
     const MODULUS: u128 = 1_u128 << 64;
     let step = delta.rem_euclid(MODULUS as i128) as u128;
     let distance = (i128::from(limit) - i128::from(initial)).rem_euclid(MODULUS as i128) as u128;
-    distance % greatest_common_divisor(step, MODULUS) == 0
+    distance.is_multiple_of(greatest_common_divisor(step, MODULUS))
 }
 
 fn greatest_common_divisor(mut lhs: u128, mut rhs: u128) -> u128 {

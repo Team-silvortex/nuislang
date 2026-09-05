@@ -1,4 +1,8 @@
-use std::{ptr, slice};
+mod provider_result_stream;
+
+use std::{path::Path, ptr, slice};
+
+pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
 
 use yir_core::ModRegistry;
 use yir_exec::ExecutionTrace;
@@ -10,9 +14,33 @@ pub struct NuisRenderedBuffer {
 }
 
 pub fn render_module_to_ppm_bytes(module_source: &str, scale: usize) -> Result<Vec<u8>, String> {
-    let registry = yir_verify::default_registry();
-    let trace = execute_module_source_with_registry(module_source, &registry)?;
+    let trace = match std::env::var_os(PROVIDER_RESULT_STREAM_ENV) {
+        Some(path) => execute_module_source_with_provider_result_stream(module_source, path)?,
+        None => {
+            let registry = yir_verify::default_registry();
+            execute_module_source_with_registry(module_source, &registry)?
+        }
+    };
     render_trace_to_ppm_bytes(&trace, scale)
+}
+
+pub fn render_module_to_ppm_bytes_with_provider_result_stream(
+    module_source: &str,
+    scale: usize,
+    manifest_path: impl AsRef<Path>,
+) -> Result<Vec<u8>, String> {
+    let trace = execute_module_source_with_provider_result_stream(module_source, manifest_path)?;
+    render_trace_to_ppm_bytes(&trace, scale)
+}
+
+pub fn execute_module_source_with_provider_result_stream(
+    module_source: &str,
+    manifest_path: impl AsRef<Path>,
+) -> Result<ExecutionTrace, String> {
+    provider_result_stream::execute_with_provider_result_stream(
+        module_source,
+        manifest_path.as_ref(),
+    )
 }
 
 pub fn execute_module_source_with_registry(
@@ -21,6 +49,39 @@ pub fn execute_module_source_with_registry(
 ) -> Result<ExecutionTrace, String> {
     let module = yir_syntax::parse_module(module_source)?;
     yir_exec::execute_module_with_registry(&module, registry)
+}
+
+pub fn count_module_node_executions(
+    module_source: &str,
+    module_name: &str,
+    instruction: &str,
+    node_name: &str,
+    resource: &str,
+) -> Result<usize, String> {
+    let module = yir_syntax::parse_module(module_source)?;
+    let bound = module.nodes.iter().any(|node| {
+        node.name == node_name
+            && node.resource == resource
+            && node.op.module == module_name
+            && node.op.instruction == instruction
+    });
+    if !bound {
+        return Err(format!(
+            "provider runtime result target `{module_name}.{instruction}` node `{node_name}` resource `{resource}` is absent from YIR"
+        ));
+    }
+    let registry = yir_verify::default_registry();
+    let trace = yir_exec::execute_module_with_registry(&module, &registry)?;
+    let expected = format!("{module_name}.{instruction} @{resource} -> {node_name}");
+    let count = trace
+        .lane_steps
+        .values()
+        .flatten()
+        .filter(|step| *step == &expected)
+        .count();
+    (count > 0).then_some(count).ok_or_else(|| {
+        format!("provider runtime result target `{node_name}` was not executed by YIR")
+    })
 }
 
 pub fn render_trace_to_ppm_bytes(trace: &ExecutionTrace, scale: usize) -> Result<Vec<u8>, String> {

@@ -113,6 +113,21 @@ fn parses_registered_buffer_and_kernel_descriptors() {
 }
 
 #[test]
+fn parses_runtime_result_binding_and_rejects_invalid_source_identity() {
+    let evidence = format!(
+        "{REGISTERED};provider_runtime_result_binding_contract={PROVIDER_RUNTIME_RESULT_BINDING_CONTRACT};provider_runtime_result_source_yir_fnv1a64=0x0123456789abcdef;provider_runtime_result_module=shader;provider_runtime_result_instruction=draw_instanced;provider_runtime_result_node=draw.frame;provider_runtime_result_resource=shader0"
+    );
+    let request = provider_request_from_evidence(&evidence).expect("runtime result binding");
+    let binding = request.runtime_result_binding.expect("binding");
+    assert_eq!(binding.module, "shader");
+    assert_eq!(binding.instruction, "draw_instanced");
+    assert_eq!(binding.node, "draw.frame");
+
+    let invalid = evidence.replace("0x0123456789abcdef", "not-a-hash");
+    assert!(provider_request_from_evidence(&invalid).is_none());
+}
+
+#[test]
 fn parses_rank_three_contiguous_tensor_with_flat_span_stride() {
     let evidence = "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.features;provider_buffer_element_type=f32;provider_buffer_layout=tensor-contiguous;provider_buffer_shape=16x64x64;provider_buffer_row_stride_bytes=262144;provider_buffer_byte_length=262144;provider_buffer_payload_path=features.bin;provider_buffer_content_hash=0x1234;provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=tensor.rank3.copy;provider_kernel_operation=copy;provider_kernel_input_buffer=input.features;provider_kernel_output_buffer=output.features;provider_kernel_dispatch=16x64x64";
     let request = provider_request_from_evidence(evidence).expect("rank-three tensor request");

@@ -210,7 +210,7 @@ fn load_slot(
     }
 }
 
-fn scalar_value<'a>(value: Option<&'a LlvmValueRef>, kind: CpuCallScalarKind) -> Option<&'a str> {
+fn scalar_value(value: Option<&LlvmValueRef>, kind: CpuCallScalarKind) -> Option<&str> {
     match (kind, value?) {
         (CpuCallScalarKind::Bool, LlvmValueRef::Bool { i1, .. }) => Some(i1),
         (CpuCallScalarKind::I32, LlvmValueRef::I32(value))
