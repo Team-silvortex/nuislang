@@ -114,6 +114,24 @@ The bare aggregate-call return guard limitation remains; the event helper uses a
 equivalent supported leading guard. See the
 [window contract](../../../../docs/reference/nuis-yir-window-session-v3.md).
 
+## Cancellation Boundary
+
+`WindowSession::cancel` and `nuis_window_session_cancel` now forward an independent
+host cancellation ticket, including while work is pending. Its generic poll/free
+ABI can observe retirement after the window is freed, without executing implicit
+Nuis close or creating a terminal outcome for the parent. A late worker fault can
+appear in the ticket without rewriting the window's last observed state.
+
+This host API is not yet a cancellation control in this packaged application:
+there is no new CLI flag, Nuis intrinsic or CFFI signature grant. The close button
+and ordinary quit still follow the explicit close/Finish route above. Cancellation
+fixtures compile this actual Nuis source but do not dispatch a GPU frame; the
+separate Metal regressions remain the image-execution evidence. Host retirement
+does not certify that GPU resources are drained or reusable. See the
+[cancellation contract](../../../../docs/reference/nuis-yir-application-cancellation-v1.md).
+
+## Remaining Limits
+
 This is a **native host executable with an embedded YIR lifecycle runtime**, not
 fully native CPU lowering, a self-contained Nsld image or a stable interactive app.
 `nuis run-artifact` still supplies the registered provider session and artifact

@@ -3,9 +3,10 @@
 This file is the shortest historical index for the boundaries established
 during the alpha closeout line.
 
-For present-tense `beta-0.10.*` work, start with:
+For present-tense work, start with:
 
-* [../versioning/nuis-beta-0.10.0-self-hosting-entry.md](../../docs/versioning/nuis-beta-0.10.0-self-hosting-entry.md)
+* [Current mainline map](../current-mainline-map.md)
+* [Beta-0.12 checkpoint](../versioning/nuis-beta-0.12.0-snapshot.md)
 
 For the alpha progression that led into beta, continue with:
 

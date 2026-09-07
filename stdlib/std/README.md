@@ -10,9 +10,10 @@ Canonical short map:
 * [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](../../docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
   Use that historical file for the refactor order inherited by the current
   mainline.
-* [docs/versioning/nuis-beta-0.10.0-self-hosting-entry.md](../../docs/versioning/nuis-beta-0.10.0-self-hosting-entry.md)
-  Use that file for the current early-beta pressure across std, Nustar,
-  Nsld, Nsdb, and the development tensor.
+* [docs/versioning/nuis-beta-0.12.0-snapshot.md](../../docs/versioning/nuis-beta-0.12.0-snapshot.md)
+  Use that file for the current application-led pressure on std and the
+  toolchain. The five bounded compiler-preparation gates remain closed;
+  broader application resource safety and self-hosting are separate work.
 * [docs/versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
   Use that file for the direct registered heterogeneous execution predecessor.
 
@@ -25,7 +26,8 @@ Current source-style rule:
 
 ## Current Refactor Frontdoor
 
-For the current `beta-0.10.*` line, do not read `std` as one flat bucket first.
+For the current `beta-0.12.*` line, do not read `std` as one flat bucket first.
+Keep these independent lanes usable while ns-nova exposes their next gaps.
 
 Read it in this order:
 
@@ -94,6 +96,9 @@ Use these as the primary cluster names when placing new work:
     `StdReportContracts` helper can consume an argv output path, write an
     inspectable report file, echo the same report to stdout, and preserve
     text-stat validation through the std lane.
+    These are bounded CLI proofs: `cli_wc_demo` reads one 4096-byte chunk and
+    uses ASCII word separators. It is not complete streaming `wc`; richer
+    text semantics and large-file behavior need separate acceptance tests.
   - heterogeneous provider samples surface registered adapter, operation,
     worker lease, permit, and output-carrier evidence; supported Apple hosts
     execute real Metal/CoreML adapters while portable fallback remains explicit

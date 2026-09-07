@@ -1,356 +1,125 @@
 # Current Mainline Map
 
-This file is the canonical short reading map for the current repository spine.
-
-If several READMEs seem to overlap, prefer this file first, then drill into the
-local README for the area you are actively touching.
+This is the short reading map for current implementation, not a history catalog.
+When documents disagree, inspect the code/tests and current tensor evidence
+before changing a capability claim.
 
 ## Fast Reading Order
 
-The current `beta-0.11.*` priority is an ns-nova application-led dependency chain,
-with correctness, measured performance and staged compiler migration integrated
-into the same work. Start with
-[the application-led roadmap](versioning/nuis-beta-0.11-application-led-mainline.md)
-and [the executable mainline plan](reference/nuis-development-tensor.mainline.toml).
-The older migration-entry context remains in this reading order:
+The current `beta-0.12.*` priority is the ns-nova application-led dependency
+chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
+The [beta-0.12 snapshot](versioning/nuis-beta-0.12.0-snapshot.md) records
+`505c820c` (`beta-0.12.2`); Git remains authoritative for later patches.
 
-1. [versioning/nuis-beta-0.10.0-self-hosting-entry.md](versioning/nuis-beta-0.10.0-self-hosting-entry.md)
-2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-3. [reference/nuis-self-hosting-readiness.md](reference/nuis-self-hosting-readiness.md)
-4. [reference/nuis-compiler-stage-handoff.md](reference/nuis-compiler-stage-handoff.md)
-5. [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
-6. [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
-7. [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
-8. [reference/nuis-compiler-stage-transformation.md](reference/nuis-compiler-stage-transformation.md)
-9. [reference/nuis-compiler-candidate-preselection.md](reference/nuis-compiler-candidate-preselection.md)
-10. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-11. [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
-12. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-13. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-14. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-15. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-16. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-17. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-18. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-19. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-20. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-21. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-22. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-23. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-24. [versioning/README.md](versioning/README.md)
+1. [Repository overview](../README.md)
+2. [Mainline selection and acceptance coordinates](reference/nuis-development-tensor-mainline.md)
+3. [Machine-readable application boundary](reference/nuis-ns-nova-application-lifecycle-v1.toml)
+4. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
+5. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
+6. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
+7. [Focused validation checklist](versioning/nuis-beta-0.12.0-release-checklist.md)
 
-Short rule:
-
-`reference docs describe current behavior; versioning docs explain how that behavior got here`
+Use the [versioning index](versioning/README.md) for the earlier
+[beta-0.10 migration entry](versioning/nuis-beta-0.10.0-self-hosting-entry.md),
+[beta-0.6 foundation](versioning/nuis-beta-0.6.0-mainline-entry.md) and older
+alpha/pre-alpha anchors. Those checkpoints must not replace current behavior.
 
 ## Start Here
 
-* repo status and current toolchain spine:
-  [README.md](../README.md)
-* current development tensor progress model:
-  [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-* current goal/dependency task selection:
-  [reference/nuis-development-tensor-mainline.md](reference/nuis-development-tensor-mainline.md)
-* current staged self-hosting preparation gates:
-  [reference/nuis-self-hosting-readiness.md](reference/nuis-self-hosting-readiness.md)
-* current producer-neutral compiler-stage bundle:
-  [reference/nuis-compiler-stage-handoff.md](reference/nuis-compiler-stage-handoff.md)
-* current stage0 compiler-component build record:
-  [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
-* current pure Nuis candidate execution proof:
-  [reference/nuis-compiler-candidate-execution.md](reference/nuis-compiler-candidate-execution.md)
-* current attested Nuis stage1 leaf production proof:
-  [reference/nuis-compiler-candidate-production.md](reference/nuis-compiler-candidate-production.md)
-* current candidate-owned three-page structural pagination successor:
-  [reference/nuis-compiler-candidate-structural-pagination-v1.toml](reference/nuis-compiler-candidate-structural-pagination-v1.toml)
-* current Galaxy provider signer trust and monotonic state boundary:
-  [reference/galaxy-provider-trust-state-v1.toml](reference/galaxy-provider-trust-state-v1.toml)
-* current probe-gated Data inventory and executable CPU-memory reference:
-  [reference/nuis-data-provider-inventory-v1.toml](reference/nuis-data-provider-inventory-v1.toml)
-* current hardware-free Data conformance capsule, completion binding, and Nsld lifecycle gate:
-  [reference/nuis-data-provider-conformance-v1.toml](reference/nuis-data-provider-conformance-v1.toml)
-* current ns-nova owned application lifecycle and first GPU application slice:
-  [reference/nuis-ns-nova-application-lifecycle-v1.toml](reference/nuis-ns-nova-application-lifecycle-v1.toml)
-* current production-bound candidate compile capability:
-  [reference/nuis-compiler-candidate-compile-capability.md](reference/nuis-compiler-candidate-compile-capability.md)
-* current direct stage1 front-end compile capability:
-  [reference/nuis-compiler-candidate-direct-compile-capability.md](reference/nuis-compiler-candidate-direct-compile-capability.md)
-* current owner-signed generation-three candidate preselection:
-  [reference/nuis-compiler-candidate-preselection.md](reference/nuis-compiler-candidate-preselection.md)
-* current owner-signed direct candidate successor:
-  [reference/nuis-compiler-candidate-successor.md](reference/nuis-compiler-candidate-successor.md)
-* current bounded candidate-owned fresh-source capability:
-  [reference/nuis-compiler-candidate-fresh-source-capability.md](reference/nuis-compiler-candidate-fresh-source-capability.md)
-* current stage0/stage1 candidate differential gate:
-  [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
-* current two-clean-build compiler reproducibility aggregate and per-root sidecar binding:
-  [reference/nuis-compiler-component-reproducibility.md](reference/nuis-compiler-component-reproducibility.md)
-* current self-hosting migration entry, `beta-0.10.*`:
-  [versioning/nuis-beta-0.10.0-self-hosting-entry.md](versioning/nuis-beta-0.10.0-self-hosting-entry.md)
-* previous curated foundation entry, `beta-0.6.*`:
-  [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
-* previous curated `beta-0.3.*` entry:
-  [versioning/nuis-beta-0.3.0-mainline-entry.md](versioning/nuis-beta-0.3.0-mainline-entry.md)
-* earlier curated `beta-0.1.0` entry:
-  [versioning/nuis-beta-0.1.0-mainline-entry.md](versioning/nuis-beta-0.1.0-mainline-entry.md)
-* recorded predecessor `beta-0.0.1` entry:
-  [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)
-* direct predecessor `alpha-0.20.*` closeout entry:
-  [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
-* predecessor `alpha-0.17.*` registered worker entry:
-  [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
-* predecessor `alpha-0.16.*` tensor-guided closure entry:
-  [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
-* predecessor `alpha-0.10.*` executable-artifact closure entry:
-  [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
-* predecessor `alpha-0.8.*` binary convergence entry:
-  [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-* predecessor `alpha-0.8.*` documentation sync inventory:
-  [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
-* predecessor `alpha-0.7.*` entry:
-  [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
-* predecessor `alpha-0.6.*` linker/std smoke entry:
-  [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-* `alpha-0.4.*` hardening baseline plan:
-  [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* `alpha-0.4.*` hardening baseline inventory:
-  [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-* `alpha-0.4.*` documentation sync baseline:
-  [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-* long-range heterogeneous OS roadmap:
-  [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-* predecessor `alpha-0.1.*` status:
-  [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-* current frontdoor surface reference:
-  [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-* current native artifact workflow:
-  [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-* current binary format protocol:
-  [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-* CFFI / classic von-Neumann domain contract:
-  [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-* predecessor ABI vocabulary bridge into pre-alpha `0.20.*`:
-  [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* immediate predecessor alpha closeout set:
-  [versioning/nuis-alpha-0.0.1-preflight-report.md](versioning/nuis-alpha-0.0.1-preflight-report.md),
-  [versioning/nuis-alpha-0.0.1-closeout-board.md](versioning/nuis-alpha-0.0.1-closeout-board.md),
-  [versioning/nuis-alpha-0.0.1-closeout-checklist.md](versioning/nuis-alpha-0.0.1-closeout-checklist.md)
-* predecessor alpha mainline boundary index:
-  [reference/alpha-mainline-boundary-index.md](reference/alpha-mainline-boundary-index.md)
-* predecessor frontend-vs-CLI boundary note:
-  [versioning/nuis-0.20.0-frontend-cli-boundaries.md](versioning/nuis-0.20.0-frontend-cli-boundaries.md)
-* predecessor branch-runtime lowering matrix:
-  [versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md](versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* predecessor generic-validation regression matrix:
-  [versioning/nuis-0.20.0-generic-validation-regression-matrix.md](versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-* predecessor receiver-generic regression matrix:
-  [versioning/nuis-0.20.0-receiver-generic-regression-matrix.md](versioning/nuis-0.20.0-receiver-generic-regression-matrix.md)
-* predecessor `std` refactor frontdoor:
-  [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-* predecessor compile-gap checklist:
-  [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
-* previous minor-line anchors still worth keeping nearby:
-  [versioning/nuis-0.19.0-snapshot.md](versioning/nuis-0.19.0-snapshot.md),
-  [versioning/nuis-0.19.0-compile-workflow.md](versioning/nuis-0.19.0-compile-workflow.md),
-  [versioning/nuis-0.19.0-workflow-capability-matrix.md](versioning/nuis-0.19.0-workflow-capability-matrix.md),
-  [versioning/nuis-0.19.0-project-capability-matrix.md](versioning/nuis-0.19.0-project-capability-matrix.md),
-  [versioning/nuis-0.19.0-frontend-capability-matrix.md](versioning/nuis-0.19.0-frontend-capability-matrix.md)
-* historical/versioning router:
-  [versioning/README.md](versioning/README.md)
-* implementation-truth docs:
-  [reference/README.md](reference/README.md),
-  [reference/generic-diagnostic-ownership-contract.md](reference/generic-diagnostic-ownership-contract.md),
-  [reference/control-flow-lowering-contract.md](reference/control-flow-lowering-contract.md)
-* repo structure:
-  [repo-layout.md](repo-layout.md)
+Run from the repository root:
 
-Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-candidate-probe/bootstrap-candidate-build/bootstrap-candidate-compile-capability/bootstrap-preselect-candidate/bootstrap-candidate-direct-compile/bootstrap-sign-candidate-successor/bootstrap-candidate-fresh-source -> nsld candidate-input -> nuis bootstrap-diff/bootstrap-reproducibility/bootstrap-attest-reproducibility/bootstrap-verify-reproducibility-attestation/bootstrap-authorize-component-replacement/bootstrap-verify-component-replacement/bootstrap-activate-component/bootstrap-rollback-component/bootstrap-verify-component-transition/bootstrap-dispatch-component/bootstrap-dispatch-compile -> artifact-doctor/run-artifact -> release-check`
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- dev-tensor --json
+```
 
-Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned chunked data -> producer-neutral structural handoff -> real AST/NIR derived selection -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed canonical plus selected-representation differential reports -> two-clean-build aggregate -> pinned external attestation -> separate replacement authorization -> canonical reversible active state -> signed generation-two rollback -> path-free selected-build dispatch -> canonical selected-image compile request -> production-bound Nuis candidate delegated compile capability -> signed generation-three preselection -> direct stage1 front-end compile capability -> signed generation-three successor -> candidate-owned fresh-source front-end capability -> candidate-owned equivalent Nsld input -> per-root reproducibility-v2 sidecar binding -> candidate-owned three-page structural pagination -> bounded stage-neutral IR closure -> persistent Galaxy provider trust -> nested complete compiler-arena forwarding -> five-of-five migration-entry readiness -> candidate-owned registered native object writer`
+The current goal is `standard-library/ns-nova/interactive-image-workflow`.
+Its selected prerequisite is
+`standard-library/ns-nova/persistent-application-session`.
+Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
+not the globally lowest percentage. Correctness regressions may interrupt it.
 
-Current example-tree rule:
-`frontdoor first -> grouped companions next -> explicit probe routes after that`
+Current session evidence:
+
+- Registered Nuis open/event/close helpers retain scalar aggregate state and
+  one provider connection across independent host events.
+- Compiled AppKit/Metal regressions check input, actual image pixels, replay,
+  worker/cache reuse, explicit cleanup and failure-preserving exit.
+- An explicitly selected CPU parent opens before its child and receives one
+  owned terminal outcome; its successful cleanup cannot certify child success.
+- Pump, window and C ABI expose one independent cancellation ticket.
+  It survives window destruction without implicit close, a fabricated terminal
+  outcome or parent delivery.
+- Cancellation admission, host-scope retirement and provider/device resource
+  retirement are distinct. The last still needs provider-owned evidence.
+
+Next wire an explicit packaged-host cancellation trigger through the existing
+ticket. Ordinary quit still uses close/Finish. Then establish provider drain
+before resource reuse, without importing provider registries, transports or
+concrete cancellation state into the host window adapter.
+
+This does not close resource-capability state, peer recovery, general multi-child
+routing, richer image bindings, sustained performance, native CPU frame dispatch
+or a self-contained Nsld application image. The broad engine coordinate is not
+an engine-completion percentage.
 
 ## Current Truth By Layer
 
-Use this section as a router, not as a full inventory.
+| Area | Current Reference |
+| --- | --- |
+| Development model | [Tensor protocol](reference/nuis-development-tensor.md), [mainline selection](reference/nuis-development-tensor-mainline.md) |
+| Frontend/lowering | [Control flow](reference/control-flow-lowering-contract.md), [generic diagnostics](reference/generic-diagnostic-ownership-contract.md), [source encoding](reference/source-text-encoding-contract.md) |
+| Memory/task safety | [NIR memory](reference/nir-memory-model.md), [task/GLM](reference/cpu-task-glm-contract.md), [thread/lock boundary](reference/cpu-thread-lock-boundary.md), [FFI pointers](reference/ffi-pointer-safety-boundary.md) |
+| Runtime sessions | [Application lifecycle](reference/nuis-yir-application-session-v1.md), [window](reference/nuis-yir-window-session-v3.md), [terminal outcomes](reference/nuis-yir-application-outcome-v1.md), [parent pump](reference/nuis-yir-application-outcome-pump-v1.md), [cancellation](reference/nuis-yir-application-cancellation-v1.md) |
+| Nustars | [Capability ownership](reference/nustar-capability-split-boundary.md), [multi-backend artifacts](reference/nustar-multi-backend-artifact-contract.md), [CFFI domain](reference/cffi-von-neumann-domain-contract.md), [provider IPC](reference/nuis-yir-provider-runtime-ipc-v4.md) |
+| Linking/launch | [Native workflow](reference/nuis-native-artifact-workflow.md), [NSB protocol](reference/nuis-binary-format-protocol.md), [Nsld](reference/nsld-linker-frontdoor.md), [assembly gaps](reference/nsld-binary-assembly-gap-map.md) |
+| Debugging/distribution | [Nsdb](reference/nsdb-yir-debugger-frontdoor.md), [Nsbdr](reference/nsbdr-bundler-frontdoor.md), [reusable capability boundary](reference/toolchain-galaxy-core-boundary.md) |
+| Official Galaxies | [Std](../stdlib/std/README.md), [PixelMagic](../stdlib/pixelmagic/README.md), [WitSage](../stdlib/witsage/README.md), [ns-nova](../stdlib/ns-nova/README.md) |
+| Compiler migration | [Readiness](reference/nuis-self-hosting-readiness.md), [data model](reference/nuis-compiler-data-model.md), [stage handoff](reference/nuis-compiler-stage-handoff.md), [candidate production](reference/nuis-compiler-candidate-production.md), [candidate-to-Nsld boundary](reference/nuis-compiler-candidate-nsld-materialization.md) |
 
-* source-level examples:
-  [examples/ns/README.md](../examples/ns/README.md)
-* project-level examples:
-  [examples/projects/README.md](../examples/projects/README.md)
-* example freshness / routing audit:
-  [examples-freshness-audit.md](examples-freshness-audit.md)
-* frontdoor and native artifact closure:
-  [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md),
-  [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md),
-  [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md),
-  [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md),
-  [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md),
-  [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-  current native control-flow smoke gate:
-  [artifact_cli.rs](../tools/nuisc/tests/artifact_cli.rs)
-  current host-YIR runtime probe:
-  [host_yir.rs](../crates/nuis-runtime/src/host_yir.rs)
-  current lifecycle-loader planner, owned execution context, plan identity, and required clock/GLM service bindings:
-  [lifecycle_bootstrap.rs](../crates/nuis-runtime/src/lifecycle_bootstrap.rs),
-  [lifecycle_execution.rs](../crates/nuis-runtime/src/lifecycle_execution.rs),
-  [executable_memory.rs](../crates/nuis-runtime/src/executable_memory.rs),
-  [native_entry.rs](../tools/nsld/src/native_entry.rs),
-  [container_metadata_bindings.rs](../tools/nsld/src/container_metadata_bindings.rs),
-  [final_executable_bootstrap.rs](../tools/nsld/src/final_executable_bootstrap.rs),
-  [runtime_bootstrap.rs](../tools/nuis-host-runner/src/runtime_bootstrap.rs),
-  [native_entry.rs](../tools/nuis-host-runner/src/native_entry.rs)
-* tool/reference surface:
-  [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-* std layering and tooling:
-  [stdlib/std/README.md](../stdlib/std/README.md),
-  [reference/std-tooling-workflow-contract.md](reference/std-tooling-workflow-contract.md)
-* PixelMagic frontdoor:
-  [stdlib/pixelmagic/README.md](../stdlib/pixelmagic/README.md),
-  [reference/pixelmagic-mainline-contract.md](reference/pixelmagic-mainline-contract.md)
-  current image-preprocess bridge:
-  [reference/tooling-image-preprocess-lane.md](reference/tooling-image-preprocess-lane.md)
-  current high-level tooling ladder:
-  [cli_compile_workflow_demo](../examples/projects/tooling/cli_compile_workflow_demo),
-  [cli_workflow_automation_demo](../examples/projects/tooling/cli_workflow_automation_demo),
-  [cli_build_pipeline_demo](../examples/projects/tooling/cli_build_pipeline_demo),
-  [cli_project_build_report_demo](../examples/projects/tooling/cli_project_build_report_demo)
-* control-flow / memory / task / ownership:
-  [reference/control-flow-lowering-contract.md](reference/control-flow-lowering-contract.md),
-  [reference/nir-memory-model.md](reference/nir-memory-model.md),
-  [reference/cpu-task-glm-contract.md](reference/cpu-task-glm-contract.md),
-  [reference/cpu-thread-lock-boundary.md](reference/cpu-thread-lock-boundary.md),
-  [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-* domain and project contracts:
-  [examples/projects/domains/README.md](../examples/projects/domains/README.md),
-  [reference/std-net-layering-contract.md](reference/std-net-layering-contract.md),
-  [reference/std-shader-kernel-project-contract.md](reference/std-shader-kernel-project-contract.md)
-* capability split and future architecture edges:
-  [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md),
-  [reference/annotation-intrinsic-stdlib-sketch.md](reference/annotation-intrinsic-stdlib-sketch.md),
-  [reference/nuis-launcher-container-linker-sketch.md](reference/nuis-launcher-container-linker-sketch.md),
-  [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+The five bounded migration-preparation gates remain closed; actual compiler
+responsibility transfer is separate. Use the readiness/component references for
+canonical payloads, trust pins, differential/reproducibility and rollback
+commands rather than reproducing their entire history in this router.
 
 ## Fast Example Routes
 
-If you want one shortest checked-in route per question, use:
+| Task | Start With | Evidence Boundary |
+| --- | --- | --- |
+| Basic host CLI | [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo), [stdin_runtime_demo](../examples/projects/tooling/stdin_runtime_demo), [cli_report_file_demo](../examples/projects/tooling/cli_report_file_demo) | Native executables with observable I/O and output-file checks. |
+| Text statistics | [cli_wc_demo](../examples/projects/tooling/cli_wc_demo) | One 4096-byte read and ASCII separators, not complete streaming `wc`. |
+| Simple file/image transform | [cli_pgm_invert_demo](../examples/projects/tooling/cli_pgm_invert_demo) | Checked small PGM input/output, not a general image-codec library. |
+| Current application goal | [ns_nova_image_showcase](../examples/projects/domains/ns_nova_image_showcase) | Real Metal processing, compiled export and explicit stateful AppKit window; embedded YIR host runtime remains. |
+| Small render/uniform route | [ns_nova_showcase](../examples/projects/domains/ns_nova_showcase) | Bounded frame loop, registered render resources and live/replay evidence. |
+| Linker closure | [native_artifact_closure_demo](../examples/projects/tooling/native_artifact_closure_demo) | Inspect the selected finalizer and admission evidence; a planned image is not automatically runnable. |
+| Compiler component | [bootstrap_structural_projection_candidate](../examples/projects/tooling/bootstrap_structural_projection_candidate) | Bounded candidate proof, not general self-compilation or replacement authority. |
+| Linux device work | [CUDA bring-up](reference/linux-cuda-provider-bringup.md), [domain examples](../examples/projects/domains/README.md) | Run provider-specific gates on suitable hardware; absent hardware is unverified, not fallback success. |
 
-* sync control-flow:
-  [chained_while_demo](../examples/projects/state/chained_while_demo) ->
-  [match_branching_while_demo](../examples/projects/state/match_branching_while_demo) ->
-  [flow_branching_while_demo](../examples/projects/state/flow_branching_while_demo) ->
-  [post_flow_branching_while_demo](../examples/projects/state/post_flow_branching_while_demo)
-* async control-flow:
-  [task_async_observer_bridge_demo](../examples/projects/task/task_async_observer_bridge_demo) ->
-  [task_async_while_post_flow_demo](../examples/projects/task/task_async_while_post_flow_demo) ->
-  [task_async_while_post_flow_cond_demo](../examples/projects/task/task_async_while_post_flow_cond_demo) ->
-  [task_async_post_flow_shared_suffix_loop_control_demo](../examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
-* generic/control-flow crossover:
-  [generic_method_bound_if_binding_demo](../examples/projects/state/generic_method_bound_if_binding_demo) ->
-  [generic_method_bound_guarded_nested_match_demo](../examples/projects/state/generic_method_bound_guarded_nested_match_demo)
-* task/thread/lock boundary:
-  [hello_thread_mutex_observe.ns](../examples/ns/memory/hello_thread_mutex_observe.ns) ->
-  [task_thread_mutex_demo](../examples/projects/task/task_thread_mutex_demo)
-* native artifact closure:
-  [native_artifact_closure_demo](../examples/projects/tooling/native_artifact_closure_demo)
-* tooling compile ladder:
-  [cli_workflow_automation_demo](../examples/projects/tooling/cli_workflow_automation_demo) ->
-  [cli_build_pipeline_demo](../examples/projects/tooling/cli_build_pipeline_demo) ->
-  [cli_project_build_report_demo](../examples/projects/tooling/cli_project_build_report_demo) ->
-  [cli_compile_workflow_demo](../examples/projects/tooling/cli_compile_workflow_demo)
-* tooling image preprocess lane:
-  [cli_pgm_info_demo](../examples/projects/tooling/cli_pgm_info_demo) ->
-  [cli_pgm_invert_demo](../examples/projects/tooling/cli_pgm_invert_demo) ->
-  [cli_pgm_threshold_demo](../examples/projects/tooling/cli_pgm_threshold_demo) ->
-  [reference/tooling-image-preprocess-lane.md](reference/tooling-image-preprocess-lane.md) ->
-  [examples/projects/domains/pixelmagic_packet_bridge_demo](../examples/projects/domains/pixelmagic_packet_bridge_demo) ->
-  [examples/projects/domains/pixelmagic_texture_resource_demo](../examples/projects/domains/pixelmagic_texture_resource_demo) ->
-  [examples/projects/domains/pixelmagic_pipeline_demo](../examples/projects/domains/pixelmagic_pipeline_demo) ->
-  [examples/projects/domains/pixelmagic_render_demo](../examples/projects/domains/pixelmagic_render_demo) ->
-  [reference/pixelmagic-mainline-contract.md](reference/pixelmagic-mainline-contract.md) ->
-  [reference/galaxy-frontdoor-prep-sketch.md](reference/galaxy-frontdoor-prep-sketch.md) ->
-  [reference/galaxy-texture-handoff-contract.md](reference/galaxy-texture-handoff-contract.md)
-* std filesystem contract smoke:
-  [file_read_demo](../examples/projects/tooling/file_read_demo) ->
-  [file_write_demo](../examples/projects/tooling/file_write_demo) ->
-  [file_copy_demo](../examples/projects/tooling/file_copy_demo) ->
-  [file_output_demo](../examples/projects/tooling/file_output_demo) ->
-  [file_roundtrip_demo](../examples/projects/tooling/file_roundtrip_demo) ->
-  [directory_create_demo](../examples/projects/tooling/directory_create_demo) ->
-  [directory_remove_demo](../examples/projects/tooling/directory_remove_demo) ->
-  [filesystem_report_demo](../examples/projects/tooling/filesystem_report_demo) ->
-  [filesystem_report_file_demo](../examples/projects/tooling/filesystem_report_file_demo) ->
-  [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo) ->
-  [path_analysis_demo](../examples/projects/tooling/path_analysis_demo) ->
-  [path_safety_demo](../examples/projects/tooling/path_safety_demo) ->
-  [path_copy_remove_demo](../examples/projects/tooling/path_copy_remove_demo)
-  current rule:
-  these are `std=workspace` contract consumers and should return process-style
-  `fs_ok` / `fs_error` instead of raw probe totals
-* std tooling report smoke:
-  [io_runtime_demo](../examples/projects/tooling/io_runtime_demo) ->
-  [terminal_io_demo](../examples/projects/tooling/terminal_io_demo) ->
-  [io_report_demo](../examples/projects/tooling/io_report_demo) ->
-  [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo) ->
-  [benchmark_report_file_demo](../examples/projects/tooling/benchmark_report_file_demo) ->
-  [result_runtime_demo](../examples/projects/tooling/result_runtime_demo) ->
-  [result_diagnostic_demo](../examples/projects/tooling/result_diagnostic_demo) ->
-  [text_report_builder_demo](../examples/projects/tooling/text_report_builder_demo) ->
-  [text_report_json_demo](../examples/projects/tooling/text_report_json_demo) ->
-  [result_enum_runtime_demo](../examples/projects/tooling/result_enum_runtime_demo)
-  current rule:
-  these prove cross-contract composition across filesystem, console I/O, text,
-  benchmark, result/error, diagnostic, and JSON/report helpers
-  current gap:
-  Result enum `Ok`/`map`/value extraction, `Err`/`map_err`, and
-  branch-selected struct summaries are run-backed on CPU/tooling, task, and
-  network; shader Result enum is artifact-doctor/build-report backed as a
-  ready-to-run `window-aot-bundle` with CPU/data/shader domain units. Static
-  known-variant pruning and branch-local shader effects are still future
-  hardening work.
-* shader/kernel showcase:
-  [kernel_tensor_demo](../examples/projects/kernel_tensor_demo) /
-  [window_controls_demo](../examples/projects/window_controls_demo) (repair/probe) /
-  [kernel_result_profile_demo](../examples/projects/domains/kernel_result_profile_demo)
-  current rule:
-  kernel Result/profile code is build-report backed with CPU + kernel domain
-  units, CoreML/Apple ANE lowering metadata, host bridge metadata, and host-yir
-  kernel reference execution
-* WitSage kernel-facing ML route:
-  [stdlib/witsage/README.md](../stdlib/witsage/README.md) ->
-  [examples/projects/domains/witsage_kernel_demo](../examples/projects/domains/witsage_kernel_demo) ->
-  [examples/projects/domains/witsage_classifier_demo](../examples/projects/domains/witsage_classifier_demo)
-* network/domain route:
-  [network_profile_demo](../examples/projects/domains/network_profile_demo) ->
-  [net_http_session_loop_bridge_recipe_demo](../examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+The [observable CLI regression](../tools/nuis/tests/std_filesystem_smoke.rs)
+builds and runs seven project routes, including PixelMagic/WitSage reports.
+Those reports alone are not device-execution evidence. The separate Metal tests
+check actual dispatched image data.
+
+The engine-facing host API can now cancel a session, but the packaged AppKit
+application has no cancellation trigger yet. No new CLI flag, Nuis intrinsic
+or CFFI signature grant is implied by that API.
 
 ## Deep Routers
 
-When the short routes above are not enough, jump straight to the dedicated
-router instead of using this file as a long catalog:
+- [Documentation index](README.md) and [reference index](reference/README.md)
+- [Project examples](../examples/projects/README.md), [source examples](../examples/ns/README.md), [freshness audit](examples-freshness-audit.md)
+- [Std tooling](../stdlib/std/tooling/README.md), [filesystem](../stdlib/std/filesystem/README.md), [network](../stdlib/std/network/README.md)
+- [Repository layout](repo-layout.md) and [file-line policy](repo-file-line-policy.md)
+- [Application-led design](versioning/nuis-beta-0.11-application-led-mainline.md) and [long-range OS roadmap](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
 
-* examples tree and freshness:
-  [examples/projects/README.md](../examples/projects/README.md),
-  [examples/ns/README.md](../examples/ns/README.md),
-  [examples-freshness-audit.md](examples-freshness-audit.md)
-* std recipe ladders:
-  [stdlib/std/README.md](../stdlib/std/README.md),
-  [stdlib/std/network/README.md](../stdlib/std/network/README.md)
-* domain route catalogs:
-  [examples/projects/domains/README.md](../examples/projects/domains/README.md)
-* task-facing current contracts:
-  [reference/cpu-task-contract.md](reference/cpu-task-contract.md),
-  [reference/cpu-task-memory-contract.md](reference/cpu-task-memory-contract.md),
-  [reference/cpu-task-glm-contract.md](reference/cpu-task-glm-contract.md)
+Rendering, control, ML and audio are an engine horizon, not four completed
+workflows. Shared YIR/GLM/time contracts preserve independent Galaxy/Nustar
+ownership. Hardware extensibility and scheduling efficiency require separate
+measurements; a smoke test is not an advantage over MLIR or a mature language.
 
 ## Cleanup Rule
 
-When a local README and this file differ:
-
-* use this file for the shortest current entry path
-* use the local README only for area-specific detail
-* treat anything outside these paths as secondary unless you are actively
-  working in that subsystem
+Keep this map short. Current behavior belongs in focused reference documents;
+minor checkpoints belong in versioning, and examples state their own input,
+backend and execution limits. Keep paths repository-relative. Update tensor
+evidence and documentation drift guards after each accepted change, without
+raising capability scores for documentation work.

@@ -9,6 +9,13 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-beta-0.12.0-snapshot.md](nuis-beta-0.12.0-snapshot.md)
+* [nuis-beta-0.12.0-release-checklist.md](nuis-beta-0.12.0-release-checklist.md)
+
+These record `beta-0.12.2`; the `.0` filenames identify the minor series rather
+than retroactively assigning every feature to its first patch. The governing
+application-led agreement and migration-entry history remain:
+
 * [nuis-beta-0.11-application-led-mainline.md](nuis-beta-0.11-application-led-mainline.md)
 * [nuis-beta-0.10.0-self-hosting-entry.md](nuis-beta-0.10.0-self-hosting-entry.md)
 
@@ -46,6 +53,10 @@ Earlier alpha anchors are:
 
 Use this section when the question is:
 
+* what beta-0.12 established for persistent windows, independent cancellation
+  tickets and the remaining AppKit/provider-retirement boundary
+* why ns-nova application work drives general foundation fixes and measured
+  compiler-module migration without coupling independent Galaxies/Nustars
 * why `beta-0.10.*` activates formal stage0-to-stage1 migration without
   claiming completed self-hosting or final replacement readiness
 * what `beta-0.0.1` established at the alpha-to-beta transition
@@ -67,7 +78,7 @@ Use this section when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `beta-0.10.*`
+* what the `beta-0.10.*` migration-entry phase established
 * which documentation routes and wording are current after the beta entry
   refresh
 * which broad README surfaces were refreshed for the current beta line
@@ -181,7 +192,9 @@ Read:
 
 Practical rule:
 
-* start at the current `beta-0.10.*` self-hosting entry first
+* start at the current `beta-0.12.*` application-session snapshot first
+* use `beta-0.11.*` for the governing application-led direction
+* use `beta-0.10.*` for the historical staged-migration entry
 * use `beta-0.6.*` for the previous curated foundation snapshot
 * use `beta-0.3.*` for the previous curated linker/runtime snapshot
 * use `beta-0.1.0` for the earlier curated beta foundation snapshot

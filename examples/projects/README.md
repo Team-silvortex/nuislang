@@ -16,8 +16,9 @@ The important reading rule now is:
 * if you want the current cleanup/status board for project routes, use
   [docs/examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
 * if you want the current repo-level line status that explains why some
-  examples are frontdoor while others are only companions, use
-  [docs/versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
+  examples are frontdoor while others are only companions, use the
+  [beta-0.12 snapshot](../../docs/versioning/nuis-beta-0.12.0-snapshot.md),
+  not an alpha-era inventory
 
 Current source-style rule:
 
@@ -72,8 +73,13 @@ Current practical rule:
 
 These are the best current first-entry projects:
 
+* [domains/ns_nova_image_showcase](domains/ns_nova_image_showcase)
+  current application-led route: compiled Metal image export and an explicit
+  stateful AppKit window, still using the embedded-YIR host runtime and providers
+* [tooling/filesystem_io_report_demo](tooling/filesystem_io_report_demo)
+  small native host CLI with observable I/O; no GPU is needed for this route
 * [kernel_tensor_demo](kernel_tensor_demo)
-  current verified `cpu + data + kernel` first route for the project pipeline
+  focused `cpu + data + kernel` project-pipeline companion
 * [tooling/native_artifact_closure_demo](tooling/native_artifact_closure_demo)
   current linker/runtime closure pressure route
 * [window_controls_demo](window_controls_demo)

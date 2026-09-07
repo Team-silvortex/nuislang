@@ -4,525 +4,189 @@
 > `nuis -> NIR -> YIR -> registered Nustar backends -> Nsld -> runtime`.
 
 Nuis treats CPU, shader, kernel, data, network, and C compatibility as
-registered execution domains under one semantic, clock, GLM, artifact, and
-lifecycle contract. LLVM and host operating systems are important bootstrap
-backends, but they do not define the language model.
+registered execution domains under shared function/node, clock, GLM, artifact,
+and lifecycle contracts. LLVM and host operating systems are bootstrap
+backends, not the language's semantic root.
 
 ## Current Line
 
-The repository is on `beta-0.11.*`. Git history is the authoritative source for
-the exact patch checkpoint; the independent Cargo package versions are not the
-project release number yet.
+The repository is on `beta-0.12.*`. Git history is authoritative for the exact
+patch checkpoint; Cargo package versions are independent of the project release.
+The [beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) records
+checkpoint `505c820c` (`beta-0.12.2`), not a new release or compatibility freeze.
 
-The mainline is now **ns-nova application-led development**: grow one real
-Nuis-owned application, fix the foundation gaps it exposes, measure performance,
-and progressively replace independently testable toolchain modules with Nuis
-implementations. The first task is persistent application state across host
-events, not whole-module timer replay. Engine development validates the language;
-only actual compiler responsibility transfer counts as compiler self-hosting.
-See the [recalibrated roadmap](docs/versioning/nuis-beta-0.11-application-led-mainline.md)
-and [dependency selection contract](docs/reference/nuis-development-tensor-mainline.md).
+The mainline is **ns-nova application-led development**: grow one Nuis-owned
+interactive image application, fix the foundation gaps it exposes, measure
+performance, and progressively replace independently testable compiler modules
+with Nuis implementations. Writing an engine in Nuis validates the language;
+only real compiler responsibility transfer counts as compiler self-hosting.
 
-The intended ns-nova engine combines **rendering, control, ML and audio workflows**
-in one Nuis-owned lifecycle, with shared YIR/GLM/time contracts and independent
-Galaxy/Nustar implementations. This is the
-[capability horizon](docs/versioning/nuis-beta-0.11-application-led-mainline.md#engine-capability-horizon),
-not a claim of an integrated ML/audio engine today or a larger first milestone.
-
-This is the formal staged self-hosting migration line, not a self-hosting,
-API-stability, or production-ready claim. `stage0` remains an immutable rollback
-root while bounded compiler capabilities move into the Nuis candidate. The
-important inherited foundation is one exercised toolchain spine:
+Start with the [current mainline map](docs/current-mainline-map.md),
+[development tensor](docs/reference/nuis-development-tensor.md), and
+[application-led roadmap](docs/versioning/nuis-beta-0.11-application-led-mainline.md).
+This is a formal staged self-hosting migration line, not a claim of a self-hosted
+compiler, stable public API, or production-ready engine.
 
 ```text
 nuis source / nuis.toml
-  -> nuis workflow frontdoor
+  -> nuis project frontdoor
   -> nuisc frontend and semantic checks
   -> NIR
   -> YIR + GLM / clock / domain verification
   -> registered Nustar lowering and backend artifacts
-  -> Nsld link graph, NSB image, and host-shell finalization
-  -> nuis-runtime lifecycle dispatch
-  -> run-artifact / Nsdb execution evidence and replay metadata
+  -> Nsld link planning, NSB assembly, host-shell finalization
+  -> lifecycle/runtime dispatch
+  -> run-artifact / Nsdb execution evidence and replay
 ```
-
-The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and implementation drift; `nuis dev-tensor --json` is the authoritative
-source for current counts and the selected goal/dependency path. The compiler data model, stage-neutral boundary,
-bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
-bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
-forwarding, chunked typed payload projection, and canonical reversible active
-state close their previous weakest tasks. Dispatch v1 now resolves an unordered
-exact-two build/image inventory through the signed generation-two identities,
-executes a private byte-verified copy of the stage0 `current` image, and retains
-the stage1 candidate as `forward` without persisting paths or timestamps.
-Candidate compile capability v1 now reuses the production-v11-bound adapter,
-folds the complete request through Nuis exports, and drives an exact verified
-stage0 provider with no shell while granting no replacement or selection
-authority. Candidate preselection v1 now replays that complete trust chain and
-lets the generation-two component owner sign the exact capability into
-generation-three review while keeping both final authority flags false.
-Candidate compile capability v2 now executes the production-bound adapter over
-the exact five-stage handoff with a cleared environment and no runtime provider,
-then binds the canonical 53-line front-end result while explicitly leaving
-fresh-source parsing, native materialization, and selection open.
-Candidate successor v1 now replays the complete generation-two and preselection
-chain, deep-verifies that direct result, and signs it into generation-three
-review under the continuing component-owner key. It is same-generation evidence
-strengthening only: its own fresh-source, native-materialization, replacement,
-and final-selection claims remain false. The downstream fresh-source capability
-now drives one canonical 56-byte Nuis snapshot through candidate-owned source,
-token, AST, NIR, and YIR identities with no stage0 handoff or runtime provider;
-the same candidate now carries that verified YIR through reserved subset-v8
-ordinals into one exact `nuis-compiler-candidate-nsld-input-v1`. Nsld consumes
-the target-neutral `Main.main -> i64 7` record and stops at registered
-object-writer selection. This closes the bounded equivalent-input slice while
-native object bytes and all authority flags remain false.
-Self-hosting readiness v2 now records
-`stage0-to-stage1-migration/active` with `ready = true` and all `5/5`
-preparation gates closed. This starts candidate-owned migration work but grants
-no stage0 replacement or final-selection authority. Reproducibility v2 preserves the exact signed v1 aggregate
-while binding each clean root's distinct selected-representation sidecar and
-proving `4/4` semantic equivalence. Persistent Galaxy signer trust and rollback
-protection have closed the package-resolution coordinate at `stable/100`; both
-the readiness manifest records the closed bounded preparation gate. Task selection
-now follows the declared application dependency plan, with explicit correctness
-interrupts. The next task is
-`standard-library/ns-nova/persistent-application-session` under the
-`interactive-image-workflow` goal. The broad engine coordinate is recalibrated
-to `active/20` as a scope marker, not an engine-completion percentage; seven
-separate coordinates track session, safety, resources, interaction, performance,
-native CPU dispatch and actual compiler-module ownership transfer.
-The pump's [explicit cancellation ticket](docs/reference/nuis-yir-application-cancellation-v1.md)
-now separates cancellation admission from worker-owned host-resource release and
-arbitrates with provider Finish. `WindowSession` and its C ABI now forward that
-ticket without generating a terminal outcome; the ticket can outlive the window.
-This is not GPU retirement. AppKit cancellation policy and provider drain
-acknowledgement remain open; ordinary window quit still requests explicit close.
-Its first Nuis-owned app/frame lifecycle now composes with PixelMagic, Data, and
-Shader in a host-adaptive project, compiles through NIR/YIR, emits an Apple arm64
-window AOT executable, reaches window/Fabric boot, and passes a relocatable
-framework-Galaxy/profile check without compiler special cases. Conditional
-presentation now uses the generic registered branch-effect path and real LLVM
-CFG. A shared YIR result-family projection now carries verified Shader readiness
-through `submit_frame` into that predicate without forging its provider-owned
-frame payload. The showcase now lowers a bounded three-frame Nuis loop, carries
-one aggregate application state through every frame-helper backedge, and routes
-each frame through a typed runtime-owned result handle. Shader observe now issues
-the shared YIR token/clock/root completion receipt, ns-nova validates and preserves
-that identity without a local token formula, and a pure-Nuis kernel receipt reaches
-a native executable. YIR text round-tripping now preserves explicit result edges without
-inventing a reverse loop dependency, and the full window AOT graph is checked acyclic.
-A compiled-binary runtime regression now requests three real Metal frames as the
-executable reaches each YIR draw node through bounded provider-neutral IPC, rather than
-pre-executing the module. They share one Nsdb session, Nuis worker PID, and adapter
-cache while retaining independent graph-output release and physical completion;
-live pixels match the persisted replay byte-for-byte. Bound live and replay draws
-now reuse Shader-owned borrowed request validation without rasterizing a CPU
-reference image; their events describe the returned RGBA8 frame, and dimensions
-come from the render pass rather than an ASCII preview's minimum size. CPU-only
-reference rendering remains available. Typed IPC v4 carries runtime vertex
-and instance counts from the Nuis loop into registered device dispatch and
-hash-bound replay. On M2, `3/2/3` vertices produce full/clear/full frames while
-retaining live/replay equality and adapter cache reuse. A Nuis-owned four-f32 tuple
-now reaches a real immutable fragment uniform: the first/third frames have matching
-coverage but change from red to blue. Optional draw bindings survive NIR ownership
-checks, optimization, and YIR lowering. Shader owns type/shape/finite-value checks;
-the registered adapter admits the compiled slot, and Metal reflection checks the
-actual read-only float4 buffer before a 16-byte upload. The bounded IPC envelope
-and replay bind slot, type, shape, little-endian bytes, and content identity without
-accepting pointers or paths. The companion
-[image showcase](examples/projects/domains/ns_nova_image_showcase) now fills a
-32x24 RGBA8 image in Nuis, snapshots and frees its original Buffer, and uploads
-3,072 checked little-endian u32 bytes through a separate bounded binary carrier.
-Inline WGSL performs RGB inversion on Metal; fixed-array reflection and generated
-checked reads constrain the resource. The control argument limit stays 256 bytes,
-and replay retains content-bound descriptors rather than duplicate input images.
-The image regression checks every GPU pixel alongside the existing tint regression.
-It also exposed and fixed missing guard/call ordering and ignored function-local
-early returns in the YIR execution path. General buffer-writing `while` lowering
-remains incomplete, so image generation uses logarithmic-depth recursion.
-`nuis run-artifact --export-frame <new.ppm> <artifact-dir>` now runs the complete
-bounded lifecycle through the compiled native host, not a test executable, and
-exports its last frame without opening a window. The host embeds the YIR runtime;
-this is not yet fully native CPU execution or a self-contained Nsld image.
-It requires registered live IPC or explicit replay, never reference fallback.
-Exports refuse to overwrite existing files and do not create output on rejected
-dispatch. The same binary replays without reading the external YIR file.
-The explicit [registered window route](docs/reference/nuis-yir-window-session-v3.md),
-`nuis run-artifact --window-session window <artifact-dir>`, now retains Nuis state
-and one provider connection in the compiled AppKit process. Space toggles the
-GPU-processed checkerboard; bounded logical-input replay checks exact Metal pixels
-and confirmed close without main/timer replay. The old no-option preview is unchanged.
-Replay limits are now checked before device work and payload reads; invalid
-replacement evidence does not erase the previous replay.
-Supervised provider connections can now wait idle between events without
-reconnecting or resetting clocks and budgets. An incoming request still has a
-120-second deadline from its first byte, including uploads; EOF and supervisor
-shutdown wake the wait. A shortened-deadline Metal regression retains one worker
-and exact live/replay pixels across idle gaps.
-Window profile v3 passes close intent and a producer-observed failure category to
-Nuis, preserving the first fault and reporting cleanup separately from execution
-success. The compiled-window fault-injection test
-finishes Nuis cleanup without certifying a failed provider run or replacing old
-replay evidence; supervision allows five seconds before forced teardown.
-The same binary also rejects a third draw against a two-frame replay with a typed
-exhaustion result, not a substitute image. Existing v1/v2 window bundles, Nuis
-close helpers and application-state artifacts must be rebuilt together.
-[Provider IPC v4](docs/reference/nuis-yir-provider-runtime-ipc-v4.md) now carries
-producer-owned rejection phase, sequence and code. Nuis distinguishes remote
-budget, execution and finalization failures without reading diagnostic wording;
-late Finish failure cannot repeat cleanup. Rebuild IPC-v3 hosts and supervisors
-together; window callback signatures stay v3 while the failure vocabulary is v2.
-[Terminal outcomes](docs/reference/nuis-yir-application-outcome-v1.md) now expose
-late Finish failure separately from the old close state, with readonly host
-readout and a Nuis decoder. An explicit one-attempt delivery can now feed an
-already running parent's Nuis event under a scoped execution-step budget, without
-reinitializing either application or repeating cleanup. The packaged window now
-opts into a [registered CPU parent](docs/reference/nuis-yir-application-outcome-pump-v1.md)
-with `--window-parent-session`: parent-before-child startup, root-scoped globals,
-nonblocking delivery/cleanup and failure-preserving exit. This remains a bounded
-single-child adapter; its budget cannot preempt provider calls.
-Unsupported bindings fail closed. Code-asset authority and output extents remain
-fixed; textures/samplers, mixed resources, device-specific causes/recovery,
-self-contained host-runner injection,
-and cross-host window adapters remain open. The prior Data
-lane stays `usable/74`: its hardware-free reference and conformance closure are
-preserved, while physical DPU/IPU/RDMA certification is deferred until suitable
-hardware is available rather than blocking the current mainline.
-Canonical recursive owned-struct layouts are now parsed once in `yir-core` and
-shared by CPU execution and LLVM lowering; the common `nuis-runtime`
-blob/aggregate shim also carries the shader result-enum bundle through native
-AppKit host linking without stale-layout or undefined-symbol failures.
-The dedicated
-`nuis bootstrap-build` frontdoor emits a complete compiler-image,
-stage-handoff, dependency-closure, native-output, reproducible-identity, exact
-audit record, and component-bound diagnostic proof for one project-form
-compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
-stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
-native-output identities while keeping replacement authorization separate. The
-`nuis bootstrap-status` frontdoor reports `5/5` gates closed. Compiler data
-model v11 materializes four owned token records per bounded window, emits
-the canonical 59-byte fixture plus the real candidate's 91-byte
-`use cpu StdLanguageCore;` token
-prefix from a packed 128-byte buffer, decodes that prefix into a fresh owned
-store, canonically re-emits the same bytes and hash, builds a stable-order
-sixteen-entry `CompilerMap` with ordered identity `415394959`, stores two
-stable-index arena objects with ordered identity `1064756829`, then stores and
-rebuilds two canonical owned texts through the frozen `CompilerTextArena`, then
-stores 18 bytes across two logical pages through `CompilerPagedTextArena`,
-then registers canonical text and fixed-width source-span payload kinds. The
-shared aggregate arena stores 20 bytes, projects both values across the page
-boundary, and pins registry identity `1630830726`, page identities `934788601`
-and `1229397900`, plus complete identity `1274791798`. It then registers a
-24-byte `CompilerChunkedPayload`, projects it from a 44-byte three-page arena,
-and pins typed identity `94500080`, extended registry identity `1593840720`,
-and complete identity `551151124`, then forwards that complete arena through
-two owned Nuis helper boundaries before projection. A valid but mismatched v9
-registry fails atomically with code `3`. Native execution remains deterministic
-at score `130`; the bounded compiler data boundary is now `stable`, `100/100`.
-Its shared structural codec independently parses
-and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
-from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
-pure Nuis typed structural consumer, then binds its stage0 component and native
-image to an explicitly execution-only proof. `nuis bootstrap-candidate-build`
-then feeds all five serialized payloads through twenty-one exact Nuis scalar
-exports, independently verifies their folds, drives the complete token payload
-through a bounded Nuis-native DFA, hashes every contiguous 128-byte token page
-through a Nuis-produced chain, and preserves production-v11's two opaque AST
-and NIR pages.
-Token pages may cross records; the artifact layer independently replays the
-complete byte stream while preserving the legacy 91-byte canonical prefix
-identity `164749511446`. Nuis then serializes eight-lane cursors and resumes
-both structural projections before production v11 emits the distinct
-`nuis-stage1-compact-structured-nir-producer-v10` candidate. Nuis also emits
-both AST and NIR cursor pairs as two non-identity 22-word structural
-checkpoints through adapter protocol v9;
-`nuis-compiler-stage-transformation-v3` independently replays every word and
-materializes two canonical ULEB128 structural payloads without appending a
-complete source blob. It reparses every record and losslessly recovers both
-canonical payloads. `nuis-compiler-stage-semantic-differential-v1` then records
-`2/2` representation equivalence. `nuis-compiler-stage-handoff-v2` selects every
-registered reversible derived stage in registration order and binds its source,
-transform, payload, checkpoint, recovery, and semantic identities without an
-NIR-specific driver branch. Candidate production v11 binds that selection
-before the candidate reaches repository-native `13/13` differential
-equivalence. The sibling component representation report now consumes the
-actually selected byte-different AST and NIR payloads, recovered canonical
-anchors, and handoff-v2 proof at `2/2` equivalence without a stage-specific
-comparison branch;
-both reports retain `replacement_authorized = false`. `nuis
-bootstrap-candidate-build` additionally executes a disjoint three-page mode,
-persists its canonical 62-line result, and emits
-`nuis-compiler-candidate-structural-pagination-v1`. That successor binds full
-third-page state and all cursor lanes for AST and NIR to an independent replay
-without mutating production-v11 or granting authority. `nuis
-bootstrap-reproducibility` now performs
-two cache-bypassed clean candidate builds, rereads both evidence roots, requires
-stable compiler-image, native-output, and differential identities, and emits a
-path-free reproducibility aggregate with independent replacement authorization
-still disabled. The separate `bootstrap-attest-reproducibility` and
-`bootstrap-verify-reproducibility-attestation` frontdoors now bind that exact
-aggregate, both production v11 proofs, and a fresh challenge to an
-environment-scoped Ed25519 key under a caller-pinned canonical trust registry.
-The checked-in
-[Linux amd64 generation-one evidence](docs/evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml)
-contains two cache-bypassed `13/13` clean builds, the signed aggregate, and exact
-registry pin. Its random private seed remained on the attester; repository
-regression verifies the real claim without that seed and rejects a wrong
-challenge or pin. This closes one real Nuis leaf production and remote
-reproducibility loop; physical independence remains an operational fact and
-the compiler is not yet self-hosted.
-
-The separate `bootstrap-authorize-component-replacement` and
-`bootstrap-verify-component-replacement` frontdoors require a second
-component-scoped registry pin, challenge, identity, and Ed25519 key. They reject
-attester identity or key reuse and bind one generation-one stage0-to-candidate
-transition with stage0 retained as rollback. The signed record grants exact
-permission without changing the attestation. `bootstrap-activate-component`
-now repeats both pinned trust checks and derives a canonical active-state record
-whose provider-neutral selector resolves the candidate as `active` and the
-original stage0 build as `rollback`; authorization and attestation bytes remain
-immutable. `bootstrap-rollback-component` now signs generation two over the
-predecessor authorization proof and active-state identity, restores stage0 as
-`current`, and retains the candidate as `forward`. Execution through that
-selected identity now runs through `bootstrap-dispatch-component` and emits a
-canonical `current-executed-forward-retained` receipt.
-`bootstrap-dispatch-compile` now derives a canonical rebuild request from that
-exact current record, invokes its byte-verified image through the real
-`bootstrap-build` frontdoor, rereads every result payload, and emits a path-free
-`current-compiled-forward-retained` receipt while preserving the candidate as
-forward. Raw path-bearing artifact containers stay auditable, while decoded
-artifact semantics, dependencies, handoff, native output, and reproducible
-identity must match.
-
-Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
-private shell construction, independent validation, real OS-loader execution,
-admission replay, atomic publication, and ordinary final-output selection. The
-Linux route exercises versioned, hash-whitelisted `libc` and `libm` symbols in
-one real GNU loader process. Explicit private selection persists relocatable
-owner-private `nuis-nsld-final-output-selection-evidence-file-v1` evidence;
-compatibility output remains the non-mutating default. Stale admission,
-signature, registration, or image identity blocks mutation even when candidate
-ELF bytes have not changed.
-
-The first GNU resolver providers and symbol-version rows now belong to
-`official.cffi`. Nuisc validates and preserves their registration contract,
-while Nsld generates a static runtime table at build time without changing the
-existing private-image or admission identity. With the producer-neutral
-structural codec, typed Nuis consumer, bounded token, AST, and NIR pages, candidate
-execution proof, chunked compiler data, first attested stage1 leaf, and
-two-clean-build aggregate and typed owned-text arena in place, the tensor now
-routes mainline work to a canonical bootstrap compile request through the
-already verified generation-two `current` image. That compile dispatch is
-closed for stage0, and the production-bound Nuis candidate adapter now drives
-the same canonical request through an explicit verified stage0 provider. The
-capability is now bound by a path-free generation-three preselection without
-mutating generation two or claiming direct stage1 compilation. The v11 production
-lineage now has checked-in challenge-bound Ed25519 attester evidence and a
-separate genesis replacement-authorization protocol. Authorization consumption
-is closed by canonical active-state v1, and the first rollback link is signed
-by transition v2; dispatch v1 closes the first selected-image process
-execution, compile-dispatch v1 closes the first selected-image project rebuild,
-and candidate compile-capability v1 closes the delegated stage1 driver boundary,
-while candidate preselection v1 closes the owner-signed trust binding. Direct
-stage1 compilation without the stage0 provider, a capability-v2 successor and
-final generation-three transition, broader compiler-data paging, remote Galaxy
-transport, broader ELF architecture coverage, and PE/COFF remain separate
-registered foundation work.
-
-Start with these documents:
-
-* [Current mainline map](docs/current-mainline-map.md)
-* [Beta 0.10 self-hosting entry](docs/versioning/nuis-beta-0.10.0-self-hosting-entry.md)
-* [Beta 0.6 foundation entry](docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
-* [Development tensor](docs/reference/nuis-development-tensor.md)
-* [Self-hosting readiness](docs/reference/nuis-self-hosting-readiness.md)
-* [Compiler data model](docs/reference/nuis-compiler-data-model.md)
-* [Compiler stage handoff](docs/reference/nuis-compiler-stage-handoff.md)
-* [Compiler stage transformation](docs/reference/nuis-compiler-stage-transformation.md)
-* [Compiler component build](docs/reference/nuis-compiler-component-build.md)
-* [Compiler remote attestation evidence](docs/evidence/compiler-attestation/linux-amd64-cleanroom/generation-1/nuis.compiler-component-remote-evidence.toml)
-* [Compiler candidate execution](docs/reference/nuis-compiler-candidate-execution.md)
-* [Compiler candidate production](docs/reference/nuis-compiler-candidate-production.md)
-* [Compiler candidate compile capability](docs/reference/nuis-compiler-candidate-compile-capability.md)
-* [Compiler candidate preselection](docs/reference/nuis-compiler-candidate-preselection.md)
-* [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
-* [Compiler component reproducibility](docs/reference/nuis-compiler-component-reproducibility.md)
-* [Compiler component replacement authorization](docs/reference/nuis-compiler-component-replacement-authorization.md)
-* [Compiler component compile dispatch](docs/reference/nuis-compiler-component-compile-dispatch.md)
-* [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
-* [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
-* [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)
-* [Documentation index](docs/README.md)
-
-Use [the versioning index](docs/versioning/README.md) only when you need older
-minor-line snapshots. Alpha and pre-alpha documents are historical context, not
-the default description of current behavior.
 
 ## Capability Snapshot
 
-The following surfaces are implemented and exercised today:
+| Surface | Verified Scope | Important Boundary |
+| --- | --- | --- |
+| Small host CLI tools | Native builds exercise argv, piped stdin, stdout/stderr, file reads/writes, text statistics, reports and simple PGM transformations. | Examples have bounded inputs; this is not blanket compatibility or production certification. |
+| Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions. | Supported syntax does not imply every combination lowers; general buffer-writing `while` and some aggregate early-return shapes remain incomplete. |
+| Image application | Nuis generates RGBA8 data, inline WGSL runs RGB inversion on real Metal, and compiled host execution exports checked PPM frames. | The host embeds the YIR lifecycle runtime and uses registered providers; it is not fully native CPU execution or a self-contained Nsld image. |
+| Persistent window | Registered Nuis open/event/close callbacks retain state and one provider connection across AppKit events. A separate registered CPU parent can consume one terminal outcome. | Explicit mode, bounded dispatch/replay, one-child parent profile; not an unlimited engine loop or general supervisor. |
+| Cancellation | Pump, `WindowSession` and C ABI expose an independent cancellation ticket with a once-only host-scope retirement receipt. | AppKit cancellation policy, parent cancellation and provider/device drain acknowledgement are not wired. |
+| Other backends | Checked-in routes include Linux CUDA/Vulkan and Apple Metal/CoreML provider work. | Evidence is backend- and workload-specific; reference results and hardware-free conformance do not certify physical execution. |
+| Nsld | Deterministic plans/NSB assembly, first ARM64 Mach-O and x86_64 Linux ELF private-shell routes, loader admission, publication and final-output selection. | Broader architecture/provider parity, PE/COFF final execution and self-contained application packaging remain incomplete. |
+| Self-hosting | Five bounded preparation gates, Nuis compiler-component proofs, differential/reproducibility evidence and explicit selection/rollback contracts. | `stage0-to-stage1-migration/active` is not completed compiler replacement; the bounded candidate-to-Nsld path stops before native object emission. |
 
-* `nuis` owns project orientation, checking, testing, benchmarking, building,
-  artifact inspection, runtime handoff, release checks, Galaxy workflows, and
-  the development tensor.
-* `nuisc` owns parsing, type/control-flow/generic validation, NIR and YIR
-  production, verification, LLVM lowering, AOT emission, and project metadata.
-  Its normalized `while let` path now carries ordered `i64` fields and both
-  identity-updated and condition-driven replacement `bool` fields across real
-  native backedges. The versioned
-  bool transport selects a source-typed neutral value before encoding into the
-  loop ABI and decodes during field-identity-preserving variant rebuild. Its
-  per-slot codec is serialized in an optional YIR tail contract, then parsed
-  and fail-closed validated by both the CPU domain and LLVM lowering. A shared
-  YIR-core arity contract now admits single-state affine replacement sources;
-  legacy YIR without the tail remains valid.
-  Structured `continue` and `break` retain every matched binding's
-  pre-transition value. `i32`, floating-point, and owned payloads still fail
-  before carry construction with a typed-scalar or GLM-owned diagnostic.
-* Nustar registration covers `cpu`, `data`, `shader`, `kernel`, `network`, and
-  first-class `official.cffi` host compatibility without making the compiler a
-  finite table of backend implementations. The CFFI package also owns the first
-  generated GNU resolver and symbol-version registry.
-* Registered provider paths carry lifecycle, clock, GLM, artifact, and
-  completion evidence. Checked-in routes include host CPU, Metal/CoreML, and
-  Linux CUDA/Vulkan provider work.
-* `nsld` owns deterministic link planning, closure, NSB assembly, provider
-  payload placement, native entry planning, the first ARM64 Mach-O and x86_64
-  Linux ELF private-shell routes, loader admission, publication, and persisted
-  final-output selection evidence.
-* `nuis-runtime` and `nuis-host-runner` own the current lifecycle loader and
-  host execution bridge; `nsdb` consumes YIR-level trace, handoff, cursor, and
-  replay metadata.
-* `std`, PixelMagic, and WitSage provide checked-in Nuis source contracts and
-  runnable pressure routes for host IO/filesystem/text, concurrency, image
-  processing, and classical ML.
+The [observable CLI regression](tools/nuis/tests/std_filesystem_smoke.rs)
+builds and runs actual host executables, rather than only checking source.
+For example, [cli_wc_demo](examples/projects/tooling/cli_wc_demo) reads one
+4096-byte chunk and uses ASCII word separators; it is not a complete `wc`.
+Large-file streaming, broader text semantics, long-running concurrency and
+cross-platform distribution need their own acceptance tests.
 
-The following boundaries are still intentionally incomplete:
+Tensor `stable/100` means stable for the recorded bounded milestone, not
+language, stdlib, ABI, package, or whole-engine stability. Current task selection
+comes from `nuis dev-tensor --json`, not a hardcoded progress total in this page.
 
-* broader ELF architecture/provider parity and a PE/COFF final executable route
-* stable package/import/autoinjection and public API compatibility policy
-* complete raw-pointer and unsafe interoperability policy
-* provider-neutral graph execution with equal maturity across all hardware
-  families, especially the early Data provider lane
-* a self-hosted compiler and a Nuis-native operating-system/runtime substrate
+## Current Mainline
 
-Tensor `stable` means stable for the recorded milestone slice. It must not be
-read as a promise of language, stdlib, ABI, or package compatibility.
+The goal is `standard-library/ns-nova/interactive-image-workflow`; the selected
+prerequisite remains `standard-library/ns-nova/persistent-application-session`.
+The [dependency plan](docs/reference/nuis-development-tensor-mainline.md)
+keeps correctness interrupts, application progress and compiler migration distinct.
+
+The [image showcase](examples/projects/domains/ns_nova_image_showcase) currently
+has two separate execution routes: a bounded three-frame lifecycle, and an
+explicit stateful `--window-session window` route. Space toggles the GPU-processed
+checkerboard. Tests check actual pixels, one worker, cache reuse, live/replay
+identity, explicit close and failure-preserving parent handoff.
+
+Cancellation does not collapse three different facts into one:
+
+| Observation | Meaning |
+| --- | --- |
+| Cancellation admitted | No further host operations are admitted; an in-flight callback may still finish. |
+| Host retirement acknowledged | The worker-owned module, registry, execution state and transport have left scope. |
+| Provider/device resources retired | Requires provider-owned completion/drain evidence; it cannot be inferred from either observation above. |
+
+`WindowSession::cancel` and its C ABI only forward the independent ticket.
+It can outlive the window. Accepted cancellation never invokes implicit close
+or manufactures a terminal outcome or parent delivery. Provider sessions depend
+on the small, statically bound `ScopeAdmission` interface, not concrete window
+or cancellation internals. The [cancellation contract](docs/reference/nuis-yir-application-cancellation-v1.md)
+defines the ownership and failure boundaries.
+
+Next: connect an explicit packaged-host cancellation path, then establish
+provider-owned resource drain before reuse. Normal window quit still uses
+explicit close/Finish. Resource-capability state, recovery, richer image bindings,
+long-duration measurements and native CPU frame dispatch remain separate work.
+
+ns-nova's intended role is a real-time world engine combining rendering,
+control, ML and audio workflows, not just a widget kit. That
+[capability horizon](docs/versioning/nuis-beta-0.11-application-led-mainline.md#engine-capability-horizon)
+is not an integrated ML/audio engine today. PixelMagic, WitSage and registered
+Nustars keep their own semantics; shared YIR/GLM/time contracts do not require
+engine-specific compiler branches or a finite list of backend combinations.
 
 ## Quick Start
 
-When the next command is unclear, ask the workflow frontdoor first:
+Run from the repository root with the Rust toolchain, the host LLVM/linker
+requirements for the selected profile, and any provider-specific prerequisites.
+Start with a host CLI route; GPU/window examples require their registered backend.
 
 ```bash
+export CARGO_INCREMENTAL=0
+export CARGO_BUILD_JOBS=1
 cargo run -p nuis -- dev-tensor
-cargo run -p nuis -- bootstrap-status
-cargo run -p nuis -- bootstrap-build examples/projects/tooling/bootstrap_compiler_data_model_demo build/bootstrap-component
-cargo run -p nuis -- bootstrap-candidate-probe examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate
-cargo run -p nuis -- bootstrap-candidate-build examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-production
-cargo run -p nuis -- bootstrap-candidate-compile-capability build/bootstrap-candidate-production target/debug/nuis examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate-compile build/bootstrap-candidate-compile-capability.toml
-cargo run -p nuis -- bootstrap-candidate-direct-compile build/bootstrap-candidate-production build/bootstrap-candidate-front-end-result build/bootstrap-candidate-direct-compile-capability.toml
-cargo run -p nuis -- bootstrap-reproducibility examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-reproducibility
-cargo run -p nuis -- workflow examples/projects/kernel_tensor_demo
-cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo
-cargo run -p nuis -- check examples/projects/kernel_tensor_demo
-cargo run -p nuis -- test examples/projects/kernel_tensor_demo
-cargo run -p nuis -- build \
-  examples/projects/kernel_tensor_demo \
-  target/nuis-readme/kernel_tensor_demo
-cargo run -p nuis -- run-artifact \
-  target/nuis-readme/kernel_tensor_demo
+cargo run -p nuis -- workflow examples/projects/tooling/filesystem_io_report_demo
+cargo run -p nuis -- check examples/projects/tooling/filesystem_io_report_demo
+cargo run -p nuis -- build examples/projects/tooling/filesystem_io_report_demo target/nuis-readme/cli-report
+cargo run -p nuis -- run-artifact target/nuis-readme/cli-report
 ```
 
-Use `--json` on workflow, tensor, inspection, linker, runtime, and release
-surfaces when another tool needs structured evidence.
+For a compiled Metal image application on a supported Apple Silicon host, follow
+the [image showcase instructions](examples/projects/domains/ns_nova_image_showcase/README.md)
+for `--export-frame`, `--window-session` and optional
+`--window-parent-session`. The launcher still supplies registered provider
+sessions and artifact sidecars; copying only the executable is not this route.
+
+Use `--json` on supported inspection/workflow surfaces for structured evidence.
+Do not treat inspection as execution: `run-artifact --json` does not run the app.
 
 ### Native Artifact Closure
 
-The shortest checked-in linker pressure route is:
+The checked-in linker pressure route is:
 
 ```bash
-cargo run -p nuis -- build \
-  examples/projects/tooling/native_artifact_closure_demo \
-  target/nuis-readme/native_artifact_closure_demo
-
-cargo run -p nuis -- artifact-doctor \
-  target/nuis-readme/native_artifact_closure_demo
-
-cargo run -p nsld -- drive \
-  target/nuis-readme/native_artifact_closure_demo/nuis.build.manifest.toml
-
-cargo run -p nsld -- drive \
-  target/nuis-readme/native_artifact_closure_demo/nuis.build.manifest.toml \
-  --apply --until-clean --json
-
-cargo run -p nuis -- run-artifact \
-  target/nuis-readme/native_artifact_closure_demo
+cargo run -p nuis -- build examples/projects/tooling/native_artifact_closure_demo target/nuis-readme/native-artifact
+cargo run -p nuis -- artifact-doctor target/nuis-readme/native-artifact
+cargo run -p nsld -- drive target/nuis-readme/native-artifact/nuis.build.manifest.toml
+cargo run -p nsld -- drive target/nuis-readme/native-artifact/nuis.build.manifest.toml --apply --until-clean --json
+cargo run -p nuis -- run-artifact target/nuis-readme/native-artifact
 ```
 
-`nsld drive` without `--apply` is non-mutating. Applying mode writes only
-whitelisted next artifacts and stops with structured evidence when a boundary
-is blocked rather than silently bypassing it.
-
-Useful inspection commands:
-
-```bash
-cargo run -p nuis -- dump-ast examples/projects/kernel_tensor_demo
-cargo run -p nuis -- dump-nir examples/projects/kernel_tensor_demo
-cargo run -p nuis -- dump-yir examples/projects/kernel_tensor_demo
-cargo run -p nuis -- project-status examples/projects/kernel_tensor_demo
-cargo run -p nuis -- verify-build-manifest \
-  target/nuis-readme/kernel_tensor_demo/nuis.build.manifest.toml
-```
+`nsld drive` is non-mutating without `--apply`. Applying writes whitelisted
+next artifacts and reports blocked boundaries instead of bypassing them.
+Compatibility output remains the default; explicit private-image selection
+requires independently validated admission and selection evidence.
+Read the [native workflow](docs/reference/nuis-native-artifact-workflow.md),
+[Nsld frontdoor](docs/reference/nsld-linker-frontdoor.md), and
+[binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md).
 
 ## Repository Map
 
 | Path | Responsibility |
 | --- | --- |
-| [`tools/`](tools) | CLI frontdoors: `nuis`, `nuisc`, `nsld`, `nsdb`, `nsbdr`, the host runner, and YIR tools |
-| [`crates/`](crates) | Reusable compiler, semantic, artifact, runtime, YIR, verifier, lowering, and domain capabilities |
-| [`nustar-packages/`](nustar-packages) | Static Nustar manifests, backend registration metadata, ABI targets, and packaged assets |
-| [`stdlib/`](stdlib) | Nuis source assets for `core`, `std`, PixelMagic, WitSage, and the ns-nova engine |
-| [`examples/`](examples) | Current projects and source probes, invalid/verifier cases, YIR anchors, and explicit legacy material |
-| [`docs/reference/`](docs/reference) | Present-tense implementation and protocol truth |
-| [`docs/versioning/`](docs/versioning) | Minor-line snapshots and long-range policy anchors |
-| [`docs/*-spec/`](docs) | Broader grammar, GLM, fabric, and YIR design direction |
-| [`subprojects/`](subprojects) | Explicitly separated Vulpoya and Yalivia project shells |
-| [`scripts/`](scripts) | Repository maintenance and developer-machine helpers |
+| [`tools/`](tools) | Project/compiler/linker/debugger/bundler frontdoors and host/YIR tools |
+| [`crates/`](crates) | Reusable compiler, semantic, artifact, runtime and domain capabilities |
+| [`nustar-packages/`](nustar-packages) | Static manifests, backend registrations, ABI targets and packaged assets |
+| [`stdlib/`](stdlib) | Nuis sources for core, std, PixelMagic, WitSage and ns-nova |
+| [`examples/`](examples) | Runnable projects, source probes, verifier cases and explicit legacy material |
+| [`docs/reference/`](docs/reference) | Current implementation contracts and boundaries |
+| [`docs/versioning/`](docs/versioning) | Minor-line history and long-range policy |
+| [`subprojects/`](subprojects) | Separately owned Vulpoya and Yalivia shells |
+| [`scripts/`](scripts) | Maintenance and developer-machine helpers |
 
-See [the detailed repository layout](docs/repo-layout.md) before adding a new
-top-level directory. CLI code should stay an adapter over reusable capability
-code; historical material belongs under the existing historical/versioning
-routes rather than the mainline entry path.
+See the [repository layout](docs/repo-layout.md) and
+[documentation index](docs/README.md) before adding another top-level entry.
 
 ## Toolchain Boundaries
 
 ```text
 nuis             workflow and project frontdoor
 nuisc            compiler core and AOT artifact producer
-nsld             linker frontdoor and binary assembly owner
+nsld             deterministic linking and binary assembly
 nuis-runtime     lifecycle loader and execution context
+yir-runtime-host embedded-YIR application/window host boundary
 nuis-host-runner host compatibility launcher
-nsdb             YIR semantic debugger and replay frontdoor
+nsdb             YIR debugging and replay
 nsbdr            OS bundle/distribution adapter over final Nsld outputs
-yir-*            lower-level YIR inspection, packing, execution, and export
 ```
 
-`nsld`, `nsdb`, and `nsbdr` are command adapters over reusable toolchain
-capabilities, not independent CLI-only logic piles. The same rule applies to
-Nustar domains: the compiler knows registration contract shapes and asks the
-registered package for domain behavior.
-
-The C world is an explicit compatibility domain, not the hidden default machine
-model. Read the [CFFI domain contract](docs/reference/cffi-von-neumann-domain-contract.md),
-[FFI pointer safety boundary](docs/reference/ffi-pointer-safety-boundary.md),
-and [toolchain capability boundary](docs/reference/toolchain-galaxy-core-boundary.md)
-for the current rules.
+Frontdoors should be thin adapters over reusable capabilities. The compiler knows
+Nustar registration contract shapes and asks registered packages for domain
+behavior; the CFFI package owns the generated GNU resolver and symbol-version registry.
+The C world is an explicit compatibility domain, not a privileged linker model.
+See the [CFFI contract](docs/reference/cffi-von-neumann-domain-contract.md),
+[pointer safety boundary](docs/reference/ffi-pointer-safety-boundary.md), and
+[toolchain capability boundary](docs/reference/toolchain-galaxy-core-boundary.md).
 
 ## Libraries And Examples
-
-The current official source layering is:
 
 ```text
 core -> std -> pixelmagic
@@ -530,58 +194,51 @@ core -> std -> witsage
 core -> std -> ns-nova
 ```
 
-`core` is the smallest semantic base. `std` owns practical systems contracts.
-PixelMagic exercises shader-facing image pipelines, WitSage exercises
-kernel-facing classical ML, and ns-nova now drives real application acceptance
-on those foundations. Its ownership remains separate from the underlying
-official Galaxies and registered providers.
-
-Use [the stdlib index](stdlib/README.md) and [the examples router](examples/README.md)
-rather than treating every old `.ns` or handwritten YIR file as equally
-current. The default runnable layer is [`examples/projects/`](examples/projects);
-[`examples/legacy/`](examples/legacy) is explicit predecessor material.
+`core` is the semantic base; `std` owns practical systems contracts. PixelMagic
+owns image algorithms, WitSage owns classical ML, and ns-nova composes application
+policy without absorbing either package. The [stdlib index](stdlib/README.md)
+and [examples router](examples/README.md) distinguish runnable projects from
+recipes, metadata proofs and legacy probes. A file's existence or a backend
+declaration alone is not execution evidence.
 
 ## Development
 
-Focused checks are preferred over rebuilding the whole workspace on every edit:
+Prefer focused checks rather than rebuilding the workspace on every edit:
 
 ```bash
-CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib --no-run -j 1
-CARGO_INCREMENTAL=0 cargo test -q -p nsld -j 1
-CARGO_INCREMENTAL=0 cargo test -q -p nuis --test self_contained_nsb_smoke -j 1
-cargo fmt --check
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test std_filesystem_smoke std_tooling_observable_cli_smoke_checks_reports_and_stdin -j 1 -- --exact --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis dev_tensor -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test file_line_limit -j 1 -- --test-threads=1
+cargo fmt --all -- --check
 git diff --check
 ```
 
-For a small local disk, preview cleanup before applying it:
+The [beta-0.12 validation checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
+lists the separate lifecycle, compiled-Nuis and real Metal checks.
+For disk cleanup, inspect `scripts/disk-clean-safe.sh` output before choosing
+`--apply`; do not remove source or unrelated project data.
 
-```bash
-scripts/disk-clean-safe.sh
-scripts/disk-clean-safe.sh --apply
-scripts/disk-clean-safe.sh --apply --workspace --cargo-cache
-```
-
-Local development should not depend on absolute filesystem paths, private host
-addresses, or one macOS release. Prefer project-relative paths and registered
-target/provider identities. Use remote Linux infrastructure for Docker and
-CUDA-heavy validation when available.
-
-Rust and Nuis implementation files use an 800-line default, tests use 1000,
-and Markdown uses 2000. See [the file-line policy](docs/repo-file-line-policy.md).
+Use repository-relative paths and registered target/provider identities, not
+personal directories, private host addresses or a fixed macOS version. Prefer
+remote Linux infrastructure for Docker and CUDA-heavy tests. Rust/Nuis source
+defaults to 800 lines, tests to 1000, Markdown to 2000; see the
+[file-line policy](docs/repo-file-line-policy.md).
 
 ## Long-Range Direction
 
-Nuis aims at a self-owned heterogeneous computing stack rather than a classic
-C-shaped language with a thin syntax layer. Beta first hardens the compiler,
-runtime, linker, package, stdlib, and provider foundations. Staged self-hosting
-has been active since `beta-0.10.*`; application-led development now guides
-module migration, with stage2-equivalent completion still planned around
-`gamma-0.5.*` through `gamma-0.10.*`. The broader gamma line is reserved
-for whole-toolchain coordination, Vulpoya/Yalivia integration, and native
-framework maturity before any `1.0.0` claim.
+Staged migration began at `beta-0.10.*`; ns-nova now supplies application pressure
+for foundation hardening, measured optimization and module-by-module ownership
+transfer. The five closed preparation gates do not replace the Rust compiler.
+The bounded Nuis candidate, trust/rollback chain and remaining native-object
+boundary are documented in [self-hosting readiness](docs/reference/nuis-self-hosting-readiness.md)
+and [candidate-to-Nsld materialization](docs/reference/nuis-compiler-candidate-nsld-materialization.md).
 
-Read the [long-range heterogeneous OS roadmap](docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md),
-[GLM heterogeneous flow-graph positioning](docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md),
-and [Vulpoya/YIR secondary review positioning](docs/glm-spec/vulpoya-yir-secondary-review-positioning.md)
-for that direction. Current implementation claims still come from the code,
-tests, reference docs, and development tensor.
+The approximate stage2-equivalent target remains `gamma-0.5.*` through
+`gamma-0.10.*`, not a deadline or a claim of full engine maturity. Wider
+Vulpoya/Yalivia collaboration, runtime/framework maturity and a self-owned
+heterogeneous OS/hardware stack are longer-range work. Read the
+[OS roadmap](docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md),
+[GLM positioning](docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md) and
+[Vulpoya/YIR review boundary](docs/glm-spec/vulpoya-yir-secondary-review-positioning.md).
+Hardware extensibility and scheduling performance are design goals, not measured
+advantages over other compiler infrastructures.

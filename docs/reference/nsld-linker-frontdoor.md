@@ -8,10 +8,13 @@ provider-neutral plan boundary shared with `nuisc::linker`. It now owns
 substantial native finalization behavior, but does not claim a finished
 self-hosted linker core or stable public linker API.
 
-For the current `beta-0.10.*` line, the emphasis is tensor-guided native
-finalization hardening: preserve the structured frontdoor while moving backend
+Within the current application-led mainline, the linker foundation remains
+tensor-guided native finalization hardening: preserve the structured frontdoor while moving backend
 registration out of built-in tables and keeping admission, publication, and
 selection evidence independently replayable.
+
+This is a subsystem boundary, not a claim that native finalization is the
+currently selected task. See the [mainline map](../current-mainline-map.md).
 
 Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
 linker core / galaxy capability boundary, not as a CLI-only tool. See

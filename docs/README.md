@@ -6,17 +6,20 @@ tests, the development tensor, and `docs/reference/` in that order.
 
 ## Read This First
 
-Use this short route for the current `beta-0.11.*` repository:
+Use this short route for the current `beta-0.12.*` repository:
 
 1. [Current mainline map](current-mainline-map.md)
-2. [Application-led mainline](versioning/nuis-beta-0.11-application-led-mainline.md)
-3. [Development tensor](reference/nuis-development-tensor.md)
-4. [Self-hosting readiness](reference/nuis-self-hosting-readiness.md)
-5. [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
-6. [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)
-7. [Binary assembly gap map](reference/nsld-binary-assembly-gap-map.md)
-8. [Nustar multi-backend artifact contract](reference/nustar-multi-backend-artifact-contract.md)
-9. [Repository layout](repo-layout.md)
+2. [Beta-0.12 checkpoint](versioning/nuis-beta-0.12.0-snapshot.md)
+3. [Mainline dependency selection](reference/nuis-development-tensor-mainline.md)
+4. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
+5. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
+6. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
+7. [Focused validation checklist](versioning/nuis-beta-0.12.0-release-checklist.md)
+
+The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
+still governs this line. Window/cancellation API availability does not imply
+AppKit cancellation policy, provider/device retirement, a self-contained image
+or completed compiler self-hosting. Use the references below for each boundary.
 
 The [versioning index](versioning/README.md) routes older beta, alpha, and
 pre-alpha snapshots. Those files explain how the current shape emerged; they
@@ -60,6 +63,12 @@ For the compiler and project frontdoor:
 
 For native binaries, runtime, and debugging:
 
+* [Registered application session](reference/nuis-yir-application-session-v1.md)
+* [Stateful window](reference/nuis-yir-window-session-v3.md)
+* [Application cancellation](reference/nuis-yir-application-cancellation-v1.md)
+* [Terminal outcomes](reference/nuis-yir-application-outcome-v1.md)
+* [Independent CPU parent](reference/nuis-yir-application-outcome-pump-v1.md)
+* [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
 * [Nuis binary format protocol](reference/nuis-binary-format-protocol.md)
 * [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)
 * [Nsld binary assembly gap map](reference/nsld-binary-assembly-gap-map.md)
@@ -79,11 +88,16 @@ For heterogeneous domains and host compatibility:
 For std and official Galaxies:
 
 * [Standard library index](../stdlib/README.md)
+* [ns-nova engine](../stdlib/ns-nova/README.md)
 * [Std mainline layering](reference/std-mainline-layering-contract.md)
 * [PixelMagic mainline](reference/pixelmagic-mainline-contract.md)
 * [Shader/kernel project contract](reference/std-shader-kernel-project-contract.md)
 * [Project examples](../examples/projects/README.md)
 * [Source examples](../examples/ns/README.md)
+* [Observable CLI regression](../tools/nuis/tests/std_filesystem_smoke.rs)
+
+CLI evidence covers real bounded host input/output programs. Device declarations,
+recipe names and report text are not substitutes for dispatched device results.
 
 For long-range architecture:
 

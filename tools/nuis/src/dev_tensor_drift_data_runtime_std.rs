@@ -235,7 +235,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "std-readme-host-io-text-lane",
         path: "stdlib/std/README.md",
         required_patterns: &[
-            "beta-0.10.*",
+            "beta-0.12.*",
             "host I/O and text",
             "filesystem/path/location",
             "worker lease",

@@ -1,6 +1,29 @@
 # Examples Freshness Audit
 
-This file is the current cleanup-oriented freshness audit for example routes.
+This file combines current example routing with a retained earlier cleanup
+inventory. A past "done for current pass" entry does not certify today's entire
+execution matrix; follow the current route's tests and focused reference contract.
+
+## Beta-0.12 Route Update
+
+The [current mainline map](current-mainline-map.md) and
+[beta-0.12 snapshot](versioning/nuis-beta-0.12.0-snapshot.md) are the default
+entry points. This documentation pass changes routing, not example source or
+capability scores.
+
+| Role | Route | Boundary |
+| --- | --- | --- |
+| Application frontdoor | [ns_nova_image_showcase](../examples/projects/domains/ns_nova_image_showcase) | Nuis image policy, actual Metal processing, compiled export and an explicit stateful AppKit window. Embedded YIR and registered providers remain. |
+| Basic CLI frontdoor | [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo), [stdin_runtime_demo](../examples/projects/tooling/stdin_runtime_demo), [cli_report_file_demo](../examples/projects/tooling/cli_report_file_demo) | Native host I/O/output-file evidence, not arbitrary-size or cross-platform certification. |
+| Bounded CLI companions | [cli_wc_demo](../examples/projects/tooling/cli_wc_demo), [cli_pgm_invert_demo](../examples/projects/tooling/cli_pgm_invert_demo) | One 4096-byte ASCII-counting read for wc, and small PGM fixtures for image transformation. |
+| Compiler/linker companions | [bootstrap_structural_projection_candidate](../examples/projects/tooling/bootstrap_structural_projection_candidate), [native_artifact_closure_demo](../examples/projects/tooling/native_artifact_closure_demo) | Inspect the exact candidate/finalizer acceptance boundary, not a claim of full self-hosting. |
+
+Window cancellation API/ticket tests do not imply that the example has an AppKit
+cancel action or that GPU resources are retired. PixelMagic/WitSage report
+examples are host composition evidence, not device execution by name alone.
+Do not demote or delete an old fixture while it still carries an active regression.
+
+## Earlier Cleanup Inventory
 
 It is intentionally narrower than the full mainline map. The goal here is not
 to list everything that exists, but to decide:
@@ -10,7 +33,7 @@ to list everything that exists, but to decide:
 * what already feels overshadowed and should be reconsidered before the next
   cleanup pass
 
-Companion current-state matrix:
+Historical companion matrices:
 
 * [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
 * [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
@@ -25,9 +48,9 @@ Current policy:
 * do not archive or delete examples that still carry active doc, workflow, or
   regression value until those references are intentionally moved
 
-Alpha hardening rule:
+Original alpha hardening scope:
 
-* this file is the example-tree companion for the repo-level `alpha-0.4.*`
+* the inventory below was the example-tree companion for the repo-level `alpha-0.4.*`
   inventory and hardening plan
 * use it to decide which example routes stay frontdoor, which only stay as
   companions, and which should be demoted before current docs make stronger

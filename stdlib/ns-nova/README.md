@@ -1,6 +1,7 @@
 # `ns-nova`
 
-`ns-nova` is the third major standard-library module of `nuis`.
+`ns-nova` is the official Nuis engine Galaxy, composed from independent Nuis
+source modules rather than a compiler-specific application namespace.
 
 Its ecosystem role is the Nuis counterpart to Unreal Engine: a native real-time
 world engine that turns heterogeneous execution, data-plane orchestration, and
@@ -64,6 +65,9 @@ See the [roadmap](../../docs/versioning/nuis-beta-0.11-application-led-mainline.
 and [separate acceptance coordinates](../../docs/reference/nuis-development-tensor-mainline.md).
 Bounded Metal output is established; engine maturity and compiler self-hosting
 are not inferred from that evidence.
+The [beta-0.12 snapshot](../../docs/versioning/nuis-beta-0.12.0-snapshot.md)
+records the persistent-session and cancellation checkpoint; current details
+remain in the referenced contracts and development tensor.
 
 Current state:
 
@@ -101,6 +105,13 @@ Current state:
   a separate worker. Root-scoped globals avoid unrelated device initialization;
   native parent dispatch and general multi-child orchestration remain open
 * lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
+* [cancellation and host retirement](../../docs/reference/nuis-yir-application-cancellation-v1.md)
+  are now exposed by the pump, `WindowSession` and thin C ABI. The independent
+  ticket can outlive its window; accepted cancellation creates no implicit
+  cleanup, terminal outcome or parent delivery. Only its receipt confirms
+  host-scope release, not provider/device resource retirement. Window getters retain their last
+  observations while the ticket may report later faults. The packaged AppKit
+  host has no cancellation trigger yet; ordinary quit still uses close/Finish
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
   frame through `NovaFrameResultHandle` before submission and conditional presentation
@@ -117,8 +128,7 @@ Current state:
 
 Current source-asset status:
 
-* this is currently the only `stdlib` layer that already declares a canonical
-  checked-in source set through
+* the canonical checked-in source set is declared through
   [module.toml](module.toml)
 * the initial score-oriented project library module is
   [lib/nova_contracts.ns](lib/nova_contracts.ns)
@@ -162,8 +172,8 @@ Current limitation:
 * the native three-frame validation loop and the persistent embedded-YIR window
   are distinct routes. The latter remains bounded to 256 dispatches and 64 MiB
   replay, not a stable unlimited interactive world loop. Failure teardown is
-  tested, but device-specific causes, general multi-child parent orchestration, cancellation
-  and owned-resource retirement remain open
+  tested, but device-specific causes, general multi-child parent orchestration,
+  AppKit/parent cancellation policy and provider-owned resource retirement remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;
   its receipt is provider-domain-issued, but its clock still comes from the planned
