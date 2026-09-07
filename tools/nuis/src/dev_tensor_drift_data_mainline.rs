@@ -2,6 +2,34 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "application-outcome-parent-pump",
+        path: "crates/yir-runtime-host/src/application_outcome_pump.rs",
+        required_patterns: &[
+            "nuis-yir-application-outcome-pump-v1",
+            "open_registered_rooted_budgeted",
+            "finish_with_outcome",
+            "delivery.deliver(&mut parent, max_steps)",
+            "parent.close_budgeted",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-outcome-rooted-initialization",
+        path: "crates/yir-exec/src/execution_engine/function_session/initialization.rs",
+        required_patterns: &["rooted_nodes", "incoming", "semantics.dependencies", "function.body_nodes"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-outcome-parent-pump-failure-evidence",
+        path: "crates/yir-runtime-host/src/application_outcome_pump/tests.rs",
+        required_patterns: &[
+            "failed_parent_event_has_independent_cleanup_fuel_but_never_success",
+            "exhausted_close_keeps_delivered_state_and_cannot_report_cleanup_success",
+            "packaged_profile_rejects_unadmitted_execution_without_reference_fallback",
+            "rooted_initialization_preserves_ordered_effects_but_not_unrelated_globals",
+            "rooted_initialization_follows_helper_globals_and_rejects_unrelated_functions",
+            "ffi_delivery_is_one_attempt_and_keeps_child_failure_readable",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "application-terminal-outcome-contract",
         path: "crates/yir-core/src/application_outcome.rs",
         required_patterns: &[
@@ -32,6 +60,8 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "actual_late_finish_snapshot_reaches_nuis_without_reopening_the_image_session",
             "Message::Finish(0)",
             "consume(outcome.codes())",
+            "delivery.deliver(&mut parent, 100_000)",
+            "field(parent.state(), \"seen\"), 44",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -41,8 +71,43 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "[application_outcome]",
             "nuis-yir-application-outcome-v1",
             "post_close_observer = false",
-            "parent_nuis_delivery = false",
+            "parent_nuis_delivery = true",
+            "compiled_window_parent_delivery = true",
+            "compiled_window_parent_provider_inheritance = false",
+            "native_parent_delivery = false",
+            "durable_exactly_once_delivery = false",
             "resource_retirement_authority = false",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-outcome-explicit-parent-delivery",
+        path: "crates/yir-runtime-host/src/application_outcome_delivery.rs",
+        required_patterns: &[
+            "nuis-yir-application-outcome-delivery-v1",
+            "pub struct ApplicationOutcomeDelivery",
+            "pub(crate) fn new",
+            "pub fn deliver",
+            "parent.event_budgeted",
+            "not a pure observer",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-outcome-parent-failure-and-ownership-evidence",
+        path: "crates/yir-runtime-host/src/application_outcome_delivery/tests.rs",
+        required_patterns: &[
+            "delivery_uses_parent_owned_state_and_effects_without_reinitialization",
+            "failed_delivery_keeps_effects_but_not_new_state_and_does_not_authorize_retry",
+            "signature_and_closed_parent_rejections_have_no_effects",
+            "terminal_source_issues_one_attempt_even_if_it_is_abandoned",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-scoped-fuel-evidence",
+        path: "crates/yir-runtime-host/tests/application_session.rs",
+        required_patterns: &[
+            "event_fuel_exhaustion_faults_without_changing_accepted_state_and_allows_cleanup",
+            "scoped_fuel_is_shared_by_nested_calls_and_does_not_leak_to_later_invocations",
+            "exhausted_invocations_drain_partial_traces_and_do_not_repeat_global_initialization",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -357,6 +422,8 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "self.pump.close_after_failure(arguments, kind)",
             "self.observe_stopped_error(&result)",
             "pub fn outcome(&self) -> Option<ApplicationOutcome>",
+            "pub fn take_outcome_delivery",
+            "self.outcome_taken = true",
             "self.cleanup_completed = reply.cleanup_completed",
         ],
     },
@@ -384,6 +451,11 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
         path: "tools/yir-pack-aot/src/host_window_session.rs",
         required_patterns: &[
             "--window-session",
+            "--window-parent-session",
+            "nuis_outcome_parent_finish",
+            "window_parent_opened",
+            "window_parent_delivered=",
+            "window_parent_closed",
             "nuis_window_session_poll",
             "if (!window_session_mode) nuis_yir_entry()",
             "NSModalPanelRunLoopMode",

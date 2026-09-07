@@ -66,11 +66,17 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     );
     let source = fs::read_to_string(&prepared.source_yir_path).unwrap();
     let module = yir_syntax::parse_module(&source).unwrap();
-    assert_eq!(module.application_sessions.len(), 2);
-    assert_eq!(module.application_sessions[0].id, "image");
+    assert_eq!(
+        module
+            .application_sessions
+            .iter()
+            .map(|session| session.id.as_str())
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["image", "window", "parent"]),
+    );
     let record = source
         .lines()
-        .find(|line| line.starts_with("application-session "))
+        .find(|line| line.starts_with("application-session image "))
         .unwrap();
     let binary =
         crate::artifact_runtime_command::resolve_run_artifact_binary_path(&output.0).unwrap();

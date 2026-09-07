@@ -93,7 +93,13 @@ Current state:
   adds `NovaAppOutcome`, `terminal_outcome`, `outcome_succeeded` and `outcome_failed`.
   The Nuis decoder separates late Finish failure from completed cleanup, rejects
   contradictory/unknown fields and never rewrites the old application state.
-  Runtime snapshots are readonly; automatic post-close Nuis delivery is not implemented
+  Runtime snapshots are readonly. Explicit owned delivery invokes an already
+  running parent's Nuis event once under scoped executor fuel; it does not rerun
+  global initialization or transfer child resources. Explicit
+  [packaged parent wiring](../../docs/reference/nuis-yir-application-outcome-pump-v1.md)
+  now initializes a registered CPU parent before the child and delivers once on
+  a separate worker. Root-scoped globals avoid unrelated device initialization;
+  native parent dispatch and general multi-child orchestration remain open
 * lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
@@ -156,7 +162,7 @@ Current limitation:
 * the native three-frame validation loop and the persistent embedded-YIR window
   are distinct routes. The latter remains bounded to 256 dispatches and 64 MiB
   replay, not a stable unlimited interactive world loop. Failure teardown is
-  tested, but device-specific causes, outcome delivery into parent Nuis orchestration, cancellation
+  tested, but device-specific causes, general multi-child parent orchestration, cancellation
   and owned-resource retirement remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;

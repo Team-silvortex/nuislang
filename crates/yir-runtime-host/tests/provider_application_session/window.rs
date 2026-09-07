@@ -97,6 +97,12 @@ fn window_profile_routes_redraw_unicode_key_and_explicit_close() {
     assert_eq!(closed.failure_kind, ApplicationFailureKind::None);
     assert_eq!(closed.outcome.unwrap().codes(), [1, 1, 0]);
     assert_eq!(session.outcome(), closed.outcome);
+    {
+        let delivery = session.take_outcome_delivery().unwrap();
+        assert_eq!(delivery.outcome().codes(), [1, 1, 0]);
+        assert!(session.take_outcome_delivery().is_none());
+    }
+    assert_eq!(session.outcome(), closed.outcome);
     assert!(closed.frame.unwrap().is_none());
     drop(session);
     assert_eq!(peer.finish(), (2, true));

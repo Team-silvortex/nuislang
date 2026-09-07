@@ -20,8 +20,9 @@ pub enum ApplicationSessionPhase {
 /// entry replay occurs. The caller must explicitly close; Drop does not run Nuis
 /// code. A failed event stops event delivery, but permits one close attempt with
 /// the last accepted scalar state. Effects are never rolled back or retried.
-/// Resource handles in state, native CPU dispatch and window wiring are not yet
-/// part of this boundary. The registry is explicit; no backend fallback is chosen.
+/// Resource handles in state and native CPU dispatch are not part of this
+/// boundary. Window/parent pumps are separate adapters; the registry is explicit
+/// and no backend fallback is chosen.
 pub struct ApplicationSession<'a> {
     execution: FunctionSession<'a>,
     boundary: SessionBoundary<'a>,
@@ -65,12 +66,77 @@ impl<'a> ApplicationSession<'a> {
         arguments: Vec<Value>,
         failures: FailureState,
     ) -> Result<(Self, ExecutionTrace), String> {
+        Self::open_with_limit(module, registry, entries, arguments, failures, None, false)
+    }
+
+    /// Give initialization and open their own step budgets, without replaying
+    /// either when this session later receives an outcome.
+    pub fn open_registered_budgeted(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        id: &str,
+        arguments: Vec<Value>,
+        max_steps: usize,
+    ) -> Result<(Self, ExecutionTrace), String> {
+        let registration = yir_core::registered_application_session(module, id)?;
+        Self::open_with_limit(
+            module,
+            registry,
+            registration.entries(),
+            arguments,
+            FailureState::default(),
+            Some(max_steps),
+            false,
+        )
+    }
+
+    /// Opt into root-scoped globals for these three registered callbacks. This
+    /// is not whole-module initialization with selected effects silently dropped.
+    pub fn open_registered_rooted_budgeted(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        id: &str,
+        arguments: Vec<Value>,
+        max_steps: usize,
+    ) -> Result<(Self, ExecutionTrace), String> {
+        let registration = yir_core::registered_application_session(module, id)?;
+        Self::open_with_limit(
+            module,
+            registry,
+            registration.entries(),
+            arguments,
+            FailureState::default(),
+            Some(max_steps),
+            true,
+        )
+    }
+
+    fn open_with_limit(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        entries: ApplicationSessionEntries<'_>,
+        arguments: Vec<Value>,
+        failures: FailureState,
+        max_steps: Option<usize>,
+        rooted: bool,
+    ) -> Result<(Self, ExecutionTrace), String> {
         let boundary = SessionBoundary::bind(module, entries)?;
         FunctionSession::validate_arguments(&boundary.open.parameters, &arguments)?;
-        let mut execution = FunctionSession::new(module, registry)?;
-        let opened = execution
-            .invoke(&boundary.open.name, arguments)
-            .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
+        let mut execution = match max_steps {
+            Some(limit) if rooted => FunctionSession::new_rooted_budgeted(
+                module,
+                registry,
+                &[entries.open, entries.event, entries.close],
+                limit,
+            )?,
+            Some(limit) => FunctionSession::new_budgeted(module, registry, limit)?,
+            None => FunctionSession::new(module, registry)?,
+        };
+        let opened = match max_steps {
+            Some(limit) => execution.invoke_budgeted(&boundary.open.name, arguments, limit),
+            None => execution.invoke(&boundary.open.name, arguments),
+        }
+        .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
         boundary
             .state_arguments(&opened.value)
             .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
@@ -141,6 +207,25 @@ impl<'a> ApplicationSession<'a> {
     }
 
     pub fn event(&mut self, arguments: Vec<Value>) -> Result<ExecutionTrace, String> {
+        self.deliver_event(arguments, None)
+    }
+
+    /// An ordinary parent-owned event with explicit reference-executor fuel.
+    /// Exhaustion faults the session without rolling back effects or statefully
+    /// retrying it. Registered operations retain their own execution limits.
+    pub fn event_budgeted(
+        &mut self,
+        arguments: Vec<Value>,
+        max_steps: usize,
+    ) -> Result<ExecutionTrace, String> {
+        self.deliver_event(arguments, Some(max_steps))
+    }
+
+    fn deliver_event(
+        &mut self,
+        arguments: Vec<Value>,
+        max_steps: Option<usize>,
+    ) -> Result<ExecutionTrace, String> {
         if self.phase != ApplicationSessionPhase::Open {
             return Err(format!(
                 "application session cannot deliver an event while {:?}",
@@ -150,7 +235,13 @@ impl<'a> ApplicationSession<'a> {
         let arguments =
             self.boundary
                 .call_arguments(&self.state, self.boundary.event, arguments)?;
-        let result = self.execution.invoke(&self.boundary.event.name, arguments);
+        let result = match max_steps {
+            Some(limit) => {
+                self.execution
+                    .invoke_budgeted(&self.boundary.event.name, arguments, limit)
+            }
+            None => self.execution.invoke(&self.boundary.event.name, arguments),
+        };
         match result.and_then(|invocation| {
             self.boundary.state_arguments(&invocation.value)?;
             Ok(invocation)
@@ -171,6 +262,22 @@ impl<'a> ApplicationSession<'a> {
     /// Close at most once, including a failed close. Repeated success is a no-op;
     /// repeated failure returns the original error without re-executing teardown.
     pub fn close(&mut self, arguments: Vec<Value>) -> Result<Option<ExecutionTrace>, String> {
+        self.close_with_limit(arguments, None)
+    }
+
+    pub fn close_budgeted(
+        &mut self,
+        arguments: Vec<Value>,
+        max_steps: usize,
+    ) -> Result<Option<ExecutionTrace>, String> {
+        self.close_with_limit(arguments, Some(max_steps))
+    }
+
+    fn close_with_limit(
+        &mut self,
+        arguments: Vec<Value>,
+        max_steps: Option<usize>,
+    ) -> Result<Option<ExecutionTrace>, String> {
         if self.phase == ApplicationSessionPhase::Closed {
             return match &self.close_error {
                 Some(error) => Err(error.clone()),
@@ -181,7 +288,13 @@ impl<'a> ApplicationSession<'a> {
             self.boundary
                 .call_arguments(&self.state, self.boundary.close, arguments)?;
         self.phase = ApplicationSessionPhase::Closed;
-        let result = self.execution.invoke(&self.boundary.close.name, arguments);
+        let result = match max_steps {
+            Some(limit) => {
+                self.execution
+                    .invoke_budgeted(&self.boundary.close.name, arguments, limit)
+            }
+            None => self.execution.invoke(&self.boundary.close.name, arguments),
+        };
         match result.and_then(|invocation| {
             self.boundary.state_arguments(&invocation.value)?;
             Ok(invocation)

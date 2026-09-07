@@ -103,8 +103,15 @@ The independent [terminal outcome](nuis-yir-application-outcome-v1.md) snapshots
 status, cleanup and failure after the terminal reply. Its readonly runtime/FFI
 getters and Nuis `NovaAppOutcome` decoder distinguish `[1,1,0]` success from,
 for example, `[2,1,11]` late finalization failure. Reads do not rerun the closed
-application or its global initialization. There is no automatic post-close
-Nuis observer yet; parent-orchestrator delivery needs its own execution contract.
+application or its global initialization. Explicit outcome-delivery-v1 issues one
+owned attempt into an existing parent's registered Nuis event, under a scoped
+execution-step budget. It transfers only the three scalars, not child resources
+or completion authority. No automatic post-close child observer is introduced.
+The explicit `--window-parent-session` option now wires a separately registered
+CPU parent before child startup, with root-scoped initialization, an independent
+worker and one delivery/cleanup attempt. See the
+[parent pump profile](nuis-yir-application-outcome-pump-v1.md); parent success
+cannot overwrite a failed child exit.
 
 ### Typed Failure Evidence
 
@@ -248,5 +255,5 @@ The current Nuis event wrapper uses a leading guard returning existing state.
 Bare `if { return aggregate_call(...); }` with no else is still unsupported by the
 minimal lowering path; the equivalent guard form is not a compiler fix.
 Close intent and observed failure kind are now separate. Device-specific causes,
-terminal-outcome delivery into parent Nuis orchestration, application recovery, cancellation/resource retirement,
+packaged-window parent orchestration, application recovery, cancellation/resource retirement,
 richer input, textures and non-Metal/native-CPU parity remain separate work.

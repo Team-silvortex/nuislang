@@ -1,6 +1,7 @@
 use yir_core::{YirFunctionParameter, YirValueOwnership};
 
 use super::*;
+mod initialization;
 
 /// One explicit function call. Events/frames are per-call; completion witnesses
 /// are a snapshot of the current context, not a history of every invocation.
@@ -12,17 +13,54 @@ pub struct FunctionInvocation {
 
 /// A verified reference-execution context shared by independent host calls.
 ///
-/// Construction runs global nodes once, but never invokes entry functions.
+/// Ordinary construction runs all global nodes once, but never invokes entry
+/// functions. Root-scoped construction explicitly selects a dependency closure.
 /// Heap and provider clock state persist; function locals and delivered traces do
 /// not. Ingress currently admits value-owned scalars only, not raw capabilities.
 /// Errors do not roll back effects. The caller is responsible for fault policy.
 pub struct FunctionSession<'a> {
     engine: ExecutionEngine<'a>,
+    admitted_functions: Option<BTreeSet<String>>,
 }
 
 impl<'a> FunctionSession<'a> {
     pub fn new(module: &'a YirModule, registry: &'a ModRegistry) -> Result<Self, String> {
+        Self::initialize(module, registry, None, None)
+    }
+
+    /// Bound global-node execution separately from later invocations. Verification
+    /// and registered operations are not preempted by this reference-executor fuel.
+    pub fn new_budgeted(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        max_steps: usize,
+    ) -> Result<Self, String> {
+        Self::initialize(module, registry, Some(max_steps), None)
+    }
+
+    /// Explicit root-scoped initialization, rather than whole-module startup.
+    /// Only globals in the static callback/dependency closure execute. Ordering
+    /// dependencies remain roots; unrelated functions cannot be invoked later.
+    pub fn new_rooted_budgeted(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        roots: &[&str],
+        max_steps: usize,
+    ) -> Result<Self, String> {
+        Self::initialize(module, registry, Some(max_steps), Some(roots))
+    }
+
+    fn initialize(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        max_steps: Option<usize>,
+        roots: Option<&[&str]>,
+    ) -> Result<Self, String> {
         let (mut engine, order) = ExecutionEngine::prepare(module, registry)?;
+        let closure = roots
+            .map(|roots| initialization::rooted_nodes(module, registry, roots))
+            .transpose()?;
+        engine.remaining_steps = max_steps;
         let bodies = module
             .functions
             .iter()
@@ -30,12 +68,20 @@ impl<'a> FunctionSession<'a> {
             .collect::<BTreeSet<_>>();
         let mut delayed = BTreeMap::new();
         for node in order {
-            if !bodies.contains(&node) {
+            if !bodies.contains(&node)
+                && closure
+                    .as_ref()
+                    .is_none_or(|(nodes, _)| nodes.contains(&node))
+            {
                 engine.execute_named_node(&node, &mut delayed)?;
             }
         }
         reject_remaining_delayed(&delayed)?;
-        Ok(Self { engine })
+        engine.remaining_steps = None;
+        Ok(Self {
+            engine,
+            admitted_functions: closure.map(|(_, functions)| functions),
+        })
     }
 
     pub fn invoke(
@@ -43,6 +89,38 @@ impl<'a> FunctionSession<'a> {
         name: &str,
         arguments: Vec<Value>,
     ) -> Result<FunctionInvocation, String> {
+        self.invoke_with_limit(name, arguments, None)
+    }
+
+    /// Charge one step before each scoped function entry and graph node,
+    /// sharing the budget across nested calls and scoped loop iterations.
+    /// This is not a wall-time limit or preemption of a registered executor:
+    /// a provider's internal work, blocking and allocation need its own limits.
+    /// Exhaustion preserves already performed effects and drains this call's trace.
+    pub fn invoke_budgeted(
+        &mut self,
+        name: &str,
+        arguments: Vec<Value>,
+        max_steps: usize,
+    ) -> Result<FunctionInvocation, String> {
+        self.invoke_with_limit(name, arguments, Some(max_steps))
+    }
+
+    fn invoke_with_limit(
+        &mut self,
+        name: &str,
+        arguments: Vec<Value>,
+        max_steps: Option<usize>,
+    ) -> Result<FunctionInvocation, String> {
+        if self
+            .admitted_functions
+            .as_ref()
+            .is_some_and(|functions| !functions.contains(name))
+        {
+            return Err(format!(
+                "function `{name}` is outside the admitted session roots"
+            ));
+        }
         let function = self
             .engine
             .module
@@ -53,7 +131,9 @@ impl<'a> FunctionSession<'a> {
         Self::validate_function(function)?;
         Self::validate_arguments(&function.parameters, &arguments)?;
         let result_type = function.result.as_ref().unwrap().ty.clone();
+        self.engine.remaining_steps = max_steps;
         let result = self.engine.execute_function(name, arguments);
+        self.engine.remaining_steps = None;
         // Drain even on failure: a failed callback must not retain frame history.
         let trace = self.take_trace();
         let value = result?;

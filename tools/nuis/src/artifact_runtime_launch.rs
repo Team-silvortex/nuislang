@@ -40,8 +40,8 @@ fn handle_run_artifact_options(
         return Ok(());
     }
     let doctor = probe_artifact_doctor(&input);
-    if window_options.is_some() {
-        window_session::validate(&doctor)?;
+    if let Some(options) = &window_options {
+        window_session::validate(&doctor, options.parent.is_some())?;
     }
     if let Some(output) = frame_output.as_deref() {
         frame_export::validate(&doctor, output)?;
@@ -151,6 +151,9 @@ fn handle_run_artifact_options(
         command.arg("--window-session").arg(&options.id);
         if let Some(events) = &options.events {
             command.arg("--window-events").arg(events);
+        }
+        if let Some(parent) = &options.parent {
+            command.arg("--window-parent-session").arg(parent);
         }
     }
     if let Some(output) = frame_output.as_deref() {

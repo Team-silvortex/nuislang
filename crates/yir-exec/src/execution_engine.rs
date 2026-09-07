@@ -56,6 +56,7 @@ struct ExecutionEngine<'a> {
     state: ExecutionState,
     lane_steps: BTreeMap<String, Vec<String>>,
     call_stack: Vec<String>,
+    remaining_steps: Option<usize>,
 }
 
 impl<'a> ExecutionEngine<'a> {
@@ -95,6 +96,7 @@ impl<'a> ExecutionEngine<'a> {
             state: ExecutionState::default(),
             lane_steps: BTreeMap::new(),
             call_stack: Vec::new(),
+            remaining_steps: None,
         };
         Ok((engine, order))
     }
@@ -104,6 +106,7 @@ impl<'a> ExecutionEngine<'a> {
         node_name: &str,
         delayed: &mut BTreeMap<String, String>,
     ) -> Result<(), String> {
+        self.charge_step()?;
         let node = self
             .nodes_by_name
             .get(node_name)
@@ -263,6 +266,7 @@ impl<'a> ExecutionEngine<'a> {
     }
 
     fn execute_function(&mut self, name: &str, arguments: Vec<Value>) -> Result<Value, String> {
+        self.charge_step()?;
         let function = self
             .module
             .functions
@@ -453,6 +457,15 @@ impl<'a> ExecutionEngine<'a> {
             ),
         );
         Ok(Some(Value::Int(current)))
+    }
+
+    fn charge_step(&mut self) -> Result<(), String> {
+        if let Some(remaining) = &mut self.remaining_steps {
+            *remaining = remaining
+                .checked_sub(1)
+                .ok_or_else(|| "YIR invocation step budget exhausted".to_owned())?;
+        }
+        Ok(())
     }
 
     fn into_trace(self) -> ExecutionTrace {

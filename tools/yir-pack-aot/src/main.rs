@@ -290,6 +290,10 @@ fn run() -> Result<(), String> {
                 host_window_session::CONTRACT
             ));
             manifest.push(format!(
+                "window_parent_contract={}",
+                host_window_session::PARENT_CONTRACT
+            ));
+            manifest.push(format!(
                 "frame_export_contract={}",
                 host_runtime_frame::FRAME_EXPORT_CONTRACT
             ));

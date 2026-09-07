@@ -223,7 +223,19 @@ invalid_nuis_input = "3,0,255-library-local-not-wire-terminal-report"
 runtime_readout = "immutable-pump-window-snapshot-and-readonly-ffi-getter"
 evidence = "terminal-matrix-late-finish-cleanup-failure-pre-open-failure-compiled-nuis-consumer-native-decoder-compiled-window-readout"
 post_close_observer = false
-parent_nuis_delivery = false
+parent_nuis_delivery = true
+parent_delivery_contract = "nuis-yir-application-outcome-delivery-v1"
+parent_delivery_mode = "explicit-existing-parent-registered-event-one-owned-attempt"
+parent_delivery_budget = "scoped-function-entries-and-graph-nodes-not-provider-private-work-or-wall-time"
+parent_delivery_evidence = "compiled-nuis-parent-open-before-child-retains-prior-state-and-consumes-injected-late-finish"
+compiled_window_parent_delivery = true
+compiled_window_parent_contract = "nuis-yir-application-outcome-pump-v1"
+compiled_window_parent_mode = "explicit-registered-cpu-parent-before-child-nonblocking-one-delivery-and-close"
+compiled_window_parent_initialization = "rooted-callback-function-and-incoming-dependency-closure-no-unrelated-globals"
+compiled_window_parent_budget = "100000-steps-each-init-open-event-close-not-wall-time"
+compiled_window_parent_provider_inheritance = false
+native_parent_delivery = false
+durable_exactly_once_delivery = false
 completion_authority = false
 resource_retirement_authority = false
 
@@ -405,5 +417,5 @@ dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "deliver immutable terminal outcomes into parent Nuis orchestration under explicit ownership/effect/budget rules, then account for in-flight cancellation/resource retirement; never reinitialize the closed module, repeat close or reset provider clocks and budgets; retain typed rejection and compiled Metal window/export evidence"
+action = "account for in-flight cancellation/resource retirement after explicit packaged-parent delivery; never reinitialize the closed module, repeat close or reset provider clocks and budgets; retain rooted initialization, independent parent effects/fuel, typed rejection and compiled Metal window/export evidence"
 validation = "retain compiled-binary image/uniform export, exact GPU pixels, live/replay equality without an external YIR read, fail-closed missing providers, no overwrite or output on rejected dispatch, cache reuse, physical completion and GLM release; do not conflate embedded-YIR execution with fully native CPU lowering, self-contained Nsld injection or continuous application state"

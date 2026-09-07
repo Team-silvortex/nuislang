@@ -39,8 +39,12 @@ The current lifecycle slice separates completed Nuis cleanup from final provider
 success. [Terminal outcome v1](../reference/nuis-yir-application-outcome-v1.md)
 adds a readonly scalar snapshot and a Nuis decoder, including late Finish failure.
 It does not execute an automatic post-close observer: a new function context
-would rerun global initialization. Parent Nuis delivery needs an explicit
-ownership/effect/budget contract; closed state and resource authority stay separate.
+would rerun global initialization. Explicit outcome-delivery-v1 now carries one
+owned attempt to an existing parent's ordinary Nuis event with scoped executor
+fuel. Parent effects and state stay parent-owned; child state and resource
+authority stay separate. Explicit packaged-window parent wiring now uses an
+independent worker and root-scoped CPU initialization before child startup;
+general multi-child orchestration and native parent dispatch remain open.
 
 ## Engine Capability Horizon
 

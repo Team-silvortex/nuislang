@@ -4,7 +4,8 @@ use yir_core::{
 };
 
 use crate::{
-    ApplicationEventPump, ApplicationProviderSource, ApplicationPumpOperation, ApplicationPumpPhase,
+    ApplicationEventPump, ApplicationOutcomeDelivery, ApplicationProviderSource,
+    ApplicationPumpOperation, ApplicationPumpPhase,
 };
 
 mod ffi;
@@ -20,6 +21,7 @@ pub struct WindowSession {
     cleanup_completed: bool,
     failure_kind: ApplicationFailureKind,
     outcome: Option<ApplicationOutcome>,
+    outcome_taken: bool,
 }
 
 pub struct WindowSessionReply {
@@ -59,6 +61,7 @@ impl WindowSession {
             cleanup_completed: false,
             failure_kind: ApplicationFailureKind::None,
             outcome: None,
+            outcome_taken: false,
         })
     }
 
@@ -102,6 +105,18 @@ impl WindowSession {
     /// Read-only terminal snapshot; does not poll, rerun cleanup or revive state.
     pub fn outcome(&self) -> Option<ApplicationOutcome> {
         self.outcome
+    }
+
+    /// Issue one explicit parent delivery after terminal observation. Pending
+    /// calls do not consume the slot. Readonly snapshots remain available; a
+    /// dropped or failed delivery cannot be taken again or restart this child.
+    pub fn take_outcome_delivery(&mut self) -> Option<ApplicationOutcomeDelivery> {
+        if self.outcome_taken {
+            return None;
+        }
+        let outcome = self.outcome?;
+        self.outcome_taken = true;
+        Some(ApplicationOutcomeDelivery::new(outcome))
     }
 
     /// Failed events dominate an ordinary host close request. Host failures are

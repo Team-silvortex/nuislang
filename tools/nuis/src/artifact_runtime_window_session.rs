@@ -2,6 +2,7 @@ use std::{fs, path::Path};
 
 pub(super) fn validate(
     doctor: &crate::artifact_doctor::ArtifactDoctorReport,
+    parent: bool,
 ) -> Result<(), String> {
     let manifest = doctor
         .manifest_path
@@ -19,6 +20,15 @@ pub(super) fn validate(
     );
     if !bundle.lines().any(|line| line == contract) {
         return Err("artifact does not declare window session support; rebuild it".to_owned());
+    }
+    if parent {
+        let contract = format!(
+            "window_parent_contract={}",
+            yir_runtime_host::APPLICATION_OUTCOME_PUMP_CONTRACT
+        );
+        if !bundle.lines().any(|line| line == contract) {
+            return Err("artifact does not declare window parent support; rebuild it".to_owned());
+        }
     }
     Ok(())
 }

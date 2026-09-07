@@ -659,6 +659,24 @@ mod tests {
                 .count(),
             3
         );
+        // Enter the same loop through a persistent helper session. Fuel cannot
+        // reset on each backedge, and failed calls must restore all local carries.
+        module.functions[1].role = YirFunctionRole::Helper;
+        let registry = default_registry();
+        let mut session = FunctionSession::new(&module, &registry).unwrap();
+        let error = session.invoke_budgeted("main", vec![], 11).unwrap_err();
+        assert!(error.contains("step budget exhausted"), "{error}");
+        let result = session.invoke_budgeted("main", vec![], 23).unwrap();
+        assert_eq!(result.value, Value::Int(3));
+        assert_eq!(
+            result
+                .trace
+                .events
+                .iter()
+                .filter(|event| event.contains("effect cpu.return_owned_struct"))
+                .count(),
+            3
+        );
     }
 
     #[test]

@@ -1,5 +1,7 @@
 mod application_event_pump;
 mod application_failure;
+mod application_outcome_delivery;
+mod application_outcome_pump;
 mod application_session;
 mod frame_export;
 mod provider_application_session;
@@ -14,6 +16,10 @@ pub use application_event_pump::{
     ApplicationEventPump, ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,
     APPLICATION_EVENT_PUMP_CONTRACT,
 };
+pub use application_outcome_delivery::{
+    ApplicationOutcomeDelivery, APPLICATION_OUTCOME_DELIVERY_CONTRACT,
+};
+pub use application_outcome_pump::*;
 pub use application_session::{
     ApplicationSession, ApplicationSessionEntries, ApplicationSessionPhase,
     APPLICATION_SESSION_CONTRACT,

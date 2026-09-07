@@ -27,7 +27,14 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
     let log = fs::File::create(&log_path).unwrap();
     let mut command = Command::new(&binary);
     command
-        .args(["--window-session", "window", "--window-events", "32,128578"])
+        .args([
+            "--window-session",
+            "window",
+            "--window-events",
+            "32,128578",
+            "--window-parent-session",
+            "parent",
+        ])
         .stdout(Stdio::from(log.try_clone().unwrap()))
         .stderr(Stdio::from(log));
     // A wedged AppKit loop must not strand this test or the user's desktop.
@@ -42,6 +49,24 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
     assert_eq!(log.matches("window_session_opened").count(), 1, "{log}");
     assert_eq!(log.matches("window_session_presented").count(), 2, "{log}");
     assert_eq!(log.matches("window_session_closed").count(), 1, "{log}");
+    assert_eq!(log.matches("window_parent_opened\n").count(), 1, "{log}");
+    assert_eq!(log.matches("window_parent_closed\n").count(), 1, "{log}");
+    assert_eq!(
+        log.matches("window_parent_delivered=1\n").count(),
+        1,
+        "{log}"
+    );
+    assert_eq!(
+        log.matches("window_parent_cleanup_completed=1\n").count(),
+        1,
+        "{log}"
+    );
+    assert!(
+        log.find("window_parent_opened\n").unwrap() < log.find("window_session_opened\n").unwrap()
+    );
+    assert!(
+        log.find("window_parent_closed\n").unwrap() > log.find("window_session_closed\n").unwrap()
+    );
     assert_eq!(
         log.matches("window_session_close_requested").count(),
         1,
@@ -126,6 +151,30 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
     for args in [
         vec!["--window-session", "image", "--window-events", ""],
         vec!["--window-session", "window", "--window-events", "55296"],
+        vec![
+            "--window-session",
+            "window",
+            "--window-events",
+            "",
+            "--window-parent-session",
+            "absent",
+        ],
+        vec![
+            "--window-session",
+            "window",
+            "--window-events",
+            "",
+            "--window-parent-session",
+            "window",
+        ],
+        vec![
+            "--window-session",
+            "window",
+            "--window-events",
+            "",
+            "--window-parent-session",
+            "image",
+        ],
     ] {
         let mut child = Command::new(&binary)
             .args(args)
@@ -157,6 +206,7 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
         crate::cli::WindowSessionOptions {
             id: "window".to_owned(),
             events: Some("32,128578".to_owned()),
+            parent: Some("parent".to_owned()),
         },
     )
     .expect("production run-artifact window frontdoor");

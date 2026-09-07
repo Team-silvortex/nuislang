@@ -31,7 +31,14 @@ pub(super) fn verify_compiled_provider_failure_cleanup(output: &Path, binary: &P
     let log = fs::File::create(&log_path).unwrap();
     let mut command = Command::new(binary);
     command
-        .args(["--window-session", "window", "--window-events", ""])
+        .args([
+            "--window-session",
+            "window",
+            "--window-events",
+            "",
+            "--window-parent-session",
+            "parent",
+        ])
         .stdout(Stdio::from(log.try_clone().unwrap()))
         .stderr(Stdio::from(log));
     let result = crate::artifact_runtime_provider_results::run_command_with_request_reader(
@@ -65,6 +72,12 @@ pub(super) fn verify_compiled_provider_failure_cleanup(output: &Path, binary: &P
         "{log}"
     );
     assert!(!log.contains("window_session_closed\n"), "{log}");
+    assert_eq!(
+        log.matches("window_parent_delivered=1\n").count(),
+        1,
+        "{log}"
+    );
+    assert_eq!(log.matches("window_parent_closed\n").count(), 1, "{log}");
     assert!(
         log.contains("window_session_close_failure_kind=5\n"),
         "{log}"
@@ -92,7 +105,14 @@ fn verify_compiled_replay_exhaustion_cleanup(output: &Path, binary: &Path) {
     // The successful run saved two frames; the third draw must exhaust replay,
     // not reconnect a live provider or borrow a reference renderer.
     let mut child = Command::new(binary)
-        .args(["--window-session", "window", "--window-events", "32,32"])
+        .args([
+            "--window-session",
+            "window",
+            "--window-events",
+            "32,32",
+            "--window-parent-session",
+            "parent",
+        ])
         .env_remove(yir_runtime_host::PROVIDER_DISPATCH_SOCKET_ENV)
         .env(
             yir_runtime_host::PROVIDER_RESULT_STREAM_ENV,
@@ -116,6 +136,12 @@ fn verify_compiled_replay_exhaustion_cleanup(output: &Path, binary: &Path) {
     };
     let log = fs::read_to_string(log_path).unwrap();
     assert!(!status.success(), "{status}\n{log}");
+    assert_eq!(
+        log.matches("window_parent_delivered=1\n").count(),
+        1,
+        "{log}"
+    );
+    assert_eq!(log.matches("window_parent_closed\n").count(), 1, "{log}");
     assert_eq!(log.matches("window_session_presented").count(), 2, "{log}");
     assert_eq!(
         log.matches("window_session_close_requested").count(),

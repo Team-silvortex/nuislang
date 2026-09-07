@@ -72,7 +72,7 @@ finite compiler-module migration plan.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/86 | IPC v4 admits remote rejection identity; immutable terminal outcome v1 and the Nuis decoder distinguish late Finish from cleanup. Parent-orchestrator delivery, recovery and resource cancellation remain open. |
+| `ns-nova/persistent-application-session` | active/86 | Explicit packaged CPU parent opens before the child, initializes callback-rooted globals and consumes one outcome with independent fuel/cleanup. Multi-child routing, recovery and resource cancellation remain open. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -152,13 +152,19 @@ not a text-only rejection. Exchange errors still group I/O and framing, and
 execution errors do not identify hardware-specific causes.
 The independent [outcome v1](nuis-yir-application-outcome-v1.md) now exposes a
 stable status/cleanup/failure snapshot without changing the old Nuis state.
-A protocol-injected late Finish from the compiled image reaches a separate
-compiled Nuis consumer; native execution checks the decoder too. The window's
-runtime/FFI getters only read data, never reinitialize the module or repeat close.
-`active/86` is not an engine-completion percentage: automatic delivery into a
-parent Nuis orchestrator, cancellation/resource retirement, long-duration soak
-and transactional publication remain open. Do not replace that delivery contract
-with an unchecked post-close callback.
+A protocol-injected late Finish from the compiled image reaches a compiled Nuis
+parent that was already open and had accepted an earlier event. Explicit
+outcome-delivery-v1 consumes one owned attempt under scoped function/node fuel;
+no new context, child capability transfer or automatic retry occurs. Native
+execution checks the Nuis reducer too. The runtime/FFI getters remain readonly.
+The explicit [packaged parent profile](nuis-yir-application-outcome-pump-v1.md)
+now runs that handoff on an independent worker, initialized from callback roots
+before the child. Real Metal and compiled failure/replay cases retain one device
+worker, one parent delivery/cleanup, and failed child exit despite parent success.
+`active/86` is not an engine-completion percentage: multi-child routing,
+cancellation/resource retirement, long-duration soak and transactional publication
+remain open. Fuel does not preempt provider-private work, blocking FFI or devices;
+do not replace explicit delivery with an unchecked post-close child callback.
 
 ## Validation And Scope
 

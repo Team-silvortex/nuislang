@@ -170,8 +170,13 @@ late Finish failure cannot repeat cleanup. Rebuild IPC-v3 hosts and supervisors
 together; window callback signatures stay v3 while the failure vocabulary is v2.
 [Terminal outcomes](docs/reference/nuis-yir-application-outcome-v1.md) now expose
 late Finish failure separately from the old close state, with readonly host
-readout and a Nuis decoder. Automatic post-close Nuis delivery remains open;
-reading the outcome never reinitializes the application or repeats cleanup.
+readout and a Nuis decoder. An explicit one-attempt delivery can now feed an
+already running parent's Nuis event under a scoped execution-step budget, without
+reinitializing either application or repeating cleanup. The packaged window now
+opts into a [registered CPU parent](docs/reference/nuis-yir-application-outcome-pump-v1.md)
+with `--window-parent-session`: parent-before-child startup, root-scoped globals,
+nonblocking delivery/cleanup and failure-preserving exit. This remains a bounded
+single-child adapter; its budget cannot preempt provider calls.
 Unsupported bindings fail closed. Code-asset authority and output extents remain
 fixed; textures/samplers, mixed resources, device-specific causes/recovery,
 self-contained host-runner injection,

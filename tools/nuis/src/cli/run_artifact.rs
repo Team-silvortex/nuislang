@@ -7,6 +7,7 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     let mut frame_output = None;
     let mut window_session = None;
     let mut window_events = None;
+    let mut window_parent = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--json" if !json => json = true,
@@ -22,6 +23,13 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
                     args.next()
                         .filter(|id| !id.is_empty() && !id.starts_with('-'))
                         .ok_or("--window-session requires a registered session ID")?,
+                );
+            }
+            "--window-parent-session" if window_parent.is_none() => {
+                window_parent = Some(
+                    args.next()
+                        .filter(|id| !id.is_empty() && !id.starts_with('-'))
+                        .ok_or("--window-parent-session requires a registered parent ID")?,
                 );
             }
             "--window-events" if window_events.is_none() => {
@@ -62,11 +70,14 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     if window_events.is_some() && window_session.is_none() {
         return Err("--window-events requires --window-session".to_owned());
     }
+    if window_parent.is_some() && (window_session.is_none() || window_parent == window_session) {
+        return Err("--window-parent-session requires a distinct --window-session".to_owned());
+    }
     if window_session.is_some() && (json || frame_output.is_some()) {
         return Err("--window-session cannot be combined with --json or --export-frame".to_owned());
     }
     let input = input.ok_or(
-        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS]] <artifact>",
+        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID]] <artifact>",
     )?;
     Ok(CommandKind::RunArtifact {
         input,
@@ -75,6 +86,7 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
         window_session: window_session.map(|id| WindowSessionOptions {
             id,
             events: window_events,
+            parent: window_parent,
         }),
     })
 }
@@ -82,6 +94,59 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parent_requires_a_distinct_registered_window_and_no_duplicate_option() {
+        let parsed = parse(
+            &mut [
+                "build",
+                "--window-session",
+                "ui",
+                "--window-parent-session",
+                "parent",
+            ]
+            .into_iter()
+            .map(str::to_owned),
+        )
+        .unwrap();
+        let CommandKind::RunArtifact {
+            window_session: Some(options),
+            ..
+        } = parsed
+        else {
+            panic!("window options");
+        };
+        assert_eq!(options.parent.as_deref(), Some("parent"));
+        for args in [
+            vec!["build", "--window-parent-session", "parent"],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-parent-session",
+                "ui",
+            ],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-parent-session",
+                "",
+            ],
+            vec!["build", "--window-session", "ui", "--window-parent-session"],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-parent-session",
+                "p",
+                "--window-parent-session",
+                "p",
+            ],
+        ] {
+            assert!(parse(&mut args.into_iter().map(str::to_owned)).is_err());
+        }
+    }
 
     #[test]
     fn accepts_registered_window_and_bounded_unicode_event_script() {
@@ -105,7 +170,8 @@ mod tests {
                 frame_output: None,
                 window_session: Some(WindowSessionOptions {
                     id: "ui".to_owned(),
-                    events: Some("32,128578".to_owned())
+                    events: Some("32,128578".to_owned()),
+                    parent: None,
                 })
             }
         );

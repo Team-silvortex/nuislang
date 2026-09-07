@@ -352,3 +352,117 @@ fn generic_function_session_checks_scalar_boundaries_and_excludes_entry_calls() 
         Value::Int(24)
     );
 }
+
+#[test]
+fn event_fuel_exhaustion_faults_without_changing_accepted_state_and_allows_cleanup() {
+    let module = fixture();
+    let registry = yir_verify::default_registry();
+    let (mut session, _) =
+        ApplicationSession::open(&module, &registry, entries(), vec![Value::Int(10)]).unwrap();
+    // One function entry and two nodes, not a budget for the entire session.
+    session.event_budgeted(vec![Value::Int(2)], 3).unwrap();
+    assert_eq!(count(&session), 12);
+    assert!(session.event_budgeted(vec![Value::Bool(true)], 0).is_err());
+    assert_eq!(session.phase(), ApplicationSessionPhase::Open);
+    let error = session.event_budgeted(vec![Value::Int(7)], 2).unwrap_err();
+    assert!(error.contains("step budget exhausted"), "{error}");
+    assert_eq!(session.phase(), ApplicationSessionPhase::Faulted);
+    assert_eq!(count(&session), 12);
+    assert!(session.event_budgeted(vec![Value::Int(7)], 100).is_err());
+    session.close(vec![Value::Int(1)]).unwrap();
+    assert_eq!(count(&session), 12);
+    assert!(session.completion_status().is_err());
+}
+
+#[test]
+fn scoped_fuel_is_shared_by_nested_calls_and_does_not_leak_to_later_invocations() {
+    let module = yir_syntax::parse_module(
+        r#"
+yir 0.1
+resource cpu0 cpu.arm64
+function outer cpu helper
+function-param outer value i64 value input
+function-result outer i64 value called
+function-node outer input
+function-node outer called
+function inner cpu helper
+function-param inner value i64 value forwarded
+function-result inner i64 value forwarded
+function-node inner forwarded
+cpu.param_i64 input cpu0 0
+cpu.param_i64 forwarded cpu0 0
+cpu.call_i64 called cpu0 inner input
+edge dep input called
+"#,
+    )
+    .unwrap();
+    let registry = yir_verify::default_registry();
+    let mut execution = yir_exec::FunctionSession::new(&module, &registry).unwrap();
+    for steps in 0..3 {
+        let error = execution
+            .invoke_budgeted("outer", vec![Value::Int(7)], steps)
+            .unwrap_err();
+        assert!(error.contains("step budget exhausted"), "{steps}: {error}");
+    }
+    for value in [11, 19] {
+        let result = execution
+            .invoke_budgeted("outer", vec![Value::Int(value)], 3)
+            .unwrap();
+        assert_eq!(result.value, Value::Int(value));
+        assert_eq!(
+            result
+                .trace
+                .lane_steps
+                .values()
+                .map(Vec::len)
+                .sum::<usize>(),
+            1
+        );
+    }
+    assert_eq!(
+        execution
+            .invoke("outer", vec![Value::Int(23)])
+            .unwrap()
+            .value,
+        Value::Int(23)
+    );
+    let mut recursive = module.clone();
+    recursive
+        .nodes
+        .iter_mut()
+        .find(|node| node.name == "called")
+        .unwrap()
+        .op
+        .args[0] = "outer".to_owned();
+    let mut execution = yir_exec::FunctionSession::new(&recursive, &registry).unwrap();
+    let error = execution
+        .invoke_budgeted("outer", vec![Value::Int(1)], 20)
+        .unwrap_err();
+    assert!(error.contains("step budget exhausted"), "{error}");
+}
+
+#[test]
+fn exhausted_invocations_drain_partial_traces_and_do_not_repeat_global_initialization() {
+    let module = fixture();
+    let registry = yir_verify::default_registry();
+    let mut execution = yir_exec::FunctionSession::new(&module, &registry).unwrap();
+    execution.invoke("open", vec![Value::Int(10)]).unwrap();
+    // Entry + print executes, then fuel runs out before div/struct. These
+    // effects are not rolled back, but their trace must not appear on retry.
+    assert!(execution
+        .invoke_budgeted("close", vec![Value::Int(10), Value::Int(1)], 2)
+        .is_err());
+    let result = execution
+        .invoke_budgeted("open", vec![Value::Int(20)], 2)
+        .unwrap();
+    assert_eq!(
+        result
+            .trace
+            .lane_steps
+            .values()
+            .map(Vec::len)
+            .sum::<usize>(),
+        1
+    );
+    assert!(result.trace.events.is_empty());
+}

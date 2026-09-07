@@ -120,4 +120,20 @@ mod cpu Main {
       NovaAppRuntime.close(app, cpu_tick_i64(0, 1));
     print(NovaAppRuntime.summary(closed) + frame_index);
   }
+
+  struct ShowcaseParent { outcomes: i64, status: i64, cleanup: i64, failure: i64 }
+
+  fn parent_open() -> ShowcaseParent {
+    return ShowcaseParent { outcomes: 0, status: 0, cleanup: 0, failure: 0 };
+  }
+
+  fn parent_event(state: ShowcaseParent, status: i64, cleanup: i64, failure: i64) -> ShowcaseParent {
+    let outcome: NovaAppOutcome = NovaAppRuntime.terminal_outcome(status, cleanup, failure);
+    return ShowcaseParent {
+      outcomes: state.outcomes + 1, status: outcome.status,
+      cleanup: outcome.cleanup_completed, failure: outcome.failure_kind
+    };
+  }
+
+  fn parent_close(state: ShowcaseParent) -> ShowcaseParent { return state; }
 }

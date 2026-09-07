@@ -18,7 +18,7 @@ connection across host events instead of replaying that three-frame program.
    words. Nuis `Bytes` currently stores i64 Buffer elements, so this is an
    explicit checked conversion, not a reinterpretation of host memory.
 4. The 3,072-byte payload travels outside the 256-byte argument field in bounded
-   IPC v3. A registered inherited-FD carrier forwards it to Metal; application
+   IPC v4. A registered inherited-FD carrier forwards it to Metal; application
    paths and pointers cannot select device resources.
 5. `PixelMagicImageSurface` reads the array and inverts RGB in inline WGSL.
    Generated MSL bounds-checks array reads, returning zero outside the array.
@@ -72,12 +72,21 @@ After the same build, launch the event-driven path explicitly:
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -q -p nuis -- run-artifact --window-session window build/ns-nova-image
 # Initial redraw, space, one ignored non-BMP logical input, then explicit close:
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -q -p nuis -- run-artifact --window-session window --window-events 32,128578 build/ns-nova-image
+# Explicit Nuis parent receives the child outcome before its own cleanup:
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -q -p nuis -- run-artifact --window-session window --window-parent-session parent --window-events 32,128578 build/ns-nova-image
 ```
 
 Space toggles the GPU-processed checkerboard. The window's close button waits for
 Nuis close and the provider acknowledgement. Scripted input traverses the actual
 AppKit event queue as logical events, not synthesized physical keys. No application
 names, fields or image policy are embedded in the generic host adapter.
+The optional parent registration selects `parent_open`, `parent_event` and
+`parent_close` in this Nuis source. It records the child's canonical terminal
+status/cleanup/failure and outcome count. It opens once before the child, with
+CPU-only, callback-rooted initialization, then processes the one outcome on a
+separate worker. Successful parent cleanup cannot clear a failed child exit.
+This is a one-child profile, not a general supervisor or native parent ABI; see
+the [parent contract](../../../../docs/reference/nuis-yir-application-outcome-pump-v1.md).
 Without `--window-session`, the old preview route is unchanged. This first window
 profile still has the provider's 256-dispatch and 64 MiB replay limits. It can wait
 idle between inputs without reconnecting or resetting clocks/budgets; an incoming
@@ -99,8 +108,8 @@ cleanup grace, not a retry or fresh budget. Rebuild older v1/v2 bundles, state
 artifacts and close helpers together. The compiled-window test injects a provider reader failure and
 verifies completed cleanup, failed execution and unchanged prior replay evidence.
 It also exhausts a two-frame replay with a third draw in the same compiled binary.
-The IPC rejection remains text-only: remote budget/device causes are not guessed
-from its wording, and late Finish errors do not re-enter Nuis cleanup.
+IPC v4 carries typed rejection phase/sequence/code; categories are not guessed
+from diagnostic wording, and late Finish errors do not re-enter Nuis cleanup.
 The bare aggregate-call return guard limitation remains; the event helper uses an
 equivalent supported leading guard. See the
 [window contract](../../../../docs/reference/nuis-yir-window-session-v3.md).
