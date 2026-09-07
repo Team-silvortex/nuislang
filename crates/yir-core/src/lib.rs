@@ -471,6 +471,11 @@ impl ExecutionState {
         &self.presented_frames
     }
 
+    /// Transfer delivered frames without resetting execution or provider clocks.
+    pub fn take_presented_frames(&mut self) -> Vec<FrameSurface> {
+        std::mem::take(&mut self.presented_frames)
+    }
+
     pub fn alloc_heap_node(&mut self, value: i64, next: Option<usize>) -> usize {
         let address = self.next_heap_address.max(1);
         self.next_heap_address = address + 1;

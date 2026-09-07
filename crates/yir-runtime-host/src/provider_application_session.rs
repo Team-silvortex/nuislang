@@ -1,0 +1,55 @@
+use std::path::Path;
+
+use yir_core::Value;
+use yir_exec::ExecutionTrace;
+
+use crate::provider_result_stream::{finish_provider_source, provider_registry, replay_source};
+use crate::{ApplicationSession, ApplicationSessionEntries};
+
+pub const PROVIDER_APPLICATION_SESSION_CONTRACT: &str = "nuis-yir-provider-application-session-v1";
+
+/// Explicit admission source. There is no implicit environment lookup or
+/// reference-device fallback in the persistent application frontdoor.
+pub enum ApplicationProviderSource<'a> {
+    #[cfg(unix)]
+    Ipc(&'a Path),
+    Replay(&'a Path),
+}
+
+/// Keep module, registry, provider transport and Nuis state alive across host
+/// event deliveries. The driver must explicitly close the application.
+///
+/// Only a successful driver AND application lifecycle may finish the provider
+/// transport. Any failure drops it without a success acknowledgement, including
+/// a driver that swallows a failed event or close. Provider close errors propagate
+/// instead of releasing a successful return value to the caller.
+///
+/// This is synchronous and bounded by the existing transport budgets. It neither
+/// launches a window nor claims native CPU or arbitrary multi-provider support.
+pub fn with_provider_application_session<T>(
+    source: &str,
+    provider: ApplicationProviderSource<'_>,
+    entries: ApplicationSessionEntries<'_>,
+    arguments: Vec<Value>,
+    drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
+) -> Result<T, String> {
+    let module = yir_syntax::parse_module(source)?;
+    ApplicationSession::preflight(&module, entries, &arguments)?;
+    let provider = match provider {
+        #[cfg(unix)]
+        ApplicationProviderSource::Ipc(path) => {
+            crate::provider_result_stream::ProviderResultSource::Live(
+                crate::provider_runtime_ipc::connect_provider_runtime(source, &module, path)?,
+            )
+        }
+        ApplicationProviderSource::Replay(path) => replay_source(source, path)?,
+    };
+    let (registry, provider) = provider_registry(provider);
+    let (mut application, opened) =
+        ApplicationSession::open(&module, &registry, entries, arguments)?;
+    let result = drive(&mut application, opened)?;
+    application.completion_status()?;
+    drop(application);
+    finish_provider_source(&provider)?;
+    Ok(result)
+}

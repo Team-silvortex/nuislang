@@ -19,31 +19,50 @@ pub(super) fn execute_with_provider_result_stream(
     module_source: &str,
     manifest_path: &Path,
 ) -> Result<yir_exec::ExecutionTrace, String> {
+    execute_with_provider_source(module_source, replay_source(module_source, manifest_path)?)
+}
+
+pub(super) fn replay_source(
+    module_source: &str,
+    manifest_path: &Path,
+) -> Result<ProviderResultSource, String> {
     let stream = ProviderResultStream::load(manifest_path)?;
     if fnv1a64_hex(module_source.as_bytes()) != stream.source_yir_fnv1a64 {
         return Err("provider runtime result stream belongs to a different YIR module".to_owned());
     }
-    execute_with_provider_source(
-        module_source,
-        ProviderResultSource::Replay(ProviderResultQueue::new(stream.frames)?),
-    )
+    Ok(ProviderResultSource::Replay(ProviderResultQueue::new(
+        stream.frames,
+    )?))
 }
 
 pub(super) fn execute_with_provider_source(
     module_source: &str,
     source: ProviderResultSource,
 ) -> Result<yir_exec::ExecutionTrace, String> {
+    let (registry, state) = provider_registry(source);
+    let trace = super::execute_module_source_with_registry(module_source, &registry)?;
+    finish_provider_source(&state)?;
+    Ok(trace)
+}
+
+pub(super) fn provider_registry(
+    source: ProviderResultSource,
+) -> (yir_core::ModRegistry, Arc<Mutex<ProviderResultSource>>) {
     let state = Arc::new(Mutex::new(source));
     let mut registry = yir_verify::default_registry();
     registry.register(ProviderResultShaderMod {
         state: Arc::clone(&state),
     });
-    let trace = super::execute_module_source_with_registry(module_source, &registry)?;
+    (registry, state)
+}
+
+pub(super) fn finish_provider_source(
+    state: &Arc<Mutex<ProviderResultSource>>,
+) -> Result<(), String> {
     state
         .lock()
         .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
-        .finish()?;
-    Ok(trace)
+        .finish()
 }
 
 struct ProviderResultStream {
@@ -306,6 +325,9 @@ impl RegisteredMod for ProviderResultShaderMod {
             .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
             .targets(node);
         if !targets {
+            if yir_domain_shader::ShaderMod::requires_provider_frame(node) {
+                return Err(format!("runtime shader frame operation `{}` has no admitted provider target; reference fallback is forbidden", node.name));
+            }
             return yir_domain_shader::ShaderMod.execute(node, resource, state);
         }
         let descriptor =

@@ -174,7 +174,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftC
             "provider_frame_uses_pass_extent_not_ascii_preview_minimum_and_records_actual_pixels",
             "invalid_request_fails_before_consuming_provider_result_or_emitting_draw",
             "returned_dimension_drift_does_not_stage_completion_or_emit_draw",
-            "unbound_draw_keeps_reference_execution_and_does_not_consume_provider_frame",
+            "unbound_draw_rejects_reference_fallback_without_consuming_provider_frame",
             "frame[1x1; rgba8_bytes=4]",
             "replay_rejects_changed_runtime_counts_before_consuming_frame",
             "unsupported_pass_projection_rejects_before_consuming_frame",

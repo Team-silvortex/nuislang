@@ -1,11 +1,21 @@
+mod application_session;
 mod frame_export;
+mod provider_application_session;
 mod provider_result_stream;
 #[cfg(unix)]
 mod provider_runtime_ipc;
 
 use std::{path::Path, ptr, slice};
 
+pub use application_session::{
+    ApplicationSession, ApplicationSessionEntries, ApplicationSessionPhase,
+    APPLICATION_SESSION_CONTRACT,
+};
 pub use frame_export::{export_module_frame, nuis_export_embedded_yir_ppm, FRAME_EXPORT_CONTRACT};
+pub use provider_application_session::{
+    with_provider_application_session, ApplicationProviderSource,
+    PROVIDER_APPLICATION_SESSION_CONTRACT,
+};
 pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
 #[cfg(unix)]
 pub use provider_runtime_ipc::execute_module_source_with_provider_ipc;

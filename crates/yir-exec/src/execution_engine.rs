@@ -15,12 +15,14 @@ use super::{
 const MAX_FUNCTION_CALL_DEPTH: usize = 128;
 const MAX_SCOPED_LOOP_ITERATIONS: usize = 100_000;
 
+mod function_session;
+pub use function_session::{FunctionInvocation, FunctionSession};
+
 pub(super) fn execute_module_with_registry(
     module: &YirModule,
     registry: &ModRegistry,
 ) -> Result<ExecutionTrace, String> {
-    verify_module_with_registry(module, registry)?;
-    let order = topological_order(module)?;
+    let (mut engine, order) = ExecutionEngine::prepare(module, registry)?;
     let all_function_nodes = module
         .functions
         .iter()
@@ -32,37 +34,6 @@ pub(super) fn execute_module_with_registry(
         .filter(|function| function.role == YirFunctionRole::Entry)
         .flat_map(|function| function.body_nodes.iter().cloned())
         .collect::<BTreeSet<_>>();
-    let function_orders = module
-        .functions
-        .iter()
-        .map(|function| {
-            let body = function.body_nodes.iter().collect::<BTreeSet<_>>();
-            let body_order = order
-                .iter()
-                .filter(|name| body.contains(name))
-                .cloned()
-                .collect::<Vec<_>>();
-            (function.name.clone(), body_order)
-        })
-        .collect();
-    let mut engine = ExecutionEngine {
-        module,
-        registry,
-        resources: module
-            .resources
-            .iter()
-            .map(|resource| (resource.name.clone(), resource))
-            .collect(),
-        nodes_by_name: module
-            .nodes
-            .iter()
-            .map(|node| (node.name.clone(), node))
-            .collect(),
-        function_orders,
-        state: ExecutionState::default(),
-        lane_steps: BTreeMap::new(),
-        call_stack: Vec::new(),
-    };
     let mut delayed = BTreeMap::new();
     for node_name in order {
         if all_function_nodes.contains(&node_name) && !entry_nodes.contains(&node_name) {
@@ -85,7 +56,47 @@ struct ExecutionEngine<'a> {
     call_stack: Vec<String>,
 }
 
-impl ExecutionEngine<'_> {
+impl<'a> ExecutionEngine<'a> {
+    fn prepare(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+    ) -> Result<(Self, Vec<String>), String> {
+        verify_module_with_registry(module, registry)?;
+        let order = topological_order(module)?;
+        let function_orders = module
+            .functions
+            .iter()
+            .map(|function| {
+                let body = function.body_nodes.iter().collect::<BTreeSet<_>>();
+                let body_order = order
+                    .iter()
+                    .filter(|name| body.contains(name))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                (function.name.clone(), body_order)
+            })
+            .collect();
+        let engine = Self {
+            module,
+            registry,
+            resources: module
+                .resources
+                .iter()
+                .map(|resource| (resource.name.clone(), resource))
+                .collect(),
+            nodes_by_name: module
+                .nodes
+                .iter()
+                .map(|node| (node.name.clone(), node))
+                .collect(),
+            function_orders,
+            state: ExecutionState::default(),
+            lane_steps: BTreeMap::new(),
+            call_stack: Vec::new(),
+        };
+        Ok((engine, order))
+    }
+
     fn execute_named_node(
         &mut self,
         node_name: &str,

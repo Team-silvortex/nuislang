@@ -6,6 +6,7 @@ use yir_core::{
 use yir_verify::default_registry;
 
 mod execution_engine;
+pub use execution_engine::{FunctionInvocation, FunctionSession};
 
 #[derive(Debug, Default)]
 pub struct ExecutionTrace {

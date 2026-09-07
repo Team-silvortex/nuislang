@@ -200,17 +200,26 @@ fn unsupported_pass_projection_rejects_before_consuming_frame() {
 }
 
 #[test]
-fn unbound_draw_keeps_reference_execution_and_does_not_consume_provider_frame() {
-    let (adapter, mut node, resource, mut state) = fixture();
-    node.name = "reference.draw".to_owned();
-    let Value::Frame(frame) = adapter.execute(&node, &resource, &mut state).unwrap() else {
-        panic!("expected reference frame")
-    };
-    assert!(frame.rgba8.is_none());
-    assert!(!frame.rows.is_empty());
-    assert_eq!(remaining(&adapter), 1);
-    assert_eq!(state.events.len(), 1);
-    assert!(!state.events[0].contains("rgba8_bytes"));
+fn unbound_draw_rejects_reference_fallback_without_consuming_provider_frame() {
+    for instruction in [
+        "draw_instanced",
+        "draw_ball",
+        "draw_sphere",
+        "clear",
+        "overlay",
+    ] {
+        let (adapter, mut node, resource, mut state) = fixture();
+        node.name = "unbound.frame".to_owned();
+        node.op.instruction = instruction.to_owned();
+        node.op.args.clear();
+        let error = adapter.execute(&node, &resource, &mut state).unwrap_err();
+        assert!(
+            error.contains("no admitted provider target"),
+            "{instruction}: {error}"
+        );
+        assert_eq!(remaining(&adapter), 1);
+        assert!(state.events.is_empty());
+    }
 }
 
 #[test]

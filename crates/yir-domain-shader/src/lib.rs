@@ -54,6 +54,18 @@ use yir_core::{
 
 pub struct ShaderMod;
 
+impl ShaderMod {
+    /// Frame computation needs an admitted execution adapter in a provider-bound
+    /// context. Descriptor construction and forwarding are not rasterization.
+    pub fn requires_provider_frame(node: &Node) -> bool {
+        node.op.module == "shader"
+            && matches!(
+                node.op.instruction.as_str(),
+                "clear" | "overlay" | "draw_instanced" | "draw_ball" | "draw_sphere"
+            )
+    }
+}
+
 impl RegisteredMod for ShaderMod {
     fn module_name(&self) -> &'static str {
         "shader"

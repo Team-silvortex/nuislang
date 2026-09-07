@@ -62,9 +62,9 @@ proofs under one broad engine label. Its `active/99` is replaced by an
 percentage of engine completion or a regression in the verified three-frame
 artifact. Existing Metal, replay, completion and GLM evidence stays intact.
 
-| Coordinate Suffix | Baseline | Evidence Needed To Close |
+| Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | early/10 | State survives independent events; no whole-module timer replay; exactly-once close. |
+| `ns-nova/persistent-application-session` | active/45 | Scoped live Metal session and per-event replay verified; bind artifact metadata and the GUI event pump without whole-module replay. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Cancellation, backpressure, failure and in-flight close account for owned resources. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -83,6 +83,15 @@ Its first actionable prerequisite is
 failure testing follow that prerequisite, rather than their lower scores
 prematurely displacing session work. A reopened shared std/runtime prerequisite
 can correctly take priority within the same dependency chain.
+
+The [persistent session boundary](nuis-yir-application-session-v1.md) now calls
+explicit compiled Nuis helpers in one execution context. It preserves scalar
+aggregate state and provider clock frontiers between separate host calls, drains
+per-call frames, and bounds close to one attempt. A second integration path now
+uses one real Metal worker through one admitted IPC connection for two independent
+events, validates every image pixel, and reproduces both events through replay.
+The GUI timer and default compiled-host entry are not migrated yet; this
+coordinate remains open, and `active/45` is not an engine-completion percentage.
 
 ## Validation And Scope
 

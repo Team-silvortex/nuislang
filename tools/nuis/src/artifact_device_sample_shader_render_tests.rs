@@ -6,6 +6,10 @@ use std::{
 
 static NONCE: AtomicU64 = AtomicU64::new(0);
 
+#[cfg(target_os = "macos")]
+#[path = "artifact_device_sample_shader_session_tests.rs"]
+mod application_session;
+
 fn temp_output_dir() -> std::path::PathBuf {
     let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!(

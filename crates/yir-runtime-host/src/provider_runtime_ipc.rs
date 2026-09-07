@@ -6,13 +6,23 @@ use yir_core::{
     provider_runtime_ipc::{
         hash_bytes, DispatchArguments, DispatchTarget, Message, MAX_DISPATCHES,
     },
-    Node,
+    Node, YirModule,
 };
 
 pub fn execute_module_source_with_provider_ipc(
     module_source: &str,
     socket_path: impl AsRef<Path>,
 ) -> Result<yir_exec::ExecutionTrace, String> {
+    let module = yir_syntax::parse_module(module_source)?;
+    let client = connect_provider_runtime(module_source, &module, socket_path.as_ref())?;
+    execute_with_provider_source(module_source, ProviderResultSource::Live(client))
+}
+
+pub(super) fn connect_provider_runtime(
+    module_source: &str,
+    module: &YirModule,
+    socket_path: &Path,
+) -> Result<ProviderRuntimeClient, String> {
     let mut stream = UnixStream::connect(socket_path)
         .map_err(|error| format!("runtime IPC connection failed: {error}"))?;
     let timeout = Some(Duration::from_secs(120));
@@ -26,21 +36,17 @@ pub fn execute_module_source_with_provider_ipc(
     if target.source_yir_fnv1a64 != hash_bytes(module_source.as_bytes()) {
         return Err("runtime IPC target belongs to a different YIR module".to_owned());
     }
-    let module = yir_syntax::parse_module(module_source)?;
     if !module.nodes.iter().any(|node| target.matches(node)) {
         return Err("runtime IPC target is absent from the admitted YIR".to_owned());
     }
     if target.module != "shader" || target.instruction != "draw_instanced" {
         return Err("no registered runtime result adapter accepts this IPC target".to_owned());
     }
-    execute_with_provider_source(
-        module_source,
-        ProviderResultSource::Live(ProviderRuntimeClient {
-            stream,
-            target,
-            sequence: 0,
-        }),
-    )
+    Ok(ProviderRuntimeClient {
+        stream,
+        target,
+        sequence: 0,
+    })
 }
 
 pub(super) struct ProviderRuntimeClient {
