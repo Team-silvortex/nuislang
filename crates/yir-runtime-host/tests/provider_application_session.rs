@@ -17,6 +17,11 @@ use yir_runtime_host::{
     ApplicationProviderSource, ApplicationSessionEntries,
 };
 
+#[path = "provider_application_session/event_pump.rs"]
+mod event_pump;
+#[path = "provider_application_session/window.rs"]
+mod window;
+
 const SOURCE: &str = r#"
 yir 0.1
 resource cpu0 cpu.arm64
@@ -104,6 +109,28 @@ enum Reply {
     WrongHash,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Pause {
+    Hello,
+    Frame,
+    Finish,
+}
+
+struct Gate {
+    at: Pause,
+    ready: std::sync::mpsc::SyncSender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+}
+
+impl Gate {
+    fn wait(&self, at: Pause) {
+        if self.at == at {
+            self.ready.send(()).unwrap();
+            self.release.recv_timeout(Duration::from_secs(5)).unwrap();
+        }
+    }
+}
+
 struct Peer {
     path: PathBuf,
     worker: Option<JoinHandle<(usize, bool)>>,
@@ -111,6 +138,10 @@ struct Peer {
 
 impl Peer {
     fn start(reply: Reply) -> Self {
+        Self::start_source(reply, SOURCE.to_owned(), None)
+    }
+
+    fn start_source(reply: Reply, source: String, gate: Option<Gate>) -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "ns-app-ipc-{}-{}",
@@ -130,13 +161,16 @@ impl Peer {
                 source_yir_fnv1a64: hash_bytes(if matches!(reply, Reply::WrongHash) {
                     b"other"
                 } else {
-                    SOURCE.as_bytes()
+                    source.as_bytes()
                 }),
                 module: "shader".to_owned(),
                 instruction: "draw_instanced".to_owned(),
                 node: "draw".to_owned(),
                 resource: "gpu".to_owned(),
             };
+            if let Some(gate) = &gate {
+                gate.wait(Pause::Hello);
+            }
             Message::Hello(target.clone())
                 .write_to(&mut stream)
                 .unwrap();
@@ -151,6 +185,9 @@ impl Peer {
                         assert_eq!(actual, target);
                         assert_eq!(sequence, count);
                         count += 1;
+                        if let Some(gate) = &gate {
+                            gate.wait(Pause::Frame);
+                        }
                         if matches!(reply, Reply::RejectedFrame) {
                             Message::Rejected("injected device failure".to_owned())
                                 .write_to(&mut stream)
@@ -181,6 +218,9 @@ impl Peer {
                     }
                     Message::Finish(sequence) => {
                         assert_eq!(sequence, count);
+                        if let Some(gate) = &gate {
+                            gate.wait(Pause::Finish);
+                        }
                         Message::Closed(if matches!(reply, Reply::BadClose) {
                             count + 1
                         } else {

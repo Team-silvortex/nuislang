@@ -1,12 +1,18 @@
+mod application_event_pump;
 mod application_session;
 mod frame_export;
 mod provider_application_session;
 mod provider_result_stream;
 #[cfg(unix)]
 mod provider_runtime_ipc;
+mod window_session;
 
 use std::{path::Path, ptr, slice};
 
+pub use application_event_pump::{
+    ApplicationEventPump, ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,
+    APPLICATION_EVENT_PUMP_CONTRACT,
+};
 pub use application_session::{
     ApplicationSession, ApplicationSessionEntries, ApplicationSessionPhase,
     APPLICATION_SESSION_CONTRACT,
@@ -19,6 +25,7 @@ pub use provider_application_session::{
 pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
 #[cfg(unix)]
 pub use provider_runtime_ipc::execute_module_source_with_provider_ipc;
+pub use window_session::*;
 pub use yir_core::provider_runtime_ipc::SOCKET_ENV as PROVIDER_DISPATCH_SOCKET_ENV;
 
 use yir_core::ModRegistry;

@@ -137,8 +137,13 @@ this is not yet fully native CPU execution or a self-contained Nsld image.
 It requires registered live IPC or explicit replay, never reference fallback.
 Exports refuse to overwrite existing files and do not create output on rejected
 dispatch. The same binary replays without reading the external YIR file.
+The explicit [registered window route](docs/reference/nuis-yir-window-session-v1.md),
+`nuis run-artifact --window-session window <artifact-dir>`, now retains Nuis state
+and one provider connection in the compiled AppKit process. Space toggles the
+GPU-processed checkerboard; bounded logical-input replay checks exact Metal pixels
+and confirmed close without main/timer replay. The old no-option preview is unchanged.
 Unsupported bindings fail closed. Code-asset authority and output extents remain
-fixed; textures/samplers, mixed resources, whole-app session continuity,
+fixed; textures/samplers, mixed resources, sustained idle/budget handling,
 self-contained host-runner injection,
 and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are

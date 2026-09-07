@@ -124,6 +124,8 @@ error_policy = "stop-event-delivery-retain-last-accepted-scalar-state-no-effect-
 provider_session_contract = "nuis-yir-provider-application-session-v1"
 scoped_live_provider_ipc_verified = true
 scoped_provider_evidence = "two-independent-events-one-metal-worker-compiled-hit-exact-pixels-and-replay"
+owned_event_pump_contract = "nuis-yir-application-event-pump-v1"
+owned_event_pump_verified = true
 provider_finish_gate = "successful-driver-explicit-close-no-latched-failure-matching-ack"
 reference_frame_fallback = false
 # These migration flags describe the default window/compiled-host entry.
@@ -131,6 +133,47 @@ window_timer_migrated = false
 live_provider_ipc_migrated = false
 resource_capability_state_supported = false
 native_cpu_dispatch = false
+
+[event_pump]
+contract = "nuis-yir-application-event-pump-v1"
+implementation = "crates/yir-runtime-host/src/application_event_pump.rs"
+ownership = "host-owned-handle-worker-owned-registered-provider-scope"
+admission = "asynchronous-open-reply-no-implicit-source-selection"
+delivery = "nonblocking-submit-poll-or-bounded-wait"
+max_outstanding_operations = 1
+pending_reply_counts_as_outstanding = true
+timeout_policy = "leave-request-pending-no-retry-or-budget-reset"
+state_policy = "nuis-owned-scalar-aggregate-snapshot-per-reply"
+close_reply_gate = "lifecycle-success-and-provider-finish-acknowledgement"
+drop_policy = "disconnect-without-join-or-implicit-close-in-flight-effects-not-retracted"
+protocol_evidence = "100-events-delayed-admission-frame-close-backpressure-fault-abandonment-and-dispatch-limit"
+device_evidence = "compiled-nuis-image-live-metal-and-replay-via-owned-pump"
+window_wired = true
+window_selection = "explicit-window-session-id-not-default-legacy-preview"
+general_cancellation = false
+
+[window_session]
+contract = "nuis-yir-window-session-v1"
+implementation = "crates/yir-runtime-host/src/window_session.rs"
+host_adapter = "tools/yir-pack-aot/src/host_window_session.rs"
+command = "nuis run-artifact --window-session ID [--window-events CODEPOINTS] ARTIFACT"
+open_arguments = ["width:i64", "height:i64"]
+event_arguments = ["kind:i64", "code:i64"]
+close_arguments = []
+state_policy = "same-registered-nuis-owned-scalar-aggregate"
+events = ["redraw:0,0", "key:1,unicode-scalar"]
+script_transport = "appkit-queued-logical-input-not-physical-key-synthesis"
+max_script_inputs = 64
+script_frontdoor_deadline_seconds = 180
+main_and_timer_replay = false
+close_presentation_allowed = false
+max_callback_frames = 1
+max_rgba8_frame_bytes = 16777216
+close_gate = "explicit-nuis-close-and-provider-finish-before-host-success"
+evidence = "compiled-appkit-process-two-exact-metal-frames-one-worker-unicode-logical-input-and-confirmed-close"
+default_legacy_preview_replaced = false
+general_ime_input = false
+fully_native_cpu_dispatch = false
 
 [runtime_ipc]
 contract = "nuis-yir-provider-runtime-ipc-v3"
@@ -255,6 +298,7 @@ dynamic_cross_domain_present_predicate = false
 loop_carried_application_state = true
 framework_owned_renderer = false
 continuous_event_loop = false
+bounded_registered_window_event_loop = true
 cross_host_window_adapter = false
 native_bool_aggregate_abi = true
 live_backend_completion_clock = true
@@ -288,5 +332,5 @@ dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "replace whole-module GUI timer reexecution with a persistent Nuis-owned application/frame session across host events; preserve the compiled export entry as a bounded regression boundary"
+action = "harden the explicit registered window route for sustained idle/dispatch/replay budgets and cancellation/resource retirement without reconnecting to reset clocks; preserve compiled window and one-shot export evidence"
 validation = "retain compiled-binary image/uniform export, exact GPU pixels, live/replay equality without an external YIR read, fail-closed missing providers, no overwrite or output on rejected dispatch, cache reuse, physical completion and GLM release; do not conflate embedded-YIR execution with fully native CPU lowering, self-contained Nsld injection or continuous application state"

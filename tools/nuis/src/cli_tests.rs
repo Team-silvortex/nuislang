@@ -699,6 +699,7 @@ fn parses_run_artifact_with_manifest_input() {
             input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
             json: false,
             frame_output: None,
+            window_session: None,
         }
     );
 }
@@ -720,6 +721,7 @@ fn parses_run_artifact_json_with_manifest_input() {
             input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
             json: true,
             frame_output: None,
+            window_session: None,
         }
     );
 }

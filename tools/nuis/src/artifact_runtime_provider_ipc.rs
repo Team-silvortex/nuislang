@@ -13,12 +13,20 @@ use std::{
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub(super) fn run_command(
     output_dir: &Path,
     command: &mut Command,
+) -> Result<(ExitStatus, usize), String> {
+    run_command_with_timeout(output_dir, command, None)
+}
+
+pub(super) fn run_command_with_timeout(
+    output_dir: &Path,
+    command: &mut Command,
+    timeout: Option<Duration>,
 ) -> Result<(ExitStatus, usize), String> {
     let mut server = RuntimeProviderServer::start(output_dir)?;
     command
@@ -30,6 +38,7 @@ pub(super) fn run_command(
     let mut child = command
         .spawn()
         .map_err(|error| format!("failed to launch runtime child: {error}"))?;
+    let started = Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(status)) => return server.finish().map(|count| (status, count)),
@@ -39,6 +48,11 @@ pub(super) fn run_command(
                 let _ = child.wait();
                 return Err(format!("failed to wait for runtime child: {error}"));
             }
+        }
+        if timeout.is_some_and(|limit| started.elapsed() >= limit) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("runtime child exceeded its explicit wall-clock limit".to_owned());
         }
         if server
             .thread

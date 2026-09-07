@@ -36,3 +36,17 @@ fn unconnected_server_rejects_success_and_removes_private_socket() {
     drop(server);
     assert!(!directory.exists());
 }
+
+#[test]
+fn bounded_child_timeout_kills_and_reaps_without_waiting_for_an_ipc_connection() {
+    let mut command = Command::new("sleep");
+    command.arg("10");
+    let started = Instant::now();
+    let result = run_command_with_timeout(
+        Path::new("."),
+        &mut command,
+        Some(Duration::from_millis(30)),
+    );
+    assert!(result.unwrap_err().contains("explicit wall-clock limit"));
+    assert!(started.elapsed() < Duration::from_secs(5));
+}

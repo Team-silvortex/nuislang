@@ -9,8 +9,12 @@ use std::{
 };
 use yir_core::{ProviderCompletionClockKind, Value, YirFunctionRole};
 use yir_runtime_host::{
-    with_registered_provider_application_session, ApplicationProviderSource, ApplicationSession,
+    with_registered_provider_application_session, ApplicationEventPump, ApplicationProviderSource,
+    ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,
 };
+
+#[path = "artifact_device_sample_shader_window_tests.rs"]
+mod window;
 
 struct Artifacts(PathBuf);
 impl Drop for Artifacts {
@@ -23,8 +27,8 @@ fn configuration() -> Vec<Value> {
     [640, 400, 60, 0].map(Value::Int).to_vec()
 }
 
-fn state_field(session: &ApplicationSession<'_>, name: &str) -> i64 {
-    let Value::Struct(state) = session.state() else {
+fn state_field(state: &Value, name: &str) -> i64 {
+    let Value::Struct(state) = state else {
         panic!("missing Nuis state")
     };
     let (_, Value::Int(value)) = state
@@ -61,7 +65,7 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     );
     let source = fs::read_to_string(&prepared.source_yir_path).unwrap();
     let module = yir_syntax::parse_module(&source).unwrap();
-    assert_eq!(module.application_sessions.len(), 1);
+    assert_eq!(module.application_sessions.len(), 2);
     assert_eq!(module.application_sessions[0].id, "image");
     let record = source
         .lines()
@@ -122,16 +126,15 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     });
     // The host supplies separate events. All image, application and receipt
     // policy still executes from compiled Nuis helpers, never from a Rust copy.
-    let live = with_registered_provider_application_session(
-        &source,
+    let mut session = ApplicationEventPump::spawn(
+        source.clone(),
         ApplicationProviderSource::Ipc(&socket_path),
-        "image",
+        "image".to_owned(),
         configuration(),
-        |session, opened| {
-            assert!(opened.presented_frames.is_empty());
-            drive_images(session, &main_nodes)
-        },
-    );
+    )
+    .unwrap();
+    let live = drive_images(&mut session, &main_nodes);
+    drop(session);
     let served = worker.join().unwrap();
     let live = live.unwrap();
     assert_eq!(served.unwrap(), 2);
@@ -170,31 +173,37 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     assert!(payload.contains("metal.command-buffer.completed"));
     let stream = fs::read_to_string(&prepared.stream_path).unwrap();
     assert!(stream.contains("frame_count = 2"));
-    let replay = with_registered_provider_application_session(
-        &source,
+    let mut session = ApplicationEventPump::spawn(
+        source.clone(),
         ApplicationProviderSource::Replay(&prepared.stream_path),
-        "image",
+        "image".to_owned(),
         configuration(),
-        |session, _| drive_images(session, &main_nodes),
     )
     .unwrap();
+    let replay = drive_images(&mut session, &main_nodes).unwrap();
     assert_eq!(
         live, replay,
         "persistent replay must match each live event, not just the final frame"
     );
 
-    let error = with_registered_provider_application_session(
-        &source,
+    let mut session = ApplicationEventPump::spawn(
+        source.clone(),
         ApplicationProviderSource::Replay(&prepared.stream_path),
-        "image",
+        "image".to_owned(),
         configuration(),
-        |session, _| {
-            session.event(vec![Value::Int(0)])?;
-            session.close(vec![Value::Int(100)])?;
-            Ok(())
-        },
     )
-    .unwrap_err();
+    .unwrap();
+    receive(&mut session, ApplicationPumpOperation::Open)
+        .trace
+        .unwrap();
+    session.event(vec![Value::Int(0)]).unwrap();
+    receive(&mut session, ApplicationPumpOperation::Event)
+        .trace
+        .unwrap();
+    session.close(vec![Value::Int(100)]).unwrap();
+    let closed = receive(&mut session, ApplicationPumpOperation::Close);
+    assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+    let error = closed.trace.unwrap_err();
     assert!(error.contains("unconsumed frame"), "{error}");
     assert_eq!(fs::read_to_string(&prepared.stream_path).unwrap(), stream);
 
@@ -211,21 +220,35 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
 }
 
 fn drive_images(
-    session: &mut ApplicationSession<'_>,
+    session: &mut ApplicationEventPump,
     main_nodes: &BTreeSet<String>,
 ) -> Result<Vec<Vec<u8>>, String> {
-    assert_eq!(state_field(session, "frame_index"), 0);
+    let opened = receive(session, ApplicationPumpOperation::Open);
+    assert_eq!(opened.phase, ApplicationPumpPhase::Open);
+    assert!(opened.trace?.presented_frames.is_empty());
+    assert_eq!(
+        state_field(opened.state.as_ref().unwrap(), "frame_index"),
+        0
+    );
     let mut result = Vec::new();
     let mut previous_clock = 0;
     let mut previous_physical = 0;
     let mut previous_root = 0;
     for (ordinal, event) in [(1, 0), (2, 2)] {
-        let trace = session.event(vec![Value::Int(event)])?;
-        assert_eq!(state_field(session, "frame_index"), ordinal);
-        assert_eq!(state_field(session, "presented_frames"), ordinal);
-        assert_eq!(state_field(session, "dropped_frames"), 0);
-        let clock = state_field(session, "last_completion_tick");
-        let root = state_field(session, "last_completion_root");
+        session.event(vec![Value::Int(event)])?;
+        assert!(session
+            .event(vec![Value::Int(event)])
+            .unwrap_err()
+            .contains("busy"));
+        let reply = receive(session, ApplicationPumpOperation::Event);
+        assert_eq!(reply.phase, ApplicationPumpPhase::Open);
+        let trace = reply.trace?;
+        let state = reply.state.as_ref().unwrap();
+        assert_eq!(state_field(state, "frame_index"), ordinal);
+        assert_eq!(state_field(state, "presented_frames"), ordinal);
+        assert_eq!(state_field(state, "dropped_frames"), 0);
+        let clock = state_field(state, "last_completion_tick");
+        let root = state_field(state, "last_completion_root");
         assert!(clock > previous_clock);
         assert!(root > 0);
         if previous_root != 0 {
@@ -262,13 +285,29 @@ fn drive_images(
             );
         }
     }
-    let close = session
-        .close(vec![Value::Int(previous_clock + 1)])?
-        .unwrap();
-    assert!(close.presented_frames.is_empty());
-    assert_eq!(state_field(session, "status"), 2);
-    assert_eq!(state_field(session, "frame_index"), 2);
-    assert!(session.close(vec![Value::Int(999)])?.is_none());
-    session.completion_status()?;
+    session.close(vec![Value::Int(previous_clock + 1)])?;
+    let closed = receive(session, ApplicationPumpOperation::Close);
+    assert_eq!(closed.phase, ApplicationPumpPhase::Closed);
+    assert!(closed.trace?.presented_frames.is_empty());
+    assert_eq!(state_field(closed.state.as_ref().unwrap(), "status"), 2);
+    assert_eq!(
+        state_field(closed.state.as_ref().unwrap(), "frame_index"),
+        2
+    );
+    assert!(session.close(vec![Value::Int(999)]).is_err());
+    assert!(session.poll()?.is_none());
     Ok(result)
+}
+
+fn receive(
+    session: &mut ApplicationEventPump,
+    operation: ApplicationPumpOperation,
+) -> ApplicationPumpReply {
+    let reply = session
+        .wait(Duration::from_secs(130))
+        .unwrap()
+        .expect("bounded host event reply");
+    assert_eq!(reply.operation, operation);
+    assert_eq!(session.pending(), None);
+    reply
 }

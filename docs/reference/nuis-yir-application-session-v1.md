@@ -136,7 +136,7 @@ Descriptor construction/forwarding remains available. The separate reference
 executor is unchanged and must not be presented as device evidence.
 
 The Metal integration regression builds the Nuis image project, consumes the
-emitted YIR in the new scoped API and routes two separately delivered inputs
+emitted YIR through the owned event pump over the scoped API, and routes two separately delivered inputs
 (0 and 2) through `nsdb::serve_runtime_provider_session` and the real registered
 Nuis worker. It checks every RGBA8 pixel against the inverted Nuis checkerboard,
 one frame per event, frame state 0 -> 1 -> 2, no `main` replay, increasing physical
@@ -146,8 +146,54 @@ registration survives binary embedding. Per-event replay matches both live
 frames; incomplete replay and a renamed registration against old evidence are
 rejected. A separate compiler regression retains and runs three helpers never
 called by `main`, and rejects missing host roots and signature drift.
-The CPU driver is still embedded-YIR execution in the integration process, not
+The CPU driver is still embedded-YIR execution in an integration-process worker, not
 the default compiled app entry or native CPU function lowering.
+
+## Owned Event Pump
+
+`nuis-yir-application-event-pump-v1` exposes `ApplicationEventPump`, an owned host
+handle rather than a borrowed driver closure. `spawn` takes owned source text,
+an explicit provider source, a registered ID and scalar opening arguments. It
+returns after starting a worker, not after provider admission. The worker owns
+the source/module, registry, provider and borrowed application session in one
+scope. No self-referential allocation, unsafe lifetime extension, application
+field list or backend selection policy is introduced.
+
+The host consumes the `Open` reply, submits an `event`, then consumes its reply.
+`poll` never waits; `wait(Duration)` bounds only the host wait. An expired wait
+leaves the original operation pending and does not cancel, retry, reconnect or
+reset provider budgets. `phase()` is the last observed phase, so callers must
+also inspect `pending()`. There is exactly one outstanding operation, including
+an unconsumed reply. Both channels have capacity one; busy submission is rejected
+without queuing or coalescing input. Per-event state snapshots and traces are
+moved to the caller, not retained as pump-owned frame history. This bounds queue
+count, not all application allocations or the size of arbitrary user input.
+
+Replies identify `Open`, `Event` or `Close`, carry the last accepted scalar state
+when available, and expose either that call's trace or an error. Invalid event or
+close arguments leave the application phase unchanged and can be corrected.
+Callback failures latch `Faulted`; later events are rejected, while one explicit
+close attempt is still possible. Terminal admission/close/transport failure is
+`Stopped`, never `Closed`. A successful `Closed` reply is published only after
+the scoped lifecycle and provider finish checks, including complete replay
+consumption. No cleanup success can hide an earlier event failure.
+
+`abort` and dropping the handle disconnect the channels without joining the
+worker or implicitly executing Nuis close. An idle worker wakes and drops its
+scope without successful provider finish. An already admitted callback may still
+run; an already requested close may still finish and persist provider evidence
+even if its caller stops waiting. Neither operation preempts arbitrary YIR code
+or guarantees immediate device/transport cleanup. They are abandonment, not a
+general cancellation protocol.
+
+Protocol regressions cover 100 independent deliveries without frame/witness
+history growth, pending-reply backpressure, delayed admission/frame/close replies,
+recoverable input errors, latched callback failures, failed close acknowledgements,
+idle/in-flight abandonment and the unchanged per-session dispatch limit. The live
+Metal regression now holds this owned handle between deliveries, verifies both
+images and replays them through another owned pump. An explicit registered
+[window mode](nuis-yir-window-session-v1.md) now uses this handle in the compiled
+AppKit process; the no-option legacy preview timer remains unchanged.
 
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-runtime-host --test application_session -j 1
@@ -156,23 +202,27 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test ns_nova_applic
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib project::application_sessions -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-syntax --test application_sessions -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-core -p yir-exec -p yir-runtime-host --lib -j 1
-# Metal-capable macOS host; includes old compiled exports and the new scoped session.
+# Metal-capable macOS host; includes old compiled exports and the owned event pump.
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 NUIS_TEST_QUIET_SUCCESS_LOGS=1 cargo test -p nuis --bin nuis artifact_device_sample_shader_render -j 1 -- --test-threads=1
 ```
 
 ## Remaining Integration
 
-The native window timer and default compiled-host entry are **not migrated** to
-this API yet. They still execute a complete module. The existing compiled
+The default legacy window timer is **not migrated**; no-option preview still
+executes a complete module. Explicit `--window-session ID` instead selects the
+window profile, bypasses main/tick replay, delivers logical inputs and waits for
+confirmed close. The existing compiled
 `run-artifact --export-frame` Metal/replay path is a separate bounded regression;
 it must keep its explicit provider admission, output validation and no-reference-
 fallback policy. The carrier does not create a provider or choose a fallback.
 
-The scoped API is synchronous. Existing IPC limits remain: one registered target,
+The inner scoped API is synchronous; the owned pump keeps it off the host event
+thread. Existing IPC limits remain: one registered target,
 256 dispatches, 64 MiB retained replay data and 120-second socket I/O timeouts.
 Those bounds are not a sustained interactive-window protocol. The lifecycle
-registration now exists, but an owned event pump/host handle, idle/cancellation
-policy and window shutdown still need integration. Do not simply reopen a scope
+registration, owned event pump and explicit window startup/input/shutdown route
+now exist, but sustained idle/budget management and cancellation/resource retirement
+still need integration. Do not simply reopen a scope
 on every timer tick or silently reset clocks/budgets. This must not introduce special function
 names or backend combinations into the compiler. Native CPU dispatch remains
 its own differential-execution step.

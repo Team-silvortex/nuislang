@@ -46,8 +46,27 @@ pub fn with_registered_provider_application_session<T>(
     arguments: Vec<Value>,
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
+    with_registered_provider_application_session_checked(
+        source,
+        provider,
+        id,
+        arguments,
+        |_, _| Ok(()),
+        drive,
+    )
+}
+
+pub(crate) fn with_registered_provider_application_session_checked<T>(
+    source: &str,
+    provider: ApplicationProviderSource<'_>,
+    id: &str,
+    arguments: Vec<Value>,
+    preflight: fn(&yir_core::YirModule, &str) -> Result<(), String>,
+    drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
+) -> Result<T, String> {
     let module = yir_syntax::parse_module(source)?;
     let registration = yir_core::registered_application_session(&module, id)?;
+    preflight(&module, id)?;
     with_session(
         source,
         &module,

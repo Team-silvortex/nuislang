@@ -64,7 +64,7 @@ artifact. Existing Metal, replay, completion and GLM evidence stays intact.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/55 | Static YIR lifecycle registration and scoped live Metal/replay verified; connect the owned GUI event pump without whole-module replay. |
+| `ns-nova/persistent-application-session` | active/70 | Explicit compiled window route with Nuis state, queued logical input, exact Metal frames and confirmed close; harden sustained idle/budget handling. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Cancellation, backpressure, failure and in-flight close account for owned resources. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -94,8 +94,18 @@ Static `application_sessions` declarations now retain host-call helper roots,
 survive canonical YIR/binary embedding and select the scoped session by ID. The
 shared YIR contract rejects signature drift before provider connection; changing
 the registration also changes source identity and invalidates old replay.
-The GUI timer and default compiled-host entry are not migrated yet; this
-coordinate remains open, and `active/55` is not an engine-completion percentage.
+The owned event pump now keeps this registered scope in one worker across host
+deliveries. Nonblocking admission/polling allows only one outstanding operation,
+including an unconsumed reply; close success waits for the provider acknowledgement.
+Protocol tests exercise delayed replies, failures, abandonment and unchanged
+dispatch budgets, while the Metal test verifies both image deliveries and replay
+through the owned handle. The explicit `--window-session ID` route now consumes
+that handle inside the compiled AppKit process, bypassing native main and the
+whole-module timer. Its queued logical input regression checks initial redraw,
+space/Unicode input, two exact Metal images, one worker and confirmed close; the
+production `run-artifact` frontdoor is included. The default legacy preview is
+unchanged. Sustained idle/dispatch/replay budgets, cancellation and resource
+retirement remain open; `active/70` is not an engine-completion percentage.
 
 ## Validation And Scope
 

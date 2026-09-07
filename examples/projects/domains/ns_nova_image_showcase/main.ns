@@ -90,6 +90,20 @@ mod cpu Main {
     return committed;
   }
 
+  fn window_open(width: i64, height: i64) -> NovaAppState {
+    return NovaAppRuntime.open(width, height, 60, 0);
+  }
+
+  fn window_event(state: NovaAppState, kind: i64, code: i64) -> NovaAppState {
+    if kind != 0 && (kind != 1 || code != 32) { return state; }
+    let frame_index: i64 = if kind == 0 { 0 } else { (state.frame_index % 2) * 2 };
+    return render_showcase_frame(state, frame_index);
+  }
+
+  fn window_close(state: NovaAppState) -> NovaAppState {
+    return NovaAppRuntime.close(state, state.timeline_tick + 1);
+  }
+
   fn main() {
     cpu_bind_core(0);
     cpu_window(640, 400, "NS Nova Image Showcase");

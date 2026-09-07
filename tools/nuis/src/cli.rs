@@ -190,6 +190,7 @@ pub enum CommandKind {
         input: PathBuf,
         json: bool,
         frame_output: Option<PathBuf>,
+        window_session: Option<WindowSessionOptions>,
     },
     DebugResume {
         input: PathBuf,
@@ -246,6 +247,12 @@ pub enum CommandKind {
         input: PathBuf,
     },
     Galaxy(GalaxyCommand),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WindowSessionOptions {
+    pub id: String,
+    pub events: Option<String>,
 }
 
 pub fn parse_args<I>(mut args: I) -> Result<CommandKind, String>

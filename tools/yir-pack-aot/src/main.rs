@@ -19,6 +19,7 @@ use yir_verify::verify_module;
 mod host_ffi_stub;
 mod host_runtime_frame;
 mod host_text_runtime;
+mod host_window_session;
 
 use host_ffi_stub::render_host_ffi_stubs;
 use host_text_runtime::host_text_runtime_source;
@@ -284,6 +285,10 @@ fn run() -> Result<(), String> {
         manifest.push(format!("host_stub={}", host_path.display()));
         if let Some(runtime_support) = &runtime_frame_support {
             manifest.push("runtime_bootstrap_mode=embedded_yir_tick".to_owned());
+            manifest.push(format!(
+                "window_session_contract={}",
+                host_window_session::CONTRACT
+            ));
             manifest.push(format!(
                 "frame_export_contract={}",
                 host_runtime_frame::FRAME_EXPORT_CONTRACT
@@ -2345,6 +2350,7 @@ fn compile_native_appkit_binary(
         .arg(ll_path)
         .arg(host_path)
         .arg("-O2")
+        .arg("-fobjc-arc")
         .arg("-framework")
         .arg("AppKit")
         .arg("-framework")
@@ -3152,7 +3158,7 @@ fn maybe_prepare_embedded_runtime_support(
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "tick_i64");
-    if !has_tick {
+    if !has_tick && module.application_sessions.is_empty() {
         return Ok(None);
     }
 
@@ -3255,6 +3261,7 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
     append_c_shim_owned_blob_runtime(&mut owned_blob_runtime);
     let runtime_support = if runtime_mode {
         host_runtime_frame::runtime_frame_source(embedded_runtime_module_bytes, runtime_frame_scale)
+            + host_window_session::SUPPORT
     } else {
         String::new()
     };
@@ -3270,6 +3277,7 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
 @property(nonatomic, strong) NSTimer *frameTimer;
 "#
         .to_owned()
+            + host_window_session::FIELDS
     } else {
         r#"
 @property(nonatomic, strong) NSImageView *imageView;
@@ -3286,6 +3294,7 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
     };
     let runtime_image_assignment = if runtime_mode {
         r#"
+    if (gNuisWindowSessionId == NULL) {
     self.imageView = imageView;
     self.frameTimer = [NSTimer scheduledTimerWithTimeInterval:(1.0 / 30.0)
                                                        repeats:YES
@@ -3301,8 +3310,10 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
             self.tick += 1;
         }
     }];
+    }
 "#
         .to_owned()
+            + host_window_session::START
     } else {
         String::new()
     };
@@ -3312,6 +3323,7 @@ fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
     self.frameTimer = nil;
 "#
         .to_owned()
+            + host_window_session::STOP
     } else {
         String::new()
     };
@@ -3417,17 +3429,20 @@ static NSImage *nuisImageFromPpmData(NSData *ppmData) {
 "#;
     let initial_image_bootstrap = if runtime_mode {
         r#"
+    NSImage *image = nil;
+    if (gNuisWindowSessionId == NULL) {
     NSData *frameData = nuisGenerateRuntimeFrame(0);
     if (frameData == nil) {
         fprintf(stderr, "failed to generate initial runtime frame\n");
         [NSApp terminate:nil];
         return;
     }
-    NSImage *image = nuisImageFromPpmData(frameData);
+    image = nuisImageFromPpmData(frameData);
     if (image == nil) {
         fprintf(stderr, "failed to decode initial runtime frame image\n");
         [NSApp terminate:nil];
         return;
+    }
     }
 "#
         .to_owned()
@@ -3445,6 +3460,26 @@ static NSImage *nuisImageFromPpmData(NSData *ppmData) {
     }}
 "#
         )
+    };
+    let window_session_methods = if runtime_mode {
+        host_window_session::METHODS
+    } else {
+        ""
+    };
+    let native_entry = if runtime_mode {
+        host_window_session::ENTRY
+    } else {
+        "    nuis_yir_entry();"
+    };
+    let exit_status = if runtime_mode {
+        "gNuisWindowExitStatus"
+    } else {
+        "0"
+    };
+    let window_session_exit = if runtime_mode {
+        "    if (gNuisWindowSessionId != NULL) exit(gNuisWindowExitStatus);\n"
+    } else {
+        ""
     };
     format!(
         r###"#import <AppKit/AppKit.h>
@@ -3762,13 +3797,14 @@ static void nuis_stop_fabric_worker(void) {{
 @end
 
 @implementation NuisPreviewDelegate
+{window_session_methods}
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {{
     (void)notification;
     nuis_dispatch_host_signal("window_boot", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
 {initial_image_bootstrap}
 
-    NSSize imageSize = [image size];
+    NSSize imageSize = image != nil ? [image size] : NSZeroSize;
     CGFloat width = MAX(imageSize.width, {window_width}.0);
     CGFloat height = MAX(imageSize.height, {window_height}.0);
     NSRect windowRect = NSMakeRect(0, 0, width, height);
@@ -3810,13 +3846,13 @@ static void nuis_stop_fabric_worker(void) {{
     (void)notification;
 {runtime_teardown}
     nuis_dispatch_host_signal("shutdown", "{fabric_table_id}", "{fabric_render_resource}", "{fabric_host_resource}");
-{affinity_teardown}}}
+{affinity_teardown}{window_session_exit}}}
 
 @end
 
 int main(int argc, const char **argv) {{
 {frame_export_entry}
-    nuis_yir_entry();
+{native_entry}
 {affinity_setup}
     nuis_dispatch_host_signal("boot", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
 
@@ -3824,12 +3860,12 @@ int main(int argc, const char **argv) {{
         NSApplication *app = [NSApplication sharedApplication];
         [app setActivationPolicy:NSApplicationActivationPolicyRegular];
 
-        NuisPreviewDelegate *delegate = [[NuisPreviewDelegate alloc] init];
+        __attribute__((objc_precise_lifetime)) NuisPreviewDelegate *delegate = [[NuisPreviewDelegate alloc] init];
         [app setDelegate:delegate];
         [app run];
     }}
 
-    return 0;
+    return {exit_status};
 }}
 "###
     )

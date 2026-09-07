@@ -609,10 +609,14 @@ fn run() -> Result<(), String> {
             target,
             packaging_mode,
         )?,
-        cli::CommandKind::RunArtifact { input, json, frame_output } => {
-            match frame_output {
-                Some(output) => artifact_runtime_command::handle_run_artifact_with_frame_output(input, json, Some(output))?,
-                None => handle_run_artifact(input, json)?,
+        cli::CommandKind::RunArtifact { input, json, frame_output, window_session } => {
+            if let Some(options) = window_session {
+                artifact_runtime_command::handle_run_artifact_with_window(input, options)?;
+            } else {
+                match frame_output {
+                    Some(output) => artifact_runtime_command::handle_run_artifact_with_frame_output(input, json, Some(output))?,
+                    None => handle_run_artifact(input, json)?,
+                }
             }
         }
         cli::CommandKind::DebugResume {

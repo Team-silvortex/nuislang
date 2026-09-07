@@ -2,6 +2,100 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "application-session-window-profile",
+        path: "crates/yir-runtime-host/src/window_session.rs",
+        required_patterns: &[
+            "nuis-yir-window-session-v1",
+            "validate_window_session",
+            "validate_window_trace",
+            "ApplicationSessionSignature::bind",
+            "close callback must not present",
+            "window_trace_requires_exact_bounded_rgba8_without_glyph_fallback",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-window-c-ownership",
+        path: "crates/yir-runtime-host/src/window_session/ffi.rs",
+        required_patterns: &[
+            "nuis_window_session_open",
+            "nuis_window_session_poll",
+            "nuis_window_session_free",
+            "poll buffer must be empty",
+            "Box::from_raw",
+            "exactly one registered IPC or replay",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-appkit-event-adapter",
+        path: "tools/yir-pack-aot/src/host_window_session.rs",
+        required_patterns: &[
+            "--window-session",
+            "nuis_window_session_poll",
+            "if (!window_session_mode) nuis_yir_entry()",
+            "NSModalPanelRunLoopMode",
+            "requestSessionTermination",
+            "NSEventTypeApplicationDefined",
+            "window_session_closed",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-compiled-window-evidence",
+        path: "tools/nuis/src/artifact_device_sample_shader_window_tests.rs",
+        required_patterns: &[
+            "compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal",
+            "run_command_bounded",
+            "handle_run_artifact_with_window",
+            "window_session_close_requested",
+            "128578",
+            "compiled,hit",
+            "source_index",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-window-failure-evidence",
+        path: "crates/yir-runtime-host/tests/provider_application_session/window.rs",
+        required_patterns: &[
+            "window_signature_drift_fails_before_connecting_or_opening",
+            "multiple_presentations_reject_before_provider_success",
+            "close_presentation_is_rejected_before_finish_acknowledgement",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-owned-event-pump",
+        path: "crates/yir-runtime-host/src/application_event_pump.rs",
+        required_patterns: &[
+            "nuis-yir-application-event-pump-v1",
+            "mpsc::sync_channel(1)",
+            "ApplicationEventPump",
+            "recv_timeout(timeout)",
+            "self.pending.is_some()",
+            "pub fn abort",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-pump-scoped-worker",
+        path: "crates/yir-runtime-host/src/application_event_pump/worker.rs",
+        required_patterns: &[
+            "with_registered_provider_application_session",
+            "requests.recv()",
+            "session.event(command.arguments)",
+            "session.close(command.arguments)",
+            "ApplicationPumpPhase::Closed",
+            "ApplicationPumpPhase::Stopped",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-pump-failure-and-pressure-evidence",
+        path: "crates/yir-runtime-host/tests/provider_application_session/event_pump.rs",
+        required_patterns: &[
+            "owned_pump_keeps_one_session_across_one_hundred_host_deliveries",
+            "close_reply_waits_for_provider_acknowledgement",
+            "failed_event_latches_and_successful_cleanup_cannot_certify_completion",
+            "abort_does_not_join_an_in_flight_callback_or_queue_cleanup",
+            "provider_dispatch_budget_is_not_reset_between_host_events",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "application-session-static-yir-contract",
         path: "crates/yir-core/src/application_session.rs",
         required_patterns: &[
@@ -83,6 +177,7 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
         path: "tools/nuis/src/artifact_device_sample_shader_session_tests.rs",
         required_patterns: &[
             "executes_ns_nova_persistent_image_session_through_live_provider",
+            "ApplicationEventPump::spawn",
             "nsdb::serve_runtime_provider_session",
             "PhysicalFence",
             "runtime_dispatch_session_worker_count",

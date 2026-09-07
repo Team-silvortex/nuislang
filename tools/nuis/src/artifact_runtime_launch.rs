@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "artifact_runtime_frame_export.rs"]
 mod frame_export;
+#[path = "artifact_runtime_window_session.rs"]
+mod window_session;
 
 pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
     handle_run_artifact_with_frame_output(input, json, None)
@@ -11,6 +13,22 @@ pub(crate) fn handle_run_artifact_with_frame_output(
     input: PathBuf,
     json: bool,
     frame_output: Option<PathBuf>,
+) -> Result<(), String> {
+    handle_run_artifact_options(input, json, frame_output, None)
+}
+
+pub(crate) fn handle_run_artifact_with_window(
+    input: PathBuf,
+    options: crate::cli::WindowSessionOptions,
+) -> Result<(), String> {
+    handle_run_artifact_options(input, false, None, Some(options))
+}
+
+fn handle_run_artifact_options(
+    input: PathBuf,
+    json: bool,
+    frame_output: Option<PathBuf>,
+    window_options: Option<crate::cli::WindowSessionOptions>,
 ) -> Result<(), String> {
     if json && frame_output.is_some() {
         return Err(
@@ -22,6 +40,9 @@ pub(crate) fn handle_run_artifact_with_frame_output(
         return Ok(());
     }
     let doctor = probe_artifact_doctor(&input);
+    if window_options.is_some() {
+        window_session::validate(&doctor)?;
+    }
     if let Some(output) = frame_output.as_deref() {
         frame_export::validate(&doctor, output)?;
     }
@@ -123,6 +144,15 @@ pub(crate) fn handle_run_artifact_with_frame_output(
         .transpose()?
         .flatten();
     let mut command = Command::new(&binary);
+    if let Some(options) = &window_options {
+        if runtime_provider_results.is_none() {
+            return Err("registered window launch requires a prepared runtime provider".to_owned());
+        }
+        command.arg("--window-session").arg(&options.id);
+        if let Some(events) = &options.events {
+            command.arg("--window-events").arg(events);
+        }
+    }
     if let Some(output) = frame_output.as_deref() {
         command.arg("--export-frame").arg(output);
     }
@@ -130,6 +160,13 @@ pub(crate) fn handle_run_artifact_with_frame_output(
         command.stdout(Stdio::null()).stderr(Stdio::null());
     }
     let (status, runtime_invocations) = match runtime_provider_results.as_ref() {
+        Some(prepared)
+            if window_options
+                .as_ref()
+                .is_some_and(|options| options.events.is_some()) =>
+        {
+            prepared.run_command_bounded(&mut command, std::time::Duration::from_secs(180))?
+        }
         Some(prepared) => prepared.run_command(&mut command)?,
         None => (
             command

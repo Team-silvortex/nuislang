@@ -3,6 +3,8 @@
 Nuis owns image generation, inline GPU image processing, and the three-frame
 ns-nova application lifecycle. This complements, rather than replaces, the
 small-uniform regression in `../ns_nova_showcase`.
+An explicit registered window mode now keeps the same Nuis state and provider
+connection across host events instead of replaying that three-frame program.
 
 ## Data Path
 
@@ -61,6 +63,27 @@ Replay stores input descriptors, not another image payload; changed input conten
 or layout must not consume an old frame. The same binary also exports identity-checked
 replay with the external `.yir` file temporarily absent, proving embedded execution.
 Failed dispatch does not create a partial output; existing files are not overwritten.
+
+## Registered Window
+
+After the same build, launch the event-driven path explicitly:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -q -p nuis -- run-artifact --window-session window build/ns-nova-image
+# Initial redraw, space, one ignored non-BMP logical input, then explicit close:
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -q -p nuis -- run-artifact --window-session window --window-events 32,128578 build/ns-nova-image
+```
+
+Space toggles the GPU-processed checkerboard. The window's close button waits for
+Nuis close and the provider acknowledgement. Scripted input traverses the actual
+AppKit event queue as logical events, not synthesized physical keys. No application
+names, fields or image policy are embedded in the generic host adapter.
+Without `--window-session`, the old preview route is unchanged. This first window
+profile still has the provider's 256-dispatch, 64 MiB replay and 120-second I/O/idle
+limits; it does not support general IME, pointer input or arbitrary-length sessions.
+The bare aggregate-call return guard limitation remains; the event helper uses an
+equivalent supported leading guard. See the
+[window contract](../../../../docs/reference/nuis-yir-window-session-v1.md).
 
 This is a **native host executable with an embedded YIR lifecycle runtime**, not
 fully native CPU lowering, a self-contained Nsld image or a stable interactive app.

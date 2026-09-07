@@ -16,6 +16,22 @@ pub(crate) struct PreparedRuntimeProviderResults {
 }
 
 impl PreparedRuntimeProviderResults {
+    pub(crate) fn run_command_bounded(
+        &self,
+        command: &mut Command,
+        timeout: std::time::Duration,
+    ) -> Result<(ExitStatus, usize), String> {
+        #[cfg(unix)]
+        {
+            ipc::run_command_with_timeout(&self.output_dir, command, Some(timeout))
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (command, timeout);
+            Err("runtime provider IPC requires a registered host transport".to_owned())
+        }
+    }
+
     pub(crate) fn run_command(&self, command: &mut Command) -> Result<(ExitStatus, usize), String> {
         #[cfg(unix)]
         {
