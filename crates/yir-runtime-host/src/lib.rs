@@ -13,8 +13,8 @@ pub use application_session::{
 };
 pub use frame_export::{export_module_frame, nuis_export_embedded_yir_ppm, FRAME_EXPORT_CONTRACT};
 pub use provider_application_session::{
-    with_provider_application_session, ApplicationProviderSource,
-    PROVIDER_APPLICATION_SESSION_CONTRACT,
+    with_provider_application_session, with_registered_provider_application_session,
+    ApplicationProviderSource, PROVIDER_APPLICATION_SESSION_CONTRACT,
 };
 pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
 #[cfg(unix)]

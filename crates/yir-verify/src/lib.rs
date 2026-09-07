@@ -109,6 +109,7 @@ pub fn verify_module_with_registry(
     }
 
     verify_function_table(module, &nodes)?;
+    yir_core::validate_application_sessions(module)?;
 
     for (node_index, node) in module.nodes.iter().enumerate() {
         let resource = resources

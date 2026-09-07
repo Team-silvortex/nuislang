@@ -212,7 +212,16 @@ pub fn lower_nir_to_yir(
     nustar_manifest: &NustarPackageManifest,
     target_config: Option<&LoweringTargetConfig>,
 ) -> Result<YirModule, String> {
-    dispatch_nustar_lowering(module, nustar_manifest, target_config)
+    lower_nir_to_yir_with_host_entries(module, nustar_manifest, target_config, &BTreeSet::new())
+}
+
+pub(crate) fn lower_nir_to_yir_with_host_entries(
+    module: &NirModule,
+    nustar_manifest: &NustarPackageManifest,
+    target_config: Option<&LoweringTargetConfig>,
+    host_entries: &BTreeSet<String>,
+) -> Result<YirModule, String> {
+    dispatch_nustar_lowering(module, nustar_manifest, target_config, host_entries)
 }
 
 fn yir_value_ownership(ty: &NirTypeRef) -> YirValueOwnership {

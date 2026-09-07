@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+mod application_session;
 mod branch_call_args;
 mod branch_effect;
 mod data_mod;
@@ -20,6 +21,7 @@ mod result_receipt;
 mod value_display;
 mod value_types;
 
+pub use application_session::*;
 pub use branch_call_args::*;
 pub use branch_effect::*;
 pub use data_mod::{DataMod, LegacyFabricMod};

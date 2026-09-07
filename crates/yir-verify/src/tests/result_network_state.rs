@@ -211,6 +211,7 @@ fn accepts_network_control_result_probes() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -330,6 +331,7 @@ fn accepts_network_value_from_connect_result() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -480,6 +482,7 @@ fn accepts_network_observe_from_host_transport_probe() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();

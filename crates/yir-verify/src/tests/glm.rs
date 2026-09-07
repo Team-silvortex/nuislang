@@ -9,6 +9,7 @@ fn glm_module(nodes: Vec<Node>, edges: Vec<Edge>) -> YirModule {
             kind: ResourceKind::parse("cpu.arm64"),
         }],
         functions: Vec::new(),
+        application_sessions: Vec::new(),
         nodes,
         edges,
         node_lanes: BTreeMap::new(),

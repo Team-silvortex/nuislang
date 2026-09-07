@@ -16,6 +16,8 @@ pub(super) fn parse_project_manifest(
     let artifact_provider_metadata =
         parse_optional_string_array(source, "artifact_provider_metadata").unwrap_or_default();
     validate_artifact_provider_metadata(&artifact_provider_metadata, path)?;
+    let application_sessions = super::application_sessions::parse_application_sessions(source)
+        .map_err(|error| format!("project manifest `{}`: {error}", path.display()))?;
     let code_assets = parse_optional_string_array(source, "code_assets").unwrap_or_default();
     validate_unique_code_assets(&code_assets, path)?;
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
@@ -32,6 +34,7 @@ pub(super) fn parse_project_manifest(
         entry,
         packaging_mode,
         artifact_provider_metadata,
+        application_sessions,
         code_assets,
         modules,
         tests,

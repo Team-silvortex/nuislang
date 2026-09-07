@@ -109,7 +109,12 @@ registration_preparation = "derive-missing-manifest-before-launch-preserve-exist
 [application_session]
 contract = "nuis-yir-application-session-v1"
 implementation = "crates/yir-runtime-host/src/application_session.rs"
-entry_binding = "explicit-yir-helper-function-signatures"
+entry_binding = "static-yir-application-session-record-and-explicit-id-selection"
+registration_owner = "yir-core"
+registration_manifest_field = "application_sessions"
+registration_payload = "canonical-yir-and-current-window-artifact-embedded-yir"
+registration_identity = "included-in-existing-stage-and-provider-source-hashes"
+registration_roots = "retained-host-call-helpers-without-c-exports-or-dummy-main-calls"
 state = "nuis-owned-recursive-scalar-aggregate"
 execution_context = "one-verified-reference-context-across-host-calls"
 cross_event_state_status = "compiled-nuis-image-two-independent-events-verified"

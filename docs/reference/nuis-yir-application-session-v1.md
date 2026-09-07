@@ -6,8 +6,9 @@ language, scheduler, native CPU ABI or device-specific engine implementation.
 
 ## Ownership And Execution
 
-The caller supplies a verified module, an explicit Nustar registry and distinct
-helper names for `open`, `event`, and `close`. No engine, galaxy, function name or
+The caller supplies a verified module, an explicit Nustar registry and either a
+registered session ID or distinct helper names for `open`, `event`, and `close`.
+No engine, galaxy, function name or
 backend is hardcoded in the carrier. Application transitions remain in Nuis;
 the current acceptance workload reuses `NovaAppRuntime` and the image showcase's
 `render_showcase_frame` without translating their policy to Rust.
@@ -70,6 +71,46 @@ frame state 0 -> 1 -> 2, two presentations, increasing completion clocks, stable
 completion root, one returned frame per event and no entry-node execution.
 This test explicitly uses the **reference provider**, not Metal hardware.
 
+## Static Registration
+
+Projects can declare lifecycle bindings in `nuis.toml` without hardcoding
+application names in compiler or runtime logic:
+
+```toml
+application_sessions = [
+  "image open=NovaAppRuntime.open event=render_showcase_frame close=NovaAppRuntime.close state=state"
+]
+```
+
+Each string starts with an explicit session ID and contains exactly the four
+named fields shown above, in any order. The array supports comments and trailing
+commas; the declaration strings use unescaped, single-line UTF-8 text. Unknown
+or duplicate fields, duplicate IDs, missing fields, malformed arrays and more
+than 64 registrations are errors. The optional field defaults to no registration,
+not to guessed helper names or a default application.
+
+The compiler retains the three helpers as generic host-call roots, even if
+`main` never calls them. It does not mark them as C exports or introduce dummy
+calls. `yir-core::ApplicationSessionSignature` owns the common signature checks;
+the verifier and runtime consume the same contract rather than separate copies.
+The emitted YIR carries a non-executable record:
+
+```text
+application-session image nuis-yir-application-session-v1 NovaAppRuntime.open render_showcase_frame NovaAppRuntime.close state
+```
+
+Records may precede the function table; verification resolves them after parsing.
+Unknown versions are rejected. The record travels in the canonical YIR payload,
+including the current window artifact's embedded YIR, and participates in existing
+stage/provider source identity checks. There is no independently editable host
+mapping file. This is not yet a new Nsld-native session ABI or a native CPU caller.
+
+`ApplicationSession::open_registered` selects a declared ID from an already
+loaded module and explicit registry. `with_registered_provider_application_session`
+does the same for an explicit IPC/replay source, with signature and scalar-input
+preflight before connecting. The lower-level explicit-entry APIs remain available
+for callers that deliberately supply bindings; neither API auto-selects a session.
+
 ## Provider-Backed Scope
 
 `nuis-yir-provider-application-session-v1` adds
@@ -100,7 +141,11 @@ emitted YIR in the new scoped API and routes two separately delivered inputs
 Nuis worker. It checks every RGBA8 pixel against the inverted Nuis checkerboard,
 one frame per event, frame state 0 -> 1 -> 2, no `main` replay, increasing physical
 completion clocks, one worker/lease, sequences `0,1` and cache `compiled,hit`.
-Per-event replay matches both live frames; incomplete replay is rejected.
+The driver selects only the declared `image` ID. The test also checks that the
+registration survives binary embedding. Per-event replay matches both live
+frames; incomplete replay and a renamed registration against old evidence are
+rejected. A separate compiler regression retains and runs three helpers never
+called by `main`, and rejects missing host roots and signature drift.
 The CPU driver is still embedded-YIR execution in the integration process, not
 the default compiled app entry or native CPU function lowering.
 
@@ -108,6 +153,8 @@ the default compiled app entry or native CPU function lowering.
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-runtime-host --test application_session -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-runtime-host --test provider_application_session -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test ns_nova_application_session -j 1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib project::application_sessions -j 1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-syntax --test application_sessions -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-core -p yir-exec -p yir-runtime-host --lib -j 1
 # Metal-capable macOS host; includes old compiled exports and the new scoped session.
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 NUIS_TEST_QUIET_SUCCESS_LOGS=1 cargo test -p nuis --bin nuis artifact_device_sample_shader_render -j 1 -- --test-threads=1
@@ -123,10 +170,10 @@ fallback policy. The carrier does not create a provider or choose a fallback.
 
 The scoped API is synchronous. Existing IPC limits remain: one registered target,
 256 dispatches, 64 MiB retained replay data and 120-second socket I/O timeouts.
-Those bounds are not a sustained interactive-window protocol. Artifact lifecycle
-metadata, an owned event pump/host handle, idle/cancellation policy and window
-shutdown still need integration. Do not simply reopen a scope on every timer
-tick or silently reset clocks/budgets. This must not introduce special function
+Those bounds are not a sustained interactive-window protocol. The lifecycle
+registration now exists, but an owned event pump/host handle, idle/cancellation
+policy and window shutdown still need integration. Do not simply reopen a scope
+on every timer tick or silently reset clocks/budgets. This must not introduce special function
 names or backend combinations into the compiler. Native CPU dispatch remains
 its own differential-execution step.
 

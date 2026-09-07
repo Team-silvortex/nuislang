@@ -28,6 +28,7 @@ fn rejects_invalid_project_bridge_stage_contract() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -71,6 +72,7 @@ fn rejects_nested_data_window_values() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -109,6 +111,7 @@ fn rejects_mutable_window_payload_across_data_pipe() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -149,6 +152,7 @@ fn accepts_frozen_window_payload_across_data_pipe() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -192,6 +196,7 @@ fn rejects_write_window_on_immutable_input() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap_err();
@@ -229,6 +234,7 @@ fn accepts_read_window_on_immutable_input() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -274,6 +280,7 @@ fn rejects_bridge_payload_shape_mismatch() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();

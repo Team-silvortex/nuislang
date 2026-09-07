@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, path::PathBuf, sync::OnceLock};
 
 use yir_core::{Value, YirFunctionRole, YirModule};
-use yir_runtime_host::{ApplicationSession, ApplicationSessionEntries, ApplicationSessionPhase};
+use yir_runtime_host::{ApplicationSession, ApplicationSessionPhase};
 
 fn image_module() -> &'static YirModule {
     static MODULE: OnceLock<YirModule> = OnceLock::new();
@@ -31,16 +31,10 @@ fn field(state: &Value, name: &str) -> i64 {
 fn compiled_nuis_image_state_survives_independent_events_without_main_replay() {
     let module = image_module();
     let registry = yir_verify::default_registry();
-    let entries = ApplicationSessionEntries {
-        open: "NovaAppRuntime.open",
-        event: "render_showcase_frame",
-        close: "NovaAppRuntime.close",
-        state_parameter: "state",
-    };
-    let (mut session, opened) = ApplicationSession::open(
+    let (mut session, opened) = ApplicationSession::open_registered(
         module,
         &registry,
-        entries,
+        "image",
         vec![
             Value::Int(640),
             Value::Int(400),
@@ -110,4 +104,99 @@ fn compiled_nuis_image_state_survives_independent_events_without_main_replay() {
             assert!(!entry_nodes.contains(node), "replayed main node {node}");
         }
     }
+}
+
+#[test]
+fn compiled_registration_roundtrips_and_rejects_signature_drift() {
+    let module = image_module();
+    let source = nuisc::render::render_yir(module);
+    let roundtrip = yir_syntax::parse_module(&source).unwrap();
+    assert_eq!(roundtrip.application_sessions, module.application_sessions);
+    assert_eq!(roundtrip.application_sessions[0].id, "image");
+    yir_verify::verify_module(&roundtrip).unwrap();
+    let mut drift = roundtrip.clone();
+    drift.application_sessions[0].event = "missing_event".to_owned();
+    assert!(yir_verify::verify_module(&drift)
+        .unwrap_err()
+        .contains("unknown function"));
+    let mut duplicate = roundtrip;
+    duplicate
+        .application_sessions
+        .push(duplicate.application_sessions[0].clone());
+    assert!(yir_verify::verify_module(&duplicate)
+        .unwrap_err()
+        .contains("duplicate application session"));
+}
+
+#[test]
+fn registration_preserves_uncalled_helpers_as_host_roots() {
+    use std::{
+        fs,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    struct Project(PathBuf);
+    impl Drop for Project {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let project = Project(std::env::temp_dir().join(format!(
+        "nuis-registered-roots-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )));
+    fs::create_dir(&project.0).unwrap();
+    let manifest = "name = \"registered_roots\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\napplication_sessions = [\"counter open=start event=step close=stop state=state\"]\n";
+    fs::write(project.0.join("nuis.toml"), manifest).unwrap();
+    fs::write(
+        project.0.join("main.ns"),
+        r#"
+mod cpu Main {
+  struct Counter { count: i64 }
+  fn start(seed: i64) -> Counter { return Counter { count: seed }; }
+  fn step(state: Counter, input: i64) -> Counter {
+    return Counter { count: state.count + input };
+  }
+  fn stop(state: Counter) -> Counter { return state; }
+  fn main() { print(999); }
+}
+"#,
+    )
+    .unwrap();
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let registry = yir_verify::default_registry();
+    let (mut session, opened) = ApplicationSession::open_registered(
+        &compiled.yir,
+        &registry,
+        "counter",
+        vec![Value::Int(40)],
+    )
+    .unwrap();
+    let entry_nodes = compiled
+        .yir
+        .functions
+        .iter()
+        .filter(|function| function.role == YirFunctionRole::Entry)
+        .flat_map(|function| function.body_nodes.iter().map(String::as_str))
+        .collect::<BTreeSet<_>>();
+    assert!(!entry_nodes.is_empty());
+    for step in opened.lane_steps.values().flatten() {
+        assert!(
+            !entry_nodes.contains(step.rsplit_once(" -> ").unwrap().1),
+            "registration replayed main: {step}"
+        );
+    }
+    session.event(vec![Value::Int(2)]).unwrap();
+    assert_eq!(field(session.state(), "count"), 42);
+    session.close(vec![]).unwrap();
+    session.completion_status().unwrap();
+
+    fs::write(
+        project.0.join("nuis.toml"),
+        manifest.replace("event=step", "event=missing"),
+    )
+    .unwrap();
+    let error = nuisc::pipeline::compile_project(&project.0).err().unwrap();
+    assert!(error.contains("host entry function `missing`"), "{error}");
 }

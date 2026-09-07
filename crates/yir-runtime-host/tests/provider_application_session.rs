@@ -13,7 +13,8 @@ use yir_core::{
     ProviderPhysicalCompletion, Value,
 };
 use yir_runtime_host::{
-    with_provider_application_session, ApplicationProviderSource, ApplicationSessionEntries,
+    with_provider_application_session, with_registered_provider_application_session,
+    ApplicationProviderSource, ApplicationSessionEntries,
 };
 
 const SOURCE: &str = r#"
@@ -325,4 +326,42 @@ fn invalid_binding_is_rejected_before_connecting() {
     )
     .unwrap_err();
     assert!(error.contains("unknown function"), "{error}");
+}
+
+#[test]
+fn invalid_registered_bindings_and_inputs_fail_before_transport() {
+    let declaration = format!(
+        "application-session app {} open update close state\n",
+        yir_core::APPLICATION_SESSION_CONTRACT
+    );
+    let source = format!("{declaration}{SOURCE}");
+    let path = PathBuf::from("missing-registered-session-provider-socket");
+    for (input, id, argument) in [
+        (source.clone(), "missing", Value::Int(10)),
+        (source.clone(), "app", Value::Bool(false)),
+        (format!("{declaration}{source}"), "app", Value::Int(10)),
+        (
+            source.replace("open update close state", "open missing close state"),
+            "app",
+            Value::Int(10),
+        ),
+        (
+            source.replace(yir_core::APPLICATION_SESSION_CONTRACT, "future-contract"),
+            "app",
+            Value::Int(10),
+        ),
+    ] {
+        let error = with_registered_provider_application_session::<()>(
+            &input,
+            ApplicationProviderSource::Ipc(&path),
+            id,
+            vec![argument],
+            |_, _| panic!("invalid registration or input executed open"),
+        )
+        .unwrap_err();
+        assert!(
+            !error.contains("connection failed"),
+            "preflight attempted a connection: {error}"
+        );
+    }
 }

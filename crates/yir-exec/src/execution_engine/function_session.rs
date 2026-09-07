@@ -69,43 +69,7 @@ impl<'a> FunctionSession<'a> {
 
     /// Preflight a boundary without executing any nodes.
     pub fn validate_function(function: &YirFunction) -> Result<(), String> {
-        if function.role != YirFunctionRole::Helper {
-            return Err(format!(
-                "session function `{}` must be a helper",
-                function.name
-            ));
-        }
-        let mut nodes = BTreeSet::new();
-        for parameter in &function.parameters {
-            if !nodes.insert(&parameter.node) {
-                return Err(format!(
-                    "session function `{}` aliases parameter nodes",
-                    function.name
-                ));
-            }
-            if parameter.ownership != YirValueOwnership::Value || !is_scalar_type(&parameter.ty) {
-                return Err(format!(
-                    "session parameter `{}` must be a value-owned scalar",
-                    parameter.name
-                ));
-            }
-        }
-        let result = function
-            .result
-            .as_ref()
-            .ok_or_else(|| format!("session function `{}` requires a result", function.name))?;
-        let valid = if is_scalar_type(&result.ty) {
-            result.ownership == YirValueOwnership::Value
-        } else {
-            result.ownership == YirValueOwnership::Owned
-        };
-        if !valid {
-            return Err(format!(
-                "session function `{}` has an unsupported result ownership",
-                function.name
-            ));
-        }
-        Ok(())
+        yir_core::validate_session_function(function)
     }
 
     pub fn validate_arguments(
@@ -147,10 +111,6 @@ impl<'a> FunctionSession<'a> {
                 .clone(),
         }
     }
-}
-
-fn is_scalar_type(ty: &str) -> bool {
-    matches!(ty, "bool" | "i32" | "i64" | "f32" | "f64")
 }
 
 fn scalar_matches(ty: &str, value: &Value) -> bool {

@@ -373,6 +373,17 @@ pub fn render_nir(module: &NirModule) -> String {
 pub fn render_yir(module: &YirModule) -> String {
     let mut out = String::new();
     out.push_str(&format!("yir {}\n\n", module.version));
+    for session in &module.application_sessions {
+        out.push_str(&format!(
+            "application-session {} {} {} {} {} {}\n",
+            session.id,
+            yir_core::APPLICATION_SESSION_CONTRACT,
+            session.open,
+            session.event,
+            session.close,
+            session.state_parameter
+        ));
+    }
     for resource in &module.resources {
         out.push_str(&format!(
             "resource {} {}\n",

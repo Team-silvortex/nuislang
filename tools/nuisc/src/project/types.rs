@@ -8,6 +8,7 @@ pub struct NuisProjectManifest {
     pub entry: String,
     pub packaging_mode: Option<String>,
     pub artifact_provider_metadata: Vec<String>,
+    pub application_sessions: Vec<yir_core::YirApplicationSession>,
     pub code_assets: Vec<String>,
     pub modules: Vec<String>,
     pub tests: Vec<String>,

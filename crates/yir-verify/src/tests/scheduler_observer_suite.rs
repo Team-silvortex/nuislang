@@ -84,6 +84,7 @@ fn scheduler_contract_nodes_reject_invalid_observer_source_class_label() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -186,6 +187,7 @@ fn scheduler_contract_nodes_reject_invalid_observer_stage_class_label() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -312,6 +314,7 @@ fn scheduler_contract_nodes_reject_invalid_observer_scope_class_label() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -438,6 +441,7 @@ fn scheduler_contract_nodes_reject_invalid_observer_branch_class_label() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -492,6 +496,7 @@ fn scheduler_contract_nodes_reject_lane_capability_outside_declared_set() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -538,6 +543,7 @@ fn scheduler_contract_nodes_reject_invalid_cpu_bridge_capability() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();

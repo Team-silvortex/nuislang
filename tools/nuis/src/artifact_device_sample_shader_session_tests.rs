@@ -9,23 +9,13 @@ use std::{
 };
 use yir_core::{ProviderCompletionClockKind, Value, YirFunctionRole};
 use yir_runtime_host::{
-    with_provider_application_session, ApplicationProviderSource, ApplicationSession,
-    ApplicationSessionEntries,
+    with_registered_provider_application_session, ApplicationProviderSource, ApplicationSession,
 };
 
 struct Artifacts(PathBuf);
 impl Drop for Artifacts {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
-fn entries() -> ApplicationSessionEntries<'static> {
-    ApplicationSessionEntries {
-        open: "NovaAppRuntime.open",
-        event: "render_showcase_frame",
-        close: "NovaAppRuntime.close",
-        state_parameter: "state",
     }
 }
 
@@ -71,6 +61,22 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     );
     let source = fs::read_to_string(&prepared.source_yir_path).unwrap();
     let module = yir_syntax::parse_module(&source).unwrap();
+    assert_eq!(module.application_sessions.len(), 1);
+    assert_eq!(module.application_sessions[0].id, "image");
+    let record = source
+        .lines()
+        .find(|line| line.starts_with("application-session "))
+        .unwrap();
+    let binary =
+        crate::artifact_runtime_command::resolve_run_artifact_binary_path(&output.0).unwrap();
+    let bytes = fs::read(binary).unwrap();
+    assert!(
+        bytes
+            .windows(record.len())
+            .any(|window| window == record.as_bytes()),
+        "compiled host must retain the lifecycle registration in embedded YIR"
+    );
+    drop(bytes);
     let main_nodes = module
         .functions
         .iter()
@@ -116,10 +122,10 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     });
     // The host supplies separate events. All image, application and receipt
     // policy still executes from compiled Nuis helpers, never from a Rust copy.
-    let live = with_provider_application_session(
+    let live = with_registered_provider_application_session(
         &source,
         ApplicationProviderSource::Ipc(&socket_path),
-        entries(),
+        "image",
         configuration(),
         |session, opened| {
             assert!(opened.presented_frames.is_empty());
@@ -164,10 +170,10 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     assert!(payload.contains("metal.command-buffer.completed"));
     let stream = fs::read_to_string(&prepared.stream_path).unwrap();
     assert!(stream.contains("frame_count = 2"));
-    let replay = with_provider_application_session(
+    let replay = with_registered_provider_application_session(
         &source,
         ApplicationProviderSource::Replay(&prepared.stream_path),
-        entries(),
+        "image",
         configuration(),
         |session, _| drive_images(session, &main_nodes),
     )
@@ -177,10 +183,10 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
         "persistent replay must match each live event, not just the final frame"
     );
 
-    let error = with_provider_application_session(
+    let error = with_registered_provider_application_session(
         &source,
         ApplicationProviderSource::Replay(&prepared.stream_path),
-        entries(),
+        "image",
         configuration(),
         |session, _| {
             session.event(vec![Value::Int(0)])?;
@@ -191,6 +197,17 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     .unwrap_err();
     assert!(error.contains("unconsumed frame"), "{error}");
     assert_eq!(fs::read_to_string(&prepared.stream_path).unwrap(), stream);
+
+    let drifted = source.replace("application-session image ", "application-session changed ");
+    let error = with_registered_provider_application_session::<()>(
+        &drifted,
+        ApplicationProviderSource::Replay(&prepared.stream_path),
+        "changed",
+        configuration(),
+        |_, _| panic!("drifted registration must fail before opening the application"),
+    )
+    .unwrap_err();
+    assert!(error.contains("different YIR module"), "{error}");
 }
 
 fn drive_images(

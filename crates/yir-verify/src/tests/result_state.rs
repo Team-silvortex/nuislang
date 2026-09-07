@@ -22,6 +22,7 @@ fn rejects_mismatched_data_observe_state() {
         edges: vec![xfer("value", "pipe"), dep("pipe", "result")],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -68,6 +69,7 @@ fn accepts_kernel_result_observe_from_project_profile_ref() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -119,6 +121,7 @@ fn accepts_kernel_result_observe_from_resolved_project_profile_slot() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -140,6 +143,7 @@ fn rejects_task_value_without_join_result_source() {
         edges: vec![dep("value", "task"), dep("task", "invalid")],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -204,6 +208,7 @@ fn shader_completion_receipt_module() -> YirModule {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     }
 }
 
@@ -246,6 +251,7 @@ fn data_completion_receipt_module(with_clock: bool) -> YirModule {
         edges,
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     }
 }
 

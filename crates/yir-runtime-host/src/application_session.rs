@@ -4,17 +4,7 @@ use yir_exec::{ExecutionTrace, FunctionSession};
 mod boundary;
 use boundary::SessionBoundary;
 
-pub const APPLICATION_SESSION_CONTRACT: &str = "nuis-yir-application-session-v1";
-
-/// Explicit, function-table-bound lifecycle entries, independent of any galaxy.
-#[derive(Clone, Copy)]
-pub struct ApplicationSessionEntries<'a> {
-    pub open: &'a str,
-    pub event: &'a str,
-    pub close: &'a str,
-    /// Common leading aggregate parameter in both event and close signatures.
-    pub state_parameter: &'a str,
-}
+pub use yir_core::{ApplicationSessionEntries, APPLICATION_SESSION_CONTRACT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApplicationSessionPhase {
@@ -41,6 +31,16 @@ pub struct ApplicationSession<'a> {
 }
 
 impl<'a> ApplicationSession<'a> {
+    pub fn open_registered(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        id: &str,
+        arguments: Vec<Value>,
+    ) -> Result<(Self, ExecutionTrace), String> {
+        let registration = yir_core::registered_application_session(module, id)?;
+        Self::open(module, registry, registration.entries(), arguments)
+    }
+
     pub fn open(
         module: &'a YirModule,
         registry: &'a ModRegistry,

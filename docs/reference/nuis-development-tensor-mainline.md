@@ -64,7 +64,7 @@ artifact. Existing Metal, replay, completion and GLM evidence stays intact.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/45 | Scoped live Metal session and per-event replay verified; bind artifact metadata and the GUI event pump without whole-module replay. |
+| `ns-nova/persistent-application-session` | active/55 | Static YIR lifecycle registration and scoped live Metal/replay verified; connect the owned GUI event pump without whole-module replay. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Cancellation, backpressure, failure and in-flight close account for owned resources. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -90,8 +90,12 @@ aggregate state and provider clock frontiers between separate host calls, drains
 per-call frames, and bounds close to one attempt. A second integration path now
 uses one real Metal worker through one admitted IPC connection for two independent
 events, validates every image pixel, and reproduces both events through replay.
+Static `application_sessions` declarations now retain host-call helper roots,
+survive canonical YIR/binary embedding and select the scoped session by ID. The
+shared YIR contract rejects signature drift before provider connection; changing
+the registration also changes source identity and invalidates old replay.
 The GUI timer and default compiled-host entry are not migrated yet; this
-coordinate remains open, and `active/45` is not an engine-completion percentage.
+coordinate remains open, and `active/55` is not an engine-completion percentage.
 
 ## Validation And Scope
 

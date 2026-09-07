@@ -112,6 +112,7 @@ fn project_contract_nodes_validate_data_shader_and_kernel_links() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -148,6 +149,7 @@ fn project_contract_nodes_require_contract_edge() {
         edges: vec![],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -188,6 +190,7 @@ fn project_contract_nodes_reject_kernel_slot_mismatch() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -228,6 +231,7 @@ fn project_contract_nodes_validate_kernel_target_config() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -267,6 +271,7 @@ fn project_contract_nodes_reject_kernel_target_runtime_mismatch() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -329,6 +334,7 @@ fn project_contract_nodes_validate_shader_and_network_target_configs() {
         ],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -368,6 +374,7 @@ fn project_contract_nodes_validate_shader_abi_selection_contract() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -402,6 +409,7 @@ fn project_contract_nodes_validate_project_cpu_abi_summary() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -436,6 +444,7 @@ fn project_contract_nodes_validate_project_abi_graph_summary() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -470,6 +479,7 @@ fn project_contract_nodes_reject_project_data_abi_summary_invalid_mode() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -510,6 +520,7 @@ fn project_contract_nodes_reject_shader_abi_selection_mode_mismatch() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -550,6 +561,7 @@ fn project_contract_nodes_reject_shader_target_runtime_mismatch() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -590,6 +602,7 @@ fn project_contract_nodes_reject_network_target_lane_width_mismatch() {
         )],
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
+        application_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();

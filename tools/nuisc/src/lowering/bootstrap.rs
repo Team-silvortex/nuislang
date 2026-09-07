@@ -16,6 +16,7 @@ pub(super) trait BootstrapLoweringProvider {
         module: &NirModule,
         manifest: &NustarPackageManifest,
         target_config: Option<&LoweringTargetConfig>,
+        host_entries: &BTreeSet<String>,
     ) -> Result<YirModule, String>;
 }
 
@@ -23,6 +24,7 @@ pub(super) fn dispatch_nustar_lowering(
     module: &NirModule,
     nustar_manifest: &NustarPackageManifest,
     target_config: Option<&LoweringTargetConfig>,
+    host_entries: &BTreeSet<String>,
 ) -> Result<YirModule, String> {
     if nustar_manifest.domain_family != module.domain {
         return Err(format!(
@@ -38,7 +40,7 @@ pub(super) fn dispatch_nustar_lowering(
             )
         })?;
     validate_lowering_target(module, nustar_manifest, target_config)?;
-    provider.lower(module, nustar_manifest, target_config)
+    provider.lower(module, nustar_manifest, target_config, host_entries)
 }
 
 fn bootstrap_lowering_provider(entry: &str) -> Option<&'static dyn BootstrapLoweringProvider> {
@@ -64,10 +66,11 @@ impl BootstrapLoweringProvider for CffiBootstrapLoweringProvider {
         module: &NirModule,
         manifest: &NustarPackageManifest,
         target_config: Option<&LoweringTargetConfig>,
+        host_entries: &BTreeSet<String>,
     ) -> Result<YirModule, String> {
         // The CFFI package owns the source boundary while CPU remains the
         // registered host object-code provider during the bootstrap phase.
-        lower_nir_to_yir_builtin_cpu_with_manifest(module, manifest, target_config)
+        lower_nir_to_yir_builtin_cpu_with_manifest(module, manifest, target_config, host_entries)
     }
 }
 
@@ -83,8 +86,9 @@ impl BootstrapLoweringProvider for CpuBootstrapLoweringProvider {
         module: &NirModule,
         manifest: &NustarPackageManifest,
         target_config: Option<&LoweringTargetConfig>,
+        host_entries: &BTreeSet<String>,
     ) -> Result<YirModule, String> {
-        lower_nir_to_yir_builtin_cpu_with_manifest(module, manifest, target_config)
+        lower_nir_to_yir_builtin_cpu_with_manifest(module, manifest, target_config, host_entries)
     }
 }
 
@@ -104,6 +108,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
         target_config,
         &branch_action_registry,
         None,
+        &BTreeSet::new(),
     )
 }
 
@@ -111,6 +116,7 @@ fn lower_nir_to_yir_builtin_cpu_with_manifest(
     module: &NirModule,
     manifest: &NustarPackageManifest,
     target_config: Option<&LoweringTargetConfig>,
+    host_entries: &BTreeSet<String>,
 ) -> Result<YirModule, String> {
     let branch_action_registry = yir_verify::default_registry();
     let host_ffi_registry = HostFfiRegistryView::try_from_manifest(manifest)?;
@@ -119,6 +125,7 @@ fn lower_nir_to_yir_builtin_cpu_with_manifest(
         target_config,
         &branch_action_registry,
         Some(host_ffi_registry),
+        host_entries,
     )
 }
 
@@ -133,6 +140,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
         target_config,
         branch_action_registry,
         None,
+        &BTreeSet::new(),
     )
 }
 
@@ -141,6 +149,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
     target_config: Option<&LoweringTargetConfig>,
     branch_action_registry: &ModRegistry,
     host_ffi_registry: Option<HostFfiRegistryView>,
+    host_entries: &BTreeSet<String>,
 ) -> Result<YirModule, String> {
     if !crate::frontend::is_host_execution_domain(&module.domain) {
         return Err(format!(
@@ -149,6 +158,18 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         ));
     }
 
+    for name in host_entries {
+        if name == "main"
+            || !module
+                .functions
+                .iter()
+                .any(|function| &function.name == name)
+        {
+            return Err(format!(
+                "unknown or non-helper host entry function `{name}`"
+            ));
+        }
+    }
     let rewritten_module = rewrite_self_tail_recursive_functions(module);
     let module = &rewritten_module;
     super::nested_owned_returns::validate_selected_owned_pointer_transfers(module)?;
@@ -184,6 +205,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&exported_functions)
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .union(host_entries)
         .cloned()
         .collect::<BTreeSet<_>>();
     let async_helper_functions = collect_recursive_async_helper_functions(module);

@@ -2,6 +2,61 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "application-session-static-yir-contract",
+        path: "crates/yir-core/src/application_session.rs",
+        required_patterns: &[
+            "nuis-yir-application-session-v1",
+            "YirApplicationSession",
+            "ApplicationSessionSignature",
+            "validate_application_sessions",
+            "registered_application_session",
+            "duplicate application session",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-project-declaration",
+        path: "tools/nuisc/src/project/application_sessions.rs",
+        required_patterns: &[
+            "parse_application_sessions",
+            "duplicate application_sessions field",
+            "malformed application_sessions string array",
+            "register_project_application_sessions",
+            "validate_application_sessions",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-registered-host-admission",
+        path: "crates/yir-runtime-host/src/provider_application_session.rs",
+        required_patterns: &[
+            "with_registered_provider_application_session",
+            "registered_application_session",
+            "registration.entries()",
+            "ApplicationSession::preflight",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-uncalled-host-roots",
+        path: "tools/nuisc/tests/ns_nova_application_session.rs",
+        required_patterns: &[
+            "registration_preserves_uncalled_helpers_as_host_roots",
+            "compiled_registration_roundtrips_and_rejects_signature_drift",
+            "ApplicationSession::open_registered",
+            "unknown",
+            "duplicate application session",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-embedded-registration-evidence",
+        path: "tools/nuis/src/artifact_device_sample_shader_session_tests.rs",
+        required_patterns: &[
+            "with_registered_provider_application_session",
+            "application-session ",
+            ".windows(record.len())",
+            "compiled host must retain the lifecycle registration",
+            "different YIR module",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "application-session-provider-finish-gate",
         path: "crates/yir-runtime-host/src/provider_application_session.rs",
         required_patterns: &[
@@ -50,7 +105,7 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
         id: "application-session-runtime-carrier",
         path: "crates/yir-runtime-host/src/application_session.rs",
         required_patterns: &[
-            "nuis-yir-application-session-v1",
+            "APPLICATION_SESSION_CONTRACT",
             "SessionBoundary::bind",
             "FunctionSession::new",
             "ApplicationSessionPhase::Faulted",

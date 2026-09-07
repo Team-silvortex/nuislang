@@ -34,19 +34,51 @@ pub fn with_provider_application_session<T>(
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
     let module = yir_syntax::parse_module(source)?;
-    ApplicationSession::preflight(&module, entries, &arguments)?;
+    with_session(source, &module, provider, entries, arguments, drive)
+}
+
+/// Select only a static registration embedded in the admitted YIR. Unknown or
+/// inconsistent bindings fail before provider connection or application effects.
+pub fn with_registered_provider_application_session<T>(
+    source: &str,
+    provider: ApplicationProviderSource<'_>,
+    id: &str,
+    arguments: Vec<Value>,
+    drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
+) -> Result<T, String> {
+    let module = yir_syntax::parse_module(source)?;
+    let registration = yir_core::registered_application_session(&module, id)?;
+    with_session(
+        source,
+        &module,
+        provider,
+        registration.entries(),
+        arguments,
+        drive,
+    )
+}
+
+fn with_session<T>(
+    source: &str,
+    module: &yir_core::YirModule,
+    provider: ApplicationProviderSource<'_>,
+    entries: ApplicationSessionEntries<'_>,
+    arguments: Vec<Value>,
+    drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
+) -> Result<T, String> {
+    ApplicationSession::preflight(module, entries, &arguments)?;
     let provider = match provider {
         #[cfg(unix)]
         ApplicationProviderSource::Ipc(path) => {
             crate::provider_result_stream::ProviderResultSource::Live(
-                crate::provider_runtime_ipc::connect_provider_runtime(source, &module, path)?,
+                crate::provider_runtime_ipc::connect_provider_runtime(source, module, path)?,
             )
         }
         ApplicationProviderSource::Replay(path) => replay_source(source, path)?,
     };
     let (registry, provider) = provider_registry(provider);
     let (mut application, opened) =
-        ApplicationSession::open(&module, &registry, entries, arguments)?;
+        ApplicationSession::open(module, &registry, entries, arguments)?;
     let result = drive(&mut application, opened)?;
     application.completion_status()?;
     drop(application);

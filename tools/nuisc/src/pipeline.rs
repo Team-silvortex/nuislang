@@ -228,12 +228,21 @@ pub fn compile_project_plan_with_options(
         ExternValidationMode::Source,
         |_, nir, _| crate::project::validate_project_links_against_nir(project, nir),
     )?;
-    let mut artifacts = lower_prepared_pipeline(prepared, lowering_target)?;
+    let host_entries = project
+        .manifest
+        .application_sessions
+        .iter()
+        .flat_map(|session| [&session.open, &session.event, &session.close])
+        .cloned()
+        .collect();
+    let mut artifacts =
+        lower_prepared_pipeline_with_host_entries(prepared, lowering_target, &host_entries)?;
     crate::project::apply_project_support_modules_to_yir(project, &mut artifacts.yir)?;
     crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
     crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
     crate::project::validate_project_abi_against_yir(project, &artifacts.yir)?;
     crate::project::prune_project_topology_for_codegen(project, &mut artifacts.yir)?;
+    crate::project::register_project_application_sessions(project, &mut artifacts.yir)?;
     refresh_loaded_nustar(&mut artifacts)?;
     artifacts.llvm_ir = crate::nustar_codegen_registry::emit_module_with_loaded_nustar(
         &artifacts.yir,
@@ -461,10 +470,19 @@ fn lower_prepared_pipeline(
     prepared: PreparedPipeline,
     lowering_target: Option<crate::lowering::LoweringTargetConfig>,
 ) -> Result<PipelineArtifacts, String> {
-    let yir = crate::lowering::lower_nir_to_yir(
+    lower_prepared_pipeline_with_host_entries(prepared, lowering_target, &BTreeSet::new())
+}
+
+fn lower_prepared_pipeline_with_host_entries(
+    prepared: PreparedPipeline,
+    lowering_target: Option<crate::lowering::LoweringTargetConfig>,
+    host_entries: &BTreeSet<String>,
+) -> Result<PipelineArtifacts, String> {
+    let yir = crate::lowering::lower_nir_to_yir_with_host_entries(
         &prepared.nir,
         &prepared.lowering_manifest,
         lowering_target.as_ref(),
+        host_entries,
     )?;
     pipeline_ffi_owned_buffer::validate_owned_return_buffer_yir(&yir)?;
     pipeline_ffi_owned_object::validate_owned_return_object_yir(&yir)?;

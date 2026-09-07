@@ -9,6 +9,7 @@ use nuis_semantics::model::{NirDataFlowState, NirResultStage};
 use yir_core::YirModule;
 
 mod abi;
+mod application_sessions;
 mod bridge_contracts;
 mod data_bridge_directions;
 mod data_contract_types;
@@ -129,6 +130,7 @@ use validation_core::{
     validate_project_modules, validate_project_unit_bindings, validate_project_uses,
 };
 
+pub(crate) use application_sessions::register_project_application_sessions;
 pub use types::*;
 pub fn is_project_input(path: &Path) -> bool {
     path.is_dir() || path.file_name().and_then(|name| name.to_str()) == Some("nuis.toml")
@@ -187,6 +189,7 @@ mod tests {
                 entry: "main.ns".to_owned(),
                 packaging_mode: None,
                 artifact_provider_metadata: vec![],
+                application_sessions: Vec::new(),
                 code_assets: vec![],
                 modules: vec![],
                 tests: vec![],

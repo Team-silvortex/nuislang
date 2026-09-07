@@ -62,6 +62,7 @@ fn default_manifest_packages_only_project_owned_modules() {
             entry: "main.ns".to_owned(),
             packaging_mode: None,
             artifact_provider_metadata: Vec::new(),
+            application_sessions: Vec::new(),
             code_assets: Vec::new(),
             modules: vec!["main.ns".to_owned()],
             tests: Vec::new(),

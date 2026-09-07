@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
-use crate::Operation;
+use crate::{Operation, YirApplicationSession};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YirModule {
     pub version: String,
     pub resources: Vec<Resource>,
     pub functions: Vec<YirFunction>,
+    pub application_sessions: Vec<YirApplicationSession>,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub node_lanes: BTreeMap<String, String>,
@@ -18,6 +19,7 @@ impl YirModule {
             version: version.into(),
             resources: Vec::new(),
             functions: Vec::new(),
+            application_sessions: Vec::new(),
             nodes: Vec::new(),
             edges: Vec::new(),
             node_lanes: BTreeMap::new(),

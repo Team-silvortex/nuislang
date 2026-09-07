@@ -5,6 +5,9 @@ modules = ["main.ns", "fabric_plane.ns"]
 galaxy = ["ns-nova=workspace", "pixelmagic=workspace"]
 galaxy_imports = ["ns-nova:lib/app_runtime.ns"]
 artifact_provider_metadata = ["@scope(domain=shader)|official.shader:provider-sample=project-render"]
+application_sessions = [
+  "image open=NovaAppRuntime.open event=render_showcase_frame close=NovaAppRuntime.close state=state"
+]
 links = [
   "cpu.Main -> shader.PixelMagicImageSurface via data.FabricPlane",
   "shader.PixelMagicImageSurface -> cpu.Main via data.FabricPlane"

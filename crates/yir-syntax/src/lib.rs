@@ -35,6 +35,22 @@ pub fn parse_explicit_module(input: &str) -> Result<YirModule, String> {
             Some("function-param") => parse_function_parameter(&mut module, &tokens, line_no)?,
             Some("function-result") => parse_function_result(&mut module, &tokens, line_no)?,
             Some("function-node") => parse_function_node(&mut module, &tokens, line_no)?,
+            Some("application-session") => {
+                let fields = tokens[1..].iter().map(String::as_str).collect::<Vec<_>>();
+                let session = yir_core::YirApplicationSession::from_fields(&fields)
+                    .map_err(|error| format!("line {line_no}: {error}"))?;
+                if module.application_sessions.len() >= 64
+                    || module
+                        .application_sessions
+                        .iter()
+                        .any(|entry| entry.id == session.id)
+                {
+                    return Err(format!(
+                        "line {line_no}: duplicate or excessive application session registrations"
+                    ));
+                }
+                module.application_sessions.push(session);
+            }
             Some("edge") => parse_edge(&mut module, &tokens, line_no)?,
             Some("node") => parse_shorthand_node(&mut module, &tokens, line_no)?,
             Some(opcode) => parse_node(&mut module, opcode, &tokens, line_no)?,
