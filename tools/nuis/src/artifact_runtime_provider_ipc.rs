@@ -7,7 +7,7 @@ use std::{
         net::{UnixListener, UnixStream},
     },
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::{Child, Command, ExitStatus},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
@@ -15,6 +15,11 @@ use std::{
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
+
+#[path = "artifact_runtime_provider_transport.rs"]
+pub(crate) mod transport;
+
+const FAILURE_CLEANUP_GRACE: Duration = Duration::from_secs(5);
 
 pub(super) fn run_command(
     output_dir: &Path,
@@ -28,7 +33,15 @@ pub(super) fn run_command_with_timeout(
     command: &mut Command,
     timeout: Option<Duration>,
 ) -> Result<(ExitStatus, usize), String> {
-    let mut server = RuntimeProviderServer::start(output_dir)?;
+    let server = RuntimeProviderServer::start(output_dir)?;
+    run_supervised_command(server, command, timeout)
+}
+
+fn run_supervised_command(
+    mut server: RuntimeProviderServer,
+    command: &mut Command,
+    timeout: Option<Duration>,
+) -> Result<(ExitStatus, usize), String> {
     command
         .env_remove(yir_runtime_host::PROVIDER_RESULT_STREAM_ENV)
         .env(
@@ -38,10 +51,31 @@ pub(super) fn run_command_with_timeout(
     let mut child = command
         .spawn()
         .map_err(|error| format!("failed to launch runtime child: {error}"))?;
+    let child_result = supervise_child(&mut child, timeout, FAILURE_CLEANUP_GRACE, || {
+        server
+            .thread
+            .as_ref()
+            .is_some_and(|worker| worker.is_finished())
+    });
+    // A child that cleaned up (or even exited zero) cannot erase provider failure.
+    match (child_result, server.finish()) {
+        (Ok(status), Ok(count)) => Ok((status, count)),
+        (Err(child), Err(provider)) => Err(format!("{provider}; {child}")),
+        (Err(error), _) | (_, Err(error)) => Err(error),
+    }
+}
+
+fn supervise_child(
+    child: &mut Child,
+    timeout: Option<Duration>,
+    failure_grace: Duration,
+    mut provider_stopped: impl FnMut() -> bool,
+) -> Result<ExitStatus, String> {
     let started = Instant::now();
+    let mut failed_at = None;
     loop {
         match child.try_wait() {
-            Ok(Some(status)) => return server.finish().map(|count| (status, count)),
+            Ok(Some(status)) => return Ok(status),
             Ok(None) => {}
             Err(error) => {
                 let _ = child.kill();
@@ -54,17 +88,14 @@ pub(super) fn run_command_with_timeout(
             let _ = child.wait();
             return Err("runtime child exceeded its explicit wall-clock limit".to_owned());
         }
-        if server
-            .thread
-            .as_ref()
-            .is_some_and(|worker| worker.is_finished())
-        {
+        if provider_stopped() && failed_at.is_none() {
+            failed_at = Some(Instant::now());
+            eprintln!("runtime provider stopped; allowing bounded application failure cleanup");
+        }
+        if failed_at.is_some_and(|start| start.elapsed() >= failure_grace) {
             let _ = child.kill();
             let _ = child.wait();
-            return match server.finish() {
-                Err(error) => Err(error),
-                Ok(_) => Err("runtime IPC server stopped before its child".to_owned()),
-            };
+            return Err("runtime child exceeded the provider failure cleanup deadline".to_owned());
         }
         thread::sleep(Duration::from_millis(10));
     }
@@ -79,6 +110,17 @@ struct RuntimeProviderServer {
 
 impl RuntimeProviderServer {
     fn start(output_dir: &Path) -> Result<Self, String> {
+        Self::start_with_reader(output_dir, |stream| {
+            transport::read_request(stream, transport::IO_TIMEOUT)
+        })
+    }
+
+    fn start_with_reader(
+        output_dir: &Path,
+        read_request: fn(
+            &mut UnixStream,
+        ) -> Result<yir_core::provider_runtime_ipc::Message, String>,
+    ) -> Result<Self, String> {
         let directory = private_socket_directory()?;
         let stop = Arc::new(AtomicBool::new(false));
         let active = Arc::new(Mutex::new(None));
@@ -102,7 +144,7 @@ impl RuntimeProviderServer {
             while !stop.load(Ordering::Acquire) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
-                        configure_connection(&stream)?;
+                        transport::configure_connection(&stream, transport::IO_TIMEOUT)?;
                         *active
                             .lock()
                             .map_err(|_| "runtime IPC stream lock was poisoned")? =
@@ -110,7 +152,11 @@ impl RuntimeProviderServer {
                         if stop.load(Ordering::Acquire) {
                             break;
                         }
-                        let result = nsdb::serve_runtime_provider_session(&output_dir, &mut stream);
+                        let result = nsdb::serve_runtime_provider_session_with_request_reader(
+                            &output_dir,
+                            &mut stream,
+                            read_request,
+                        );
                         active
                             .lock()
                             .map_err(|_| "runtime IPC stream lock was poisoned")?
@@ -149,6 +195,20 @@ impl RuntimeProviderServer {
     }
 }
 
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) fn run_command_with_request_reader(
+    output_dir: &Path,
+    command: &mut Command,
+    timeout: Duration,
+    read_request: fn(&mut UnixStream) -> Result<yir_core::provider_runtime_ipc::Message, String>,
+) -> Result<(ExitStatus, usize), String> {
+    run_supervised_command(
+        RuntimeProviderServer::start_with_reader(output_dir, read_request)?,
+        command,
+        Some(timeout),
+    )
+}
+
 impl Drop for RuntimeProviderServer {
     fn drop(&mut self) {
         if self.thread.is_some() {
@@ -156,16 +216,6 @@ impl Drop for RuntimeProviderServer {
         }
         let _ = fs::remove_dir_all(&self.directory);
     }
-}
-
-fn configure_connection(stream: &UnixStream) -> Result<(), String> {
-    let timeout = Some(Duration::from_secs(120));
-    // BSD may inherit the listener's nonblocking flag on accept.
-    stream
-        .set_nonblocking(false)
-        .and_then(|_| stream.set_read_timeout(timeout))
-        .and_then(|_| stream.set_write_timeout(timeout))
-        .map_err(|error| format!("runtime IPC connection setup failed: {error}"))
 }
 
 fn private_socket_directory() -> Result<PathBuf, String> {

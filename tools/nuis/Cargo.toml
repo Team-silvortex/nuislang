@@ -14,11 +14,11 @@ nuis-semantics = { path = "../../crates/nuis-semantics" }
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuisc = { path = "../nuisc" }
 nsdb = { path = "../nsdb" }
+yir-core = { path = "../../crates/yir-core" }
 yir-runtime-host = { path = "../../crates/yir-runtime-host" }
 yir-domain-shader = { path = "../../crates/yir-domain-shader" }
 ed25519-dalek.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true
-yir-core = { path = "../../crates/yir-core" }
 yir-syntax = { path = "../../crates/yir-syntax" }

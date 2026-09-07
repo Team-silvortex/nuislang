@@ -1,6 +1,9 @@
 use super::*;
 use std::process::{Command, Stdio};
 
+#[path = "artifact_device_sample_shader_failure_tests.rs"]
+mod failure;
+
 #[test]
 fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal() {
     let output = Artifacts(temp_output_dir());
@@ -46,6 +49,11 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
     );
     assert!(log.contains("window_session_key=32\n"), "{log}");
     assert!(log.contains("window_session_key=128578\n"), "{log}");
+    assert!(log.contains("window_session_close_reason=0\n"), "{log}");
+    assert!(
+        log.contains("window_session_cleanup_completed=1\n"),
+        "{log}"
+    );
     assert!(!log.contains("embedded runtime frame generation"), "{log}");
     assert!(!log.contains("while busy"), "{log}");
     let source = fs::read_to_string(&prepared.source_yir_path).unwrap();
@@ -96,7 +104,11 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
                 trace.presented_frames.is_empty(),
                 "unbound key must not redraw"
             );
-            assert!(session.close(vec![])?.unwrap().presented_frames.is_empty());
+            assert!(session
+                .close(vec![Value::Int(0)])?
+                .unwrap()
+                .presented_frames
+                .is_empty());
             Ok(())
         },
     )
@@ -140,4 +152,5 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
         },
     )
     .expect("production run-artifact window frontdoor");
+    failure::verify_compiled_provider_failure_cleanup(&output.0, &binary);
 }

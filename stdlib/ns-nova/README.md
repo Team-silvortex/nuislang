@@ -45,7 +45,7 @@ Design principles:
 
 The current mainline uses ns-nova to drive one growing interactive image
 application, then foundation hardening, measured performance and incremental
-compiler-module migration. The first open prerequisite is a persistent
+compiler-module migration. The first open prerequisite is hardening the bounded
 Nuis-owned session across host events, not whole-module timer replay.
 See the [roadmap](../../docs/versioning/nuis-beta-0.11-application-led-mainline.md)
 and [separate acceptance coordinates](../../docs/reference/nuis-development-tensor-mainline.md).
@@ -63,8 +63,14 @@ Current state:
   immutable bytes, while the registered Shader adapter owns GPU resource admission.
   `nuis run-artifact --export-frame` now drives both examples through their compiled
   host binary, not a test child. The native shell embeds the YIR lifecycle runtime;
-  fully native CPU lowering, self-contained provider injection and persistent
-  interactive sessions remain separate milestones
+  fully native CPU lowering and self-contained provider injection remain separate
+  milestones. Explicit `--window-session window` now retains Nuis state and one
+  provider across AppKit events; the no-option legacy preview is not migrated
+* [window profile v2](../../docs/reference/nuis-yir-window-session-v2.md) passes a
+  `NovaCloseReason` to Nuis cleanup. `close_with_reason` preserves failed status
+  and accepted frame identity; the host distinguishes completed cleanup from
+  successful execution. Compiled provider-failure injection retains the error
+  and old replay files. Version 1 window bundles and close helpers require rebuilding
 * lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
@@ -89,7 +95,7 @@ Current source-asset status:
   [lib/nova_contracts.ns](lib/nova_contracts.ns)
 * the first executable lifecycle module is
   [lib/app_runtime.ns](lib/app_runtime.ns), which exposes owned
-  `NovaAppState` and `NovaFrameTransaction` transitions
+  `NovaAppState` and `NovaFrameTransaction` transitions plus `NovaCloseReason`
 * both library modules currently use `library_import_policy = "manual-only"`
   so it is declared and discoverable through project metadata, but it is not
   auto-injected into project scope by default
@@ -123,9 +129,10 @@ First source modules:
 
 Current limitation:
 
-* the current lifecycle is a bounded three-frame validation loop, not a stable
-  interactive world loop; aggregate `NovaAppState` carry is native, but continuous
-  event dispatch and an unbounded scheduler-owned world loop remain open
+* the native three-frame validation loop and the persistent embedded-YIR window
+  are distinct routes. The latter remains bounded to 256 dispatches and 64 MiB
+  replay, not a stable unlimited interactive world loop. Failure teardown is
+  tested, but detailed causes, cancellation and owned-resource retirement remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;
   its receipt is provider-domain-issued, but its clock still comes from the planned

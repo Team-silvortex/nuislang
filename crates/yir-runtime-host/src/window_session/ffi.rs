@@ -6,6 +6,7 @@ use std::{
 
 use super::WindowSession;
 use crate::{ApplicationProviderSource, ApplicationPumpPhase, NuisRenderedBuffer};
+use yir_core::ApplicationCloseReason;
 
 fn fail(error: impl std::fmt::Display) -> i32 {
     eprintln!("nuis window session: {error}");
@@ -82,13 +83,53 @@ pub unsafe extern "C" fn nuis_window_session_event(
 /// Session must be an exclusive live handle returned by nuis_window_session_open.
 #[no_mangle]
 pub unsafe extern "C" fn nuis_window_session_close(session: *mut WindowSession) -> i32 {
+    unsafe {
+        nuis_window_session_close_with_reason(session, ApplicationCloseReason::Requested.code())
+    }
+}
+
+/// Reason codes are requested=0, event-failed=1, host-failed=2. Invalid codes
+/// reject before admission. A latched event failure cannot be downgraded to 0.
+/// # Safety
+/// Session must be an exclusive live handle returned by nuis_window_session_open.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_close_with_reason(
+    session: *mut WindowSession,
+    reason: i64,
+) -> i32 {
     let Some(session) = (unsafe { session.as_mut() }) else {
         return fail("null session");
+    };
+    let reason = match ApplicationCloseReason::from_code(reason) {
+        Ok(reason) => reason,
+        Err(error) => return fail(error),
     };
     if session.pending() {
         return 1;
     }
-    session.close().map_or_else(fail, |_| 0)
+    session.close_with_reason(reason).map_or_else(fail, |_| 0)
+}
+
+/// Return the admitted close reason, or -1 before close admission/null handle.
+/// This is not a successful-close acknowledgement.
+/// # Safety
+/// Session must be null or an exclusive live handle returned by open.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_close_reason(session: *const WindowSession) -> i64 {
+    unsafe { session.as_ref() }
+        .and_then(WindowSession::close_reason)
+        .map_or(-1, ApplicationCloseReason::code)
+}
+
+/// Return 1 only when the validated Nuis cleanup callback completed, otherwise 0.
+/// Even 1 does not certify provider finish or a successful application lifecycle.
+/// # Safety
+/// Session must be null or an exclusive live handle returned by open.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_cleanup_completed(
+    session: *const WindowSession,
+) -> i32 {
+    i32::from(unsafe { session.as_ref() }.is_some_and(WindowSession::cleanup_completed))
 }
 
 /// Return 0 for pending, 1 for one reply, -1 for error. Phase codes are opening=0,
@@ -173,6 +214,8 @@ mod tests {
             assert!(slot.is_null());
             assert_eq!(nuis_window_session_event(slot, 0, 0), -1);
             assert_eq!(nuis_window_session_close(slot), -1);
+            assert_eq!(nuis_window_session_close_reason(slot), -1);
+            assert_eq!(nuis_window_session_cleanup_completed(slot), 0);
             nuis_window_session_free(&mut slot);
         }
         let session = WindowSession::spawn(
@@ -191,6 +234,8 @@ mod tests {
         };
         let mut phase = 99;
         unsafe {
+            assert_eq!(nuis_window_session_close_with_reason(slot, 99), -1);
+            assert_eq!(nuis_window_session_close_reason(slot), -1);
             assert_eq!(nuis_window_session_poll(slot, &mut buffer, &mut phase), -1);
             assert_eq!(phase, 99);
             assert_eq!(buffer.ptr, bytes.as_mut_ptr());

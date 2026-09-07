@@ -1,4 +1,5 @@
 use super::*;
+use crate::artifact_runtime_provider_results::transport;
 use std::{
     fs::DirBuilder,
     io::ErrorKind,
@@ -106,14 +107,12 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
         loop {
             match listener.accept() {
                 Ok((mut stream, _)) => {
-                    stream.set_nonblocking(false).unwrap();
-                    stream
-                        .set_read_timeout(Some(Duration::from_secs(120)))
-                        .unwrap();
-                    stream
-                        .set_write_timeout(Some(Duration::from_secs(120)))
-                        .unwrap();
-                    return nsdb::serve_runtime_provider_session(&provider_output, &mut stream);
+                    transport::configure_connection(&stream, Duration::from_secs(1)).unwrap();
+                    return nsdb::serve_runtime_provider_session_with_request_reader(
+                        &provider_output,
+                        &mut stream,
+                        |stream| transport::read_request(stream, Duration::from_secs(1)),
+                    );
                 }
                 Err(error)
                     if error.kind() == ErrorKind::WouldBlock && Instant::now() < deadline =>
@@ -133,7 +132,9 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
         configuration(),
     )
     .unwrap();
-    let live = drive_images(&mut session, &main_nodes);
+    // Exercise the production idle policy across open, consecutive draws and
+    // finish, beyond an injected one-second deadline without a two-minute test.
+    let live = drive_images(&mut session, &main_nodes, Duration::from_millis(1500));
     drop(session);
     let served = worker.join().unwrap();
     let live = live.unwrap();
@@ -180,7 +181,7 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
         configuration(),
     )
     .unwrap();
-    let replay = drive_images(&mut session, &main_nodes).unwrap();
+    let replay = drive_images(&mut session, &main_nodes, Duration::ZERO).unwrap();
     assert_eq!(
         live, replay,
         "persistent replay must match each live event, not just the final frame"
@@ -222,6 +223,7 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
 fn drive_images(
     session: &mut ApplicationEventPump,
     main_nodes: &BTreeSet<String>,
+    idle: Duration,
 ) -> Result<Vec<Vec<u8>>, String> {
     let opened = receive(session, ApplicationPumpOperation::Open);
     assert_eq!(opened.phase, ApplicationPumpPhase::Open);
@@ -235,6 +237,11 @@ fn drive_images(
     let mut previous_physical = 0;
     let mut previous_root = 0;
     for (ordinal, event) in [(1, 0), (2, 2)] {
+        thread::sleep(idle);
+        assert!(
+            session.poll()?.is_none(),
+            "idle must not generate an event or frame"
+        );
         session.event(vec![Value::Int(event)])?;
         assert!(session
             .event(vec![Value::Int(event)])
@@ -285,6 +292,8 @@ fn drive_images(
             );
         }
     }
+    thread::sleep(idle);
+    assert!(session.poll()?.is_none());
     session.close(vec![Value::Int(previous_clock + 1)])?;
     let closed = receive(session, ApplicationPumpOperation::Close);
     assert_eq!(closed.phase, ApplicationPumpPhase::Closed);

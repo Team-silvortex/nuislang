@@ -1,5 +1,6 @@
 use super::*;
 use std::time::Instant;
+use yir_core::ApplicationCloseReason;
 use yir_runtime_host::{
     validate_window_session, ApplicationPumpPhase, WindowSession, WindowSessionReply,
 };
@@ -33,12 +34,20 @@ fn source() -> String {
         "cpu.param_i64 delta cpu0 1",
         "cpu.param_i64 kind cpu0 1\ncpu.param_i64 delta cpu0 2",
     )
-    .replace("function-param close divisor i64 value divisor\n", "")
-    .replace("function-node close divisor\n", "")
+    .replace(
+        "function-param close divisor i64 value divisor",
+        "function-param close reason i64 value reason",
+    )
+    .replace("function-node close divisor", "function-node close reason")
     .replace(
         "cpu.param_i64 divisor cpu0 1",
-        "cpu.const_i64 divisor cpu0 1",
+        "cpu.param_i64 reason cpu0 1",
     )
+    .replace(
+        "cpu.div quotient cpu0 final_count divisor",
+        "cpu.add quotient cpu0 final_count reason",
+    )
+    .replace("edge dep divisor quotient", "edge dep reason quotient")
 }
 
 fn receive(session: &mut WindowSession) -> WindowSessionReply {
@@ -82,6 +91,8 @@ fn window_profile_routes_redraw_unicode_key_and_explicit_close() {
     session.close().unwrap();
     let closed = receive(&mut session);
     assert_eq!(closed.phase, ApplicationPumpPhase::Closed);
+    assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
+    assert!(closed.cleanup_completed);
     assert!(closed.frame.unwrap().is_none());
     drop(session);
     assert_eq!(peer.finish(), (2, true));
@@ -96,6 +107,8 @@ fn window_signature_drift_fails_before_connecting_or_opening() {
         source.replace("height i64", "fps i64"),
         source.replace("kind i64", "kind bool"),
         source.replace("code i64", "value i64"),
+        source.replace("reason i64", "cause i64"),
+        source.replace("function-param close reason i64 value reason\n", ""),
     ] {
         let mut session = WindowSession::spawn(
             source,
@@ -130,6 +143,7 @@ fn multiple_presentations_reject_before_provider_success() {
     let reply = receive(&mut session);
     assert_eq!(reply.phase, ApplicationPumpPhase::Stopped);
     assert!(reply.frame.unwrap_err().contains("more than one frame"));
+    assert!(!reply.cleanup_completed);
     assert!(session.close().is_err());
     drop(session);
     assert_eq!(peer.finish(), (1, false));
@@ -156,10 +170,140 @@ fn close_presentation_is_rejected_before_finish_acknowledgement() {
     session.close().unwrap();
     let reply = receive(&mut session);
     assert_eq!(reply.phase, ApplicationPumpPhase::Stopped);
+    assert!(!reply.cleanup_completed);
     assert!(reply
         .frame
         .unwrap_err()
         .contains("close callback must not present"));
     drop(session);
     assert_eq!(peer.finish(), (1, false));
+}
+
+fn state_count(reply: &WindowSessionReply) -> i64 {
+    let Some(Value::Struct(state)) = &reply.state else {
+        panic!("missing Nuis state")
+    };
+    let [(_, Value::Int(count))] = state.fields.as_slice() else {
+        panic!("missing count")
+    };
+    *count
+}
+
+#[test]
+fn provider_and_dispatch_budget_failures_reach_nuis_close_without_becoming_success() {
+    for (response, events) in [(Reply::RejectedFrame, 0), (Reply::Good, 256)] {
+        let source = source();
+        let peer = Peer::start_source(response, source.clone(), None);
+        let mut session = WindowSession::spawn(
+            source,
+            ApplicationProviderSource::Ipc(&peer.path),
+            "ui".to_owned(),
+            640,
+            400,
+        )
+        .unwrap();
+        receive(&mut session).frame.unwrap();
+        for _ in 0..events {
+            session.event(0, 0).unwrap();
+            receive(&mut session).frame.unwrap();
+        }
+        session.event(0, 0).unwrap();
+        let failed = receive(&mut session);
+        assert_eq!(failed.phase, ApplicationPumpPhase::Faulted);
+        assert!(failed.frame.is_err());
+        assert_eq!(
+            state_count(&failed),
+            640,
+            "failed event did not publish replacement state"
+        );
+        assert!(session.event(0, 0).is_err());
+        session.close().unwrap();
+        assert_eq!(
+            session.close_reason(),
+            Some(ApplicationCloseReason::EventFailed)
+        );
+        let closed = receive(&mut session);
+        assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+        assert!(closed.cleanup_completed);
+        assert_eq!(
+            state_count(&closed),
+            641,
+            "Nuis close consumed reason=1 on the old state"
+        );
+        assert!(closed
+            .frame
+            .unwrap_err()
+            .contains("did not complete successfully"));
+        assert!(session.close().is_err());
+        drop(session);
+        assert_eq!(peer.finish(), (if events == 0 { 1 } else { events }, false));
+    }
+}
+
+#[test]
+fn host_failure_is_latched_before_cleanup_and_busy_close_does_not_poison_state() {
+    for failed in [false, true] {
+        let source = source();
+        let peer = Peer::start_source(Reply::Good, source.clone(), None);
+        let mut session = WindowSession::spawn(
+            source,
+            ApplicationProviderSource::Ipc(&peer.path),
+            "ui".to_owned(),
+            640,
+            400,
+        )
+        .unwrap();
+        assert!(session
+            .close_with_reason(ApplicationCloseReason::HostFailed)
+            .is_err());
+        assert_eq!(session.close_reason(), None);
+        receive(&mut session).frame.unwrap();
+        let reason = if failed {
+            ApplicationCloseReason::HostFailed
+        } else {
+            ApplicationCloseReason::Requested
+        };
+        session.close_with_reason(reason).unwrap();
+        let closed = receive(&mut session);
+        assert_eq!(closed.close_reason, Some(reason));
+        assert!(closed.cleanup_completed);
+        assert_eq!(state_count(&closed), 640 + reason.code());
+        assert_eq!(closed.frame.is_err(), failed);
+        assert_eq!(
+            closed.phase,
+            if failed {
+                ApplicationPumpPhase::Stopped
+            } else {
+                ApplicationPumpPhase::Closed
+            }
+        );
+        drop(session);
+        assert_eq!(peer.finish(), (0, !failed));
+    }
+}
+
+#[test]
+fn late_finish_failure_preserves_cleanup_without_repeating_or_certifying_it() {
+    let source = source();
+    let peer = Peer::start_source(Reply::BadClose, source.clone(), None);
+    let mut session = WindowSession::spawn(
+        source,
+        ApplicationProviderSource::Ipc(&peer.path),
+        "ui".to_owned(),
+        640,
+        400,
+    )
+    .unwrap();
+    receive(&mut session).frame.unwrap();
+    session.close().unwrap();
+    let closed = receive(&mut session);
+    assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
+    assert!(closed.cleanup_completed);
+    assert_eq!(state_count(&closed), 640);
+    assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+    assert!(closed.frame.is_err());
+    assert!(session.close().is_err());
+    assert!(session.event(0, 0).is_err());
+    drop(session);
+    assert_eq!(peer.finish(), (0, true));
 }

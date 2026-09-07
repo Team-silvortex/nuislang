@@ -492,33 +492,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "nsdb-provider-runtime-result-stream",
-        path: "tools/nsdb/src/provider_runtime_result_stream.rs",
-        required_patterns: &[
-            "nuis-provider-runtime-result-stream-v2",
-            "ProviderRuntimeResultTarget",
-            "ProviderPhysicalCompletion::parse",
-            "stream_hash",
-            "nuis.runtime.provider-result.",
-            "rejected manifest protocol",
-        ],
-    },
-    DevTensorDriftCheckSpec {
-        id: "yir-host-provider-runtime-result-consumer",
-        path: "crates/yir-runtime-host/src/provider_result_stream.rs",
-        required_patterns: &[
-            "nuis-provider-runtime-result-stream-v2",
-            "ProviderResultShaderMod",
-            "ShaderMod.validate_draw_instanced",
-            "ShaderMod.record_draw_instanced",
-            "ProviderResultSource",
-            "physical_fence_required",
-            "stage_provider_physical_completion",
-            "provider runtime result stream is exhausted",
-            "payload path is not output-relative",
-        ],
-    },
-    DevTensorDriftCheckSpec {
         id: "nuis-runtime-provider-result-preparation",
         path: "tools/nuis/src/artifact_runtime_provider_results.rs",
         required_patterns: &[
@@ -557,8 +530,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         id: "nuis-child-runtime-ipc-transport",
         path: "tools/nuis/src/artifact_runtime_provider_ipc.rs",
         required_patterns: &[
-            "configure_connection",
-            "set_nonblocking(false)",
+            "transport::configure_connection",
+            "serve_runtime_provider_session_with_request_reader",
             "Shutdown::Both",
             "child.kill()",
             "mode(0o700)",

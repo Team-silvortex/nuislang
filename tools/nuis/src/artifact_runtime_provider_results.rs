@@ -8,6 +8,12 @@ use std::{
 #[path = "artifact_runtime_provider_ipc.rs"]
 mod ipc;
 
+#[cfg(all(target_os = "macos", test))]
+pub(crate) use ipc::transport;
+
+#[cfg(all(target_os = "macos", test))]
+pub(crate) use ipc::run_command_with_request_reader;
+
 pub(crate) struct PreparedRuntimeProviderResults {
     pub(crate) stream_path: PathBuf,
     pub(crate) source_yir_path: PathBuf,

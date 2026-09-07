@@ -23,7 +23,7 @@ use std::{
     path::Path,
 };
 use yir_core::provider_runtime_ipc::{
-    DispatchArguments, DispatchFrame, DispatchTarget, Message, MAX_DISPATCHES, MAX_PAYLOAD_BYTES,
+    DispatchArguments, DispatchFrame, DispatchTarget, Message, ReplayBudget, MAX_DISPATCHES,
 };
 
 /// Serve one bounded lifecycle. Device work starts only after a validated Dispatch message.
@@ -31,10 +31,22 @@ pub fn serve_runtime_provider_session(
     output_dir: &Path,
     stream: &mut (impl Read + Write),
 ) -> Result<usize, String> {
+    serve_runtime_provider_session_with_request_reader(output_dir, stream, Message::read_from)
+}
+
+/// Supply transport-specific request waiting without changing dispatch admission,
+/// session accounting or close handling. A reader error terminates the lifecycle;
+/// the reader must not retry a partially consumed message or reconnect the peer.
+pub fn serve_runtime_provider_session_with_request_reader<S: Read + Write>(
+    output_dir: &Path,
+    stream: &mut S,
+    read_request: impl FnMut(&mut S) -> Result<Message, String>,
+) -> Result<usize, String> {
     let (record, target, adapter) = admit_target(output_dir)?;
+    let payload_bytes = admitted_payload_bytes(&record, &target)?;
     Message::Hello(target.clone()).write_to(stream)?;
     let mut session = ProviderRuntimeDispatchSession::open(output_dir);
-    let execution = dispatch_loop(stream, &target, |arguments| {
+    let execution = dispatch_loop(stream, &target, payload_bytes, read_request, |arguments| {
         session.execute_graph(output_dir, &record, &adapter, Some((&target, arguments)))
     });
     let close = session.close();
@@ -111,19 +123,6 @@ fn admit_target(
     {
         return Err("runtime IPC registered adapter identity or capability drift".to_owned());
     }
-    // Bound replay storage before any device request is admitted.
-    let collection = provider_request_collection_from_evidence(&record.input_evidence)
-        .ok_or("runtime IPC request collection is invalid")?;
-    for request in &collection.requests {
-        if request.runtime_result_binding.is_some()
-            && request
-                .output_bindings
-                .iter()
-                .any(|binding| binding.byte_length == 0 || binding.byte_length > MAX_PAYLOAD_BYTES)
-        {
-            return Err("runtime IPC bounded replay payload budget exceeded".to_owned());
-        }
-    }
     Ok((
         record,
         DispatchTarget {
@@ -137,17 +136,56 @@ fn admit_target(
     ))
 }
 
-fn dispatch_loop(
-    stream: &mut (impl Read + Write),
+fn admitted_payload_bytes(
+    record: &NsdbDeviceProviderSampleRecordInfo,
     target: &DispatchTarget,
+) -> Result<usize, String> {
+    let collection = provider_request_collection_from_evidence(&record.input_evidence)
+        .ok_or("runtime IPC request collection is invalid")?;
+    let mut payload_bytes = None;
+    for request in collection.requests {
+        if request
+            .runtime_result_binding
+            .as_ref()
+            .is_some_and(|binding| {
+                binding.source_yir_fnv1a64 == target.source_yir_fnv1a64
+                    && binding.module == target.module
+                    && binding.instruction == target.instruction
+                    && binding.node == target.node
+                    && binding.resource == target.resource
+            })
+        {
+            // from_execution binds the first declared output, not an extent
+            // chosen by application arguments or a returned device payload.
+            for output in &request.output_bindings {
+                ReplayBudget::default().reserve(output.byte_length)?;
+            }
+            let bytes = request
+                .output_bindings
+                .first()
+                .ok_or("runtime IPC registered result has no output")?
+                .byte_length;
+            if payload_bytes.replace(bytes).is_some() {
+                return Err("runtime IPC registered result extent is ambiguous".to_owned());
+            }
+        }
+    }
+    payload_bytes.ok_or_else(|| "runtime IPC registered result extent is missing".to_owned())
+}
+
+fn dispatch_loop<S: Read + Write>(
+    stream: &mut S,
+    target: &DispatchTarget,
+    payload_bytes: usize,
+    mut read_request: impl FnMut(&mut S) -> Result<Message, String>,
     mut execute: impl FnMut(&DispatchArguments) -> Result<NativeProviderOutputs, String>,
 ) -> Result<(usize, NativeProviderOutputs), String> {
     let mut count = 0;
     let mut retained = NativeProviderOutputs::empty();
     let mut observations = Vec::new();
-    let mut replay_bytes = 0usize;
+    let mut replay_budget = ReplayBudget::default();
     loop {
-        match Message::read_from(stream)? {
+        match read_request(stream)? {
             Message::Dispatch {
                 sequence,
                 target: requested,
@@ -156,7 +194,8 @@ fn dispatch_loop(
                 if requested != *target || sequence != count || count >= MAX_DISPATCHES {
                     return Err("runtime IPC request target or sequence mismatch".to_owned());
                 }
-                let mut outputs = execute(&arguments)?;
+                let mut outputs =
+                    execute_reserved(&mut replay_budget, payload_bytes, || execute(&arguments))?;
                 let [result] = outputs.runtime_results.as_slice() else {
                     return Err("runtime IPC graph must return exactly one bound result".to_owned());
                 };
@@ -173,10 +212,6 @@ fn dispatch_loop(
                     count,
                     &outputs.native_outputs,
                 )?);
-                replay_bytes = replay_bytes
-                    .checked_add(result.payload.len())
-                    .filter(|bytes| *bytes <= 64 * 1024 * 1024)
-                    .ok_or("runtime IPC replay storage budget exceeded")?;
                 let reply = Message::Frame(DispatchFrame {
                     sequence,
                     arguments: result.arguments.clone(),
@@ -210,6 +245,22 @@ fn dispatch_loop(
             _ => return Err("runtime IPC expected ordered dispatch or matching finish".to_owned()),
         }
     }
+}
+
+fn execute_reserved(
+    budget: &mut ReplayBudget,
+    payload_bytes: usize,
+    execute: impl FnOnce() -> Result<NativeProviderOutputs, String>,
+) -> Result<NativeProviderOutputs, String> {
+    budget.reserve(payload_bytes)?;
+    let outputs = execute()?;
+    let [result] = outputs.runtime_results.as_slice() else {
+        return Err("runtime IPC graph must return exactly one bound result".to_owned());
+    };
+    if result.payload.len() != payload_bytes {
+        return Err("runtime IPC result differs from its reserved output extent".to_owned());
+    }
+    Ok(outputs)
 }
 
 fn persist_outputs(

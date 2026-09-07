@@ -100,8 +100,9 @@ mod cpu Main {
     return render_showcase_frame(state, frame_index);
   }
 
-  fn window_close(state: NovaAppState) -> NovaAppState {
-    return NovaAppRuntime.close(state, state.timeline_tick + 1);
+  fn window_close(state: NovaAppState, reason: i64) -> NovaAppState {
+    let cause: NovaCloseReason = NovaAppRuntime.close_reason(reason);
+    return NovaAppRuntime.close_with_reason(state, state.timeline_tick + 1, cause);
   }
 
   fn main() {

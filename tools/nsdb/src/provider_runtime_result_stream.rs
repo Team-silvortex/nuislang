@@ -7,13 +7,13 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use yir_core::provider_runtime_ipc::{ReplayBudget, MAX_DISPATCHES, MAX_REPLAY_MANIFEST_BYTES};
 
 pub const PROVIDER_RUNTIME_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v2";
 pub const PROVIDER_RUNTIME_RESULT_STREAM_FILE_NAME: &str =
     "nuis.runtime.provider-result-stream.toml";
 const PAYLOAD_PREFIX: &str = "nuis.runtime.provider-result.";
 const PAYLOAD_SUFFIX: &str = ".bin";
-const MAX_RUNTIME_RESULTS: usize = 256;
 
 pub fn provider_runtime_result_stream_path(output_dir: &Path) -> PathBuf {
     output_dir.join(PROVIDER_RUNTIME_RESULT_STREAM_FILE_NAME)
@@ -88,7 +88,7 @@ pub fn provider_runtime_result_targets(
             }
         }
     }
-    if targets.len() > MAX_RUNTIME_RESULTS {
+    if targets.len() > MAX_DISPATCHES {
         return Err("provider runtime result target count exceeds protocol limit".to_owned());
     }
     Ok(targets.into_iter().collect())
@@ -168,7 +168,7 @@ pub(crate) fn persist_provider_runtime_results(
     output_dir: &Path,
     results: &[ProviderRuntimeResult],
 ) -> Result<PathBuf, String> {
-    if results.is_empty() || results.len() > MAX_RUNTIME_RESULTS {
+    if results.is_empty() || results.len() > MAX_DISPATCHES {
         return Err("provider runtime result stream count is invalid".to_owned());
     }
     let source_yir_fnv1a64 = &results[0].source_yir_fnv1a64;
@@ -178,16 +178,13 @@ pub(crate) fn persist_provider_runtime_results(
     {
         return Err("provider runtime result stream mixes source YIR identities".to_owned());
     }
-    clear_previous_stream(output_dir)?;
-
+    let mut budget = ReplayBudget::default();
     let mut records = Vec::with_capacity(results.len());
     for (index, result) in results.iter().enumerate() {
+        budget.reserve(result.payload.len())?;
         validate_result(result)?;
         let payload_path = format!("{PAYLOAD_PREFIX}{index:04}{PAYLOAD_SUFFIX}");
         let payload_hash = fnv1a64_hex(&result.payload);
-        fs::write(output_dir.join(&payload_path), &result.payload).map_err(|error| {
-            format!("failed to write provider runtime result `{payload_path}`: {error}")
-        })?;
         records.push(RuntimeResultRecord {
             index,
             result,
@@ -231,6 +228,18 @@ pub(crate) fn persist_provider_runtime_results(
             record.payload_hash,
             escape_toml(&result.completion_wire),
         ));
+    }
+    if manifest.len() > MAX_REPLAY_MANIFEST_BYTES {
+        return Err("provider replay manifest byte budget exceeded".to_owned());
+    }
+    // Invalid replacement evidence must not erase a previous valid stream.
+    clear_previous_stream(output_dir)?;
+    for record in &records {
+        fs::write(
+            output_dir.join(&record.payload_path),
+            &record.result.payload,
+        )
+        .map_err(|error| format!("failed to write provider runtime result payload: {error}"))?;
     }
     let path = provider_runtime_result_stream_path(output_dir);
     fs::write(&path, manifest)
@@ -283,16 +292,22 @@ fn stream_hash(source_yir_fnv1a64: &str, records: &[RuntimeResultRecord<'_>]) ->
 
 fn validate_result(result: &ProviderRuntimeResult) -> Result<(), String> {
     result.arguments.to_wire()?;
+    let strings = [
+        &result.provider_family,
+        &result.request_id,
+        &result.module,
+        &result.instruction,
+        &result.node,
+        &result.resource,
+        &result.element_type,
+        &result.layout,
+    ];
     if !valid_hash(&result.source_yir_fnv1a64)
-        || result.provider_family.is_empty()
-        || result.request_id.is_empty()
-        || result.module.is_empty()
-        || result.instruction.is_empty()
-        || result.node.is_empty()
-        || result.resource.is_empty()
-        || result.element_type.is_empty()
-        || result.layout.is_empty()
+        || strings.iter().any(|value| {
+            value.is_empty() || value.len() > 256 || value.contains(['\n', '\r', '\0'])
+        })
         || result.shape.is_empty()
+        || result.shape.len() > 8
         || result.shape.contains(&0)
         || result.row_stride_bytes == 0
         || result.payload.is_empty()

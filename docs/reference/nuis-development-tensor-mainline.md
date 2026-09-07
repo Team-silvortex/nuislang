@@ -64,8 +64,8 @@ artifact. Existing Metal, replay, completion and GLM evidence stays intact.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/70 | Explicit compiled window route with Nuis state, queued logical input, exact Metal frames and confirmed close; harden sustained idle/budget handling. |
-| `application-session/lifecycle-failure-resource-safety` | early/0 | Cancellation, backpressure, failure and in-flight close account for owned resources. |
+| `ns-nova/persistent-application-session` | active/82 | Compiled window v2, typed close intent, failure-preserving Nuis cleanup and bounded supervisor grace verified; structured cause details, recovery and resource cancellation remain open. |
+| `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
 | `ns-nova/sustained-runtime-performance` | early/0 | Repeatable cold/warm and sustained measurements with semantic and resource checks. |
@@ -104,8 +104,30 @@ that handle inside the compiled AppKit process, bypassing native main and the
 whole-module timer. Its queued logical input regression checks initial redraw,
 space/Unicode input, two exact Metal images, one worker and confirmed close; the
 production `run-artifact` frontdoor is included. The default legacy preview is
-unchanged. Sustained idle/dispatch/replay budgets, cancellation and resource
-retirement remain open; `active/70` is not an engine-completion percentage.
+unchanged. Detailed dispatch/replay failure causes, recovery, cancellation
+and resource retirement remain open. Shared YIR budget accounting now rejects replay exhaustion
+before device effects, bounds manifest/payload reads before allocation, and
+preserves old replay evidence when a replacement fails validation. Tests cover
+exact limits and sparse oversized files without allocating full replay payloads.
+Supervised Unix IPC now separates idle waiting from a whole-request deadline:
+the first byte starts one 120-second budget for prefix/header/uploads, while
+quiet intervals do not reconnect, advance clocks or consume dispatches. EOF and
+supervisor shutdown wake the wait. A shortened-deadline live Metal test crosses
+idle gaps before independent draws and finish with one worker, exact pixels and
+monotonic clocks; transport tests reject partial-message stalls. The v3 wire is
+unchanged.
+
+[Window profile v2](nuis-yir-window-session-v2.md) now carries a shared requested,
+event-failed or host-failed close intent into Nuis. Std cleanup preserves failed
+status and accepted frame identity. The pump separately reports cleanup completion
+and lifecycle success; host failure is latched before cleanup, and late Finish
+failure never repeats it. A compiled-window injected provider failure completes
+one Nuis cleanup while retaining failure and previous replay files. Protocol tests
+also reject the 257th dispatch without losing the last state. The supervisor
+allows a latched five-second cleanup grace; a stricter total child deadline still
+wins. This is not recovery, resource retirement or a live full-budget soak test.
+`active/82` is not an engine-completion percentage; long-duration soak, fine-grained
+failure details and transactional replay publication remain unverified or open.
 
 ## Validation And Scope
 

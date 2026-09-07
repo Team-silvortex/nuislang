@@ -129,6 +129,43 @@ fn compiled_registration_roundtrips_and_rejects_signature_drift() {
 }
 
 #[test]
+fn compiled_nuis_close_reason_sets_and_preserves_failure_without_frame_replay() {
+    let module = image_module();
+    let registry = yir_verify::default_registry();
+    let legacy_close = &yir_core::registered_application_session(module, "image")
+        .unwrap()
+        .close;
+    let window = yir_core::registered_application_session(module, "window").unwrap();
+    for reason in [0, 1, 2, -1, 99] {
+        // Reference-only helper composition checks std failure-state semantics;
+        // the WindowSession transport tests separately enforce failure admission.
+        let (mut session, _) = ApplicationSession::open(
+            module,
+            &registry,
+            yir_runtime_host::ApplicationSessionEntries {
+                open: &window.open,
+                event: &window.close,
+                close: legacy_close,
+                state_parameter: "state",
+            },
+            vec![Value::Int(640), Value::Int(400)],
+        )
+        .unwrap();
+        let trace = session.event(vec![Value::Int(reason)]).unwrap();
+        let status = if reason == 0 { 2 } else { 4 };
+        assert_eq!(field(session.state(), "status"), status);
+        assert_eq!(field(session.state(), "frame_index"), 0);
+        assert_eq!(field(session.state(), "last_completion_root"), 0);
+        assert!(trace.presented_frames.is_empty());
+        assert!(trace.provider_completion_witnesses.is_empty());
+        // A subsequent ordinary std cleanup must not clear an application failure.
+        let trace = session.close(vec![Value::Int(10)]).unwrap().unwrap();
+        assert_eq!(field(session.state(), "status"), status);
+        assert!(trace.presented_frames.is_empty());
+    }
+}
+
+#[test]
 fn registration_preserves_uncalled_helpers_as_host_roots() {
     use std::{
         fs,

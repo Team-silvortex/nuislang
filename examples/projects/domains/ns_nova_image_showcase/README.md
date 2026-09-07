@@ -79,11 +79,27 @@ Nuis close and the provider acknowledgement. Scripted input traverses the actual
 AppKit event queue as logical events, not synthesized physical keys. No application
 names, fields or image policy are embedded in the generic host adapter.
 Without `--window-session`, the old preview route is unchanged. This first window
-profile still has the provider's 256-dispatch, 64 MiB replay and 120-second I/O/idle
-limits; it does not support general IME, pointer input or arbitrary-length sessions.
+profile still has the provider's 256-dispatch and 64 MiB replay limits. It can wait
+idle between inputs without reconnecting or resetting clocks/budgets; an incoming
+request has a 120-second deadline from its first byte, with separate reply/write
+timeouts. It does not support general IME, pointer input or unlimited dispatches.
+Replay capacity is reserved from the registered output extent before GPU work.
+Loading checks the complete 64 MiB aggregate and bounded files before consuming
+pixels; invalid replacement evidence no longer erases a prior valid replay.
+The live session test includes idle gaps longer than an injected short request
+deadline, retaining the same Metal worker and clock lineage. This is not yet a
+long-duration window soak test or peer-failure recovery mechanism.
+Window profile v2 calls `window_close(state, reason: i64)`. Nuis decodes the
+requested/event-failed/host-failed cause and marks failed status without replaying
+a frame or clearing an earlier failure. Successful cleanup is not successful
+execution: the host reports both separately, and late Finish failure still fails
+the run without repeating close. Provider failure gets a five-second supervised
+cleanup grace, not a retry or fresh budget. Rebuild older v1 bundles and close
+helpers together. The compiled-window test injects a provider reader failure and
+verifies completed cleanup, failed execution and unchanged prior replay evidence.
 The bare aggregate-call return guard limitation remains; the event helper uses an
 equivalent supported leading guard. See the
-[window contract](../../../../docs/reference/nuis-yir-window-session-v1.md).
+[window contract](../../../../docs/reference/nuis-yir-window-session-v2.md).
 
 This is a **native host executable with an embedded YIR lifecycle runtime**, not
 fully native CPU lowering, a self-contained Nsld image or a stable interactive app.

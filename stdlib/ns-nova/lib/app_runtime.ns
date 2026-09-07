@@ -1,5 +1,8 @@
 /// Provider-neutral NS Nova application and frame lifecycle.
 mod cpu NovaAppRuntime {
+  /// Host close intent, not proof that the provider completed successfully.
+  pub enum NovaCloseReason { Requested, EventFailed, HostFailed, Unknown }
+
   pub struct NovaAppState {
     pub status: i64,
     pub width: i64,
@@ -50,6 +53,25 @@ mod cpu NovaAppRuntime {
 
   pub fn status_invalid() -> i64 {
     return 3;
+  }
+
+  pub fn status_failed() -> i64 {
+    return 4;
+  }
+
+  /// nuis-yir-application-close-reason-v1; unknown codes fail closed.
+  pub fn close_reason(code: i64) -> NovaCloseReason {
+    if code == 0 { return NovaCloseReason.Requested; }
+    if code == 1 { return NovaCloseReason.EventFailed; }
+    if code == 2 { return NovaCloseReason.HostFailed; }
+    return NovaCloseReason.Unknown;
+  }
+
+  pub fn close_requested(reason: NovaCloseReason) -> bool {
+    match reason {
+      NovaCloseReason.Requested => { return true; }
+      _ => { return false; }
+    }
   }
 
   pub fn phase_begun() -> i64 {
@@ -221,8 +243,18 @@ mod cpu NovaAppRuntime {
   }
 
   pub fn close(state: NovaAppState, observed_tick: i64) -> NovaAppState {
+    return close_with_reason(state, observed_tick, NovaCloseReason.Requested);
+  }
+
+  /// Cleanup preserves frame/completion identity and never clears failure.
+  pub fn close_with_reason(
+    state: NovaAppState,
+    observed_tick: i64,
+    reason: NovaCloseReason
+  ) -> NovaAppState {
+    let stopped: bool = close_requested(reason) && state.status != status_failed();
     return NovaAppState {
-      status: status_stopped(),
+      status: if stopped { status_stopped() } else { status_failed() },
       width: state.width,
       height: state.height,
       target_fps: state.target_fps,

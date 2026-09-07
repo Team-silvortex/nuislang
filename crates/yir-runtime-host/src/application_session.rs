@@ -73,6 +73,14 @@ impl<'a> ApplicationSession<'a> {
         self.phase
     }
 
+    pub(crate) fn record_host_failure(&mut self) {
+        if self.phase != ApplicationSessionPhase::Closed {
+            self.phase = ApplicationSessionPhase::Faulted;
+            self.event_error
+                .get_or_insert_with(|| "application host requested failed cleanup".to_owned());
+        }
+    }
+
     /// Cleanup may succeed after a failed event, but that is not a successful
     /// application lifecycle and must not authorize provider evidence persistence.
     pub fn completion_status(&self) -> Result<(), String> {

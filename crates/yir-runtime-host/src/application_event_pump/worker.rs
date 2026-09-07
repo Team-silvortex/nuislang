@@ -51,6 +51,7 @@ pub(super) fn run(
 ) {
     let mut operation = ApplicationPumpOperation::Open;
     let mut final_state = None;
+    let mut cleanup_completed = false;
     let result = with_registered_provider_application_session_checked(
         &source,
         provider.borrowed(),
@@ -71,6 +72,7 @@ pub(super) fn run(
                         operation,
                         phase,
                         state: Some(session.state().clone()),
+                        cleanup_completed: false,
                         trace,
                     })
                     .map_err(|_| "application event pump reply receiver disconnected".to_owned())
@@ -79,6 +81,9 @@ pub(super) fn run(
             send(operation, Ok(opened), session)?;
             while let Ok(command) = requests.recv() {
                 operation = command.operation;
+                if command.failed_close {
+                    session.record_host_failure();
+                }
                 let trace = match operation {
                     ApplicationPumpOperation::Event => session.event(command.arguments),
                     ApplicationPumpOperation::Close => {
@@ -96,6 +101,7 @@ pub(super) fn run(
                 }
                 if session.phase() == ApplicationSessionPhase::Closed {
                     final_state = Some(session.state().clone());
+                    cleanup_completed = trace.is_ok();
                     // The scoped API gates this result on completion_status AND
                     // provider Finish/Closed (or complete replay consumption).
                     return trace;
@@ -114,6 +120,7 @@ pub(super) fn run(
         operation,
         phase,
         state: final_state,
+        cleanup_completed,
         trace: result,
     });
 }

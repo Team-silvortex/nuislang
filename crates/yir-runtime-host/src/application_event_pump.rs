@@ -42,12 +42,16 @@ pub struct ApplicationPumpReply {
     pub operation: ApplicationPumpOperation,
     pub phase: ApplicationPumpPhase,
     pub state: Option<Value>,
+    /// A validated close callback returned; provider/lifecycle completion can
+    /// still fail. This flag never authorizes success or retrying cleanup.
+    pub cleanup_completed: bool,
     pub trace: Result<ExecutionTrace, String>,
 }
 
 struct Command {
     operation: ApplicationPumpOperation,
     arguments: Vec<Value>,
+    failed_close: bool,
 }
 
 /// Owned host handle with nonblocking admission and polling. Module, registry,
@@ -121,11 +125,15 @@ impl ApplicationEventPump {
     /// Admission is not execution success. Consume the matching reply before
     /// issuing another event or close; busy requests are never queued or retried.
     pub fn event(&mut self, arguments: Vec<Value>) -> Result<(), String> {
-        self.submit(ApplicationPumpOperation::Event, arguments)
+        self.submit(ApplicationPumpOperation::Event, arguments, false)
     }
 
     pub fn close(&mut self, arguments: Vec<Value>) -> Result<(), String> {
-        self.submit(ApplicationPumpOperation::Close, arguments)
+        self.submit(ApplicationPumpOperation::Close, arguments, false)
+    }
+
+    pub(crate) fn close_after_failure(&mut self, arguments: Vec<Value>) -> Result<(), String> {
+        self.submit(ApplicationPumpOperation::Close, arguments, true)
     }
 
     pub fn poll(&mut self) -> Result<Option<ApplicationPumpReply>, String> {
@@ -166,6 +174,7 @@ impl ApplicationEventPump {
         &mut self,
         operation: ApplicationPumpOperation,
         arguments: Vec<Value>,
+        failed_close: bool,
     ) -> Result<(), String> {
         if self.pending.is_some() {
             return Err("application event pump is busy; consume the pending reply".to_owned());
@@ -182,6 +191,7 @@ impl ApplicationEventPump {
         let command = Command {
             operation,
             arguments,
+            failed_close,
         };
         match self.commands.as_ref().unwrap().try_send(command) {
             Ok(()) => {

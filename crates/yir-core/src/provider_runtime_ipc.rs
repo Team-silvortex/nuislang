@@ -3,6 +3,9 @@ use std::io::{Read, Write};
 #[path = "provider_runtime_arguments.rs"]
 mod arguments;
 pub use arguments::{DispatchArguments, DispatchResource, DispatchUpload, MAX_UPLOAD_BYTES};
+#[path = "provider_runtime_budget.rs"]
+mod budget;
+pub use budget::{ReplayBudget, MAX_REPLAY_BYTES, MAX_REPLAY_MANIFEST_BYTES};
 
 pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v3";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";

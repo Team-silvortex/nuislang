@@ -178,6 +178,13 @@ close attempt is still possible. Terminal admission/close/transport failure is
 the scoped lifecycle and provider finish checks, including complete replay
 consumption. No cleanup success can hide an earlier event failure.
 
+Replies also expose `cleanup_completed`: the close callback returned a state and
+passed host trace checks. This is independent of lifecycle success and resource
+retirement. A failed event or late provider Finish can yield a terminal `Stopped`
+reply with this flag true. Failed close callbacks or invalid close presentations
+leave it false. The window profile can latch a host failure before Nuis cleanup;
+that failure likewise prevents successful Finish, even if the callback succeeds.
+
 `abort` and dropping the handle disconnect the channels without joining the
 worker or implicitly executing Nuis close. An idle worker wakes and drops its
 scope without successful provider finish. An already admitted callback may still
@@ -192,8 +199,43 @@ recoverable input errors, latched callback failures, failed close acknowledgemen
 idle/in-flight abandonment and the unchanged per-session dispatch limit. The live
 Metal regression now holds this owned handle between deliveries, verifies both
 images and replays them through another owned pump. An explicit registered
-[window mode](nuis-yir-window-session-v1.md) now uses this handle in the compiled
+[window mode](nuis-yir-window-session-v2.md) now uses this handle in the compiled
 AppKit process; the no-option legacy preview timer remains unchanged.
+
+### Idle And Request Deadlines
+
+The supervised Unix provider now waits for a request's first byte without an
+idle deadline. A quiet application no longer fails simply because 120 seconds
+pass between events. This is the same connection, application scope, worker,
+clock frontier and replay budget: idle waiting issues no heartbeat, device work
+or synthetic Nuis event. The IPC v3 wire format is unchanged.
+
+After the first byte, the complete incoming request, including length prefix,
+header and uploads, shares one 120-second deadline. Partial progress cannot
+restart that deadline. A malformed, truncated or timed-out request terminates
+the provider lifecycle rather than retrying a partially consumed stream. Existing
+reply/write and device-operation timeouts remain separate; this is not arbitrary
+callback preemption. Nsdb accepts a transport-specific request reader while
+retaining ownership of dispatch admission, accounting and close.
+
+EOF or supervisor socket shutdown wakes idle waiting without a success
+acknowledgement. Explicit child wall-clock limits still apply to scripted runs;
+interactive runs do not gain an implicit lifetime limit. There is no automatic
+reconnect or proactive idle health probe. If the provider itself fails, recovery
+is still a separate protocol, not authorization to restart clocks or budgets.
+
+On provider-worker failure, the launcher allows at most five seconds for the
+child to observe the error and perform local Nuis cleanup before kill/reap. An
+explicit total child deadline is not extended, and successful child cleanup or
+zero exit cannot replace the provider error with success. This bounded grace is
+not reconnection, resource retirement or arbitrary callback cancellation.
+
+Fast transport tests cover repeated idle waits, buffered requests, incomplete
+prefix/header/uploads, cumulative deadlines, EOF and supervisor shutdown. The
+real Metal owned-session regression injects a one-second request deadline and
+waits 1.5 seconds before both draws and close, verifying exact pixels, one worker,
+monotonic clocks and unchanged replay. This is shortened-deadline evidence, not a
+multi-hour window soak test.
 
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-runtime-host --test application_session -j 1
@@ -202,6 +244,8 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test ns_nova_applic
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib project::application_sessions -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-syntax --test application_sessions -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-core -p yir-exec -p yir-runtime-host --lib -j 1
+# Unix host transport: idle waits, partial-message deadlines and supervisor shutdown.
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis artifact_runtime_provider_results -j 1 -- --test-threads=1
 # Metal-capable macOS host; includes old compiled exports and the owned event pump.
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 NUIS_TEST_QUIET_SUCCESS_LOGS=1 cargo test -p nuis --bin nuis artifact_device_sample_shader_render -j 1 -- --test-threads=1
 ```
@@ -219,9 +263,17 @@ fallback policy. The carrier does not create a provider or choose a fallback.
 The inner scoped API is synchronous; the owned pump keeps it off the host event
 thread. Existing IPC limits remain: one registered target,
 256 dispatches, 64 MiB retained replay data and 120-second socket I/O timeouts.
+Incoming requests have the whole-message deadline described above, not an idle
+timeout between messages.
+Shared YIR budget accounting now reserves the registered extent before device
+execution. Replay readers validate the full declared aggregate before payload
+reads, bound each actual read and the 4 MiB manifest, and retain identity checks.
+Writers validate replacement evidence before removing the prior stream; this
+does not yet provide crash-atomic or disk-error-atomic publication.
 Those bounds are not a sustained interactive-window protocol. The lifecycle
 registration, owned event pump and explicit window startup/input/shutdown route
-now exist, but sustained idle/budget management and cancellation/resource retirement
+now exist, including same-connection idle waiting, but user-visible budget
+exhaustion, peer-failure recovery and cancellation/resource retirement
 still need integration. Do not simply reopen a scope
 on every timer tick or silently reset clocks/budgets. This must not introduce special function
 names or backend combinations into the compiler. Native CPU dispatch remains

@@ -1,19 +1,21 @@
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
-    fs,
     path::{Component, Path},
     sync::{Arc, Mutex},
 };
 
 use yir_core::{
-    provider_runtime_ipc::DispatchArguments, ExecutionState, FrameSurface, InstructionSemantics,
-    Node, ProviderCompletionRegistration, ProviderPhysicalCompletion, RegisteredMod, Resource,
-    Value,
+    provider_runtime_ipc::{
+        DispatchArguments, ReplayBudget, MAX_DISPATCHES, MAX_REPLAY_MANIFEST_BYTES,
+    },
+    ExecutionState, FrameSurface, InstructionSemantics, Node, ProviderCompletionRegistration,
+    ProviderPhysicalCompletion, RegisteredMod, Resource, Value,
 };
 
 pub const PROVIDER_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v2";
 pub const PROVIDER_RESULT_STREAM_ENV: &str = "NUIS_YIR_PROVIDER_RESULT_STREAM";
-const MAX_RUNTIME_RESULTS: usize = 256;
+#[path = "provider_replay_io.rs"]
+mod replay_io;
 
 pub(super) fn execute_with_provider_result_stream(
     module_source: &str,
@@ -155,23 +157,27 @@ impl ProviderResultSource {
 
 impl ProviderResultStream {
     fn load(manifest_path: &Path) -> Result<Self, String> {
-        let source = fs::read_to_string(manifest_path).map_err(|error| {
-            format!(
-                "failed to read provider runtime result stream `{}`: {error}",
-                manifest_path.display()
-            )
-        })?;
+        let source = String::from_utf8(replay_io::read_bounded(
+            manifest_path,
+            MAX_REPLAY_MANIFEST_BYTES,
+        )?)
+        .map_err(|_| "provider runtime result stream is not UTF-8".to_owned())?;
         let (header, frame_fields) = parse_sections(&source)?;
         require(&header, "schema", PROVIDER_RESULT_STREAM_CONTRACT)?;
         let source_yir_fnv1a64 = string_field(&header, "source_yir_fnv1a64")?;
         let frame_count = usize_field(&header, "frame_count")?;
         let claimed_stream_hash = string_field(&header, "stream_hash")?;
-        if !(1..=MAX_RUNTIME_RESULTS).contains(&frame_count)
+        if !(1..=MAX_DISPATCHES).contains(&frame_count)
             || frame_count != frame_fields.len()
             || !valid_hash(&source_yir_fnv1a64)
             || !valid_hash(&claimed_stream_hash)
         {
             return Err("provider runtime result stream header is invalid".to_owned());
+        }
+        // Validate the entire declared aggregate before opening any payload.
+        let mut budget = ReplayBudget::default();
+        for fields in &frame_fields {
+            budget.reserve(usize_field(fields, "payload_byte_length")?)?;
         }
         let root = manifest_path.parent().unwrap_or_else(|| Path::new("."));
         let frames = frame_fields
@@ -392,10 +398,8 @@ fn parse_frame(
     if !relative_file_name(&payload_path) {
         return Err("provider runtime result payload path is not output-relative".to_owned());
     }
-    let payload = fs::read(root.join(&payload_path)).map_err(|error| {
-        format!("failed to read provider runtime result `{payload_path}`: {error}")
-    })?;
     let payload_byte_length = usize_field(fields, "payload_byte_length")?;
+    let payload = replay_io::read_bounded(&root.join(&payload_path), payload_byte_length)?;
     let payload_hash = string_field(fields, "payload_hash")?;
     if payload.len() != payload_byte_length || fnv1a64_hex(&payload) != payload_hash {
         return Err(format!(
@@ -574,3 +578,7 @@ fn valid_hash(value: &str) -> bool {
 #[cfg(all(test, unix))]
 #[path = "provider_result_draw_tests.rs"]
 mod draw_tests;
+
+#[cfg(test)]
+#[path = "provider_replay_budget_tests.rs"]
+mod replay_budget_tests;

@@ -1,4 +1,6 @@
-use yir_core::{ApplicationSessionSignature, Value, YirFunctionParameter, YirModule};
+use yir_core::{
+    ApplicationCloseReason, ApplicationSessionSignature, Value, YirFunctionParameter, YirModule,
+};
 
 use crate::{
     ApplicationEventPump, ApplicationProviderSource, ApplicationPumpOperation, ApplicationPumpPhase,
@@ -7,17 +9,22 @@ use crate::{
 mod ffi;
 pub use ffi::*;
 
-pub const WINDOW_SESSION_CONTRACT: &str = "nuis-yir-window-session-v1";
+pub const WINDOW_SESSION_CONTRACT: &str = "nuis-yir-window-session-v2";
 
 /// Window-specific host adapter, not a YIR application or rendering policy.
 /// The registered Nuis helpers own configuration, image transitions and clocks.
 pub struct WindowSession {
     pump: ApplicationEventPump,
+    close_reason: Option<ApplicationCloseReason>,
+    cleanup_completed: bool,
 }
 
 pub struct WindowSessionReply {
     pub operation: ApplicationPumpOperation,
     pub phase: ApplicationPumpPhase,
+    pub state: Option<Value>,
+    pub close_reason: Option<ApplicationCloseReason>,
+    pub cleanup_completed: bool,
     pub frame: Result<Option<Vec<u8>>, String>,
 }
 
@@ -43,6 +50,8 @@ impl WindowSession {
                     trace: validate_window_trace,
                 },
             )?,
+            close_reason: None,
+            cleanup_completed: false,
         })
     }
 
@@ -66,13 +75,40 @@ impl WindowSession {
     }
 
     pub fn close(&mut self) -> Result<(), String> {
-        self.pump.close(vec![])
+        self.close_with_reason(ApplicationCloseReason::Requested)
+    }
+
+    pub fn close_reason(&self) -> Option<ApplicationCloseReason> {
+        self.close_reason
+    }
+
+    pub fn cleanup_completed(&self) -> bool {
+        self.cleanup_completed
+    }
+
+    /// Failed events dominate an ordinary host close request. Host failures are
+    /// latched in the worker before cleanup, so they cannot authorize Finish.
+    pub fn close_with_reason(&mut self, reason: ApplicationCloseReason) -> Result<(), String> {
+        let reason = if self.pump.phase() == ApplicationPumpPhase::Faulted {
+            ApplicationCloseReason::EventFailed
+        } else {
+            reason
+        };
+        let arguments = vec![Value::Int(reason.code())];
+        if reason.is_failure() {
+            self.pump.close_after_failure(arguments)?;
+        } else {
+            self.pump.close(arguments)?;
+        }
+        self.close_reason = Some(reason);
+        Ok(())
     }
 
     pub fn poll(&mut self) -> Result<Option<WindowSessionReply>, String> {
         let Some(reply) = self.pump.poll()? else {
             return Ok(None);
         };
+        self.cleanup_completed = reply.cleanup_completed;
         let frame = reply.trace.and_then(|trace| {
             if trace.presented_frames.is_empty() {
                 Ok(None)
@@ -93,6 +129,9 @@ impl WindowSession {
         Ok(Some(WindowSessionReply {
             operation: reply.operation,
             phase: self.phase(),
+            state: reply.state,
+            close_reason: self.close_reason,
+            cleanup_completed: self.cleanup_completed,
             frame,
         }))
     }
@@ -141,7 +180,7 @@ pub fn validate_window_session(module: &YirModule, id: &str) -> Result<(), Strin
             &signature.event.parameters[state_count..],
             &["kind", "code"][..],
         ),
-        (&signature.close.parameters[state_count..], &[][..]),
+        (&signature.close.parameters[state_count..], &["reason"][..]),
     ] {
         validate_parameters(parameters, names)?;
     }

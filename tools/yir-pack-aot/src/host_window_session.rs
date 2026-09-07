@@ -1,10 +1,13 @@
-pub(super) const CONTRACT: &str = "nuis-yir-window-session-v1";
+pub(super) const CONTRACT: &str = "nuis-yir-window-session-v2";
 
 pub(super) const SUPPORT: &str = r#"
 typedef struct NuisWindowSession NuisWindowSession;
 extern int32_t nuis_window_session_open(const unsigned char *, uintptr_t, const char *, int64_t, int64_t, NuisWindowSession **);
 extern int32_t nuis_window_session_event(NuisWindowSession *, int64_t, int64_t);
 extern int32_t nuis_window_session_close(NuisWindowSession *);
+extern int32_t nuis_window_session_close_with_reason(NuisWindowSession *, int64_t);
+extern int64_t nuis_window_session_close_reason(const NuisWindowSession *);
+extern int32_t nuis_window_session_cleanup_completed(const NuisWindowSession *);
 extern int32_t nuis_window_session_poll(NuisWindowSession *, NuisRenderedBuffer *, int32_t *);
 extern void nuis_window_session_free(NuisWindowSession **);
 
@@ -152,12 +155,15 @@ pub(super) const METHODS: &str = r#"
         NSData *data = [NSData dataWithBytes:buffer.ptr length:buffer.len];
         nuis_rendered_buffer_free(buffer.ptr, buffer.len);
         NSImage *image = nuisImageFromPpmData(data);
-        if (image == nil) { self.sessionTerminal = YES; [self failSession]; return; }
-        [self.imageView setImage:image];
-        fprintf(stderr, "nuis: window_session_presented\n");
+        if (image == nil) [self failSession];
+        else {
+            [self.imageView setImage:image];
+            fprintf(stderr, "nuis: window_session_presented\n");
+        }
     }
     if (phase == 3 || phase == 4) {
         self.sessionTerminal = YES;
+        fprintf(stderr, "nuis: window_session_cleanup_completed=%d\n", nuis_window_session_cleanup_completed(self.session));
         if (phase == 3 && status >= 0 && !self.sessionFailed) {
             gNuisWindowExitStatus = 0;
             fprintf(stderr, "nuis: window_session_closed\n");
@@ -169,10 +175,11 @@ pub(super) const METHODS: &str = r#"
     if (status < 0) [self failSession];
     if (self.sessionClosing) {
         if (!self.sessionCloseSubmitted) {
-            int close_status = nuis_window_session_close(self.session);
+            int close_status = nuis_window_session_close_with_reason(self.session, self.sessionFailed ? 2 : 0);
             if (close_status == 0) {
                 self.sessionCloseSubmitted = YES;
                 fprintf(stderr, "nuis: window_session_close_requested\n");
+                fprintf(stderr, "nuis: window_session_close_reason=%lld\n", (long long)nuis_window_session_close_reason(self.session));
             }
             if (close_status < 0) { self.sessionTerminal = YES; [self failSession]; }
         }
