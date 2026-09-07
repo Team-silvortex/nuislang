@@ -72,7 +72,7 @@ finite compiler-module migration plan.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/86 | Explicit packaged CPU parent opens before the child, initializes callback-rooted globals and consumes one outcome with independent fuel/cleanup. Multi-child routing, recovery and resource cancellation remain open. |
+| `ns-nova/persistent-application-session` | active/86 | Packaged CPU parent and one outcome handoff are verified. Pump/window cancellation arbitrates with Finish and independently acknowledges host-scope retirement through the ticket C ABI. AppKit policy and provider/device retirement remain open, as do multi-child routing and recovery. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -91,6 +91,21 @@ Its first actionable prerequisite is
 failure testing follow that prerequisite, rather than their lower scores
 prematurely displacing session work. A reopened shared std/runtime prerequisite
 can correctly take priority within the same dependency chain.
+
+The new [host cancellation boundary](nuis-yir-application-cancellation-v1.md)
+does not raise this coordinate's score or close resource safety. One cancellation
+ticket distinguishes admission from release of worker-owned host state; provider
+retirement is not inferred from socket Drop. The registered window and C ABI
+now forward that independent ticket without manufacturing any terminal outcome
+or parent delivery, including after rejected window calls. Tickets can outlive
+their window; typed late faults are delivered without mutating old snapshots.
+Next wire explicit packaged-host cancellation policy, then establish explicit
+provider-owned drain acknowledgement before resource reuse.
+Provider sessions now depend only on the two-operation `ScopeAdmission` interface,
+not on the concrete cancellation controller. Static policy-substitution tests
+preserve the lifecycle gate. The generic ticket C ABI has no window, concrete
+pump/controller or provider dependency; window adapters must not inherit provider
+internals or merge parent outcome authority with resource retirement.
 
 The [persistent session boundary](nuis-yir-application-session-v1.md) now calls
 explicit compiled Nuis helpers in one execution context. It preserves scalar
@@ -162,7 +177,7 @@ now runs that handoff on an independent worker, initialized from callback roots
 before the child. Real Metal and compiled failure/replay cases retain one device
 worker, one parent delivery/cleanup, and failed child exit despite parent success.
 `active/86` is not an engine-completion percentage: multi-child routing,
-cancellation/resource retirement, long-duration soak and transactional publication
+packaged-host cancellation/provider retirement, long-duration soak and transactional publication
 remain open. Fuel does not preempt provider-private work, blocking FFI or devices;
 do not replace explicit delivery with an unchecked post-close child callback.
 

@@ -93,6 +93,12 @@ interrupts. The next task is
 to `active/20` as a scope marker, not an engine-completion percentage; seven
 separate coordinates track session, safety, resources, interaction, performance,
 native CPU dispatch and actual compiler-module ownership transfer.
+The pump's [explicit cancellation ticket](docs/reference/nuis-yir-application-cancellation-v1.md)
+now separates cancellation admission from worker-owned host-resource release and
+arbitrates with provider Finish. `WindowSession` and its C ABI now forward that
+ticket without generating a terminal outcome; the ticket can outlive the window.
+This is not GPU retirement. AppKit cancellation policy and provider drain
+acknowledgement remain open; ordinary window quit still requests explicit close.
 Its first Nuis-owned app/frame lifecycle now composes with PixelMagic, Data, and
 Shader in a host-adaptive project, compiles through NIR/YIR, emits an Apple arm64
 window AOT executable, reaches window/Fabric boot, and passes a relocatable

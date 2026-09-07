@@ -113,6 +113,19 @@ worker and one delivery/cleanup attempt. See the
 [parent pump profile](nuis-yir-application-outcome-pump-v1.md); parent success
 cannot overwrite a failed child exit.
 
+The underlying pump now has a separate
+[host cancellation ticket](nuis-yir-application-cancellation-v1.md). It revokes
+further host work, arbitrates with Finish and acknowledges host-scope retirement
+without claiming device retirement or invoking implicit close. `WindowSession::cancel`
+and `nuis_window_session_cancel` forward this ticket, including while a callback
+is pending. Its generic application-cancellation C ABI can poll/free the ticket
+after the window is freed without borrowing window or provider internals.
+Accepted cancellation and later rejected window calls produce no terminal outcome
+or parent delivery; window getters retain only their last observations. The
+independent receipt may carry a later worker fault. Finish winning admission
+leaves the original close request/reply intact. AppKit cancellation policy is not
+yet wired; ordinary window quit continues to use explicit close/Finish.
+
 ### Typed Failure Evidence
 
 `nuis-yir-application-failure-v2` is a shared, backend-neutral category contract:
@@ -255,5 +268,5 @@ The current Nuis event wrapper uses a leading guard returning existing state.
 Bare `if { return aggregate_call(...); }` with no else is still unsupported by the
 minimal lowering path; the equivalent guard form is not a compiler fix.
 Close intent and observed failure kind are now separate. Device-specific causes,
-packaged-window parent orchestration, application recovery, cancellation/resource retirement,
+multi-child parent orchestration, application recovery, AppKit cancellation policy/provider retirement,
 richer input, textures and non-Metal/native-CPU parity remain separate work.

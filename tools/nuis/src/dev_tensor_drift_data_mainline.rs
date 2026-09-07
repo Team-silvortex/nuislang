@@ -1,5 +1,14 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_application_cancellation.rs"]
+mod cancellation;
+
+pub(crate) fn mainline_drift_checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
+    DEV_TENSOR_MAINLINE_DRIFT_CHECKS
+        .iter()
+        .chain(cancellation::CHECKS.iter())
+}
+
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "application-outcome-parent-pump",
@@ -603,7 +612,9 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "ApplicationProviderSource::Ipc",
             "ApplicationProviderSource::Replay",
             "application.completion_status()?",
-            "finish_provider_source_with_failures(&provider, &failures)?",
+            "control.checkpoint()?",
+            "control.admit_finalization()?",
+            "finish_provider_source_with_failures(&provider, &control.failures)?",
         ],
     },
     DevTensorDriftCheckSpec {

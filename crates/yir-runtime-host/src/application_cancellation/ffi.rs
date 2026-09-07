@@ -1,0 +1,59 @@
+use std::ptr;
+
+use super::ApplicationCancellation;
+
+fn fail(error: impl std::fmt::Display) -> i32 {
+    eprintln!("nuis application cancellation: {error}");
+    -1
+}
+
+/// Nonblocking: 0 pending/already consumed, 1 one host-retirement receipt,
+/// -1 invalid arguments or lost acknowledgement. Outputs are written only on 1;
+/// cleanup is 0/1 and failure is the first ApplicationFailureKind code. Neither
+/// field certifies application success or provider/device resource retirement.
+/// # Safety
+/// Ticket must be an exclusive live cancellation handle. Outputs must be
+/// writable and nonaliasing with each other and the ticket. Calls must not overlap.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_application_cancellation_poll(
+    ticket: *mut ApplicationCancellation,
+    cleanup: *mut i32,
+    failure: *mut i64,
+) -> i32 {
+    if cleanup.is_null() || failure.is_null() {
+        return fail("null retirement output");
+    }
+    let Some(ticket) = (unsafe { ticket.as_mut() }) else {
+        return fail("null cancellation ticket");
+    };
+    match ticket.poll() {
+        Ok(Some(ack)) => {
+            unsafe {
+                *cleanup = i32::from(ack.cleanup_completed());
+                *failure = ack.failure_kind().code();
+            }
+            1
+        }
+        Ok(None) => 0,
+        Err(error) => fail(error),
+    }
+}
+
+/// Abandon observation without joining, running cleanup or claiming retirement.
+/// # Safety
+/// Slot must be writable and contain null or an exclusively owned live ticket.
+/// Never free a copy of a previously freed handle; null slots are harmless.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_application_cancellation_free(
+    slot: *mut *mut ApplicationCancellation,
+) {
+    if let Some(slot) = unsafe { slot.as_mut() } {
+        let handle = std::mem::replace(slot, ptr::null_mut());
+        if !handle.is_null() {
+            drop(unsafe { Box::from_raw(handle) });
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -4,12 +4,37 @@ use yir_core::Value;
 use yir_exec::ExecutionTrace;
 
 use crate::application_failure::FailureState;
+use crate::application_scope_admission::ScopeAdmission;
 use crate::provider_result_stream::{
     finish_provider_source_with_failures, provider_registry_with_failures, replay_source,
 };
 use crate::{ApplicationSession, ApplicationSessionEntries};
 
 pub const PROVIDER_APPLICATION_SESSION_CONTRACT: &str = "nuis-yir-provider-application-session-v1";
+
+pub(crate) struct SessionControl<'a, A: ScopeAdmission = ()> {
+    pub failures: FailureState,
+    pub admission: &'a A,
+}
+
+impl Default for SessionControl<'_, ()> {
+    fn default() -> Self {
+        Self {
+            failures: FailureState::default(),
+            admission: &(),
+        }
+    }
+}
+
+impl<A: ScopeAdmission> SessionControl<'_, A> {
+    fn checkpoint(&self) -> Result<(), String> {
+        self.admission.checkpoint()
+    }
+
+    fn admit_finalization(&self) -> Result<(), String> {
+        self.admission.admit_finalization()
+    }
+}
 
 /// Explicit admission source. There is no implicit environment lookup or
 /// reference-device fallback in the persistent application frontdoor.
@@ -43,7 +68,7 @@ pub fn with_provider_application_session<T>(
         provider,
         entries,
         arguments,
-        FailureState::default(),
+        SessionControl::default(),
         drive,
     )
 }
@@ -63,18 +88,18 @@ pub fn with_registered_provider_application_session<T>(
         id,
         arguments,
         |_, _| Ok(()),
-        FailureState::default(),
+        SessionControl::default(),
         drive,
     )
 }
 
-pub(crate) fn with_registered_provider_application_session_checked<T>(
+pub(crate) fn with_registered_provider_application_session_checked<T, A: ScopeAdmission>(
     source: &str,
     provider: ApplicationProviderSource<'_>,
     id: &str,
     arguments: Vec<Value>,
     preflight: fn(&yir_core::YirModule, &str) -> Result<(), String>,
-    failures: FailureState,
+    control: SessionControl<'_, A>,
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
     let module = yir_syntax::parse_module(source)?;
@@ -86,20 +111,21 @@ pub(crate) fn with_registered_provider_application_session_checked<T>(
         provider,
         registration.entries(),
         arguments,
-        failures,
+        control,
         drive,
     )
 }
 
-fn with_session<T>(
+fn with_session<T, A: ScopeAdmission>(
     source: &str,
     module: &yir_core::YirModule,
     provider: ApplicationProviderSource<'_>,
     entries: ApplicationSessionEntries<'_>,
     arguments: Vec<Value>,
-    failures: FailureState,
+    control: SessionControl<'_, A>,
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
+    control.checkpoint()?;
     ApplicationSession::preflight(module, entries, &arguments)?;
     let provider = match provider {
         #[cfg(unix)]
@@ -110,17 +136,23 @@ fn with_session<T>(
         }
         ApplicationProviderSource::Replay(path) => replay_source(source, path)?,
     };
-    let (registry, provider) = provider_registry_with_failures(provider, failures.clone());
+    control.checkpoint()?;
+    let (registry, provider) = provider_registry_with_failures(provider, control.failures.clone());
     let (mut application, opened) = ApplicationSession::open_with_failures(
         module,
         &registry,
         entries,
         arguments,
-        failures.clone(),
+        control.failures.clone(),
     )?;
     let result = drive(&mut application, opened)?;
     application.completion_status()?;
     drop(application);
-    finish_provider_source_with_failures(&provider, &failures)?;
+    control.admit_finalization()?;
+    finish_provider_source_with_failures(&provider, &control.failures)?;
     Ok(result)
 }
+
+#[cfg(all(test, unix))]
+#[path = "provider_application_session/admission_tests.rs"]
+mod admission_tests;

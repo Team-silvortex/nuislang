@@ -2,7 +2,7 @@ use crate::{
     dev_tensor_drift::DevTensorDriftCheckSpec,
     dev_tensor_drift_data_core::DEV_TENSOR_CORE_DRIFT_CHECKS,
     dev_tensor_drift_data_language::DEV_TENSOR_LANGUAGE_DRIFT_CHECKS,
-    dev_tensor_drift_data_mainline::DEV_TENSOR_MAINLINE_DRIFT_CHECKS,
+    dev_tensor_drift_data_mainline::mainline_drift_checks,
     dev_tensor_drift_data_runtime::DEV_TENSOR_RUNTIME_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_bootstrap::DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_bootstrap_evidence::DEV_TENSOR_RUNTIME_BOOTSTRAP_EVIDENCE_DRIFT_CHECKS,
@@ -31,7 +31,7 @@ pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTens
     DEV_TENSOR_CORE_DRIFT_CHECKS
         .iter()
         .chain(DEV_TENSOR_LANGUAGE_DRIFT_CHECKS.iter())
-        .chain(DEV_TENSOR_MAINLINE_DRIFT_CHECKS.iter())
+        .chain(mainline_drift_checks())
         .chain(DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DRIFT_CHECKS.iter())

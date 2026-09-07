@@ -5,6 +5,9 @@ use yir_runtime_host::{
     validate_window_session, ApplicationPumpPhase, WindowSession, WindowSessionReply,
 };
 
+#[path = "window/cancellation.rs"]
+mod cancellation;
+
 fn source() -> String {
     format!(
         "application-session ui {} open update close state\n{SOURCE}",

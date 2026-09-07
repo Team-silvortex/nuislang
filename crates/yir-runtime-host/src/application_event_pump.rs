@@ -1,5 +1,6 @@
 use std::{
     sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
+    sync::Arc,
     thread,
     time::Duration,
 };
@@ -7,7 +8,10 @@ use std::{
 use yir_core::{ApplicationFailureKind, Value};
 use yir_exec::ExecutionTrace;
 
-use crate::ApplicationProviderSource;
+use crate::{
+    application_cancellation::CancellationControl, ApplicationCancellation,
+    ApplicationHostRetirementAck, ApplicationProviderSource,
+};
 
 mod outcome;
 mod worker;
@@ -69,6 +73,8 @@ pub struct ApplicationEventPump {
     replies: Option<Receiver<ApplicationPumpReply>>,
     pending: Option<ApplicationPumpOperation>,
     phase: ApplicationPumpPhase,
+    cancellation: Arc<CancellationControl>,
+    retirement: Option<Receiver<ApplicationHostRetirementAck>>,
 }
 
 impl ApplicationEventPump {
@@ -102,10 +108,29 @@ impl ApplicationEventPump {
         let provider = worker::OwnedProvider::from(provider);
         let (commands, requests) = mpsc::sync_channel(1);
         let (responses, replies) = mpsc::sync_channel(1);
+        let (retired, retirement) = mpsc::sync_channel(1);
+        let cancellation = Arc::new(CancellationControl::default());
+        let control = Arc::clone(&cancellation);
         thread::Builder::new()
             .name("nuis-application-event-pump".to_owned())
             .spawn(move || {
-                worker::run(source, provider, id, arguments, requests, responses, checks)
+                let ack = worker::run(
+                    source,
+                    provider,
+                    id,
+                    arguments,
+                    worker::Channel {
+                        requests,
+                        replies: responses,
+                        control: Arc::clone(&control),
+                    },
+                    checks,
+                );
+                // No borrowed execution state, registry or transport survives run.
+                // A panic/disconnect produces no affirmative acknowledgement.
+                if control.retire() {
+                    let _ = retired.send(ack);
+                }
             })
             .map_err(|error| format!("application event pump could not start: {error}"))?;
         Ok(Self {
@@ -113,6 +138,8 @@ impl ApplicationEventPump {
             replies: Some(replies),
             pending: Some(ApplicationPumpOperation::Open),
             phase: ApplicationPumpPhase::Opening,
+            cancellation,
+            retirement: Some(retirement),
         })
     }
 
@@ -175,8 +202,27 @@ impl ApplicationEventPump {
     pub fn abort(&mut self) {
         self.commands.take();
         self.replies.take();
+        self.retirement.take();
         self.pending = None;
         self.phase = ApplicationPumpPhase::Stopped;
+    }
+
+    /// Revoke further host work and observe eventual host-scope retirement.
+    /// An in-flight callback may finish; its reply is abandoned, not rolled back.
+    /// No implicit close, provider cancellation packet or device-retirement claim
+    /// is made. Once Finish wins admission, cancellation rejects without changing
+    /// the original pending request. Drop/abort remain unacknowledged abandonment.
+    pub fn cancel(&mut self) -> Result<ApplicationCancellation, String> {
+        if self.commands.is_none() {
+            return Err("application cancellation requires a live pump".to_owned());
+        }
+        self.cancellation.request()?;
+        let retirement = self
+            .retirement
+            .take()
+            .expect("live pump owns retirement receiver");
+        self.abort();
+        Ok(ApplicationCancellation::new(retirement))
     }
 
     fn submit(
@@ -229,6 +275,7 @@ impl ApplicationEventPump {
         ) {
             self.commands.take();
             self.replies.take();
+            self.retirement.take();
         }
         Ok(reply)
     }

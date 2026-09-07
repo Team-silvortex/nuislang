@@ -181,6 +181,39 @@ device_evidence = "compiled-nuis-image-live-metal-and-replay-via-owned-pump"
 window_wired = true
 window_selection = "explicit-window-session-id-not-default-legacy-preview"
 general_cancellation = false
+host_cancellation_admission = true
+host_retirement_acknowledgement = true
+
+[application_cancellation]
+contract = "nuis-yir-application-cancellation-v1"
+implementation = "crates/yir-runtime-host/src/application_cancellation.rs"
+entry = "ApplicationEventPump.cancel"
+admission = "atomic-cancellation-versus-provider-finish-one-winner"
+admission_boundary = "ScopeAdmission.checkpoint+admit_finalization"
+admission_binding = "compile-time-generic-no-concrete-cancellation-dependency"
+concrete_cancellation_owner = "host-worker-not-provider-or-window-policy"
+provider_finalization_owner = "provider-session-after-lifecycle-and-generic-admission"
+in_flight = "admitted-callback-may-return-no-preemption-or-rollback"
+cleanup = "no-implicit-close-preserve-explicit-validated-close-and-first-latched-fault"
+retirement_scope = "worker-owned-host-module-registry-execution-state-and-transport-dropped"
+acknowledgement = "separate-one-owned-ticket-after-borrowed-scope-return-not-thread-join"
+timeout = "keep-ticket-no-retry-or-resource-reuse-authority"
+lost_acknowledgement = "error-not-retirement"
+provider_finish_after_accepted_cancel = false
+provider_device_retirement_claimed = false
+provider_wire_cancellation = false
+window_cancellation_wired = true
+window_entry = "WindowSession.cancel"
+window_ffi_entry = "nuis_window_session_cancel"
+ticket_ffi = ["nuis_application_cancellation_poll", "nuis_application_cancellation_free"]
+ticket_owner = "independent-of-window-lifetime-no-window-or-provider-borrow"
+ticket_poll_outputs = "write-cleanup-i32-and-failure-i64-only-on-one-receipt-status"
+cancelled_window_outcome = "none-even-after-rejected-window-calls-no-parent-delivery"
+window_observations = "last-observed-cleanup-and-failure-independent-of-later-ticket-receipt"
+appkit_cancellation_wired = false
+parent_cancellation_wired = false
+evidence = "gated-ipc-callback-finish-races-first-fault-window-and-ticket-ffi-ownership-compiled-nuis-window-host-retirement"
+dependency_evidence = "independent-recording-policy-before-io-after-admission-before-finalization-and-direct-dependency-guards"
 
 [window_session]
 contract = "nuis-yir-window-session-v3"
@@ -417,5 +450,5 @@ dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "account for in-flight cancellation/resource retirement after explicit packaged-parent delivery; never reinitialize the closed module, repeat close or reset provider clocks and budgets; retain rooted initialization, independent parent effects/fuel, typed rejection and compiled Metal window/export evidence"
+action = "wire an explicit packaged-host cancellation path through the existing independent window ticket, then establish provider-owned drain acknowledgement before resource reuse; never synthesize a child outcome, reinitialize the closed module, repeat close or reset provider clocks and budgets; retain rooted initialization, independent parent effects/fuel, typed rejection and compiled Metal window/export evidence"
 validation = "retain compiled-binary image/uniform export, exact GPU pixels, live/replay equality without an external YIR read, fail-closed missing providers, no overwrite or output on rejected dispatch, cache reuse, physical completion and GLM release; do not conflate embedded-YIR execution with fully native CPU lowering, self-contained Nsld injection or continuous application state"

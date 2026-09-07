@@ -1,9 +1,12 @@
 use std::{
     path::PathBuf,
     sync::mpsc::{Receiver, SyncSender},
+    sync::Arc,
 };
 
 use crate::application_failure::FailureState;
+use crate::application_scope_admission::ScopeAdmission;
+use crate::{application_cancellation::CancellationControl, ApplicationHostRetirementAck};
 use yir_core::{ApplicationFailureKind, Value};
 
 use super::{
@@ -11,9 +14,17 @@ use super::{
     Command,
 };
 use crate::{
-    provider_application_session::with_registered_provider_application_session_checked,
+    provider_application_session::{
+        with_registered_provider_application_session_checked, SessionControl,
+    },
     ApplicationProviderSource, ApplicationSessionPhase,
 };
+
+pub(super) struct Channel {
+    pub requests: Receiver<Command>,
+    pub replies: SyncSender<ApplicationPumpReply>,
+    pub control: Arc<CancellationControl>,
+}
 
 pub(super) enum OwnedProvider {
     #[cfg(unix)]
@@ -46,10 +57,14 @@ pub(super) fn run(
     provider: OwnedProvider,
     id: String,
     arguments: Vec<Value>,
-    requests: Receiver<Command>,
-    replies: SyncSender<ApplicationPumpReply>,
+    channel: Channel,
     checks: ApplicationPumpChecks,
-) {
+) -> ApplicationHostRetirementAck {
+    let Channel {
+        requests,
+        replies,
+        control,
+    } = channel;
     let mut operation = ApplicationPumpOperation::Open;
     let mut final_state = None;
     let mut cleanup_completed = false;
@@ -60,9 +75,13 @@ pub(super) fn run(
         &id,
         arguments,
         checks.preflight,
-        failures.clone(),
+        SessionControl {
+            failures: failures.clone(),
+            admission: control.as_ref(),
+        },
         |session, opened| {
             let send = |operation, trace, session: &crate::ApplicationSession<'_>| {
+                control.checkpoint()?;
                 let phase = match session.phase() {
                     ApplicationSessionPhase::Open => ApplicationPumpPhase::Open,
                     ApplicationSessionPhase::Faulted => ApplicationPumpPhase::Faulted,
@@ -85,6 +104,7 @@ pub(super) fn run(
                 .inspect_err(|_| failures.record(ApplicationFailureKind::Host))?;
             send(operation, Ok(opened), session)?;
             while let Ok(command) = requests.recv() {
+                control.checkpoint()?;
                 operation = command.operation;
                 if let Some(kind) = command.failed_close {
                     session.record_host_failure(kind);
@@ -116,6 +136,7 @@ pub(super) fn run(
                 if session.phase() == ApplicationSessionPhase::Closed {
                     final_state = Some(session.state().clone());
                     cleanup_completed = trace.is_ok();
+                    control.checkpoint()?;
                     // The scoped API gates this result on completion_status AND
                     // provider Finish/Closed (or complete replay consumption).
                     // Preserve the original event error as well as a failed
@@ -127,6 +148,9 @@ pub(super) fn run(
             Err("application event pump disconnected without explicit close".to_owned())
         },
     );
+    if control.cancelled() {
+        return ApplicationHostRetirementAck::new(cleanup_completed, failures.kind());
+    }
     let phase = if result.is_ok() {
         ApplicationPumpPhase::Closed
     } else {
@@ -141,4 +165,5 @@ pub(super) fn run(
         failure_kind: failures.kind(),
         trace: result,
     });
+    ApplicationHostRetirementAck::new(cleanup_completed, failures.kind())
 }

@@ -5,7 +5,9 @@ use std::{
 };
 
 use super::WindowSession;
-use crate::{ApplicationProviderSource, ApplicationPumpPhase, NuisRenderedBuffer};
+use crate::{
+    ApplicationCancellation, ApplicationProviderSource, ApplicationPumpPhase, NuisRenderedBuffer,
+};
 use yir_core::ApplicationCloseReason;
 
 fn fail(error: impl std::fmt::Display) -> i32 {
@@ -85,6 +87,34 @@ pub unsafe extern "C" fn nuis_window_session_event(
 pub unsafe extern "C" fn nuis_window_session_close(session: *mut WindowSession) -> i32 {
     unsafe {
         nuis_window_session_close_with_reason(session, ApplicationCloseReason::Requested.code())
+    }
+}
+
+/// Return 0 for cancellation admission, -1 for rejection. Unlike event/close,
+/// this accepts pending work. It never joins, closes or publishes an outcome.
+/// The ticket is independent of the window and uses the application cancellation
+/// poll/free ABI; acceptance is not host or device retirement.
+/// # Safety
+/// Session must be an exclusive live handle. Output must be a writable,
+/// nonaliasing slot; a non-null slot is rejected without being dereferenced or
+/// overwritten. Each accepted ticket is exclusively owned and must be freed once.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_cancel(
+    session: *mut WindowSession,
+    output: *mut *mut ApplicationCancellation,
+) -> i32 {
+    if output.is_null() || !unsafe { *output }.is_null() {
+        return fail("cancellation output must be a valid empty slot");
+    }
+    let Some(session) = (unsafe { session.as_mut() }) else {
+        return fail("null session");
+    };
+    match session.cancel() {
+        Ok(ticket) => {
+            unsafe { *output = Box::into_raw(Box::new(ticket)) };
+            0
+        }
+        Err(error) => fail(error),
     }
 }
 

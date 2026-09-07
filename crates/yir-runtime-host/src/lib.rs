@@ -1,7 +1,9 @@
+mod application_cancellation;
 mod application_event_pump;
 mod application_failure;
 mod application_outcome_delivery;
 mod application_outcome_pump;
+mod application_scope_admission;
 mod application_session;
 mod frame_export;
 mod provider_application_session;
@@ -12,6 +14,10 @@ mod window_session;
 
 use std::{path::Path, ptr, slice};
 
+pub use application_cancellation::{
+    nuis_application_cancellation_free, nuis_application_cancellation_poll,
+    ApplicationCancellation, ApplicationHostRetirementAck, APPLICATION_CANCELLATION_CONTRACT,
+};
 pub use application_event_pump::{
     ApplicationEventPump, ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,
     APPLICATION_EVENT_PUMP_CONTRACT,

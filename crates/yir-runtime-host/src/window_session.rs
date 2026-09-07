@@ -4,8 +4,8 @@ use yir_core::{
 };
 
 use crate::{
-    ApplicationEventPump, ApplicationOutcomeDelivery, ApplicationProviderSource,
-    ApplicationPumpOperation, ApplicationPumpPhase,
+    ApplicationCancellation, ApplicationEventPump, ApplicationOutcomeDelivery,
+    ApplicationProviderSource, ApplicationPumpOperation, ApplicationPumpPhase,
 };
 
 mod ffi;
@@ -22,6 +22,7 @@ pub struct WindowSession {
     failure_kind: ApplicationFailureKind,
     outcome: Option<ApplicationOutcome>,
     outcome_taken: bool,
+    cancellation_admitted: bool,
 }
 
 pub struct WindowSessionReply {
@@ -62,6 +63,7 @@ impl WindowSession {
             failure_kind: ApplicationFailureKind::None,
             outcome: None,
             outcome_taken: false,
+            cancellation_admitted: false,
         })
     }
 
@@ -88,6 +90,16 @@ impl WindowSession {
 
     pub fn close(&mut self) -> Result<(), String> {
         self.close_with_reason(ApplicationCloseReason::Requested)
+    }
+
+    /// Forward cooperative cancellation without running close or publishing an
+    /// application outcome. The independent ticket may outlive this window;
+    /// its acknowledgement covers host scope, not provider/device retirement.
+    /// Rejection leaves the original request and observed state unchanged.
+    pub fn cancel(&mut self) -> Result<ApplicationCancellation, String> {
+        let ticket = self.pump.cancel()?;
+        self.cancellation_admitted = true;
+        Ok(ticket)
     }
 
     pub fn close_reason(&self) -> Option<ApplicationCloseReason> {
@@ -205,6 +217,7 @@ impl WindowSession {
         if result.is_err()
             && self.phase() == ApplicationPumpPhase::Stopped
             && self.outcome.is_none()
+            && !self.cancellation_admitted
         {
             if !self.failure_kind.is_failure() {
                 self.failure_kind = ApplicationFailureKind::Unclassified;

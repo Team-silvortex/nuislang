@@ -2,6 +2,7 @@
 
 use std::{
     fs,
+    io::Read,
     os::unix::net::UnixListener,
     path::PathBuf,
     sync::atomic::{AtomicUsize, Ordering},
@@ -20,80 +21,14 @@ use yir_runtime_host::{
     ApplicationProviderSource, ApplicationSessionEntries,
 };
 
+#[path = "provider_application_session/cancellation.rs"]
+mod cancellation;
 #[path = "provider_application_session/event_pump.rs"]
 mod event_pump;
 #[path = "provider_application_session/window.rs"]
 mod window;
 
-const SOURCE: &str = r#"
-yir 0.1
-resource cpu0 cpu.arm64
-resource gpu shader.metal
-function open cpu helper
-function-param open seed i64 value seed
-function-result open Counter owned opened
-function-node open seed
-function-node open opened
-function update cpu helper
-function-param update state.count i64 value count
-function-param update delta i64 value delta
-function-result update Counter owned updated
-function-node update count
-function-node update delta
-function-node update next
-function-node update pass
-function-node update draw
-function-node update present
-function-node update updated
-function close cpu helper
-function-param close state.count i64 value final_count
-function-param close divisor i64 value divisor
-function-result close Counter owned closed
-function-node close final_count
-function-node close divisor
-function-node close quotient
-function-node close closed
-function main cpu entry
-function-node main main_print
-cpu.param_i64 seed cpu0 0
-cpu.struct opened cpu0 Counter count=seed
-cpu.param_i64 count cpu0 0
-cpu.param_i64 delta cpu0 1
-cpu.add next cpu0 count delta
-shader.target target gpu rgba8_unorm 1 1
-shader.viewport view gpu 1 1
-shader.pipeline pipeline gpu ball triangle_strip
-shader.const_i64 color gpu 1
-shader.const_i64 speed gpu 2
-shader.pack_ball_state packet gpu color speed
-shader.begin_pass pass gpu target pipeline view
-shader.draw_instanced draw gpu pass packet 4 1
-cpu.present_frame present cpu0 draw
-cpu.struct updated cpu0 Counter count=next
-cpu.param_i64 final_count cpu0 0
-cpu.param_i64 divisor cpu0 1
-cpu.div quotient cpu0 final_count divisor
-cpu.struct closed cpu0 Counter count=quotient
-cpu.const_i64 sentinel cpu0 999
-cpu.print main_print cpu0 sentinel
-edge dep seed opened
-edge dep count next
-edge dep delta next
-edge dep next updated
-edge dep target pass
-edge dep pipeline pass
-edge dep view pass
-edge dep color packet
-edge dep speed packet
-edge dep pass draw
-edge dep packet draw
-edge dep draw present
-edge dep present updated
-edge dep final_count quotient
-edge dep divisor quotient
-edge dep quotient closed
-edge dep sentinel main_print
-"#;
+const SOURCE: &str = include_str!("fixtures/application_session.yir");
 
 fn entries() -> ApplicationSessionEntries<'static> {
     ApplicationSessionEntries {
@@ -269,6 +204,9 @@ impl Peer {
                     other => panic!("unexpected client message: {other:?}"),
                 }
             }
+            // Failure/abandonment must release the transport, not merely leave
+            // the peer waiting until its read deadline. EOF remains observable.
+            assert_eq!(stream.read(&mut [0_u8; 1]).unwrap(), 0);
             (count, false)
         });
         Self {
