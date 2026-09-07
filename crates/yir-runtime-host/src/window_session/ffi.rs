@@ -132,6 +132,15 @@ pub unsafe extern "C" fn nuis_window_session_cleanup_completed(
     i32::from(unsafe { session.as_ref() }.is_some_and(WindowSession::cleanup_completed))
 }
 
+/// First observed/admitted failure code, 0 before failure, -1 for a null handle.
+/// Late Finish failure can set this after Nuis close has already completed.
+/// # Safety
+/// Session must be null or an exclusive live handle returned by open.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_failure_kind(session: *const WindowSession) -> i64 {
+    unsafe { session.as_ref() }.map_or(-1, |session| session.failure_kind().code())
+}
+
 /// Return 0 for pending, 1 for one reply, -1 for error. Phase codes are opening=0,
 /// open=1, faulted=2, closed=3, stopped=4. A returned buffer is owned by the caller
 /// and must use nuis_rendered_buffer_free; replies without frames leave it empty.
@@ -216,6 +225,7 @@ mod tests {
             assert_eq!(nuis_window_session_close(slot), -1);
             assert_eq!(nuis_window_session_close_reason(slot), -1);
             assert_eq!(nuis_window_session_cleanup_completed(slot), 0);
+            assert_eq!(nuis_window_session_failure_kind(slot), -1);
             nuis_window_session_free(&mut slot);
         }
         let session = WindowSession::spawn(
@@ -236,6 +246,7 @@ mod tests {
         unsafe {
             assert_eq!(nuis_window_session_close_with_reason(slot, 99), -1);
             assert_eq!(nuis_window_session_close_reason(slot), -1);
+            assert_eq!(nuis_window_session_failure_kind(slot), 0);
             assert_eq!(nuis_window_session_poll(slot, &mut buffer, &mut phase), -1);
             assert_eq!(phase, 99);
             assert_eq!(buffer.ptr, bytes.as_mut_ptr());

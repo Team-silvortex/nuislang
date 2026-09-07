@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use yir_core::Value;
+use yir_core::{ApplicationFailureKind, Value};
 use yir_exec::ExecutionTrace;
 
 use crate::ApplicationProviderSource;
@@ -45,13 +45,14 @@ pub struct ApplicationPumpReply {
     /// A validated close callback returned; provider/lifecycle completion can
     /// still fail. This flag never authorizes success or retrying cleanup.
     pub cleanup_completed: bool,
+    pub failure_kind: ApplicationFailureKind,
     pub trace: Result<ExecutionTrace, String>,
 }
 
 struct Command {
     operation: ApplicationPumpOperation,
     arguments: Vec<Value>,
-    failed_close: bool,
+    failed_close: Option<ApplicationFailureKind>,
 }
 
 /// Owned host handle with nonblocking admission and polling. Module, registry,
@@ -125,15 +126,22 @@ impl ApplicationEventPump {
     /// Admission is not execution success. Consume the matching reply before
     /// issuing another event or close; busy requests are never queued or retried.
     pub fn event(&mut self, arguments: Vec<Value>) -> Result<(), String> {
-        self.submit(ApplicationPumpOperation::Event, arguments, false)
+        self.submit(ApplicationPumpOperation::Event, arguments, None)
     }
 
     pub fn close(&mut self, arguments: Vec<Value>) -> Result<(), String> {
-        self.submit(ApplicationPumpOperation::Close, arguments, false)
+        self.submit(ApplicationPumpOperation::Close, arguments, None)
     }
 
-    pub(crate) fn close_after_failure(&mut self, arguments: Vec<Value>) -> Result<(), String> {
-        self.submit(ApplicationPumpOperation::Close, arguments, true)
+    pub(crate) fn close_after_failure(
+        &mut self,
+        arguments: Vec<Value>,
+        kind: ApplicationFailureKind,
+    ) -> Result<(), String> {
+        if !kind.is_failure() {
+            return Err("failed cleanup requires a failure kind".to_owned());
+        }
+        self.submit(ApplicationPumpOperation::Close, arguments, Some(kind))
     }
 
     pub fn poll(&mut self) -> Result<Option<ApplicationPumpReply>, String> {
@@ -174,7 +182,7 @@ impl ApplicationEventPump {
         &mut self,
         operation: ApplicationPumpOperation,
         arguments: Vec<Value>,
-        failed_close: bool,
+        failed_close: Option<ApplicationFailureKind>,
     ) -> Result<(), String> {
         if self.pending.is_some() {
             return Err("application event pump is busy; consume the pending reply".to_owned());

@@ -136,7 +136,22 @@ fn compiled_nuis_close_reason_sets_and_preserves_failure_without_frame_replay() 
         .unwrap()
         .close;
     let window = yir_core::registered_application_session(module, "window").unwrap();
-    for reason in [0, 1, 2, -1, 99] {
+    for (reason, failure, expected) in [
+        (0, 0, 0),
+        (1, 0, 1),
+        (2, 0, 2),
+        (-1, 0, 255),
+        (99, 0, 255),
+        (1, 3, 3),
+        (1, 4, 4),
+        (1, 5, 5),
+        (1, 6, 6),
+        (1, 7, 7),
+        (1, 8, 8),
+        (1, -1, 255),
+        (0, 99, 255),
+        (0, 3, 3),
+    ] {
         // Reference-only helper composition checks std failure-state semantics;
         // the WindowSession transport tests separately enforce failure admission.
         let (mut session, _) = ApplicationSession::open(
@@ -151,9 +166,12 @@ fn compiled_nuis_close_reason_sets_and_preserves_failure_without_frame_replay() 
             vec![Value::Int(640), Value::Int(400)],
         )
         .unwrap();
-        let trace = session.event(vec![Value::Int(reason)]).unwrap();
-        let status = if reason == 0 { 2 } else { 4 };
+        let trace = session
+            .event(vec![Value::Int(reason), Value::Int(failure)])
+            .unwrap();
+        let status = if expected == 0 { 2 } else { 4 };
         assert_eq!(field(session.state(), "status"), status);
+        assert_eq!(field(session.state(), "failure_kind"), expected);
         assert_eq!(field(session.state(), "frame_index"), 0);
         assert_eq!(field(session.state(), "last_completion_root"), 0);
         assert!(trace.presented_frames.is_empty());
@@ -161,6 +179,7 @@ fn compiled_nuis_close_reason_sets_and_preserves_failure_without_frame_replay() 
         // A subsequent ordinary std cleanup must not clear an application failure.
         let trace = session.close(vec![Value::Int(10)]).unwrap().unwrap();
         assert_eq!(field(session.state(), "status"), status);
+        assert_eq!(field(session.state(), "failure_kind"), expected);
         assert!(trace.presented_frames.is_empty());
     }
 }

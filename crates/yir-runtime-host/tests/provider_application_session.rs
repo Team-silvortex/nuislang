@@ -107,6 +107,8 @@ enum Reply {
     BadClose,
     RejectedFrame,
     WrongHash,
+    DisconnectedFrame,
+    WrongSequence,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -189,13 +191,24 @@ impl Peer {
                             gate.wait(Pause::Frame);
                         }
                         if matches!(reply, Reply::RejectedFrame) {
-                            Message::Rejected("injected device failure".to_owned())
-                                .write_to(&mut stream)
-                                .unwrap();
+                            // Deliberately mentions a budget: clients must classify
+                            // the message kind, not guess from this diagnostic.
+                            Message::Rejected(
+                                "injected device failure: dispatch budget".to_owned(),
+                            )
+                            .write_to(&mut stream)
+                            .unwrap();
                             continue;
                         }
+                        if matches!(reply, Reply::DisconnectedFrame) {
+                            return (count, false);
+                        }
                         Message::Frame(DispatchFrame {
-                            sequence,
+                            sequence: if matches!(reply, Reply::WrongSequence) {
+                                sequence + 1
+                            } else {
+                                sequence
+                            },
                             arguments,
                             request_id: "render".to_owned(),
                             provider_family: "test:device".to_owned(),

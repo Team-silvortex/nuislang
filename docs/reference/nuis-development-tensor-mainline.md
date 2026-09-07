@@ -64,7 +64,7 @@ artifact. Existing Metal, replay, completion and GLM evidence stays intact.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/82 | Compiled window v2, typed close intent, failure-preserving Nuis cleanup and bounded supervisor grace verified; structured cause details, recovery and resource cancellation remain open. |
+| `ns-nova/persistent-application-session` | active/86 | Window v3 carries first-fault categories into Nuis; compiled provider rejection and replay exhaustion preserve failure/evidence. Typed remote codes, late delivery, recovery and resource cancellation remain open. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -117,7 +117,7 @@ idle gaps before independent draws and finish with one worker, exact pixels and
 monotonic clocks; transport tests reject partial-message stalls. The v3 wire is
 unchanged.
 
-[Window profile v2](nuis-yir-window-session-v2.md) now carries a shared requested,
+[Window profile v3](nuis-yir-window-session-v3.md) now carries a shared requested,
 event-failed or host-failed close intent into Nuis. Std cleanup preserves failed
 status and accepted frame identity. The pump separately reports cleanup completion
 and lifecycle success; host failure is latched before cleanup, and late Finish
@@ -126,8 +126,17 @@ one Nuis cleanup while retaining failure and previous replay files. Protocol tes
 also reject the 257th dispatch without losing the last state. The supervisor
 allows a latched five-second cleanup grace; a stricter total child deadline still
 wins. This is not recovery, resource retirement or a live full-budget soak test.
-`active/82` is not an engine-completion percentage; long-duration soak, fine-grained
-failure details and transactional replay publication remain unverified or open.
+Producer-observed failure categories now cross the executor's String diagnostic
+boundary through a scope-owned first-failure latch, not text matching or global
+state. Nuis retains the category in its application state. The compiled window
+also consumes two saved frames then rejects a third draw with `ReplayExhausted`;
+there is no substitute frame, successful exit or replacement replay evidence.
+Tests distinguish local dispatch limits, peer rejection, disconnect and result
+drift; simultaneous event/cleanup errors keep both diagnostics and the first kind.
+Late Finish is visible to the host without repeating Nuis close. IPC v3 remote
+rejection is still text-only and exchange errors still group I/O and framing.
+`active/86` is not an engine-completion percentage; remote error codes, late-failure
+delivery, long-duration soak and transactional publication remain open.
 
 ## Validation And Scope
 

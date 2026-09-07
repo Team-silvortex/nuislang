@@ -79,6 +79,7 @@ fn fixture() -> (ProviderResultShaderMod, Node, Resource, ExecutionState) {
     (
         ProviderResultShaderMod {
             state: Arc::new(Mutex::new(source)),
+            failures: FailureState::default(),
         },
         node,
         resource,
@@ -265,4 +266,28 @@ fn replay_uniform_identity_is_checked_before_consuming_frame() {
         assert_eq!(remaining(&adapter), 1);
         assert!(state.events.is_empty());
     }
+}
+
+#[test]
+fn replay_exhaustion_is_typed_without_matching_the_diagnostic() {
+    let (adapter, node, resource, mut state) = fixture();
+    {
+        let mut source = adapter.state.lock().unwrap();
+        let ProviderResultSource::Replay(queue) = &mut *source else {
+            unreachable!()
+        };
+        queue.frames.clear();
+    }
+    let error = adapter.execute(&node, &resource, &mut state).unwrap_err();
+    assert!(error.contains("exhausted"));
+    assert_eq!(
+        adapter.failures.kind(),
+        ApplicationFailureKind::ReplayExhausted
+    );
+    assert!(state.events.is_empty());
+    adapter.failures.record(ApplicationFailureKind::Host);
+    assert_eq!(
+        adapter.failures.kind(),
+        ApplicationFailureKind::ReplayExhausted
+    );
 }

@@ -89,17 +89,21 @@ pixels; invalid replacement evidence no longer erases a prior valid replay.
 The live session test includes idle gaps longer than an injected short request
 deadline, retaining the same Metal worker and clock lineage. This is not yet a
 long-duration window soak test or peer-failure recovery mechanism.
-Window profile v2 calls `window_close(state, reason: i64)`. Nuis decodes the
-requested/event-failed/host-failed cause and marks failed status without replaying
-a frame or clearing an earlier failure. Successful cleanup is not successful
+Window profile v3 calls `window_close(state, reason: i64, failure: i64)`. Nuis decodes
+close intent and the separately observed failure category, saves the first fault
+in `NovaAppState.failure_kind`, and marks failed status without replaying a frame
+or clearing an earlier failure. Successful cleanup is not successful
 execution: the host reports both separately, and late Finish failure still fails
 the run without repeating close. Provider failure gets a five-second supervised
-cleanup grace, not a retry or fresh budget. Rebuild older v1 bundles and close
-helpers together. The compiled-window test injects a provider reader failure and
+cleanup grace, not a retry or fresh budget. Rebuild older v1/v2 bundles, state
+artifacts and close helpers together. The compiled-window test injects a provider reader failure and
 verifies completed cleanup, failed execution and unchanged prior replay evidence.
+It also exhausts a two-frame replay with a third draw in the same compiled binary.
+The IPC rejection remains text-only: remote budget/device causes are not guessed
+from its wording, and late Finish errors do not re-enter Nuis cleanup.
 The bare aggregate-call return guard limitation remains; the event helper uses an
 equivalent supported leading guard. See the
-[window contract](../../../../docs/reference/nuis-yir-window-session-v2.md).
+[window contract](../../../../docs/reference/nuis-yir-window-session-v3.md).
 
 This is a **native host executable with an embedded YIR lifecycle runtime**, not
 fully native CPU lowering, a self-contained Nsld image or a stable interactive app.

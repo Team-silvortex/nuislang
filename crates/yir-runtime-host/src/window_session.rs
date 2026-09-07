@@ -1,5 +1,6 @@
 use yir_core::{
-    ApplicationCloseReason, ApplicationSessionSignature, Value, YirFunctionParameter, YirModule,
+    ApplicationCloseReason, ApplicationFailureKind, ApplicationSessionSignature, Value,
+    YirFunctionParameter, YirModule,
 };
 
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
 mod ffi;
 pub use ffi::*;
 
-pub const WINDOW_SESSION_CONTRACT: &str = "nuis-yir-window-session-v2";
+pub const WINDOW_SESSION_CONTRACT: &str = "nuis-yir-window-session-v3";
 
 /// Window-specific host adapter, not a YIR application or rendering policy.
 /// The registered Nuis helpers own configuration, image transitions and clocks.
@@ -17,6 +18,7 @@ pub struct WindowSession {
     pump: ApplicationEventPump,
     close_reason: Option<ApplicationCloseReason>,
     cleanup_completed: bool,
+    failure_kind: ApplicationFailureKind,
 }
 
 pub struct WindowSessionReply {
@@ -25,6 +27,7 @@ pub struct WindowSessionReply {
     pub state: Option<Value>,
     pub close_reason: Option<ApplicationCloseReason>,
     pub cleanup_completed: bool,
+    pub failure_kind: ApplicationFailureKind,
     pub frame: Result<Option<Vec<u8>>, String>,
 }
 
@@ -52,6 +55,7 @@ impl WindowSession {
             )?,
             close_reason: None,
             cleanup_completed: false,
+            failure_kind: ApplicationFailureKind::None,
         })
     }
 
@@ -86,6 +90,10 @@ impl WindowSession {
         self.cleanup_completed
     }
 
+    pub fn failure_kind(&self) -> ApplicationFailureKind {
+        self.failure_kind
+    }
+
     /// Failed events dominate an ordinary host close request. Host failures are
     /// latched in the worker before cleanup, so they cannot authorize Finish.
     pub fn close_with_reason(&mut self, reason: ApplicationCloseReason) -> Result<(), String> {
@@ -94,13 +102,23 @@ impl WindowSession {
         } else {
             reason
         };
-        let arguments = vec![Value::Int(reason.code())];
+        let kind = if self.failure_kind.is_failure() {
+            self.failure_kind
+        } else {
+            match reason {
+                ApplicationCloseReason::Requested => ApplicationFailureKind::None,
+                ApplicationCloseReason::EventFailed => ApplicationFailureKind::Callback,
+                ApplicationCloseReason::HostFailed => ApplicationFailureKind::Host,
+            }
+        };
+        let arguments = vec![Value::Int(reason.code()), Value::Int(kind.code())];
         if reason.is_failure() {
-            self.pump.close_after_failure(arguments)?;
+            self.pump.close_after_failure(arguments, kind)?;
         } else {
             self.pump.close(arguments)?;
         }
         self.close_reason = Some(reason);
+        self.failure_kind = kind;
         Ok(())
     }
 
@@ -109,6 +127,9 @@ impl WindowSession {
             return Ok(None);
         };
         self.cleanup_completed = reply.cleanup_completed;
+        if !self.failure_kind.is_failure() {
+            self.failure_kind = reply.failure_kind;
+        }
         let frame = reply.trace.and_then(|trace| {
             if trace.presented_frames.is_empty() {
                 Ok(None)
@@ -125,6 +146,9 @@ impl WindowSession {
             )
         {
             self.pump.abort();
+            if !self.failure_kind.is_failure() {
+                self.failure_kind = ApplicationFailureKind::Host;
+            }
         }
         Ok(Some(WindowSessionReply {
             operation: reply.operation,
@@ -132,6 +156,7 @@ impl WindowSession {
             state: reply.state,
             close_reason: self.close_reason,
             cleanup_completed: self.cleanup_completed,
+            failure_kind: self.failure_kind,
             frame,
         }))
     }
@@ -180,7 +205,10 @@ pub fn validate_window_session(module: &YirModule, id: &str) -> Result<(), Strin
             &signature.event.parameters[state_count..],
             &["kind", "code"][..],
         ),
-        (&signature.close.parameters[state_count..], &["reason"][..]),
+        (
+            &signature.close.parameters[state_count..],
+            &["reason", "failure"][..],
+        ),
     ] {
         validate_parameters(parameters, names)?;
     }

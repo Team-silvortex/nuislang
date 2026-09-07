@@ -137,7 +137,7 @@ this is not yet fully native CPU execution or a self-contained Nsld image.
 It requires registered live IPC or explicit replay, never reference fallback.
 Exports refuse to overwrite existing files and do not create output on rejected
 dispatch. The same binary replays without reading the external YIR file.
-The explicit [registered window route](docs/reference/nuis-yir-window-session-v2.md),
+The explicit [registered window route](docs/reference/nuis-yir-window-session-v3.md),
 `nuis run-artifact --window-session window <artifact-dir>`, now retains Nuis state
 and one provider connection in the compiled AppKit process. Space toggles the
 GPU-processed checkerboard; bounded logical-input replay checks exact Metal pixels
@@ -149,13 +149,16 @@ reconnecting or resetting clocks and budgets. An incoming request still has a
 120-second deadline from its first byte, including uploads; EOF and supervisor
 shutdown wake the wait. A shortened-deadline Metal regression retains one worker
 and exact live/replay pixels across idle gaps.
-Window profile v2 passes an explicit close reason to Nuis and reports cleanup
-separately from execution success. The compiled-window fault-injection test
+Window profile v3 passes close intent and a producer-observed failure category to
+Nuis, preserving the first fault and reporting cleanup separately from execution
+success. The compiled-window fault-injection test
 finishes Nuis cleanup without certifying a failed provider run or replacing old
 replay evidence; supervision allows five seconds before forced teardown.
-Existing v1 window bundles and their close helpers must be rebuilt together.
+The same binary also rejects a third draw against a two-frame replay with a typed
+exhaustion result, not a substitute image. Existing v1/v2 window bundles, Nuis
+close helpers and application-state artifacts must be rebuilt together.
 Unsupported bindings fail closed. Code-asset authority and output extents remain
-fixed; textures/samplers, mixed resources, detailed failure causes/recovery,
+fixed; textures/samplers, mixed resources, typed remote failures/recovery,
 self-contained host-runner injection,
 and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are

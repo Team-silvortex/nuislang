@@ -66,11 +66,11 @@ Current state:
   fully native CPU lowering and self-contained provider injection remain separate
   milestones. Explicit `--window-session window` now retains Nuis state and one
   provider across AppKit events; the no-option legacy preview is not migrated
-* [window profile v2](../../docs/reference/nuis-yir-window-session-v2.md) passes a
-  `NovaCloseReason` to Nuis cleanup. `close_with_reason` preserves failed status
-  and accepted frame identity; the host distinguishes completed cleanup from
+* [window profile v3](../../docs/reference/nuis-yir-window-session-v3.md) passes
+  `NovaCloseReason` and `NovaFailureKind` to Nuis cleanup. `close_with_failure`
+  preserves failed status, the first fault and accepted frame identity; the host distinguishes completed cleanup from
   successful execution. Compiled provider-failure injection retains the error
-  and old replay files. Version 1 window bundles and close helpers require rebuilding
+  and old replay files. Version 1/2 window bundles, state artifacts and close helpers require rebuilding
 * lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
@@ -95,7 +95,8 @@ Current source-asset status:
   [lib/nova_contracts.ns](lib/nova_contracts.ns)
 * the first executable lifecycle module is
   [lib/app_runtime.ns](lib/app_runtime.ns), which exposes owned
-  `NovaAppState` and `NovaFrameTransaction` transitions plus `NovaCloseReason`
+  `NovaAppState` and `NovaFrameTransaction` transitions plus `NovaCloseReason` and
+  `NovaFailureKind`; the first observed fault survives subsequent cleanup
 * both library modules currently use `library_import_policy = "manual-only"`
   so it is declared and discoverable through project metadata, but it is not
   auto-injected into project scope by default
@@ -132,7 +133,7 @@ Current limitation:
 * the native three-frame validation loop and the persistent embedded-YIR window
   are distinct routes. The latter remains bounded to 256 dispatches and 64 MiB
   replay, not a stable unlimited interactive world loop. Failure teardown is
-  tested, but detailed causes, cancellation and owned-resource retirement remain open
+  tested, but typed remote causes, cancellation and owned-resource retirement remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;
   its receipt is provider-domain-issued, but its clock still comes from the planned

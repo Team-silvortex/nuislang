@@ -1,4 +1,5 @@
-use yir_core::{ModRegistry, Value, YirModule};
+use crate::application_failure::FailureState;
+use yir_core::{ApplicationFailureKind, ModRegistry, Value, YirModule};
 use yir_exec::{ExecutionTrace, FunctionSession};
 
 mod boundary;
@@ -28,6 +29,7 @@ pub struct ApplicationSession<'a> {
     phase: ApplicationSessionPhase,
     close_error: Option<String>,
     event_error: Option<String>,
+    failures: FailureState,
 }
 
 impl<'a> ApplicationSession<'a> {
@@ -47,11 +49,31 @@ impl<'a> ApplicationSession<'a> {
         entries: ApplicationSessionEntries<'_>,
         arguments: Vec<Value>,
     ) -> Result<(Self, ExecutionTrace), String> {
+        Self::open_with_failures(
+            module,
+            registry,
+            entries,
+            arguments,
+            FailureState::default(),
+        )
+    }
+
+    pub(crate) fn open_with_failures(
+        module: &'a YirModule,
+        registry: &'a ModRegistry,
+        entries: ApplicationSessionEntries<'_>,
+        arguments: Vec<Value>,
+        failures: FailureState,
+    ) -> Result<(Self, ExecutionTrace), String> {
         let boundary = SessionBoundary::bind(module, entries)?;
         FunctionSession::validate_arguments(&boundary.open.parameters, &arguments)?;
         let mut execution = FunctionSession::new(module, registry)?;
-        let opened = execution.invoke(&boundary.open.name, arguments)?;
-        boundary.state_arguments(&opened.value)?;
+        let opened = execution
+            .invoke(&boundary.open.name, arguments)
+            .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
+        boundary
+            .state_arguments(&opened.value)
+            .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
         Ok((
             Self {
                 execution,
@@ -60,6 +82,7 @@ impl<'a> ApplicationSession<'a> {
                 phase: ApplicationSessionPhase::Open,
                 close_error: None,
                 event_error: None,
+                failures,
             },
             opened.trace,
         ))
@@ -73,8 +96,13 @@ impl<'a> ApplicationSession<'a> {
         self.phase
     }
 
-    pub(crate) fn record_host_failure(&mut self) {
+    pub fn failure_kind(&self) -> ApplicationFailureKind {
+        self.failures.kind()
+    }
+
+    pub(crate) fn record_host_failure(&mut self, kind: ApplicationFailureKind) {
         if self.phase != ApplicationSessionPhase::Closed {
+            self.failures.record(kind);
             self.phase = ApplicationSessionPhase::Faulted;
             self.event_error
                 .get_or_insert_with(|| "application host requested failed cleanup".to_owned());
@@ -87,10 +115,18 @@ impl<'a> ApplicationSession<'a> {
         if self.phase != ApplicationSessionPhase::Closed {
             return Err("application session was not explicitly closed".to_owned());
         }
-        if let Some(error) = self.close_error.as_ref().or(self.event_error.as_ref()) {
+        if let (Some(event), Some(close)) = (&self.event_error, &self.close_error) {
+            return Err(format!(
+                "application session did not complete successfully: {event}; cleanup failed: {close}"
+            ));
+        }
+        if let Some(error) = self.event_error.as_ref().or(self.close_error.as_ref()) {
             return Err(format!(
                 "application session did not complete successfully: {error}"
             ));
+        }
+        if self.failure_kind().is_failure() {
+            return Err("application session retained a producer failure".to_owned());
         }
         Ok(())
     }
@@ -125,6 +161,7 @@ impl<'a> ApplicationSession<'a> {
             }
             Err(error) => {
                 self.phase = ApplicationSessionPhase::Faulted;
+                self.failures.record(ApplicationFailureKind::Callback);
                 self.event_error = Some(error.clone());
                 Err(error)
             }
@@ -155,6 +192,7 @@ impl<'a> ApplicationSession<'a> {
             }
             Err(error) => {
                 self.close_error = Some(error.clone());
+                self.failures.record(ApplicationFailureKind::Callback);
                 Err(error)
             }
         }

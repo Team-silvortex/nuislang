@@ -1,12 +1,13 @@
 use super::provider_result_stream::{
     execute_with_provider_source, ProviderResultFrame, ProviderResultSource,
 };
+use crate::application_failure::ProviderFailure;
 use std::{os::unix::net::UnixStream, path::Path, time::Duration};
 use yir_core::{
     provider_runtime_ipc::{
         hash_bytes, DispatchArguments, DispatchTarget, Message, MAX_DISPATCHES,
     },
-    Node, YirModule,
+    ApplicationFailureKind, Node, YirModule,
 };
 
 pub fn execute_module_source_with_provider_ipc(
@@ -64,25 +65,41 @@ impl ProviderRuntimeClient {
         &mut self,
         node: &Node,
         arguments: &DispatchArguments,
-    ) -> Result<ProviderResultFrame, String> {
-        if !self.targets(node) || self.sequence >= MAX_DISPATCHES {
-            return Err("runtime IPC target or invocation limit rejected".to_owned());
+    ) -> Result<ProviderResultFrame, ProviderFailure> {
+        if !self.targets(node) {
+            return Err("runtime IPC target rejected".to_owned().into());
+        }
+        if self.sequence >= MAX_DISPATCHES {
+            return Err(ProviderFailure::new(
+                ApplicationFailureKind::DispatchLimit,
+                "runtime IPC invocation limit rejected",
+            ));
         }
         Message::Dispatch {
             sequence: self.sequence,
             target: self.target.clone(),
             arguments: arguments.clone(),
         }
-        .write_to(&mut self.stream)?;
-        let frame = match Message::read_from(&mut self.stream)? {
+        .write_to(&mut self.stream)
+        .map_err(ProviderFailure::exchange)?;
+        let frame = match Message::read_from(&mut self.stream).map_err(ProviderFailure::exchange)? {
             Message::Frame(frame) if frame.sequence == self.sequence => frame,
             Message::Rejected(error) => {
-                return Err(format!("runtime provider rejected dispatch: {error}"))
+                return Err(ProviderFailure::new(
+                    ApplicationFailureKind::ProviderRejected,
+                    format!("runtime provider rejected dispatch: {error}"),
+                ))
             }
-            _ => return Err("runtime IPC reply sequence or message mismatch".to_owned()),
+            _ => {
+                return Err("runtime IPC reply sequence or message mismatch"
+                    .to_owned()
+                    .into())
+            }
         };
         if !frame.arguments.matches_identity(arguments)? {
-            return Err("runtime IPC reply dispatch arguments mismatch".to_owned());
+            return Err("runtime IPC reply dispatch arguments mismatch"
+                .to_owned()
+                .into());
         }
         if frame.element_type != "u8"
             || frame.layout != "image-2d-row-major:pixel-format=rgba8"
@@ -90,19 +107,28 @@ impl ProviderRuntimeClient {
             || frame.row_stride_bytes != frame.shape[0].saturating_mul(4)
             || frame.row_stride_bytes.checked_mul(frame.shape[1]) != Some(frame.payload.len())
         {
-            return Err("runtime IPC frame layout or byte length mismatch".to_owned());
+            return Err("runtime IPC frame layout or byte length mismatch"
+                .to_owned()
+                .into());
         }
         let result = ProviderResultFrame::from_ipc(&self.target, frame)?;
         self.sequence += 1;
         Ok(result)
     }
 
-    pub(super) fn finish(&mut self) -> Result<(), String> {
-        Message::Finish(self.sequence).write_to(&mut self.stream)?;
-        match Message::read_from(&mut self.stream)? {
+    pub(super) fn finish(&mut self) -> Result<(), ProviderFailure> {
+        Message::Finish(self.sequence)
+            .write_to(&mut self.stream)
+            .map_err(ProviderFailure::exchange)?;
+        match Message::read_from(&mut self.stream).map_err(ProviderFailure::exchange)? {
             Message::Closed(count) if count == self.sequence => Ok(()),
-            Message::Rejected(error) => Err(format!("runtime provider rejected close: {error}")),
-            _ => Err("runtime IPC close acknowledgement mismatch".to_owned()),
+            Message::Rejected(error) => Err(ProviderFailure::new(
+                ApplicationFailureKind::ProviderRejected,
+                format!("runtime provider rejected close: {error}"),
+            )),
+            _ => Err("runtime IPC close acknowledgement mismatch"
+                .to_owned()
+                .into()),
         }
     }
 }

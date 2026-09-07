@@ -2,6 +2,49 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "application-session-typed-failure-contract",
+        path: "crates/yir-core/src/application_failure.rs",
+        required_patterns: &[
+            "nuis-yir-application-failure-v1",
+            "DispatchLimit = 3",
+            "ProviderRejected = 4",
+            "ProviderExchange = 5",
+            "ProviderContract = 6",
+            "ReplayExhausted = 7",
+            "failure_codes_are_explicit_and_unknown_codes_do_not_become_success",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-first-failure-latch",
+        path: "crates/yir-runtime-host/src/application_failure.rs",
+        required_patterns: &[
+            "struct FailureState(Arc<AtomicI64>)",
+            "compare_exchange(0, kind.code()",
+            "self.record(failure.kind)",
+            "failure_state_is_first_wins_and_isolated_between_sessions",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-provider-failure-producer",
+        path: "crates/yir-runtime-host/src/provider_runtime_ipc.rs",
+        required_patterns: &[
+            "Result<ProviderResultFrame, ProviderFailure>",
+            "ApplicationFailureKind::DispatchLimit",
+            "ApplicationFailureKind::ProviderRejected",
+            "ProviderFailure::exchange",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "application-session-replay-failure-producer",
+        path: "crates/yir-runtime-host/src/provider_result_stream.rs",
+        required_patterns: &[
+            "provider_registry_with_failures",
+            "self.failures.report(failure)",
+            "ApplicationFailureKind::ReplayExhausted",
+            "finish_provider_source_with_failures",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "application-session-close-reason-contract",
         path: "crates/yir-core/src/application_close_reason.rs",
         required_patterns: &[
@@ -21,6 +64,9 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "NovaCloseReason.Unknown",
             "pub fn close_with_reason",
             "state.status != status_failed()",
+            "pub enum NovaFailureKind",
+            "pub fn close_with_failure",
+            "state.failure_kind != 0",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -53,18 +99,21 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "window_session_close_reason=1",
             "window_session_cleanup_completed=1",
             "failure replaced old replay evidence",
+            "verify_compiled_replay_exhaustion_cleanup",
+            "window_session_failure_kind=7",
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "application-session-window-v2-boundary",
-        path: "docs/reference/nuis-yir-window-session-v2.md",
+        id: "application-session-window-v3-boundary",
+        path: "docs/reference/nuis-yir-window-session-v3.md",
         required_patterns: &[
-            "nuis-yir-window-session-v2",
+            "nuis-yir-window-session-v3",
             "nuis-yir-application-close-reason-v1",
             "cleanup_completed",
             "not successful-completion receipts",
             "five seconds",
-            "structured cause details",
+            "nuis-yir-application-failure-v1",
+            "Diagnostic strings are not parsed",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -209,14 +258,14 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
         id: "application-session-window-profile",
         path: "crates/yir-runtime-host/src/window_session.rs",
         required_patterns: &[
-            "nuis-yir-window-session-v2",
+            "nuis-yir-window-session-v3",
             "validate_window_session",
             "validate_window_trace",
             "ApplicationSessionSignature::bind",
             "close callback must not present",
             "window_trace_requires_exact_bounded_rgba8_without_glyph_fallback",
             "ApplicationCloseReason::EventFailed",
-            "self.pump.close_after_failure(arguments)?",
+            "self.pump.close_after_failure(arguments, kind)?",
             "self.cleanup_completed = reply.cleanup_completed",
         ],
     },
@@ -229,6 +278,7 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "nuis_window_session_close_with_reason",
             "nuis_window_session_close_reason",
             "nuis_window_session_cleanup_completed",
+            "nuis_window_session_failure_kind",
             "ApplicationCloseReason::from_code(reason)",
             "nuis_window_session_free",
             "poll buffer must be empty",
@@ -249,6 +299,8 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "window_session_closed",
             "window_session_close_reason=",
             "window_session_cleanup_completed=",
+            "window_session_close_failure_kind=",
+            "window_session_failure_kind=",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -275,6 +327,8 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "provider_and_dispatch_budget_failures_reach_nuis_close_without_becoming_success",
             "host_failure_is_latched_before_cleanup_and_busy_close_does_not_poison_state",
             "late_finish_failure_preserves_cleanup_without_repeating_or_certifying_it",
+            "cleanup_failure_cannot_hide_the_original_provider_failure",
+            "invalid_cleanup_trace_cannot_hide_the_original_callback_failure",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -300,8 +354,10 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "session.close(command.arguments)",
             "ApplicationPumpPhase::Closed",
             "ApplicationPumpPhase::Stopped",
-            "session.record_host_failure()",
+            "session.record_host_failure(kind)",
             "cleanup_completed = trace.is_ok()",
+            "failure_kind: failures.kind()",
+            "session.completion_status().and(trace)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -379,7 +435,7 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "ApplicationProviderSource::Ipc",
             "ApplicationProviderSource::Replay",
             "application.completion_status()?",
-            "finish_provider_source(&provider)?",
+            "finish_provider_source_with_failures(&provider, &failures)?",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -431,6 +487,8 @@ pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = 
             "close_error",
             "pub(crate) fn record_host_failure",
             "application host requested failed cleanup",
+            "pub fn failure_kind",
+            "cleanup failed: {close}",
         ],
     },
     DevTensorDriftCheckSpec {

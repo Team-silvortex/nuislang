@@ -51,6 +51,11 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
     assert!(log.contains("window_session_key=128578\n"), "{log}");
     assert!(log.contains("window_session_close_reason=0\n"), "{log}");
     assert!(
+        log.contains("window_session_close_failure_kind=0\n"),
+        "{log}"
+    );
+    assert!(log.contains("window_session_failure_kind=0\n"), "{log}");
+    assert!(
         log.contains("window_session_cleanup_completed=1\n"),
         "{log}"
     );
@@ -105,7 +110,7 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
                 "unbound key must not redraw"
             );
             assert!(session
-                .close(vec![Value::Int(0)])?
+                .close(vec![Value::Int(0), Value::Int(0)])?
                 .unwrap()
                 .presented_frames
                 .is_empty());

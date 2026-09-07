@@ -1,3 +1,4 @@
+use crate::application_failure::{FailureState, ProviderFailure};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Component, Path},
@@ -8,8 +9,8 @@ use yir_core::{
     provider_runtime_ipc::{
         DispatchArguments, ReplayBudget, MAX_DISPATCHES, MAX_REPLAY_MANIFEST_BYTES,
     },
-    ExecutionState, FrameSurface, InstructionSemantics, Node, ProviderCompletionRegistration,
-    ProviderPhysicalCompletion, RegisteredMod, Resource, Value,
+    ApplicationFailureKind, ExecutionState, FrameSurface, InstructionSemantics, Node,
+    ProviderCompletionRegistration, ProviderPhysicalCompletion, RegisteredMod, Resource, Value,
 };
 
 pub const PROVIDER_RESULT_STREAM_CONTRACT: &str = "nuis-provider-runtime-result-stream-v2";
@@ -50,10 +51,18 @@ pub(super) fn execute_with_provider_source(
 pub(super) fn provider_registry(
     source: ProviderResultSource,
 ) -> (yir_core::ModRegistry, Arc<Mutex<ProviderResultSource>>) {
+    provider_registry_with_failures(source, FailureState::default())
+}
+
+pub(super) fn provider_registry_with_failures(
+    source: ProviderResultSource,
+    failures: FailureState,
+) -> (yir_core::ModRegistry, Arc<Mutex<ProviderResultSource>>) {
     let state = Arc::new(Mutex::new(source));
     let mut registry = yir_verify::default_registry();
     registry.register(ProviderResultShaderMod {
         state: Arc::clone(&state),
+        failures,
     });
     (registry, state)
 }
@@ -61,10 +70,18 @@ pub(super) fn provider_registry(
 pub(super) fn finish_provider_source(
     state: &Arc<Mutex<ProviderResultSource>>,
 ) -> Result<(), String> {
+    finish_provider_source_with_failures(state, &FailureState::default())
+}
+
+pub(super) fn finish_provider_source_with_failures(
+    state: &Arc<Mutex<ProviderResultSource>>,
+    failures: &FailureState,
+) -> Result<(), String> {
     state
         .lock()
         .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
         .finish()
+        .map_err(|failure| failures.report(failure))
 }
 
 struct ProviderResultStream {
@@ -139,16 +156,16 @@ impl ProviderResultSource {
         &mut self,
         node: &Node,
         arguments: &DispatchArguments,
-    ) -> Result<ProviderResultFrame, String> {
+    ) -> Result<ProviderResultFrame, ProviderFailure> {
         match self {
             Self::Replay(queue) => queue.take(node, arguments),
             #[cfg(unix)]
             Self::Live(client) => client.take(node, arguments),
         }
     }
-    fn finish(&mut self) -> Result<(), String> {
+    fn finish(&mut self) -> Result<(), ProviderFailure> {
         match self {
-            Self::Replay(queue) => queue.ensure_consumed(),
+            Self::Replay(queue) => queue.ensure_consumed().map_err(Into::into),
             #[cfg(unix)]
             Self::Live(client) => client.finish(),
         }
@@ -243,11 +260,14 @@ impl ProviderResultQueue {
         &mut self,
         node: &Node,
         arguments: &DispatchArguments,
-    ) -> Result<ProviderResultFrame, String> {
+    ) -> Result<ProviderResultFrame, ProviderFailure> {
         let frame = self.frames.front().ok_or_else(|| {
-            format!(
-                "provider runtime result stream is exhausted at `{}`",
-                node.name
+            ProviderFailure::new(
+                ApplicationFailureKind::ReplayExhausted,
+                format!(
+                    "provider runtime result stream is exhausted at `{}`",
+                    node.name
+                ),
             )
         })?;
         if frame.module != node.op.module
@@ -265,10 +285,12 @@ impl ProviderResultQueue {
                 node.op.instruction,
                 node.name,
                 node.resource,
-            ));
+            ).into());
         }
         if !frame.arguments.matches_identity(arguments)? {
-            return Err("provider runtime result dispatch arguments mismatch".to_owned());
+            return Err("provider runtime result dispatch arguments mismatch"
+                .to_owned()
+                .into());
         }
         Ok(self.frames.pop_front().expect("validated provider frame"))
     }
@@ -285,6 +307,7 @@ impl ProviderResultQueue {
 
 struct ProviderResultShaderMod {
     state: Arc<Mutex<ProviderResultSource>>,
+    failures: FailureState,
 }
 
 impl RegisteredMod for ProviderResultShaderMod {
@@ -325,6 +348,18 @@ impl RegisteredMod for ProviderResultShaderMod {
         resource: &Resource,
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
+        self.execute_checked(node, resource, state)
+            .map_err(|failure| self.failures.report(failure))
+    }
+}
+
+impl ProviderResultShaderMod {
+    fn execute_checked(
+        &self,
+        node: &Node,
+        resource: &Resource,
+        state: &mut ExecutionState,
+    ) -> Result<Value, ProviderFailure> {
         let targets = self
             .state
             .lock()
@@ -332,9 +367,11 @@ impl RegisteredMod for ProviderResultShaderMod {
             .targets(node);
         if !targets {
             if yir_domain_shader::ShaderMod::requires_provider_frame(node) {
-                return Err(format!("runtime shader frame operation `{}` has no admitted provider target; reference fallback is forbidden", node.name));
+                return Err(format!("runtime shader frame operation `{}` has no admitted provider target; reference fallback is forbidden", node.name).into());
             }
-            return yir_domain_shader::ShaderMod.execute(node, resource, state);
+            return yir_domain_shader::ShaderMod
+                .execute(node, resource, state)
+                .map_err(|detail| ProviderFailure::new(ApplicationFailureKind::Callback, detail));
         }
         let descriptor =
             yir_domain_shader::ShaderMod.validate_draw_instanced(node, resource, state)?;
@@ -348,7 +385,8 @@ impl RegisteredMod for ProviderResultShaderMod {
             return Err(format!(
                 "provider runtime result dimensions for `{}` disagree with YIR",
                 node.name
-            ));
+            )
+            .into());
         }
         let surface =
             FrameSurface::from_rgba8(descriptor.width(), descriptor.height(), frame.payload)?;

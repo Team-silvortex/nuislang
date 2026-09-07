@@ -1,6 +1,6 @@
 use super::*;
 use std::time::Instant;
-use yir_core::ApplicationCloseReason;
+use yir_core::{ApplicationCloseReason, ApplicationFailureKind};
 use yir_runtime_host::{
     validate_window_session, ApplicationPumpPhase, WindowSession, WindowSessionReply,
 };
@@ -36,18 +36,19 @@ fn source() -> String {
     )
     .replace(
         "function-param close divisor i64 value divisor",
-        "function-param close reason i64 value reason",
+        "function-param close reason i64 value reason\nfunction-param close failure i64 value failure",
     )
-    .replace("function-node close divisor", "function-node close reason")
+    .replace("function-node close divisor", "function-node close reason\nfunction-node close failure\nfunction-node close reason_count")
     .replace(
         "cpu.param_i64 divisor cpu0 1",
-        "cpu.param_i64 reason cpu0 1",
+        "cpu.param_i64 reason cpu0 1\ncpu.param_i64 failure cpu0 2",
     )
     .replace(
         "cpu.div quotient cpu0 final_count divisor",
-        "cpu.add quotient cpu0 final_count reason",
+        "cpu.add reason_count cpu0 final_count reason\ncpu.add quotient cpu0 reason_count failure",
     )
-    .replace("edge dep divisor quotient", "edge dep reason quotient")
+    .replace("edge dep divisor quotient", "edge dep reason reason_count\nedge dep reason_count quotient\nedge dep failure quotient")
+    .replace("edge dep final_count quotient", "edge dep final_count reason_count")
 }
 
 fn receive(session: &mut WindowSession) -> WindowSessionReply {
@@ -93,6 +94,7 @@ fn window_profile_routes_redraw_unicode_key_and_explicit_close() {
     assert_eq!(closed.phase, ApplicationPumpPhase::Closed);
     assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
     assert!(closed.cleanup_completed);
+    assert_eq!(closed.failure_kind, ApplicationFailureKind::None);
     assert!(closed.frame.unwrap().is_none());
     drop(session);
     assert_eq!(peer.finish(), (2, true));
@@ -109,6 +111,8 @@ fn window_signature_drift_fails_before_connecting_or_opening() {
         source.replace("code i64", "value i64"),
         source.replace("reason i64", "cause i64"),
         source.replace("function-param close reason i64 value reason\n", ""),
+        source.replace("function-param close failure i64 value failure\n", ""),
+        source.replace("failure i64", "detail i64"),
     ] {
         let mut session = WindowSession::spawn(
             source,
@@ -144,6 +148,7 @@ fn multiple_presentations_reject_before_provider_success() {
     assert_eq!(reply.phase, ApplicationPumpPhase::Stopped);
     assert!(reply.frame.unwrap_err().contains("more than one frame"));
     assert!(!reply.cleanup_completed);
+    assert_eq!(reply.failure_kind, ApplicationFailureKind::Host);
     assert!(session.close().is_err());
     drop(session);
     assert_eq!(peer.finish(), (1, false));
@@ -191,7 +196,24 @@ fn state_count(reply: &WindowSessionReply) -> i64 {
 
 #[test]
 fn provider_and_dispatch_budget_failures_reach_nuis_close_without_becoming_success() {
-    for (response, events) in [(Reply::RejectedFrame, 0), (Reply::Good, 256)] {
+    for (response, events, kind) in [
+        (
+            Reply::RejectedFrame,
+            0,
+            ApplicationFailureKind::ProviderRejected,
+        ),
+        (Reply::Good, 256, ApplicationFailureKind::DispatchLimit),
+        (
+            Reply::DisconnectedFrame,
+            0,
+            ApplicationFailureKind::ProviderExchange,
+        ),
+        (
+            Reply::WrongSequence,
+            0,
+            ApplicationFailureKind::ProviderContract,
+        ),
+    ] {
         let source = source();
         let peer = Peer::start_source(response, source.clone(), None);
         let mut session = WindowSession::spawn(
@@ -211,6 +233,7 @@ fn provider_and_dispatch_budget_failures_reach_nuis_close_without_becoming_succe
         let failed = receive(&mut session);
         assert_eq!(failed.phase, ApplicationPumpPhase::Faulted);
         assert!(failed.frame.is_err());
+        assert_eq!(failed.failure_kind, kind);
         assert_eq!(
             state_count(&failed),
             640,
@@ -225,10 +248,11 @@ fn provider_and_dispatch_budget_failures_reach_nuis_close_without_becoming_succe
         let closed = receive(&mut session);
         assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
         assert!(closed.cleanup_completed);
+        assert_eq!(closed.failure_kind, kind);
         assert_eq!(
             state_count(&closed),
-            641,
-            "Nuis close consumed reason=1 on the old state"
+            641 + kind.code(),
+            "Nuis close consumed reason and typed failure on the old state"
         );
         assert!(closed
             .frame
@@ -265,9 +289,15 @@ fn host_failure_is_latched_before_cleanup_and_busy_close_does_not_poison_state()
         };
         session.close_with_reason(reason).unwrap();
         let closed = receive(&mut session);
+        let kind = if failed {
+            ApplicationFailureKind::Host
+        } else {
+            ApplicationFailureKind::None
+        };
         assert_eq!(closed.close_reason, Some(reason));
         assert!(closed.cleanup_completed);
-        assert_eq!(state_count(&closed), 640 + reason.code());
+        assert_eq!(closed.failure_kind, kind);
+        assert_eq!(state_count(&closed), 640 + reason.code() + kind.code());
         assert_eq!(closed.frame.is_err(), failed);
         assert_eq!(
             closed.phase,
@@ -296,14 +326,101 @@ fn late_finish_failure_preserves_cleanup_without_repeating_or_certifying_it() {
     .unwrap();
     receive(&mut session).frame.unwrap();
     session.close().unwrap();
+    assert_eq!(session.failure_kind(), ApplicationFailureKind::None);
     let closed = receive(&mut session);
     assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
     assert!(closed.cleanup_completed);
     assert_eq!(state_count(&closed), 640);
     assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+    assert_eq!(
+        closed.failure_kind,
+        ApplicationFailureKind::ProviderContract
+    );
     assert!(closed.frame.is_err());
     assert!(session.close().is_err());
     assert!(session.event(0, 0).is_err());
     drop(session);
     assert_eq!(peer.finish(), (0, true));
+}
+
+#[test]
+fn cleanup_failure_cannot_hide_the_original_provider_failure() {
+    let source = source()
+        .replace(
+            "cpu.add quotient cpu0 reason_count failure",
+            "cpu.div quotient cpu0 reason_count zero_close",
+        )
+        .replace(
+            "function-node close quotient",
+            "function-node close quotient\nfunction-node close zero_close",
+        )
+        + "\ncpu.const_i64 zero_close cpu0 0\nedge dep zero_close quotient\n";
+    let peer = Peer::start_source(Reply::RejectedFrame, source.clone(), None);
+    let mut session = WindowSession::spawn(
+        source,
+        ApplicationProviderSource::Ipc(&peer.path),
+        "ui".to_owned(),
+        640,
+        400,
+    )
+    .unwrap();
+    receive(&mut session).frame.unwrap();
+    session.event(0, 0).unwrap();
+    let failed = receive(&mut session);
+    assert_eq!(
+        failed.failure_kind,
+        ApplicationFailureKind::ProviderRejected
+    );
+    let original = failed.frame.unwrap_err();
+    session.close().unwrap();
+    let closed = receive(&mut session);
+    assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+    assert_eq!(
+        closed.failure_kind,
+        ApplicationFailureKind::ProviderRejected
+    );
+    assert!(!closed.cleanup_completed);
+    let detail = closed.frame.unwrap_err();
+    assert!(detail.contains(&original), "{detail}");
+    assert!(detail.contains("cleanup failed:"), "{detail}");
+    assert!(detail.contains("zero"), "{detail}");
+    assert!(session.close().is_err());
+    drop(session);
+    assert_eq!(peer.finish(), (1, false));
+}
+
+#[test]
+fn invalid_cleanup_trace_cannot_hide_the_original_callback_failure() {
+    let source = source()
+        .replace("cpu.add next cpu0 count delta", "cpu.div next cpu0 count delta")
+        .replace("function-result close Counter owned closed", "function-result close Counter owned close_call")
+        .replace("function-node close closed", "function-node close closed\nfunction-node close close_call")
+        + "\ncpu.const_i64 zero cpu0 0\ncpu.const_i64 one cpu0 1\ncpu.call_owned_struct close_call cpu0 update Counter final_count zero one\nedge dep final_count close_call\nedge dep zero close_call\nedge dep one close_call\n";
+    let peer = Peer::start_source(Reply::Good, source.clone(), None);
+    let mut session = WindowSession::spawn(
+        source,
+        ApplicationProviderSource::Ipc(&peer.path),
+        "ui".to_owned(),
+        640,
+        400,
+    )
+    .unwrap();
+    receive(&mut session).frame.unwrap();
+    session.event(0, 0).unwrap();
+    let failed = receive(&mut session);
+    assert_eq!(failed.failure_kind, ApplicationFailureKind::Callback);
+    let original = failed.frame.unwrap_err();
+    session.close().unwrap();
+    let closed = receive(&mut session);
+    assert_eq!(closed.failure_kind, ApplicationFailureKind::Callback);
+    assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+    assert!(!closed.cleanup_completed);
+    let detail = closed.frame.unwrap_err();
+    assert!(detail.contains(&original), "{detail}");
+    assert!(detail.contains("cleanup validation failed:"), "{detail}");
+    assert!(detail.contains("must not present"), "{detail}");
+    drop(session);
+    let (dispatches, finished) = peer.finish();
+    assert!(dispatches > 0);
+    assert!(!finished);
 }

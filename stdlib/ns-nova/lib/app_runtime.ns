@@ -3,6 +3,12 @@ mod cpu NovaAppRuntime {
   /// Host close intent, not proof that the provider completed successfully.
   pub enum NovaCloseReason { Requested, EventFailed, HostFailed, Unknown }
 
+  /// nuis-yir-application-failure-v1; independent from close intent.
+  pub enum NovaFailureKind {
+    None, Callback, Host, DispatchLimit, ProviderRejected,
+    ProviderExchange, ProviderContract, ReplayExhausted, Unclassified, Unknown
+  }
+
   pub struct NovaAppState {
     pub status: i64,
     pub width: i64,
@@ -14,7 +20,8 @@ mod cpu NovaAppRuntime {
     pub dropped_frames: i64,
     pub last_completion_token: i64,
     pub last_completion_tick: i64,
-    pub last_completion_root: i64
+    pub last_completion_root: i64,
+    pub failure_kind: i64
   }
 
   pub struct NovaFrameTransaction {
@@ -74,6 +81,43 @@ mod cpu NovaAppRuntime {
     }
   }
 
+  pub fn failure_kind(code: i64) -> NovaFailureKind {
+    if code == 0 { return NovaFailureKind.None; }
+    if code == 1 { return NovaFailureKind.Callback; }
+    if code == 2 { return NovaFailureKind.Host; }
+    if code == 3 { return NovaFailureKind.DispatchLimit; }
+    if code == 4 { return NovaFailureKind.ProviderRejected; }
+    if code == 5 { return NovaFailureKind.ProviderExchange; }
+    if code == 6 { return NovaFailureKind.ProviderContract; }
+    if code == 7 { return NovaFailureKind.ReplayExhausted; }
+    if code == 8 { return NovaFailureKind.Unclassified; }
+    return NovaFailureKind.Unknown;
+  }
+
+  pub fn failure_code(kind: NovaFailureKind) -> i64 {
+    match kind {
+      NovaFailureKind.None => { return 0; }
+      NovaFailureKind.Callback => { return 1; }
+      NovaFailureKind.Host => { return 2; }
+      NovaFailureKind.DispatchLimit => { return 3; }
+      NovaFailureKind.ProviderRejected => { return 4; }
+      NovaFailureKind.ProviderExchange => { return 5; }
+      NovaFailureKind.ProviderContract => { return 6; }
+      NovaFailureKind.ReplayExhausted => { return 7; }
+      NovaFailureKind.Unclassified => { return 8; }
+      _ => { return 255; }
+    }
+  }
+
+  pub fn reason_failure(reason: NovaCloseReason) -> NovaFailureKind {
+    match reason {
+      NovaCloseReason.Requested => { return NovaFailureKind.None; }
+      NovaCloseReason.EventFailed => { return NovaFailureKind.Callback; }
+      NovaCloseReason.HostFailed => { return NovaFailureKind.Host; }
+      _ => { return NovaFailureKind.Unknown; }
+    }
+  }
+
   pub fn phase_begun() -> i64 {
     return 1;
   }
@@ -128,7 +172,8 @@ mod cpu NovaAppRuntime {
       dropped_frames: 0,
       last_completion_token: 0,
       last_completion_tick: initial_tick,
-      last_completion_root: 0
+      last_completion_root: 0,
+      failure_kind: 0
     };
   }
 
@@ -238,7 +283,8 @@ mod cpu NovaAppRuntime {
       dropped_frames: frame.dropped_frames + if presented { 0 } else { 1 },
       last_completion_token: if presented { frame.completion_token } else { 0 },
       last_completion_tick: frame.completion_tick,
-      last_completion_root: if presented { frame.completion_root } else { 0 }
+      last_completion_root: if presented { frame.completion_root } else { 0 },
+      failure_kind: 0
     };
   }
 
@@ -252,7 +298,22 @@ mod cpu NovaAppRuntime {
     observed_tick: i64,
     reason: NovaCloseReason
   ) -> NovaAppState {
-    let stopped: bool = close_requested(reason) && state.status != status_failed();
+    return close_with_failure(state, observed_tick, reason, reason_failure(reason));
+  }
+
+  /// First failure wins; neither a normal close nor later faults erase it.
+  pub fn close_with_failure(
+    state: NovaAppState,
+    observed_tick: i64,
+    reason: NovaCloseReason,
+    failure: NovaFailureKind
+  ) -> NovaAppState {
+    let reported: i64 = failure_code(failure);
+    let fallback: i64 = failure_code(reason_failure(reason));
+    let selected: i64 = if reported != 0 { reported } else { fallback };
+    let retained: i64 = if state.failure_kind != 0 { state.failure_kind } else { selected };
+    let effective: i64 = if retained == 0 && state.status == status_failed() { 8 } else { retained };
+    let stopped: bool = close_requested(reason) && state.status != status_failed() && effective == 0;
     return NovaAppState {
       status: if stopped { status_stopped() } else { status_failed() },
       width: state.width,
@@ -264,7 +325,8 @@ mod cpu NovaAppRuntime {
       dropped_frames: state.dropped_frames,
       last_completion_token: state.last_completion_token,
       last_completion_tick: state.last_completion_tick,
-      last_completion_root: state.last_completion_root
+      last_completion_root: state.last_completion_root,
+      failure_kind: effective
     };
   }
 
@@ -279,6 +341,7 @@ mod cpu NovaAppRuntime {
       state.dropped_frames +
       state.last_completion_token +
       state.last_completion_tick +
-      state.last_completion_root;
+      state.last_completion_root +
+      state.failure_kind;
   }
 }

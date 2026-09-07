@@ -3,7 +3,10 @@ use std::path::Path;
 use yir_core::Value;
 use yir_exec::ExecutionTrace;
 
-use crate::provider_result_stream::{finish_provider_source, provider_registry, replay_source};
+use crate::application_failure::FailureState;
+use crate::provider_result_stream::{
+    finish_provider_source_with_failures, provider_registry_with_failures, replay_source,
+};
 use crate::{ApplicationSession, ApplicationSessionEntries};
 
 pub const PROVIDER_APPLICATION_SESSION_CONTRACT: &str = "nuis-yir-provider-application-session-v1";
@@ -34,7 +37,15 @@ pub fn with_provider_application_session<T>(
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
     let module = yir_syntax::parse_module(source)?;
-    with_session(source, &module, provider, entries, arguments, drive)
+    with_session(
+        source,
+        &module,
+        provider,
+        entries,
+        arguments,
+        FailureState::default(),
+        drive,
+    )
 }
 
 /// Select only a static registration embedded in the admitted YIR. Unknown or
@@ -52,6 +63,7 @@ pub fn with_registered_provider_application_session<T>(
         id,
         arguments,
         |_, _| Ok(()),
+        FailureState::default(),
         drive,
     )
 }
@@ -62,6 +74,7 @@ pub(crate) fn with_registered_provider_application_session_checked<T>(
     id: &str,
     arguments: Vec<Value>,
     preflight: fn(&yir_core::YirModule, &str) -> Result<(), String>,
+    failures: FailureState,
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
     let module = yir_syntax::parse_module(source)?;
@@ -73,6 +86,7 @@ pub(crate) fn with_registered_provider_application_session_checked<T>(
         provider,
         registration.entries(),
         arguments,
+        failures,
         drive,
     )
 }
@@ -83,6 +97,7 @@ fn with_session<T>(
     provider: ApplicationProviderSource<'_>,
     entries: ApplicationSessionEntries<'_>,
     arguments: Vec<Value>,
+    failures: FailureState,
     drive: impl FnOnce(&mut ApplicationSession<'_>, ExecutionTrace) -> Result<T, String>,
 ) -> Result<T, String> {
     ApplicationSession::preflight(module, entries, &arguments)?;
@@ -95,12 +110,17 @@ fn with_session<T>(
         }
         ApplicationProviderSource::Replay(path) => replay_source(source, path)?,
     };
-    let (registry, provider) = provider_registry(provider);
-    let (mut application, opened) =
-        ApplicationSession::open(module, &registry, entries, arguments)?;
+    let (registry, provider) = provider_registry_with_failures(provider, failures.clone());
+    let (mut application, opened) = ApplicationSession::open_with_failures(
+        module,
+        &registry,
+        entries,
+        arguments,
+        failures.clone(),
+    )?;
     let result = drive(&mut application, opened)?;
     application.completion_status()?;
     drop(application);
-    finish_provider_source(&provider)?;
+    finish_provider_source_with_failures(&provider, &failures)?;
     Ok(result)
 }

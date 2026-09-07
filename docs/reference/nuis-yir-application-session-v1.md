@@ -185,6 +185,16 @@ reply with this flag true. Failed close callbacks or invalid close presentations
 leave it false. The window profile can latch a host failure before Nuis cleanup;
 that failure likewise prevents successful Finish, even if the callback succeeds.
 
+`failure_kind` carries the shared `nuis-yir-application-failure-v1` code separately
+from text diagnostics and close intent. Producers record their observation before
+crossing the executor's String error boundary; each scope owns its first-failure
+latch. Callback/host cleanup cannot overwrite an earlier provider fault. Invalid
+ingress arguments rejected before execution do not poison the latch. The terminal
+reply includes late Finish failure even though Nuis close cannot be repeated.
+The window terminal diagnostic retains both an event error and a later cleanup
+error. Text-only peer rejection and exchange/framing failures remain coarse
+categories; no remote cause is guessed from diagnostic wording.
+
 `abort` and dropping the handle disconnect the channels without joining the
 worker or implicitly executing Nuis close. An idle worker wakes and drops its
 scope without successful provider finish. An already admitted callback may still
@@ -199,7 +209,7 @@ recoverable input errors, latched callback failures, failed close acknowledgemen
 idle/in-flight abandonment and the unchanged per-session dispatch limit. The live
 Metal regression now holds this owned handle between deliveries, verifies both
 images and replays them through another owned pump. An explicit registered
-[window mode](nuis-yir-window-session-v2.md) now uses this handle in the compiled
+[window mode](nuis-yir-window-session-v3.md) now uses this handle in the compiled
 AppKit process; the no-option legacy preview timer remains unchanged.
 
 ### Idle And Request Deadlines

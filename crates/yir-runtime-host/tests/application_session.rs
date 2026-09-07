@@ -160,6 +160,10 @@ fn invalid_ingress_has_no_effect_and_can_be_corrected() {
         assert!(session.event(arguments).is_err());
         assert_eq!(session.phase(), ApplicationSessionPhase::Open);
         assert_eq!(count(&session), 10);
+        assert_eq!(
+            session.failure_kind(),
+            yir_core::ApplicationFailureKind::None
+        );
     }
     assert!(session.close(vec![]).is_err());
     assert_eq!(session.phase(), ApplicationSessionPhase::Open);
@@ -175,6 +179,10 @@ fn failed_close_is_terminal_and_is_not_retried() {
     let (mut session, _) =
         ApplicationSession::open(&module, &registry, entries(), vec![Value::Int(10)]).unwrap();
     let error = session.close(vec![Value::Int(0)]).unwrap_err();
+    assert_eq!(
+        session.failure_kind(),
+        yir_core::ApplicationFailureKind::Callback
+    );
     assert!(session.completion_status().is_err());
     assert!(error.contains("zero"), "{error}");
     assert_eq!(session.phase(), ApplicationSessionPhase::Closed);
@@ -200,6 +208,10 @@ fn failed_event_stops_delivery_but_allows_one_explicit_close() {
         .unwrap_err()
         .contains("zero"));
     assert_eq!(session.phase(), ApplicationSessionPhase::Faulted);
+    assert_eq!(
+        session.failure_kind(),
+        yir_core::ApplicationFailureKind::Callback
+    );
     assert!(session.event(vec![Value::Int(2)]).is_err());
     assert_eq!(count(&session), 10);
     let trace = session.close(vec![Value::Int(1)]).unwrap().unwrap();
@@ -210,6 +222,10 @@ fn failed_event_stops_delivery_but_allows_one_explicit_close() {
         .any(|step| step.ends_with("-> next")));
     assert!(session.close(vec![Value::Int(1)]).unwrap().is_none());
     assert!(session.completion_status().unwrap_err().contains("zero"));
+    assert_eq!(
+        session.failure_kind(),
+        yir_core::ApplicationFailureKind::Callback
+    );
 }
 
 #[test]

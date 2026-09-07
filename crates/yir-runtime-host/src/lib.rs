@@ -1,4 +1,5 @@
 mod application_event_pump;
+mod application_failure;
 mod application_session;
 mod frame_export;
 mod provider_application_session;

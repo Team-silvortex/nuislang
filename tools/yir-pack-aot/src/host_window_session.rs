@@ -1,4 +1,4 @@
-pub(super) const CONTRACT: &str = "nuis-yir-window-session-v2";
+pub(super) const CONTRACT: &str = "nuis-yir-window-session-v3";
 
 pub(super) const SUPPORT: &str = r#"
 typedef struct NuisWindowSession NuisWindowSession;
@@ -8,6 +8,7 @@ extern int32_t nuis_window_session_close(NuisWindowSession *);
 extern int32_t nuis_window_session_close_with_reason(NuisWindowSession *, int64_t);
 extern int64_t nuis_window_session_close_reason(const NuisWindowSession *);
 extern int32_t nuis_window_session_cleanup_completed(const NuisWindowSession *);
+extern int64_t nuis_window_session_failure_kind(const NuisWindowSession *);
 extern int32_t nuis_window_session_poll(NuisWindowSession *, NuisRenderedBuffer *, int32_t *);
 extern void nuis_window_session_free(NuisWindowSession **);
 
@@ -164,6 +165,7 @@ pub(super) const METHODS: &str = r#"
     if (phase == 3 || phase == 4) {
         self.sessionTerminal = YES;
         fprintf(stderr, "nuis: window_session_cleanup_completed=%d\n", nuis_window_session_cleanup_completed(self.session));
+        fprintf(stderr, "nuis: window_session_failure_kind=%lld\n", (long long)nuis_window_session_failure_kind(self.session));
         if (phase == 3 && status >= 0 && !self.sessionFailed) {
             gNuisWindowExitStatus = 0;
             fprintf(stderr, "nuis: window_session_closed\n");
@@ -180,6 +182,7 @@ pub(super) const METHODS: &str = r#"
                 self.sessionCloseSubmitted = YES;
                 fprintf(stderr, "nuis: window_session_close_requested\n");
                 fprintf(stderr, "nuis: window_session_close_reason=%lld\n", (long long)nuis_window_session_close_reason(self.session));
+                fprintf(stderr, "nuis: window_session_close_failure_kind=%lld\n", (long long)nuis_window_session_failure_kind(self.session));
             }
             if (close_status < 0) { self.sessionTerminal = YES; [self failSession]; }
         }
