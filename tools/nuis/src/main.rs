@@ -76,6 +76,7 @@ mod dev_tensor_drift;
 mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_language;
+mod dev_tensor_drift_data_mainline;
 mod dev_tensor_drift_data_runtime;
 mod dev_tensor_drift_data_runtime_bootstrap;
 mod dev_tensor_drift_data_runtime_bootstrap_evidence;
@@ -99,6 +100,7 @@ mod dev_tensor_drift_data_runtime_shader_graph;
 mod dev_tensor_drift_data_runtime_std;
 mod dev_tensor_drift_data_runtime_vulkan;
 mod dev_tensor_hierarchy;
+mod dev_tensor_mainline;
 mod dev_tensor_manifest;
 mod dev_tensor_milestones;
 mod dev_tensor_render;
@@ -308,6 +310,7 @@ fn run() -> Result<(), String> {
                 "  dev_tensor_bootstrap_critical_average_progress: {}",
                 dev_tensor.bootstrap_critical_average_progress
             );
+            println!("  dev_tensor_mainline_goal: {}", dev_tensor.mainline.target);
             println!(
                 "  dev_tensor_weakest_bootstrap_architecture: {}",
                 dev_tensor.weakest_bootstrap_architecture

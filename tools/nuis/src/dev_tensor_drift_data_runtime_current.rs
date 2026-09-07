@@ -64,7 +64,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         path: "docs/reference/nuis-ns-nova-application-lifecycle-v1.toml",
         required_patterns: &[
             "nuis-ns-nova-application-lifecycle-v1",
-            "progress = 99",
+            "interactive-engine-triage-not-bounded-proof-percentage",
             "owned-state-transition",
             "abstract-monotonic-step",
             "nuis-yir-provider-physical-completion-v1",

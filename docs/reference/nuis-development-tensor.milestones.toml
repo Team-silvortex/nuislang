@@ -126,3 +126,17 @@ required = false
 coordinates = [
   "standard-library/ns-nova/application-rendering-framework",
 ]
+
+[[milestones]]
+id = "beta-0.11-application-led-mainline"
+# Required by the mainline plan, not retroactively by the preparation gates.
+required = false
+coordinates = [
+  "standard-library/ns-nova/persistent-application-session",
+  "standard-library/ns-nova/interactive-image-workflow",
+  "heterogeneous-runtime/application-session/lifecycle-failure-resource-safety",
+  "heterogeneous-runtime/shader/shader-resource-bindings",
+  "standard-library/ns-nova/sustained-runtime-performance",
+  "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
+  "compiler-toolchain/bootstrap/compiler-component-ownership-transfer",
+]

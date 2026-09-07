@@ -1,9 +1,12 @@
 # `nuis` `beta-0.10.*` Self-Hosting Entry
 
-This file is the current-line anchor for the formal Nuis self-hosting migration
+This file is the entry-checkpoint anchor for the formal Nuis self-hosting migration
 period. The first recorded checkpoint is Git commit `c496bb67`
 (`beta-0.10.0`). Git history remains authoritative for later patch checkpoints;
 independent Cargo package versions still do not encode the project release.
+The current task-selection policy is the
+[beta-0.11 application-led mainline](nuis-beta-0.11-application-led-mainline.md);
+the entry-state counts below are historical, not the live readiness report.
 
 `beta-0.10.*` activates staged `stage0 -> stage1` compiler migration. It does
 not claim that Nuis is already self-hosted, that stage0 can be removed, or that

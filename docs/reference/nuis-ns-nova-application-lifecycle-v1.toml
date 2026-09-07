@@ -1,6 +1,8 @@
 schema = "nuis-ns-nova-application-lifecycle-v1"
 status = "active"
-progress = 99
+progress = 20
+progress_scope = "interactive-engine-triage-not-bounded-proof-percentage"
+mainline_plan = "docs/reference/nuis-development-tensor.mainline.toml"
 owner = "nuis.ns-nova"
 runtime_module = "stdlib/ns-nova/lib/app_runtime.ns"
 reference_project = "examples/projects/domains/ns_nova_showcase"

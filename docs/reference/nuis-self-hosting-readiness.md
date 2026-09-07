@@ -7,6 +7,12 @@ machine-readable v2 source is
 Completed stage2-equivalent compiler ownership remains a later
 `gamma-0.5.*` through `gamma-0.10.*` closure window.
 
+Current development follows the
+[application-led mainline](../versioning/nuis-beta-0.11-application-led-mainline.md).
+These five gates retain their bounded preparation meaning. Actual compiler-module
+ownership transfer has a separate tensor coordinate; Nuis-written engine code
+and readiness alone do not authorize stage0 replacement.
+
 ## Roadmap Is Not Readiness
 
 `developer-system/dev-tensor/self-hosting-phase-roadmap` is `stable/100`

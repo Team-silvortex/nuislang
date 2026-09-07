@@ -27,6 +27,14 @@ fn status_prints_closure_then_tensor_handoff_sample() {
     assert!(stdout.contains("dev_tensor_hierarchy_protocol: nuis-dev-tensor-hierarchy-v1"));
     assert!(stdout.contains("dev_tensor_hierarchy_validation_status: clean"));
     assert!(stdout.contains("dev_tensor_hierarchy_validation_error_count: 0"));
+    assert!(stdout
+        .contains("dev_tensor_mainline_goal: standard-library/ns-nova/interactive-image-workflow"));
+    assert!(
+        stdout.contains("dev_tensor_weakest_task_card_source: mainline-goal-dependency-frontier")
+    );
+    assert!(stdout.contains(
+        "dev_tensor_weakest_task_card_handoff_coordinate: standard-library/ns-nova/persistent-application-session"
+    ));
     let reading_order = stdout
         .find("frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff")
         .expect("status should expose frontdoor reading order");

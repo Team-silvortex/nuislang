@@ -21,7 +21,7 @@ Each tensor cell carries:
   protocol-owned maturity label. In `dev-tensor-status-v1`, valid values are
   `stable`, `usable`, `active`, and `early`
 * `progress`
-  current progress score from `0` to `100`
+  scope-specific triage score from `0` to `100`, not a project completion percentage
 * `bootstrap_critical`
   whether Nuis should treat this cell as important before self-hosting
 * `closure_role`
@@ -36,7 +36,7 @@ Each tensor cell carries:
   the action-oriented task-card step; this can mirror `next_step` while tools
   migrate from narrative guidance to machine-consumable planning
 * `validation_command`
-  the narrow command that should prove the next action worked
+  baseline regression command; new acceptance evidence is also required to close new scope
 * `expected_artifact`
   the concrete artifact or surfaced contract expected after the next action
 
@@ -207,16 +207,12 @@ recursive form is intended to support future bootstrap planning where a weak
 architecture lane can be expanded into its weakest module and then into the
 exact function cell that needs work.
 
-The summary mirrors the weakest bootstrap-critical function cell as a small
-closure bundle: status, progress, closure role, evidence, and next step. The
-task-card selector uses that lane while any bootstrap-critical cell remains
-below `stable/100`. Once every bootstrap-critical cell is closed, it
-automatically falls through to the weakest incomplete cell across the full
-tensor. The selected cell is projected into a small task-card surface:
-protocol, source, status, ready flag, coordinate, priority reason, action,
-validation command, and expected artifact. That gives scripts and future
-self-hosted tooling one stable bundle to consume without reassembling many
-`weakest_bootstrap_*` fields by hand.
+The summary retains weakest-bootstrap statistics as preparation diagnostics.
+Current task selection instead follows the declared application goals and their
+dependency graph in [mainline v1](nuis-development-tensor-mainline.md).
+The selected task still exposes protocol, source, readiness, coordinate, reason,
+action, validation command and expected artifact through the existing task-card
+fields; their historical `weakest_bootstrap_*` names are not a priority policy.
 
 At alpha closeout the transition reason was explicit:
 `all bootstrap-critical cells are stable at 100/100`. Beta may then register
@@ -470,35 +466,33 @@ The `beta-0.1` calibration baseline is:
   blocks stale admission before mutation. `official.cffi` now owns two generated GNU resolver providers and four version rows; Nuisc validates and preserves them, Nsld consumes a static build-time table, and runtime registry identity remains `0xc6631e590d61aca8`. Architecture and PE/COFF parity remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `usable/74`, optional;
   reference replay is bound while physical certification and adapters remain open
-* `standard-library/ns-nova/application-rendering-framework`: `active/99`, optional;
+* `standard-library/ns-nova/application-rendering-framework`: recalibrated `active/20`, optional;
   compiled PixelMagic WGSL is projected from verified YIR into content-addressed MSL and registered requests. IPC v3 keeps a 256-byte argument field while immutable-upload-le descriptors bind separate binary bodies capped at 16MiB per dispatch. One f32x4 fragment uniform still produces red/clear/blue frames; the image companion generates a 32x24 checkerboard in Nuis, snapshots and frees its original Buffer, uploads 3072 checked little-endian u32 bytes through a registered inherited-FD carrier, and performs RGB inversion in inline WGSL. Compiler-emitted bounds checks and native Metal reflection constrain the fixed read-only array slot, size and stride. The M2 compiled-binary regression checks every image pixel, full/clear/full coverage, live/replay equality, one worker with compiled/hit/hit cache reuse, physical completion and independent GLM release. Result-stream v2 stores content-bound upload descriptors, not duplicate image bodies; layout/content/code drift and missing offline payloads fail closed. The image workload also exposed missing guard/call ordering and ignored function-local early returns; regressions now cover recursive termination and invalid generator inputs without writes or caller return. Generation uses logarithmic-depth recursion because general buffer-writing while lowering remains incomplete. The production run-artifact --export-frame entry now starts the compiled native host, executes one full embedded-YIR lifecycle without a test executable or GUI bootstrap, and exports the last native-resolution PPM. The same binary replays with its external YIR sidecar temporarily absent. Missing/ambiguous providers, output overwrite and output creation before a successful lifecycle are rejected. This remains embedded-YIR CPU execution, not fully native lowering or a self-contained Nsld image. Next is persistent Nuis-owned application state across host events instead of whole-module GUI timer replay; standalone injection, continuous sessions, textures/samplers, mixed resources, dynamic extents, multiple targets and non-Metal parity remain open.
 
 These scores describe the new beta slices only. Existing `stable/100` cells
 remain evidence that their narrower protocol milestone closed; they are not a
 claim that the containing architecture is finished forever.
 
-The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
-means the tensor found an actionable bootstrap or global incomplete
-coordinate, coordinate coverage is clean, the recursive hierarchy is clean,
-and the task/handoff lineage validation is clean. If every registered cell is
-`stable/100`, the card reports `complete` instead of inventing more work.
+The broad engine score is not a measured completion percentage. Seven new cells
+separately track persistent sessions, resource/failure safety, image bindings,
+interaction, sustained performance, native CPU dispatch and compiler ownership.
+Their baselines and acceptance criteria are in
+[the mainline selection contract](nuis-development-tensor-mainline.md).
 
-Task-card selection uses the deterministic ordering
-`status_rank -> progress -> coordinate`. Before bootstrap closure its source is
-`weakest-bootstrap-status-progress-path`; after closure it becomes
-`weakest-global-incomplete-status-progress-path`. Lower status maturity is
-weaker, progress breaks status ties, and the full coordinate makes selection
-stable when input registration order changes. When no incomplete coordinate
-remains, the source becomes `all-cells-complete` and lineage is clean but empty.
+The task-card protocol remains `nuis-dev-tensor-task-card-v1`. A ready card now
+requires a valid `nuis-dev-tensor-mainline-v1` plan, an actionable dependency,
+clean coverage, recursive hierarchy and task/handoff lineage. Selection prefers
+explicit correctness interrupts, then the first incomplete declared goal, then
+the weakest actionable prerequisite by `status_rank -> progress -> coordinate`.
+Source is `mainline-blocking-regression` or `mainline-goal-dependency-frontier`.
+Unknown references, duplicate declarations and cycles block selection without
+global fallback. A closed plan reports `mainline-plan-complete`, not project or
+self-hosting completion. Direct handoff preserves the selected coordinate.
 
-The task-card also exposes a handoff bundle. When the weakest coordinate is the
-tensor itself, `weakest_bootstrap_task_card_handoff_mode` becomes
-`self-maintenance-handoff` and the handoff coordinate names the next weakest
-bootstrap-critical non-tensor cell to continue after refreshing the model.
-Otherwise the handoff mode is `direct` and mirrors the current task-card
-coordinate. The same status/progress/path ordering chooses the non-tensor
-handoff, so a completed stable frontdoor does not hide a merely usable runtime
-lane just because it appears earlier in the source snapshot.
+The former `weakest-bootstrap-status-progress-path` and
+`weakest-global-incomplete-status-progress-path` policies are historical. Raw
+bootstrap and global statistics remain inspectable but do not displace an
+application goal merely because an unrelated coordinate has a lower score.
 
 Task and handoff coordinates are independently bound back to the recursive
 hierarchy by `nuis-dev-tensor-task-card-lineage-v1`. The validator recursively
@@ -1963,7 +1957,7 @@ The first useful jobs are:
 * keep CLI closure, Nsld, std, language-core, Nustar, and native-binary work in one comparable view
 * make weak cells explicit instead of hiding them in broad status prose
 * separate `host runnable`, `Nsld-owned ready`, and `self-owned binary assembly` as different functions instead of one overloaded "binary works" claim
-* let `nuis` name the weakest bootstrap-critical coordinate without requiring a human to reread the whole roadmap
+* let `nuis` name the current application's weakest actionable dependency without losing separate bootstrap diagnostics
 * preserve alpha milestone provenance while early-beta foundation and later self-hosting pressure grow
 * recalibrate completed broad slices into narrower beta coordinates instead of erasing historical closure evidence or reporting a false project-wide 100%
 * preserve the completed foundation-through-`beta-0.9.*`, active migration-from-`beta-0.10.*`,
@@ -1980,7 +1974,7 @@ updates when the architecture changes. The stable part is the coordinate idea:
 
 The task-card layer is intentionally small: protocol/source/status/ready,
 handoff metadata, `blocker`, `next_action`, `validation_command`, and
-`expected_artifact`. It lets the weakest bootstrap coordinate become a concrete
+`expected_artifact`. It lets the selected goal dependency become a concrete
 work item without turning the tensor into a full issue tracker. Its recursive
 lineage adds reachability evidence rather than scheduling policy: downstream
 tools can prove where a handoff came from without coupling the tensor to a

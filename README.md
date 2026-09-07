@@ -10,9 +10,18 @@ backends, but they do not define the language model.
 
 ## Current Line
 
-The repository is on `beta-0.10.*`. Git history is the authoritative source for
+The repository is on `beta-0.11.*`. Git history is the authoritative source for
 the exact patch checkpoint; the independent Cargo package versions are not the
 project release number yet.
+
+The mainline is now **ns-nova application-led development**: grow one real
+Nuis-owned application, fix the foundation gaps it exposes, measure performance,
+and progressively replace independently testable toolchain modules with Nuis
+implementations. The first task is persistent application state across host
+events, not whole-module timer replay. Engine development validates the language;
+only actual compiler responsibility transfer counts as compiler self-hosting.
+See the [recalibrated roadmap](docs/versioning/nuis-beta-0.11-application-led-mainline.md)
+and [dependency selection contract](docs/reference/nuis-development-tensor-mainline.md).
 
 This is the formal staged self-hosting migration line, not a self-hosting,
 API-stability, or production-ready claim. `stage0` remains an immutable rollback
@@ -32,8 +41,8 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and implementation drift across `27/27` registered coordinates and
-`890/890` passing drift checks. The compiler data model, stage-neutral boundary,
+manifest, and implementation drift; `nuis dev-tensor --json` is the authoritative
+source for current counts and the selected goal/dependency path. The compiler data model, stage-neutral boundary,
 bootstrap subset, stage0/stage1 driver, differential/reproducibility gate, and
 bounded Galaxy provider trust are now `stable/100`. Complete registered-arena
 forwarding, chunked typed payload projection, and canonical reversible active
@@ -70,9 +79,14 @@ no stage0 replacement or final-selection authority. Reproducibility v2 preserves
 while binding each clean root's distinct selected-representation sidecar and
 proving `4/4` semantic equivalence. Persistent Galaxy signer trust and rollback
 protection have closed the package-resolution coordinate at `stable/100`; both
-the readiness manifest and global bootstrap-first tensor can now leave the
-bounded preparation gate. The next global tensor task is
-`standard-library/ns-nova/application-rendering-framework` at `active/99`.
+the readiness manifest records the closed bounded preparation gate. Task selection
+now follows the declared application dependency plan, with explicit correctness
+interrupts. The next task is
+`standard-library/ns-nova/persistent-application-session` under the
+`interactive-image-workflow` goal. The broad engine coordinate is recalibrated
+to `active/20` as a scope marker, not an engine-completion percentage; seven
+separate coordinates track session, safety, resources, interaction, performance,
+native CPU dispatch and actual compiler-module ownership transfer.
 Its first Nuis-owned app/frame lifecycle now composes with PixelMagic, Data, and
 Shader in a host-adaptive project, compiles through NIR/YIR, emits an Apple arm64
 window AOT executable, reaches window/Fabric boot, and passes a relocatable
@@ -423,7 +437,7 @@ cargo run -p nuis -- verify-build-manifest \
 | [`tools/`](tools) | CLI frontdoors: `nuis`, `nuisc`, `nsld`, `nsdb`, `nsbdr`, the host runner, and YIR tools |
 | [`crates/`](crates) | Reusable compiler, semantic, artifact, runtime, YIR, verifier, lowering, and domain capabilities |
 | [`nustar-packages/`](nustar-packages) | Static Nustar manifests, backend registration metadata, ABI targets, and packaged assets |
-| [`stdlib/`](stdlib) | Nuis source assets for `core`, `std`, PixelMagic, WitSage, and the later ns-nova framework |
+| [`stdlib/`](stdlib) | Nuis source assets for `core`, `std`, PixelMagic, WitSage, and the ns-nova engine |
 | [`examples/`](examples) | Current projects and source probes, invalid/verifier cases, YIR anchors, and explicit legacy material |
 | [`docs/reference/`](docs/reference) | Present-tense implementation and protocol truth |
 | [`docs/versioning/`](docs/versioning) | Minor-line snapshots and long-range policy anchors |
@@ -472,8 +486,9 @@ core -> std -> ns-nova
 
 `core` is the smallest semantic base. `std` owns practical systems contracts.
 PixelMagic exercises shader-facing image pipelines, WitSage exercises
-kernel-facing classical ML, and ns-nova remains intentionally later than the
-AOT, linker, runtime, std, and official-Galaxy foundations.
+kernel-facing classical ML, and ns-nova now drives real application acceptance
+on those foundations. Its ownership remains separate from the underlying
+official Galaxies and registered providers.
 
 Use [the stdlib index](stdlib/README.md) and [the examples router](examples/README.md)
 rather than treating every old `.ns` or handwritten YIR file as equally
@@ -512,8 +527,10 @@ and Markdown uses 2000. See [the file-line policy](docs/repo-file-line-policy.md
 
 Nuis aims at a self-owned heterogeneous computing stack rather than a classic
 C-shaped language with a thin syntax layer. Beta first hardens the compiler,
-runtime, linker, package, stdlib, and provider foundations. Self-hosting
-pressure becomes explicit later in beta, while a later gamma line is reserved
+runtime, linker, package, stdlib, and provider foundations. Staged self-hosting
+has been active since `beta-0.10.*`; application-led development now guides
+module migration, with stage2-equivalent completion still planned around
+`gamma-0.5.*` through `gamma-0.10.*`. The broader gamma line is reserved
 for whole-toolchain coordination, Vulpoya/Yalivia integration, and native
 framework maturity before any `1.0.0` claim.
 

@@ -7,7 +7,12 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `beta-0.10.*` reading route, use this order:
+The current `beta-0.11.*` priority is an ns-nova application-led dependency chain,
+with correctness, measured performance and staged compiler migration integrated
+into the same work. Start with
+[the application-led roadmap](versioning/nuis-beta-0.11-application-led-mainline.md)
+and [the executable mainline plan](reference/nuis-development-tensor.mainline.toml).
+The older migration-entry context remains in this reading order:
 
 1. [versioning/nuis-beta-0.10.0-self-hosting-entry.md](versioning/nuis-beta-0.10.0-self-hosting-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
@@ -44,6 +49,8 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
+* current goal/dependency task selection:
+  [reference/nuis-development-tensor-mainline.md](reference/nuis-development-tensor-mainline.md)
 * current staged self-hosting preparation gates:
   [reference/nuis-self-hosting-readiness.md](reference/nuis-self-hosting-readiness.md)
 * current producer-neutral compiler-stage bundle:

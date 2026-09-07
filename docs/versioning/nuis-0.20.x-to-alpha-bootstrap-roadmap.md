@@ -94,7 +94,11 @@ So `alpha-0.0.1` means:
 
 ## Beta-Line Self-Hosting Goal
 
-During `beta`, the central pressure should become self-hosting.
+During `beta`, self-hosting pressure grows through real applications. The
+[beta-0.11 recalibration](nuis-beta-0.11-application-led-mainline.md) makes ns-nova
+the application driver: fix exposed foundation bugs, optimize from measurements,
+and replace toolchain modules incrementally. It does not require completing a
+whole engine before migration, nor count engine code as compiler self-hosting.
 
 The current planning estimate is not "self-host before beta". It is closer to:
 

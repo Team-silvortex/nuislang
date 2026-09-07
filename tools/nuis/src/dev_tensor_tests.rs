@@ -2,103 +2,6 @@ use super::*;
 use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 
 #[test]
-fn handoff_selection_is_status_aware_and_input_order_independent() {
-    let selected = select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS);
-    let mut reversed = DEV_TENSOR_CELLS.to_vec();
-    reversed.reverse();
-    let reversed_selected = select_dev_tensor_handoff_bootstrap_cell(&reversed);
-
-    assert!(selected.is_none());
-    assert!(reversed_selected.is_none());
-}
-
-#[test]
-fn handoff_uses_coordinate_order_while_equal_gates_are_open() {
-    let mut cells = DEV_TENSOR_CELLS.to_vec();
-    let stage_neutral = cells
-        .iter_mut()
-        .find(|cell| cell.function == "stage-neutral-ir-boundary")
-        .expect("stage-neutral cell");
-    stage_neutral.status = "usable";
-    stage_neutral.progress = 99;
-    let selected = select_dev_tensor_handoff_bootstrap_cell(&cells).expect("select handoff cell");
-    assert_eq!(
-        dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
-        "language-core/nuisc/stage-neutral-ir-boundary"
-    );
-}
-
-#[test]
-fn task_selection_reports_none_after_every_registered_cell_closes() {
-    let mut cells = DEV_TENSOR_CELLS.to_vec();
-    for cell in &mut cells {
-        cell.status = "stable";
-        cell.progress = 100;
-    }
-    assert!(select_dev_tensor_task_cell(&cells).is_none());
-}
-
-#[test]
-fn task_selection_advances_to_linux_cuda_after_previous_cells_close() {
-    let mut cells = DEV_TENSOR_CELLS.to_vec();
-    for cell in &mut cells {
-        cell.status = "stable";
-        cell.progress = 100;
-    }
-    let cuda = cells
-        .iter_mut()
-        .find(|cell| cell.function == "cuda-provider-bringup")
-        .expect("CUDA cell");
-    cuda.status = "active";
-    cuda.progress = 99;
-    let selected = select_dev_tensor_task_cell(&cells).expect("select CUDA task");
-    assert_eq!(
-        dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
-        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
-    );
-    assert_eq!(selected.status, "active");
-    assert_eq!(selected.progress, 99);
-}
-
-#[test]
-fn task_selection_keeps_bootstrap_priority_until_critical_cells_close() {
-    let cells = [
-        DevTensorCell {
-            architecture: "optional",
-            module: "lane",
-            function: "weaker",
-            status: "early",
-            progress: 10,
-            bootstrap_critical: false,
-            closure_role: "optional",
-            evidence: "evidence",
-            next_step: "next",
-            blocker: "none",
-            next_action: "advance optional",
-            validation_command: "validate optional",
-            expected_artifact: "optional artifact",
-        },
-        DevTensorCell {
-            architecture: "bootstrap",
-            module: "lane",
-            function: "required",
-            status: "usable",
-            progress: 90,
-            bootstrap_critical: true,
-            closure_role: "required",
-            evidence: "evidence",
-            next_step: "next",
-            blocker: "none",
-            next_action: "close bootstrap",
-            validation_command: "validate bootstrap",
-            expected_artifact: "bootstrap artifact",
-        },
-    ];
-    let selected = select_dev_tensor_task_cell(&cells).expect("select bootstrap task");
-    assert_eq!(selected.architecture, "bootstrap");
-}
-
-#[test]
 fn dev_tensor_summary_reports_three_axes_and_cells() {
     let summary = dev_tensor_summary();
     assert_eq!(
@@ -133,25 +36,25 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_source,
-        "weakest-global-incomplete-status-progress-path"
+        "mainline-goal-dependency-frontier"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "standard-library/ns-nova/application-rendering-framework"
+        "standard-library/ns-nova/persistent-application-session"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("all bootstrap-critical cells are stable at 100/100"));
+        .contains("declared mainline goal"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "standard-library/ns-nova/application-rendering-framework"
+        "standard-library/ns-nova/persistent-application-session"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
         .weakest_bootstrap_task_card_handoff_reason
-        .contains("weakest task card is directly actionable"));
+        .contains("weakest actionable dependency"));
     assert_ne!(summary.weakest_bootstrap_task_card_handoff_action, "<none>");
     assert_ne!(
         summary.weakest_bootstrap_task_card_handoff_command,
@@ -187,7 +90,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "standard-library/ns-nova/application-rendering-framework"
+        "standard-library/ns-nova/persistent-application-session"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -306,9 +209,8 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(
         json.contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\"")
     );
-    assert!(json.contains(
-        "\"weakest_bootstrap_task_card_source\":\"weakest-global-incomplete-status-progress-path\""
-    ));
+    assert!(json
+        .contains("\"weakest_bootstrap_task_card_source\":\"mainline-goal-dependency-frontier\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
     assert!(json.contains("\"weakest_bootstrap_task_card_coordinate\""));
@@ -333,7 +235,10 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("standard-library/std/concurrency-task-thread-lock"));
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
-    assert!(json.contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(json.contains("declared mainline goal"));
+    assert!(json.contains("\"mainline_protocol\":\"nuis-dev-tensor-mainline-v1\""));
+    assert!(json
+        .contains("\"mainline_target\":\"standard-library/ns-nova/interactive-image-workflow\""));
     assert!(json.contains("\"module\":\"nuis-runtime\""));
     assert!(json.contains("\"function\":\"lifecycle-loader-bootstrap\""));
     assert!(json.contains("\"function\":\"lifecycle-context-dispatch\""));
@@ -400,7 +305,16 @@ fn dev_tensor_json_exposes_coordinate_cells() {
 #[test]
 fn dev_tensor_drift_checks_are_currently_clean() {
     let drift = dev_tensor_drift_summary();
-    assert_eq!(drift.status, "clean");
+    assert_eq!(
+        drift.status,
+        "clean",
+        "failed drift checks: {:?}",
+        drift
+            .checks
+            .iter()
+            .filter(|check| !check.passed)
+            .collect::<Vec<_>>()
+    );
     assert_eq!(drift.failed_count, 0);
     assert_eq!(drift.passed_count, drift.check_count);
     assert!(drift.first_failed_check.is_none());
@@ -545,9 +459,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_validation_command:"));
     assert!(text.contains("weakest_bootstrap_expected_artifact:"));
     assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
-    assert!(text.contains(
-        "weakest_bootstrap_task_card_source: weakest-global-incomplete-status-progress-path"
-    ));
+    assert!(text.contains("weakest_bootstrap_task_card_source: mainline-goal-dependency-frontier"));
     assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
     assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
     assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
@@ -567,10 +479,11 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: standard-library/ns-nova/application-rendering-framework"
+        "weakest_bootstrap_task_card_common_ancestor_path: standard-library/ns-nova/persistent-application-session"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
-    assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(text.contains("declared mainline goal"));
+    assert!(text.contains("mainline_id: ns-nova-application-led"));
     assert!(text.contains(
         "cell: architecture=standard-library module=std function=concurrency-task-thread-lock"
     ));

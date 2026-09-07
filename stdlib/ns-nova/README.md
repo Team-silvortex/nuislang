@@ -41,6 +41,17 @@ Design principles:
 * powered by `nuis` inline shader and heterogenous graph abilities rather than hiding them completely
 * should remain mod-aware and ABI-aware so that packaged `nustar` capabilities stay visible
 
+## Application-Led Mainline
+
+The current mainline uses ns-nova to drive one growing interactive image
+application, then foundation hardening, measured performance and incremental
+compiler-module migration. The first open prerequisite is a persistent
+Nuis-owned session across host events, not whole-module timer replay.
+See the [roadmap](../../docs/versioning/nuis-beta-0.11-application-led-mainline.md)
+and [separate acceptance coordinates](../../docs/reference/nuis-development-tensor-mainline.md).
+Bounded Metal output is established; engine maturity and compiler self-hosting
+are not inferred from that evidence.
+
 Current state:
 
 * this repository now treats `ns-nova` as a standard-library/framework layer target, not as a separate future repository by default

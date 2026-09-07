@@ -55,10 +55,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.10-mainline-router",
+        id: "beta-0.11-mainline-router",
         path: "docs/current-mainline-map.md",
         required_patterns: &[
-            "current `beta-0.10.*` reading route",
+            "current `beta-0.11.*` priority",
+            "nuis-beta-0.11-application-led-mainline.md",
             "nuis-beta-0.10.0-self-hosting-entry.md",
             "nuis-beta-0.6.0-mainline-entry.md",
             "previous curated `beta-0.3.*` entry",
@@ -71,10 +72,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.10-repository-frontdoor",
+        id: "beta-0.11-repository-frontdoor",
         path: "README.md",
         required_patterns: &[
-            "repository is on `beta-0.10.*`",
+            "repository is on `beta-0.11.*`",
+            "ns-nova application-led development",
             "formal staged self-hosting migration line",
             "stage0-to-stage1-migration/active",
             "nuis-beta-0.10.0-self-hosting-entry.md",

@@ -5,6 +5,7 @@ use crate::{
     },
     dev_tensor_drift_data::dev_tensor_drift_checks,
     dev_tensor_hierarchy::dev_tensor_hierarchy_summary,
+    dev_tensor_mainline::{mainline_selection, MainlineSelection},
     dev_tensor_manifest::{dev_tensor_manifest_coverage, DevTensorManifestCoverage},
     dev_tensor_milestones::{
         dev_tensor_milestone_coverage, expected_coordinates_from_milestones,
@@ -67,6 +68,7 @@ pub(crate) struct DevTensorCoverageSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DevTensorSummary {
+    pub(crate) mainline: MainlineSelection,
     pub(crate) hierarchy_protocol_version: &'static str,
     pub(crate) hierarchy_validation_status: &'static str,
     pub(crate) hierarchy_validation_node_count: usize,
@@ -145,54 +147,18 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         }
     }
     let cell_count = DEV_TENSOR_CELLS.len();
-    let bootstrap_closed = dev_tensor_bootstrap_cells_closed(DEV_TENSOR_CELLS);
-    let task_cell = select_dev_tensor_task_cell(DEV_TENSOR_CELLS);
+    let mainline = mainline_selection(DEV_TENSOR_CELLS);
+    let task_cell = DEV_TENSOR_CELLS.iter().find(|cell| {
+        dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function)
+            == mainline.selected
+    });
     let task_card_coordinate = task_cell
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .unwrap_or_else(|| "<none>".to_owned());
-    let task_card_source = if bootstrap_closed && task_cell.is_none() {
-        "all-cells-complete"
-    } else if bootstrap_closed {
-        "weakest-global-incomplete-status-progress-path"
-    } else {
-        "weakest-bootstrap-status-progress-path"
-    };
-    let task_card_priority_reason = task_cell
-        .map(|cell| {
-            if bootstrap_closed {
-                format!(
-                    "all bootstrap-critical cells are stable at 100/100; weakest global incomplete status/progress ordering: status `{}` rank {}, progress {}/100 at {}",
-                    cell.status,
-                    dev_tensor_status_rank(cell.status),
-                    cell.progress,
-                    task_card_coordinate
-                )
-            } else {
-                format!(
-                    "weakest bootstrap-critical status/progress ordering: status `{}` rank {}, progress {}/100 at {}",
-                    cell.status,
-                    dev_tensor_status_rank(cell.status),
-                    cell.progress,
-                    task_card_coordinate
-                )
-            }
-        })
-        .unwrap_or_else(|| {
-            if bootstrap_closed {
-                "all registered tensor cells are stable at 100/100".to_owned()
-            } else {
-                "no bootstrap-critical tensor cell is currently registered".to_owned()
-            }
-        });
-    let handoff_bootstrap = task_cell.and_then(dev_tensor_handoff_bootstrap_cell);
-    let handoff_coordinate = handoff_bootstrap
-        .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
-        .unwrap_or_else(|| task_card_coordinate.clone());
-    let handoff_mode = if handoff_bootstrap.is_some() {
-        "self-maintenance-handoff"
-    } else {
-        "direct"
-    };
+    let task_card_source = mainline.source;
+    let task_card_priority_reason = mainline.reason.clone();
+    let handoff_coordinate = task_card_coordinate.clone();
+    let handoff_mode = "direct";
     let task_card_lineage = validate_dev_tensor_task_card_lineage(
         &hierarchy.root,
         hierarchy.validation.status,
@@ -200,27 +166,11 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         &handoff_coordinate,
         handoff_mode,
     );
-    let task_card_ready = task_cell.is_some()
-        && coverage.status == "clean"
+    let task_card_valid = coverage.status == "clean"
         && hierarchy.validation.status == "clean"
         && task_card_lineage.status == "clean";
-    let handoff_reason = handoff_bootstrap
-        .map(|cell| {
-            format!(
-                "weakest coordinate is the dev tensor itself; after refreshing the tensor, continue at {} with status `{}` rank {} and {}/100 progress",
-                handoff_coordinate,
-                cell.status,
-                dev_tensor_status_rank(cell.status),
-                cell.progress
-            )
-        })
-        .unwrap_or_else(|| match task_cell {
-            Some(_) => format!(
-                "weakest task card is directly actionable at {}",
-                task_card_coordinate
-            ),
-            None => "all registered tensor cells are complete; no handoff is required".to_owned(),
-        });
+    let task_card_ready = mainline.status == "ready" && task_cell.is_some() && task_card_valid;
+    let handoff_reason = mainline.reason.clone();
     DevTensorSummary {
         hierarchy_protocol_version: hierarchy.hierarchy_protocol_version,
         hierarchy_validation_status: hierarchy.validation.status,
@@ -284,7 +234,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         weakest_bootstrap_task_card_source: task_card_source,
         weakest_bootstrap_task_card_status: if task_card_ready {
             "ready"
-        } else if bootstrap_closed && task_cell.is_none() {
+        } else if mainline.status == "complete" && task_card_valid {
             "complete"
         } else {
             "blocked"
@@ -304,16 +254,13 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         weakest_bootstrap_task_card_handoff_mode: handoff_mode,
         weakest_bootstrap_task_card_handoff_coordinate: handoff_coordinate,
         weakest_bootstrap_task_card_handoff_reason: handoff_reason,
-        weakest_bootstrap_task_card_handoff_action: handoff_bootstrap
-            .or(task_cell)
+        weakest_bootstrap_task_card_handoff_action: task_cell
             .map(|cell| cell.next_action)
             .unwrap_or("<none>"),
-        weakest_bootstrap_task_card_handoff_command: handoff_bootstrap
-            .or(task_cell)
+        weakest_bootstrap_task_card_handoff_command: task_cell
             .map(|cell| cell.validation_command)
             .unwrap_or("<none>"),
-        weakest_bootstrap_task_card_handoff_expected_artifact: handoff_bootstrap
-            .or(task_cell)
+        weakest_bootstrap_task_card_handoff_expected_artifact: task_cell
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_lineage: task_card_lineage,
@@ -323,50 +270,11 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         coverage_missing_count: coverage.missing_count,
         coverage_orphaned_count: coverage.orphaned_count,
         coverage_stale_count: coverage.stale_count,
+        mainline,
     }
 }
 
-fn dev_tensor_handoff_bootstrap_cell(weakest: &DevTensorCell) -> Option<&'static DevTensorCell> {
-    if dev_tensor_coordinate_key(weakest.architecture, weakest.module, weakest.function)
-        != "developer-system/dev-tensor/architecture-module-function-progress-model"
-    {
-        return None;
-    }
-    select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS)
-}
-
-fn dev_tensor_bootstrap_cells_closed(cells: &[DevTensorCell]) -> bool {
-    let mut critical = cells.iter().filter(|cell| cell.bootstrap_critical);
-    let critical_count = critical.clone().count();
-    critical_count > 0 && critical.all(|cell| cell.status == "stable" && cell.progress == 100)
-}
-
-fn select_dev_tensor_task_cell(cells: &[DevTensorCell]) -> Option<&DevTensorCell> {
-    if dev_tensor_bootstrap_cells_closed(cells) {
-        return cells
-            .iter()
-            .filter(|cell| cell.status != "stable" || cell.progress < 100)
-            .min_by_key(|cell| dev_tensor_cell_weakness_key(cell));
-    }
-    cells
-        .iter()
-        .filter(|cell| cell.bootstrap_critical)
-        .min_by_key(|cell| dev_tensor_cell_weakness_key(cell))
-}
-
-fn select_dev_tensor_handoff_bootstrap_cell(cells: &[DevTensorCell]) -> Option<&DevTensorCell> {
-    cells
-        .iter()
-        .filter(|cell| cell.bootstrap_critical)
-        .filter(|cell| cell.status != "stable" || cell.progress < 100)
-        .filter(|cell| {
-            dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function)
-                != "developer-system/dev-tensor/architecture-module-function-progress-model"
-        })
-        .min_by_key(|cell| dev_tensor_cell_weakness_key(cell))
-}
-
-fn dev_tensor_cell_weakness_key(cell: &DevTensorCell) -> (usize, usize, String) {
+pub(crate) fn dev_tensor_cell_weakness_key(cell: &DevTensorCell) -> (usize, usize, String) {
     (
         dev_tensor_status_rank(cell.status),
         cell.progress,

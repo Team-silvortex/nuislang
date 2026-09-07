@@ -1,0 +1,90 @@
+schema = "nuis-dev-tensor-mainline-v1"
+id = "ns-nova-application-led"
+# Ordered deliverables, not a global percentage or a compiler replacement grant.
+goals = [
+  "standard-library/ns-nova/interactive-image-workflow",
+  "standard-library/ns-nova/sustained-runtime-performance",
+  "compiler-toolchain/bootstrap/compiler-component-ownership-transfer",
+  "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
+]
+# Register evidenced correctness regressions here to preempt feature work.
+interrupts = []
+
+[[nodes]]
+coordinate = "standard-library/ns-nova/interactive-image-workflow"
+depends_on = [
+  "standard-library/ns-nova/persistent-application-session",
+  "heterogeneous-runtime/application-session/lifecycle-failure-resource-safety",
+  "heterogeneous-runtime/shader/shader-resource-bindings",
+  "standard-library/std/host-io-filesystem-text",
+  "standard-library/pixelmagic/image-processing-lane",
+]
+
+[[nodes]]
+coordinate = "standard-library/ns-nova/persistent-application-session"
+depends_on = [
+  "standard-library/std/concurrency-task-thread-lock",
+  "heterogeneous-runtime/nustar/registered-domain-contracts",
+]
+
+[[nodes]]
+coordinate = "heterogeneous-runtime/application-session/lifecycle-failure-resource-safety"
+depends_on = ["standard-library/ns-nova/persistent-application-session"]
+
+[[nodes]]
+coordinate = "heterogeneous-runtime/shader/shader-resource-bindings"
+depends_on = ["standard-library/ns-nova/persistent-application-session"]
+
+[[nodes]]
+coordinate = "standard-library/ns-nova/sustained-runtime-performance"
+depends_on = ["standard-library/ns-nova/interactive-image-workflow"]
+
+[[nodes]]
+coordinate = "compiler-toolchain/bootstrap/compiler-component-ownership-transfer"
+depends_on = [
+  "language-core/nuisc/bootstrap-language-subset",
+  "language-core/nuisc/stage-neutral-ir-boundary",
+  "standard-library/std/compiler-data-model",
+  "compiler-toolchain/bootstrap/stage0-stage1-driver",
+  "developer-system/bootstrap/differential-reproducibility-gate",
+]
+
+[[nodes]]
+coordinate = "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
+depends_on = ["standard-library/ns-nova/persistent-application-session"]
+
+[[nodes]]
+coordinate = "standard-library/std/host-io-filesystem-text"
+depends_on = []
+
+[[nodes]]
+coordinate = "standard-library/std/concurrency-task-thread-lock"
+depends_on = []
+
+[[nodes]]
+coordinate = "heterogeneous-runtime/nustar/registered-domain-contracts"
+depends_on = []
+
+[[nodes]]
+coordinate = "standard-library/pixelmagic/image-processing-lane"
+depends_on = []
+
+[[nodes]]
+coordinate = "language-core/nuisc/bootstrap-language-subset"
+depends_on = []
+
+[[nodes]]
+coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
+depends_on = []
+
+[[nodes]]
+coordinate = "standard-library/std/compiler-data-model"
+depends_on = []
+
+[[nodes]]
+coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
+depends_on = []
+
+[[nodes]]
+coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
+depends_on = []

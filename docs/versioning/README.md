@@ -9,6 +9,7 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-beta-0.11-application-led-mainline.md](nuis-beta-0.11-application-led-mainline.md)
 * [nuis-beta-0.10.0-self-hosting-entry.md](nuis-beta-0.10.0-self-hosting-entry.md)
 
 The previous curated foundation entry is:

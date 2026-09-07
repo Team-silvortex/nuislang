@@ -342,6 +342,10 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
         ],
     );
     append_json_field_strings(&mut out, dev_tensor_task_card_lineage_json_fields(&summary));
+    append_json_field_strings(
+        &mut out,
+        crate::dev_tensor_mainline::mainline_json_fields(&summary.mainline),
+    );
     out.push('}');
     out
 }
@@ -624,6 +628,9 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
             drift.first_failed_check.unwrap_or("<none>")
         ),
     ];
+    lines.extend(crate::dev_tensor_mainline::mainline_text_lines(
+        &summary.mainline,
+    ));
     for coordinate in &coverage.missing_coordinates {
         lines.push(format!("  coverage_missing_coordinate: {coordinate}"));
     }
