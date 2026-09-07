@@ -113,3 +113,124 @@ fn live_client_rejects_disconnect_and_wrong_target() {
     drop(peer);
     assert!(client.take(&node, &frame.arguments).is_err());
 }
+
+#[test]
+fn typed_remote_rejections_are_admitted_before_category_delivery_and_never_advance() {
+    for (phase, sequence, code, expected) in [
+        (
+            RejectionPhase::Dispatch,
+            0,
+            RejectionCode::Budget,
+            ApplicationFailureKind::ProviderBudget,
+        ),
+        (
+            RejectionPhase::Dispatch,
+            0,
+            RejectionCode::Execution,
+            ApplicationFailureKind::ProviderExecution,
+        ),
+        (
+            RejectionPhase::Dispatch,
+            0,
+            RejectionCode::Request,
+            ApplicationFailureKind::ProviderRejected,
+        ),
+        (
+            RejectionPhase::Receive,
+            0,
+            RejectionCode::Exchange,
+            ApplicationFailureKind::ProviderExchange,
+        ),
+        (
+            RejectionPhase::Dispatch,
+            1,
+            RejectionCode::Budget,
+            ApplicationFailureKind::ProviderContract,
+        ),
+        (
+            RejectionPhase::Finish,
+            0,
+            RejectionCode::Finalization,
+            ApplicationFailureKind::ProviderContract,
+        ),
+    ] {
+        let (target, node, frame) = fixture();
+        let (stream, mut peer) = UnixStream::pair().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let worker = thread::spawn(move || {
+            assert!(matches!(
+                Message::read_from(&mut peer).unwrap(),
+                Message::Dispatch { sequence: 0, .. }
+            ));
+            Message::Rejected(Rejection::new(
+                phase,
+                sequence,
+                code,
+                "device failed: budget exceeded",
+            ))
+            .write_to(&mut peer)
+            .unwrap();
+        });
+        let mut client = ProviderRuntimeClient {
+            stream,
+            target,
+            sequence: 0,
+        };
+        let error = client.take(&node, &frame.arguments).err().unwrap();
+        assert_eq!(error.kind, expected);
+        assert_eq!(client.sequence, 0);
+        worker.join().unwrap();
+    }
+}
+
+#[test]
+fn finish_rejection_requires_finish_identity_and_cannot_become_closed() {
+    for (phase, sequence, code, expected) in [
+        (
+            RejectionPhase::Finish,
+            1,
+            RejectionCode::Finalization,
+            ApplicationFailureKind::ProviderFinalization,
+        ),
+        (
+            RejectionPhase::Receive,
+            1,
+            RejectionCode::Exchange,
+            ApplicationFailureKind::ProviderExchange,
+        ),
+        (
+            RejectionPhase::Dispatch,
+            1,
+            RejectionCode::Execution,
+            ApplicationFailureKind::ProviderContract,
+        ),
+        (
+            RejectionPhase::Finish,
+            0,
+            RejectionCode::Finalization,
+            ApplicationFailureKind::ProviderContract,
+        ),
+    ] {
+        let (target, _, _) = fixture();
+        let (stream, mut peer) = UnixStream::pair().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let worker = thread::spawn(move || {
+            assert_eq!(Message::read_from(&mut peer).unwrap(), Message::Finish(1));
+            Message::Rejected(Rejection::new(phase, sequence, code, "finish failed"))
+                .write_to(&mut peer)
+                .unwrap();
+        });
+        let mut client = ProviderRuntimeClient {
+            stream,
+            target,
+            sequence: 1,
+        };
+        assert_eq!(client.finish().unwrap_err().kind, expected);
+        assert_eq!(client.sequence, 1);
+        worker.join().unwrap();
+    }
+}

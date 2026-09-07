@@ -9,7 +9,10 @@ use std::{
     time::Duration,
 };
 use yir_core::{
-    provider_runtime_ipc::{hash_bytes, DispatchFrame, DispatchTarget, Message},
+    provider_runtime_ipc::{
+        hash_bytes, DispatchFrame, DispatchTarget, Message, Rejection, RejectionCode,
+        RejectionPhase,
+    },
     ProviderPhysicalCompletion, Value,
 };
 use yir_runtime_host::{
@@ -106,6 +109,8 @@ enum Reply {
     Good,
     BadClose,
     RejectedFrame,
+    TypedRejectedFrame(RejectionCode),
+    RejectedClose,
     WrongHash,
     DisconnectedFrame,
     WrongSequence,
@@ -190,12 +195,19 @@ impl Peer {
                         if let Some(gate) = &gate {
                             gate.wait(Pause::Frame);
                         }
-                        if matches!(reply, Reply::RejectedFrame) {
+                        if matches!(reply, Reply::RejectedFrame | Reply::TypedRejectedFrame(_)) {
                             // Deliberately mentions a budget: clients must classify
                             // the message kind, not guess from this diagnostic.
-                            Message::Rejected(
-                                "injected device failure: dispatch budget".to_owned(),
-                            )
+                            let code = match reply {
+                                Reply::TypedRejectedFrame(code) => code,
+                                _ => RejectionCode::Request,
+                            };
+                            Message::Rejected(Rejection::new(
+                                RejectionPhase::Dispatch,
+                                sequence,
+                                code,
+                                "injected device failure: dispatch budget",
+                            ))
                             .write_to(&mut stream)
                             .unwrap();
                             continue;
@@ -233,6 +245,17 @@ impl Peer {
                         assert_eq!(sequence, count);
                         if let Some(gate) = &gate {
                             gate.wait(Pause::Finish);
+                        }
+                        if matches!(reply, Reply::RejectedClose) {
+                            Message::Rejected(Rejection::new(
+                                RejectionPhase::Finish,
+                                sequence,
+                                RejectionCode::Finalization,
+                                "publication failed",
+                            ))
+                            .write_to(&mut stream)
+                            .unwrap();
+                            return (count, true);
                         }
                         Message::Closed(if matches!(reply, Reply::BadClose) {
                             count + 1

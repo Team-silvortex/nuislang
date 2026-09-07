@@ -9,6 +9,7 @@ use yir_exec::ExecutionTrace;
 
 use crate::ApplicationProviderSource;
 
+mod outcome;
 mod worker;
 
 pub const APPLICATION_EVENT_PUMP_CONTRACT: &str = "nuis-yir-application-event-pump-v1";
@@ -215,6 +216,10 @@ impl ApplicationEventPump {
         if self.pending != Some(reply.operation) {
             self.abort();
             return Err("application event pump received an out-of-order reply".to_owned());
+        }
+        if let Err(error) = reply.outcome() {
+            self.abort();
+            return Err(error);
         }
         self.pending = None;
         self.phase = reply.phase;

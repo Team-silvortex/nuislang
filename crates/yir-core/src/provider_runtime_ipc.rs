@@ -6,8 +6,11 @@ pub use arguments::{DispatchArguments, DispatchResource, DispatchUpload, MAX_UPL
 #[path = "provider_runtime_budget.rs"]
 mod budget;
 pub use budget::{ReplayBudget, MAX_REPLAY_BYTES, MAX_REPLAY_MANIFEST_BYTES};
+#[path = "provider_runtime_rejection.rs"]
+mod rejection;
+pub use rejection::{Rejection, RejectionCode, RejectionPhase};
 
-pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v3";
+pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v4";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";
 pub const MAX_DISPATCHES: usize = 256;
 pub const MAX_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
@@ -79,7 +82,7 @@ pub enum Message {
     Frame(DispatchFrame),
     Finish(usize),
     Closed(usize),
-    Rejected(String),
+    Rejected(Rejection),
 }
 
 impl Message {
@@ -131,7 +134,10 @@ impl Message {
             }
             Self::Finish(sequence) => fields.extend(["finish".to_owned(), sequence.to_string()]),
             Self::Closed(sequence) => fields.extend(["closed".to_owned(), sequence.to_string()]),
-            Self::Rejected(error) => fields.extend(["rejected".to_owned(), error.clone()]),
+            Self::Rejected(error) => {
+                fields.push("rejected".to_owned());
+                fields.extend(error.fields()?);
+            }
         }
         if fields.iter().any(|value| !valid_field(value)) {
             return Err("runtime IPC field is invalid".to_owned());
@@ -192,7 +198,9 @@ impl Message {
             }
             Some("finish") if fields.len() == 3 => Ok(Self::Finish(number(fields[2])?)),
             Some("closed") if fields.len() == 3 => Ok(Self::Closed(number(fields[2])?)),
-            Some("rejected") if fields.len() == 3 => Ok(Self::Rejected(fields[2].to_owned())),
+            Some("rejected") if fields.len() == 6 => {
+                Ok(Self::Rejected(Rejection::parse(&fields[2..])?))
+            }
             Some("frame") if fields.len() == 13 => {
                 let length = number(fields[9])?;
                 if length == 0 || length > MAX_PAYLOAD_BYTES {

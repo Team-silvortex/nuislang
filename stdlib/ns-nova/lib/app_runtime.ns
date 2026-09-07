@@ -3,10 +3,18 @@ mod cpu NovaAppRuntime {
   /// Host close intent, not proof that the provider completed successfully.
   pub enum NovaCloseReason { Requested, EventFailed, HostFailed, Unknown }
 
-  /// nuis-yir-application-failure-v1; independent from close intent.
+  /// nuis-yir-application-failure-v2; independent from close intent.
   pub enum NovaFailureKind {
     None, Callback, Host, DispatchLimit, ProviderRejected,
-    ProviderExchange, ProviderContract, ReplayExhausted, Unclassified, Unknown
+    ProviderExchange, ProviderContract, ReplayExhausted, Unclassified,
+    ProviderBudget, ProviderExecution, ProviderFinalization, Unknown
+  }
+
+  /// Terminal observation, not app state, completion authority or a resource handle.
+  pub struct NovaAppOutcome {
+    pub status: i64,
+    pub cleanup_completed: i64,
+    pub failure_kind: i64
   }
 
   pub struct NovaAppState {
@@ -91,6 +99,9 @@ mod cpu NovaAppRuntime {
     if code == 6 { return NovaFailureKind.ProviderContract; }
     if code == 7 { return NovaFailureKind.ReplayExhausted; }
     if code == 8 { return NovaFailureKind.Unclassified; }
+    if code == 9 { return NovaFailureKind.ProviderBudget; }
+    if code == 10 { return NovaFailureKind.ProviderExecution; }
+    if code == 11 { return NovaFailureKind.ProviderFinalization; }
     return NovaFailureKind.Unknown;
   }
 
@@ -105,6 +116,9 @@ mod cpu NovaAppRuntime {
       NovaFailureKind.ProviderContract => { return 6; }
       NovaFailureKind.ReplayExhausted => { return 7; }
       NovaFailureKind.Unclassified => { return 8; }
+      NovaFailureKind.ProviderBudget => { return 9; }
+      NovaFailureKind.ProviderExecution => { return 10; }
+      NovaFailureKind.ProviderFinalization => { return 11; }
       _ => { return 255; }
     }
   }
@@ -116,6 +130,30 @@ mod cpu NovaAppRuntime {
       NovaCloseReason.HostFailed => { return NovaFailureKind.Host; }
       _ => { return NovaFailureKind.Unknown; }
     }
+  }
+
+  /// nuis-yir-application-outcome-v1: succeeded=1, failed=2; invalid input=3.
+  /// A completed close can coexist with failed Finish. Never call close again.
+  pub fn terminal_outcome(status: i64, cleanup: i64, failure: i64) -> NovaAppOutcome {
+    if status == 1 && cleanup == 1 && failure == 0 {
+      return NovaAppOutcome { status: 1, cleanup_completed: 1, failure_kind: 0 };
+    }
+    let known: i64 = failure_code(failure_kind(failure));
+    if status == 2 && (cleanup == 0 || cleanup == 1) && known != 0 && known != 255 {
+      return NovaAppOutcome { status: 2, cleanup_completed: cleanup, failure_kind: known };
+    }
+    return NovaAppOutcome { status: 3, cleanup_completed: 0, failure_kind: 255 };
+  }
+
+  pub fn outcome_succeeded(outcome: NovaAppOutcome) -> bool {
+    return outcome.status == 1 && outcome.cleanup_completed == 1 && outcome.failure_kind == 0;
+  }
+
+  pub fn outcome_failed(outcome: NovaAppOutcome) -> bool {
+    let checked: NovaAppOutcome = terminal_outcome(
+      outcome.status, outcome.cleanup_completed, outcome.failure_kind
+    );
+    return checked.status == 2;
   }
 
   pub fn phase_begun() -> i64 {

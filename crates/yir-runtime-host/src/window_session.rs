@@ -1,6 +1,6 @@
 use yir_core::{
-    ApplicationCloseReason, ApplicationFailureKind, ApplicationSessionSignature, Value,
-    YirFunctionParameter, YirModule,
+    ApplicationCloseReason, ApplicationFailureKind, ApplicationOutcome,
+    ApplicationSessionSignature, Value, YirFunctionParameter, YirModule,
 };
 
 use crate::{
@@ -19,6 +19,7 @@ pub struct WindowSession {
     close_reason: Option<ApplicationCloseReason>,
     cleanup_completed: bool,
     failure_kind: ApplicationFailureKind,
+    outcome: Option<ApplicationOutcome>,
 }
 
 pub struct WindowSessionReply {
@@ -28,6 +29,7 @@ pub struct WindowSessionReply {
     pub close_reason: Option<ApplicationCloseReason>,
     pub cleanup_completed: bool,
     pub failure_kind: ApplicationFailureKind,
+    pub outcome: Option<ApplicationOutcome>,
     pub frame: Result<Option<Vec<u8>>, String>,
 }
 
@@ -56,6 +58,7 @@ impl WindowSession {
             close_reason: None,
             cleanup_completed: false,
             failure_kind: ApplicationFailureKind::None,
+            outcome: None,
         })
     }
 
@@ -75,7 +78,9 @@ impl WindowSession {
                 return Err("window event requires redraw(0,0) or key(1,Unicode scalar)".to_owned())
             }
         }
-        self.pump.event(vec![Value::Int(kind), Value::Int(code)])
+        let result = self.pump.event(vec![Value::Int(kind), Value::Int(code)]);
+        self.observe_stopped_error(&result);
+        result
     }
 
     pub fn close(&mut self) -> Result<(), String> {
@@ -92,6 +97,11 @@ impl WindowSession {
 
     pub fn failure_kind(&self) -> ApplicationFailureKind {
         self.failure_kind
+    }
+
+    /// Read-only terminal snapshot; does not poll, rerun cleanup or revive state.
+    pub fn outcome(&self) -> Option<ApplicationOutcome> {
+        self.outcome
     }
 
     /// Failed events dominate an ordinary host close request. Host failures are
@@ -112,20 +122,26 @@ impl WindowSession {
             }
         };
         let arguments = vec![Value::Int(reason.code()), Value::Int(kind.code())];
-        if reason.is_failure() {
-            self.pump.close_after_failure(arguments, kind)?;
+        let result = if reason.is_failure() {
+            self.pump.close_after_failure(arguments, kind)
         } else {
-            self.pump.close(arguments)?;
-        }
+            self.pump.close(arguments)
+        };
+        self.observe_stopped_error(&result);
+        result?;
         self.close_reason = Some(reason);
         self.failure_kind = kind;
         Ok(())
     }
 
     pub fn poll(&mut self) -> Result<Option<WindowSessionReply>, String> {
-        let Some(reply) = self.pump.poll()? else {
+        let result = self.pump.poll();
+        self.observe_stopped_error(&result);
+        let Some(reply) = result? else {
             return Ok(None);
         };
+        // The pump has validated the reply before accepting it.
+        let outcome = reply.outcome()?;
         self.cleanup_completed = reply.cleanup_completed;
         if !self.failure_kind.is_failure() {
             self.failure_kind = reply.failure_kind;
@@ -150,6 +166,14 @@ impl WindowSession {
                 self.failure_kind = ApplicationFailureKind::Host;
             }
         }
+        self.outcome = if self.phase() == ApplicationPumpPhase::Stopped {
+            Some(ApplicationOutcome::failed(
+                self.cleanup_completed,
+                self.failure_kind,
+            ))
+        } else {
+            outcome
+        };
         Ok(Some(WindowSessionReply {
             operation: reply.operation,
             phase: self.phase(),
@@ -157,8 +181,24 @@ impl WindowSession {
             close_reason: self.close_reason,
             cleanup_completed: self.cleanup_completed,
             failure_kind: self.failure_kind,
+            outcome: self.outcome,
             frame,
         }))
+    }
+
+    fn observe_stopped_error<T>(&mut self, result: &Result<T, String>) {
+        if result.is_err()
+            && self.phase() == ApplicationPumpPhase::Stopped
+            && self.outcome.is_none()
+        {
+            if !self.failure_kind.is_failure() {
+                self.failure_kind = ApplicationFailureKind::Unclassified;
+            }
+            self.outcome = Some(ApplicationOutcome::failed(
+                self.cleanup_completed,
+                self.failure_kind,
+            ));
+        }
     }
 }
 

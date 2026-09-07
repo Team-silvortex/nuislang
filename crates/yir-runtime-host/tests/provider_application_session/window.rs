@@ -95,6 +95,8 @@ fn window_profile_routes_redraw_unicode_key_and_explicit_close() {
     assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
     assert!(closed.cleanup_completed);
     assert_eq!(closed.failure_kind, ApplicationFailureKind::None);
+    assert_eq!(closed.outcome.unwrap().codes(), [1, 1, 0]);
+    assert_eq!(session.outcome(), closed.outcome);
     assert!(closed.frame.unwrap().is_none());
     drop(session);
     assert_eq!(peer.finish(), (2, true));
@@ -201,6 +203,26 @@ fn provider_and_dispatch_budget_failures_reach_nuis_close_without_becoming_succe
             Reply::RejectedFrame,
             0,
             ApplicationFailureKind::ProviderRejected,
+        ),
+        (
+            Reply::TypedRejectedFrame(RejectionCode::Budget),
+            0,
+            ApplicationFailureKind::ProviderBudget,
+        ),
+        (
+            Reply::TypedRejectedFrame(RejectionCode::Execution),
+            0,
+            ApplicationFailureKind::ProviderExecution,
+        ),
+        (
+            Reply::TypedRejectedFrame(RejectionCode::Result),
+            0,
+            ApplicationFailureKind::ProviderContract,
+        ),
+        (
+            Reply::TypedRejectedFrame(RejectionCode::Exchange),
+            0,
+            ApplicationFailureKind::ProviderExchange,
         ),
         (Reply::Good, 256, ApplicationFailureKind::DispatchLimit),
         (
@@ -314,33 +336,60 @@ fn host_failure_is_latched_before_cleanup_and_busy_close_does_not_poison_state()
 
 #[test]
 fn late_finish_failure_preserves_cleanup_without_repeating_or_certifying_it() {
-    let source = source();
-    let peer = Peer::start_source(Reply::BadClose, source.clone(), None);
-    let mut session = WindowSession::spawn(
-        source,
-        ApplicationProviderSource::Ipc(&peer.path),
-        "ui".to_owned(),
-        640,
-        400,
-    )
-    .unwrap();
-    receive(&mut session).frame.unwrap();
-    session.close().unwrap();
-    assert_eq!(session.failure_kind(), ApplicationFailureKind::None);
-    let closed = receive(&mut session);
-    assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
-    assert!(closed.cleanup_completed);
-    assert_eq!(state_count(&closed), 640);
-    assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
-    assert_eq!(
-        closed.failure_kind,
-        ApplicationFailureKind::ProviderContract
-    );
-    assert!(closed.frame.is_err());
-    assert!(session.close().is_err());
-    assert!(session.event(0, 0).is_err());
-    drop(session);
-    assert_eq!(peer.finish(), (0, true));
+    for (response, expected) in [
+        (Reply::BadClose, ApplicationFailureKind::ProviderContract),
+        (
+            Reply::RejectedClose,
+            ApplicationFailureKind::ProviderFinalization,
+        ),
+    ] {
+        let source = source();
+        let peer = Peer::start_source(response, source.clone(), None);
+        let mut session = WindowSession::spawn(
+            source,
+            ApplicationProviderSource::Ipc(&peer.path),
+            "ui".to_owned(),
+            640,
+            400,
+        )
+        .unwrap();
+        receive(&mut session).frame.unwrap();
+        session.close().unwrap();
+        assert_eq!(session.failure_kind(), ApplicationFailureKind::None);
+        assert_eq!(session.outcome(), None);
+        let closed = receive(&mut session);
+        assert_eq!(closed.close_reason, Some(ApplicationCloseReason::Requested));
+        assert!(closed.cleanup_completed);
+        assert_eq!(state_count(&closed), 640);
+        assert_eq!(closed.phase, ApplicationPumpPhase::Stopped);
+        assert_eq!(closed.failure_kind, expected);
+        assert!(closed.frame.is_err());
+        let outcome = closed.outcome.unwrap();
+        assert_eq!(outcome.codes(), [2, 1, expected.code()]);
+        for _ in 0..3 {
+            assert_eq!(session.outcome(), Some(outcome));
+            assert!(session.poll().unwrap().is_none());
+            for (field, expected) in outcome.codes().into_iter().enumerate() {
+                assert_eq!(
+                    unsafe {
+                        yir_runtime_host::nuis_window_session_outcome_field(&session, field as i64)
+                    },
+                    expected
+                );
+            }
+            for field in [-1, 3, i64::MAX] {
+                assert_eq!(
+                    unsafe { yir_runtime_host::nuis_window_session_outcome_field(&session, field) },
+                    -1
+                );
+            }
+        }
+        assert!(session.close().is_err());
+        assert!(session.event(0, 0).is_err());
+        assert_eq!(session.outcome(), Some(outcome));
+        drop(session);
+        assert_eq!(peer.finish(), (0, true));
+    }
 }
 
 #[test]
@@ -380,6 +429,7 @@ fn cleanup_failure_cannot_hide_the_original_provider_failure() {
         ApplicationFailureKind::ProviderRejected
     );
     assert!(!closed.cleanup_completed);
+    assert_eq!(closed.outcome.unwrap().codes(), [2, 0, 4]);
     let detail = closed.frame.unwrap_err();
     assert!(detail.contains(&original), "{detail}");
     assert!(detail.contains("cleanup failed:"), "{detail}");

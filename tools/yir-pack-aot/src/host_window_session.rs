@@ -9,6 +9,7 @@ extern int32_t nuis_window_session_close_with_reason(NuisWindowSession *, int64_
 extern int64_t nuis_window_session_close_reason(const NuisWindowSession *);
 extern int32_t nuis_window_session_cleanup_completed(const NuisWindowSession *);
 extern int64_t nuis_window_session_failure_kind(const NuisWindowSession *);
+extern int64_t nuis_window_session_outcome_field(const NuisWindowSession *, int64_t);
 extern int32_t nuis_window_session_poll(NuisWindowSession *, NuisRenderedBuffer *, int32_t *);
 extern void nuis_window_session_free(NuisWindowSession **);
 
@@ -166,6 +167,9 @@ pub(super) const METHODS: &str = r#"
         self.sessionTerminal = YES;
         fprintf(stderr, "nuis: window_session_cleanup_completed=%d\n", nuis_window_session_cleanup_completed(self.session));
         fprintf(stderr, "nuis: window_session_failure_kind=%lld\n", (long long)nuis_window_session_failure_kind(self.session));
+        fprintf(stderr, "nuis: window_session_outcome_status=%lld\n", (long long)nuis_window_session_outcome_field(self.session, 0));
+        fprintf(stderr, "nuis: window_session_outcome_cleanup=%lld\n", (long long)nuis_window_session_outcome_field(self.session, 1));
+        fprintf(stderr, "nuis: window_session_outcome_failure=%lld\n", (long long)nuis_window_session_outcome_field(self.session, 2));
         if (phase == 3 && status >= 0 && !self.sessionFailed) {
             gNuisWindowExitStatus = 0;
             fprintf(stderr, "nuis: window_session_closed\n");

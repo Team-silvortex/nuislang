@@ -1,8 +1,8 @@
-pub const APPLICATION_FAILURE_CONTRACT: &str = "nuis-yir-application-failure-v1";
+pub const APPLICATION_FAILURE_CONTRACT: &str = "nuis-yir-application-failure-v2";
 
 /// Producer-observed failure category, never completion or recovery authority.
-/// ProviderExchange includes transport and framing errors; a text-only remote
-/// rejection is ProviderRejected, not a guessed device or budget failure.
+/// ProviderExchange includes transport and framing errors. Remote categories
+/// describe admitted producer boundaries, never causes inferred from diagnostics.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(i64)]
 pub enum ApplicationFailureKind {
@@ -16,6 +16,9 @@ pub enum ApplicationFailureKind {
     ProviderContract = 6,
     ReplayExhausted = 7,
     Unclassified = 8,
+    ProviderBudget = 9,
+    ProviderExecution = 10,
+    ProviderFinalization = 11,
 }
 
 impl ApplicationFailureKind {
@@ -34,6 +37,9 @@ impl ApplicationFailureKind {
             6 => Ok(Self::ProviderContract),
             7 => Ok(Self::ReplayExhausted),
             8 => Ok(Self::Unclassified),
+            9 => Ok(Self::ProviderBudget),
+            10 => Ok(Self::ProviderExecution),
+            11 => Ok(Self::ProviderFinalization),
             _ => Err("application failure kind is not a registered code".to_owned()),
         }
     }
@@ -49,12 +55,12 @@ mod tests {
 
     #[test]
     fn failure_codes_are_explicit_and_unknown_codes_do_not_become_success() {
-        for code in 0..=8 {
+        for code in 0..=11 {
             let kind = ApplicationFailureKind::from_code(code).unwrap();
             assert_eq!(kind.code(), code);
             assert_eq!(kind.is_failure(), code != 0);
         }
-        for code in [-1, 9, i64::MIN, i64::MAX] {
+        for code in [-1, 12, i64::MIN, i64::MAX] {
             assert!(ApplicationFailureKind::from_code(code).is_err());
         }
     }

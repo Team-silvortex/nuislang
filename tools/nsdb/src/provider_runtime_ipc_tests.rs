@@ -41,7 +41,9 @@ fn invalid_events_and_disconnect_never_reach_device_execution() {
             Message::read_from,
             |_| panic!("invalid event executed device"),
         );
-        assert!(result.is_err());
+        let error = result.err().unwrap();
+        assert_eq!(error.code, RejectionCode::Request);
+        assert_eq!(error.sequence, 0);
     }
     assert!(dispatch_loop(
         &mut Cursor::new(Vec::<u8>::new()),
@@ -78,26 +80,36 @@ fn exhausted_replay_budget_rejects_before_device_execution() {
         budget.reserve(MAX_PAYLOAD_BYTES).unwrap();
     }
     let full = budget.clone();
-    let error = execute_reserved(&mut budget, 4, || {
+    let error = execute_reserved(&mut budget, 4, 4, || {
         panic!("budget exhaustion must not reach device execution")
     })
     .err()
     .unwrap();
-    assert!(error.contains("storage budget"));
+    assert!(error.detail.contains("storage budget"));
+    assert_eq!(error.code, RejectionCode::Budget);
+    assert_eq!(error.phase, RejectionPhase::Dispatch);
+    assert_eq!(error.sequence, 4);
     assert_eq!(budget, full);
 }
 
 #[test]
 fn failed_admitted_device_work_does_not_refund_its_reservation() {
     let mut budget = ReplayBudget::default();
-    let error = execute_reserved(&mut budget, 4, || Err("device failed".to_owned()))
+    let error = execute_reserved(&mut budget, 4, 0, || Err("device failed".to_owned()))
         .err()
         .unwrap();
-    assert_eq!(error, "device failed");
+    assert_eq!(error.detail, "device failed");
+    assert_eq!(error.code, RejectionCode::Execution);
     let mut reserved = ReplayBudget::default();
     reserved.reserve(4).unwrap();
     assert_eq!(budget, reserved);
-    assert!(execute_reserved(&mut budget, 4, || Ok(NativeProviderOutputs::empty())).is_err());
+    assert_eq!(
+        execute_reserved(&mut budget, 4, 1, || Ok(NativeProviderOutputs::empty()))
+            .err()
+            .unwrap()
+            .code,
+        RejectionCode::Result
+    );
     reserved.reserve(4).unwrap();
     assert_eq!(budget, reserved);
 }
@@ -105,7 +117,7 @@ fn failed_admitted_device_work_does_not_refund_its_reservation() {
 #[test]
 fn device_result_must_fit_the_registered_reservation() {
     let mut budget = ReplayBudget::default();
-    let error = execute_reserved(&mut budget, 1, || {
+    let error = execute_reserved(&mut budget, 1, 0, || {
         let mut output = NativeProviderOutputs::empty();
         output
             .runtime_results
@@ -114,7 +126,8 @@ fn device_result_must_fit_the_registered_reservation() {
     })
     .err()
     .unwrap();
-    assert!(error.contains("reserved output extent"));
+    assert!(error.detail.contains("reserved output extent"));
+    assert_eq!(error.code, RejectionCode::Result);
 }
 
 #[test]
@@ -195,5 +208,50 @@ fn request_reader_failure_is_terminal_without_retry_or_device_execution() {
     .err()
     .unwrap();
     assert_eq!(reads, 1);
-    assert_eq!(error, "request deadline exceeded after partial input");
+    assert_eq!(
+        error.detail,
+        "request deadline exceeded after partial input"
+    );
+    assert_eq!(error.code, RejectionCode::Exchange);
+    assert_eq!(error.phase, RejectionPhase::Receive);
+    assert_eq!(error.sequence, 0);
+}
+
+#[test]
+fn cleanup_and_publication_failures_keep_typed_first_fault_and_never_acknowledge() {
+    let error = complete_session(
+        Err(Rejection::new(
+            RejectionPhase::Dispatch,
+            2,
+            RejectionCode::Execution,
+            "original",
+        )),
+        Err("cleanup".to_owned()),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(error.code, RejectionCode::Execution);
+    assert_eq!(error.sequence, 2);
+    assert_eq!(error.detail, "original; provider cleanup failed: cleanup");
+    let error = complete_session(
+        Ok((2, NativeProviderOutputs::empty())),
+        Err("cleanup".to_owned()),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(error.code, RejectionCode::Finalization);
+    assert_eq!(error.phase, RejectionPhase::Finish);
+    let mut output = Vec::new();
+    let error = finalize_session(&mut output, 2, || Err("disk failure".to_owned())).unwrap_err();
+    assert_eq!(error.code, RejectionCode::Finalization);
+    assert_eq!(error.sequence, 2);
+    assert!(output.is_empty(), "failed publication acknowledged success");
+    assert_eq!(
+        finalize_session(&mut output, MAX_DISPATCHES, || Ok(())).unwrap(),
+        MAX_DISPATCHES
+    );
+    assert_eq!(
+        Message::read_from(&mut output.as_slice()).unwrap(),
+        Message::Closed(MAX_DISPATCHES)
+    );
 }

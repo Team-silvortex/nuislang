@@ -15,7 +15,9 @@ use super::{
 const MAX_FUNCTION_CALL_DEPTH: usize = 128;
 const MAX_SCOPED_LOOP_ITERATIONS: usize = 100_000;
 
+mod call_result;
 mod function_session;
+use call_result::validate_call_result;
 pub use function_session::{FunctionInvocation, FunctionSession};
 
 pub(super) fn execute_module_with_registry(
@@ -464,27 +466,6 @@ impl<'a> ExecutionEngine<'a> {
             presented_frames,
             provider_completion_witnesses,
         }
-    }
-}
-
-fn validate_call_result(node: &Node, value: &Value) -> Result<(), String> {
-    let valid = matches!(
-        (node.op.instruction.as_str(), value),
-        ("call_bool", Value::Bool(_))
-            | ("call_i32", Value::I32(_))
-            | ("call_i64", Value::Int(_))
-            | ("call_f32", Value::F32(_))
-            | ("call_f64", Value::F64(_))
-            | ("call_owned_bytes", Value::OwnedBytes(_))
-            | ("call_owned_struct", Value::Struct(_))
-    );
-    if valid {
-        Ok(())
-    } else {
-        Err(format!(
-            "node `{}` received incompatible result {value} from `{}`",
-            node.name, node.op.args[0]
-        ))
     }
 }
 

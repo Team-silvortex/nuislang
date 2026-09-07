@@ -55,6 +55,9 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
         "{log}"
     );
     assert!(log.contains("window_session_failure_kind=0\n"), "{log}");
+    assert!(log.contains("window_session_outcome_status=1\n"), "{log}");
+    assert!(log.contains("window_session_outcome_cleanup=1\n"), "{log}");
+    assert!(log.contains("window_session_outcome_failure=0\n"), "{log}");
     assert!(
         log.contains("window_session_cleanup_completed=1\n"),
         "{log}"

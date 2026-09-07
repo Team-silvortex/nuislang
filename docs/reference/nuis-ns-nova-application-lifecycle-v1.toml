@@ -7,6 +7,25 @@ owner = "nuis.ns-nova"
 runtime_module = "stdlib/ns-nova/lib/app_runtime.ns"
 reference_project = "examples/projects/domains/ns_nova_showcase"
 
+# Planning scope only: these fields do not register executable capabilities.
+[engine_target]
+status = "planned"
+roadmap = "docs/versioning/nuis-beta-0.11-application-led-mainline.md"
+capabilities = ["rendering", "control", "machine-learning", "audio-workflows"]
+composition = "one-nuis-owned-application-session"
+acceptance = "cross-workflow-effects-not-isolated-demos"
+shared_contracts = ["yir-function-node", "glm-resource-ownership", "global-clock-partial-order", "lifecycle-hooks"]
+clock_policy = "multi-rate-explicit-clock-bridges-not-frame-lockstep"
+ml_owner = "independent-witsage-semantics-and-registered-kernel-providers"
+audio_owner = "ns-nova-workflow-policy-independent-processing-modules-registered-device-providers"
+audio_registration = "capability-contract-before-new-galaxy-or-nustar-choice"
+hardware_evidence = "verified-execution-not-device-label-or-provider-preference-no-silent-fallback"
+application_ml_integration_claimed = false
+application_audio_workflow_claimed = false
+combined_workflow_execution_claimed = false
+hard_realtime_claimed = false
+mainline_expansion = "explicit-future-coordinates-not-new-prerequisites-for-current-image-goal"
+
 [application]
 state_type = "NovaAppState"
 open = "NovaAppRuntime.open"
@@ -153,7 +172,7 @@ state_policy = "nuis-owned-scalar-aggregate-snapshot-per-reply"
 close_reply_gate = "lifecycle-success-and-provider-finish-acknowledgement"
 cleanup_completed = "close-callback-returned-state-and-passed-trace-checks-not-success-or-resource-retirement"
 host_failure_gate = "latch-before-nuis-close-no-provider-finish-on-failure"
-failure_contract = "nuis-yir-application-failure-v1"
+failure_contract = "nuis-yir-application-failure-v2"
 failure_evidence = "scope-owned-first-producer-fault-no-string-classification-no-global-state-no-reset"
 failure_diagnostic = "window-retains-original-event-error-and-appends-cleanup-error"
 drop_policy = "disconnect-without-join-or-implicit-close-in-flight-effects-not-retracted"
@@ -175,8 +194,8 @@ close_reason_contract = "nuis-yir-application-close-reason-v1"
 close_reasons = ["requested:0", "event-failed:1", "host-failed:2"]
 close_reason_policy = "intent-at-admission-event-failure-dominates-not-completion-receipt"
 migration = "rebuild-v1-v2-host-bundle-nuis-close-helper-and-state-artifacts-together"
-failure_kinds = ["none:0", "callback:1", "host:2", "dispatch-limit:3", "provider-rejected:4", "provider-exchange:5", "provider-contract:6", "replay-exhausted:7", "unclassified:8"]
-late_failure = "terminal-host-observation-not-second-nuis-close-or-retroactive-state-update"
+failure_kinds = ["none:0", "callback:1", "host:2", "dispatch-limit:3", "provider-rejected:4", "provider-exchange:5", "provider-contract:6", "replay-exhausted:7", "unclassified:8", "provider-budget:9", "provider-execution:10", "provider-finalization:11"]
+late_failure = "immutable-terminal-outcome-separate-from-old-close-state-no-reinitialization-or-second-close"
 state_policy = "same-registered-nuis-owned-scalar-aggregate"
 events = ["redraw:0,0", "key:1,unicode-scalar"]
 script_transport = "appkit-queued-logical-input-not-physical-key-synthesis"
@@ -193,8 +212,27 @@ default_legacy_preview_replaced = false
 general_ime_input = false
 fully_native_cpu_dispatch = false
 
+[application_outcome]
+contract = "nuis-yir-application-outcome-v1"
+implementation = "crates/yir-core/src/application_outcome.rs"
+consumer = "stdlib/ns-nova/lib/app_runtime.ns"
+fields = ["status:i64", "cleanup_completed:i64", "failure_kind:i64"]
+success = "1,1,0"
+failure = "2,canonical-cleanup-flag,registered-nonzero-failure-v2"
+invalid_nuis_input = "3,0,255-library-local-not-wire-terminal-report"
+runtime_readout = "immutable-pump-window-snapshot-and-readonly-ffi-getter"
+evidence = "terminal-matrix-late-finish-cleanup-failure-pre-open-failure-compiled-nuis-consumer-native-decoder-compiled-window-readout"
+post_close_observer = false
+parent_nuis_delivery = false
+completion_authority = false
+resource_retirement_authority = false
+
 [runtime_ipc]
-contract = "nuis-yir-provider-runtime-ipc-v3"
+contract = "nuis-yir-provider-runtime-ipc-v4"
+rejection = "producer-phase-sequence-code-admitted-against-pending-request"
+rejection_codes = ["request:1", "budget:2", "execution:3", "result:4", "finalization:5", "exchange:6"]
+rejection_diagnostic = "not-classification-input-bounded-utf8-with-full-local-first-fault"
+rejection_migration = "rebuild-v3-peers-no-negotiation-or-text-only-fallback"
 contract_owner = "yir-core"
 transport = "private-unix-stream"
 dispatch_trigger = "child-yir-node-ipc"
@@ -367,5 +405,5 @@ dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "define typed remote rejection/late-failure delivery and account for in-flight cancellation/resource retirement without reconnecting to reset clocks; retain first-failure evidence, failure-cleanup separation, bounded grace, idle/request deadlines and compiled Metal window/export evidence"
+action = "deliver immutable terminal outcomes into parent Nuis orchestration under explicit ownership/effect/budget rules, then account for in-flight cancellation/resource retirement; never reinitialize the closed module, repeat close or reset provider clocks and budgets; retain typed rejection and compiled Metal window/export evidence"
 validation = "retain compiled-binary image/uniform export, exact GPU pixels, live/replay equality without an external YIR read, fail-closed missing providers, no overwrite or output on rejected dispatch, cache reuse, physical completion and GLM release; do not conflate embedded-YIR execution with fully native CPU lowering, self-contained Nsld injection or continuous application state"

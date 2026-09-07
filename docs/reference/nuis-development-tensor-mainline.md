@@ -62,9 +62,17 @@ proofs under one broad engine label. Its `active/99` is replaced by an
 percentage of engine completion or a regression in the verified three-frame
 artifact. Existing Metal, replay, completion and GLM evidence stays intact.
 
+That broad scope includes the planned rendering, control, ML and audio
+[engine horizon](../versioning/nuis-beta-0.11-application-led-mainline.md#engine-capability-horizon).
+The lifecycle manifest's `[engine_target]` records it without claiming integrated
+execution. No progress score is raised for this direction update. ML, audio and
+combined-workflow acceptance need separate coordinates before implementation is
+scheduled; they are not extra prerequisites of the current image goal or the
+finite compiler-module migration plan.
+
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/86 | Window v3 carries first-fault categories into Nuis; compiled provider rejection and replay exhaustion preserve failure/evidence. Typed remote codes, late delivery, recovery and resource cancellation remain open. |
+| `ns-nova/persistent-application-session` | active/86 | IPC v4 admits remote rejection identity; immutable terminal outcome v1 and the Nuis decoder distinguish late Finish from cleanup. Parent-orchestrator delivery, recovery and resource cancellation remain open. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -114,8 +122,8 @@ the first byte starts one 120-second budget for prefix/header/uploads, while
 quiet intervals do not reconnect, advance clocks or consume dispatches. EOF and
 supervisor shutdown wake the wait. A shortened-deadline live Metal test crosses
 idle gaps before independent draws and finish with one worker, exact pixels and
-monotonic clocks; transport tests reject partial-message stalls. The v3 wire is
-unchanged.
+monotonic clocks; transport tests reject partial-message stalls. IPC v4 retains
+these deadlines and budgets while changing rejection framing.
 
 [Window profile v3](nuis-yir-window-session-v3.md) now carries a shared requested,
 event-failed or host-failed close intent into Nuis. Std cleanup preserves failed
@@ -133,10 +141,24 @@ also consumes two saved frames then rejects a third draw with `ReplayExhausted`;
 there is no substitute frame, successful exit or replacement replay evidence.
 Tests distinguish local dispatch limits, peer rejection, disconnect and result
 drift; simultaneous event/cleanup errors keep both diagnostics and the first kind.
-Late Finish is visible to the host without repeating Nuis close. IPC v3 remote
-rejection is still text-only and exchange errors still group I/O and framing.
-`active/86` is not an engine-completion percentage; remote error codes, late-failure
-delivery, long-duration soak and transactional publication remain open.
+Late Finish is visible to the host without repeating Nuis close.
+[IPC v4](nuis-yir-provider-runtime-ipc-v4.md) now admits producer-owned rejection
+phase, sequence and code before delivery. Remote budget, execution and
+finalization are distinct; incorrect phase/sequence is a contract failure, and
+unknown/legacy framing is rejected. Provider-close failure cannot overwrite an
+earlier execution fault or produce a successful acknowledgement. The compiled
+window's injected request-reader failure now reaches Nuis as `ProviderExchange`,
+not a text-only rejection. Exchange errors still group I/O and framing, and
+execution errors do not identify hardware-specific causes.
+The independent [outcome v1](nuis-yir-application-outcome-v1.md) now exposes a
+stable status/cleanup/failure snapshot without changing the old Nuis state.
+A protocol-injected late Finish from the compiled image reaches a separate
+compiled Nuis consumer; native execution checks the decoder too. The window's
+runtime/FFI getters only read data, never reinitialize the module or repeat close.
+`active/86` is not an engine-completion percentage: automatic delivery into a
+parent Nuis orchestrator, cancellation/resource retirement, long-duration soak
+and transactional publication remain open. Do not replace that delivery contract
+with an unchecked post-close callback.
 
 ## Validation And Scope
 

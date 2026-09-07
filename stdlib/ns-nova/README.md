@@ -11,13 +11,14 @@ with Unreal Engine.
 Target character:
 
 * native GPU cross-platform 2D/3D real-time world engine
-* world loop, scene, rendering, input, audio, physics, and resource orchestration
-  rather than only a widget kit
+* world loop, scene, rendering, control/input, ML, audio workflows, physics,
+  and resource orchestration rather than only a widget kit
 * built on `nuis` domain composition:
   `cpu` for orchestration,
   `data` for exchange,
   `shader` for rendering,
-  `kernel` for future compute-heavy scene or simulation workflows
+  `kernel` for model and compute-heavy scene or simulation workflows;
+  concrete device placement remains a registered capability, not an engine assumption
 
 Intended scope:
 
@@ -25,6 +26,18 @@ Intended scope:
 * material/pipeline/shader packaging helpers
 * window/input/frame lifecycle abstractions
 * 2D UI, 3D scene, and game-style application driving built on the same GPU-native core
+* ML task/result integration with independent WitSage algorithms and registered providers
+* audio capture/playback, processing and mixing workflows with independent processing/device modules
+* cross-workflow data, time and resource coordination in one Nuis-owned application,
+  not a collection of isolated rendering, ML and audio demos
+
+These are target capabilities, not present API or execution claims. Shared YIR,
+GLM and clock/lifecycle contracts allow different event, frame, inference and
+audio rates; they do not require frame lockstep. Audio integration and ML-driven
+application behavior are still planned. See the
+[engine capability horizon](../../docs/versioning/nuis-beta-0.11-application-led-mainline.md#engine-capability-horizon)
+for ownership boundaries and combined acceptance without expanding the current
+image-session prerequisite.
 
 Family structure:
 
@@ -71,6 +84,16 @@ Current state:
   preserves failed status, the first fault and accepted frame identity; the host distinguishes completed cleanup from
   successful execution. Compiled provider-failure injection retains the error
   and old replay files. Version 1/2 window bundles, state artifacts and close helpers require rebuilding
+* [provider IPC v4](../../docs/reference/nuis-yir-provider-runtime-ipc-v4.md) admits
+  rejection phase/sequence/code before projecting failure-v2 categories into
+  Nuis. `ProviderBudget`, `ProviderExecution` and `ProviderFinalization` preserve
+  producer boundaries without guessing device causes. IPC-v3 peers require
+  rebuilding together; the window-v3 close signature is unchanged
+* [terminal outcome v1](../../docs/reference/nuis-yir-application-outcome-v1.md)
+  adds `NovaAppOutcome`, `terminal_outcome`, `outcome_succeeded` and `outcome_failed`.
+  The Nuis decoder separates late Finish failure from completed cleanup, rejects
+  contradictory/unknown fields and never rewrites the old application state.
+  Runtime snapshots are readonly; automatic post-close Nuis delivery is not implemented
 * lifecycle-gated `cpu_present_frame` now lowers through the generic registered branch-effect contract; ns-nova adds no compiler branch of its own
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
@@ -133,7 +156,8 @@ Current limitation:
 * the native three-frame validation loop and the persistent embedded-YIR window
   are distinct routes. The latter remains bounded to 256 dispatches and 64 MiB
   replay, not a stable unlimited interactive world loop. Failure teardown is
-  tested, but typed remote causes, cancellation and owned-resource retirement remain open
+  tested, but device-specific causes, outcome delivery into parent Nuis orchestration, cancellation
+  and owned-resource retirement remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;
   its receipt is provider-domain-issued, but its clock still comes from the planned

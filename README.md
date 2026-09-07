@@ -23,6 +23,12 @@ only actual compiler responsibility transfer counts as compiler self-hosting.
 See the [recalibrated roadmap](docs/versioning/nuis-beta-0.11-application-led-mainline.md)
 and [dependency selection contract](docs/reference/nuis-development-tensor-mainline.md).
 
+The intended ns-nova engine combines **rendering, control, ML and audio workflows**
+in one Nuis-owned lifecycle, with shared YIR/GLM/time contracts and independent
+Galaxy/Nustar implementations. This is the
+[capability horizon](docs/versioning/nuis-beta-0.11-application-led-mainline.md#engine-capability-horizon),
+not a claim of an integrated ML/audio engine today or a larger first milestone.
+
 This is the formal staged self-hosting migration line, not a self-hosting,
 API-stability, or production-ready claim. `stage0` remains an immutable rollback
 root while bounded compiler capabilities move into the Nuis candidate. The
@@ -109,7 +115,7 @@ live pixels match the persisted replay byte-for-byte. Bound live and replay draw
 now reuse Shader-owned borrowed request validation without rasterizing a CPU
 reference image; their events describe the returned RGBA8 frame, and dimensions
 come from the render pass rather than an ASCII preview's minimum size. CPU-only
-reference rendering remains available. Typed IPC v3 carries runtime vertex
+reference rendering remains available. Typed IPC v4 carries runtime vertex
 and instance counts from the Nuis loop into registered device dispatch and
 hash-bound replay. On M2, `3/2/3` vertices produce full/clear/full frames while
 retaining live/replay equality and adapter cache reuse. A Nuis-owned four-f32 tuple
@@ -157,8 +163,17 @@ replay evidence; supervision allows five seconds before forced teardown.
 The same binary also rejects a third draw against a two-frame replay with a typed
 exhaustion result, not a substitute image. Existing v1/v2 window bundles, Nuis
 close helpers and application-state artifacts must be rebuilt together.
+[Provider IPC v4](docs/reference/nuis-yir-provider-runtime-ipc-v4.md) now carries
+producer-owned rejection phase, sequence and code. Nuis distinguishes remote
+budget, execution and finalization failures without reading diagnostic wording;
+late Finish failure cannot repeat cleanup. Rebuild IPC-v3 hosts and supervisors
+together; window callback signatures stay v3 while the failure vocabulary is v2.
+[Terminal outcomes](docs/reference/nuis-yir-application-outcome-v1.md) now expose
+late Finish failure separately from the old close state, with readonly host
+readout and a Nuis decoder. Automatic post-close Nuis delivery remains open;
+reading the outcome never reinitializes the application or repeats cleanup.
 Unsupported bindings fail closed. Code-asset authority and output extents remain
-fixed; textures/samplers, mixed resources, typed remote failures/recovery,
+fixed; textures/samplers, mixed resources, device-specific causes/recovery,
 self-contained host-runner injection,
 and cross-host window adapters remain open. The prior Data
 lane stays `usable/74`: its hardware-free reference and conformance closure are

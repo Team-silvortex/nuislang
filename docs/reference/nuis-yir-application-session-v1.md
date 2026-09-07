@@ -185,15 +185,23 @@ reply with this flag true. Failed close callbacks or invalid close presentations
 leave it false. The window profile can latch a host failure before Nuis cleanup;
 that failure likewise prevents successful Finish, even if the callback succeeds.
 
-`failure_kind` carries the shared `nuis-yir-application-failure-v1` code separately
+`failure_kind` carries the shared `nuis-yir-application-failure-v2` code separately
 from text diagnostics and close intent. Producers record their observation before
 crossing the executor's String error boundary; each scope owns its first-failure
 latch. Callback/host cleanup cannot overwrite an earlier provider fault. Invalid
 ingress arguments rejected before execution do not poison the latch. The terminal
 reply includes late Finish failure even though Nuis close cannot be repeated.
 The window terminal diagnostic retains both an event error and a later cleanup
-error. Text-only peer rejection and exchange/framing failures remain coarse
-categories; no remote cause is guessed from diagnostic wording.
+error. [IPC v4](nuis-yir-provider-runtime-ipc-v4.md) validates remote rejection
+phase/sequence/code before category delivery, distinguishing producer budget,
+execution and finalization failures without guessing from diagnostic wording.
+Execution-adapter internals and exchange/framing failures remain coarse categories.
+
+`ApplicationPumpReply::outcome()` projects a validated terminal reply into the
+independent [application-outcome-v1](nuis-yir-application-outcome-v1.md) scalar
+contract. Nonterminal faults have no outcome yet. Window readout is immutable;
+Nuis can decode it without mutating the old close state or claiming resource
+retirement. An automatic post-close callback is not registered or executed.
 
 `abort` and dropping the handle disconnect the channels without joining the
 worker or implicitly executing Nuis close. An idle worker wakes and drops its

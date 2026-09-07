@@ -141,6 +141,26 @@ pub unsafe extern "C" fn nuis_window_session_failure_kind(session: *const Window
     unsafe { session.as_ref() }.map_or(-1, |session| session.failure_kind().code())
 }
 
+/// Read nuis-yir-application-outcome-v1: field 0=status, 1=cleanup, 2=failure.
+/// Return -1 for null, unavailable outcome or unknown field. Reading never polls
+/// or executes a callback. All fields are immutable once published.
+/// # Safety
+/// Session must be null or an exclusive live handle returned by open.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_outcome_field(
+    session: *const WindowSession,
+    field: i64,
+) -> i64 {
+    unsafe { session.as_ref() }
+        .and_then(WindowSession::outcome)
+        .and_then(|outcome| {
+            usize::try_from(field)
+                .ok()
+                .and_then(|field| outcome.codes().get(field).copied())
+        })
+        .unwrap_or(-1)
+}
+
 /// Return 0 for pending, 1 for one reply, -1 for error. Phase codes are opening=0,
 /// open=1, faulted=2, closed=3, stopped=4. A returned buffer is owned by the caller
 /// and must use nuis_rendered_buffer_free; replies without frames leave it empty.
@@ -209,6 +229,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn terminal_open_failure_has_a_stable_snapshot_without_cleanup() {
+        let session = WindowSession::spawn(
+            "yir 0.1\n".to_owned(),
+            ApplicationProviderSource::Replay(std::path::Path::new("unused-outcome-replay")),
+            "absent".to_owned(),
+            1,
+            1,
+        )
+        .unwrap();
+        let mut slot = Box::into_raw(Box::new(session));
+        let mut buffer = NuisRenderedBuffer {
+            ptr: ptr::null_mut(),
+            len: 0,
+        };
+        let mut phase = 0;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        unsafe {
+            assert_eq!(nuis_window_session_outcome_field(slot, 0), -1);
+            loop {
+                let status = nuis_window_session_poll(slot, &mut buffer, &mut phase);
+                if status != 0 {
+                    assert_eq!(status, -1);
+                    break;
+                }
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            assert_eq!(phase, 4);
+            assert!(buffer.ptr.is_null());
+            for _ in 0..3 {
+                assert_eq!(nuis_window_session_close(slot), -1);
+                assert_eq!(nuis_window_session_poll(slot, &mut buffer, &mut phase), 0);
+                assert_eq!(nuis_window_session_outcome_field(slot, 0), 2);
+                assert_eq!(nuis_window_session_outcome_field(slot, 1), 0);
+                assert_eq!(nuis_window_session_outcome_field(slot, 2), 8);
+            }
+            nuis_window_session_free(&mut slot);
+        }
+    }
+
+    #[test]
     fn ffi_rejects_invalid_inputs_and_preserves_live_output_buffers() {
         let mut slot = ptr::null_mut();
         unsafe {
@@ -226,6 +287,7 @@ mod tests {
             assert_eq!(nuis_window_session_close_reason(slot), -1);
             assert_eq!(nuis_window_session_cleanup_completed(slot), 0);
             assert_eq!(nuis_window_session_failure_kind(slot), -1);
+            assert_eq!(nuis_window_session_outcome_field(slot, 0), -1);
             nuis_window_session_free(&mut slot);
         }
         let session = WindowSession::spawn(
@@ -247,6 +309,9 @@ mod tests {
             assert_eq!(nuis_window_session_close_with_reason(slot, 99), -1);
             assert_eq!(nuis_window_session_close_reason(slot), -1);
             assert_eq!(nuis_window_session_failure_kind(slot), 0);
+            for field in -1..=3 {
+                assert_eq!(nuis_window_session_outcome_field(slot, field), -1);
+            }
             assert_eq!(nuis_window_session_poll(slot, &mut buffer, &mut phase), -1);
             assert_eq!(phase, 99);
             assert_eq!(buffer.ptr, bytes.as_mut_ptr());

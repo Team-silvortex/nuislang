@@ -19,9 +19,9 @@ the worker checks the shared YIR session signature and this host profile:
 Version 3 requires rebuilding the host bundle and changing its registered Nuis
 close helper to `close(state, reason: i64, failure: i64)`. Version 1 had no close
 arguments; version 2 had only `reason`. Both older bundles are rejected by the
-current launcher. The shared application-session v1 and
-provider IPC v3 contracts are unchanged; this is a window-profile migration,
-not a new application ABI or wire format.
+current launcher. The shared application-session v1 contract is unchanged;
+the current transport uses IPC v4 and application-failure v2 independently of
+this window-profile signature.
 
 Event kinds are `0,0` for redraw and `1,code` for one Unicode scalar. Surrogates,
 out-of-range codepoints and unknown kinds are rejected. Dimensions are restricted
@@ -99,9 +99,16 @@ If Finish fails after successful Nuis cleanup, the flag stays true, the phase is
 `Stopped`, and close is never called again. The original close reason is not
 retroactively changed to a failure the callback could not yet observe.
 
+The independent [terminal outcome](nuis-yir-application-outcome-v1.md) snapshots
+status, cleanup and failure after the terminal reply. Its readonly runtime/FFI
+getters and Nuis `NovaAppOutcome` decoder distinguish `[1,1,0]` success from,
+for example, `[2,1,11]` late finalization failure. Reads do not rerun the closed
+application or its global initialization. There is no automatic post-close
+Nuis observer yet; parent-orchestrator delivery needs its own execution contract.
+
 ### Typed Failure Evidence
 
-`nuis-yir-application-failure-v1` is a shared, backend-neutral category contract:
+`nuis-yir-application-failure-v2` is a shared, backend-neutral category contract:
 
 | Code | Kind | Producer Observation |
 | --- | --- | --- |
@@ -109,19 +116,24 @@ retroactively changed to a failure the callback could not yet observe.
 | `1` | `Callback` | Nuis helper execution/state validation failed without a prior provider fault |
 | `2` | `Host` | Host-reported failure or window presentation-contract rejection |
 | `3` | `DispatchLimit` | Local IPC client refused a dispatch at its fixed invocation limit |
-| `4` | `ProviderRejected` | Peer sent the existing text-only `Rejected` message |
+| `4` | `ProviderRejected` | Peer rejected request admission at the matching frontier |
 | `5` | `ProviderExchange` | Request/reply transport, serialization or framing failed |
 | `6` | `ProviderContract` | Provider request/result identity, extent or Finish acknowledgement disagreed |
 | `7` | `ReplayExhausted` | An admitted replay queue has no next frame |
 | `8` | `Unclassified` | Terminal failure without a more specific producer observation |
+| `9` | `ProviderBudget` | Remote output reservation failed before execution |
+| `10` | `ProviderExecution` | Remote execution operation failed, not necessarily a device fault |
+| `11` | `ProviderFinalization` | Remote provider close or evidence publication failed |
 
 Providers record the kind at the failing operation, before the executor's current
 String diagnostic boundary. A scope-owned atomic latch carries that evidence to
 the application session and pump; it is not process-global or thread-local state.
 The first fault wins, reads do not consume it, and a second session starts empty.
-Diagnostic strings are not parsed to select codes. A remote rejection mentioning
-"budget" is still `ProviderRejected`, not an inferred `DispatchLimit`. In particular,
-the server's 64 MiB replay-budget rejection is not yet separately typed on IPC v3.
+Diagnostic strings are not parsed to select codes. A Request rejection mentioning
+"budget" is still `ProviderRejected`, not an inferred `DispatchLimit`.
+[IPC v4](nuis-yir-provider-runtime-ipc-v4.md) now carries producer-owned rejection
+phase, sequence and code. Only an envelope matching the pending operation can
+project its remote category; unknown codes and unrelated responses fail closed.
 `ProviderExchange` deliberately groups I/O and wire decoding, rather than claiming
 to distinguish errors after the lower-level diagnostic has lost that information.
 
@@ -136,7 +148,8 @@ The Nuis decoder maps unsupported codes to `Unknown` (stored as `255`), never a
 successful state. Legacy std `close`/`close_with_reason` helpers remain available
 but cannot erase an existing fault. The added state field is part of the Nuis
 library migration; applications and replay artifacts must be rebuilt together.
-This does not change provider IPC v3, infer remote device causes, authorize recovery
+The close signature remains v3, but failure-v2 helpers and IPC-v4 peers must be
+rebuilt together. This does not infer remote device causes, authorize recovery
 or prove cancellation/resource retirement.
 
 After its provider worker stops, the supervising launcher gives the child at most
@@ -234,6 +247,6 @@ tests check graceful exit, a latched cleanup deadline and stricter total timeout
 The current Nuis event wrapper uses a leading guard returning existing state.
 Bare `if { return aggregate_call(...); }` with no else is still unsupported by the
 minimal lowering path; the equivalent guard form is not a compiler fix.
-Close intent and observed failure kind are now separate. Typed remote error codes,
-late-failure delivery to Nuis, application recovery, cancellation/resource retirement,
+Close intent and observed failure kind are now separate. Device-specific causes,
+terminal-outcome delivery into parent Nuis orchestration, application recovery, cancellation/resource retirement,
 richer input, textures and non-Metal/native-CPU parity remain separate work.

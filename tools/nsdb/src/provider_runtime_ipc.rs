@@ -23,7 +23,8 @@ use std::{
     path::Path,
 };
 use yir_core::provider_runtime_ipc::{
-    DispatchArguments, DispatchFrame, DispatchTarget, Message, ReplayBudget, MAX_DISPATCHES,
+    DispatchArguments, DispatchFrame, DispatchTarget, Message, Rejection, RejectionCode,
+    RejectionPhase, ReplayBudget, MAX_DISPATCHES,
 };
 
 /// Serve one bounded lifecycle. Device work starts only after a validated Dispatch message.
@@ -50,23 +51,69 @@ pub fn serve_runtime_provider_session_with_request_reader<S: Read + Write>(
         session.execute_graph(output_dir, &record, &adapter, Some((&target, arguments)))
     });
     let close = session.close();
-    let result = execution.and_then(|(count, outputs)| {
-        close?;
-        if count > 0 {
-            persist_outputs(output_dir, &record, &adapter, &outputs)?;
-        }
-        Message::Closed(count).write_to(stream)?;
-        Ok(count)
+    let result = complete_session(execution, close).and_then(|(count, outputs)| {
+        finalize_session(stream, count, || {
+            if count > 0 {
+                persist_outputs(output_dir, &record, &adapter, &outputs)?;
+            }
+            Ok(())
+        })
     });
     if let Err(error) = &result {
-        let detail = error
-            .chars()
-            .filter(|ch| !matches!(ch, '\n' | '\r' | '\0'))
-            .take(60)
-            .collect::<String>();
-        let _ = Message::Rejected(detail).write_to(stream);
+        let _ = Message::Rejected(error.clone()).write_to(stream);
     }
-    result
+    result.map_err(|error| error.to_string())
+}
+
+fn complete_session(
+    execution: Result<(usize, NativeProviderOutputs), Rejection>,
+    close: Result<(), String>,
+) -> Result<(usize, NativeProviderOutputs), Rejection> {
+    match execution {
+        Err(mut error) => {
+            if let Err(close) = close {
+                error
+                    .detail
+                    .push_str(&format!("; provider cleanup failed: {close}"));
+            }
+            Err(error)
+        }
+        Ok((count, outputs)) => {
+            close.map_err(|error| {
+                Rejection::new(
+                    RejectionPhase::Finish,
+                    count,
+                    RejectionCode::Finalization,
+                    error,
+                )
+            })?;
+            Ok((count, outputs))
+        }
+    }
+}
+
+fn finalize_session(
+    stream: &mut impl Write,
+    count: usize,
+    persist: impl FnOnce() -> Result<(), String>,
+) -> Result<usize, Rejection> {
+    persist().map_err(|error| {
+        Rejection::new(
+            RejectionPhase::Finish,
+            count,
+            RejectionCode::Finalization,
+            error,
+        )
+    })?;
+    Message::Closed(count).write_to(stream).map_err(|error| {
+        Rejection::new(
+            RejectionPhase::Finish,
+            count,
+            RejectionCode::Exchange,
+            error,
+        )
+    })?;
+    Ok(count)
 }
 
 fn admit_target(
@@ -179,39 +226,65 @@ fn dispatch_loop<S: Read + Write>(
     payload_bytes: usize,
     mut read_request: impl FnMut(&mut S) -> Result<Message, String>,
     mut execute: impl FnMut(&DispatchArguments) -> Result<NativeProviderOutputs, String>,
-) -> Result<(usize, NativeProviderOutputs), String> {
+) -> Result<(usize, NativeProviderOutputs), Rejection> {
     let mut count = 0;
     let mut retained = NativeProviderOutputs::empty();
     let mut observations = Vec::new();
     let mut replay_budget = ReplayBudget::default();
     loop {
-        match read_request(stream)? {
+        let request = read_request(stream).map_err(|error| {
+            Rejection::new(
+                RejectionPhase::Receive,
+                count,
+                RejectionCode::Exchange,
+                error,
+            )
+        })?;
+        let dispatch_error =
+            |code, error| Rejection::new(RejectionPhase::Dispatch, count, code, error);
+        match request {
             Message::Dispatch {
                 sequence,
                 target: requested,
                 arguments,
             } => {
                 if requested != *target || sequence != count || count >= MAX_DISPATCHES {
-                    return Err("runtime IPC request target or sequence mismatch".to_owned());
+                    return Err(Rejection::new(
+                        RejectionPhase::Receive,
+                        count,
+                        RejectionCode::Request,
+                        "runtime IPC request target or sequence mismatch".to_owned(),
+                    ));
                 }
                 let mut outputs =
-                    execute_reserved(&mut replay_budget, payload_bytes, || execute(&arguments))?;
+                    execute_reserved(&mut replay_budget, payload_bytes, count, || {
+                        execute(&arguments)
+                    })?;
                 let [result] = outputs.runtime_results.as_slice() else {
-                    return Err("runtime IPC graph must return exactly one bound result".to_owned());
+                    return Err(dispatch_error(
+                        RejectionCode::Result,
+                        "runtime IPC graph must return exactly one bound result".to_owned(),
+                    ));
                 };
                 if result.source_yir_fnv1a64 != target.source_yir_fnv1a64
                     || result.module != target.module
                     || result.instruction != target.instruction
                     || result.node != target.node
                     || result.resource != target.resource
-                    || !result.arguments.matches_identity(&arguments)?
+                    || !result
+                        .arguments
+                        .matches_identity(&arguments)
+                        .map_err(|error| dispatch_error(RejectionCode::Result, error))?
                 {
-                    return Err("runtime IPC result target drift".to_owned());
+                    return Err(dispatch_error(
+                        RejectionCode::Result,
+                        "runtime IPC result target drift".to_owned(),
+                    ));
                 }
-                observations.extend(runtime_dispatch_observations(
-                    count,
-                    &outputs.native_outputs,
-                )?);
+                observations.extend(
+                    runtime_dispatch_observations(count, &outputs.native_outputs)
+                        .map_err(|error| dispatch_error(RejectionCode::Result, error))?,
+                );
                 let reply = Message::Frame(DispatchFrame {
                     sequence,
                     arguments: result.arguments.clone(),
@@ -231,18 +304,32 @@ fn dispatch_loop<S: Read + Write>(
                         .runtime_results
                         .append(&mut outputs.runtime_results);
                 }
-                reply.write_to(stream)?;
+                reply
+                    .write_to(stream)
+                    .map_err(|error| dispatch_error(RejectionCode::Exchange, error))?;
                 count += 1;
             }
             Message::Finish(sequence) if sequence == count => {
                 retained.runtime_session_evidence =
-                    ProviderRuntimeDispatchSessionEvidence::from_observations(
-                        count,
-                        &observations,
-                    )?;
+                    ProviderRuntimeDispatchSessionEvidence::from_observations(count, &observations)
+                        .map_err(|error| {
+                            Rejection::new(
+                                RejectionPhase::Finish,
+                                count,
+                                RejectionCode::Result,
+                                error,
+                            )
+                        })?;
                 return Ok((count, retained));
             }
-            _ => return Err("runtime IPC expected ordered dispatch or matching finish".to_owned()),
+            _ => {
+                return Err(Rejection::new(
+                    RejectionPhase::Receive,
+                    count,
+                    RejectionCode::Request,
+                    "runtime IPC expected ordered dispatch or matching finish",
+                ))
+            }
         }
     }
 }
@@ -250,15 +337,25 @@ fn dispatch_loop<S: Read + Write>(
 fn execute_reserved(
     budget: &mut ReplayBudget,
     payload_bytes: usize,
+    sequence: usize,
     execute: impl FnOnce() -> Result<NativeProviderOutputs, String>,
-) -> Result<NativeProviderOutputs, String> {
-    budget.reserve(payload_bytes)?;
-    let outputs = execute()?;
+) -> Result<NativeProviderOutputs, Rejection> {
+    let failure = |code, error| Rejection::new(RejectionPhase::Dispatch, sequence, code, error);
+    budget
+        .reserve(payload_bytes)
+        .map_err(|error| failure(RejectionCode::Budget, error))?;
+    let outputs = execute().map_err(|error| failure(RejectionCode::Execution, error))?;
     let [result] = outputs.runtime_results.as_slice() else {
-        return Err("runtime IPC graph must return exactly one bound result".to_owned());
+        return Err(failure(
+            RejectionCode::Result,
+            "runtime IPC graph must return exactly one bound result".to_owned(),
+        ));
     };
     if result.payload.len() != payload_bytes {
-        return Err("runtime IPC result differs from its reserved output extent".to_owned());
+        return Err(failure(
+            RejectionCode::Result,
+            "runtime IPC result differs from its reserved output extent".to_owned(),
+        ));
     }
     Ok(outputs)
 }

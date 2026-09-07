@@ -5,7 +5,8 @@ use crate::application_failure::ProviderFailure;
 use std::{os::unix::net::UnixStream, path::Path, time::Duration};
 use yir_core::{
     provider_runtime_ipc::{
-        hash_bytes, DispatchArguments, DispatchTarget, Message, MAX_DISPATCHES,
+        hash_bytes, DispatchArguments, DispatchTarget, Message, Rejection, RejectionCode,
+        RejectionPhase, MAX_DISPATCHES,
     },
     ApplicationFailureKind, Node, YirModule,
 };
@@ -84,12 +85,7 @@ impl ProviderRuntimeClient {
         .map_err(ProviderFailure::exchange)?;
         let frame = match Message::read_from(&mut self.stream).map_err(ProviderFailure::exchange)? {
             Message::Frame(frame) if frame.sequence == self.sequence => frame,
-            Message::Rejected(error) => {
-                return Err(ProviderFailure::new(
-                    ApplicationFailureKind::ProviderRejected,
-                    format!("runtime provider rejected dispatch: {error}"),
-                ))
-            }
+            Message::Rejected(error) => return Err(self.rejected(error, RejectionPhase::Dispatch)),
             _ => {
                 return Err("runtime IPC reply sequence or message mismatch"
                     .to_owned()
@@ -122,14 +118,29 @@ impl ProviderRuntimeClient {
             .map_err(ProviderFailure::exchange)?;
         match Message::read_from(&mut self.stream).map_err(ProviderFailure::exchange)? {
             Message::Closed(count) if count == self.sequence => Ok(()),
-            Message::Rejected(error) => Err(ProviderFailure::new(
-                ApplicationFailureKind::ProviderRejected,
-                format!("runtime provider rejected close: {error}"),
-            )),
+            Message::Rejected(error) => Err(self.rejected(error, RejectionPhase::Finish)),
             _ => Err("runtime IPC close acknowledgement mismatch"
                 .to_owned()
                 .into()),
         }
+    }
+
+    fn rejected(&self, error: Rejection, phase: RejectionPhase) -> ProviderFailure {
+        if let Err(detail) = error.admit(phase, self.sequence) {
+            return ProviderFailure::new(ApplicationFailureKind::ProviderContract, detail);
+        }
+        let kind = match error.code {
+            RejectionCode::Request => ApplicationFailureKind::ProviderRejected,
+            RejectionCode::Budget => ApplicationFailureKind::ProviderBudget,
+            RejectionCode::Execution => ApplicationFailureKind::ProviderExecution,
+            RejectionCode::Result => ApplicationFailureKind::ProviderContract,
+            RejectionCode::Finalization => ApplicationFailureKind::ProviderFinalization,
+            RejectionCode::Exchange => ApplicationFailureKind::ProviderExchange,
+        };
+        ProviderFailure::new(
+            kind,
+            format!("runtime provider rejected {phase:?}: {error}"),
+        )
     }
 }
 

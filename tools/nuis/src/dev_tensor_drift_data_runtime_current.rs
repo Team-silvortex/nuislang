@@ -507,7 +507,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CURRENT_DRIFT_CHECKS: &[DevTensorDriftCheckS
         id: "yir-provider-runtime-ipc-contract",
         path: "crates/yir-core/src/provider_runtime_ipc.rs",
         required_patterns: &[
-            "nuis-yir-provider-runtime-ipc-v3",
+            "nuis-yir-provider-runtime-ipc-v4",
             "MAX_DISPATCHES",
             "MAX_PAYLOAD_BYTES",
             "runtime IPC payload identity mismatch",

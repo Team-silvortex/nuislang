@@ -66,10 +66,13 @@ pub(super) fn verify_compiled_provider_failure_cleanup(output: &Path, binary: &P
     );
     assert!(!log.contains("window_session_closed\n"), "{log}");
     assert!(
-        log.contains("window_session_close_failure_kind=4\n"),
+        log.contains("window_session_close_failure_kind=5\n"),
         "{log}"
     );
-    assert!(log.contains("window_session_failure_kind=4\n"), "{log}");
+    assert!(log.contains("window_session_failure_kind=5\n"), "{log}");
+    assert!(log.contains("window_session_outcome_status=2\n"), "{log}");
+    assert!(log.contains("window_session_outcome_cleanup=1\n"), "{log}");
+    assert!(log.contains("window_session_outcome_failure=5\n"), "{log}");
     assert!(!log.contains("window_session_presented"), "{log}");
     verify_compiled_replay_exhaustion_cleanup(output, binary);
     assert_eq!(fs::read(manifest).unwrap(), manifest_bytes);
@@ -125,6 +128,9 @@ fn verify_compiled_replay_exhaustion_cleanup(output: &Path, binary: &Path) {
         "{log}"
     );
     assert!(log.contains("window_session_failure_kind=7\n"), "{log}");
+    assert!(log.contains("window_session_outcome_status=2\n"), "{log}");
+    assert!(log.contains("window_session_outcome_cleanup=1\n"), "{log}");
+    assert!(log.contains("window_session_outcome_failure=7\n"), "{log}");
     assert!(
         log.contains("window_session_cleanup_completed=1\n"),
         "{log}"
