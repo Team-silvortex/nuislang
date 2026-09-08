@@ -2,6 +2,57 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_GALAXY_TRUST_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "nuis-rc-heap-stack-read-only-policy",
+        path: "tools/nuis-rc/src/cache_lifecycle.rs",
+        required_patterns: &[
+            "nuis-rc-cache-lifecycle-v1",
+            "resolve_package_lifetime",
+            "plan_gc",
+            "BuildLease",
+            "InvalidOwnershipEdge",
+            "IncompleteSnapshot",
+            "over_budget_bytes",
+            "Logical ownership identity",
+            "logical objects, not physical CAS",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-rc-heap-stack-policy-regression",
+        path: "tools/nuis-rc/src/cache_lifecycle_tests.rs",
+        required_patterns: &[
+            "unmarked_packages_default_to_heap_and_stack_cannot_be_weakened",
+            "each_root_kind_protects_the_complete_dependency_closure",
+            "unreachable_cycles_are_collectible_without_reference_count_leaks",
+            "stack_objects_and_their_heap_dependencies_are_never_gc_candidates",
+            "incomplete_registry_or_clock_rollback_never_produces_a_plan",
+            "budget_pressure_reports_shortfall_instead_of_evicting_live_content",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-rc-heap-stack-implementation-boundary",
+        path: "docs/reference/nuis-rc-cache-lifecycle.md",
+        required_patterns: &[
+            "nuis-rc-cache-lifecycle-v1",
+            "not accepted manifest syntax yet",
+            "Not implemented yet",
+            "Planning alone",
+            "Built applications do not require RC",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-software-manufacturing-architecture-boundary",
+        path: "docs/reference/nuis-software-manufacturing-architecture.md",
+        required_patterns: &[
+            "nuis-software-manufacturing-model-v1",
+            "not equal kernel privileges",
+            "Discovery != Identity != Integrity != Trust",
+            "output content hash is not an action key",
+            "Reclaimability is a",
+            "physical blob deduplication",
+            "without raising implementation maturity",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "galaxy-provider-persistent-trust-state",
         path: "tools/nuisc/src/stdlib_registry_provider_trust_state.rs",
         required_patterns: &[

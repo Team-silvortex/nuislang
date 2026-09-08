@@ -16,6 +16,7 @@ use yir_lower_contract::{analyze_kernel_lowering, analyze_shader_lowering};
 use yir_lower_llvm::emit_module;
 use yir_verify::verify_module;
 
+mod host_application_script;
 mod host_ffi_stub;
 mod host_runtime_frame;
 mod host_text_runtime;
@@ -34,24 +35,20 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
     let input = args.next().ok_or_else(|| {
-        "usage: cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale]".to_owned()
+        "usage: cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale] [--headless]".to_owned()
     })?;
     let output_dir = args.next().ok_or_else(|| {
-        "usage: cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale]".to_owned()
+        "usage: cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale] [--headless]".to_owned()
     })?;
-    let frame_scale = args
-        .next()
-        .map(|raw| {
-            raw.parse::<usize>()
-                .map_err(|_| format!("invalid frame scale `{raw}`"))
-        })
-        .transpose()?
-        .unwrap_or(8);
+    let (frame_scale, headless) = host_application_script::parse_options(args)?;
 
     let source =
         fs::read_to_string(&input).map_err(|error| format!("failed to read `{input}`: {error}"))?;
     let module = yir_syntax::parse_module(&source)?;
     verify_module(&module)?;
+    if headless && module.application_sessions.is_empty() {
+        return Err("headless packaging requires a registered application session".to_owned());
+    }
     validate_host_ffi_symbols(&module)?;
     let host_ffi_symbols = collect_host_ffi_symbols(&module)?;
     let host_ffi_stub_source = render_host_ffi_stubs(&host_ffi_symbols);
@@ -75,16 +72,15 @@ fn run() -> Result<(), String> {
     let kernel_contract_path = output_dir.join("kernel_contract.txt");
     let kernel_package_path = output_dir.join("kernel_package.toml");
 
-    let llvm_ir = emit_module(&module)?;
-    fs::write(&ll_path, llvm_ir)
-        .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-    fs::write(&shim_path, c_shim_source(&host_ffi_symbols))
-        .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
-
-    let mut manifest = vec![
-        format!("module={input}"),
-        format!("llvm_ir={}", ll_path.display()),
-    ];
+    let mut manifest = vec![format!("module={input}")];
+    if !headless {
+        let llvm_ir = emit_module(&module)?;
+        fs::write(&ll_path, llvm_ir)
+            .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
+        fs::write(&shim_path, c_shim_source(&host_ffi_symbols))
+            .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
+        manifest.push(format!("llvm_ir={}", ll_path.display()));
+    }
     append_host_ffi_manifest_entries(&mut manifest, &host_ffi_symbols)?;
 
     let shader_contract = analyze_shader_lowering(&module);
@@ -109,7 +105,11 @@ fn run() -> Result<(), String> {
     if let Some(core_binding) = shader_contract.fabric_core_bindings.first() {
         manifest.push(format!("fabric_worker_resource={}", core_binding.resource));
         manifest.push(format!("fabric_worker_core={}", core_binding.core_index));
-        manifest.push("fabric_worker_core_mode=macos_affinity_worker_thread".to_owned());
+        manifest.push(if headless {
+            "fabric_worker_core_mode=not-applied-by-headless-host".to_owned()
+        } else {
+            "fabric_worker_core_mode=macos_affinity_worker_thread".to_owned()
+        });
     }
     if shader_contract.has_shader_work() {
         fs::write(&shader_contract_path, shader_contract.render_text()).map_err(|error| {
@@ -196,11 +196,12 @@ fn run() -> Result<(), String> {
     let runtime_frame_support =
         maybe_prepare_embedded_runtime_support(&module, &source, frame_scale)?;
     let shader_requires_prerender_fallback = shader_contract.requires_prerender_fallback();
-    let frame_bundle = if runtime_frame_support.is_some() && !shader_requires_prerender_fallback {
-        None
-    } else {
-        maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?
-    };
+    let frame_bundle =
+        if headless || (runtime_frame_support.is_some() && !shader_requires_prerender_fallback) {
+            None
+        } else {
+            maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?
+        };
     if runtime_frame_support.is_some() && frame_bundle.is_none() {
         cleanup_stale_fallback_frame(&output_dir, stem)?;
     }
@@ -211,7 +212,9 @@ fn run() -> Result<(), String> {
             .map(|binding| binding.host_resource.as_str()),
     );
 
-    if runtime_frame_support.is_some() {
+    if headless {
+        manifest.push("render_mode=application_session_observation".to_owned());
+    } else if runtime_frame_support.is_some() {
         manifest.push("render_mode=runtime_tick".to_owned());
         if let Some(frame_bundle) = &frame_bundle {
             manifest.push(format!(
@@ -230,7 +233,18 @@ fn run() -> Result<(), String> {
     let use_window_host =
         runtime_frame_support.is_some() || frame_bundle.is_some() || window_spec.is_some();
 
-    if use_window_host {
+    if headless {
+        let runtime = runtime_frame_support
+            .as_ref()
+            .ok_or("headless packaging requires embedded runtime support")?;
+        let host = output_dir.join(format!("{stem}_headless.c"));
+        manifest.extend(host_application_script::build(
+            &host,
+            &runtime.staticlib_path,
+            &exe_path,
+            &runtime.embedded_module_bytes,
+        )?);
+    } else if use_window_host {
         let fabric_boot_plan = extract_fabric_boot_plan(
             &module,
             primary_fabric_binding.as_ref(),

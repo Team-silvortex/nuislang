@@ -62,9 +62,13 @@ exchange guards. The packaged script now accepts opt-in `--drain-provider` behin
 an exact bundle capability; the shared policy requires a typed Drained terminal
 and cancellation exit, rejecting Finish before publication. It never publishes
 cancelled work as successful launch/trace evidence. The terminal contract and
-launch policy have no OS/window/backend dependency. AppKit and Unix IPC are
-current adapters; non-AppKit/headless packaged entry is the next conformance
-boundary and Windows transport is not yet claimed.
+launch policy have no OS/window/backend dependency. A separate
+[headless scalar-script profile](reference/nuis-yir-application-scalar-script-v1.md)
+now packages the same pump without AppKit, with compiled protocol and real M2
+image/drain evidence. The next boundary is explicit profile selection and
+capability admission through ordinary `nuis build/run-artifact`; currently the
+headless option belongs to `yir-pack-aot`. Linux hardware and Windows transport
+are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.
 The default host-only path acknowledges its own scope, while the live provider
 still treats EOF without Finish as incomplete execution. Ordinary quit still uses
@@ -81,6 +85,7 @@ an engine-completion percentage.
 | Area | Current Reference |
 | --- | --- |
 | Development model | [Tensor protocol](reference/nuis-development-tensor.md), [mainline selection](reference/nuis-development-tensor-mainline.md) |
+| Production architecture | [Software manufacturing direction](reference/nuis-software-manufacturing-architecture.md), [RC policy and current limits](reference/nuis-rc-cache-lifecycle.md) |
 | Frontend/lowering | [Control flow](reference/control-flow-lowering-contract.md), [generic diagnostics](reference/generic-diagnostic-ownership-contract.md), [source encoding](reference/source-text-encoding-contract.md) |
 | Memory/task safety | [NIR memory](reference/nir-memory-model.md), [task/GLM](reference/cpu-task-glm-contract.md), [thread/lock boundary](reference/cpu-thread-lock-boundary.md), [FFI pointers](reference/ffi-pointer-safety-boundary.md) |
 | Runtime sessions | [Application lifecycle](reference/nuis-yir-application-session-v1.md), [window](reference/nuis-yir-window-session-v3.md), [terminal outcomes](reference/nuis-yir-application-outcome-v1.md), [parent pump](reference/nuis-yir-application-outcome-pump-v1.md), [cancellation](reference/nuis-yir-application-cancellation-v1.md) |

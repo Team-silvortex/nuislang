@@ -18,6 +18,7 @@ For the current `beta-0.12.*` application-led line, start with:
 * [Window contract](nuis-yir-window-session-v3.md)
 * [Cancellation and host retirement](nuis-yir-application-cancellation-v1.md)
 * [Provider-owned session drain](nuis-yir-provider-session-drain-v1.md)
+* [Headless application scalar script](nuis-yir-application-scalar-script-v1.md)
 * [Parent outcome pump](nuis-yir-application-outcome-pump-v1.md)
 * [Application lifecycle manifest](nuis-ns-nova-application-lifecycle-v1.toml)
 
@@ -31,6 +32,7 @@ Start in this order:
 
 * `YIR` foundation
   - [nuis-development-tensor.md](nuis-development-tensor.md)
+  - [nuis-software-manufacturing-architecture.md](nuis-software-manufacturing-architecture.md)
   - [source-text-encoding-contract.md](source-text-encoding-contract.md)
   - [yir-reference.md](yir-reference.md)
   - [yir-langref.md](yir-langref.md)
@@ -39,6 +41,7 @@ Start in this order:
   - [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
   - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
   - [galaxy-resolution-lock-contract.md](galaxy-resolution-lock-contract.md)
+  - [nuis-rc-cache-lifecycle.md](nuis-rc-cache-lifecycle.md)
   - [galaxy-provider-trust-state-v1.toml](galaxy-provider-trust-state-v1.toml)
   - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
   - [nuis-data-provider-inventory-v1.toml](nuis-data-provider-inventory-v1.toml)

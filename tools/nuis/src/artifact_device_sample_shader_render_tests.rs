@@ -14,6 +14,10 @@ mod application_session;
 #[path = "artifact_device_sample_shader_drain_tests.rs"]
 mod provider_drain;
 
+#[cfg(target_os = "macos")]
+#[path = "artifact_device_sample_shader_headless_tests.rs"]
+mod headless;
+
 fn temp_output_dir() -> std::path::PathBuf {
     let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!(

@@ -1,7 +1,7 @@
 # Toolchain Galaxy Core Boundary
 
 This note defines the intended boundary for toolchain members such as `nsld`,
-`nsdb`, and `nsbdr`.
+`nsdb`, `nsbdr`, and `nuis-rc`.
 
 The short rule is:
 
@@ -10,6 +10,10 @@ core galaxy capability -> CLI adapter
 ```
 
 The CLI is a front door, not the long-lived capability boundary.
+
+The [software manufacturing architecture](nuis-software-manufacturing-architecture.md)
+applies this to the whole production system: RC coordinates resources but must
+not absorb independently owned resolution, verification or lowering semantics.
 
 ## Why This Exists
 
@@ -65,6 +69,12 @@ Native debuggers can still inspect the host shell binary. `nsdb-core` owns the
 Nuis semantic debug view.
 
 ## Contract Rules
+
+Nuis-rc follows the same split: logical ownership, inventory, lease and GC policy
+belong to a reusable control-plane core; CLI/daemon/IPC and OS service lifecycle
+are adapters. The current RC library only plans logical GC candidates. It is
+not a shared CAS, physical deduplicator or running service yet; see the
+[RC lifecycle contract](nuis-rc-cache-lifecycle.md).
 
 Use these rules when evolving linker/debugger code:
 

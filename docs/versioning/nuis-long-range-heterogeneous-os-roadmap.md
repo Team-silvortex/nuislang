@@ -11,6 +11,14 @@ to the temporary Linux/libc/host-toolchain bridge used during early bootstrap.
 
 `nuis is using the traditional host stack as a bridge, not as its final machine model`
 
+The complementary [software manufacturing architecture](../reference/nuis-software-manufacturing-architecture.md)
+treats OS execution and Nuis production as peer responsibility domains. RC owns
+the intended machine-local resource control plane across registered projects;
+decentralized discovery feeds verified local identities, logical bindings and
+immutable material. This is not a privilege claim or a dependency on completing
+Nuis OS first. Shared CAS, physical deduplication and the daemon remain future
+implementation gates rather than roadmap accomplishments.
+
 The current toolchain still relies on host operating systems, LLVM, native
 linkers, and carefully whitelisted FFI surfaces where they are useful. That is
 practical and intentional.

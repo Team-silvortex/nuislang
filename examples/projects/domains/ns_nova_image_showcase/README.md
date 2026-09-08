@@ -5,6 +5,11 @@ ns-nova application lifecycle. This complements, rather than replaces, the
 small-uniform regression in `../ns_nova_showcase`.
 An explicit registered window mode now keeps the same Nuis state and provider
 connection across host events instead of replaying that three-frame program.
+The same registrations can now be packaged with a separate
+[headless scalar-script host](../../../../docs/reference/nuis-yir-application-scalar-script-v1.md).
+It does not link AppKit; the real Metal regression verifies exact frame hashes,
+normal completion and explicit provider drain. Ordinary `run-artifact` profile
+selection is still pending; this first entry is opt-in through `yir-pack-aot`.
 
 ## Data Path
 

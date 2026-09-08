@@ -351,4 +351,42 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "frontdoor drain published success evidence", "window_session_provider_drain_status=2",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "headless-application-scalar-script-contract",
+        path: "docs/reference/nuis-yir-application-scalar-script-v1.md",
+        required_patterns: &[
+            "nuis-yir-application-scalar-script-v1",
+            "64 ordered event deliveries",
+            "180-second", "neither exit130 nor EOF proves retirement",
+            "not fully native CPU", "do not yet select or admit this profile",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-application-common-pump-boundary",
+        path: "crates/yir-runtime-host/src/application_script.rs",
+        required_patterns: &[
+            "ApplicationEventPump::spawn", "MAX_SCRIPT_EVENTS: usize = 64",
+            "MAX_SCRIPT_ARGUMENTS: usize = 16", "remaining(deadline)",
+            "pump.cancel_with_provider_drain()", "drop(pump)",
+            "ApplicationScriptOutcome::Finished", "ApplicationScriptOutcome::Cancelled",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-application-packaged-protocol-evidence",
+        path: "tools/yir-pack-aot/tests/headless_session.rs",
+        required_patterns: &[
+            "packaged_headless_session_finishes_or_drains_without_a_window_backend",
+            "Message::Drained", "Message::Finish(2)", "receipt.admit(&target, 2)",
+            "cpu_host_binary_mode=embedded_yir_headless", "rgba8_fnv1a64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-application-live-metal-evidence",
+        path: "tools/nuis/src/artifact_device_sample_shader_headless_tests.rs",
+        required_patterns: &[
+            "headless_metal_session_uses_shared_lifecycle_without_appkit",
+            "ProviderLaunchOutcome::Drained(receipt)", "ProviderLaunchPolicy::ExplicitDrain",
+            "verify_frames", "drain replaced", "Some(130)", "provider_status=2;",
+        ],
+    },
 ];

@@ -114,6 +114,13 @@ coordinates = [
 ]
 
 [[milestones]]
+id = "beta-0.12-resident-cache-lifecycle"
+required = false
+coordinates = [
+  "package-system/nuis-rc/heap-stack-cache-lifecycle",
+]
+
+[[milestones]]
 id = "beta-0.1-data-provider-direction"
 required = false
 coordinates = [

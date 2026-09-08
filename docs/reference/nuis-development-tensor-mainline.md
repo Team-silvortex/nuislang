@@ -201,8 +201,13 @@ not device retirement. Capability-gated packaged-host drain and a typed non-succ
 launcher result now have one/two-frame compiled Metal evidence, including
 unchanged success evidence, pre-publication Finish rejection and replay-only exit 1.
 Terminal types and launch policy are platform-neutral; AppKit only forwards the
-ticket and common receipt-to-exit classification. Next exercise those contracts
-through a non-AppKit/headless packaged entry. Windows transport remains missing;
+ticket and common receipt-to-exit classification. The
+[headless scalar-script entry](nuis-yir-application-scalar-script-v1.md) now reuses
+the common pump without WindowSession or AppKit. Compiled protocol tests and M2
+Metal verify stateful events, exact frame hashes, Finish/drain separation and
+unchanged old evidence. The score remains `active/86`: ordinary build/run-artifact
+profile selection and capability admission are next, not already implemented.
+Linux hardware execution is unverified and Windows transport remains missing;
 no cross-session reuse permission or general device
 cancellation follows from this bounded boundary.
 

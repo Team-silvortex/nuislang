@@ -25,6 +25,8 @@ use yir_runtime_host::{
 mod cancellation;
 #[path = "provider_application_session/event_pump.rs"]
 mod event_pump;
+#[path = "provider_application_session/script.rs"]
+mod script;
 #[path = "provider_application_session/window.rs"]
 mod window;
 

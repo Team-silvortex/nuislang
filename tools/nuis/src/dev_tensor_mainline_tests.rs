@@ -251,3 +251,24 @@ fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() 
     let readiness = include_str!("../../../docs/reference/nuis-self-hosting-readiness.toml");
     assert!(readiness.contains("stage0-to-stage1-migration"));
 }
+
+#[test]
+fn headless_packaged_evidence_keeps_frontdoor_admission_as_the_next_boundary() {
+    let session = crate::dev_tensor_data::DEV_TENSOR_CELLS
+        .iter()
+        .find(|cell| cell.module == "ns-nova" && cell.function == "persistent-application-session")
+        .unwrap();
+    assert_eq!(session.status, "active");
+    assert!(session.evidence.contains("yir-pack-aot --headless"));
+    assert!(session
+        .evidence
+        .contains("no WindowSession or AppKit dependency"));
+    assert!(session
+        .next_step
+        .contains("build metadata and nuis run-artifact"));
+    assert!(session.next_action.contains("binary identity"));
+    assert!(session.blocker.contains("Windows transport"));
+    assert!(session
+        .validation_command
+        .contains("--test headless_session"));
+}

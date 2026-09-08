@@ -8,6 +8,12 @@ registered execution domains under shared function/node, clock, GLM, artifact,
 and lifecycle contracts. LLVM and host operating systems are bootstrap
 backends, not the language's semantic root.
 
+The [software manufacturing architecture](docs/reference/nuis-software-manufacturing-architecture.md)
+sets the wider direction: the OS hosts execution; Nuis owns production contracts.
+Nuis-rc is the intended machine-local resource control plane, with decentralized
+acquisition and separate discovery, identity, integrity and trust. This is an
+architecture commitment, not a claim of an implemented CAS or resident collector.
+
 ## Current Line
 
 The repository is on `beta-0.12.*`. Git history is authoritative for the exact
@@ -47,7 +53,7 @@ nuis source / nuis.toml
 | Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions. | Supported syntax does not imply every combination lowers; general buffer-writing `while` and some aggregate early-return shapes remain incomplete. |
 | Image application | Nuis generates RGBA8 data, inline WGSL runs RGB inversion on real Metal, and compiled host execution exports checked PPM frames. | The host embeds the YIR lifecycle runtime and uses registered providers; it is not fully native CPU execution or a self-contained Nsld image. |
 | Persistent window | Registered Nuis open/event/close callbacks retain state and one provider connection across AppKit events. A separate registered CPU parent can consume one terminal outcome. | Explicit mode, bounded dispatch/replay, one-child parent profile; not an unlimited engine loop or general supervisor. |
-| Cancellation | Independent pump/window/C ABI tickets and an opt-in packaged-host capability carry provider-worker drain into a typed, non-success launcher result; Metal regressions retain prior success evidence. | AppKit cancellation policy remains scripted. Shared policy is platform-neutral, but non-AppKit host entry, Windows transport, parent cancellation and resource reuse remain open. |
+| Cancellation | Independent tickets carry provider-worker drain into a typed, non-success result. AppKit and a new headless packaged entry share the classifier; Metal regressions retain prior success evidence. | AppKit cancellation policy remains scripted. Headless selection in ordinary build/run-artifact, Linux hardware evidence, Windows transport, parent cancellation and resource reuse remain open. |
 | Other backends | Checked-in routes include Linux CUDA/Vulkan and Apple Metal/CoreML provider work. | Evidence is backend- and workload-specific; reference results and hardware-free conformance do not certify physical execution. |
 | Nsld | Deterministic plans/NSB assembly, first ARM64 Mach-O and x86_64 Linux ELF private-shell routes, loader admission, publication and final-output selection. | Broader architecture/provider parity, PE/COFF final execution and self-contained application packaging remain incomplete. |
 | Self-hosting | Five bounded preparation gates, Nuis compiler-component proofs, differential/reproducibility evidence and explicit selection/rollback contracts. | `stage0-to-stage1-migration/active` is not completed compiler replacement; the bounded candidate-to-Nsld path stops before native object emission. |
@@ -63,6 +69,12 @@ Tensor `stable/100` means stable for the recorded bounded milestone, not
 language, stdlib, ABI, package, or whole-engine stability. Current task selection
 comes from `nuis dev-tensor --json`, not a hardcoded progress total in this page.
 
+Development-resource management follows the
+[Nuis-rc heap/stack contract](docs/reference/nuis-rc-cache-lifecycle.md): default
+shared heap packages, explicit project-owned stack packages, and root/lease-based
+GC. The read-only policy core is tested; shared-store migration, compiler leases,
+and the actual resident collector remain unimplemented. Existing caches are unchanged.
+
 ## Current Mainline
 
 The goal is `standard-library/ns-nova/interactive-image-workflow`; the selected
@@ -71,7 +83,7 @@ The [dependency plan](docs/reference/nuis-development-tensor-mainline.md)
 keeps correctness interrupts, application progress and compiler migration distinct.
 
 The [image showcase](examples/projects/domains/ns_nova_image_showcase) currently
-has two separate execution routes: a bounded three-frame lifecycle, and an
+has a bounded three-frame lifecycle and an
 explicit stateful `--window-session window` route. Space toggles the GPU-processed
 checkerboard. Tests check actual pixels, one worker, cache reuse, live/replay
 identity, explicit close and failure-preserving parent handoff.
@@ -103,8 +115,11 @@ requires both the provider's Drained terminal and the child's non-success exit 1
 it rejects Finish under drain intent before provider publication. Default
 host-only cancellation still reports EOF as incomplete provider execution.
 The terminal contract and launch policy contain no OS/window/provider implementation;
-AppKit and Unix IPC remain the current adapters, not proof of Windows support.
-Next exercise a non-AppKit/headless packaged entry through those same contracts.
+The [headless scalar-script profile](docs/reference/nuis-yir-application-scalar-script-v1.md)
+now uses those contracts without AppKit. Compiled M2 tests check exact image hashes,
+normal Finish and typed drain with unchanged old evidence. Its opt-in packager
+entry is ready; ordinary build/run-artifact profile selection is next.
+Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.
 

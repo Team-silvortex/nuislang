@@ -15,6 +15,35 @@ pub struct NuisApplicationCancellationReceipt {
     pub completed_dispatches: i64,
 }
 
+impl From<super::ApplicationHostRetirementAck> for NuisApplicationCancellationReceipt {
+    fn from(ack: super::ApplicationHostRetirementAck) -> Self {
+        let provider = ack.provider_drain();
+        Self {
+            cleanup_completed: i32::from(ack.cleanup_completed()),
+            provider_status: provider.code(),
+            failure_kind: ack.failure_kind().code(),
+            provider_failure_kind: provider.failure_kind().code(),
+            completed_dispatches: provider.completed_dispatches().map_or(-1, |n| n as i64),
+        }
+    }
+}
+
+impl NuisApplicationCancellationReceipt {
+    pub fn provider_drain_exit_status(&self) -> i32 {
+        if matches!(self.cleanup_completed, 0 | 1)
+            && self.failure_kind == 0
+            && self.provider_status == 5
+            && self.provider_failure_kind == 0
+            && (0..=yir_core::provider_runtime_ipc::MAX_DISPATCHES as i64)
+                .contains(&self.completed_dispatches)
+        {
+            super::APPLICATION_CANCELLED_EXIT_CODE
+        } else {
+            1
+        }
+    }
+}
+
 /// Portable classification of an explicitly requested provider-drain receipt.
 /// It does not poll, perform cleanup or mutate the ticket. A platform adapter
 /// must not replace this decision with an inference from its own window state.
@@ -27,17 +56,7 @@ pub unsafe extern "C" fn nuis_application_provider_drain_exit_status(
     let Some(receipt) = (unsafe { receipt.as_ref() }) else {
         return 1;
     };
-    if matches!(receipt.cleanup_completed, 0 | 1)
-        && receipt.failure_kind == 0
-        && receipt.provider_status == 5
-        && receipt.provider_failure_kind == 0
-        && (0..=yir_core::provider_runtime_ipc::MAX_DISPATCHES as i64)
-            .contains(&receipt.completed_dispatches)
-    {
-        super::APPLICATION_CANCELLED_EXIT_CODE
-    } else {
-        1
-    }
+    receipt.provider_drain_exit_status()
 }
 
 fn fail(error: impl std::fmt::Display) -> i32 {
@@ -96,15 +115,8 @@ pub unsafe extern "C" fn nuis_application_cancellation_poll_with_provider(
     };
     match ticket.poll() {
         Ok(Some(ack)) => {
-            let provider = ack.provider_drain();
             unsafe {
-                *output = NuisApplicationCancellationReceipt {
-                    cleanup_completed: i32::from(ack.cleanup_completed()),
-                    provider_status: provider.code(),
-                    failure_kind: ack.failure_kind().code(),
-                    provider_failure_kind: provider.failure_kind().code(),
-                    completed_dispatches: provider.completed_dispatches().map_or(-1, |n| n as i64),
-                };
+                *output = ack.into();
             }
             1
         }

@@ -15,6 +15,12 @@ lock, absolute bundle paths, and FNV-only project dependency authority have
 been removed. Local `pack`, `publish-local`, and `install-local` remain a
 separate package-cache surface and do not define compiler resolution.
 
+The [RC heap/stack lifecycle contract](nuis-rc-cache-lifecycle.md) defines the
+next storage-management layer: default shared heap packages and explicitly
+project-owned stack packages. Only its read-only policy core exists today;
+the compiler still uses the project-local cache described here. RC liveness,
+lease, and GC state must not become a second resolution authority.
+
 Every project build writes `nuis.project.galaxy.lock` into its output metadata.
 The build manifest records both that path and the snapshot's SHA-256 resolution
 digest. Build-manifest verification reads the lock, verifies its canonical

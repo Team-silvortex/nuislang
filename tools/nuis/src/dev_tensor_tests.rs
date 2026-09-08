@@ -2,6 +2,31 @@ use super::*;
 use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 
 #[test]
+fn dev_tensor_rc_cache_policy_does_not_claim_daemon_or_storage_closure() {
+    let cell = DEV_TENSOR_CELLS
+        .iter()
+        .find(|cell| {
+            cell.architecture == "package-system"
+                && cell.module == "nuis-rc"
+                && cell.function == "heap-stack-cache-lifecycle"
+        })
+        .unwrap();
+    assert_eq!(cell.status, "early");
+    assert_eq!(cell.progress, 20);
+    assert!(!cell.bootstrap_critical);
+    assert!(cell.evidence.contains("no cache migration"));
+    assert!(cell.blocker.contains("synthetic verified snapshots only"));
+    assert!(cell
+        .evidence
+        .contains("nuis-software-manufacturing-model-v1"));
+    assert!(cell.blocker.contains("physical inventory/deduplication"));
+    assert!(cell
+        .expected_artifact
+        .contains("logical bytes are physical savings"));
+    assert!(cell.validation_command.contains("-p nuis-rc"));
+}
+
+#[test]
 fn dev_tensor_summary_reports_three_axes_and_cells() {
     let summary = dev_tensor_summary();
     assert_eq!(
