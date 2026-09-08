@@ -1,11 +1,36 @@
 name: Build
-on: [push]
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "2"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  RUSTUP_TOOLCHAIN: stable
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - run: python3 scripts/check-text-encoding.py
-      - run: bash scripts/check-host-absolute-paths.sh
-      - run: bash scripts/check-doc-links.sh
-      - run: cargo build --workspace --verbose
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+        with:
+          persist-credentials: false
+      - name: Check CI guard regressions
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Check UTF-8 source
+        run: python3 scripts/check-text-encoding.py
+      - name: Check documentation links
+        run: bash scripts/check-doc-links.sh
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Check host path portability
+        run: bash scripts/check-host-absolute-paths.sh
+      - name: Build workspace
+        run: cargo build --workspace --locked

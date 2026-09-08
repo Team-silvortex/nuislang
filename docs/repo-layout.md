@@ -66,9 +66,9 @@ to trust first when implementation and future direction are both present.
 
 * [nuis-logo](../nuis-logo)
   branding assets
-* [target](../target)
+* `target/`
   local build outputs and scratch artifacts; not part of the curated source
-  layout
+  layout and absent from a clean checkout
 * [examples/bins](../examples/bins)
   explicitly retained generated example bundles; new scratch builds should use
   a local output directory unless the bundle is intentionally curated

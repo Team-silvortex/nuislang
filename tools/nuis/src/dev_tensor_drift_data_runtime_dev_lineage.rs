@@ -2,6 +2,45 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "ci-cold-checkout-workflow",
+        path: ".github/workflows/build.yml",
+        required_patterns: &[
+            "python3 -m unittest discover -s scripts/tests -v",
+            "cargo fetch --locked",
+            "cargo build --workspace --locked",
+            "persist-credentials: false",
+            "CARGO_INCREMENTAL: \"0\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "ci-portability-focused-locked-test",
+        path: "scripts/check-host-absolute-paths.sh",
+        required_patterns: &[
+            "cargo test --locked -p nuisc --test examples_mainline_compile",
+            "checked_in_docs_do_not_embed_host_absolute_paths -- --exact --test-threads=1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "ci-document-link-extractor-failure-boundary",
+        path: "scripts/check-doc-links.sh",
+        required_patterns: &[
+            "targets=\"$(perl",
+            "CHECKED=$((CHECKED + 1))",
+            "done <<< \"$targets\"",
+            "local links checked",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "ci-cold-source-guard-regressions",
+        path: "scripts/tests/test_ci_checks.py",
+        required_patterns: &[
+            "test_missing_inline_link_fails_instead_of_silent_success",
+            "test_extractor_failure_is_not_reported_as_success",
+            "test_repository_links_do_not_depend_on_ignored_build_outputs",
+            "test_workflow_fetches_locked_dependencies_before_cargo_validation",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "dev-tensor-task-card-recursive-lineage",
         path: "tools/nuis/src/dev_tensor_task_card_lineage.rs",
         required_patterns: &[

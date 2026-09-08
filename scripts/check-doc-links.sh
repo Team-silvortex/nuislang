@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 BAD=0
+CHECKED=0
 
 is_external_or_anchor() {
   case "$1" in
@@ -21,8 +22,12 @@ is_external_or_anchor() {
   return 1
 }
 
+sources="$(find README.md docs -type f -name '*.md' -print | sort)"
 while IFS= read -r src; do
+  [[ -z "$src" ]] && continue
   base_dir="$(dirname "$src")"
+  # Do not hide extractor failures behind process substitution and a green exit.
+  targets="$(perl -nE 'while (/\[[^\]]*\]\(([^)\s]+)\)/g) { say $1 }' "$src")"
 
   while IFS= read -r raw_target; do
     [[ -z "$raw_target" ]] && continue
@@ -46,26 +51,21 @@ while IFS= read -r src; do
       continue
     fi
 
-    if [[ "$target" == docs/* || "$target" == *.md || "$target" == examples/* || "$target" == stdlib/* || "$target" == "."* || "$target" == ".."* ]]; then
-      :
-    else
-      continue
-    fi
-
     if [[ -z "$base_dir" ]]; then
       base_dir="."
     fi
     resolved="$base_dir/$target"
+    CHECKED=$((CHECKED + 1))
     if [[ ! -e "$resolved" ]]; then
       echo "[docs-link] $src => missing target '$raw_target' (checked '$resolved')"
       BAD=1
     fi
-  done < <(perl -nE 'while (/\\[[^\\]]*\\]\\(([^)\\s]+)\\)/g) { say $1 }' "$src")
-done < <(find README.md docs -type f -name '*.md' -print | sort)
+  done <<< "$targets"
+done <<< "$sources"
 
 if [[ $BAD -ne 0 ]]; then
   echo "docs link verification: failed"
   exit 1
 fi
 
-echo "docs link verification: ok"
+echo "docs link verification: ok ($CHECKED local links checked)"

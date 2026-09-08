@@ -205,6 +205,11 @@ declaration alone is not execution evidence.
 
 ## Development
 
+The [CI cold-start contract](docs/reference/nuis-ci-cold-start.md) separates
+source-only checks, locked dependency fetch, focused portability validation and
+the workspace build. A clean checkout must not need existing Cargo caches or
+generated `target/` files to pass its source guards.
+
 Prefer focused checks rather than rebuilding the workspace on every edit:
 
 ```bash

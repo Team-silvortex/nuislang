@@ -20,6 +20,7 @@ TEXT_SUFFIXES = {
     ".md",
     ".ns",
     ".pest",
+    ".py",
     ".rs",
     ".sh",
     ".swift",
