@@ -136,7 +136,7 @@ pub(in crate::lowering) fn lower_post_flow_while(
         args.push(carry_initial_name.clone());
         match &prepared.carries[index].kind {
             PreparedCarryUpdateKind::Linear { op, source } => {
-                if has_conditional {
+                if uses_cond_chain {
                     args.push("always".to_owned());
                     args.push(initial_name.clone());
                     let (carry_args, carry_dep_inputs, carry_effect_inputs) =

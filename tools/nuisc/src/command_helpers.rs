@@ -6,7 +6,7 @@ pub(crate) const NUSTAR_REGISTRY_ROOT: &str = "nustar-packages";
 
 pub(crate) struct CompiledCommandInput {
     pub(crate) resolved: pipeline::ResolvedCompileInput,
-    pub(crate) artifacts: pipeline::PipelineArtifacts,
+    pub(crate) artifacts: pipeline::InspectedPipeline,
 }
 
 pub fn project_compile_workflow_brief() -> &'static str {
@@ -37,7 +37,7 @@ pub(crate) fn resolve_compile_input(
 
 pub(crate) fn compile_command_input(input: &Path) -> Result<CompiledCommandInput, String> {
     let resolved = resolve_compile_input(input)?;
-    let artifacts = resolved.compile()?;
+    let artifacts = resolved.compile_for_inspection()?;
     Ok(CompiledCommandInput {
         resolved,
         artifacts,
@@ -143,10 +143,10 @@ pub(crate) fn print_project_context(resolved: &pipeline::ResolvedCompileInput) {
 }
 
 pub(crate) fn print_required_nustar_context(
-    artifacts: &pipeline::PipelineArtifacts,
+    artifacts: pipeline::PipelineArtifactView<'_>,
 ) -> Result<(), String> {
     let required =
-        registry::load_required_manifests(Path::new(NUSTAR_REGISTRY_ROOT), &artifacts.yir)?;
+        registry::load_required_manifests(Path::new(NUSTAR_REGISTRY_ROOT), artifacts.yir)?;
     registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
     eprintln!(
         "nuisc: lazily loaded nustar = {}",
@@ -157,4 +157,12 @@ pub(crate) fn print_required_nustar_context(
             .join(", ")
     );
     Ok(())
+}
+
+pub(crate) fn print_compiler_checkpoint(artifacts: pipeline::PipelineArtifactView<'_>) {
+    eprintln!(
+        "nuisc: compiler_checkpoint: {}",
+        artifacts.checkpoint_name()
+    );
+    eprintln!("nuisc: llvm_emit: {}", artifacts.llvm_status());
 }

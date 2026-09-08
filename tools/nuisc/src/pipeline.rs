@@ -17,6 +17,10 @@ mod pipeline_ffi_owned_buffer;
 mod pipeline_ffi_owned_object;
 #[path = "pipeline_ffi_owned_utf8.rs"]
 mod pipeline_ffi_owned_utf8;
+#[path = "pipeline_inspection.rs"]
+mod pipeline_inspection;
+#[path = "pipeline_packaging.rs"]
+mod pipeline_packaging;
 #[path = "pipeline_report.rs"]
 mod pipeline_report;
 #[path = "pipeline_units.rs"]
@@ -28,6 +32,7 @@ mod pipeline_yir_checkpoint;
 mod tests;
 
 use pipeline_ffi::{validate_benchmark_harness_externs, validate_externs};
+pub use pipeline_inspection::{InspectedPipeline, PipelineArtifactView};
 pub use pipeline_report::compile_pipeline_report;
 use pipeline_units::{
     collect_loaded_nustar, validate_instantiated_units, validate_used_units_with_local_units,
@@ -64,7 +69,8 @@ pub struct CompilePipelineReport {
     pub yir_nodes: usize,
     pub yir_resources: usize,
     pub yir_edges: usize,
-    pub llvm_ir_bytes: usize,
+    pub compiler_checkpoint: &'static str,
+    pub llvm_ir_bytes: Option<usize>,
     pub loaded_nustar: Vec<String>,
     pub stages: Vec<CompilePipelineStage>,
     pub ready_for_aot: bool,

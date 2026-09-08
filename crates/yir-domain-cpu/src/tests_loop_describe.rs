@@ -321,14 +321,16 @@ fn execution_path_routes_previous_state_validation_to_async_post_flow_only() {
         .unwrap(),
     };
 
-    assert_eq!(
-        cpu.execute(
+    let error = cpu
+        .execute(
             &node("cpu.loop_while_scalar_async_post_flow_cond_chain"),
             &resource,
             &mut state,
         )
-        .unwrap(),
-        Value::Unit
+        .unwrap_err();
+    assert!(
+        error.contains("requires a registered function execution context"),
+        "{error}"
     );
     let error = cpu
         .execute(

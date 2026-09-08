@@ -457,29 +457,6 @@ where
     }
 }
 
-pub(crate) fn format_loop_flow_expr<F>(
-    expr: &LoopFlowExpr,
-    resolve_rhs: &F,
-) -> Result<String, String>
-where
-    F: Fn(&str) -> Result<String, String>,
-{
-    match expr {
-        LoopFlowExpr::Legacy { condition, action }
-        | LoopFlowExpr::Terminal { action, condition } => Ok(format!(
-            "if {} then {}",
-            format_loop_condition_expr(condition, resolve_rhs)?,
-            action
-        )),
-        LoopFlowExpr::Binary { op, lhs, rhs } => Ok(format!(
-            "({} {} {})",
-            format_loop_flow_expr(lhs, resolve_rhs)?,
-            op,
-            format_loop_flow_expr(rhs, resolve_rhs)?
-        )),
-    }
-}
-
 pub(crate) fn format_conditional_carry<F>(
     carry: &ParsedConditionalCarry,
     resolve_value: &F,

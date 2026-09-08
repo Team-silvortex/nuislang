@@ -68,9 +68,8 @@ mod cpu Main {
 }
 
 #[test]
-fn headless_checkpoint_does_not_bypass_invalid_yir_or_native_codegen_requirements() {
-    let fixture = project(
-        r#"
+fn headless_checkpoint_executes_compound_while_callbacks() {
+    let source = r#"
 mod cpu Main {
   struct Counter { count: i64 }
   fn start(seed: i64) -> Counter { return Counter { count: seed }; }
@@ -85,17 +84,55 @@ mod cpu Main {
   fn stop(state: Counter) -> Counter { return state; }
   fn main() { print(999); }
 }
-"#,
-    );
+"#;
+    let async_source = source
+        .replace("fn step(", "async fn step(")
+        .replace("let x: i64 = x + 1;", "let x: i64 = await increment(x);")
+        .replace(
+            "  fn stop(",
+            "  async fn increment(x: i64) -> i64 { return x + 1; }\n  fn stop(",
+        );
+    for source in [source.to_owned(), async_source] {
+        for (operator, cases) in [
+            ("&&", [(40, 41, 42), (48, 49, 100), (100, 0, 100)]),
+            ("||", [(40, 60, 41), (50, 52, 53), (100, 0, 100)]),
+        ] {
+            let fixture = project(&source.replace("&&", operator));
+            let resolved = nuisc::pipeline::resolve_compile_input(&fixture.0).unwrap();
+            let checkpoint = resolved
+                .compile_to_verified_yir(&Default::default())
+                .unwrap();
+            let registry = yir_verify::default_registry();
+            for (seed, input, expected) in cases {
+                let (mut session, _) = yir_runtime_host::ApplicationSession::open_registered(
+                    checkpoint.yir(),
+                    &registry,
+                    "counter",
+                    vec![yir_core::Value::Int(seed)],
+                )
+                .unwrap();
+                session.event(vec![yir_core::Value::Int(input)]).unwrap();
+                session.close(vec![]).unwrap();
+                let yir_core::Value::Struct(state) = session.state() else {
+                    panic!("missing counter state")
+                };
+                assert_eq!(state.fields[0].1, yir_core::Value::Int(expected));
+            }
+            checkpoint.emit_llvm().unwrap();
+        }
+    }
+}
+
+#[test]
+fn headless_checkpoint_does_not_bypass_invalid_registration_or_native_codegen_requirements() {
+    let source = "mod cpu Main { fn main() { print(1); } }";
+    let fixture = project(source);
     let resolved = nuisc::pipeline::resolve_compile_input(&fixture.0).unwrap();
     let error = resolved
         .compile_to_verified_yir(&Default::default())
         .err()
         .unwrap();
-    assert!(
-        error.contains("cpu.loop_while_scalar_flow_chain"),
-        "{error}"
-    );
+    assert!(error.contains("start"), "{error}");
     let output = fixture.0.join("rejected");
     assert!(nuisc::run(nuisc::CommandKind::Compile {
         input: fixture.0.clone(),
@@ -106,10 +143,12 @@ mod cpu Main {
         packaging_mode: Some("headless-aot-bundle".to_owned()),
     })
     .unwrap_err()
-    .contains("cpu.loop_while_scalar_flow_chain"));
-    assert!(!output.exists(), "invalid YIR must fail before packaging");
+    .contains("start"));
+    assert!(
+        !output.exists(),
+        "invalid registration must fail before packaging"
+    );
 
-    let source = "mod cpu Main { fn main() { print(1); } }";
     let compiled = nuisc::pipeline::compile_source(source).unwrap();
     let error = nuisc::aot::write_and_link_with_source(
         &fixture.0.join("main.ns"),

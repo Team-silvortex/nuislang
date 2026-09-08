@@ -101,7 +101,8 @@ pub(super) fn encode_loop_flow_control_args(
                 PreparedLoopFlowAction::Break => "break".to_owned(),
                 PreparedLoopFlowAction::Continue => "continue".to_owned(),
             });
-            Ok((condition_args, dep_inputs, effect_inputs, false))
+            // A compound predicate needs the recursive descriptor even for one action.
+            Ok((condition_args, dep_inputs, effect_inputs, true))
         }
     }
 }

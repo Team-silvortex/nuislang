@@ -124,6 +124,8 @@ headless process with a protocol peer, without needing GPU hardware:
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-pack-aot --test headless_session -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-runtime-host --test provider_application_session script:: -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test headless_checkpoint -j 1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test checkpoint_inspection -j 1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test checkpoint_workflow -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib aot_application_bundle -j 1
 ```
 
@@ -161,16 +163,48 @@ env -u NUIS_YIR_PROVIDER_DISPATCH_SOCKET NUIS_YIR_PROVIDER_RESULT_STREAM=build/n
   --open-args 160,120 --event-args 0,0 --event-args 1,32 --close-args 1,0
 ```
 
+## Source Inspection
+
+Set `packaging_mode = "headless-aot-bundle"` in `nuis.toml` to select the
+verified-YIR checkpoint for `nuis check`, `nuis dump-yir`, the `nuisc` AST/NIR/YIR
+dumps, benchmark/binding inspection and `nuis workflow --json`. Both a project
+directory and its manifest file select this profile. A bare `.ns` input, an
+unmarked project, and native/window/self-contained-image profiles retain the
+existing LLVM path. A build-only `--packaging-mode` override does not persist into
+later inspection commands. Unknown packaging profiles fail rather than being
+treated as native defaults.
+
+The selection occurs before compilation; no LLVM error is caught as a headless
+fallback. Input resolution, NIR checks, registered YIR semantics, ownership and
+application-session registration are still required. Dumps report the checkpoint
+on stderr so their stdout remains parseable. Inspection creates no build outputs.
+
+Workflow JSON exposes `compile_pipeline_checkpoint = "verified-yir"`,
+`llvm_emit` stage status `not_requested`, and
+`compile_pipeline_llvm_ir_bytes = null`. The native AOT heuristic
+`compile_pipeline_ready_for_aot` remains false, with `build_headless` as the next
+step. Native reports retain their real LLVM byte counts. Neither kind of source
+inspection certifies a runnable image; artifact hash/identity checks and provider
+admission remain separate and unchanged.
+
 ## Current Boundary
 
 Ordinary `nuis build` and `nuis run-artifact` now select and admit this profile.
 Headless build selection removes the unused CPU LLVM prerequisite without
 fabricating an empty intermediate or weakening the verified stage handoff.
-Check/dump/inspection still use the native-oriented pipeline; making their
-checkpoint selection and stage reporting explicit is the next compiler boundary.
-Supported callback parity is not evidence that every formerly LLVM-rejected
-source shape now works. Compound-condition while lowering can produce a rejected
-flow-chain descriptor at the YIR boundary; the headless route rejects it too.
+Checkpoint-aware source inspection now follows the explicit manifest selection.
+The next lowering gap is buffer-writing application callback loops, not more
+metadata claiming an executable that has not been produced.
+Compound-condition `while` callbacks now pass the verified-YIR boundary and execute
+their current/carry state rather than returning trace-only unit values. CPU Nustar
+owns the scalar loop state machine; the generic reference executor only drives
+registered resumes and existing YIR function calls, sharing invocation fuel.
+Synchronous and awaited steps, pre/post-update control, `&&`/`||`, mixed break/continue
+and add/keep carries have reference/native parity tests. Registered callback tests
+include zero iterations and untaken conditions. Arbitrary loop bodies, payload-bearing
+carries and mixed-action `flow_and` descriptors are not certified by this fix.
+Reference execution also has a 100000-resume per-node ceiling when no session fuel
+is supplied; that ceiling is not a native ABI or native loop limit.
 Standalone artifact verification preserves all compiler inputs; a relocated full
 device launch still needs its provider environment and separate execution evidence.
 

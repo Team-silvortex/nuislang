@@ -51,6 +51,7 @@ pub(in crate::lowering) fn lower_async_post_flow_while(
         .carries
         .iter()
         .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
+    let uses_cond_chain = has_conditional || control_uses_cond_chain;
     let compare = render_loop_compare(prepared.compare);
     let mut args = vec![
         initial_name.clone(),
@@ -65,7 +66,7 @@ pub(in crate::lowering) fn lower_async_post_flow_while(
         args.push(carry_initial_name.clone());
         match &prepared.carries[index].kind {
             PreparedCarryUpdateKind::Linear { op, source } => {
-                if has_conditional {
+                if uses_cond_chain {
                     args.push("always".to_owned());
                     args.push(initial_name.clone());
                     let (carry_args, carry_dep_inputs, carry_effect_inputs) =
@@ -109,7 +110,7 @@ pub(in crate::lowering) fn lower_async_post_flow_while(
     }
     let name = next_name(
         state,
-        if has_conditional || control_uses_cond_chain {
+        if uses_cond_chain {
             "loop_while_scalar_async_post_flow_cond_chain"
         } else {
             "loop_while_scalar_async_post_flow_chain"
@@ -120,7 +121,7 @@ pub(in crate::lowering) fn lower_async_post_flow_while(
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: if has_conditional || control_uses_cond_chain {
+            instruction: if uses_cond_chain {
                 "loop_while_scalar_async_post_flow_cond_chain".to_owned()
             } else {
                 "loop_while_scalar_async_post_flow_chain".to_owned()

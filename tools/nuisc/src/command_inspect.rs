@@ -21,16 +21,19 @@ pub(crate) fn run_inspect_execution(input: PathBuf, json: bool) -> Result<(), St
 
 pub(crate) fn run_inspect_benchmarks(input: PathBuf, json: bool) -> Result<(), String> {
     let compiled = compile_command_input(&input)?;
-    let benchmarks = collect_benchmark_inventory(&compiled.artifacts);
+    let artifacts = compiled.artifacts.view();
+    let benchmarks = collect_benchmark_inventory(artifacts);
     if json {
-        println!("{}", inspect_benchmarks_json(&input, &compiled.artifacts));
+        println!("{}", inspect_benchmarks_json(&input, artifacts));
         return Ok(());
     }
     print_project_context(&compiled.resolved);
     println!("benchmark inventory: {}", input.display());
+    println!("  compiler_checkpoint: {}", artifacts.checkpoint_name());
+    println!("  llvm_emit: {}", artifacts.llvm_status());
     println!(
         "  domain_unit: {}::{}",
-        compiled.artifacts.nir.domain, compiled.artifacts.nir.unit
+        artifacts.nir.domain, artifacts.nir.unit
     );
     println!("  benchmark_count: {}", benchmarks.len());
     for entry in benchmarks {

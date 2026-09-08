@@ -420,4 +420,54 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "compile_to_verified_yir", "llvm_ir.as_deref()",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "headless-source-inspection-selection",
+        path: "tools/nuisc/src/pipeline_inspection.rs",
+        required_patterns: &[
+            "compile_for_inspection", "requested_packaging_mode",
+            "Some(\"headless-aot-bundle\")", "compile_to_verified_yir",
+            "self.compile().map(InspectedPipeline::Native)", "not_requested",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-source-inspection-command-evidence",
+        path: "tools/nuisc/tests/checkpoint_inspection.rs",
+        required_patterns: &[
+            "manifest_selected_headless_check_dump_and_inspection_skip_llvm",
+            "headless_pipeline_report_does_not_claim_native_readiness",
+            "native_and_window_inspection_still_emit_llvm",
+            "inspection_rejects_invalid_registration_and_unsupported_lowering_without_fallback",
+            "inspection_and_build_reject_unknown_packaging_selection",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-source-inspection-frontdoor-evidence",
+        path: "tools/nuis/tests/checkpoint_workflow.rs",
+        required_patterns: &[
+            "headless_frontdoor_check_dump_and_workflow_report_the_selected_checkpoint",
+            "native_frontdoor_workflow_keeps_native_stage_evidence",
+            "workflow_does_not_turn_invalid_headless_yir_into_success_evidence",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-compound-loop-native-parity",
+        path: "tools/nuisc/tests/compound_loop_flow.rs",
+        required_patterns: &[
+            "compound_flow_without_carries_runs_in_reference_and_native",
+            "compound_flow_preserves_linear_carries_in_reference_and_native",
+            "compound_post_flow_preserves_updated_carries_in_reference_and_native",
+            "mixed_actions_and_conditional_carries_run_in_reference_and_native",
+            "execute_module_source_with_registry", "write_and_link_with_source",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "registered-cooperative-execution-fuel",
+        path: "crates/yir-exec/tests/registered_execution.rs",
+        required_patterns: &[
+            "registered_execution_calls_existing_functions_without_domain_dispatch",
+            "registered_execution_and_nested_calls_share_invocation_fuel",
+            "registered_execution_rejects_missing_functions_without_retry",
+            "registered_execution_is_bounded_even_without_session_fuel",
+        ],
+    },
 ];

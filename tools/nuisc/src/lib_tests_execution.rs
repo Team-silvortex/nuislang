@@ -644,7 +644,7 @@ fn benchmark_inventory_collects_declared_benchmarks() {
         )
         .unwrap();
 
-    let entries = collect_benchmark_inventory(&artifacts);
+    let entries = collect_benchmark_inventory(artifacts.view());
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].symbol, "cpu::Main::sum_loop");
     assert_eq!(entries[0].label, "sum_loop");
@@ -675,7 +675,7 @@ fn inspect_benchmarks_json_exposes_metadata() {
     )
     .unwrap();
 
-    let json = inspect_benchmarks_json(Path::new("main.ns"), &artifacts);
+    let json = inspect_benchmarks_json(Path::new("main.ns"), artifacts.view());
     assert!(json.contains("\"kind\":\"nuis_benchmark_inventory\""));
     assert!(json.contains("\"input\":\"main.ns\""));
     assert!(json.contains("\"benchmark_count\":1"));

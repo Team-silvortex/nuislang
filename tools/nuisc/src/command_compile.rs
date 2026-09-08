@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::command_helpers::{
-    compile_command_input, print_project_context, print_required_nustar_context,
-    resolve_compile_input, success_logs_enabled,
+    compile_command_input, print_compiler_checkpoint, print_project_context,
+    print_required_nustar_context, resolve_compile_input, success_logs_enabled,
 };
 use crate::inspect_report::{collect_benchmark_inventory, write_compile_doc_index};
 use crate::{aot, cache, lowering, pipeline, project, registry, render};
@@ -35,7 +35,9 @@ impl CompileCachePolicy {
 pub(crate) fn run_dump_ast(input: PathBuf) -> Result<(), String> {
     let compiled = compile_command_input(&input)?;
     print_project_context(&compiled.resolved);
-    print!("{}", render::render_ast(&compiled.artifacts.ast));
+    let artifacts = compiled.artifacts.view();
+    print_compiler_checkpoint(artifacts);
+    print!("{}", render::render_ast(artifacts.ast));
 
     Ok(())
 }
@@ -43,8 +45,10 @@ pub(crate) fn run_dump_ast(input: PathBuf) -> Result<(), String> {
 pub(crate) fn run_dump_nir(input: PathBuf) -> Result<(), String> {
     let compiled = compile_command_input(&input)?;
     print_project_context(&compiled.resolved);
-    print_required_nustar_context(&compiled.artifacts)?;
-    print!("{}", render::render_nir(&compiled.artifacts.nir));
+    let artifacts = compiled.artifacts.view();
+    print_required_nustar_context(artifacts)?;
+    print_compiler_checkpoint(artifacts);
+    print!("{}", render::render_nir(artifacts.nir));
 
     Ok(())
 }
@@ -52,16 +56,19 @@ pub(crate) fn run_dump_nir(input: PathBuf) -> Result<(), String> {
 pub(crate) fn run_dump_yir(input: PathBuf) -> Result<(), String> {
     let compiled = compile_command_input(&input)?;
     print_project_context(&compiled.resolved);
-    print_required_nustar_context(&compiled.artifacts)?;
-    print!("{}", render::render_yir(&compiled.artifacts.yir));
+    let artifacts = compiled.artifacts.view();
+    print_required_nustar_context(artifacts)?;
+    print_compiler_checkpoint(artifacts);
+    print!("{}", render::render_yir(artifacts.yir));
 
     Ok(())
 }
 
 pub(crate) fn run_check(input: PathBuf) -> Result<(), String> {
-    let resolved = resolve_compile_input(&input)?;
-    let artifacts = resolved.compile()?;
-    let benchmarks = collect_benchmark_inventory(&artifacts);
+    let compiled = compile_command_input(&input)?;
+    let resolved = &compiled.resolved;
+    let artifacts = compiled.artifacts.view();
+    let benchmarks = collect_benchmark_inventory(artifacts);
     if success_logs_enabled() {
         println!("checked nuis source: {}", input.display());
         if let Some(project) = &resolved.project {
@@ -100,7 +107,11 @@ pub(crate) fn run_check(input: PathBuf) -> Result<(), String> {
         }
         println!("yir_nodes: {}", artifacts.yir.nodes.len());
         println!("yir_edges: {}", artifacts.yir.edges.len());
-        println!("llvm_ir_bytes: {}", artifacts.llvm_ir.len());
+        println!("compiler_checkpoint: {}", artifacts.checkpoint_name());
+        println!("llvm_emit: {}", artifacts.llvm_status());
+        if let Some(llvm_ir) = artifacts.llvm_ir {
+            println!("llvm_ir_bytes: {}", llvm_ir.len());
+        }
     }
 
     Ok(())
@@ -145,16 +156,7 @@ pub(crate) fn run_compile_resolved(
     if let Some(project) = &resolved.project {
         project::verify_committed_project_galaxy_resolution_lock(project)?;
     }
-    let requested_packaging_mode = packaging_mode
-        .as_deref()
-        .or_else(|| {
-            resolved
-                .project
-                .as_ref()
-                .and_then(|project| project.manifest.packaging_mode.as_deref())
-        })
-        .map(validate_packaging_mode)
-        .transpose()?;
+    let requested_packaging_mode = resolved.requested_packaging_mode(packaging_mode.as_deref())?;
     let cpu_target = aot::resolve_cpu_build_target(
         Path::new("nustar-packages"),
         resolved
@@ -543,13 +545,4 @@ pub(crate) fn run_compile_resolved(
     }
 
     Ok(())
-}
-
-fn validate_packaging_mode(packaging_mode: &str) -> Result<&str, String> {
-    match packaging_mode {
-        "native-cpu-llvm" | "window-aot-bundle" | "headless-aot-bundle" | "nuis-self-contained-image" => Ok(packaging_mode),
-        other => Err(format!(
-            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, `headless-aot-bundle`, or `nuis-self-contained-image`"
-        )),
-    }
 }

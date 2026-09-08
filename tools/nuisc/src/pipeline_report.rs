@@ -1,8 +1,18 @@
-use super::{CompilePipelineReport, CompilePipelineStage, PipelineArtifacts, ResolvedCompileInput};
+use super::{
+    CompilePipelineReport, CompilePipelineStage, PipelineArtifactView, PipelineArtifacts,
+    ResolvedCompileInput,
+};
 
 pub fn compile_pipeline_report(
     resolved: &ResolvedCompileInput,
     artifacts: &PipelineArtifacts,
+) -> CompilePipelineReport {
+    compile_pipeline_view_report(resolved, artifacts.view())
+}
+
+pub(super) fn compile_pipeline_view_report(
+    resolved: &ResolvedCompileInput,
+    artifacts: PipelineArtifactView<'_>,
 ) -> CompilePipelineReport {
     let source_kind = if resolved.project.is_some() {
         "project"
@@ -70,9 +80,21 @@ pub fn compile_pipeline_report(
             ),
         },
         CompilePipelineStage {
-            id: "llvm_emit",
+            id: "yir_verify",
             status: "ok",
-            detail: format!("bytes={}", artifacts.llvm_ir.len()),
+            detail: "registered semantic and ownership contracts verified".to_owned(),
+        },
+        CompilePipelineStage {
+            id: "llvm_emit",
+            status: if artifacts.llvm_ir.is_some() {
+                "ok"
+            } else {
+                "not_requested"
+            },
+            detail: match artifacts.llvm_ir {
+                Some(llvm_ir) => format!("bytes={}", llvm_ir.len()),
+                None => "verified-yir checkpoint selected; LLVM not requested".to_owned(),
+            },
         },
         CompilePipelineStage {
             id: "nustar_closure",
@@ -80,7 +102,7 @@ pub fn compile_pipeline_report(
             detail: artifacts.loaded_nustar.join(","),
         },
     ]);
-    let ready_for_aot = !artifacts.llvm_ir.is_empty()
+    let ready_for_aot = artifacts.llvm_ir.is_some_and(|ir| !ir.is_empty())
         && !artifacts.loaded_nustar.is_empty()
         && artifacts
             .yir
@@ -91,6 +113,11 @@ pub fn compile_pipeline_report(
         (
             "build",
             "pipeline reached LLVM and has a non-empty Nustar closure, so the next durable step is AOT packaging/linking",
+        )
+    } else if artifacts.llvm_ir.is_none() {
+        (
+            "build_headless",
+            "verified YIR is available for headless packaging; native LLVM and provider execution have not been validated by this inspection",
         )
     } else {
         (
@@ -110,8 +137,9 @@ pub fn compile_pipeline_report(
         yir_nodes: artifacts.yir.nodes.len(),
         yir_resources: artifacts.yir.resources.len(),
         yir_edges: artifacts.yir.edges.len(),
-        llvm_ir_bytes: artifacts.llvm_ir.len(),
-        loaded_nustar: artifacts.loaded_nustar.clone(),
+        compiler_checkpoint: artifacts.checkpoint_name(),
+        llvm_ir_bytes: artifacts.llvm_ir.map(str::len),
+        loaded_nustar: artifacts.loaded_nustar.to_vec(),
         stages,
         ready_for_aot,
         recommended_next_step,

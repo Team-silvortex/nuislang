@@ -17,8 +17,8 @@ fn compile_pipeline_stage_json(stage: &nuisc::pipeline::CompilePipelineStage) ->
 
 pub(crate) fn workflow_compile_pipeline_json_fields(input: &Path) -> Vec<String> {
     match nuisc::pipeline::resolve_compile_input(input).and_then(|resolved| {
-        let artifacts = resolved.compile()?;
-        Ok(resolved.compile_report(&artifacts))
+        let artifacts = resolved.compile_for_inspection()?;
+        Ok(artifacts.report(&resolved))
     }) {
         Ok(report) => {
             let stage_records = report
@@ -47,7 +47,14 @@ pub(crate) fn workflow_compile_pipeline_json_fields(input: &Path) -> Vec<String>
                 json_usize_field("compile_pipeline_yir_nodes", report.yir_nodes),
                 json_usize_field("compile_pipeline_yir_resources", report.yir_resources),
                 json_usize_field("compile_pipeline_yir_edges", report.yir_edges),
-                json_usize_field("compile_pipeline_llvm_ir_bytes", report.llvm_ir_bytes),
+                json_field("compile_pipeline_checkpoint", report.compiler_checkpoint),
+                format!(
+                    "\"compile_pipeline_llvm_ir_bytes\":{}",
+                    report
+                        .llvm_ir_bytes
+                        .map(|bytes| bytes.to_string())
+                        .unwrap_or_else(|| "null".to_owned())
+                ),
                 json_usize_field(
                     "compile_pipeline_loaded_nustar_count",
                     report.loaded_nustar.len(),

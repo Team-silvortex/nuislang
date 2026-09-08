@@ -52,9 +52,9 @@ pub(crate) struct StdlibDocSummary {
 }
 
 pub(crate) fn collect_benchmark_inventory(
-    artifacts: &pipeline::PipelineArtifacts,
+    artifacts: pipeline::PipelineArtifactView<'_>,
 ) -> Vec<BenchmarkInventoryEntry> {
-    frontend::collect_nir_benchmarks(&artifacts.nir)
+    frontend::collect_nir_benchmarks(artifacts.nir)
         .into_iter()
         .map(|function| BenchmarkInventoryEntry {
             symbol: format!(
@@ -86,7 +86,7 @@ pub(crate) fn collect_benchmark_inventory(
 
 pub(crate) fn inspect_benchmarks_json(
     input: &Path,
-    artifacts: &pipeline::PipelineArtifacts,
+    artifacts: pipeline::PipelineArtifactView<'_>,
 ) -> String {
     let benchmarks = collect_benchmark_inventory(artifacts);
     let entries = benchmarks
@@ -109,6 +109,8 @@ pub(crate) fn inspect_benchmarks_json(
         .join(",");
     let fields = [
         json_string_field("kind", "nuis_benchmark_inventory"),
+        json_string_field("compiler_checkpoint", artifacts.checkpoint_name()),
+        json_string_field("llvm_emit", artifacts.llvm_status()),
         json_string_field("input", &input.display().to_string()),
         json_string_field("domain", &artifacts.nir.domain),
         json_string_field("unit", &artifacts.nir.unit),

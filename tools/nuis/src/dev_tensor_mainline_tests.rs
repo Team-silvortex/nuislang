@@ -253,7 +253,7 @@ fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() 
 }
 
 #[test]
-fn headless_checkpoint_evidence_keeps_inspection_as_the_next_boundary() {
+fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     let session = crate::dev_tensor_data::DEV_TENSOR_CELLS
         .iter()
         .find(|cell| cell.module == "ns-nova" && cell.function == "persistent-application-session")
@@ -265,8 +265,22 @@ fn headless_checkpoint_evidence_keeps_inspection_as_the_next_boundary() {
         .contains("no WindowSession or AppKit dependency"));
     assert!(session.evidence.contains("headless-aot-bundle"));
     assert!(session.evidence.contains("without CPU LLVM generation"));
-    assert!(session.next_step.contains("check/dump/inspection"));
-    assert!(session.blocker.contains("rejected flow-chain descriptor"));
+    assert!(session
+        .evidence
+        .contains("Manifest-selected check/dump/inspection"));
+    assert!(session.evidence.contains("LLVM as not_requested"));
+    assert!(session.next_step.contains("buffer-writing while"));
+    assert!(session
+        .validation_command
+        .contains("--test checkpoint_inspection"));
+    assert!(session
+        .validation_command
+        .contains("--test checkpoint_workflow"));
+    assert!(session.evidence.contains("36 scalar-loop cases"));
+    assert!(!session.blocker.contains("rejected flow-chain descriptor"));
+    assert!(session
+        .validation_command
+        .contains("--test compound_loop_flow"));
     assert!(session.next_action.contains("binary identity"));
     assert!(session.blocker.contains("Windows transport"));
     assert!(session

@@ -61,6 +61,25 @@ impl ProviderCompletionRegistration {
     }
 }
 
+/// Cooperative reference execution. Each resume and nested function call shares
+/// the caller's fuel; a resume must bound its own private work.
+pub trait RegisteredExecution {
+    fn resume(
+        &mut self,
+        state: &mut ExecutionState,
+        call_result: Option<Value>,
+    ) -> Result<RegisteredExecutionStep, String>;
+}
+
+pub enum RegisteredExecutionStep {
+    Continue,
+    Call {
+        function: String,
+        arguments: Vec<Value>,
+    },
+    Complete(Value),
+}
+
 pub trait RegisteredMod: Send + Sync {
     fn module_name(&self) -> &'static str;
 
@@ -76,6 +95,15 @@ pub trait RegisteredMod: Send + Sync {
     }
 
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String>;
+
+    fn begin_execution(
+        &self,
+        _node: &Node,
+        _resource: &Resource,
+        _state: &ExecutionState,
+    ) -> Result<Option<Box<dyn RegisteredExecution>>, String> {
+        Ok(None)
+    }
 
     fn execute(
         &self,

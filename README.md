@@ -53,7 +53,7 @@ nuis source / nuis.toml
 | Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions. | Supported syntax does not imply every combination lowers; general buffer-writing `while` and some aggregate early-return shapes remain incomplete. |
 | Image application | Nuis generates RGBA8 data, inline WGSL runs RGB inversion on real Metal, and compiled host execution exports checked PPM frames. | The host embeds the YIR lifecycle runtime and uses registered providers; it is not fully native CPU execution or a self-contained Nsld image. |
 | Persistent window | Registered Nuis open/event/close callbacks retain state and one provider connection across AppKit events. A separate registered CPU parent can consume one terminal outcome. | Explicit mode, bounded dispatch/replay, one-child parent profile; not an unlimited engine loop or general supervisor. |
-| Cancellation | Independent tickets carry provider-worker drain into a typed, non-success result. AppKit and the headless build/run-artifact route share the classifier and launch policy; Metal regressions retain prior success evidence. | AppKit cancellation policy remains scripted; headless uses bounded scalar scripts. Checkpoint-aware inspection, Linux hardware evidence, Windows transport, parent cancellation and resource reuse remain open. |
+| Cancellation | Independent tickets carry provider-worker drain into a typed, non-success result. AppKit and the headless build/run-artifact route share the classifier and launch policy; Metal regressions retain prior success evidence. | AppKit cancellation policy remains scripted; headless uses bounded scalar scripts. Linux hardware evidence, Windows transport, parent cancellation and resource reuse remain open. |
 | Other backends | Checked-in routes include Linux CUDA/Vulkan and Apple Metal/CoreML provider work. | Evidence is backend- and workload-specific; reference results and hardware-free conformance do not certify physical execution. |
 | Nsld | Deterministic plans/NSB assembly, first ARM64 Mach-O and x86_64 Linux ELF private-shell routes, loader admission, publication and final-output selection. | Broader architecture/provider parity, PE/COFF final execution and self-contained application packaging remain incomplete. |
 | Self-hosting | Five bounded preparation gates, Nuis compiler-component proofs, differential/reproducibility evidence and explicit selection/rollback contracts. | `stage0-to-stage1-migration/active` is not completed compiler replacement; the bounded candidate-to-Nsld path stops before native object emission. |
@@ -123,8 +123,10 @@ only after capability, source and executable identity checks. Explicit build
 selections are cache-isolated. Headless builds consume an explicit verified-YIR
 checkpoint without requesting CPU LLVM or inventing an empty `.ll` file. Source,
 tokens, AST, NIR and YIR remain bound by the portable compiler-stage handoff.
-Native/window builds still require LLVM; inspection commands have not yet adopted
-the headless checkpoint selection.
+Native/window builds still require LLVM. With `packaging_mode = "headless-aot-bundle"`
+in `nuis.toml`, check/dump, benchmark/binding inspection and `nuis workflow --json`
+select verified YIR and report LLVM as not requested. This is semantic-stage
+evidence, not proof of native AOT readiness or successful provider execution.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

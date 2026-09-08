@@ -17,6 +17,7 @@ const MAX_SCOPED_LOOP_ITERATIONS: usize = 100_000;
 
 mod call_result;
 mod function_session;
+mod registered_execution;
 use call_result::validate_call_result;
 pub use function_session::{FunctionInvocation, FunctionSession};
 
@@ -189,7 +190,11 @@ impl<'a> ExecutionEngine<'a> {
                     return Err(error);
                 }
                 Ok(Some(value)) => Ok(value),
-                Ok(None) => module_impl.execute(&node, &resource, &mut self.state),
+                Ok(None) => match module_impl.begin_execution(&node, &resource, &self.state) {
+                    Ok(Some(execution)) => self.execute_registered_node(&node, execution),
+                    Ok(None) => module_impl.execute(&node, &resource, &mut self.state),
+                    Err(error) => Err(error),
+                },
             };
         match executed {
             Ok(value) => {

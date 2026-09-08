@@ -5,7 +5,7 @@ use crate::{nustar_binary, project, registry};
 
 pub(crate) fn run_bindings(input: PathBuf) -> Result<(), String> {
     let compiled = compile_command_input(&input)?;
-    let artifacts = &compiled.artifacts;
+    let artifacts = compiled.artifacts.view();
     let declared_used_units = artifacts
         .ast
         .uses
@@ -34,14 +34,16 @@ pub(crate) fn run_bindings(input: PathBuf) -> Result<(), String> {
         .collect::<Vec<_>>();
     let plan = registry::plan_bindings(
         Path::new(NUSTAR_REGISTRY_ROOT),
-        &artifacts.nir,
-        &artifacts.yir,
+        artifacts.nir,
+        artifacts.yir,
         &artifacts.ast.domain,
         &artifacts.ast.unit,
         &declared_used_units,
         &declared_externs,
     )?;
     println!("binding plan for: {}", input.display());
+    println!("compiler_checkpoint: {}", artifacts.checkpoint_name());
+    println!("llvm_emit: {}", artifacts.llvm_status());
     if let Some(project) = &compiled.resolved.project {
         println!("project: {}", project::describe_project(project));
     }

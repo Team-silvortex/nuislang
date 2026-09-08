@@ -71,8 +71,10 @@ identity before preparing providers, and reuse the existing typed launch policy.
 Explicit host selections are cache-isolated. Headless builds now consume a
 verified-YIR checkpoint without CPU LLVM codegen. The complete source-to-YIR
 handoff travels with the artifact; no empty LLVM file substitutes for a stage.
-The next boundary is checkpoint-aware check/dump/inspection reporting rather than
-requiring native codegen to inspect an embedded application. Linux hardware and Windows transport
+Manifest-selected headless check/dump, benchmark/binding inspection and workflow JSON
+now use the same checkpoint, with `llvm_emit=not_requested` and no invented LLVM
+byte count. Default native diagnostics remain in place. Buffer-writing callback
+loops and richer carry payloads remain separate lowering gaps. Linux hardware and Windows transport
 are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.
 The default host-only path acknowledges its own scope, while the live provider

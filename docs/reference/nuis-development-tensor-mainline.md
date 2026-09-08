@@ -210,10 +210,19 @@ bind capabilities and YIR to the verified image, isolate explicit build selectio
 in cache and reuse the same provider lifecycle. Headless builds now stop at an
 explicit verified-YIR checkpoint without CPU LLVM generation or dummy intermediates.
 The v2 bounded inputs preserve the complete compiler-stage handoff through artifact
-relocation. The score remains `active/86`: checkpoint-aware check/dump/inspection
-is next. Supported callback parity does not yet certify a new source shape beyond
-former LLVM admission. Compound-condition while lowering still has a rejected YIR
-descriptor shape; this semantic failure is not bypassed by the headless route.
+relocation. Manifest-selected check/dump, benchmark/binding inspection and workflow
+JSON now select verified YIR before codegen, report LLVM as `not_requested` with
+no fabricated byte count, and retain default native errors. Command regressions
+cover directory/manifest inputs, dump roundtrips and rejected invalid inputs;
+semantic inspection is not executable or provider evidence. The score remains
+`active/86`: buffer-writing application callback loops are the next lowering gap.
+Compound-condition `while` lowering now selects recursive descriptors,
+normalizes linear carries consistently and deduplicates shared effect inputs.
+CPU-owned cooperative execution replaces trace-only loop results; generic YIR
+function calls and resumes share invocation fuel. Thirty-six synchronous/asynchronous
+scalar-loop cases agree between reference execution and native M2 binaries, with
+registered callback coverage for both `&&` and `||`. This covers bounded integer
+induction and add/keep carries, not arbitrary loop bodies or every carry descriptor.
 Linux hardware execution is unverified and Windows transport remains missing;
 no cross-session reuse permission or general device
 cancellation follows from this bounded boundary.

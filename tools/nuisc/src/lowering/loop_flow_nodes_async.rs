@@ -51,6 +51,7 @@ pub(in crate::lowering) fn lower_async_flow_while(
         .carries
         .iter()
         .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
+    let uses_cond_chain = has_conditional || control_uses_cond_chain;
     let compare = render_loop_compare(prepared.compare);
     let mut args = vec![
         initial_name.clone(),
@@ -65,7 +66,7 @@ pub(in crate::lowering) fn lower_async_flow_while(
         args.push(carry_initial_name.clone());
         match &prepared.carries[index].kind {
             PreparedCarryUpdateKind::Linear { op, source } => {
-                if has_conditional {
+                if uses_cond_chain {
                     args.push("always".to_owned());
                     args.push(initial_name.clone());
                     let (carry_args, carry_dep_inputs, carry_effect_inputs) =
@@ -109,7 +110,7 @@ pub(in crate::lowering) fn lower_async_flow_while(
     }
     let name = next_name(
         state,
-        if has_conditional || control_uses_cond_chain {
+        if uses_cond_chain {
             "loop_while_scalar_async_flow_cond_chain"
         } else {
             "loop_while_scalar_async_flow_chain"
@@ -120,7 +121,7 @@ pub(in crate::lowering) fn lower_async_flow_while(
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: if has_conditional || control_uses_cond_chain {
+            instruction: if uses_cond_chain {
                 "loop_while_scalar_async_flow_cond_chain".to_owned()
             } else {
                 "loop_while_scalar_async_flow_chain".to_owned()
@@ -141,32 +142,16 @@ pub(in crate::lowering) fn lower_async_flow_while(
         push_dep_edges(state, extra_dep_input, &name);
     }
     for effect in [&initial_name, &limit_name] {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: effect.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, effect, &name);
     }
     for control_effect_input in &control_effect_inputs {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: control_effect_input.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, control_effect_input, &name);
     }
     for carry_initial_name in &carry_initial_names {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: carry_initial_name.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, carry_initial_name, &name);
     }
     for extra_effect_input in &extra_effect_inputs {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: extra_effect_input.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, extra_effect_input, &name);
     }
     super::body_lowering::chain_statement_effect(state, &name);
     let current_name = next_name(state, "loop_current");
