@@ -5,6 +5,35 @@ mod frame_export;
 #[path = "artifact_runtime_window_session.rs"]
 mod window_session;
 
+/// A cancelled launch is a distinct, non-success terminal result. Only the
+/// provider policy can validate its receipt; OS exit alone cannot construct it.
+#[derive(Debug)]
+pub(crate) enum ArtifactRunOutcome {
+    Completed,
+    Cancelled(yir_core::provider_runtime_ipc::SessionDrain),
+}
+
+impl ArtifactRunOutcome {
+    pub(crate) fn exit_code(self) -> std::process::ExitCode {
+        match self {
+            Self::Completed => std::process::ExitCode::SUCCESS,
+            Self::Cancelled(_) => std::process::ExitCode::from(
+                yir_runtime_host::APPLICATION_CANCELLED_EXIT_CODE as u8,
+            ),
+        }
+    }
+
+    fn require_completed(self) -> Result<(), String> {
+        match self {
+            Self::Completed => Ok(()),
+            Self::Cancelled(receipt) => Err(format!(
+                "artifact cancelled after draining {} dispatches, not completed",
+                receipt.sequence
+            )),
+        }
+    }
+}
+
 pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
     handle_run_artifact_with_frame_output(input, json, None)
 }
@@ -14,13 +43,13 @@ pub(crate) fn handle_run_artifact_with_frame_output(
     json: bool,
     frame_output: Option<PathBuf>,
 ) -> Result<(), String> {
-    handle_run_artifact_options(input, json, frame_output, None)
+    handle_run_artifact_options(input, json, frame_output, None)?.require_completed()
 }
 
 pub(crate) fn handle_run_artifact_with_window(
     input: PathBuf,
     options: crate::cli::WindowSessionOptions,
-) -> Result<(), String> {
+) -> Result<ArtifactRunOutcome, String> {
     handle_run_artifact_options(input, false, None, Some(options))
 }
 
@@ -29,7 +58,7 @@ fn handle_run_artifact_options(
     json: bool,
     frame_output: Option<PathBuf>,
     window_options: Option<crate::cli::WindowSessionOptions>,
-) -> Result<(), String> {
+) -> Result<ArtifactRunOutcome, String> {
     if json && frame_output.is_some() {
         return Err(
             "--json is inspection-only and cannot be combined with --export-frame".to_owned(),
@@ -37,7 +66,7 @@ fn handle_run_artifact_options(
     }
     if json {
         println!("{}", render_run_artifact_json(&input));
-        return Ok(());
+        return Ok(ArtifactRunOutcome::Completed);
     }
     let doctor = probe_artifact_doctor(&input);
     if let Some(options) = &window_options {
@@ -134,7 +163,7 @@ fn handle_run_artifact_options(
                 .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
             print_run_artifact_link_plan_status(link_plan.as_ref());
         }
-        return Ok(());
+        return Ok(ArtifactRunOutcome::Completed);
     }
     let binary = resolved_binary_result?;
     let runtime_provider_results = doctor
@@ -158,12 +187,41 @@ fn handle_run_artifact_options(
         if options.cancel_after_events {
             command.arg("--window-cancel-after-events");
         }
+        if options.drain_provider {
+            command.arg("--drain-provider");
+        }
     }
     if let Some(output) = frame_output.as_deref() {
         command.arg("--export-frame").arg(output);
     }
     if cfg!(test) {
         command.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+    if window_options
+        .as_ref()
+        .is_some_and(|options| options.drain_provider)
+    {
+        use crate::artifact_runtime_provider_results::{
+            ProviderLaunchOutcome, ProviderLaunchPolicy,
+        };
+        let prepared = runtime_provider_results
+            .as_ref()
+            .ok_or("provider drain launch requires a prepared runtime provider")?;
+        let (status, outcome) = prepared.run_command_with_policy(
+            &mut command,
+            Some(std::time::Duration::from_secs(180)),
+            ProviderLaunchPolicy::ExplicitDrain,
+        )?;
+        let ProviderLaunchOutcome::Drained(receipt) = outcome else {
+            return Err("explicit drain launch did not yield a provider receipt".to_owned());
+        };
+        // Do not persist successful launch/trace evidence for an abandoned app.
+        eprintln!(
+            "run-artifact: cancelled; provider drained {} dispatches; child exit {:?}",
+            receipt.sequence,
+            status.code()
+        );
+        return Ok(ArtifactRunOutcome::Cancelled(receipt));
     }
     let (status, runtime_invocations) = match runtime_provider_results.as_ref() {
         Some(prepared)
@@ -247,7 +305,7 @@ fn handle_run_artifact_options(
         if let Some(output) = frame_output.as_deref() {
             frame_export::verify_output(output)?;
         }
-        return Ok(());
+        return Ok(ArtifactRunOutcome::Completed);
     }
     Err(format!(
         "artifact binary `{}` exited with status {:?}",

@@ -7,8 +7,10 @@ use std::{
 
 const HARNESS: &str = r#"
 static int cancelStatus, pollStatus, cancelCalls, pollCalls, sessionFrees, ticketFrees;
+static int drainCalls, providerPollCalls, classificationCalls, classifiedExit;
 static int32_t observedCleanup;
 static int64_t observedFailure;
+static NuisApplicationCancellationReceipt observedProvider;
 static int sessionStorage, ticketStorage;
 int32_t nuis_window_session_cancel(NuisWindowSession *session, NuisApplicationCancellation **ticket) {
     assert(session != NULL && *ticket == NULL);
@@ -21,6 +23,28 @@ int32_t nuis_application_cancellation_poll(NuisApplicationCancellation *ticket, 
     pollCalls++;
     if (pollStatus == 1) { *cleanup = observedCleanup; *failure = observedFailure; }
     return pollStatus;
+}
+int32_t nuis_window_session_cancel_with_provider_drain(NuisWindowSession *session, NuisApplicationCancellation **ticket) {
+    assert(session != NULL && *ticket == NULL);
+    drainCalls++;
+    if (cancelStatus == 0) *ticket = (NuisApplicationCancellation *)&ticketStorage;
+    return cancelStatus;
+}
+int32_t nuis_application_cancellation_poll_with_provider(NuisApplicationCancellation *ticket, NuisApplicationCancellationReceipt *receipt) {
+    assert(ticket == (NuisApplicationCancellation *)&ticketStorage);
+    providerPollCalls++;
+    if (pollStatus == 1) *receipt = observedProvider;
+    return pollStatus;
+}
+int32_t nuis_application_provider_drain_exit_status(const NuisApplicationCancellationReceipt *receipt) {
+    assert(receipt->cleanup_completed == observedProvider.cleanup_completed);
+    assert(receipt->provider_status == observedProvider.provider_status);
+    assert(receipt->failure_kind == observedProvider.failure_kind);
+    assert(receipt->provider_failure_kind == observedProvider.provider_failure_kind);
+    assert(receipt->completed_dispatches == observedProvider.completed_dispatches);
+    classificationCalls++;
+    // Test delegation, not a second implementation of the portable Rust policy.
+    return classifiedExit;
 }
 void nuis_window_session_free(NuisWindowSession **session) {
     assert(*session != NULL);
@@ -37,9 +61,11 @@ void nuis_application_cancellation_free(NuisApplicationCancellation **ticket) {
 const SCENARIOS: &str = r#"
 static void reset(void) {
     cancelStatus = pollStatus = cancelCalls = pollCalls = sessionFrees = ticketFrees = 0;
+    drainCalls = providerPollCalls = classificationCalls = 0; classifiedExit = 1;
+    observedProvider = (NuisApplicationCancellationReceipt){0, 0, 0, 0, -1};
     observedCleanup = 0; observedFailure = 0; gNuisWindowExitStatus = 1;
     gNuisWindowSessionId = gNuisWindowParentId = NULL;
-    gNuisWindowScripted = gNuisWindowCancelAfterEvents = NO;
+    gNuisWindowScripted = gNuisWindowCancelAfterEvents = gNuisDrainProvider = NO;
     gNuisWindowKeyCount = gNuisWindowKeyIndex = 0;
 }
 static void parseCase(int argc, const char **argv, int expected) {
@@ -59,6 +85,14 @@ int main(void) {
     parseCase(6, reverse, 1); assert(gNuisWindowCancelAfterEvents && gNuisWindowKeyCount == 0);
     parseCase(4, noScript, -1); parseCase(8, parent, -1); parseCase(7, duplicate, -1);
     parseCase(4, missing, -1); parseCase(7, ordinary, 1); assert(!gNuisWindowCancelAfterEvents);
+    const char *drain[] = {"app", "--window-session", "window", "--window-events", "", "--window-cancel-after-events", "--drain-provider"};
+    const char *drainReverse[] = {"app", "--window-session", "window", "--drain-provider", "--window-cancel-after-events", "--window-events", ""};
+    const char *drainNoCancel[] = {"app", "--window-session", "window", "--window-events", "", "--drain-provider"};
+    const char *drainDuplicate[] = {"app", "--window-session", "window", "--window-events", "", "--window-cancel-after-events", "--drain-provider", "--drain-provider"};
+    const char *drainParent[] = {"app", "--window-session", "window", "--window-events", "", "--window-cancel-after-events", "--drain-provider", "--window-parent-session", "parent"};
+    parseCase(7, drain, 1); assert(gNuisDrainProvider && gNuisWindowCancelAfterEvents);
+    parseCase(7, drainReverse, 1); assert(gNuisDrainProvider);
+    parseCase(6, drainNoCancel, -1); parseCase(8, drainDuplicate, -1); parseCase(9, drainParent, -1);
 
     reset();
     WindowHarness *host = [WindowHarness new];
@@ -109,6 +143,27 @@ int main(void) {
     assert([host applicationShouldTerminate:nil] == NSTerminateLater);
     host.sessionParentTerminal = YES;
     assert([host applicationShouldTerminate:nil] == NSTerminateNow);
+
+    for (int exitStatus = 1; exitStatus <= 130; exitStatus += 129) {
+        reset(); gNuisDrainProvider = YES; classifiedExit = exitStatus;
+        host = [WindowHarness new]; host.session = (NuisWindowSession *)&sessionStorage;
+        [host cancelSession];
+        assert(drainCalls == 1 && cancelCalls == 0 && sessionFrees == 1);
+        assert([host pollSessionCancellation]);
+        assert(providerPollCalls == 1 && pollCalls == 0 && classificationCalls == 0);
+        assert(!host.sessionTerminal && ticketFrees == 0);
+        observedProvider = (NuisApplicationCancellationReceipt){1, 5, exitStatus == 1 ? 5 : 0, 0, 2};
+        pollStatus = 1;
+        assert([host pollSessionCancellation]);
+        assert(classificationCalls == 1 && gNuisWindowExitStatus == exitStatus);
+        assert(host.sessionTerminal && ticketFrees == 1 && host.terminations == 1);
+        assert(![host pollSessionCancellation] && providerPollCalls == 2);
+    }
+    reset(); gNuisDrainProvider = YES;
+    host = [WindowHarness new]; host.session = (NuisWindowSession *)&sessionStorage;
+    [host cancelSession]; pollStatus = -1;
+    assert([host pollSessionCancellation]);
+    assert(classificationCalls == 0 && gNuisWindowExitStatus == 1 && ticketFrees == 1);
   }
 }
 "#;
@@ -181,11 +236,17 @@ fn generated_host_forwards_independent_ticket_and_preserves_pending_or_missing_r
     assert!(status.success(), "{status}\n{log}");
     assert_eq!(
         log.matches("window_session_host_retired\n").count(),
-        1,
+        3,
         "{log}"
     );
     assert!(log.contains("cancel_cleanup_completed=1\n"), "{log}");
     assert!(log.contains("cancel_failure_kind=5\n"), "{log}");
-    assert_eq!(log.matches("cancel_receipt_missing\n").count(), 1, "{log}");
+    assert_eq!(log.matches("cancel_receipt_missing\n").count(), 2, "{log}");
+    assert_eq!(log.matches("provider_drain_status=5\n").count(), 2, "{log}");
+    assert_eq!(
+        log.matches("provider_drain_dispatches=2\n").count(),
+        2,
+        "{log}"
+    );
     // No close, outcome or provider implementations are linked by this harness.
 }

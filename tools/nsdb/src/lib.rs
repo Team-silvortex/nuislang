@@ -125,7 +125,6 @@ pub use provider_conformance_capsule::{
 #[cfg(unix)]
 pub use provider_runtime_ipc::{
     serve_runtime_provider_session, serve_runtime_provider_session_with_request_reader,
-    ProviderRuntimeSessionOutcome,
 };
 pub use provider_runtime_result_stream::{
     provider_runtime_result_stream_path, provider_runtime_result_targets,
@@ -139,6 +138,7 @@ pub use provider_sample_materialize::{
     materialize_provider_samples, ProviderSampleMaterializeReport,
 };
 pub use runtime_dispatch_receipt::RuntimeDispatchReceiptSummary;
+pub use yir_core::provider_runtime_ipc::ProviderRuntimeSessionOutcome;
 
 pub fn validate_provider_request_evidence(input_evidence: &str) -> bool {
     provider_request::provider_request_collection_from_evidence(input_evidence).is_some()

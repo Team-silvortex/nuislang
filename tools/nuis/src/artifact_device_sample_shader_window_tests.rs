@@ -211,6 +211,7 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
             events: Some("32,128578".to_owned()),
             parent: Some("parent".to_owned()),
             cancel_after_events: false,
+            drain_provider: false,
         },
     )
     .expect("production run-artifact window frontdoor");

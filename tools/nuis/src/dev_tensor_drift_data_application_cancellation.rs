@@ -16,11 +16,17 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "provider-session-drain-lifecycle-boundary",
         path: "tools/nsdb/src/provider_runtime_ipc.rs",
         required_patterns: &[
-            "pub enum ProviderRuntimeSessionOutcome",
-            "pub fn into_finished_count",
             "complete_session(execution, close())?",
             "Message::Drained(drain.clone())",
             "drain.admit(target, count)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-session-terminal-portable-contract",
+        path: "crates/yir-core/src/provider_runtime_outcome.rs",
+        required_patterns: &[
+            "pub enum ProviderRuntimeSessionOutcome", "pub fn into_finished_count",
+            "Finished(usize)", "Drained(SessionDrain)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -61,7 +67,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "[provider_session_drain]",
             "host_cancellation_wired = true",
             "host_drain_policy = \"explicit-opt-in-validated-frontier-only-no-retry\"",
-            "packaged_host_drain_wired = false",
+            "packaged_host_drain_wired = true",
+            "windows_transport_claimed = false",
+            "non_appkit_packaged_drain_claimed = false",
             "cross_session_resource_reuse = false",
             "outcome = \"typed-drained-not-finished\"",
         ],
@@ -277,6 +285,70 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "runtime IPC idle read failed",
             "Some(130)",
             "frontdoor cancellation replaced old replay",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-portable-launch-policy",
+        path: "tools/nuis/src/artifact_runtime_provider_lifecycle.rs",
+        required_patterns: &[
+            "enum ProviderLaunchPolicy", "enum ProviderLaunchOutcome",
+            "fn admit_request", "fn admit_exit", "APPLICATION_CANCELLED_EXIT_CODE",
+            "rejects Finish before publication", "runtime provider drain is terminal",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-portable-launch-policy-evidence",
+        path: "tools/nuis/src/artifact_runtime_provider_lifecycle_tests.rs",
+        required_patterns: &[
+            "explicit_drain_needs_both_a_provider_terminal_and_the_cancelled_exit",
+            "drain_policy_rejects_finish_before_the_provider_can_publish",
+            "policy_mismatch_and_late_sessions_permanently_preserve_the_first_error",
+            "malformed_receipts_and_counter_overflows_cannot_be_recovered_as_success",
+            "policy_and_terminal_contract_do_not_depend_on_platform_or_provider_implementations",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-portable-exit-classifier-evidence",
+        path: "crates/yir-runtime-host/src/application_cancellation/ffi/tests.rs",
+        required_patterns: &[
+            "drain_exit_classification_is_portable_and_never_claims_application_success",
+            "drain_exit_preserves_faults_and_rejects_missing_or_contradictory_observations",
+            "nuis_application_provider_drain_exit_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "packaged-provider-drain-capability-admission",
+        path: "tools/nuis/src/artifact_runtime_window_session.rs",
+        required_patterns: &[
+            "application_provider_drain_contract=", "SESSION_DRAIN_CONTRACT",
+            "declarations != [expected.as_str()]", "options.drain_provider",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "packaged-provider-drain-typed-frontdoor",
+        path: "tools/nuis/src/artifact_runtime_launch.rs",
+        required_patterns: &[
+            "enum ArtifactRunOutcome", "ProviderLaunchPolicy::ExplicitDrain",
+            "ProviderLaunchOutcome::Drained(receipt)", "ArtifactRunOutcome::Cancelled(receipt)",
+            "Do not persist successful launch/trace evidence",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "packaged-provider-drain-thin-host-adapter",
+        path: "tools/yir-pack-aot/src/host_window_cancellation.rs",
+        required_patterns: &[
+            "nuis_window_session_cancel_with_provider_drain(self.session, &ticket)",
+            "nuis_application_cancellation_poll_with_provider(ticket, &receipt)",
+            "nuis_application_provider_drain_exit_status(&receipt)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "packaged-provider-drain-metal-evidence",
+        path: "tools/nuis/src/artifact_device_sample_shader_packaged_drain_tests.rs",
+        required_patterns: &[
+            "verify_packaged_drain", "--drain-provider", "ProviderLaunchPolicy::ExplicitDrain",
+            "ArtifactRunOutcome::Cancelled(receipt)", "before publication",
+            "frontdoor drain published success evidence", "window_session_provider_drain_status=2",
         ],
     },
 ];

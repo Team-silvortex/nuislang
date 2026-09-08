@@ -80,6 +80,44 @@ fn malformed_drain_fails_before_emitting_bytes() {
 }
 
 #[test]
+fn typed_drain_admission_uses_the_same_target_field_rules_as_the_wire() {
+    for value in [
+        "".to_owned(),
+        "a\nb".to_owned(),
+        "a\rb".to_owned(),
+        "a\0b".to_owned(),
+        "a".repeat(257),
+    ] {
+        for field in 0..4 {
+            let mut target = target();
+            match field {
+                0 => target.module = value.clone(),
+                1 => target.instruction = value.clone(),
+                2 => target.node = value.clone(),
+                _ => target.resource = value.clone(),
+            }
+            let drain = SessionDrain {
+                sequence: 0,
+                target,
+            };
+            assert!(drain.admit(&drain.target, 0).is_err());
+            let mut wire = Vec::new();
+            assert!(Message::Drained(drain).write_to(&mut wire).is_err());
+            assert!(wire.is_empty());
+        }
+    }
+    let drain = SessionDrain {
+        sequence: 0,
+        target: DispatchTarget {
+            node: "a".repeat(256),
+            ..target()
+        },
+    };
+    drain.admit(&drain.target, 0).unwrap();
+    Message::Drained(drain).write_to(&mut Vec::new()).unwrap();
+}
+
+#[test]
 fn drain_failures_cannot_impersonate_finish_or_dispatch_failures() {
     for code in [RejectionCode::Finalization, RejectionCode::Exchange] {
         let rejection = Rejection::new(RejectionPhase::Drain, MAX_DISPATCHES, code, "failed");

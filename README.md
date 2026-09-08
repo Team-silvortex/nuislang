@@ -47,7 +47,7 @@ nuis source / nuis.toml
 | Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions. | Supported syntax does not imply every combination lowers; general buffer-writing `while` and some aggregate early-return shapes remain incomplete. |
 | Image application | Nuis generates RGBA8 data, inline WGSL runs RGB inversion on real Metal, and compiled host execution exports checked PPM frames. | The host embeds the YIR lifecycle runtime and uses registered providers; it is not fully native CPU execution or a self-contained Nsld image. |
 | Persistent window | Registered Nuis open/event/close callbacks retain state and one provider connection across AppKit events. A separate registered CPU parent can consume one terminal outcome. | Explicit mode, bounded dispatch/replay, one-child parent profile; not an unlimited engine loop or general supervisor. |
-| Cancellation | Host-library pump/window/C ABI tickets can explicitly request and separately observe provider-worker drain; Metal tests cover zero/two frames and retained replay. | AppKit cancellation policy is still scripted and host-only; capability-gated drain launch, parent cancellation and resource reuse remain open. |
+| Cancellation | Independent pump/window/C ABI tickets and an opt-in packaged-host capability carry provider-worker drain into a typed, non-success launcher result; Metal regressions retain prior success evidence. | AppKit cancellation policy remains scripted. Shared policy is platform-neutral, but non-AppKit host entry, Windows transport, parent cancellation and resource reuse remain open. |
 | Other backends | Checked-in routes include Linux CUDA/Vulkan and Apple Metal/CoreML provider work. | Evidence is backend- and workload-specific; reference results and hardware-free conformance do not certify physical execution. |
 | Nsld | Deterministic plans/NSB assembly, first ARM64 Mach-O and x86_64 Linux ELF private-shell routes, loader admission, publication and final-output selection. | Broader architecture/provider parity, PE/COFF final execution and self-contained application packaging remain incomplete. |
 | Self-hosting | Five bounded preparation gates, Nuis compiler-component proofs, differential/reproducibility evidence and explicit selection/rollback contracts. | `stage0-to-stage1-migration/active` is not completed compiler replacement; the bounded candidate-to-Nsld path stops before native object emission. |
@@ -97,9 +97,14 @@ uses explicit close/Finish. The [provider-session drain extension](docs/referenc
 now reaches host-library cancellation through explicit `cancel_with_provider_drain`,
 with a separate target/count-validated observation after registered worker close.
 Damaged exchanges are not retried, and cancelled results never replace replay.
-Next connect that opt-in API to a declared packaged-host capability and a typed
-non-success launcher result. The current AppKit script still sends EOF, so
-`run-artifact` does not certify its cancellation as provider retirement or success.
+Adding `--drain-provider` to scripted cancellation now requires a declared bundle
+capability and produces typed cancellation, never application success. The launcher
+requires both the provider's Drained terminal and the child's non-success exit 130;
+it rejects Finish under drain intent before provider publication. Default
+host-only cancellation still reports EOF as incomplete provider execution.
+The terminal contract and launch policy contain no OS/window/provider implementation;
+AppKit and Unix IPC remain the current adapters, not proof of Windows support.
+Next exercise a non-AppKit/headless packaged entry through those same contracts.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.
 

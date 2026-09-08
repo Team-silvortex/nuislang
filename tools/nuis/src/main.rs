@@ -217,7 +217,7 @@ pub(crate) use workflow::{
     release_check_nsld_drive_until_clean_json_command_for_output_dir,
 };
 
-fn main() {
+fn main() -> std::process::ExitCode {
     let result = thread::Builder::new()
         .name("nuis-main".to_owned())
         .stack_size(64 * 1024 * 1024)
@@ -227,13 +227,16 @@ fn main() {
             Ok(result) => result,
             Err(_) => Err("nuis main thread panicked".to_owned()),
         });
-    if let Err(error) = result {
-        eprintln!("{error}");
-        std::process::exit(1);
+    match result {
+        Ok(code) => code,
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::ExitCode::FAILURE
+        }
     }
 }
 
-fn run() -> Result<(), String> {
+fn run() -> Result<std::process::ExitCode, String> {
     match cli::parse_args(std::env::args().skip(1))? {
         cli::CommandKind::Help => {
             print_help();
@@ -611,7 +614,8 @@ fn run() -> Result<(), String> {
         )?,
         cli::CommandKind::RunArtifact { input, json, frame_output, window_session } => {
             if let Some(options) = window_session {
-                artifact_runtime_command::handle_run_artifact_with_window(input, options)?;
+                return artifact_runtime_command::handle_run_artifact_with_window(input, options)
+                    .map(artifact_runtime_command::ArtifactRunOutcome::exit_code);
             } else {
                 match frame_output {
                     Some(output) => artifact_runtime_command::handle_run_artifact_with_frame_output(input, json, Some(output))?,
@@ -662,7 +666,7 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Galaxy(command) => handle_galaxy(command)?,
     }
 
-    Ok(())
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn handle_check(input: std::path::PathBuf) -> Result<(), String> {

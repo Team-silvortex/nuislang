@@ -12,6 +12,9 @@ pub use rejection::{Rejection, RejectionCode, RejectionPhase};
 #[path = "provider_runtime_drain.rs"]
 mod drain;
 pub use drain::{SessionDrain, SESSION_DRAIN_CONTRACT};
+#[path = "provider_runtime_outcome.rs"]
+mod outcome;
+pub use outcome::ProviderRuntimeSessionOutcome;
 
 pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v4";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";
@@ -47,7 +50,10 @@ impl DispatchTarget {
     }
 
     fn parse(fields: &[&str]) -> Result<Self, String> {
-        if fields.len() != 5 || !valid_hash(fields[0]) {
+        if fields.len() != 5
+            || !valid_hash(fields[0])
+            || fields.iter().any(|field| !valid_field(field))
+        {
             return Err("runtime IPC target identity is invalid".to_owned());
         }
         Ok(Self {

@@ -44,7 +44,7 @@ Metal-specific branch or a window-driven destructor. Existing work finishes at
 the provider boundary; Drain is not instruction-level or device preemption.
 Existing transport/worker waits still apply and are not a new wall-time guarantee.
 
-`ProviderRuntimeSessionOutcome` distinguishes `Finished(count)` from
+The platform-neutral YIR contract `ProviderRuntimeSessionOutcome` distinguishes `Finished(count)` from
 `Drained(receipt)`. The success-only launcher calls `into_finished_count`, which
 rejects Drained. Drain never persists replacement result streams, output payloads,
 successful completion records or parent deliveries. Normal Finish/Closed keeps
@@ -81,9 +81,40 @@ or drained, and successful drain cannot erase a prior application fault. The
 generic provider-scope admission policy seals abandonment before transport drop;
 the window never receives provider internals.
 
-The generated AppKit script still uses host-only cancellation, sends no Drain and
-reports EOF as incomplete provider execution. Next add capability-gated packaged
-host admission and preserve Drained as a typed non-success launcher outcome.
-Do not infer it from exit 130, suppress errors or relax the success-only launcher.
-This is not yet a drain-enabled packaged binary, non-Metal certification, general
-interactive cancellation or cross-session resource reuse.
+## Packaged Launch Policy
+
+The explicit scripted host accepts `--window-cancel-after-events --drain-provider`.
+The CLI requires exactly one compatible
+`application_provider_drain_contract=nuis-yir-provider-session-drain-v1`
+bundle declaration before launch. Missing, old, suffixed, duplicate or conflicting
+declarations reject rather than fall back to ordinary close.
+
+The [shared launch policy](../../tools/nuis/src/artifact_runtime_provider_lifecycle.rs)
+contains no socket, OS, window or concrete provider implementation. Its
+`CompletionOnly` policy retains normal Finished accounting. `ExplicitDrain`
+rejects Finish before the provider can publish completion, stops session admission
+after Drained, and requires both that typed terminal and the child's cancellation
+exit code. Missing sessions, EOF, exit 130 alone, normal Finished, a zero/error
+exit or a late additional session cannot certify drain. The first policy error
+is permanent. Shape checking a typed receipt does not authenticate it; the
+registered provider remains responsible for admission and close-before-receipt.
+
+`ArtifactRunOutcome::Cancelled(receipt)` preserves that non-success observation;
+the CLI returns 130 without persisting successful launch/trace evidence. This is
+a logical process status, not a platform signal or application outcome. The
+AppKit adapter only forwards tickets and observations and calls the common
+receipt-to-exit classifier. Replay-only, missing or failed observations and prior
+application faults cannot obtain the confirmed-drain exit.
+
+The [packaged regression](../../tools/nuis/src/artifact_device_sample_shader_packaged_drain_tests.rs)
+runs the compiled Nuis image window after one/two real Metal frames and through
+the production frontdoor. It checks typed cancellation, worker-image removal,
+unchanged successful evidence, rejected ordinary Finish under drain intent, and
+replay-only rejection. Portable policy tests cover malformed/missing terminals,
+wrong exits, counts, first errors and implementation dependency boundaries.
+
+Default host-only cancellation still sends no Drain and reports EOF as incomplete
+provider execution. Ordinary quit retains close/Finish. The current packaged
+window adapter is AppKit and the live transport is Unix-domain IPC: shared policy
+does not certify a Windows transport, a non-AppKit host, non-Metal execution,
+general interactive/parent cancellation or cross-session resource reuse.

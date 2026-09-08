@@ -119,9 +119,10 @@ pub(super) fn verify_compiled_window_cancellation(output: &Path, binary: &Path) 
             events: Some(String::new()),
             parent: None,
             cancel_after_events: true,
+            drain_provider: false,
         },
     )
-    .expect_err("production cancellation stays non-success until provider drain is defined");
+    .expect_err("default host-only cancellation cannot certify provider completion");
     assert!(error.contains("runtime IPC idle read failed"), "{error}");
     for (path, bytes) in previous {
         assert_eq!(

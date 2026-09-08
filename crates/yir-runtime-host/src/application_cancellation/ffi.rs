@@ -15,6 +15,31 @@ pub struct NuisApplicationCancellationReceipt {
     pub completed_dispatches: i64,
 }
 
+/// Portable classification of an explicitly requested provider-drain receipt.
+/// It does not poll, perform cleanup or mutate the ticket. A platform adapter
+/// must not replace this decision with an inference from its own window state.
+/// # Safety
+/// Receipt must be null or point to a readable, aligned receipt for this call.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_application_provider_drain_exit_status(
+    receipt: *const NuisApplicationCancellationReceipt,
+) -> i32 {
+    let Some(receipt) = (unsafe { receipt.as_ref() }) else {
+        return 1;
+    };
+    if matches!(receipt.cleanup_completed, 0 | 1)
+        && receipt.failure_kind == 0
+        && receipt.provider_status == 5
+        && receipt.provider_failure_kind == 0
+        && (0..=yir_core::provider_runtime_ipc::MAX_DISPATCHES as i64)
+            .contains(&receipt.completed_dispatches)
+    {
+        super::APPLICATION_CANCELLED_EXIT_CODE
+    } else {
+        1
+    }
+}
+
 fn fail(error: impl std::fmt::Display) -> i32 {
     eprintln!("nuis application cancellation: {error}");
     -1

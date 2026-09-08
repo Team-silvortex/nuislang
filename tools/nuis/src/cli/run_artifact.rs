@@ -9,9 +9,11 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     let mut window_events = None;
     let mut window_parent = None;
     let mut cancel_after_events = false;
+    let mut drain_provider = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--window-cancel-after-events" if !cancel_after_events => cancel_after_events = true,
+            "--drain-provider" if !drain_provider => drain_provider = true,
             "--json" if !json => json = true,
             "--export-frame" if frame_output.is_none() => {
                 let path = args
@@ -81,11 +83,14 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
                 .to_owned(),
         );
     }
+    if drain_provider && !cancel_after_events {
+        return Err("--drain-provider requires explicit --window-cancel-after-events".to_owned());
+    }
     if window_session.is_some() && (json || frame_output.is_some()) {
         return Err("--window-session cannot be combined with --json or --export-frame".to_owned());
     }
     let input = input.ok_or(
-        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events]] <artifact>",
+        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]]] <artifact>",
     )?;
     Ok(CommandKind::RunArtifact {
         input,
@@ -96,6 +101,7 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
             events: window_events,
             parent: window_parent,
             cancel_after_events,
+            drain_provider,
         }),
     })
 }
@@ -103,6 +109,73 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_drain_is_opt_in_and_requires_explicit_cancellation() {
+        let base = ["build", "--window-session", "ui", "--window-events", ""];
+        for args in [
+            [
+                &base[..],
+                &["--window-cancel-after-events", "--drain-provider"],
+            ]
+            .concat(),
+            [
+                &["--drain-provider"][..],
+                &base[..],
+                &["--window-cancel-after-events"],
+            ]
+            .concat(),
+        ] {
+            let CommandKind::RunArtifact {
+                window_session: Some(options),
+                ..
+            } = parse(&mut args.into_iter().map(str::to_owned)).unwrap()
+            else {
+                panic!("window options");
+            };
+            assert!(options.drain_provider && options.cancel_after_events);
+        }
+        for args in [
+            vec!["build", "--drain-provider"],
+            [&base[..], &["--drain-provider"]].concat(),
+            [
+                &base[..],
+                &[
+                    "--window-cancel-after-events",
+                    "--drain-provider",
+                    "--drain-provider",
+                ],
+            ]
+            .concat(),
+            [
+                &base[..],
+                &[
+                    "--window-cancel-after-events",
+                    "--drain-provider",
+                    "--window-parent-session",
+                    "parent",
+                ],
+            ]
+            .concat(),
+            [
+                &base[..],
+                &["--window-cancel-after-events", "--drain-provider", "--json"],
+            ]
+            .concat(),
+            [
+                &base[..],
+                &[
+                    "--window-cancel-after-events",
+                    "--drain-provider",
+                    "--export-frame",
+                    "frame.ppm",
+                ],
+            ]
+            .concat(),
+        ] {
+            assert!(parse(&mut args.into_iter().map(str::to_owned)).is_err());
+        }
+    }
 
     #[test]
     fn cancellation_requires_an_explicit_script_without_parent_authority() {
@@ -258,6 +331,7 @@ mod tests {
                     events: Some("32,128578".to_owned()),
                     parent: None,
                     cancel_after_events: false,
+                    drain_provider: false,
                 })
             }
         );

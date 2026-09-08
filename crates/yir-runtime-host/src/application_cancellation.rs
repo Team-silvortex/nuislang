@@ -16,6 +16,9 @@ mod ffi;
 pub use ffi::*;
 
 pub const APPLICATION_CANCELLATION_CONTRACT: &str = "nuis-yir-application-cancellation-v1";
+/// A logical host cancellation status on every platform, not proof of a signal
+/// or a provider receipt. Launchers must independently validate provider outcome.
+pub const APPLICATION_CANCELLED_EXIT_CODE: i32 = 130;
 
 const ACTIVE: u8 = 0;
 const CANCELLED: u8 = 1;

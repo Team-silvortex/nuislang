@@ -61,8 +61,14 @@ fn supervisor_shutdown_wakes_an_idle_provider_without_acknowledging_success() {
         directory: private_socket_directory().unwrap(),
         stop: Arc::new(AtomicBool::new(false)),
         active,
+        policy: ProviderLaunchPolicy::CompletionOnly,
         thread: Some(thread::spawn(move || {
-            transport::read_request(&mut stream, transport::IO_TIMEOUT).map(|_| 1)
+            transport::read_request(&mut stream, transport::IO_TIMEOUT).map(|_| {
+                ProviderLaunchOutcome::Finished {
+                    sessions: 1,
+                    invocations: 1,
+                }
+            })
         })),
     };
     let started = Instant::now();

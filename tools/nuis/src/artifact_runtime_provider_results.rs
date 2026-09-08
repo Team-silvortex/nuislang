@@ -4,6 +4,10 @@ use std::{
     process::{Command, ExitStatus},
 };
 
+#[path = "artifact_runtime_provider_lifecycle.rs"]
+mod lifecycle;
+pub(crate) use lifecycle::{ProviderLaunchOutcome, ProviderLaunchPolicy};
+
 #[cfg(unix)]
 #[path = "artifact_runtime_provider_ipc.rs"]
 mod ipc;
@@ -22,6 +26,23 @@ pub(crate) struct PreparedRuntimeProviderResults {
 }
 
 impl PreparedRuntimeProviderResults {
+    pub(crate) fn run_command_with_policy(
+        &self,
+        command: &mut Command,
+        timeout: Option<std::time::Duration>,
+        policy: ProviderLaunchPolicy,
+    ) -> Result<(ExitStatus, ProviderLaunchOutcome), String> {
+        #[cfg(unix)]
+        {
+            ipc::run_command_with_policy(&self.output_dir, command, timeout, policy)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (command, timeout, policy);
+            Err("runtime provider IPC requires a registered host transport".to_owned())
+        }
+    }
+
     pub(crate) fn run_command_bounded(
         &self,
         command: &mut Command,

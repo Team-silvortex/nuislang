@@ -8,6 +8,9 @@ use yir_core::provider_runtime_ipc::{DispatchArguments, DispatchUpload, Message,
 #[path = "artifact_device_sample_shader_host_drain_tests.rs"]
 mod host;
 
+#[path = "artifact_device_sample_shader_packaged_drain_tests.rs"]
+mod packaged;
+
 struct Artifacts(PathBuf);
 impl Drop for Artifacts {
     fn drop(&mut self) {
@@ -54,7 +57,7 @@ fn drains_registered_metal_session_without_replacing_success_evidence() {
     let binary =
         crate::artifact_runtime_command::resolve_run_artifact_binary_path(&output.0).unwrap();
     // Establish genuine completed evidence using the compiled Nuis application.
-    let mut command = Command::new(binary);
+    let mut command = Command::new(&binary);
     command
         .arg("--export-frame")
         .arg(output.0.join("baseline.ppm"));
@@ -166,6 +169,7 @@ fn drains_registered_metal_session_without_replacing_success_evidence() {
         }
     }
     host::verify_host_cancellation(&output.0, &prepared.source_yir_path, &prepared.stream_path);
+    packaged::verify_packaged_drain(&output.0, &binary, &prepared);
     for (path, bytes) in previous {
         assert_eq!(
             fs::read(&path).unwrap(),

@@ -17,9 +17,9 @@ use std::{path::Path, ptr, slice};
 
 pub use application_cancellation::{
     nuis_application_cancellation_free, nuis_application_cancellation_poll,
-    nuis_application_cancellation_poll_with_provider, ApplicationCancellation,
-    ApplicationHostRetirementAck, NuisApplicationCancellationReceipt,
-    APPLICATION_CANCELLATION_CONTRACT,
+    nuis_application_cancellation_poll_with_provider, nuis_application_provider_drain_exit_status,
+    ApplicationCancellation, ApplicationHostRetirementAck, NuisApplicationCancellationReceipt,
+    APPLICATION_CANCELLATION_CONTRACT, APPLICATION_CANCELLED_EXIT_CODE,
 };
 pub use application_event_pump::{
     ApplicationEventPump, ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,

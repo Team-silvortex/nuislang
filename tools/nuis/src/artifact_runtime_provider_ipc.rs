@@ -20,6 +20,7 @@ use std::{
 pub(crate) mod transport;
 
 const FAILURE_CLEANUP_GRACE: Duration = Duration::from_secs(5);
+use super::lifecycle::{ProviderLaunchLifecycle, ProviderLaunchOutcome, ProviderLaunchPolicy};
 
 pub(super) fn run_command(
     output_dir: &Path,
@@ -34,14 +35,30 @@ pub(super) fn run_command_with_timeout(
     timeout: Option<Duration>,
 ) -> Result<(ExitStatus, usize), String> {
     let server = RuntimeProviderServer::start(output_dir)?;
-    run_supervised_command(server, command, timeout)
+    let (status, outcome) = run_supervised_command(server, command, timeout)?;
+    Ok((status, outcome.into_finished_count()?))
+}
+
+pub(super) fn run_command_with_policy(
+    output_dir: &Path,
+    command: &mut Command,
+    timeout: Option<Duration>,
+    policy: ProviderLaunchPolicy,
+) -> Result<(ExitStatus, ProviderLaunchOutcome), String> {
+    run_supervised_command(
+        RuntimeProviderServer::start_with_policy(output_dir, policy, |stream| {
+            transport::read_request(stream, transport::IO_TIMEOUT)
+        })?,
+        command,
+        timeout,
+    )
 }
 
 fn run_supervised_command(
     mut server: RuntimeProviderServer,
     command: &mut Command,
     timeout: Option<Duration>,
-) -> Result<(ExitStatus, usize), String> {
+) -> Result<(ExitStatus, ProviderLaunchOutcome), String> {
     command
         .env_remove(yir_runtime_host::PROVIDER_RESULT_STREAM_ENV)
         .env(
@@ -59,7 +76,10 @@ fn run_supervised_command(
     });
     // A child that cleaned up (or even exited zero) cannot erase provider failure.
     match (child_result, server.finish()) {
-        (Ok(status), Ok(count)) => Ok((status, count)),
+        (Ok(status), Ok(outcome)) => {
+            server.policy.admit_exit(&outcome, status.code())?;
+            Ok((status, outcome))
+        }
         (Err(child), Err(provider)) => Err(format!("{provider}; {child}")),
         (Err(error), _) | (_, Err(error)) => Err(error),
     }
@@ -90,7 +110,7 @@ fn supervise_child(
         }
         if provider_stopped() && failed_at.is_none() {
             failed_at = Some(Instant::now());
-            eprintln!("runtime provider stopped; allowing bounded application failure cleanup");
+            eprintln!("runtime provider stopped; allowing bounded application cleanup");
         }
         if failed_at.is_some_and(|start| start.elapsed() >= failure_grace) {
             let _ = child.kill();
@@ -105,7 +125,8 @@ struct RuntimeProviderServer {
     directory: PathBuf,
     stop: Arc<AtomicBool>,
     active: Arc<Mutex<Option<UnixStream>>>,
-    thread: Option<JoinHandle<Result<usize, String>>>,
+    thread: Option<JoinHandle<Result<ProviderLaunchOutcome, String>>>,
+    policy: ProviderLaunchPolicy,
 }
 
 impl RuntimeProviderServer {
@@ -121,6 +142,20 @@ impl RuntimeProviderServer {
             &mut UnixStream,
         ) -> Result<yir_core::provider_runtime_ipc::Message, String>,
     ) -> Result<Self, String> {
+        Self::start_with_policy(
+            output_dir,
+            ProviderLaunchPolicy::CompletionOnly,
+            read_request,
+        )
+    }
+
+    fn start_with_policy(
+        output_dir: &Path,
+        policy: ProviderLaunchPolicy,
+        read_request: fn(
+            &mut UnixStream,
+        ) -> Result<yir_core::provider_runtime_ipc::Message, String>,
+    ) -> Result<Self, String> {
         let directory = private_socket_directory()?;
         let stop = Arc::new(AtomicBool::new(false));
         let active = Arc::new(Mutex::new(None));
@@ -129,6 +164,7 @@ impl RuntimeProviderServer {
             stop,
             active,
             thread: None,
+            policy,
         };
         let listener = UnixListener::bind(server.directory.join("dispatch"))
             .map_err(|error| format!("failed to bind runtime IPC: {error}"))?;
@@ -139,8 +175,7 @@ impl RuntimeProviderServer {
         let active = Arc::clone(&server.active);
         let output_dir = output_dir.to_owned();
         server.thread = Some(thread::spawn(move || {
-            let mut total = 0usize;
-            let mut completed = 0usize;
+            let mut lifecycle = ProviderLaunchLifecycle::new(policy);
             while !stop.load(Ordering::Acquire) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
@@ -155,16 +190,19 @@ impl RuntimeProviderServer {
                         let result = nsdb::serve_runtime_provider_session_with_request_reader(
                             &output_dir,
                             &mut stream,
-                            read_request,
+                            |stream| {
+                                let message = read_request(stream)?;
+                                policy.admit_request(&message)?;
+                                Ok(message)
+                            },
                         );
                         active
                             .lock()
                             .map_err(|_| "runtime IPC stream lock was poisoned")?
                             .take();
-                        total = total
-                            .checked_add(result?.into_finished_count()?)
-                            .ok_or("runtime IPC invocation count overflow")?;
-                        completed += 1;
+                        if lifecycle.observe(result?)? {
+                            break;
+                        }
                     }
                     Err(error) if error.kind() == ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(10))
@@ -172,15 +210,12 @@ impl RuntimeProviderServer {
                     Err(error) => return Err(format!("runtime IPC accept failed: {error}")),
                 }
             }
-            if completed == 0 {
-                return Err("runtime child did not complete a provider lifecycle".to_owned());
-            }
-            Ok(total)
+            lifecycle.finish()
         }));
         Ok(server)
     }
 
-    fn finish(&mut self) -> Result<usize, String> {
+    fn finish(&mut self) -> Result<ProviderLaunchOutcome, String> {
         self.stop.store(true, Ordering::Release);
         if let Ok(active) = self.active.lock() {
             if let Some(stream) = active.as_ref() {
@@ -202,11 +237,12 @@ pub(crate) fn run_command_with_request_reader(
     timeout: Duration,
     read_request: fn(&mut UnixStream) -> Result<yir_core::provider_runtime_ipc::Message, String>,
 ) -> Result<(ExitStatus, usize), String> {
-    run_supervised_command(
+    let (status, outcome) = run_supervised_command(
         RuntimeProviderServer::start_with_reader(output_dir, read_request)?,
         command,
         Some(timeout),
-    )
+    )?;
+    Ok((status, outcome.into_finished_count()?))
 }
 
 impl Drop for RuntimeProviderServer {

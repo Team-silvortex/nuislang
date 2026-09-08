@@ -102,8 +102,10 @@ their window; typed late faults are delivered without mutating old snapshots.
 The packaged host now admits `--window-cancel-after-events` with an explicit
 event script and no parent. Live Metal/replay regressions verify no implicit close,
 Finish, outcome or success; pending/lost receipts have generated-host tests.
-Opt-in host-library cancellation now observes provider-owned drain separately;
-the packaged script has not adopted it. EOF remains an incomplete live provider
+Opt-in cancellation now reaches the packaged script through a declared capability
+and a typed non-success launcher result. The shared policy rejects Finish under
+drain intent before publication and never derives retirement from an exit code.
+Without the option, EOF remains an incomplete live provider
 lifecycle, not success. Provider sessions depend on the three-operation
 `ScopeAdmission` interface (checkpoint, finalization and abandonment admission),
 not on the concrete cancellation controller. Static policy-substitution tests
@@ -196,7 +198,12 @@ frontier, retain first faults and expose independent provider status/count.
 Compiled Nuis callbacks plus registered Metal verify zero/two-frame cancellation,
 worker-image removal and old replay preservation. Replay is only an observation,
 not device retirement. Capability-gated packaged-host drain and a typed non-success
-launcher result are next; no cross-session reuse permission or general device
+launcher result now have one/two-frame compiled Metal evidence, including
+unchanged success evidence, pre-publication Finish rejection and replay-only exit 1.
+Terminal types and launch policy are platform-neutral; AppKit only forwards the
+ticket and common receipt-to-exit classification. Next exercise those contracts
+through a non-AppKit/headless packaged entry. Windows transport remains missing;
+no cross-session reuse permission or general device
 cancellation follows from this bounded boundary.
 
 Each cell separates existing `evidence`, the next action, baseline validation

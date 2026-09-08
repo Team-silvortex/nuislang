@@ -4,6 +4,84 @@ use std::sync::mpsc;
 use yir_core::ApplicationFailureKind;
 
 #[test]
+fn drain_exit_classification_is_portable_and_never_claims_application_success() {
+    for cleanup_completed in [0, 1] {
+        for completed_dispatches in [0, 2, yir_core::provider_runtime_ipc::MAX_DISPATCHES as i64] {
+            let receipt = NuisApplicationCancellationReceipt {
+                cleanup_completed,
+                completed_dispatches,
+                provider_status: 5,
+                failure_kind: 0,
+                provider_failure_kind: 0,
+            };
+            assert_eq!(
+                unsafe { nuis_application_provider_drain_exit_status(&receipt) },
+                crate::APPLICATION_CANCELLED_EXIT_CODE
+            );
+        }
+    }
+}
+
+#[test]
+fn drain_exit_preserves_faults_and_rejects_missing_or_contradictory_observations() {
+    let valid = NuisApplicationCancellationReceipt {
+        cleanup_completed: 1,
+        completed_dispatches: 2,
+        provider_status: 5,
+        failure_kind: 0,
+        provider_failure_kind: 0,
+    };
+    let classify = |receipt| unsafe { nuis_application_provider_drain_exit_status(&receipt) };
+    assert_eq!(
+        unsafe { nuis_application_provider_drain_exit_status(ptr::null()) },
+        1
+    );
+    for provider_status in [-1, 0, 1, 2, 3, 4, 6, i32::MAX] {
+        assert_eq!(
+            classify(NuisApplicationCancellationReceipt {
+                provider_status,
+                ..valid
+            }),
+            1
+        );
+    }
+    for completed_dispatches in [-1, 257, i64::MAX] {
+        assert_eq!(
+            classify(NuisApplicationCancellationReceipt {
+                completed_dispatches,
+                ..valid
+            }),
+            1
+        );
+    }
+    for cleanup_completed in [-1, 2] {
+        assert_eq!(
+            classify(NuisApplicationCancellationReceipt {
+                cleanup_completed,
+                ..valid
+            }),
+            1
+        );
+    }
+    for failure in [-1, 1, 5, i64::MAX] {
+        assert_eq!(
+            classify(NuisApplicationCancellationReceipt {
+                failure_kind: failure,
+                ..valid
+            }),
+            1
+        );
+        assert_eq!(
+            classify(NuisApplicationCancellationReceipt {
+                provider_failure_kind: failure,
+                ..valid
+            }),
+            1
+        );
+    }
+}
+
+#[test]
 fn ffi_receipt_is_once_only_and_invalid_outputs_do_not_consume_it() {
     let (sender, receiver) = mpsc::sync_channel(1);
     let mut slot = Box::into_raw(Box::new(ApplicationCancellation::new(receiver)));

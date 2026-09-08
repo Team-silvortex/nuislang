@@ -159,6 +159,7 @@ The bootstrap host exports these thin adapters:
 | `nuis_application_cancellation_free(ticket_slot)` | Nulls the owned slot and abandons observation, without joining or cancelling additional work. |
 | `nuis_window_session_cancel_with_provider_drain(session, ticket_out)` | Opt-in drain cancellation with the same empty-slot ownership rules. |
 | `nuis_application_cancellation_poll_with_provider(ticket, receipt_out)` | Same 0/1/-1 result, with independent host/provider observations in one output struct. |
+| `nuis_application_provider_drain_exit_status(receipt)` | Pure portable classifier: 130 only for a valid drained observation with no host/provider fault; otherwise 1. It neither polls nor authenticates an arbitrary C struct. |
 
 Ticket poll outputs are `i32` cleanup and `i64` failure code, written only when
 the result is `1`. Null outputs reject before consuming the receipt. Invalid
@@ -200,11 +201,28 @@ retirement. Rejected cancellation preserves the window/reply for normal failure
 handling and never creates a ticket receipt.
 
 This is a bounded standalone scripted policy, not a general interactive or parent
-cancellation controller. This path sends no provider drain request and the peer
+cancellation controller. Without `--drain-provider`, it sends no provider drain request and the peer
 sees EOF without Finish. Its existing supervision reports incomplete execution and
 preserves prior replay evidence. No provider error is suppressed or reclassified
 as successful cancellation; device retirement still requires provider-owned
 protocol and resource-lifetime evidence.
+
+Adding `--drain-provider` selects a separate policy, requiring exactly one matching
+`application_provider_drain_contract=nuis-yir-provider-session-drain-v1` bundle
+declaration. It retains the standalone/script requirement and independent ticket
+ownership. The adapter forwards extended receipts to the portable Rust classifier;
+it does not implement provider selection, resource release or error classification.
+Only status 5, a count in 0..=256, valid cleanup representation and zero independent
+host/provider failures yield 130. Missing, replay-only, unavailable and failed
+observations yield 1, as does a prior application fault despite provider drain.
+Cleanup remains an independent fact, not an application-success prerequisite.
+
+The launcher also requires its own typed provider Drained terminal and that
+non-success child exit; neither side's observation replaces the other. It rejects
+Finish before provider publication under explicit drain intent and returns typed
+`ArtifactRunOutcome::Cancelled` without writing successful launch/trace evidence.
+EOF and exit 130 alone are not drain. The launch policy and terminal types are
+platform-neutral; AppKit and Unix-domain transport are adapters, not the contract.
 
 ## Evidence And Limits
 
@@ -254,10 +272,15 @@ zero/two-frame drain, worker-image removal, no parent outcome and replay-only
 observation. It runs inside the image drain regression with a successful compiled
 binary baseline and unchanged prior output evidence.
 
-This verifies the host-library drain path, not a new drain-enabled AppKit binary.
-Next add explicit bundle capability admission and a typed non-success launcher
-outcome; the existing packaged script stays host-only and the success-only launcher
-still rejects Drained. Parent-pump cancellation is not yet wired. Normal window
+The [packaged drain regression](../../tools/nuis/src/artifact_device_sample_shader_packaged_drain_tests.rs)
+extends that same compiled binary with explicit one/two-frame Metal drain,
+production-frontdoor typed cancellation, unchanged success evidence, pre-publication
+Finish rejection and replay-only exit 1. Generated-host tests verify delegation,
+pending/missing receipts and unchanged default cancellation. Portable policy tests
+exercise terminal/count/exit mismatches without a window or backend dependency.
+
+Non-AppKit packaged session entry and Windows transport remain unverified/missing,
+not implied by portable types. Parent-pump cancellation is not yet wired. Normal window
 quit still uses explicit close. General device preemption, cross-session resource
 retirement, cancellation of resource-capability state, recovery, multi-child
 routing, fully native CPU execution and self-contained Nsld remain open.

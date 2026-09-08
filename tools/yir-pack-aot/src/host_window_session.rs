@@ -1,6 +1,8 @@
 pub(super) const CONTRACT: &str = "nuis-yir-window-session-v3";
 pub(super) const PARENT_CONTRACT: &str = "nuis-yir-application-outcome-pump-v1";
 pub(super) const CANCELLATION_CONTRACT: &str = "nuis-yir-application-cancellation-v1";
+pub(super) const PROVIDER_DRAIN_CONTRACT: &str =
+    yir_core::provider_runtime_ipc::SESSION_DRAIN_CONTRACT;
 
 #[path = "host_window_cancellation.rs"]
 mod cancellation;
@@ -24,6 +26,16 @@ extern void nuis_window_session_free(NuisWindowSession **);
 typedef struct NuisApplicationCancellation NuisApplicationCancellation;
 extern int32_t nuis_window_session_cancel(NuisWindowSession *, NuisApplicationCancellation **);
 extern int32_t nuis_application_cancellation_poll(NuisApplicationCancellation *, int32_t *, int64_t *);
+typedef struct {
+    int32_t cleanup_completed;
+    int32_t provider_status;
+    int64_t failure_kind;
+    int64_t provider_failure_kind;
+    int64_t completed_dispatches;
+} NuisApplicationCancellationReceipt;
+extern int32_t nuis_window_session_cancel_with_provider_drain(NuisWindowSession *, NuisApplicationCancellation **);
+extern int32_t nuis_application_cancellation_poll_with_provider(NuisApplicationCancellation *, NuisApplicationCancellationReceipt *);
+extern int32_t nuis_application_provider_drain_exit_status(const NuisApplicationCancellationReceipt *);
 extern void nuis_application_cancellation_free(NuisApplicationCancellation **);
 typedef struct NuisOutcomeParent NuisOutcomeParent;
 extern int32_t nuis_outcome_parent_open(const unsigned char *, uintptr_t, const char *, NuisOutcomeParent **);
@@ -36,6 +48,7 @@ static const char *gNuisWindowParentId = NULL;
 static int gNuisWindowExitStatus = 0;
 static BOOL gNuisWindowScripted = NO;
 static BOOL gNuisWindowCancelAfterEvents = NO;
+static BOOL gNuisDrainProvider = NO;
 static uint32_t gNuisWindowKeys[64];
 static NSUInteger gNuisWindowKeyCount = 0;
 static NSUInteger gNuisWindowKeyIndex = 0;
@@ -47,11 +60,17 @@ static int nuisParseWindowSession(int argc, const char **argv) {
         if (argc > 1) { fprintf(stderr, "nuis: unknown window host argument\n"); return -1; }
         return 0;
     }
-    if (argc < 3 || argc > 8 || argv[2][0] == '\0' || argv[2][0] == '-') return -1;
+    if (argc < 3 || argc > 9 || argv[2][0] == '\0' || argv[2][0] == '-') return -1;
     for (int index = 3; index < argc;) {
         if (strcmp(argv[index], "--window-cancel-after-events") == 0) {
             if (gNuisWindowCancelAfterEvents) return -1;
             gNuisWindowCancelAfterEvents = YES;
+            index++;
+            continue;
+        }
+        if (strcmp(argv[index], "--drain-provider") == 0) {
+            if (gNuisDrainProvider) return -1;
+            gNuisDrainProvider = YES;
             index++;
             continue;
         }
@@ -81,6 +100,7 @@ static int nuisParseWindowSession(int argc, const char **argv) {
         index += 2;
     }
     if (gNuisWindowCancelAfterEvents && (!gNuisWindowScripted || gNuisWindowParentId != NULL)) return -1;
+    if (gNuisDrainProvider && !gNuisWindowCancelAfterEvents) return -1;
     gNuisWindowSessionId = argv[2];
     gNuisWindowExitStatus = 1;
     return 1;
@@ -90,7 +110,7 @@ static int nuisParseWindowSession(int argc, const char **argv) {
 pub(super) const ENTRY: &str = r#"
     int window_session_mode = nuisParseWindowSession(argc, argv);
     if (window_session_mode < 0) {
-        fprintf(stderr, "usage: artifact [--window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events]]\n");
+        fprintf(stderr, "usage: artifact [--window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]]]\n");
         return 2;
     }
     if (!window_session_mode) nuis_yir_entry();

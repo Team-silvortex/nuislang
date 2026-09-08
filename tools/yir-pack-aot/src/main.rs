@@ -298,6 +298,10 @@ fn run() -> Result<(), String> {
                 host_window_session::CANCELLATION_CONTRACT
             ));
             manifest.push(format!(
+                "application_provider_drain_contract={}",
+                host_window_session::PROVIDER_DRAIN_CONTRACT
+            ));
+            manifest.push(format!(
                 "frame_export_contract={}",
                 host_runtime_frame::FRAME_EXPORT_CONTRACT
             ));

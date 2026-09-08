@@ -4,6 +4,9 @@ pub(super) fn validate(
     doctor: &crate::artifact_doctor::ArtifactDoctorReport,
     options: &crate::cli::WindowSessionOptions,
 ) -> Result<(), String> {
+    if options.drain_provider && !options.cancel_after_events {
+        return Err("--drain-provider requires explicit --window-cancel-after-events".to_owned());
+    }
     if options.cancel_after_events && (options.events.is_none() || options.parent.is_some()) {
         return Err(
             "--window-cancel-after-events requires --window-events and no parent session"
@@ -54,6 +57,19 @@ fn validate_contracts(
             );
         }
     }
+    if options.drain_provider {
+        let expected = format!(
+            "application_provider_drain_contract={}",
+            yir_core::provider_runtime_ipc::SESSION_DRAIN_CONTRACT
+        );
+        let declarations = bundle
+            .lines()
+            .filter(|line| line.starts_with("application_provider_drain_contract="))
+            .collect::<Vec<_>>();
+        if declarations != [expected.as_str()] {
+            return Err("artifact does not declare exactly one compatible application provider drain capability; rebuild it".to_owned());
+        }
+    }
     Ok(())
 }
 
@@ -68,6 +84,7 @@ mod tests {
             events: Some(String::new()),
             parent: None,
             cancel_after_events: false,
+            drain_provider: false,
         };
         let old = format!(
             "window_session_contract={}\n",
@@ -92,6 +109,24 @@ mod tests {
                 &options
             )
             .is_err());
+        }
+        options.drain_provider = true;
+        assert!(validate_contracts(&new, &options).is_err());
+        let capability = format!(
+            "application_provider_drain_contract={}\n",
+            yir_core::provider_runtime_ipc::SESSION_DRAIN_CONTRACT
+        );
+        assert!(validate_contracts(&format!("{new}{capability}"), &options).is_ok());
+        for declarations in [
+            capability.replace("-v1", "-v0"),
+            capability.replace("-v1", "-v1-extra"),
+            format!("{capability}{capability}"),
+            format!("{capability}application_provider_drain_contract=unknown\n"),
+        ] {
+            assert!(validate_contracts(&format!("{new}{declarations}"), &options).is_err());
+            options.drain_provider = false;
+            assert!(validate_contracts(&format!("{new}{declarations}"), &options).is_ok());
+            options.drain_provider = true;
         }
     }
 }

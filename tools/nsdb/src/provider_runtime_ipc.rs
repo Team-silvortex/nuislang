@@ -23,29 +23,9 @@ use std::{
     path::Path,
 };
 use yir_core::provider_runtime_ipc::{
-    DispatchArguments, DispatchFrame, DispatchTarget, Message, Rejection, RejectionCode,
-    RejectionPhase, ReplayBudget, SessionDrain, MAX_DISPATCHES,
+    DispatchArguments, DispatchFrame, DispatchTarget, Message, ProviderRuntimeSessionOutcome,
+    Rejection, RejectionCode, RejectionPhase, ReplayBudget, SessionDrain, MAX_DISPATCHES,
 };
-
-/// Provider-owned terminal observations. A drained session is not a successful
-/// application lifecycle and does not publish replacement replay evidence.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ProviderRuntimeSessionOutcome {
-    Finished(usize),
-    Drained(SessionDrain),
-}
-
-impl ProviderRuntimeSessionOutcome {
-    /// Existing success-only launchers must reject, not count, a drained session.
-    pub fn into_finished_count(self) -> Result<usize, String> {
-        match self {
-            Self::Finished(count) => Ok(count),
-            Self::Drained(_) => {
-                Err("runtime provider drained without application completion".to_owned())
-            }
-        }
-    }
-}
 
 enum DispatchEnd {
     Finished(usize, NativeProviderOutputs),

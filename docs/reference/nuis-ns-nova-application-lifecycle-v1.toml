@@ -339,10 +339,22 @@ ticket_ffi_entry = "nuis_application_cancellation_poll_with_provider"
 observation = "not-requested-not-observed-replay-only-unavailable-failed-or-drained-with-count"
 failure_policy = "independent-drain-failure-preserves-application-first-fault"
 abandonment_admission = "atomic-seal-before-provider-drop-late-cancellation-rejected"
-packaged_host_drain_wired = false
+packaged_host_drain_wired = true
+packaged_host_drain_option = "--window-cancel-after-events --drain-provider"
+packaged_host_drain_capability = "exactly-one-application_provider_drain_contract=nuis-yir-provider-session-drain-v1"
+launch_policy_owner = "platform-neutral-nuis-provider-launch-lifecycle"
+terminal_type_owner = "yir-core-provider-runtime-outcome"
+packaged_host_drain_exit = "typed-provider-drained-and-child130-not-application-success"
+host_exit_classifier = "nuis_application_provider_drain_exit_status"
+finish_under_drain_intent = "reject-before-provider-publication"
+default_host_only_cancellation_unchanged = true
+current_packaged_adapter = "appkit"
+current_live_transport = "unix-domain-ipc"
+windows_transport_claimed = false
+non_appkit_packaged_drain_claimed = false
 device_preemption = false
 cross_session_resource_reuse = false
-evidence = "framing-frontier-races-independent-policy-window-ffi-and-compiled-image-zero-two-frame-registered-metal-drain-plus-replay-only-observation"
+evidence = "framing-frontier-races-portable-launch-policy-window-ffi-compiled-image-zero-two-frame-host-drain-and-one-two-frame-packaged-metal-drain-typed-frontdoor-no-success-publication-rejected-finish-and-replay-only-rejection"
 
 [runtime_arguments]
 contract = "nuis-shader-fragment-uniform-v1"
@@ -479,5 +491,5 @@ dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "wire the opt-in provider drain ticket through a declared packaged-host capability and preserve a typed non-success launcher outcome; keep existing host-only cancellation and normal close/Finish explicit, never infer drain from exit130 or EOF, synthesize a child outcome, reset budgets or grant resource reuse"
+action = "exercise the shared typed termination policy through a non-AppKit/headless packaged-session entry without importing window or provider internals; retain declared capability admission, first faults, default host-only cancellation and normal close/Finish, never infer drain from exit130 or EOF or grant parent outcomes or resource reuse"
 validation = "retain compiled-binary image/uniform export, exact GPU pixels, live/replay equality without an external YIR read, fail-closed missing providers, no overwrite or output on rejected dispatch, cache reuse, physical completion and GLM release; do not conflate embedded-YIR execution with fully native CPU lowering, self-contained Nsld injection or continuous application state"

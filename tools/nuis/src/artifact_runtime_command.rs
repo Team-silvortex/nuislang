@@ -194,6 +194,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
 mod launch;
 pub(crate) use launch::{
     handle_run_artifact, handle_run_artifact_with_frame_output, handle_run_artifact_with_window,
+    ArtifactRunOutcome,
 };
 
 fn run_artifact_host_runner_surface(
