@@ -1,5 +1,37 @@
 use super::*;
 
+pub(super) fn lower_guarded_body(
+    function: &NirFunction,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    let Some((
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        },
+        tail,
+    )) = function.body.split_first()
+    else {
+        return Err(format!(
+            "outlined helper `{}` is missing its leading guard",
+            function.name
+        ));
+    };
+    if !else_body.is_empty() || then_body.as_slice() != [NirStmt::Return(Some(NirExpr::Int(0)))] {
+        return Err(format!(
+            "outlined helper `{}` has an invalid leading guard",
+            function.name
+        ));
+    }
+    // A speculative select is not equivalent: even unused branch arithmetic can trap.
+    let condition = lower_expr(condition, state, bindings)?;
+    let returned = lower_expr(&NirExpr::Int(0), state, bindings)?;
+    lower_guard_return(condition, returned, state);
+    crate::lowering::body_lowering::lower_inline_stmts(tail, state, bindings, &mut BTreeMap::new())
+}
+
 pub(in crate::lowering) fn collect_guarded_loop_direct_call_functions(
     module: &NirModule,
 ) -> BTreeSet<String> {
@@ -49,9 +81,21 @@ pub(in crate::lowering) fn collect_guarded_loop_direct_call_functions(
 }
 
 /// A guard is a control boundary even for pure operations that can trap.
-pub(super) fn order_guarded_function_nodes(state: &mut LoweringState<'_>, start: usize) {
+pub(super) fn order_guarded_function_nodes(
+    state: &mut LoweringState<'_>,
+    start: usize,
+    preserve_source_order: bool,
+) {
     let mut guard: Option<String> = None;
     let mut edges = Vec::new();
+    if preserve_source_order {
+        // Iterations, guarded arms and admitted scalar callees retain source evaluation order.
+        edges.extend(
+            state.yir.nodes[start..]
+                .windows(2)
+                .map(|pair| (pair[0].name.clone(), pair[1].name.clone())),
+        );
+    }
     for node in &state.yir.nodes[start..] {
         if let Some(previous) = &guard {
             edges.push((previous.clone(), node.name.clone()));

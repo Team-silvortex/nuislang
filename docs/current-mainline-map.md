@@ -83,8 +83,16 @@ direct-session replay, rejects executable/YIR drift and invalid callback argumen
 and retains prior evidence on replay exhaustion. Independent native/reference
 tests compare every generated pixel; invalid scalar division/remainder no longer
 panics in constant evaluation or reaches undefined native arithmetic. Conditional
-pixel transforms are the next callback boundary, not arbitrary loop bodies,
-richer carry payloads or fully native CPU callbacks.
+pixel writes now use nested guarded helpers and one-time condition snapshots;
+untaken invalid reads/writes or arithmetic do not execute. Scalar-only branch
+traps cannot be discarded as dead bindings. Source-level scalar helper composition
+now admits synchronous, acyclic `i64`/`bool` straight-line callees, with transitive
+body checks and real ordered calls under shared fuel. Buffer-read arguments remain
+inside the selected branch. PixelMagic's two-level coordinate/color helpers exercise
+this surface, with imported private helpers retained in their owner's scope rather
+than exposed as public functions or resolved against another module's same-named
+implementation. Control flow inside source helpers is the next callback boundary,
+not arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.

@@ -231,10 +231,22 @@ the ordinary image project, runs two actual M2 Metal frames, compares every outp
 byte with direct-session replay and rejects executable/YIR or callback-argument
 drift before application effects. Packaged replay exhaustion cannot close or publish
 success. Separate native/reference tests compare all generated pixels, including
-partial and empty regions. The score remains `active/86`; the next step is
-conditional pixel transforms with branch-local effects under the same admission
-and identity checks. This is not fully native CPU callbacks, arbitrary loop support
-or a complete memory-safety proof.
+partial and empty regions. PixelMagic now writes colors through explicit `if`/`else`.
+Branch-local reads, writes and nested conditions use private guarded functions,
+one-time condition snapshots and the same shared callback fuel. Untaken invalid
+accesses or arithmetic are not evaluated; selected invalid operations still fail.
+Unused checked arithmetic survives dead-binding elimination and reordered YIR
+declarations cannot skip it. Source-level scalar helper composition now admits
+synchronous `i64`/`bool` straight-line bodies after transitive type/effect checks
+and iterative acyclic dependency admission. Only reachable helpers become real
+ordered YIR calls; Buffer-read arguments remain inside the current iteration and
+selected branch. PixelMagic composes private coordinate and color helpers on this
+path; imported helpers retain owner-local signatures without exposing their
+private declarations to consumers or sibling modules.
+The score remains `active/86`; the next step is branch-local control flow inside
+source scalar helpers under the same build/run-artifact admission and identity
+checks. This is not fully native CPU callbacks, arbitrary loop support or a
+complete memory-safety proof.
 Compound-condition `while` lowering now selects recursive descriptors,
 normalizes linear carries consistently and deduplicates shared effect inputs.
 CPU-owned cooperative execution replaces trace-only loop results; generic YIR

@@ -427,8 +427,11 @@ device_upload = "owned-MTLBuffer-held-through-command-completion"
 replay_identity = "descriptor-only-type-shape-length-content-hash-plus-stream-hash"
 pointer_or_path_authority = false
 offline_default_policy = "reject-missing-runtime-upload"
-generator = "Nuis-bounded-unit-step-while-with-private-registered-YIR-helper"
+generator = "Nuis-bounded-unit-step-while-with-scalar-helper-composition-and-guarded-YIR-branches"
 bounded_buffer_mutating_while_lowering = true
+branch_local_buffer_mutation_lowering = true
+acyclic_straight_line_scalar_helper_composition = true
+source_scalar_helper_control_flow_lowering = false
 general_buffer_mutating_while_lowering = false
 
 [framework_package]

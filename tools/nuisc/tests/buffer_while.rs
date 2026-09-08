@@ -7,6 +7,11 @@ use std::{
 
 const SOURCE: &str = include_str!("fixtures/buffer_while.ns");
 
+#[path = "buffer_while/branches.rs"]
+mod branches;
+#[path = "buffer_while/scalar_helpers.rs"]
+mod scalar_helpers;
+
 struct Project(PathBuf);
 
 impl Project {

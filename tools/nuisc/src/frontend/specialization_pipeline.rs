@@ -381,15 +381,23 @@ pub(super) fn build_lowered_functions_and_impls(
 
     for helper in local_cpu_helpers {
         let helper_type_aliases = build_visible_type_alias_map(helper, local_cpu_helpers)?;
-        let helper_public_functions = helper
-            .functions
-            .iter()
-            .filter(|function| {
-                is_public_visibility(function.visibility) || is_helper_internal_synthetic(function)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let helper_higher_order_templates = helper_public_functions
+        let helper_functions = super::helper_scope::implementation_functions(helper);
+        let mut helper_signatures = signatures.clone();
+        super::helper_scope::insert_local_signatures(
+            helper,
+            &helper_functions,
+            &helper_type_aliases,
+            &mut helper_signatures,
+        )?;
+        let mut helper_return_types = inferred_function_return_types.clone();
+        for function in &helper_functions {
+            helper_return_types.insert(function.name.clone(), function.return_type.clone());
+            helper_return_types.insert(
+                format!("{}.{}", helper.unit, function.name),
+                function.return_type.clone(),
+            );
+        }
+        let helper_higher_order_templates = helper_functions
             .iter()
             .filter(|function| {
                 function.params.iter().any(|param| {
@@ -405,7 +413,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 ]
             })
             .collect::<BTreeMap<_, _>>();
-        let helper_function_table = helper_public_functions
+        let helper_function_table = helper_functions
             .iter()
             .flat_map(|function| {
                 let mut qualified = function.clone();
@@ -417,7 +425,7 @@ pub(super) fn build_lowered_functions_and_impls(
             })
             .collect::<BTreeMap<_, _>>();
         let mut helper_generic_templates = generic_templates.clone();
-        for function in helper_public_functions
+        for function in helper_functions
             .iter()
             .filter(|function| !function.generic_params.is_empty())
         {
@@ -486,6 +494,11 @@ pub(super) fn build_lowered_functions_and_impls(
                     signature.clone(),
                 );
                 signatures.insert(symbol_name.clone(), signature);
+                helper_signatures.insert(
+                    impl_method_lookup_key(&lowered_for_type, &method.name),
+                    signatures[&symbol_name].clone(),
+                );
+                helper_signatures.insert(symbol_name.clone(), signatures[&symbol_name].clone());
                 if definition
                     .methods
                     .iter()
@@ -509,12 +522,8 @@ pub(super) fn build_lowered_functions_and_impls(
                 }
             }
         }
-        for function in helper
-            .functions
+        for function in helper_functions
             .iter()
-            .filter(|function| {
-                is_public_visibility(function.visibility) || is_helper_internal_synthetic(function)
-            })
             .filter(|function| function.generic_params.is_empty())
         {
             let rewritten = rewrite_generic_calls_in_function(GenericFunctionRewriteInput {
@@ -525,10 +534,10 @@ pub(super) fn build_lowered_functions_and_impls(
                 generic_impl_method_templates: &generic_impl_method_templates,
                 higher_order_templates: &helper_higher_order_templates,
                 function_table: &helper_function_table,
-                signatures,
+                signatures: &helper_signatures,
                 impl_lookup,
                 struct_table: module_struct_table,
-                function_return_types: &inferred_function_return_types,
+                function_return_types: &helper_return_types,
                 specialization_cache: &mut helper_specialization_cache,
                 specialized_functions: &mut helper_specialized_functions,
                 specialized_signatures: &mut helper_specialized_signatures,
@@ -538,6 +547,7 @@ pub(super) fn build_lowered_functions_and_impls(
             helper_rewritten_functions.push(renamed);
         }
         for (name, signature) in helper_specialized_signatures {
+            helper_signatures.insert(name.clone(), signature.clone());
             signatures.insert(name, signature);
         }
 
@@ -562,7 +572,7 @@ pub(super) fn build_lowered_functions_and_impls(
                         &helper_struct_set,
                         helper_const_maps.get(&helper.unit).unwrap(),
                         &helper_type_aliases,
-                        signatures,
+                        &helper_signatures,
                         &helper_struct_table,
                     )
                 })
@@ -575,11 +585,10 @@ pub(super) fn build_lowered_functions_and_impls(
                     &BTreeMap::new(),
                     impl_lookup,
                     module_struct_table,
-                    &inferred_function_return_types,
+                    &helper_return_types,
                 )? {
                     function.return_type = Some(inferred_return_type.clone());
-                    inferred_function_return_types
-                        .insert(function.name.clone(), Some(inferred_return_type));
+                    helper_return_types.insert(function.name.clone(), Some(inferred_return_type));
                 }
             }
             lowered_functions.push(lower_function(
@@ -588,7 +597,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 &helper_struct_set,
                 helper_const_maps.get(&helper.unit).unwrap(),
                 &helper_type_aliases,
-                signatures,
+                &helper_signatures,
                 &helper_struct_table,
             )?);
         }
@@ -704,8 +713,4 @@ pub(super) fn build_lowered_functions_and_impls(
         traits: lowered_traits,
         impls: lowered_impls,
     })
-}
-
-fn is_helper_internal_synthetic(function: &AstFunction) -> bool {
-    function.name.starts_with("__hof_") || function.name.starts_with("__lambda_")
 }

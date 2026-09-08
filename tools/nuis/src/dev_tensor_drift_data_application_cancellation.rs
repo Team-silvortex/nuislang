@@ -477,6 +477,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "outline_buffer_loops", "verify_nir_module", "NirVisibility::Private",
             "PreparedLoopCompare::Lt", "PreparedLoopCompare::Gt", "NirExpr::StoreAt",
             "NirBinaryOp::Div", "NirBinaryOp::Rem",
+            "NirStmt::If", "validate_effects", "guarded_functions",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -505,7 +506,101 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "stdlib/pixelmagic/lib/pixels.ns",
         required_patterns: &[
             "pub fn fill_checkerboard_region", "while index < end",
-            "pixels[index] = pixel", "let index: i64 = index + 1",
+            "fn checkerboard_parity", "fn checkerboard_is_red", "if red", "pixels[index] = 4278190335",
+            "pixels[index] = 4294901760", "let index: i64 = index + 1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-helper-admission",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
+        required_patterns: &[
+            "validate_body", "function.is_async", "function.generic_params.is_empty()",
+            "function.where_bounds.is_empty()", "ready.pop_first()", "call_type",
+            "args.len() != helper.params.len()", "retain_reachable",
+            "scalar_helper_admission_checks_transitive_bodies_and_cycles",
+            "scalar_helper_admission_checks_signature_arity_and_return_types",
+            "scalar_helper_discovery_and_reachability_are_iterative",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "imported-scalar-helper-owner-scope",
+        path: "tools/nuisc/src/frontend/helper_scope.rs",
+        required_patterns: &[
+            "implementation_functions", "insert_local_signatures", "collect_body",
+            "pending.pop_first()", "AstStmt::While", "AstExpr::Call",
+            "signatures.insert(function.name.clone(), signature)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "imported-private-helper-scope-evidence",
+        path: "tools/nuisc/src/frontend/tests_frontend_core/private_helper_scope.rs",
+        required_patterns: &[
+            "imported_private_helper_composition_keeps_owner_scope_and_loop_execution",
+            "imported_private_helpers_are_not_exported_to_consumers",
+            "private_helper_signatures_do_not_leak_between_imported_modules",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-helper-direct-call-order",
+        path: "tools/nuisc/src/lowering/bootstrap.rs",
+        required_patterns: &[
+            "lower_direct_call_helper_function", "outlined.guarded_functions.contains(&function.name)",
+            "outlined.functions.contains(&function.name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-helper-execution-evidence",
+        path: "tools/nuisc/tests/buffer_while/scalar_helpers.rs",
+        required_patterns: &[
+            "scalar_helper_dag_executes_real_calls_with_ordered_buffer_arguments",
+            "untaken_scalar_helper_calls_do_not_evaluate_arguments_or_callee_traps",
+            "scalar_helper_arguments_and_unused_callee_math_keep_failure_order",
+            "scalar_helper_effects_recursion_and_dynamic_headers_stay_fail_closed",
+            "scalar_helper_callbacks_share_fuel_and_keep_failed_state_uncommitted",
+            "scalar_helper_callee_failure_preserves_last_callback_state_without_retry",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-branch-outlining",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/branches.rs",
+        required_patterns: &[
+            "outline_branches", "collect_bindings", "fresh_name", "captured_params",
+            "NirBinaryOp::Ne", "guarded.insert", "NirStmt::Return(Some(NirExpr::Int(0)))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-branch-guard-order",
+        path: "tools/nuisc/src/lowering/direct_calls/control_boundaries.rs",
+        required_patterns: &[
+            "lower_guarded_body", "lower_guard_return", "preserve_source_order",
+            "windows(2)", "push_effect_edge",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-branch-execution-evidence",
+        path: "tools/nuisc/tests/buffer_while/branches.rs",
+        required_patterns: &[
+            "nested_branches_preserve_local_reads_writes_and_loop_order",
+            "branch_condition_is_snapshotted_once_before_either_arm_mutates_it",
+            "untaken_branches_do_not_read_write_or_evaluate_invalid_arithmetic",
+            "scalar_only_branch_traps_are_neither_hoisted_nor_discarded",
+            "branch_local_failures_and_nested_calls_share_callback_admission_and_fuel",
+            "branch_local_carries_and_ownership_operations_stay_fail_closed",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-branch-checked-scalar-retention",
+        path: "tools/nuisc/src/optimize_dead_bindings.rs",
+        required_patterns: &["expr_is_dead_binding_safe", "NirBinaryOp::Div | NirBinaryOp::Rem"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "yir-lane-sugar-preserves-explicit-partial-order",
+        path: "crates/yir-syntax/src/lane_effects.rs",
+        required_patterns: &[
+            "dependency_order", "ready.pop_first()",
+            "lane_sugar_respects_transitive_dependencies_in_every_declaration_order",
+            "added_lane_edges_cannot_form_a_cycle_together",
+            "invalid_explicit_graphs_are_not_repaired_or_given_more_edges",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -513,6 +608,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/pixelmagic_buffer_loop.rs",
         required_patterns: &[
             "pixelmagic_loop_matches_every_reference_and_native_pixel",
+            "checkerboard_is_red", "checkerboard_parity", "call_bool", "call_i64",
+            "__nuis_buffer_branch_", "guard_return",
             "write_and_link_with_source", "reference pixels", "native pixels",
         ],
     },
@@ -521,6 +618,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/headless_image_loop.rs",
         required_patterns: &[
             "headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_rejects_drift",
+            "checkerboard_is_red", "checkerboard_parity", "call_bool", "call_i64",
+            "__nuis_buffer_branch_", "guard_return",
             "CARGO_BIN_EXE_nuis", "headless-aot-bundle", "run-artifact",
             "ApplicationProviderSource::Replay", "saved_stream", "application_session_outcome=",
         ],

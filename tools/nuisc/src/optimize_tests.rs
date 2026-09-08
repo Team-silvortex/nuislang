@@ -560,3 +560,23 @@ fn does_not_inline_noinline_annotated_function_calls() {
         }))]
     );
 }
+#[test]
+fn unused_checked_arithmetic_is_not_dead_code() {
+    for operator in ["/", "%"] {
+        let mut module = crate::frontend::parse_nuis_module(&format!(
+            "mod cpu Main {{ fn main() -> i64 {{ let unused: i64 = 1 {operator} 0; return 0; }} }}"
+        ))
+        .unwrap();
+        simplify_nir_module(&mut module);
+        assert!(matches!(
+            &module.functions[0].body[0],
+            NirStmt::Let {
+                value: NirExpr::Binary {
+                    op: NirBinaryOp::Div | NirBinaryOp::Rem,
+                    ..
+                },
+                ..
+            }
+        ));
+    }
+}

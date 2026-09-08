@@ -274,7 +274,29 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("Bounded Buffer-writing callbacks"));
     assert!(session.next_step.contains("buffer-writing callbacks"));
     assert!(session.next_step.contains("build/run-artifact"));
-    assert!(session.next_step.contains("conditional pixel transforms"));
+    assert!(session.next_step.contains("scalar helper composition"));
+    assert!(session.next_step.contains("branch-local control flow"));
+    assert!(session.evidence.contains("Owner-local signature scopes"));
+    assert!(session
+        .evidence
+        .contains("Source-level scalar helper composition now admits"));
+    assert!(session
+        .evidence
+        .contains("real call_i64/call_bool functions"));
+    assert!(session
+        .evidence
+        .contains("4096-function catalog regression"));
+    assert!(!session.blocker.contains(
+        "General source-level scalar helper composition inside these loops remains outside"
+    ));
+    assert!(session
+        .evidence
+        .contains("Branch-local Buffer reads and writes"));
+    assert!(session.evidence.contains("one-time condition snapshots"));
+    assert!(session.evidence.contains("transitive dependency order"));
+    assert!(!session
+        .blocker
+        .contains("still lack admitted branch-local execution"));
     assert!(session.evidence.contains("two real M2 Metal frames"));
     assert!(session
         .evidence

@@ -60,10 +60,15 @@ Current source-asset status:
 * [lib/pixels.ns](lib/pixels.ns) generates checked packed RGBA8 checkerboards in
   Nuis-owned buffers. Invalid dimensions, tile sizes, phases, and ranges return
   false before writing. The bounded range helper now uses a strict unit-step
-  `while`, with checked scalar division/remainder and indexed writes through a
-  private registered YIR helper. Native/reference regressions compare every pixel
-  for both phases, a partial range and an empty range. This is not general
-  nested-control or arbitrary loop-carry support
+  `while`, with composed Nuis coordinate/color helpers, checked scalar
+  division/remainder and explicit `if`/`else` pixel
+  writes through private guarded YIR helpers. Conditions are snapshotted once;
+  the unselected arm returns before any branch-local access or arithmetic.
+  Scalar helpers remain real ordered `call_i64`/`call_bool` functions under shared
+  callback fuel, not a generator-specific intrinsic. Imported private helpers keep
+  their module scope without expanding the public API. Native/reference regressions
+  compare every pixel for both phases, a partial range and an empty range. This is not general
+  nested-loop, control flow inside source helpers or arbitrary loop-carry support
 * [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
   u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The
   [image showcase](../../examples/projects/domains/ns_nova_image_showcase) frees

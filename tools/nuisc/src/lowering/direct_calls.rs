@@ -621,6 +621,8 @@ fn path_reaches(
 pub(super) fn lower_direct_call_helper_function(
     function: &NirFunction,
     state: &mut LoweringState<'_>,
+    preserve_leading_guard: bool,
+    preserve_source_order: bool,
 ) -> Result<(), String> {
     let start_index = state.yir.nodes.len();
     let lane = format!("fn:{}", function.name);
@@ -629,7 +631,11 @@ pub(super) fn lower_direct_call_helper_function(
     lower_direct_call_parameters(function, state, &mut bindings, &mut function_parameters)?;
     let saved_effect_anchor = state.last_effect_anchor.take();
     state.call_stack.push(function.name.clone());
-    let lowered = lower_function_body(function, state, &mut bindings, false);
+    let lowered = if preserve_leading_guard {
+        control_boundaries::lower_guarded_body(function, state, &mut bindings)
+    } else {
+        lower_function_body(function, state, &mut bindings, false)
+    };
     state.call_stack.pop();
     let returned =
         lowered?.ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
@@ -695,7 +701,7 @@ pub(super) fn lower_direct_call_helper_function(
         push_lifetime_edge(state, &returned, &return_name);
     }
     crate::lowering::edge_helpers::push_effect_edge(state, &returned, &return_name);
-    control_boundaries::order_guarded_function_nodes(state, start_index);
+    control_boundaries::order_guarded_function_nodes(state, start_index, preserve_source_order);
     let body_nodes = state.yir.nodes[start_index..]
         .iter()
         .map(|node| node.name.clone())

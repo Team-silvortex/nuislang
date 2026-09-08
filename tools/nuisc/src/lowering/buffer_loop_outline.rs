@@ -3,9 +3,22 @@ use nuis_semantics::model::{NirParam, NirVisibility};
 
 type Scope = BTreeMap<String, NirTypeRef>;
 
+#[path = "buffer_loop_outline/branches.rs"]
+mod branches;
+#[path = "buffer_loop_outline/scalar_helpers.rs"]
+mod scalar_helpers;
+use scalar_helpers::ScalarHelpers;
+
+#[derive(Default)]
+pub(super) struct BufferLoopOutlines {
+    pub functions: BTreeSet<String>,
+    pub guarded_functions: BTreeSet<String>,
+}
+
 // Keep iteration effects inside a private helper; the existing scoped-call contract
 // supplies the induction value and preserves borrowed-buffer lifetime edges.
-pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<(), String> {
+pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopOutlines, String> {
+    let catalog = scalar_helpers::collect(module);
     let mut names = module
         .functions
         .iter()
@@ -13,19 +26,31 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<(), String>
         .chain(module.externs.iter().map(|function| function.name.clone()))
         .collect::<BTreeSet<_>>();
     let mut helpers = Vec::new();
+    let mut outlined = BufferLoopOutlines::default();
     for function in &mut module.functions {
         let mut scope = function
             .params
             .iter()
             .map(|param| (param.name.clone(), param.ty.clone()))
             .collect();
-        outline_body(&mut function.body, &mut scope, &mut names, &mut helpers);
+        outline_body(
+            &mut function.body,
+            &mut scope,
+            &mut names,
+            &mut helpers,
+            &mut outlined.guarded_functions,
+            &catalog,
+            &mut outlined.functions,
+        );
     }
     if !helpers.is_empty() {
+        outlined
+            .functions
+            .extend(helpers.iter().map(|function| function.name.clone()));
         module.functions.extend(helpers);
         crate::nir_verify::verify_nir_module(module)?;
     }
-    Ok(())
+    Ok(outlined)
 }
 
 fn outline_body(
@@ -33,11 +58,14 @@ fn outline_body(
     scope: &mut Scope,
     names: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
+    guarded: &mut BTreeSet<String>,
+    catalog: &ScalarHelpers,
+    retained: &mut BTreeSet<String>,
 ) {
     for stmt in body {
         match stmt {
             NirStmt::Let { name, ty, value } => {
-                let inferred = ty.clone().or_else(|| infer_local(value, scope));
+                let inferred = ty.clone().or_else(|| infer_local(value, scope, catalog));
                 scope.remove(name);
                 if let Some(ty) = inferred {
                     scope.insert(name.clone(), ty);
@@ -51,11 +79,28 @@ fn outline_body(
                 else_body,
                 ..
             } => {
-                outline_body(then_body, &mut scope.clone(), names, helpers);
-                outline_body(else_body, &mut scope.clone(), names, helpers);
+                outline_body(
+                    then_body,
+                    &mut scope.clone(),
+                    names,
+                    helpers,
+                    guarded,
+                    catalog,
+                    retained,
+                );
+                outline_body(
+                    else_body,
+                    &mut scope.clone(),
+                    names,
+                    helpers,
+                    guarded,
+                    catalog,
+                    retained,
+                );
             }
             NirStmt::While { condition, body } => {
-                if let Some(params) = buffer_loop_params(condition, body, scope) {
+                if let Some(params) = buffer_loop_params(condition, body, scope, catalog) {
+                    scalar_helpers::retain_reachable(body, catalog, retained);
                     let mut suffix = helpers.len();
                     let name = loop {
                         let name = format!("__nuis_buffer_iteration_{suffix}");
@@ -65,7 +110,14 @@ fn outline_body(
                         suffix += 1;
                     };
                     let step = body.pop().expect("validated counted step");
-                    let mut helper_body = std::mem::take(body);
+                    let mut helper_body = branches::outline_branches(
+                        std::mem::take(body),
+                        &mut scope.clone(),
+                        names,
+                        helpers,
+                        guarded,
+                        catalog,
+                    );
                     helper_body.push(NirStmt::Return(Some(NirExpr::Int(0))));
                     let args = params
                         .iter()
@@ -90,6 +142,7 @@ fn buffer_loop_params(
     condition: &NirExpr,
     body: &[NirStmt],
     scope: &Scope,
+    catalog: &ScalarHelpers,
 ) -> Option<Vec<NirParam>> {
     let (step, effects) = body.split_last()?;
     let prepared = prepare_counted_while(
@@ -111,13 +164,42 @@ fn buffer_loop_params(
         return None;
     }
     let mut header_inputs = BTreeSet::new();
-    if scalar_expr(&prepared.limit, scope, &mut header_inputs, false)? != scalar_type("i64")
+    if scalar_expr(
+        &prepared.limit,
+        scope,
+        &mut header_inputs,
+        false,
+        &ScalarHelpers::new(),
+    )? != scalar_type("i64")
         || header_inputs.contains(&prepared.binding_name)
     {
         return None;
     }
-    let mut locals = scope.clone();
     let mut inputs = BTreeSet::new();
+    if !validate_effects(effects, &mut scope.clone(), &mut inputs, catalog)? {
+        return None;
+    }
+    Some(captured_params(inputs, scope))
+}
+
+fn captured_params(inputs: BTreeSet<String>, scope: &Scope) -> Vec<NirParam> {
+    inputs
+        .into_iter()
+        .filter_map(|name| {
+            scope.get(&name).map(|ty| NirParam {
+                name: name.clone(),
+                ty: ty.clone(),
+            })
+        })
+        .collect()
+}
+
+fn validate_effects(
+    effects: &[NirStmt],
+    locals: &mut Scope,
+    inputs: &mut BTreeSet<String>,
+    catalog: &ScalarHelpers,
+) -> Option<bool> {
     let mut has_store = false;
     for stmt in effects {
         match stmt {
@@ -126,7 +208,7 @@ fn buffer_loop_params(
                 if locals.contains_key(name) {
                     return None;
                 }
-                let inferred = scalar_expr(value, &locals, &mut inputs, true)?;
+                let inferred = scalar_expr(value, locals, inputs, true, catalog)?;
                 if ty.as_ref().is_some_and(|ty| ty != &inferred) {
                     return None;
                 }
@@ -137,31 +219,29 @@ fn buffer_loop_params(
                 index,
                 value,
             }) => {
-                buffer_input(buffer, &locals, &mut inputs)?;
-                if scalar_expr(index, &locals, &mut inputs, true)? != scalar_type("i64")
-                    || scalar_expr(value, &locals, &mut inputs, true)? != scalar_type("i64")
+                buffer_input(buffer, locals, inputs)?;
+                if scalar_expr(index, locals, inputs, true, catalog)? != scalar_type("i64")
+                    || scalar_expr(value, locals, inputs, true, catalog)? != scalar_type("i64")
                 {
                     return None;
                 }
                 has_store = true;
             }
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                if scalar_expr(condition, locals, inputs, true, catalog)? != scalar_type("bool") {
+                    return None;
+                }
+                has_store |= validate_effects(then_body, &mut locals.clone(), inputs, catalog)?;
+                has_store |= validate_effects(else_body, &mut locals.clone(), inputs, catalog)?;
+            }
             _ => return None,
         }
     }
-    if !has_store {
-        return None;
-    }
-    Some(
-        inputs
-            .into_iter()
-            .filter_map(|name| {
-                scope.get(&name).map(|ty| NirParam {
-                    name: name.clone(),
-                    ty: ty.clone(),
-                })
-            })
-            .collect(),
-    )
+    Some(has_store)
 }
 
 fn scalar_expr(
@@ -169,6 +249,7 @@ fn scalar_expr(
     scope: &Scope,
     inputs: &mut BTreeSet<String>,
     reads: bool,
+    catalog: &ScalarHelpers,
 ) -> Option<NirTypeRef> {
     match expr {
         NirExpr::Int(_) => Some(scalar_type("i64")),
@@ -182,8 +263,8 @@ fn scalar_expr(
             Some(ty.clone())
         }
         NirExpr::Binary { op, lhs, rhs } => {
-            let lhs = scalar_expr(lhs, scope, inputs, reads)?;
-            let rhs = scalar_expr(rhs, scope, inputs, reads)?;
+            let lhs = scalar_expr(lhs, scope, inputs, reads, catalog)?;
+            let rhs = scalar_expr(rhs, scope, inputs, reads, catalog)?;
             if lhs != rhs {
                 return None;
             }
@@ -217,8 +298,11 @@ fn scalar_expr(
         }
         NirExpr::LoadAt { buffer, index } if reads => {
             buffer_input(buffer, scope, inputs)?;
-            (scalar_expr(index, scope, inputs, reads)? == scalar_type("i64"))
+            (scalar_expr(index, scope, inputs, reads, catalog)? == scalar_type("i64"))
                 .then(|| scalar_type("i64"))
+        }
+        NirExpr::Call { callee, args } => {
+            scalar_helpers::call_type(callee, args, scope, inputs, reads, catalog)
         }
         _ => None,
     }
@@ -236,13 +320,13 @@ fn buffer_input(expr: &NirExpr, scope: &Scope, inputs: &mut BTreeSet<String>) ->
     Some(())
 }
 
-fn infer_local(expr: &NirExpr, scope: &Scope) -> Option<NirTypeRef> {
+fn infer_local(expr: &NirExpr, scope: &Scope, catalog: &ScalarHelpers) -> Option<NirTypeRef> {
     if matches!(expr, NirExpr::AllocBuffer { .. }) {
         let mut ty = scalar_type("Buffer");
         ty.is_ref = true;
         Some(ty)
     } else {
-        scalar_expr(expr, scope, &mut BTreeSet::new(), true)
+        scalar_expr(expr, scope, &mut BTreeSet::new(), true, catalog)
     }
 }
 

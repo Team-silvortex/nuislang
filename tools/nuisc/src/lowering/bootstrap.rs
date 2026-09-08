@@ -171,7 +171,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         }
     }
     let mut rewritten_module = rewrite_self_tail_recursive_functions(module);
-    super::buffer_loop_outline::outline_buffer_loops(&mut rewritten_module)?;
+    let outlined = super::buffer_loop_outline::outline_buffer_loops(&mut rewritten_module)?;
     let module = &rewritten_module;
     super::nested_owned_returns::validate_selected_owned_pointer_transfers(module)?;
     let exported_functions = module
@@ -190,6 +190,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
     let owned_external_buffer_helper_order =
         owned_external_buffer_helper_lowering_order(module, &owned_external_buffer_return_helpers)?;
     let direct_call_functions = collect_recursive_direct_call_functions(module)
+        .union(&outlined.functions)
+        .cloned()
+        .collect::<BTreeSet<_>>()
         .union(&collect_guarded_loop_direct_call_functions(module))
         .cloned()
         .collect::<BTreeSet<_>>()
@@ -285,7 +288,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
             .iter()
             .find(|function| &function.name == function_name)
             .expect("collected owned-buffer helper must exist");
-        lower_direct_call_helper_function(function, &mut state)?;
+        lower_direct_call_helper_function(function, &mut state, false, false)?;
     }
 
     for function in module.functions.iter().filter(|function| {
@@ -293,7 +296,12 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
             && (direct_call_functions.contains(&function.name)
                 || all_async_helper_functions.contains(&function.name))
     }) {
-        lower_direct_call_helper_function(function, &mut state)?;
+        lower_direct_call_helper_function(
+            function,
+            &mut state,
+            outlined.guarded_functions.contains(&function.name),
+            outlined.functions.contains(&function.name),
+        )?;
     }
 
     let main_start_index = state.yir.nodes.len();

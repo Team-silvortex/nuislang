@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 
-use nuis_semantics::model::{nir_expr_effect_class, NirExpr, NirExprEffectClass, NirStmt};
+use nuis_semantics::model::{
+    nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirStmt,
+};
 
 pub(super) fn prune_dead_scalar_bindings(stmts: &mut Vec<NirStmt>) -> bool {
     prune_dead_scalar_bindings_with_live_after(stmts, &BTreeSet::new())
@@ -168,6 +170,11 @@ fn expr_is_dead_binding_safe(expr: &NirExpr) -> bool {
         return false;
     }
     match expr {
+        // Checked arithmetic may fail even when its result is unused.
+        NirExpr::Binary {
+            op: NirBinaryOp::Div | NirBinaryOp::Rem,
+            ..
+        } => false,
         NirExpr::Binary { lhs, rhs, .. } => {
             expr_is_dead_binding_safe(lhs) && expr_is_dead_binding_safe(rhs)
         }

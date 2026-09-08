@@ -129,11 +129,15 @@ select verified YIR and report LLVM as not requested. This is semantic-stage
 evidence, not proof of native AOT readiness or successful provider execution.
 Bounded Buffer-writing callback loops now reuse private YIR helpers and registered
 CPU execution, with ordered reads/writes, checked native indices and checked scalar
-integer division/remainder. PixelMagic fills its image with this loop instead of
-recursion. The CLI headless build/run-artifact test checks two real M2 Metal frames,
+integer division/remainder. Nested `if`/`else` bodies use guarded private functions:
+conditions are read once and unselected arms perform no branch-local access or math.
+Reachable synchronous, acyclic `i64`/`bool` source helpers with straight-line bodies
+now remain real ordered YIR calls, including Buffer-read arguments inside selected
+branches. PixelMagic composes two such helpers before its red/blue writes. The CLI
+headless build/run-artifact test checks two real M2 Metal frames,
 direct-session replay, exact output identity and failure admission; independent
-native/reference tests compare every generated pixel. Conditional buffer-writing
-bodies and fully native CPU callbacks remain separate work.
+native/reference tests compare every generated pixel. Control flow inside source
+helpers, arbitrary loop bodies and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

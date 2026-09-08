@@ -136,6 +136,24 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     let yir_path = output.join(format!("{}.yir", report.artifact_binary_name));
     let source = fs::read_to_string(&yir_path).unwrap();
     let module = yir_syntax::parse_module(&source).unwrap();
+    for (name, instruction) in [
+        ("checkerboard_is_red", "call_bool"),
+        ("checkerboard_parity", "call_i64"),
+    ] {
+        let helper = module
+            .functions
+            .iter()
+            .find(|function| function.name.contains(name))
+            .expect("packaged YIR must retain the source scalar helper");
+        assert!(
+            module
+                .nodes
+                .iter()
+                .any(|node| node.op.instruction == instruction
+                    && node.op.args.first() == Some(&helper.name)),
+            "missing packaged call to {name}"
+        );
+    }
     assert!(
         module.nodes.iter().any(|node| {
             node.op.instruction == "loop_while_i64_effect"
@@ -147,6 +165,18 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
                     .any(|arg| arg.contains("__nuis_buffer_iteration_"))
         }),
         "packaged YIR must contain the real pixel-writing loop"
+    );
+    assert!(
+        module.functions.iter().any(|function| {
+            function.name.contains("__nuis_buffer_branch_")
+                && function.body_nodes.iter().any(|name| {
+                    module
+                        .nodes
+                        .iter()
+                        .any(|node| &node.name == name && node.op.instruction == "guard_return")
+                })
+        }),
+        "packaged pixel branches must retain a real control boundary"
     );
     let arguments = script().to_arguments().unwrap();
     let (status, stdout, stderr) = bounded(

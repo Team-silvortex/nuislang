@@ -16,10 +16,13 @@ The linked contract includes reproducible build, event, close and drain commands
 ## Data Path
 
 1. `PixelMagicPixels.fill_checkerboard` fills a 32x24 image using packed RGBA8
-   integer pixels. A bounded unit-step Nuis `while` now fills caller-owned storage
-   through a private registered YIR helper, replacing the recursive workaround.
-   Scalar division/remainder and buffer indices are checked; nested control flow
-   and arbitrary loop carries remain outside this supported subset.
+   integer pixels. Two composed scalar Nuis helpers compute coordinates and color
+   selection as actual YIR calls. A bounded unit-step Nuis `while` fills caller-owned storage
+   with guarded `if`/`else` color writes through private registered YIR helpers;
+   unselected arms perform no pixel access, replacing the recursive workaround.
+   Scalar division/remainder and buffer indices are checked; source helper bodies
+   are acyclic and straight-line. Helper control flow, nested loops and arbitrary
+   loop carries remain outside this supported subset.
 2. `copy_bytes` creates an owned snapshot. The app overwrites the original first
    pixel and frees the original Buffer before binding the snapshot.
 3. `shader_storage_binding(3, snapshot)` requests one immutable u32 array.

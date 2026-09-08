@@ -5,6 +5,9 @@ use yir_core::{
     YirFunctionResult, YirFunctionRole, YirModule, YirValueOwnership,
 };
 
+mod lane_effects;
+use lane_effects::synthesize_lane_effect_edges;
+
 pub fn parse_module(input: &str) -> Result<YirModule, String> {
     let mut module = parse_explicit_module(input)?;
 
@@ -468,34 +471,6 @@ fn synthesize_dependency_edges(module: &mut YirModule) {
                 });
             }
         }
-    }
-}
-
-fn synthesize_lane_effect_edges(module: &mut YirModule) {
-    let mut previous_by_queue = BTreeMap::<String, String>::new();
-
-    for node in &module.nodes {
-        let Some(lane) = module.node_lanes.get(&node.name) else {
-            continue;
-        };
-        let queue = format!("{}@{}", node.resource, lane);
-        if let Some(previous) = previous_by_queue.get(&queue) {
-            let exists = module.edges.iter().any(|edge| {
-                edge.kind == EdgeKind::Effect && edge.from == *previous && edge.to == node.name
-            });
-            let reverse_exists = module
-                .edges
-                .iter()
-                .any(|edge| edge.from == node.name && edge.to == *previous);
-            if !exists && !reverse_exists {
-                module.edges.push(Edge {
-                    kind: EdgeKind::Effect,
-                    from: previous.clone(),
-                    to: node.name.clone(),
-                });
-            }
-        }
-        previous_by_queue.insert(queue, node.name.clone());
     }
 }
 

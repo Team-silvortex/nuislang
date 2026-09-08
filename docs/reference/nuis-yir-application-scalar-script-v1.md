@@ -192,7 +192,9 @@ admission remain separate and unchanged.
 The [callback fixture](../../tools/nuisc/tests/fixtures/buffer_while.ns) allocates a
 small `ref Buffer`, fills it in a counted loop, reads the result and frees the
 buffer before returning scalar application state. Supported inline loop bodies
-contain scalar temporary bindings and ordered `store_at`/`load_at` operations.
+contain scalar temporary bindings, ordered `store_at`/`load_at` operations,
+`if`/`else` with branch-local temporaries and nested conditions, and admitted
+source-level scalar helper calls.
 Scalar integer division and remainder are supported too: constant evaluation
 uses checked operations, registered execution reports invalid divisors/overflow,
 and native scalar lowering traps before division by zero or `MIN / -1` (also
@@ -216,14 +218,78 @@ This is not a proof of all allocation, pointer or FFI memory safety.
 The [regressions](../../tools/nuisc/tests/buffer_while.rs) compare reference/native
 results, repeated application callbacks, zero/one/descending loops, per-iteration
 read/write order, declaration-order independence, failed-state admission and shared
-fuel. Allocation, ownership transfer, nested control flow or captured-state
-rebinding inside an outlined body remain unsupported. General steps and mutable
+fuel. Allocation, ownership transfer, nested loops or captured-state rebinding
+inside an outlined body remain unsupported. General steps and mutable
 header reads are not silently hoisted.
+
+### Branch-Local Execution
+
+An outlined `if` snapshots its condition exactly once before either arm executes.
+Each non-empty arm becomes a private registered function with a leading
+`cpu.guard_return`; the unselected arm returns before reading, writing or evaluating
+its body. Nested conditions stay inside their enclosing arm. Calls pass only named
+scalar values and borrowed buffers, never eagerly evaluated branch expressions.
+No new YIR instruction or image-specific executor path is introduced.
+
+The generated helpers retain explicit guards rather than speculative selects, and
+source-order edges keep even unused checked arithmetic before the helper return.
+Dead-binding optimization retains division/remainder that may fail. Guard entries
+and nested calls consume the existing shared callback fuel; a failed callback
+cannot commit new application state or be retried as successful.
+
+[Branch regressions](../../tools/nuisc/tests/buffer_while/branches.rs) compare
+reference/native nested and empty branches, condition reads followed by mutation,
+and untaken invalid indices, zero divisors and signed overflow. Selected invalid
+branches still fail or trap. Reversed YIR node/body declarations retain ordering,
+and generated names cannot capture user functions or local bindings. Textual lane
+edge inference now extends a dependency-topological order instead of creating
+backedges against transitive dependencies, including paths through other lanes.
+Invalid explicit graphs are left for verification, not repaired. Branch-local
+bindings do not escape; captured-state rebinding, allocation, ownership transfer,
+nested loops, `break`, `continue` and early returns in these outlined bodies remain
+outside the admitted subset.
+
+### Source Scalar Helpers
+
+Source helper composition admits synchronous functions whose concrete parameters
+and result are `i64` or `bool`. Bodies contain only fresh scalar `let`/`const` bindings
+and a final scalar return. Calls may compose other admitted helpers; signature,
+arity, expression types and every reachable callee body are checked. Iterative
+leaf-to-caller admission excludes missing or invalid callees and recursive cycles,
+without recursive call-graph discovery. Buffer parameters, memory operations,
+allocation, I/O, FFI, tasks, branches and loops inside these source helpers are not
+admitted. Unresolved generic signatures are not admitted either.
+
+Only helpers reached from accepted outlined loop bodies are retained as direct
+YIR functions. They are not replaced by an image-specific opcode or an inline-only
+workaround. Calls and unused trapping arithmetic preserve source-order edges, and
+nested invocations share the callback budget. Arguments may read Buffers, but are
+evaluated left to right inside the current iteration and selected branch, never
+hoisted across its guard. Loop-header calls remain unsupported; compute an
+invariant scalar bound before the loop instead.
+
+[Helper regressions](../../tools/nuisc/tests/buffer_while/scalar_helpers.rs) cover
+diamond dependencies, real `call_i64`/`call_bool` nodes, ordered read arguments,
+untaken argument/callee traps, rejection of transitive effects and recursion,
+reordered YIR declarations, repeated callbacks and failed shared-fuel admission.
+Admission unit tests also exercise a 4096-function dependency chain without
+recursive catalog traversal; this is not a runtime recursion-depth guarantee.
+
+Imported CPU modules retain referenced private implementation helpers in an
+owner-local signature scope, separate from their export table. Own-module names
+win over same-named consumer/import functions. The
+[scope regressions](../../tools/nuisc/src/frontend/tests_frontend_core/private_helper_scope.rs)
+check transitive private calls through a Buffer loop and reject direct private
+access from consumers or sibling modules in either import order. This fixes the
+single-file/project discrepancy exposed by PixelMagic, without making its scalar
+helpers public or adding a library-specific compiler exception.
 
 ### Packaged Pixel Loop
 
 [PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses this
-straight-line loop instead of recursive pixel filling. The
+bounded loop with two composed scalar coordinate/color helpers and explicit
+red/blue `if`/`else` writes instead of recursive pixel filling or arithmetic color
+selection. Both paths assert real source helper calls in YIR. The
 [native/reference test](../../tools/nuisc/tests/pixelmagic_buffer_loop.rs) checks
 every pixel for both 32x24 phases, a partial region and an empty region.
 The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
@@ -242,7 +308,8 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_
 The second command is a macOS Metal device regression, not Linux/Windows evidence.
 CPU callbacks in the packaged host still execute embedded YIR; the native parity
 test independently compiles the generator, not the complete live callback ABI.
-Conditional pixel transforms with branch-local effects are the next boundary.
+Branch-local control flow inside source scalar helpers is the next boundary;
+straight-line source helpers and compiler-generated guarded arms do not certify it.
 
 ## Current Boundary
 
@@ -250,8 +317,8 @@ Ordinary `nuis build` and `nuis run-artifact` now select and admit this profile.
 Headless build selection removes the unused CPU LLVM prerequisite without
 fabricating an empty intermediate or weakening the verified stage handoff.
 Checkpoint-aware source inspection now follows the explicit manifest selection.
-Bounded Buffer-writing callbacks now pass the lowering/execution boundary above;
-they still need packaged build/run-artifact evidence in the image workflow.
+Bounded Buffer-writing callbacks, including composed scalar helpers and branch-local pixel writes, now pass
+the packaged build/run-artifact image workflow described above.
 Compound-condition `while` callbacks now pass the verified-YIR boundary and execute
 their current/carry state rather than returning trace-only unit values. CPU Nustar
 owns the scalar loop state machine; the generic reference executor only drives

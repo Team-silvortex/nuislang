@@ -42,10 +42,42 @@ fn compare_pixels(
         1,
     );
     let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    for (name, instruction) in [
+        ("checkerboard_is_red", "call_bool"),
+        ("checkerboard_parity", "call_i64"),
+    ] {
+        assert!(compiled
+            .yir
+            .functions
+            .iter()
+            .any(|function| function.name == name));
+        assert!(
+            compiled
+                .yir
+                .nodes
+                .iter()
+                .any(|node| node.op.instruction == instruction
+                    && node.op.args.first().map(String::as_str) == Some(name)),
+            "missing scalar helper {name}"
+        );
+    }
     assert!(compiled.yir.nodes.iter().any(|node| {
         node.op.instruction == "loop_while_i64_effect"
             && node.op.args.get(6).map(String::as_str) == Some("scoped_call")
     }));
+    assert!(
+        compiled.yir.functions.iter().any(|function| {
+            function.name.starts_with("__nuis_buffer_branch_")
+                && function.body_nodes.iter().any(|name| {
+                    compiled
+                        .yir
+                        .nodes
+                        .iter()
+                        .any(|node| &node.name == name && node.op.instruction == "guard_return")
+                })
+        }),
+        "pixel branches must retain a real control boundary"
+    );
     let expected = (0..count)
         .map(|index| {
             if !(start..end).contains(&index) {

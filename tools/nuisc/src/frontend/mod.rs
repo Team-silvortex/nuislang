@@ -18,6 +18,7 @@ mod function_context;
 mod function_lowering;
 mod generic_rewrite;
 mod generics;
+mod helper_scope;
 mod higher_order;
 mod kernel_builtins;
 mod lambda_expansion;

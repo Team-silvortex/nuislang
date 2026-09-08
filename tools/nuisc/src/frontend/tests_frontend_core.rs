@@ -17,6 +17,8 @@ mod bytes_text;
 mod operator_overload;
 #[path = "tests_frontend_core/operator_precedence.rs"]
 mod operator_precedence;
+#[path = "tests_frontend_core/private_helper_scope.rs"]
+mod private_helper_scope;
 #[path = "tests_frontend_core/trait_qualified.rs"]
 mod trait_qualified;
 #[path = "tests_frontend_core/type_and_slice_basic.rs"]
