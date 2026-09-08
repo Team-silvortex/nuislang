@@ -123,8 +123,12 @@ after the window is freed without borrowing window or provider internals.
 Accepted cancellation and later rejected window calls produce no terminal outcome
 or parent delivery; window getters retain only their last observations. The
 independent receipt may carry a later worker fault. Finish winning admission
-leaves the original close request/reply intact. AppKit cancellation policy is not
-yet wired; ordinary window quit continues to use explicit close/Finish.
+leaves the original close request/reply intact. AppKit now exposes explicit
+`--window-cancel-after-events`, requiring an event script and no parent. It frees
+the window, polls its ticket and exits 130 on host retirement, not success.
+The live provider still reports EOF without Finish as incomplete execution;
+ordinary window quit continues to use explicit close/Finish. See the cancellation
+contract for capability admission, pending/missing receipts and evidence limits.
 
 ### Typed Failure Evidence
 
@@ -268,5 +272,5 @@ The current Nuis event wrapper uses a leading guard returning existing state.
 Bare `if { return aggregate_call(...); }` with no else is still unsupported by the
 minimal lowering path; the equivalent guard form is not a compiler fix.
 Close intent and observed failure kind are now separate. Device-specific causes,
-multi-child parent orchestration, application recovery, AppKit cancellation policy/provider retirement,
+multi-child parent orchestration, application recovery, general interactive cancellation/provider retirement,
 richer input, textures and non-Metal/native-CPU parity remain separate work.

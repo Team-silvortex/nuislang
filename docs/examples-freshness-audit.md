@@ -18,8 +18,8 @@ capability scores.
 | Bounded CLI companions | [cli_wc_demo](../examples/projects/tooling/cli_wc_demo), [cli_pgm_invert_demo](../examples/projects/tooling/cli_pgm_invert_demo) | One 4096-byte ASCII-counting read for wc, and small PGM fixtures for image transformation. |
 | Compiler/linker companions | [bootstrap_structural_projection_candidate](../examples/projects/tooling/bootstrap_structural_projection_candidate), [native_artifact_closure_demo](../examples/projects/tooling/native_artifact_closure_demo) | Inspect the exact candidate/finalizer acceptance boundary, not a claim of full self-hosting. |
 
-Window cancellation API/ticket tests do not imply that the example has an AppKit
-cancel action or that GPU resources are retired. PixelMagic/WitSage report
+The example now tests explicit scripted AppKit cancellation after real Metal
+frames; this does not prove GPU resource retirement. PixelMagic/WitSage report
 examples are host composition evidence, not device execution by name alone.
 Do not demote or delete an old fixture while it still carries an active regression.
 

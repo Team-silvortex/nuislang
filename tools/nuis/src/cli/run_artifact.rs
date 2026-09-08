@@ -8,8 +8,10 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     let mut window_session = None;
     let mut window_events = None;
     let mut window_parent = None;
+    let mut cancel_after_events = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--window-cancel-after-events" if !cancel_after_events => cancel_after_events = true,
             "--json" if !json => json = true,
             "--export-frame" if frame_output.is_none() => {
                 let path = args
@@ -73,11 +75,17 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     if window_parent.is_some() && (window_session.is_none() || window_parent == window_session) {
         return Err("--window-parent-session requires a distinct --window-session".to_owned());
     }
+    if cancel_after_events && (window_events.is_none() || window_parent.is_some()) {
+        return Err(
+            "--window-cancel-after-events requires --window-events and no parent session"
+                .to_owned(),
+        );
+    }
     if window_session.is_some() && (json || frame_output.is_some()) {
         return Err("--window-session cannot be combined with --json or --export-frame".to_owned());
     }
     let input = input.ok_or(
-        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID]] <artifact>",
+        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events]] <artifact>",
     )?;
     Ok(CommandKind::RunArtifact {
         input,
@@ -87,6 +95,7 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
             id,
             events: window_events,
             parent: window_parent,
+            cancel_after_events,
         }),
     })
 }
@@ -94,6 +103,82 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancellation_requires_an_explicit_script_without_parent_authority() {
+        for events in ["", "32,128578"] {
+            let parsed = parse(
+                &mut [
+                    "build",
+                    "--window-session",
+                    "ui",
+                    "--window-cancel-after-events",
+                    "--window-events",
+                    events,
+                ]
+                .into_iter()
+                .map(str::to_owned),
+            )
+            .unwrap();
+            let CommandKind::RunArtifact {
+                window_session: Some(options),
+                ..
+            } = parsed
+            else {
+                panic!("window options")
+            };
+            assert!(options.cancel_after_events);
+            assert_eq!(options.events.as_deref(), Some(events));
+        }
+        for args in [
+            vec!["build", "--window-cancel-after-events"],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-cancel-after-events",
+            ],
+            vec![
+                "build",
+                "--window-events",
+                "",
+                "--window-cancel-after-events",
+            ],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-events",
+                "",
+                "--window-cancel-after-events",
+                "--window-cancel-after-events",
+            ],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-events",
+                "",
+                "--window-cancel-after-events",
+                "--window-parent-session",
+                "parent",
+            ],
+            vec![
+                "build",
+                "--window-session",
+                "ui",
+                "--window-events",
+                "",
+                "--window-cancel-after-events",
+                "--json",
+            ],
+        ] {
+            assert!(
+                parse(&mut args.iter().map(|arg| (*arg).to_owned())).is_err(),
+                "{args:?}"
+            );
+        }
+    }
 
     #[test]
     fn parent_requires_a_distinct_registered_window_and_no_duplicate_option() {
@@ -172,6 +257,7 @@ mod tests {
                     id: "ui".to_owned(),
                     events: Some("32,128578".to_owned()),
                     parent: None,
+                    cancel_after_events: false,
                 })
             }
         );

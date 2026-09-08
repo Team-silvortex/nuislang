@@ -47,7 +47,7 @@ nuis source / nuis.toml
 | Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions. | Supported syntax does not imply every combination lowers; general buffer-writing `while` and some aggregate early-return shapes remain incomplete. |
 | Image application | Nuis generates RGBA8 data, inline WGSL runs RGB inversion on real Metal, and compiled host execution exports checked PPM frames. | The host embeds the YIR lifecycle runtime and uses registered providers; it is not fully native CPU execution or a self-contained Nsld image. |
 | Persistent window | Registered Nuis open/event/close callbacks retain state and one provider connection across AppKit events. A separate registered CPU parent can consume one terminal outcome. | Explicit mode, bounded dispatch/replay, one-child parent profile; not an unlimited engine loop or general supervisor. |
-| Cancellation | Pump, `WindowSession` and C ABI expose an independent cancellation ticket with a once-only host-scope retirement receipt. | AppKit cancellation policy, parent cancellation and provider/device drain acknowledgement are not wired. |
+| Cancellation | Pump/window/C ABI tickets now reach the packaged host through explicit `--window-cancel-after-events`, with one host-scope retirement receipt. | AppKit cancellation policy is scripted-only; parent cancellation and provider/device drain acknowledgement remain open. |
 | Other backends | Checked-in routes include Linux CUDA/Vulkan and Apple Metal/CoreML provider work. | Evidence is backend- and workload-specific; reference results and hardware-free conformance do not certify physical execution. |
 | Nsld | Deterministic plans/NSB assembly, first ARM64 Mach-O and x86_64 Linux ELF private-shell routes, loader admission, publication and final-output selection. | Broader architecture/provider parity, PE/COFF final execution and self-contained application packaging remain incomplete. |
 | Self-hosting | Five bounded preparation gates, Nuis compiler-component proofs, differential/reproducibility evidence and explicit selection/rollback contracts. | `stage0-to-stage1-migration/active` is not completed compiler replacement; the bounded candidate-to-Nsld path stops before native object emission. |
@@ -91,9 +91,11 @@ on the small, statically bound `ScopeAdmission` interface, not concrete window
 or cancellation internals. The [cancellation contract](docs/reference/nuis-yir-application-cancellation-v1.md)
 defines the ownership and failure boundaries.
 
-Next: connect an explicit packaged-host cancellation path, then establish
-provider-owned resource drain before reuse. Normal window quit still uses
-explicit close/Finish. Resource-capability state, recovery, richer image bindings,
+The explicit scripted cancellation path now frees the window and polls its
+independent ticket without close or parent delivery. Normal window quit still
+uses explicit close/Finish. Next establish provider-owned resource drain before
+reuse: the live provider currently sees EOF, not a cancellation acknowledgement,
+so `run-artifact` does not report successful completion. Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.
 
 ns-nova's intended role is a real-time world engine combining rendering,

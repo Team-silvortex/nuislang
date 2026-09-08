@@ -111,7 +111,9 @@ Current state:
   cleanup, terminal outcome or parent delivery. Only its receipt confirms
   host-scope release, not provider/device resource retirement. Window getters retain their last
   observations while the ticket may report later faults. The packaged AppKit
-  host has no cancellation trigger yet; ordinary quit still uses close/Finish
+  host now accepts explicit `--window-cancel-after-events` without a parent;
+  ordinary quit still uses close/Finish. The live provider sees EOF rather than
+  a drain acknowledgement, so cancellation is not reported as successful execution
 * Data, Shader, Kernel, and Network observers now share one YIR result-state projection into CPU CFG; absent provider payloads remain explicitly deferred
 * the showcase owns a bounded three-frame loop in Nuis source and passes each
   frame through `NovaFrameResultHandle` before submission and conditional presentation
@@ -173,7 +175,7 @@ Current limitation:
   are distinct routes. The latter remains bounded to 256 dispatches and 64 MiB
   replay, not a stable unlimited interactive world loop. Failure teardown is
   tested, but device-specific causes, general multi-child parent orchestration,
-  AppKit/parent cancellation policy and provider-owned resource retirement remain open
+  interactive/parent cancellation policy and provider-owned resource retirement remain open
 * conditional `cpu_present_frame` now consumes the Shader-derived
   `submitted.present_requested` predicate through a runtime-owned result handle;
   its receipt is provider-domain-issued, but its clock still comes from the planned

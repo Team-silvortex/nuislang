@@ -294,6 +294,10 @@ fn run() -> Result<(), String> {
                 host_window_session::PARENT_CONTRACT
             ));
             manifest.push(format!(
+                "window_cancellation_contract={}",
+                host_window_session::CANCELLATION_CONTRACT
+            ));
+            manifest.push(format!(
                 "frame_export_contract={}",
                 host_runtime_frame::FRAME_EXPORT_CONTRACT
             ));
@@ -3466,9 +3470,9 @@ static NSImage *nuisImageFromPpmData(NSData *ppmData) {
         )
     };
     let window_session_methods = if runtime_mode {
-        host_window_session::METHODS
+        host_window_session::methods()
     } else {
-        ""
+        String::new()
     };
     let native_entry = if runtime_mode {
         host_window_session::ENTRY

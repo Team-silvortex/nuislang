@@ -125,9 +125,36 @@ Handles are exclusively owned, with no concurrent calls or copied-handle frees.
 The ticket has no window pointer and needs no provider access to be polled/freed.
 
 The C ABI is a host boundary, not a new Nuis intrinsic or CFFI allowlist grant.
-The packaged AppKit host does not yet choose a cancellation trigger or consume
-these tickets. Normal window quit remains explicit close/Finish; no implicit
-timeout-to-cancel conversion or successful exit is introduced.
+The packaged AppKit host now forwards and consumes tickets through the explicit
+scripted path below. Normal window quit remains explicit close/Finish; no
+implicit timeout-to-cancel conversion or successful exit is introduced.
+
+## Packaged Host Policy
+
+`--window-cancel-after-events` requires `--window-session ID --window-events
+CODEPOINTS` and rejects `--window-parent-session`. An empty event script still
+waits for the initial redraw. Cancellation begins only after the final event
+reply is consumed; this entry does not interrupt a pending GPU draw. Both CLI and
+embedded-host parsers reject unsupported combinations before opening a session.
+The frontdoor also requires the bundle's exact
+`window_cancellation_contract=nuis-yir-application-cancellation-v1` declaration;
+old bundles must be rebuilt rather than silently taking normal close.
+
+The [small host adapter](../../tools/yir-pack-aot/src/host_window_cancellation.rs)
+only admits a ticket, frees the window, polls the receipt and terminates the host.
+The timer stops ordinary session polling once a ticket exists; an OS termination
+request during retirement is deferred until that observation completes. Pending
+polls retain the ticket. One receipt logs cleanup/failure independently and exits
+130, never zero; a missing receipt logs an error and exits 1 without claiming
+retirement. Rejected cancellation preserves the window/reply for normal failure
+handling and never creates a ticket receipt.
+
+This is a bounded standalone scripted policy, not a general interactive or parent
+cancellation controller. The live provider has no cancellation message and sees
+EOF without Finish. Its existing supervision reports incomplete execution and
+preserves prior replay evidence. No provider error is suppressed or reclassified
+as successful cancellation; device retirement still requires provider-owned
+protocol and resource-lifetime evidence.
 
 ## Evidence And Limits
 
@@ -156,8 +183,18 @@ C ABI, frees the window, and consumes its independent ticket exactly once.
 No GPU frame is dispatched by this cancellation fixture. Existing compiled Metal
 window/export and provider failure regressions remain separate execution evidence.
 
+The [generated host harness](../../tools/yir-pack-aot/src/host_window_cancellation_tests.rs)
+compiles the actual adapter with stub tickets and no provider/close/outcome
+implementation. It checks pending/once-only/missing receipts, late fault fields,
+rejection and argument rules. The
+[compiled-window cancellation regression](../../tools/nuis/src/artifact_device_sample_shader_cancellation_tests.rs)
+uses actual Metal frames and the production frontdoor, requires EOF rather than
+Finish, keeps old replay bytes, and separately verifies replay exit 130. It also
+rejects invalid modes before window/parent admission. These tests do not prove
+device interruption, device drain or general interactive cancellation.
+
 The pump, registered `WindowSession` and its C ABI expose cancellation tickets;
-AppKit policy and parent-pump cancellation are not yet wired.
+AppKit has the explicit standalone scripted policy; parent-pump cancellation is not yet wired.
 Normal window quit still uses explicit close. No IPC wire message is added and
 there is no general provider drain/cancel acknowledgement. Device resource
 retirement, cancellation of resource-capability state, recovery, multi-child

@@ -72,7 +72,7 @@ finite compiler-module migration plan.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/86 | Packaged CPU parent and one outcome handoff are verified. Pump/window cancellation arbitrates with Finish and independently acknowledges host-scope retirement through the ticket C ABI. AppKit policy and provider/device retirement remain open, as do multi-child routing and recovery. |
+| `ns-nova/persistent-application-session` | active/86 | Packaged CPU parent and one outcome handoff are verified. Pump/window cancellation arbitrates with Finish and acknowledges host-scope retirement; explicit scripted AppKit cancellation now consumes the ticket. Parent cancellation, provider/device retirement, multi-child routing and recovery remain open. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -99,8 +99,11 @@ retirement is not inferred from socket Drop. The registered window and C ABI
 now forward that independent ticket without manufacturing any terminal outcome
 or parent delivery, including after rejected window calls. Tickets can outlive
 their window; typed late faults are delivered without mutating old snapshots.
-Next wire explicit packaged-host cancellation policy, then establish explicit
-provider-owned drain acknowledgement before resource reuse.
+The packaged host now admits `--window-cancel-after-events` with an explicit
+event script and no parent. Live Metal/replay regressions verify no implicit close,
+Finish, outcome or success; pending/lost receipts have generated-host tests.
+Next establish explicit provider-owned cancellation/drain acknowledgement before
+resource reuse. EOF remains an incomplete live provider lifecycle, not success.
 Provider sessions now depend only on the two-operation `ScopeAdmission` interface,
 not on the concrete cancellation controller. Static policy-substitution tests
 preserve the lifecycle gate. The generic ticket C ABI has no window, concrete
@@ -127,7 +130,7 @@ that handle inside the compiled AppKit process, bypassing native main and the
 whole-module timer. Its queued logical input regression checks initial redraw,
 space/Unicode input, two exact Metal images, one worker and confirmed close; the
 production `run-artifact` frontdoor is included. The default legacy preview is
-unchanged. Detailed dispatch/replay failure causes, recovery, cancellation
+unchanged. Recovery, general interactive/parent cancellation
 and resource retirement remain open. Shared YIR budget accounting now rejects replay exhaustion
 before device effects, bounds manifest/payload reads before allocation, and
 preserves old replay evidence when a replacement fails validation. Tests cover
@@ -177,7 +180,7 @@ now runs that handoff on an independent worker, initialized from callback roots
 before the child. Real Metal and compiled failure/replay cases retain one device
 worker, one parent delivery/cleanup, and failed child exit despite parent success.
 `active/86` is not an engine-completion percentage: multi-child routing,
-packaged-host cancellation/provider retirement, long-duration soak and transactional publication
+general cancellation/provider retirement, long-duration soak and transactional publication
 remain open. Fuel does not preempt provider-private work, blocking FFI or devices;
 do not replace explicit delivery with an unchecked post-close child callback.
 

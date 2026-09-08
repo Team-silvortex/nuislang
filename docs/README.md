@@ -17,8 +17,8 @@ Use this short route for the current `beta-0.12.*` repository:
 7. [Focused validation checklist](versioning/nuis-beta-0.12.0-release-checklist.md)
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
-still governs this line. Window/cancellation API availability does not imply
-AppKit cancellation policy, provider/device retirement, a self-contained image
+still governs this line. The explicit scripted AppKit cancellation route does not imply
+general interactive/parent cancellation, provider/device retirement, a self-contained image
 or completed compiler self-hosting. Use the references below for each boundary.
 
 The [versioning index](versioning/README.md) routes older beta, alpha, and

@@ -20,8 +20,8 @@ For the current `beta-0.12.*` application-led line, start with:
 * [Parent outcome pump](nuis-yir-application-outcome-pump-v1.md)
 * [Application lifecycle manifest](nuis-ns-nova-application-lifecycle-v1.toml)
 
-Window API cancellation is not yet an AppKit cancellation trigger or device
-retirement guarantee. Older beta/alpha phase anchors remain in the
+Window API cancellation now has an explicit scripted AppKit trigger, not a device
+retirement guarantee or general parent policy. Older beta/alpha phase anchors remain in the
 [versioning index](../versioning/README.md), not the current quick-start route.
 
 ## Reading Order

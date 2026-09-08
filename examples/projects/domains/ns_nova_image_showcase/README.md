@@ -122,12 +122,30 @@ ABI can observe retirement after the window is freed, without executing implicit
 Nuis close or creating a terminal outcome for the parent. A late worker fault can
 appear in the ticket without rewriting the window's last observed state.
 
-This host API is not yet a cancellation control in this packaged application:
-there is no new CLI flag, Nuis intrinsic or CFFI signature grant. The close button
-and ordinary quit still follow the explicit close/Finish route above. Cancellation
-fixtures compile this actual Nuis source but do not dispatch a GPU frame; the
-separate Metal regressions remain the image-execution evidence. Host retirement
-does not certify that GPU resources are drained or reusable. See the
+The packaged host now exposes an explicit scripted cancellation route:
+
+```sh
+cargo run -p nuis -- run-artifact --window-session window --window-events '32,128578' --window-cancel-after-events target/ns-nova-image
+```
+
+Use the output directory from your build. This requires `--window-events`
+(an empty script is allowed after the initial redraw) and rejects a parent
+session before launch. Rebuild older bundles: cancellation support must be
+declared in `bundle.txt`. No new Nuis intrinsic or CFFI signature grant is added.
+
+After the last event reply, the host requests cancellation, frees the window,
+and polls the independent ticket. It logs `window_session_host_retired` only on
+receipt and exits with code 130, or 1 if that receipt is lost. It does not run
+close, publish a terminal application outcome or deliver to a parent. The close
+button and ordinary quit still use explicit close/Finish, not this option.
+
+This command deliberately remains **non-successful**: the live provider sees EOF
+without Finish and `run-artifact` reports that incomplete provider lifecycle.
+There is no provider cancellation/drain message yet, and old replay evidence is
+preserved. Compiled live Metal tests exercise one/two rendered frames before
+cancellation; compiled replay also verifies exit 130. Gated host fixtures test
+pending, late-fault and missing receipts without claiming device interruption.
+Host retirement does not certify that GPU resources are drained or reusable. See the
 [cancellation contract](../../../../docs/reference/nuis-yir-application-cancellation-v1.md).
 
 ## Remaining Limits

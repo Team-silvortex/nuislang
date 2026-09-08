@@ -254,6 +254,7 @@ pub(crate) struct WindowSessionOptions {
     pub id: String,
     pub events: Option<String>,
     pub parent: Option<String>,
+    pub cancel_after_events: bool,
 }
 
 pub fn parse_args<I>(mut args: I) -> Result<CommandKind, String>

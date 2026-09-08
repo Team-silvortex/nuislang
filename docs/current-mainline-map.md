@@ -48,14 +48,16 @@ Current session evidence:
   owned terminal outcome; its successful cleanup cannot certify child success.
 - Pump, window and C ABI expose one independent cancellation ticket.
   It survives window destruction without implicit close, a fabricated terminal
-  outcome or parent delivery.
+  outcome or parent delivery. The packaged host now consumes it through explicit
+  `--window-cancel-after-events`, with real Metal and compiled replay regressions.
 - Cancellation admission, host-scope retirement and provider/device resource
   retirement are distinct. The last still needs provider-owned evidence.
 
-Next wire an explicit packaged-host cancellation trigger through the existing
-ticket. Ordinary quit still uses close/Finish. Then establish provider drain
-before resource reuse, without importing provider registries, transports or
-concrete cancellation state into the host window adapter.
+Next establish provider-owned cancellation/drain acknowledgement before resource
+reuse. The scripted host path acknowledges its own scope, while the live provider
+still treats EOF without Finish as incomplete execution. Ordinary quit still uses
+close/Finish; parent cancellation remains unsupported. Do not import provider
+registries, transports or concrete cancellation state into the window adapter.
 
 This does not close resource-capability state, peer recovery, general multi-child
 routing, richer image bindings, sustained performance, native CPU frame dispatch
@@ -99,9 +101,9 @@ builds and runs seven project routes, including PixelMagic/WitSage reports.
 Those reports alone are not device-execution evidence. The separate Metal tests
 check actual dispatched image data.
 
-The engine-facing host API can now cancel a session, but the packaged AppKit
-application has no cancellation trigger yet. No new CLI flag, Nuis intrinsic
-or CFFI signature grant is implied by that API.
+The packaged AppKit application now exposes standalone scripted cancellation
+through `--window-cancel-after-events`. This does not add a Nuis intrinsic,
+CFFI signature grant, parent cancellation route or device-retirement authority.
 
 ## Deep Routers
 

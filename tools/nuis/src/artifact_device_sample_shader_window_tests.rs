@@ -4,6 +4,9 @@ use std::process::{Command, Stdio};
 #[path = "artifact_device_sample_shader_failure_tests.rs"]
 mod failure;
 
+#[path = "artifact_device_sample_shader_cancellation_tests.rs"]
+mod cancellation;
+
 #[test]
 fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal() {
     let output = Artifacts(temp_output_dir());
@@ -207,8 +210,10 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
             id: "window".to_owned(),
             events: Some("32,128578".to_owned()),
             parent: Some("parent".to_owned()),
+            cancel_after_events: false,
         },
     )
     .expect("production run-artifact window frontdoor");
+    cancellation::verify_compiled_window_cancellation(&output.0, &binary);
     failure::verify_compiled_provider_failure_cleanup(&output.0, &binary);
 }

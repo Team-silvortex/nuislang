@@ -1,5 +1,13 @@
 pub(super) const CONTRACT: &str = "nuis-yir-window-session-v3";
 pub(super) const PARENT_CONTRACT: &str = "nuis-yir-application-outcome-pump-v1";
+pub(super) const CANCELLATION_CONTRACT: &str = "nuis-yir-application-cancellation-v1";
+
+#[path = "host_window_cancellation.rs"]
+mod cancellation;
+
+pub(super) fn methods() -> String {
+    METHODS.to_owned() + cancellation::METHODS
+}
 
 pub(super) const SUPPORT: &str = r#"
 typedef struct NuisWindowSession NuisWindowSession;
@@ -13,6 +21,10 @@ extern int64_t nuis_window_session_failure_kind(const NuisWindowSession *);
 extern int64_t nuis_window_session_outcome_field(const NuisWindowSession *, int64_t);
 extern int32_t nuis_window_session_poll(NuisWindowSession *, NuisRenderedBuffer *, int32_t *);
 extern void nuis_window_session_free(NuisWindowSession **);
+typedef struct NuisApplicationCancellation NuisApplicationCancellation;
+extern int32_t nuis_window_session_cancel(NuisWindowSession *, NuisApplicationCancellation **);
+extern int32_t nuis_application_cancellation_poll(NuisApplicationCancellation *, int32_t *, int64_t *);
+extern void nuis_application_cancellation_free(NuisApplicationCancellation **);
 typedef struct NuisOutcomeParent NuisOutcomeParent;
 extern int32_t nuis_outcome_parent_open(const unsigned char *, uintptr_t, const char *, NuisOutcomeParent **);
 extern int32_t nuis_outcome_parent_finish(NuisOutcomeParent *, NuisWindowSession *);
@@ -23,6 +35,7 @@ static const char *gNuisWindowSessionId = NULL;
 static const char *gNuisWindowParentId = NULL;
 static int gNuisWindowExitStatus = 0;
 static BOOL gNuisWindowScripted = NO;
+static BOOL gNuisWindowCancelAfterEvents = NO;
 static uint32_t gNuisWindowKeys[64];
 static NSUInteger gNuisWindowKeyCount = 0;
 static NSUInteger gNuisWindowKeyIndex = 0;
@@ -34,12 +47,20 @@ static int nuisParseWindowSession(int argc, const char **argv) {
         if (argc > 1) { fprintf(stderr, "nuis: unknown window host argument\n"); return -1; }
         return 0;
     }
-    if (argc < 3 || argc > 7 || (argc % 2) == 0 || argv[2][0] == '\0') return -1;
-    for (int index = 3; index < argc; index += 2) {
+    if (argc < 3 || argc > 8 || argv[2][0] == '\0' || argv[2][0] == '-') return -1;
+    for (int index = 3; index < argc;) {
+        if (strcmp(argv[index], "--window-cancel-after-events") == 0) {
+            if (gNuisWindowCancelAfterEvents) return -1;
+            gNuisWindowCancelAfterEvents = YES;
+            index++;
+            continue;
+        }
+        if (index + 1 >= argc) return -1;
         if (strcmp(argv[index], "--window-parent-session") == 0) {
             if (gNuisWindowParentId != NULL || argv[index + 1][0] == '\0' ||
                 argv[index + 1][0] == '-' || strcmp(argv[index + 1], argv[2]) == 0) return -1;
             gNuisWindowParentId = argv[index + 1];
+            index += 2;
             continue;
         }
         if (strcmp(argv[index], "--window-events") != 0 || gNuisWindowScripted) return -1;
@@ -57,7 +78,9 @@ static int nuisParseWindowSession(int argc, const char **argv) {
             if (*cursor == ',') { cursor++; if (*cursor == '\0') return -1; }
             else if (*cursor != '\0') return -1;
         }
+        index += 2;
     }
+    if (gNuisWindowCancelAfterEvents && (!gNuisWindowScripted || gNuisWindowParentId != NULL)) return -1;
     gNuisWindowSessionId = argv[2];
     gNuisWindowExitStatus = 1;
     return 1;
@@ -67,7 +90,7 @@ static int nuisParseWindowSession(int argc, const char **argv) {
 pub(super) const ENTRY: &str = r#"
     int window_session_mode = nuisParseWindowSession(argc, argv);
     if (window_session_mode < 0) {
-        fprintf(stderr, "usage: artifact [--window-session ID [--window-events CODEPOINTS] [--window-parent-session ID]]\n");
+        fprintf(stderr, "usage: artifact [--window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events]]\n");
         return 2;
     }
     if (!window_session_mode) nuis_yir_entry();
@@ -75,6 +98,7 @@ pub(super) const ENTRY: &str = r#"
 
 pub(super) const FIELDS: &str = r#"
 @property(nonatomic, assign) NuisWindowSession *session;
+@property(nonatomic, assign) NuisApplicationCancellation *sessionCancellation;
 @property(nonatomic, assign) NuisOutcomeParent *sessionParent;
 @property(nonatomic, assign) BOOL sessionParentTerminal;
 @property(nonatomic, assign) int64_t sessionWidth;
@@ -174,6 +198,7 @@ pub(super) const METHODS: &str = r#"
 - (void)sendScriptedKey {
     if (!gNuisWindowScripted || self.sessionClosing) return;
     if (gNuisWindowKeyIndex == gNuisWindowKeyCount) {
+        if (gNuisWindowCancelAfterEvents) { [self cancelSession]; return; }
         self.sessionClosing = YES;
         // A timer cannot refire while its own callback is waiting in terminate:.
         [self performSelector:@selector(requestSessionTermination) withObject:nil afterDelay:0];
@@ -189,6 +214,7 @@ pub(super) const METHODS: &str = r#"
 }
 
 - (void)pollSession {
+    if ([self pollSessionCancellation]) return;
     if (self.sessionParent != NULL && !self.sessionParentTerminal) {
         int32_t parentPhase = 0, delivered = 0, cleanup = 0;
         int parentStatus = nuis_outcome_parent_poll(self.sessionParent, &parentPhase, &delivered, &cleanup);
@@ -271,6 +297,10 @@ pub(super) const METHODS: &str = r#"
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
+    if (self.sessionCancellation != NULL) {
+        self.sessionTerminateDeferred = YES;
+        return NSTerminateLater;
+    }
     BOOL parentPending = self.sessionParent != NULL && !self.sessionParentTerminal;
     if (gNuisWindowSessionId == NULL || (!parentPending && (self.session == NULL || self.sessionTerminal))) return NSTerminateNow;
     self.sessionClosing = YES;
@@ -289,6 +319,9 @@ pub(super) const METHODS: &str = r#"
 pub(super) const STOP: &str = r#"
     if (self.sessionKeyMonitor != nil) [NSEvent removeMonitor:self.sessionKeyMonitor];
     self.sessionKeyMonitor = nil;
+    NuisApplicationCancellation *cancellation = self.sessionCancellation;
+    self.sessionCancellation = NULL;
+    nuis_application_cancellation_free(&cancellation);
     NuisWindowSession *session = self.session;
     self.session = NULL;
     nuis_window_session_free(&session);

@@ -210,9 +210,15 @@ ticket_owner = "independent-of-window-lifetime-no-window-or-provider-borrow"
 ticket_poll_outputs = "write-cleanup-i32-and-failure-i64-only-on-one-receipt-status"
 cancelled_window_outcome = "none-even-after-rejected-window-calls-no-parent-delivery"
 window_observations = "last-observed-cleanup-and-failure-independent-of-later-ticket-receipt"
-appkit_cancellation_wired = false
+appkit_cancellation_wired = true
+appkit_cancellation_scope = "explicit-standalone-script-after-final-event-reply-not-in-flight-device-interruption"
+appkit_cancellation_option = "--window-cancel-after-events"
+appkit_cancellation_admission = "requires-event-script-no-parent-and-declared-bundle-capability"
+appkit_cancellation_polling = "free-window-retain-ticket-stop-normal-poll-defer-os-termination"
+appkit_cancellation_exit = "130-on-host-receipt-1-on-missing-receipt-never-success"
+appkit_cancellation_provider_boundary = "eof-without-finish-remains-error-old-replay-preserved-no-drain-claim"
 parent_cancellation_wired = false
-evidence = "gated-ipc-callback-finish-races-first-fault-window-and-ticket-ffi-ownership-compiled-nuis-window-host-retirement"
+evidence = "gated-ipc-callback-finish-races-first-fault-window-and-ticket-ffi-ownership-compiled-nuis-window-host-retirement-generated-host-receipt-policy-live-metal-scripted-cancel-and-compiled-replay-exit130"
 dependency_evidence = "independent-recording-policy-before-io-after-admission-before-finalization-and-direct-dependency-guards"
 
 [window_session]

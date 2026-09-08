@@ -41,7 +41,7 @@ fn handle_run_artifact_options(
     }
     let doctor = probe_artifact_doctor(&input);
     if let Some(options) = &window_options {
-        window_session::validate(&doctor, options.parent.is_some())?;
+        window_session::validate(&doctor, options)?;
     }
     if let Some(output) = frame_output.as_deref() {
         frame_export::validate(&doctor, output)?;
@@ -154,6 +154,9 @@ fn handle_run_artifact_options(
         }
         if let Some(parent) = &options.parent {
             command.arg("--window-parent-session").arg(parent);
+        }
+        if options.cancel_after_events {
+            command.arg("--window-cancel-after-events");
         }
     }
     if let Some(output) = frame_output.as_deref() {
