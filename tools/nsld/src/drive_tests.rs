@@ -658,7 +658,7 @@ fn write_test_build_manifest_with_packaging_mode(dir: &Path, packaging_mode: &st
         ast_path: ast.display().to_string(),
         nir_path: nir.display().to_string(),
         yir_path: yir.display().to_string(),
-        llvm_ir_path: ll.display().to_string(),
+        llvm_ir_path: Some(ll.display().to_string()),
         binary_path: bin.display().to_string(),
         packaging_mode: packaging_mode.to_owned(),
         host_objects: Vec::new(),

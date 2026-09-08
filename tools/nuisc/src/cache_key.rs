@@ -23,7 +23,7 @@ pub fn compute_compile_cache_key_with_plan(
     compute_compile_cache_key_with_plan_and_identity(input, project, plan, None)
 }
 
-fn compute_compile_cache_key_with_plan_and_identity(
+pub fn compute_compile_cache_key_with_plan_and_identity(
     input: &Path,
     project: Option<&LoadedProject>,
     plan: Option<&ProjectCompilationPlan>,

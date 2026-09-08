@@ -1,4 +1,5 @@
 use super::*;
+use std::path::Path;
 use yir_runtime_host::{
     run_application_script, ApplicationPumpOperation, ApplicationScript, ApplicationScriptOutcome,
     ApplicationScriptTermination, NuisApplicationCancellationReceipt, ProviderDrainObservation,
@@ -17,6 +18,31 @@ fn script(termination: ApplicationScriptTermination) -> ApplicationScript {
         open: vec![10],
         events: vec![vec![1], vec![2]],
         termination,
+    }
+}
+
+#[test]
+fn headless_script_checks_all_scalar_calls_before_effects_or_provider_setup() {
+    let valid = script(ApplicationScriptTermination::Close(vec![1]));
+    valid.validate_source(&source()).unwrap();
+    for case in 0..4 {
+        let mut invalid = valid.clone();
+        match case {
+            0 => invalid.id = "missing".to_owned(),
+            1 => invalid.open.clear(),
+            2 => invalid.events.push(vec![]),
+            _ => invalid.termination = ApplicationScriptTermination::Close(vec![]),
+        }
+        assert!(invalid.validate_source(&source()).is_err());
+        let error = run_application_script(
+            source(),
+            ApplicationProviderSource::Replay(Path::new("missing-script-test-replay")),
+            invalid,
+            Duration::from_secs(1),
+            |_| panic!("invalid script observed effects"),
+        )
+        .unwrap_err();
+        assert!(!error.contains("missing-script-test-replay"), "{error}");
     }
 }
 

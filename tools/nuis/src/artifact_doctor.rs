@@ -245,6 +245,7 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     }
 
     let mut manifest_verified = false;
+    let mut headless_application = false;
     let mut artifact_verified = false;
     let mut manifest_verify_error = None;
     let mut artifact_verify_error = None;
@@ -262,6 +263,7 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
         match nuisc::aot::verify_build_manifest(path) {
             Ok(report) => {
                 manifest_verified = true;
+                headless_application = report.packaging_mode == "headless-aot-bundle";
                 artifact_path = Some(PathBuf::from(&report.artifact_path));
                 binary_path =
                     Some(Path::new(&report.output_dir).join(&report.artifact_binary_name));
@@ -376,6 +378,12 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
                 .map(|path| format!("nsdb materialize-provider-samples {} --json", path.display()))
                 .unwrap_or_else(|| "nsdb materialize-provider-samples <output-dir> --json".to_owned()),
             "device provider sample materialization is blocked, so inspect the provider output payload diagnostics before replaying nsdb".to_owned(),
+        )
+    } else if ready_to_run && headless_application {
+        (
+            "run_application_script".to_owned(),
+            format!("nuis run-artifact {} --application-session <id> --open-args <i64,...> --close-args <i64,...>", output_dir.as_deref().unwrap_or_else(|| Path::new("<output-dir>")).display()),
+            "the headless bundle is verified; supply the registered application's explicit scalar script before preparing its provider".to_owned(),
         )
     } else if ready_to_run {
         (

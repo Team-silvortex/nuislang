@@ -10,6 +10,17 @@ struct AssembledCodegenRegistries {
     llvm_branch_effects: BranchEffectLlvmEmitterRegistry,
 }
 
+pub(crate) fn verify_module_with_loaded_nustar(
+    module: &YirModule,
+    package_ids: &[String],
+) -> Result<(), String> {
+    let manifests = package_ids
+        .iter()
+        .map(|id| crate::registry::load_manifest(Path::new(NUSTAR_REGISTRY_ROOT), id))
+        .collect::<Result<Vec<_>, _>>()?;
+    yir_verify::verify_module_with_registry(module, &assemble_semantic_registry(&manifests)?)
+}
+
 pub(crate) fn emit_module_with_loaded_nustar(
     module: &YirModule,
     package_ids: &[String],
@@ -31,15 +42,9 @@ pub(crate) fn emit_module_with_loaded_nustar(
 fn assemble_codegen_registries(
     manifests: &[NustarPackageManifest],
 ) -> Result<AssembledCodegenRegistries, String> {
-    let mut yir = ModRegistry::new();
+    let yir = assemble_semantic_registry(manifests)?;
     let mut llvm_branch_effects = BranchEffectLlvmEmitterRegistry::new();
     for manifest in manifests {
-        if !yir_verify::register_static_nustar_semantics(&manifest.yir_lowering_entry, &mut yir) {
-            return Err(format!(
-                "loaded nustar package `{}` has no static YIR semantic provider for `{}`",
-                manifest.package_id, manifest.yir_lowering_entry
-            ));
-        }
         yir_lower_llvm::register_static_nustar_branch_effect_emitters(
             &manifest.yir_lowering_entry,
             &mut llvm_branch_effects,
@@ -49,6 +54,19 @@ fn assemble_codegen_registries(
         yir,
         llvm_branch_effects,
     })
+}
+
+fn assemble_semantic_registry(manifests: &[NustarPackageManifest]) -> Result<ModRegistry, String> {
+    let mut yir = ModRegistry::new();
+    for manifest in manifests {
+        if !yir_verify::register_static_nustar_semantics(&manifest.yir_lowering_entry, &mut yir) {
+            return Err(format!(
+                "loaded nustar package `{}` has no static YIR semantic provider for `{}`",
+                manifest.package_id, manifest.yir_lowering_entry
+            ));
+        }
+    }
+    Ok(yir)
 }
 
 #[cfg(test)]

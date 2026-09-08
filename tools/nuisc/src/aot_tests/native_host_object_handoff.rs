@@ -68,14 +68,9 @@ fn native_compile_embeds_real_relocatable_host_objects() {
         verify_build_manifest(&restored_output.join("nuis.build.manifest.toml")).unwrap();
     assert_eq!(manifest_report.compile_cache_status.as_deref(), Some("hit"));
 
-    let cache_key = crate::cache::compute_compile_cache_key(&input, None).unwrap();
-    fs::remove_file(
-        cache_key
-            .root
-            .join(&cache_key.key)
-            .join("main.host-program.o"),
-    )
-    .unwrap();
+    let cache_entry = PathBuf::from(manifest_report.compile_cache_root.unwrap())
+        .join(manifest_report.compile_cache_key.unwrap());
+    fs::remove_file(cache_entry.join("main.host-program.o")).unwrap();
     crate::run(crate::cli::CommandKind::Compile {
         input: input.clone(),
         output_dir: repaired_output.clone(),
@@ -94,6 +89,6 @@ fn native_compile_embeds_real_relocatable_host_objects() {
         Some("miss")
     );
 
-    let _ = fs::remove_dir_all(cache_key.root.join(cache_key.key));
+    let _ = fs::remove_dir_all(cache_entry);
     fs::remove_dir_all(dir).unwrap();
 }

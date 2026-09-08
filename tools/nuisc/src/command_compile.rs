@@ -164,10 +164,19 @@ pub(crate) fn run_compile_resolved(
         cpu_abi.as_deref(),
         target.as_deref(),
     )?;
-    let cache_key = cache::compute_compile_cache_key_with_plan(
+    // Explicit host selections must not reuse a differently packaged image.
+    let cache_identity =
+        (packaging_mode.is_some() || cpu_abi.is_some() || target.is_some()).then(|| {
+            format!(
+                "aot-host-v1:{:?}:{:?}:{:?}",
+                requested_packaging_mode, cpu_target.abi, cpu_target.clang_target
+            )
+        });
+    let cache_key = cache::compute_compile_cache_key_with_plan_and_identity(
         &input,
         resolved.project.as_ref(),
         resolved.project_plan.as_ref(),
+        cache_identity.as_deref(),
     )?;
     let cache_hit = match cache_policy {
         CompileCachePolicy::Reuse => cache::lookup_compile_cache(&cache_key)?,
@@ -175,41 +184,56 @@ pub(crate) fn run_compile_resolved(
     };
     let compile_fresh = || -> Result<(aot::CompileArtifacts, Vec<String>), String> {
         let source = resolved.source_text()?;
-        let artifacts = resolved
-            .compile_with_options(&pipeline::PipelineCompileOptions {
+        let checkpoint = resolved
+            .compile_to_verified_yir(&pipeline::PipelineCompileOptions {
                 lowering_target: Some(lowering::LoweringTargetConfig::from_cpu_build_target(
                     &cpu_target,
                 )),
             })
             .map_err(|error| format!("targeted project compilation failed: {error}"))?;
-        let mut written = aot::write_and_link_with_source(
+        let llvm_ir = if requested_packaging_mode == Some("headless-aot-bundle") {
+            None
+        } else {
+            Some(
+                crate::nustar_codegen_registry::emit_module_with_loaded_nustar(
+                    &checkpoint.yir,
+                    &checkpoint.loaded_nustar,
+                )
+                .map_err(|error| format!("targeted LLVM compilation failed: {error}"))?,
+            )
+        };
+        let written = aot::write_and_link_with_source_and_packaging_mode(
             &resolved.effective_input_path,
             &output_dir,
             &source,
             aot::AotCompileProgram {
-                ast: &artifacts.ast,
-                nir: &artifacts.nir,
-                yir: &artifacts.yir,
-                llvm_ir: &artifacts.llvm_ir,
+                ast: &checkpoint.ast,
+                nir: &checkpoint.nir,
+                yir: &checkpoint.yir,
+                llvm_ir: llvm_ir.as_deref(),
             },
             &cpu_target,
+            requested_packaging_mode,
         )
         .map_err(|error| format!("AOT write/link failed: {error}"))?;
-        if let Some(packaging_mode) = requested_packaging_mode {
-            written.packaging_mode = packaging_mode.to_owned();
-        }
-        Ok((written, artifacts.loaded_nustar))
+        Ok((written, checkpoint.loaded_nustar))
     };
     let (written, loaded_nustar, used_cache_restore) = if let Some(entry) = &cache_hit {
         let restored = cache::restore_compile_cache(entry, &output_dir)
             .and_then(|_| aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml")))
             .and_then(|manifest| {
-                let packaging_mode =
-                    requested_packaging_mode.unwrap_or(manifest.packaging_mode.as_str());
+                if requested_packaging_mode.is_some_and(|mode| mode != manifest.packaging_mode)
+                    || (requested_packaging_mode.is_none()
+                        && manifest.packaging_mode == "headless-aot-bundle")
+                {
+                    return Err(
+                        "cached AOT packaging does not match the requested host profile".to_owned(),
+                    );
+                }
                 aot::compile_artifacts_for_output_dir_with_packaging_mode(
                     &resolved.effective_input_path,
                     &output_dir,
-                    packaging_mode,
+                    &manifest.packaging_mode,
                 )
                 .map(|written| (written, manifest.loaded_nustar))
             });
@@ -479,7 +503,11 @@ pub(crate) fn run_compile_resolved(
         println!("ast: {}", written.ast_path);
         println!("nir: {}", written.nir_path);
         println!("yir: {}", written.yir_path);
-        println!("llvm_ir: {}", written.llvm_ir_path);
+        if let Some(path) = &written.llvm_ir_path {
+            println!("llvm_ir: {path}");
+        } else {
+            println!("compiler_checkpoint: verified-yir (LLVM not requested)");
+        }
         println!("packaging_mode: {}", written.packaging_mode);
         println!("binary: {}", written.binary_path);
         println!(
@@ -519,9 +547,9 @@ pub(crate) fn run_compile_resolved(
 
 fn validate_packaging_mode(packaging_mode: &str) -> Result<&str, String> {
     match packaging_mode {
-        "native-cpu-llvm" | "window-aot-bundle" | "nuis-self-contained-image" => Ok(packaging_mode),
+        "native-cpu-llvm" | "window-aot-bundle" | "headless-aot-bundle" | "nuis-self-contained-image" => Ok(packaging_mode),
         other => Err(format!(
-            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, or `nuis-self-contained-image`"
+            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, `headless-aot-bundle`, or `nuis-self-contained-image`"
         )),
     }
 }

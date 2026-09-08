@@ -20,6 +20,14 @@ use crate::aot_verify_report::NuisCompiledArtifactVerifyReport;
 
 static VERIFY_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+struct VerificationDirectory(std::path::PathBuf);
+
+impl Drop for VerificationDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 pub(crate) fn verify_nuis_compiled_artifact_impl(
     path: &Path,
 ) -> Result<NuisCompiledArtifactVerifyReport, String> {
@@ -71,6 +79,7 @@ pub(crate) fn verify_nuis_compiled_artifact_impl(
     ));
     fs::create_dir(&temp_root)
         .map_err(|error| format!("failed to create `{}`: {error}", temp_root.display()))?;
+    let _cleanup = VerificationDirectory(temp_root.clone());
 
     let manifest_path = temp_root.join("nuis.build.manifest.toml");
     let envelope_path = temp_root.join("nuis.executable.envelope.toml");
@@ -96,7 +105,6 @@ pub(crate) fn verify_nuis_compiled_artifact_impl(
         .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
 
     let manifest_report = verify_build_manifest(&manifest_path)?;
-    let _ = fs::remove_dir_all(&temp_root);
 
     let host_object_ids = artifact
         .host_objects

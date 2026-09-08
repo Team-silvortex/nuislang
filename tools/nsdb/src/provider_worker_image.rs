@@ -114,7 +114,7 @@ pub(crate) fn resolve_provider_worker_image(
             ast: &pipeline.ast,
             nir: &pipeline.nir,
             yir: &pipeline.yir,
-            llvm_ir: &pipeline.llvm_ir,
+            llvm_ir: Some(&pipeline.llvm_ir),
         },
         &target,
     )?;

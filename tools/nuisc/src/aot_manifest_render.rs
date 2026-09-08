@@ -127,6 +127,9 @@ pub(crate) fn render_build_manifest_source(
     }
 
     append_artifact_hash_manifest_sections(&mut out, &input.artifact_set.artifacts)?;
+    if input.packaging_mode == "headless-aot-bundle" {
+        crate::aot_application_bundle::append_sources(&mut out, &input.artifact_set.artifacts)?;
+    }
 
     append_execution_contract_manifest_sections(&mut out, input.execution_contracts);
     append_domain_build_unit_manifest_sections(&mut out, input.domain_build_units);

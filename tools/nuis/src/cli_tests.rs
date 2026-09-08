@@ -700,6 +700,7 @@ fn parses_run_artifact_with_manifest_input() {
             json: false,
             frame_output: None,
             window_session: None,
+            application_session: None,
         }
     );
 }
@@ -722,6 +723,7 @@ fn parses_run_artifact_json_with_manifest_input() {
             json: true,
             frame_output: None,
             window_session: None,
+            application_session: None,
         }
     );
 }

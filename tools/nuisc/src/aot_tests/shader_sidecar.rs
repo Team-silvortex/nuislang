@@ -10,7 +10,7 @@ fn build_manifest_emits_shader_ir_sidecar() {
     let bin = dir.join("demo.bin");
     fs::write(&ast, "ast").unwrap();
     fs::write(&nir, "nir").unwrap();
-    fs::write(&yir, "yir").unwrap();
+    fs::write(&yir, "yir 0.1\n").unwrap();
     fs::write(&ll, "llvm").unwrap();
     fs::write(&bin, "bin").unwrap();
 
@@ -18,7 +18,7 @@ fn build_manifest_emits_shader_ir_sidecar() {
         ast_path: ast.display().to_string(),
         nir_path: nir.display().to_string(),
         yir_path: yir.display().to_string(),
-        llvm_ir_path: ll.display().to_string(),
+        llvm_ir_path: Some(ll.display().to_string()),
         binary_path: bin.display().to_string(),
         packaging_mode: "native-cpu-llvm".to_owned(),
         host_objects: Vec::new(),

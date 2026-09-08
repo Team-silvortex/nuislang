@@ -10,26 +10,31 @@ pub(crate) fn requires_window_bundle(yir: &YirModule) -> bool {
         .any(|node| node.op.module == "cpu" && node.op.instruction == "window")
 }
 
-pub(crate) fn build_window_bundle(
+pub(crate) fn build_application_bundle(
     yir_path: &Path,
     output_dir: &Path,
-    exe_path: &Path,
     cpu_target: &CpuBuildTarget,
-) -> Result<(String, String), String> {
+    headless: bool,
+) -> Result<(), String> {
     if cpu_target.cross_compile {
         return Err(format!(
-            "window AOT bundle packaging does not support cross-compiling yet; requested `{}` -> {}",
+            "application AOT bundle packaging does not support cross-compiling yet; requested `{}` -> {}",
             cpu_target.abi, cpu_target.clang_target
         ));
     }
-    let output = Command::new("cargo")
+    let mut command = Command::new("cargo");
+    command
         .arg("run")
         .arg("-p")
         .arg("yir-pack-aot")
         .arg("--")
         .arg(yir_path)
         .arg(output_dir)
-        .arg("4")
+        .arg("4");
+    if headless {
+        command.arg("--headless");
+    }
+    let output = command
         .output()
         .map_err(|error| format!("failed to invoke cargo for yir-pack-aot: {error}"))?;
 
@@ -41,10 +46,7 @@ pub(crate) fn build_window_bundle(
         ));
     }
 
-    Ok((
-        exe_path.display().to_string(),
-        "window-aot-bundle".to_owned(),
-    ))
+    Ok(())
 }
 
 pub(crate) fn compile_native_binary(

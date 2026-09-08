@@ -170,6 +170,40 @@ pub(crate) fn verify_manifest_artifacts(
             path,
         )?;
     }
+    if core.packaging_mode == "headless-aot-bundle" {
+        crate::aot_application_bundle::verify_sources(source, path, &artifacts)?;
+        for (kind, name) in [
+            ("application_bundle", "bundle.txt".to_owned()),
+            ("yir", format!("{}.yir", core.artifact_binary_name)),
+            (
+                "compiler_source",
+                format!("{}.source.ns", core.artifact_binary_name),
+            ),
+            (
+                "compiler_tokens",
+                format!("{}.tokens.txt", core.artifact_binary_name),
+            ),
+            ("ast", format!("{}.ast.txt", core.artifact_binary_name)),
+            ("nir", format!("{}.nir.txt", core.artifact_binary_name)),
+            (
+                "compiler_stage_handoff",
+                "nuis.compiler-stage-handoff.toml".to_owned(),
+            ),
+            ("binary", core.artifact_binary_name.clone()),
+        ] {
+            let rows = artifacts
+                .iter()
+                .filter(|item| item.kind == kind)
+                .collect::<Vec<_>>();
+            let expected = Path::new(&core.output_dir).join(name);
+            if rows.len() != 1 || Path::new(&rows[0].path) != expected {
+                return Err(format!(
+                    "headless bundle requires exactly one hash-bound `{kind}` at `{}`",
+                    expected.display()
+                ));
+            }
+        }
+    }
 
     let parsed_envelope = parse_nuis_executable_envelope(Path::new(&core.envelope_path))?;
     if parsed_envelope.schema != core.envelope_schema {
@@ -227,6 +261,14 @@ pub(crate) fn verify_manifest_artifacts(
             "`{}` nuis artifact embedded build manifest does not match manifest source",
             path.display()
         ));
+    }
+    if core.packaging_mode == "headless-aot-bundle" {
+        let binary = Path::new(&core.output_dir).join(&core.artifact_binary_name);
+        let bytes =
+            fs::read(&binary).map_err(|error| format!("cannot read headless binary: {error}"))?;
+        if bytes != parsed_artifact.binary_blob {
+            return Err("headless binary does not match the compiled artifact image".to_owned());
+        }
     }
     if parsed_artifact.envelope != parsed_envelope {
         return Err(format!(

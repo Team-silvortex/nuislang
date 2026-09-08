@@ -612,8 +612,11 @@ fn run() -> Result<std::process::ExitCode, String> {
             target,
             packaging_mode,
         )?,
-        cli::CommandKind::RunArtifact { input, json, frame_output, window_session } => {
-            if let Some(options) = window_session {
+        cli::CommandKind::RunArtifact { input, json, frame_output, window_session, application_session } => {
+            if let Some(script) = application_session {
+                return artifact_runtime_command::handle_run_artifact_with_application_script(input, script)
+                    .map(artifact_runtime_command::ArtifactRunOutcome::exit_code);
+            } else if let Some(options) = window_session {
                 return artifact_runtime_command::handle_run_artifact_with_window(input, options)
                     .map(artifact_runtime_command::ArtifactRunOutcome::exit_code);
             } else {

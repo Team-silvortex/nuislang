@@ -4,7 +4,7 @@ pub struct CompileArtifacts {
     pub ast_path: String,
     pub nir_path: String,
     pub yir_path: String,
-    pub llvm_ir_path: String,
+    pub llvm_ir_path: Option<String>,
     pub binary_path: String,
     pub packaging_mode: String,
     pub host_objects: Vec<CompileHostObject>,

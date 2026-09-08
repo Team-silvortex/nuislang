@@ -9,7 +9,7 @@ use crate::aot_manifest_types::{
     CompileArtifacts, CompileHostObject, CompileStageHandoffArtifacts,
 };
 use crate::aot_native_runner::{
-    build_window_bundle, compile_native_binary, requires_window_bundle,
+    build_application_bundle, compile_native_binary, requires_window_bundle,
 };
 use crate::aot_output_layout::output_layout;
 
@@ -18,7 +18,7 @@ pub struct AotCompileProgram<'a> {
     pub ast: &'a AstModule,
     pub nir: &'a NirModule,
     pub yir: &'a YirModule,
-    pub llvm_ir: &'a str,
+    pub llvm_ir: Option<&'a str>,
 }
 
 pub fn write_and_link(
@@ -38,9 +38,10 @@ pub fn write_and_link(
             ast,
             nir,
             yir,
-            llvm_ir,
+            llvm_ir: Some(llvm_ir),
         },
         cpu_target,
+        None,
     )
 }
 
@@ -51,7 +52,27 @@ pub fn write_and_link_with_source(
     program: AotCompileProgram<'_>,
     cpu_target: &CpuBuildTarget,
 ) -> Result<CompileArtifacts, String> {
-    write_and_link_impl(input, output_dir, Some(source), program, cpu_target)
+    write_and_link_with_source_and_packaging_mode(
+        input, output_dir, source, program, cpu_target, None,
+    )
+}
+
+pub fn write_and_link_with_source_and_packaging_mode(
+    input: &Path,
+    output_dir: &Path,
+    source: &str,
+    program: AotCompileProgram<'_>,
+    cpu_target: &CpuBuildTarget,
+    packaging_mode: Option<&str>,
+) -> Result<CompileArtifacts, String> {
+    write_and_link_impl(
+        input,
+        output_dir,
+        Some(source),
+        program,
+        cpu_target,
+        packaging_mode,
+    )
 }
 
 fn write_and_link_impl(
@@ -60,6 +81,7 @@ fn write_and_link_impl(
     source: Option<&str>,
     program: AotCompileProgram<'_>,
     cpu_target: &CpuBuildTarget,
+    requested_packaging_mode: Option<&str>,
 ) -> Result<CompileArtifacts, String> {
     let AotCompileProgram {
         ast,
@@ -67,6 +89,16 @@ fn write_and_link_impl(
         yir,
         llvm_ir,
     } = program;
+    let packaging_mode = select_packaging_mode(yir, requested_packaging_mode)?;
+    if packaging_mode == "headless-aot-bundle" {
+        if llvm_ir.is_some() || source.is_none() {
+            return Err(
+                "headless packaging requires a verified-YIR source checkpoint, not LLVM".to_owned(),
+            );
+        }
+    } else if llvm_ir.is_none_or(|ir| ir.trim().is_empty()) {
+        return Err("native/window packaging requires a real LLVM checkpoint".to_owned());
+    }
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
 
@@ -95,38 +127,44 @@ fn write_and_link_impl(
             .map_err(|error| format!("failed to write `{}`: {error}", yir_path.display()))?;
         None
     };
-    fs::write(&ll_path, llvm_ir)
-        .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-    fs::write(&shim_path, render_c_shim_source(ast))
-        .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
+    if let Some(llvm_ir) = llvm_ir {
+        fs::write(&ll_path, llvm_ir)
+            .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
+        fs::write(&shim_path, render_c_shim_source(ast))
+            .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
+    }
 
-    let (binary_path, packaging_mode, host_objects) = if requires_window_bundle(yir) {
-        let (binary_path, packaging_mode) =
-            build_window_bundle(&yir_path, output_dir, &exe_path, cpu_target)?;
-        (binary_path, packaging_mode, Vec::new())
-    } else {
-        compile_native_binary(
-            &ll_path,
-            &shim_path,
-            &llvm_object_path,
-            &runtime_object_path,
-            &exe_path,
-            cpu_target,
-        )?;
-        (
-            exe_path.display().to_string(),
-            "native-cpu-llvm".to_owned(),
-            native_host_objects(&llvm_object_path, &runtime_object_path),
-        )
-    };
+    let (binary_path, host_objects) =
+        if matches!(packaging_mode, "window-aot-bundle" | "headless-aot-bundle") {
+            build_application_bundle(
+                &yir_path,
+                output_dir,
+                cpu_target,
+                packaging_mode == "headless-aot-bundle",
+            )?;
+            (exe_path.display().to_string(), Vec::new())
+        } else {
+            compile_native_binary(
+                &ll_path,
+                &shim_path,
+                &llvm_object_path,
+                &runtime_object_path,
+                &exe_path,
+                cpu_target,
+            )?;
+            (
+                exe_path.display().to_string(),
+                native_host_objects(&llvm_object_path, &runtime_object_path),
+            )
+        };
 
     Ok(CompileArtifacts {
         ast_path: ast_path.display().to_string(),
         nir_path: nir_path.display().to_string(),
         yir_path: yir_path.display().to_string(),
-        llvm_ir_path: ll_path.display().to_string(),
+        llvm_ir_path: llvm_ir.map(|_| ll_path.display().to_string()),
         binary_path,
-        packaging_mode,
+        packaging_mode: packaging_mode.to_owned(),
         host_objects,
         stage_handoff,
     })
@@ -174,7 +212,8 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
         ast_path: layout.ast_path.display().to_string(),
         nir_path: layout.nir_path.display().to_string(),
         yir_path: layout.yir_path.display().to_string(),
-        llvm_ir_path: layout.llvm_ir_path.display().to_string(),
+        llvm_ir_path: (packaging_mode != "headless-aot-bundle")
+            .then(|| layout.llvm_ir_path.display().to_string()),
         binary_path: layout.binary_stub_path.display().to_string(),
         packaging_mode: packaging_mode.to_owned(),
         host_objects,
@@ -207,6 +246,72 @@ fn native_host_objects(
 fn is_supported_packaging_mode(packaging_mode: &str) -> bool {
     matches!(
         packaging_mode,
-        "window-aot-bundle" | "native-cpu-llvm" | "nuis-self-contained-image"
+        "window-aot-bundle"
+            | "headless-aot-bundle"
+            | "native-cpu-llvm"
+            | "nuis-self-contained-image"
     )
+}
+
+fn select_packaging_mode(yir: &YirModule, requested: Option<&str>) -> Result<&'static str, String> {
+    let window = requires_window_bundle(yir);
+    match requested {
+        Some("headless-aot-bundle") if !yir.application_sessions.is_empty() => {
+            Ok("headless-aot-bundle")
+        }
+        Some("headless-aot-bundle") => {
+            Err("headless AOT packaging requires a registered application session".to_owned())
+        }
+        Some("native-cpu-llvm") if window => {
+            Err("native CPU packaging cannot replace a required window bundle".to_owned())
+        }
+        Some("window-aot-bundle") if !window => {
+            Err("window AOT packaging requires a window entry".to_owned())
+        }
+        // The self-contained route retains its native bootstrap for Nsld finalization.
+        Some("nuis-self-contained-image") if !window => Ok("nuis-self-contained-image"),
+        None | Some("native-cpu-llvm" | "window-aot-bundle") => Ok(if window {
+            "window-aot-bundle"
+        } else {
+            "native-cpu-llvm"
+        }),
+        Some(other) => Err(format!("incompatible AOT packaging mode `{other}`")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn headless_packaging_is_explicit_and_requires_registration() {
+        let mut yir = YirModule::new("0.1");
+        assert_eq!(
+            select_packaging_mode(&yir, None).unwrap(),
+            "native-cpu-llvm"
+        );
+        assert!(select_packaging_mode(&yir, Some("headless-aot-bundle")).is_err());
+        assert!(select_packaging_mode(&yir, Some("window-aot-bundle")).is_err());
+        yir.application_sessions.push(
+            yir_core::YirApplicationSession::from_fields(&[
+                "counter",
+                yir_core::APPLICATION_SESSION_CONTRACT,
+                "open",
+                "event",
+                "close",
+                "state",
+            ])
+            .unwrap(),
+        );
+        assert_eq!(
+            select_packaging_mode(&yir, Some("headless-aot-bundle")).unwrap(),
+            "headless-aot-bundle"
+        );
+        assert_eq!(
+            select_packaging_mode(&yir, None).unwrap(),
+            "native-cpu-llvm"
+        );
+        assert!(select_packaging_mode(&yir, Some("unknown")).is_err());
+        assert!(is_supported_packaging_mode("headless-aot-bundle"));
+    }
 }

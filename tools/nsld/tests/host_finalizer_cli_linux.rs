@@ -181,7 +181,7 @@ fn write_multi_dependency_fixture(
             ast_path: ast.display().to_string(),
             nir_path: nir.display().to_string(),
             yir_path: yir.display().to_string(),
-            llvm_ir_path: llvm_ir.display().to_string(),
+            llvm_ir_path: Some(llvm_ir.display().to_string()),
             binary_path: binary.display().to_string(),
             packaging_mode: "native-cpu-llvm".to_owned(),
             host_objects: vec![

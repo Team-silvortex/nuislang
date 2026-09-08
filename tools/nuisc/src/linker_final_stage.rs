@@ -35,6 +35,12 @@ pub(super) fn derive_final_stage(
                 "this route is the protocol-first path for the Nuis-native binary format".to_owned(),
             ],
         ),
+        "headless-aot-bundle" => (
+            "heterogeneous-bundle-pack".to_owned(),
+            "yir-pack-aot".to_owned(),
+            "bundle-packaging".to_owned(),
+            vec!["headless packaging consumes a verified source-to-YIR checkpoint and links the embedded-session host without requesting CPU LLVM codegen; this is not native application callback execution".to_owned()],
+        ),
         "window-aot-bundle" => (
             "heterogeneous-bundle-pack".to_owned(),
             "yir-pack-aot".to_owned(),

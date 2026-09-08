@@ -32,7 +32,7 @@ pub use cache_entry::{
 };
 pub use cache_key::{
     compute_compile_cache_key, compute_compile_cache_key_with_identity,
-    compute_compile_cache_key_with_plan,
+    compute_compile_cache_key_with_plan, compute_compile_cache_key_with_plan_and_identity,
 };
 pub use cache_maintenance::{
     clean_compile_cache, clean_compile_cache_summary, clean_compile_cache_with_plan,

@@ -1,6 +1,43 @@
 use super::*;
 
 #[test]
+fn scalar_script_frontdoor_arguments_roundtrip_at_bounds() {
+    for termination in [
+        ApplicationScriptTermination::Close(vec![i64::MIN; MAX_SCRIPT_ARGUMENTS]),
+        ApplicationScriptTermination::Cancel {
+            drain_provider: false,
+        },
+        ApplicationScriptTermination::Cancel {
+            drain_provider: true,
+        },
+    ] {
+        let script = ApplicationScript {
+            id: "counter".to_owned(),
+            open: vec![i64::MAX; MAX_SCRIPT_ARGUMENTS],
+            events: vec![vec![i64::MIN; MAX_SCRIPT_ARGUMENTS]; MAX_SCRIPT_EVENTS],
+            termination,
+        };
+        let arguments = script.to_arguments().unwrap();
+        assert_eq!(
+            ApplicationScript::from_arguments(
+                &arguments.iter().map(String::as_str).collect::<Vec<_>>()
+            )
+            .unwrap(),
+            script
+        );
+    }
+    assert!(ApplicationScript::from_arguments(&[
+        "--application-session",
+        "bad\0id",
+        "--open-args",
+        "",
+        "--close-args",
+        "",
+    ])
+    .is_err());
+}
+
+#[test]
 fn scalar_script_requires_explicit_and_exclusive_termination() {
     let base = ["--application-session", "counter", "--open-args", "10"];
     assert!(parse(&base).is_err());

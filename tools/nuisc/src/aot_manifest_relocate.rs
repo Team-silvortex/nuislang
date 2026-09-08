@@ -24,6 +24,11 @@ pub fn render_relocated_unpacked_build_manifest(
     binary_path: &Path,
 ) -> Result<String, String> {
     let source = &artifact.build_manifest_source;
+    let headless_inputs = if artifact.packaging_mode == "headless-aot-bundle" {
+        crate::aot_application_bundle::restore_sources(source, output_dir, &artifact.binary_name)?
+    } else {
+        Vec::new()
+    };
     let mut out = String::with_capacity(source.len() + 4096);
     let mut domain_build_units =
         shared_parse_domain_build_unit_blocks(source, Path::new("<artifact>"))
@@ -202,6 +207,14 @@ pub fn render_relocated_unpacked_build_manifest(
     out.push('\n');
 
     out.push_str("[artifacts]\n");
+    for (kind, path) in &headless_inputs {
+        writeln!(
+            out,
+            "{kind} = \"{}\"",
+            escape_toml_string(&path.display().to_string())
+        )
+        .unwrap();
+    }
     writeln!(
         out,
         "binary = \"{}\"",
@@ -235,6 +248,7 @@ pub fn render_relocated_unpacked_build_manifest(
         writeln!(out, "fnv1a64 = \"{}\"", fnv1a64_hex(&bytes)).unwrap();
         out.push('\n');
     }
+    crate::aot_artifact_hash::append_artifact_hash_manifest_sections(&mut out, &headless_inputs)?;
 
     Ok(out)
 }

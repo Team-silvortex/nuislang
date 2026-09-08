@@ -1,4 +1,5 @@
 pub mod aot;
+mod aot_application_bundle;
 mod aot_artifact;
 mod aot_artifact_hash;
 mod aot_c_shim_buffer_runtime;

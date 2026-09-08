@@ -191,6 +191,7 @@ pub enum CommandKind {
         json: bool,
         frame_output: Option<PathBuf>,
         window_session: Option<WindowSessionOptions>,
+        application_session: Option<yir_runtime_host::ApplicationScript>,
     },
     DebugResume {
         input: PathBuf,

@@ -21,6 +21,8 @@ mod pipeline_ffi_owned_utf8;
 mod pipeline_report;
 #[path = "pipeline_units.rs"]
 mod pipeline_units;
+#[path = "pipeline_yir_checkpoint.rs"]
+mod pipeline_yir_checkpoint;
 #[cfg(test)]
 #[path = "pipeline_tests.rs"]
 mod tests;
@@ -30,6 +32,7 @@ pub use pipeline_report::compile_pipeline_report;
 use pipeline_units::{
     collect_loaded_nustar, validate_instantiated_units, validate_used_units_with_local_units,
 };
+pub use pipeline_yir_checkpoint::VerifiedYirArtifacts;
 
 pub struct PipelineArtifacts {
     pub ast: AstModule,
@@ -140,10 +143,17 @@ impl ResolvedCompileInput {
         &self,
         options: &PipelineCompileOptions,
     ) -> Result<PipelineArtifacts, String> {
+        self.compile_to_verified_yir(options)?.emit_llvm()
+    }
+
+    pub fn compile_to_verified_yir(
+        &self,
+        options: &PipelineCompileOptions,
+    ) -> Result<VerifiedYirArtifacts, String> {
         if let (Some(project), Some(plan)) = (&self.project, &self.project_plan) {
-            compile_project_plan_with_options(project, plan, options)
+            compile_project_plan_to_verified_yir(project, plan, options)
         } else {
-            compile_source_path_with_options(&self.input_path, options)
+            compile_source_path_to_verified_yir(&self.input_path, options)
         }
     }
 
@@ -179,16 +189,23 @@ pub fn compile_source_path_with_options(
     path: &Path,
     options: &PipelineCompileOptions,
 ) -> Result<PipelineArtifacts, String> {
+    compile_source_path_to_verified_yir(path, options)?.emit_llvm()
+}
+
+fn compile_source_path_to_verified_yir(
+    path: &Path,
+    options: &PipelineCompileOptions,
+) -> Result<VerifiedYirArtifacts, String> {
     let resolved = resolve_compile_input(path)?;
     if resolved.project.is_some() {
-        return resolved.compile_with_options(options);
+        return resolved.compile_to_verified_yir(options);
     }
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     let ast = crate::frontend::parse_nuis_ast(&source)?;
     let helper_modules = stdlib_library_helpers_for_source_path(path)?;
     if helper_modules.is_empty() {
-        compile_ast_with_options(ast, options)
+        compile_ast_to_verified_yir(ast, options)
     } else {
         compile_ast_with_helper_modules(ast, &helper_modules, options)
     }
@@ -212,6 +229,14 @@ pub fn compile_project_plan_with_options(
     plan: &crate::project::ProjectCompilationPlan,
     options: &PipelineCompileOptions,
 ) -> Result<PipelineArtifacts, String> {
+    compile_project_plan_to_verified_yir(project, plan, options)?.emit_llvm()
+}
+
+fn compile_project_plan_to_verified_yir(
+    project: &crate::project::LoadedProject,
+    plan: &crate::project::ProjectCompilationPlan,
+    options: &PipelineCompileOptions,
+) -> Result<VerifiedYirArtifacts, String> {
     crate::project::ensure_project_abi_selections_valid(project, &plan.abi_resolution)?;
     crate::registry::ensure_project_domain_registry_valid(plan)?;
     crate::project::ensure_project_lowering_selections_valid(&plan.abi_resolution)?;
@@ -244,10 +269,7 @@ pub fn compile_project_plan_with_options(
     crate::project::prune_project_topology_for_codegen(project, &mut artifacts.yir)?;
     crate::project::register_project_application_sessions(project, &mut artifacts.yir)?;
     refresh_loaded_nustar(&mut artifacts)?;
-    artifacts.llvm_ir = crate::nustar_codegen_registry::emit_module_with_loaded_nustar(
-        &artifacts.yir,
-        &artifacts.loaded_nustar,
-    )?;
+    artifacts.verify()?;
     Ok(artifacts)
 }
 
@@ -271,6 +293,13 @@ pub fn compile_ast_with_options(
     ast: AstModule,
     options: &PipelineCompileOptions,
 ) -> Result<PipelineArtifacts, String> {
+    compile_ast_to_verified_yir(ast, options)?.emit_llvm()
+}
+
+fn compile_ast_to_verified_yir(
+    ast: AstModule,
+    options: &PipelineCompileOptions,
+) -> Result<VerifiedYirArtifacts, String> {
     let nir = crate::frontend::lower_ast_to_nir(&ast)?;
     let prepared = prepare_pipeline(
         ast,
@@ -291,14 +320,14 @@ pub fn compile_benchmark_harness_ast(ast: AstModule) -> Result<PipelineArtifacts
         ExternValidationMode::BenchmarkHarness,
         |_, _, _| Ok(()),
     )?;
-    lower_prepared_pipeline(prepared, None)
+    lower_prepared_pipeline(prepared, None)?.emit_llvm()
 }
 
 fn compile_ast_with_helper_modules(
     ast: AstModule,
     helper_modules: &[AstModule],
     options: &PipelineCompileOptions,
-) -> Result<PipelineArtifacts, String> {
+) -> Result<VerifiedYirArtifacts, String> {
     let local_units = helper_modules
         .iter()
         .map(|module| (module.domain.clone(), module.unit.clone()))
@@ -469,7 +498,7 @@ where
 fn lower_prepared_pipeline(
     prepared: PreparedPipeline,
     lowering_target: Option<crate::lowering::LoweringTargetConfig>,
-) -> Result<PipelineArtifacts, String> {
+) -> Result<VerifiedYirArtifacts, String> {
     lower_prepared_pipeline_with_host_entries(prepared, lowering_target, &BTreeSet::new())
 }
 
@@ -477,27 +506,23 @@ fn lower_prepared_pipeline_with_host_entries(
     prepared: PreparedPipeline,
     lowering_target: Option<crate::lowering::LoweringTargetConfig>,
     host_entries: &BTreeSet<String>,
-) -> Result<PipelineArtifacts, String> {
+) -> Result<VerifiedYirArtifacts, String> {
     let yir = crate::lowering::lower_nir_to_yir_with_host_entries(
         &prepared.nir,
         &prepared.lowering_manifest,
         lowering_target.as_ref(),
         host_entries,
     )?;
-    pipeline_ffi_owned_buffer::validate_owned_return_buffer_yir(&yir)?;
-    pipeline_ffi_owned_object::validate_owned_return_object_yir(&yir)?;
-    pipeline_ffi_owned_utf8::validate_owned_return_utf8_yir(&yir)?;
     let loaded_nustar =
         collect_loaded_nustar(&prepared.nir, &yir, &prepared.lowering_manifest.package_id)?;
-    let llvm_ir =
-        crate::nustar_codegen_registry::emit_module_with_loaded_nustar(&yir, &loaded_nustar)?;
-    Ok(PipelineArtifacts {
+    let artifacts = VerifiedYirArtifacts {
         ast: prepared.ast,
         nir: prepared.nir,
         yir,
-        llvm_ir,
         loaded_nustar,
-    })
+    };
+    artifacts.verify()?;
+    Ok(artifacts)
 }
 
 fn project_lowering_target_for_domain(
@@ -522,7 +547,7 @@ fn project_lowering_target_for_domain(
     ))
 }
 
-fn refresh_loaded_nustar(artifacts: &mut PipelineArtifacts) -> Result<(), String> {
+fn refresh_loaded_nustar(artifacts: &mut VerifiedYirArtifacts) -> Result<(), String> {
     let lowering_manifest = crate::registry::load_manifest_for_domain(
         Path::new(NUSTAR_REGISTRY_ROOT),
         &artifacts.nir.domain,

@@ -677,7 +677,7 @@ fn write_native_cpu_fixture_with_objects(
             ast_path: ast.display().to_string(),
             nir_path: nir.display().to_string(),
             yir_path: yir.display().to_string(),
-            llvm_ir_path: ll.display().to_string(),
+            llvm_ir_path: Some(ll.display().to_string()),
             binary_path: bin.display().to_string(),
             packaging_mode: "native-cpu-llvm".to_owned(),
             host_objects: vec![

@@ -8,8 +8,10 @@ connection across host events instead of replaying that three-frame program.
 The same registrations can now be packaged with a separate
 [headless scalar-script host](../../../../docs/reference/nuis-yir-application-scalar-script-v1.md).
 It does not link AppKit; the real Metal regression verifies exact frame hashes,
-normal completion and explicit provider drain. Ordinary `run-artifact` profile
-selection is still pending; this first entry is opt-in through `yir-pack-aot`.
+normal completion and explicit provider drain. Ordinary `nuis build` selects
+`--packaging-mode headless-aot-bundle`; `run-artifact --application-session window`
+uses the same scalar script after capability and binary-identity admission.
+The linked contract includes reproducible build, event, close and drain commands.
 
 ## Data Path
 

@@ -214,6 +214,10 @@ fn run() -> Result<(), String> {
 
     if headless {
         manifest.push("render_mode=application_session_observation".to_owned());
+        manifest.push(format!(
+            "application_yir_fnv1a64={}",
+            yir_core::provider_runtime_ipc::hash_bytes(source.as_bytes())
+        ));
     } else if runtime_frame_support.is_some() {
         manifest.push("render_mode=runtime_tick".to_owned());
         if let Some(frame_bundle) = &frame_bundle {

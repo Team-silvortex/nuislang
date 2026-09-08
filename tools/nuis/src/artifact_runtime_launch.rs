@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "artifact_runtime_application_script.rs"]
+mod application_script;
 #[path = "artifact_runtime_frame_export.rs"]
 mod frame_export;
 #[path = "artifact_runtime_window_session.rs"]
@@ -43,14 +45,21 @@ pub(crate) fn handle_run_artifact_with_frame_output(
     json: bool,
     frame_output: Option<PathBuf>,
 ) -> Result<(), String> {
-    handle_run_artifact_options(input, json, frame_output, None)?.require_completed()
+    handle_run_artifact_options(input, json, frame_output, None, None)?.require_completed()
 }
 
 pub(crate) fn handle_run_artifact_with_window(
     input: PathBuf,
     options: crate::cli::WindowSessionOptions,
 ) -> Result<ArtifactRunOutcome, String> {
-    handle_run_artifact_options(input, false, None, Some(options))
+    handle_run_artifact_options(input, false, None, Some(options), None)
+}
+
+pub(crate) fn handle_run_artifact_with_application_script(
+    input: PathBuf,
+    script: yir_runtime_host::ApplicationScript,
+) -> Result<ArtifactRunOutcome, String> {
+    handle_run_artifact_options(input, false, None, None, Some(script))
 }
 
 fn handle_run_artifact_options(
@@ -58,6 +67,7 @@ fn handle_run_artifact_options(
     json: bool,
     frame_output: Option<PathBuf>,
     window_options: Option<crate::cli::WindowSessionOptions>,
+    application_options: Option<yir_runtime_host::ApplicationScript>,
 ) -> Result<ArtifactRunOutcome, String> {
     if json && frame_output.is_some() {
         return Err(
@@ -76,6 +86,15 @@ fn handle_run_artifact_options(
         frame_export::validate(&doctor, output)?;
     }
     let resolved_binary_result = resolve_run_artifact_binary_path(&input);
+    if let Some(script) = &application_options {
+        application_script::validate(
+            &doctor,
+            resolved_binary_result.as_ref().map_err(Clone::clone)?,
+            script,
+        )?;
+    } else {
+        application_script::require_explicit_script(&doctor)?;
+    }
     let resolved_binary = resolved_binary_result.as_ref().ok();
     let prelaunch = run_artifact_prelaunch_summary(
         doctor.output_dir.as_deref(),
@@ -173,6 +192,14 @@ fn handle_run_artifact_options(
         .transpose()?
         .flatten();
     let mut command = Command::new(&binary);
+    if let Some(script) = &application_options {
+        if runtime_provider_results.is_none() {
+            return Err(
+                "registered application launch requires a prepared runtime provider".to_owned(),
+            );
+        }
+        command.args(script.to_arguments()?);
+    }
     if let Some(options) = &window_options {
         if runtime_provider_results.is_none() {
             return Err("registered window launch requires a prepared runtime provider".to_owned());
@@ -200,6 +227,14 @@ fn handle_run_artifact_options(
     if window_options
         .as_ref()
         .is_some_and(|options| options.drain_provider)
+        || application_options.as_ref().is_some_and(|script| {
+            matches!(
+                script.termination,
+                yir_runtime_host::ApplicationScriptTermination::Cancel {
+                    drain_provider: true
+                }
+            )
+        })
     {
         use crate::artifact_runtime_provider_results::{
             ProviderLaunchOutcome, ProviderLaunchPolicy,
@@ -225,9 +260,10 @@ fn handle_run_artifact_options(
     }
     let (status, runtime_invocations) = match runtime_provider_results.as_ref() {
         Some(prepared)
-            if window_options
-                .as_ref()
-                .is_some_and(|options| options.events.is_some()) =>
+            if application_options.is_some()
+                || window_options
+                    .as_ref()
+                    .is_some_and(|options| options.events.is_some()) =>
         {
             prepared.run_command_bounded(&mut command, std::time::Duration::from_secs(180))?
         }
@@ -239,6 +275,16 @@ fn handle_run_artifact_options(
             0,
         ),
     };
+    if !status.success() {
+        return Err(format!(
+            "artifact binary `{}` exited with status {:?}",
+            binary.display(),
+            status.code()
+        ));
+    }
+    if let Some(output) = frame_output.as_deref() {
+        frame_export::verify_output(output)?;
+    }
     if success_logs_enabled() {
         println!("run-artifact: {}", binary.display());
         if let Some(prepared) = runtime_provider_results.as_ref() {
@@ -301,15 +347,5 @@ fn handle_run_artifact_options(
             .print_text();
         print_run_artifact_link_plan_status(link_plan.as_ref());
     }
-    if status.success() {
-        if let Some(output) = frame_output.as_deref() {
-            frame_export::verify_output(output)?;
-        }
-        return Ok(ArtifactRunOutcome::Completed);
-    }
-    Err(format!(
-        "artifact binary `{}` exited with status {:?}",
-        binary.display(),
-        status.code()
-    ))
+    Ok(ArtifactRunOutcome::Completed)
 }

@@ -65,9 +65,14 @@ cancelled work as successful launch/trace evidence. The terminal contract and
 launch policy have no OS/window/backend dependency. A separate
 [headless scalar-script profile](reference/nuis-yir-application-scalar-script-v1.md)
 now packages the same pump without AppKit, with compiled protocol and real M2
-image/drain evidence. The next boundary is explicit profile selection and
-capability admission through ordinary `nuis build/run-artifact`; currently the
-headless option belongs to `yir-pack-aot`. Linux hardware and Windows transport
+image/drain evidence. Ordinary `nuis build/run-artifact` now select
+`headless-aot-bundle`, verify exact capabilities, scalar signatures and image
+identity before preparing providers, and reuse the existing typed launch policy.
+Explicit host selections are cache-isolated. Headless builds now consume a
+verified-YIR checkpoint without CPU LLVM codegen. The complete source-to-YIR
+handoff travels with the artifact; no empty LLVM file substitutes for a stage.
+The next boundary is checkpoint-aware check/dump/inspection reporting rather than
+requiring native codegen to inspect an embedded application. Linux hardware and Windows transport
 are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.
 The default host-only path acknowledges its own scope, while the live provider

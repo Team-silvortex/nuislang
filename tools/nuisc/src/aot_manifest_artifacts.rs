@@ -41,9 +41,25 @@ pub(crate) fn prepare_build_manifest_artifacts(
         ("ast".to_owned(), PathBuf::from(&written.ast_path)),
         ("nir".to_owned(), PathBuf::from(&written.nir_path)),
         ("yir".to_owned(), PathBuf::from(&written.yir_path)),
-        ("llvm_ir".to_owned(), PathBuf::from(&written.llvm_ir_path)),
         ("binary".to_owned(), PathBuf::from(&written.binary_path)),
     ];
+    if written.packaging_mode == "headless-aot-bundle" {
+        if written.llvm_ir_path.is_some() || written.stage_handoff.is_none() {
+            return Err(
+                "headless artifacts require a source-to-YIR handoff without LLVM".to_owned(),
+            );
+        }
+        artifacts.push((
+            "application_bundle".to_owned(),
+            output_dir.join("bundle.txt"),
+        ));
+    } else {
+        let llvm_ir_path = written
+            .llvm_ir_path
+            .as_ref()
+            .ok_or_else(|| "native/window artifacts require a real LLVM checkpoint".to_owned())?;
+        artifacts.push(("llvm_ir".to_owned(), PathBuf::from(llvm_ir_path)));
+    }
     if let Some(handoff) = &written.stage_handoff {
         artifacts.extend([
             (

@@ -18,7 +18,7 @@ fn verify_compiled_artifact_preserves_heterogeneous_domain_unit_paths() {
         ast_path: ast.display().to_string(),
         nir_path: nir.display().to_string(),
         yir_path: yir.display().to_string(),
-        llvm_ir_path: ll.display().to_string(),
+        llvm_ir_path: Some(ll.display().to_string()),
         binary_path: bin.display().to_string(),
         packaging_mode: "window-aot-bundle".to_owned(),
         host_objects: Vec::new(),

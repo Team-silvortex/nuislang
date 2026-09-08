@@ -14,8 +14,13 @@ least one registered application session. The output contains an executable,
 embedded YIR and the existing statically linked host runtime. Its generated C
 source is only a process-entry bridge to `nuis_application_script_main`.
 No AppKit/Objective-C host or prerendered fallback frame is selected.
-This profile does not emit or advertise unused CPU LLVM IR/shims, nor claim
-AppKit's affinity worker. Native lowering remains a separate path; an unbound
+Neither the standalone packager nor ordinary headless `nuis build` emits or
+advertises unused CPU LLVM IR/shims, or claims AppKit's affinity worker. The compiler
+selects an explicit verified-YIR checkpoint: frontend/NIR checks, registered Nustar
+semantics, project links, ABI, application registration and FFI ownership checks
+all precede packaging. CPU LLVM is not requested; failure is never caught and
+converted into an empty intermediate. Native/window builds still require a real
+LLVM checkpoint. Native lowering remains a separate path; an unbound
 scalar parameter there now produces a function-context diagnostic, not a panic.
 
 The bundle declares:
@@ -25,6 +30,7 @@ cpu_host_binary_mode=embedded_yir_headless
 runtime_bootstrap_mode=embedded_yir_session
 application_script_contract=nuis-yir-application-scalar-script-v1
 application_provider_drain_contract=nuis-yir-provider-session-drain-v1
+application_yir_fnv1a64=<embedded-source-content-hash>
 ```
 
 The process accepts:
@@ -39,8 +45,9 @@ The process accepts:
 Each argument list has at most 16 values. The whole script has one 180-second
 deadline, not a fresh budget per callback. IDs are 1..128 UTF-8 bytes; argv entries
 are bounded to 512 bytes. Duplicate, unknown, excess, malformed and contradictory
-options fail before session startup. Callback signatures remain validated by the
-registered application contract. This profile supports i64 ingress, not arbitrary
+options fail before session startup. All open/event/close arguments are checked
+against the registered application signature before any callback is admitted.
+This profile supports i64 ingress, not arbitrary
 strings, pointer arguments, interactive stdin or a general scripting language.
 
 ## Termination And Ownership
@@ -70,6 +77,44 @@ Exactly one nonempty provider source must be explicit:
 `NUIS_YIR_PROVIDER_RESULT_STREAM` for identity-bound replay. Neither source,
 both sources, or an empty path fails. No reference-device fallback is selected.
 
+## Ordinary Build And Launch
+
+Select `--packaging-mode headless-aot-bundle` on `nuis build`, or the same
+`packaging_mode` in the project manifest. It actually invokes the headless
+packager; it does not relabel a window binary. Explicit packaging/CPU target
+overrides participate in the compile-cache identity. A restored manifest must
+match the requested profile; default builds cannot adopt a headless cache entry.
+Project manifest selections already participate through the project fingerprint.
+
+`nuis run-artifact` accepts the same scalar-script arguments as the binary.
+It requires a verified headless build manifest and compiled artifact, one
+hash-bound bundle/YIR/binary entry each, exact capability versions and a matching
+executable image. A different binary in the same directory is not admitted.
+The YIR content hash and all scripted signatures are checked before provider
+preparation. These are consistency checks, not cryptographic publisher trust or
+protection against concurrent hostile filesystem replacement.
+
+The manifest's `nuis-headless-build-inputs-v2` section declares
+`headless_compiler_checkpoint = "verified-yir-v1"` and carries exact bundle,
+source, tokens, AST, NIR, YIR and compiler-stage-handoff bytes as hex. Bundle and
+handoff are capped at 1 MiB each, source at 16 MiB, and each other input at 32 MiB;
+the aggregate decoded limit is 64 MiB. Independent artifact verification and
+relocation restore these inputs, verify hashes and the source-to-YIR SHA-256 chain,
+check canonical projections and source/token consistency, and reject missing,
+duplicate, changed inputs or an LLVM artifact claim. Rebuild older v1 headless
+artifacts; an incompatible cached manifest triggers a fresh build.
+They never rebuild capability declarations from the current installation or read
+the original source directory. Failed verification also removes its owned
+temporary directory.
+
+Window, parent-window, JSON and frame-export options cannot be mixed with an
+application script. A headless launch without a script is rejected. Live
+frontdoor cancellation requires `--drain-provider`: host-only retirement remains
+a direct-entry facility, not a substituted live provider receipt. Normal close
+and typed non-success drain share the existing prepared-provider lifecycle and
+180-second supervisor bound. Cancellation never publishes successful launch,
+replay or trace replacement evidence.
+
 ## Reproduce
 
 Run from the repository root with one Cargo job. These tests exercise a compiled
@@ -78,16 +123,31 @@ headless process with a protocol peer, without needing GPU hardware:
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-pack-aot --test headless_session -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-runtime-host --test provider_application_session script:: -j 1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test headless_checkpoint -j 1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib aot_application_bundle -j 1
 ```
 
-The separate real M2 Metal test builds the Nuis image showcase, packages its
-registered callbacks without AppKit, verifies both GPU frames' exact RGBA hashes,
-normal Finish, one/two-frame typed drain, worker removal and preservation of prior
-success evidence. The same binary rejects replay-only drain:
+The separate real M2 Metal test builds the Nuis image showcase through the ordinary
+headless build route, checks same-profile cache restoration and rejects tampered
+capabilities, mismatched binaries and invalid scripts before provider work. Direct
+and frontdoor launches verify normal Finish, one/two-frame typed drain, worker
+removal and preservation of prior success evidence. The binary's GPU frames have
+exact RGBA hashes, no AppKit dependency, and it rejects replay-only drain:
 
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis headless_metal_session_uses_shared_lifecycle_without_appkit -j 1
 ```
+
+For a live M2 Metal launch from the repository root:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- build examples/projects/domains/ns_nova_image_showcase build/ns-nova-headless --packaging-mode headless-aot-bundle
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- run-artifact build/ns-nova-headless --application-session window --open-args 160,120 --event-args 0,0 --event-args 1,32 --close-args 1,0
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- run-artifact build/ns-nova-headless --application-session window --open-args 160,120 --event-args 0,0 --cancel-after-events --drain-provider
+```
+
+The final command intentionally returns 130, not success. `window` is the sample's
+registered ID; the headless launcher does not interpret it as a window policy.
 
 For a manual replay, first build the
 [image showcase](../../examples/projects/domains/ns_nova_image_showcase/README.md)
@@ -103,10 +163,16 @@ env -u NUIS_YIR_PROVIDER_DISPATCH_SOCKET NUIS_YIR_PROVIDER_RESULT_STREAM=build/n
 
 ## Current Boundary
 
-The headless host profile is exposed by the packager. Ordinary `nuis build` and
-`nuis run-artifact` do not yet select or admit this profile; do not relabel an
-existing window bundle to bypass capability/binary validation. Their explicit
-profile selection and shared launch-policy integration are the next task.
+Ordinary `nuis build` and `nuis run-artifact` now select and admit this profile.
+Headless build selection removes the unused CPU LLVM prerequisite without
+fabricating an empty intermediate or weakening the verified stage handoff.
+Check/dump/inspection still use the native-oriented pipeline; making their
+checkpoint selection and stage reporting explicit is the next compiler boundary.
+Supported callback parity is not evidence that every formerly LLVM-rejected
+source shape now works. Compound-condition while lowering can produce a rejected
+flow-chain descriptor at the YIR boundary; the headless route rejects it too.
+Standalone artifact verification preserves all compiler inputs; a relocated full
+device launch still needs its provider environment and separate execution evidence.
 
 This is embedded-YIR execution, not fully native CPU callback lowering or a
 self-contained Nsld application image. The registered live provider remains an

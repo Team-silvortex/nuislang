@@ -205,8 +205,15 @@ ticket and common receipt-to-exit classification. The
 [headless scalar-script entry](nuis-yir-application-scalar-script-v1.md) now reuses
 the common pump without WindowSession or AppKit. Compiled protocol tests and M2
 Metal verify stateful events, exact frame hashes, Finish/drain separation and
-unchanged old evidence. The score remains `active/86`: ordinary build/run-artifact
-profile selection and capability admission are next, not already implemented.
+unchanged old evidence. Ordinary build/run-artifact now select the headless profile,
+bind capabilities and YIR to the verified image, isolate explicit build selections
+in cache and reuse the same provider lifecycle. Headless builds now stop at an
+explicit verified-YIR checkpoint without CPU LLVM generation or dummy intermediates.
+The v2 bounded inputs preserve the complete compiler-stage handoff through artifact
+relocation. The score remains `active/86`: checkpoint-aware check/dump/inspection
+is next. Supported callback parity does not yet certify a new source shape beyond
+former LLVM admission. Compound-condition while lowering still has a rejected YIR
+descriptor shape; this semantic failure is not bypassed by the headless route.
 Linux hardware execution is unverified and Windows transport remains missing;
 no cross-session reuse permission or general device
 cancellation follows from this bounded boundary.

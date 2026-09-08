@@ -39,8 +39,67 @@ pub enum ApplicationScriptOutcome {
 }
 
 impl ApplicationScript {
+    /// Validate every call before admitting any application effects.
+    pub fn validate_source(&self, source: &str) -> Result<(), String> {
+        self.validate()?;
+        let module = yir_syntax::parse_module(source)?;
+        let registration = yir_core::registered_application_session(&module, &self.id)?;
+        let signature =
+            yir_core::ApplicationSessionSignature::bind(&module, registration.entries())?;
+        let check = |parameters: &[yir_core::YirFunctionParameter], arguments: &[i64]| {
+            yir_exec::FunctionSession::validate_arguments(parameters, &values(arguments.to_vec()))
+        };
+        check(&signature.open.parameters, &self.open)?;
+        let state_count = signature.state_parameters.len();
+        for event in &self.events {
+            check(&signature.event.parameters[state_count..], event)?;
+        }
+        if let ApplicationScriptTermination::Close(arguments) = &self.termination {
+            check(&signature.close.parameters[state_count..], arguments)?;
+        }
+        Ok(())
+    }
+
+    /// Share the packaged entry grammar with launchers instead of translating
+    /// application arguments through a window-specific ingress profile.
+    pub fn from_arguments(arguments: &[&str]) -> Result<Self, String> {
+        entry::parse(arguments)
+    }
+
+    pub fn to_arguments(&self) -> Result<Vec<String>, String> {
+        self.validate()?;
+        let scalars = |values: &[i64]| {
+            values
+                .iter()
+                .map(i64::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let mut arguments = vec![
+            "--application-session".to_owned(),
+            self.id.clone(),
+            "--open-args".to_owned(),
+            scalars(&self.open),
+        ];
+        for event in &self.events {
+            arguments.extend(["--event-args".to_owned(), scalars(event)]);
+        }
+        match &self.termination {
+            ApplicationScriptTermination::Close(values) => {
+                arguments.extend(["--close-args".to_owned(), scalars(values)]);
+            }
+            ApplicationScriptTermination::Cancel { drain_provider } => {
+                arguments.push("--cancel-after-events".to_owned());
+                if *drain_provider {
+                    arguments.push("--drain-provider".to_owned());
+                }
+            }
+        }
+        Ok(arguments)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
-        if self.id.is_empty() || self.id.len() > 128 {
+        if self.id.is_empty() || self.id.len() > 128 || self.id.contains('\0') {
             return Err("application script requires a registration ID of 1..128 bytes".to_owned());
         }
         if self.events.len() > MAX_SCRIPT_EVENTS {
@@ -78,6 +137,8 @@ pub fn run_application_script(
         return Err("application script duration must be in (0, 180s]".to_owned());
     }
     let deadline = Instant::now() + timeout;
+    script.validate_source(&source)?;
+    remaining(deadline)?;
     let mut pump = ApplicationEventPump::spawn(source, provider, script.id, values(script.open))?;
     receive(&mut pump, deadline, &mut observe)?;
     for arguments in script.events {

@@ -358,7 +358,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "nuis-yir-application-scalar-script-v1",
             "64 ordered event deliveries",
             "180-second", "neither exit130 nor EOF proves retirement",
-            "not fully native CPU", "do not yet select or admit this profile",
+            "not fully native CPU", "now select and admit this profile",
+            "CPU LLVM is not requested", "not cryptographic publisher trust",
+            "nuis-headless-build-inputs-v2", "verified-yir-v1", "64 MiB",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -387,6 +389,35 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "headless_metal_session_uses_shared_lifecycle_without_appkit",
             "ProviderLaunchOutcome::Drained(receipt)", "ProviderLaunchPolicy::ExplicitDrain",
             "verify_frames", "drain replaced", "Some(130)", "provider_status=2;",
+            "headless-aot-bundle", "handle_run_artifact_with_application_script",
+            "restored.compile_cache_status", "frontdoor_receipt.sequence",
+            "headless_compiler_checkpoint", "unused LLVM artifact",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-application-frontdoor-admission",
+        path: "tools/nuis/src/artifact_runtime_application_script.rs",
+        required_patterns: &[
+            "verify_build_manifest", "verify_nuis_compiled_artifact", "fs::canonicalize",
+            "headless-aot-bundle", "application_yir_fnv1a64", "script.validate_source",
+            "declarations.next().is_some()", "live application cancellation requires --drain-provider",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-verified-yir-checkpoint",
+        path: "tools/nuisc/src/pipeline_yir_checkpoint.rs",
+        required_patterns: &[
+            "VerifiedYirArtifacts", "verify_module_with_loaded_nustar",
+            "validate_owned_return_buffer_yir", "pub fn emit_llvm",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-application-build-selection",
+        path: "tools/nuisc/src/command_compile.rs",
+        required_patterns: &[
+            "compute_compile_cache_key_with_plan_and_identity", "write_and_link_with_source_and_packaging_mode",
+            "cached AOT packaging does not match", "requested_packaging_mode",
+            "compile_to_verified_yir", "llvm_ir.as_deref()",
         ],
     },
 ];

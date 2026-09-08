@@ -10,8 +10,16 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     let mut window_parent = None;
     let mut cancel_after_events = false;
     let mut drain_provider = false;
+    let mut application_arguments = Vec::new();
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--application-session" | "--open-args" | "--event-args" | "--close-args" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| format!("{arg} requires a value"))?;
+                application_arguments.extend([arg, value]);
+            }
+            "--cancel-after-events" => application_arguments.push(arg),
             "--window-cancel-after-events" if !cancel_after_events => cancel_after_events = true,
             "--drain-provider" if !drain_provider => drain_provider = true,
             "--json" if !json => json = true,
@@ -71,6 +79,31 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
             "--json is inspection-only and cannot be combined with --export-frame".to_owned(),
         );
     }
+    let application_session = if application_arguments.is_empty() {
+        None
+    } else {
+        if window_session.is_some()
+            || window_events.is_some()
+            || window_parent.is_some()
+            || cancel_after_events
+            || json
+            || frame_output.is_some()
+        {
+            return Err(
+                "application scripts cannot be combined with window, JSON or frame-export options"
+                    .to_owned(),
+            );
+        }
+        if drain_provider {
+            application_arguments.push("--drain-provider".to_owned());
+        }
+        Some(yir_runtime_host::ApplicationScript::from_arguments(
+            &application_arguments
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        )?)
+    };
     if window_events.is_some() && window_session.is_none() {
         return Err("--window-events requires --window-session".to_owned());
     }
@@ -83,19 +116,20 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
                 .to_owned(),
         );
     }
-    if drain_provider && !cancel_after_events {
+    if drain_provider && !cancel_after_events && application_session.is_none() {
         return Err("--drain-provider requires explicit --window-cancel-after-events".to_owned());
     }
     if window_session.is_some() && (json || frame_output.is_some()) {
         return Err("--window-session cannot be combined with --json or --export-frame".to_owned());
     }
     let input = input.ok_or(
-        "usage: nuis run-artifact [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]]] <artifact>",
+        "usage: nuis run-artifact <artifact> [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]] | --application-session ID --open-args I64,... [--event-args I64,...] (--close-args I64,... | --cancel-after-events --drain-provider)]",
     )?;
     Ok(CommandKind::RunArtifact {
         input,
         json,
         frame_output,
+        application_session,
         window_session: window_session.map(|id| WindowSessionOptions {
             id,
             events: window_events,
@@ -109,6 +143,69 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn application_scripts_use_the_same_scalar_grammar_as_the_packaged_entry() {
+        let args = [
+            "build",
+            "--event-args",
+            "-1,2",
+            "--application-session",
+            "counter",
+            "--open-args",
+            "",
+            "--cancel-after-events",
+            "--drain-provider",
+        ];
+        let CommandKind::RunArtifact {
+            application_session: Some(script),
+            window_session: None,
+            ..
+        } = parse(&mut args.into_iter().map(str::to_owned)).unwrap()
+        else {
+            panic!("expected a non-window application script")
+        };
+        assert_eq!(script.events, [vec![-1, 2]]);
+        assert_eq!(
+            script.termination,
+            yir_runtime_host::ApplicationScriptTermination::Cancel {
+                drain_provider: true
+            }
+        );
+        let close = [
+            "build",
+            "--application-session",
+            "counter",
+            "--open-args",
+            "",
+            "--close-args",
+            "",
+        ];
+        assert!(parse(&mut close.into_iter().map(str::to_owned)).is_ok());
+        for extra in [
+            vec!["--window-session", "ui"],
+            vec!["--window-events", ""],
+            vec!["--window-parent-session", "parent"],
+            vec!["--window-cancel-after-events"],
+            vec!["--json"],
+            vec!["--export-frame", "a.ppm"],
+            vec!["--cancel-after-events"],
+            vec!["--drain-provider"],
+            vec!["--open-args", "1"],
+            vec!["--event-args", "1,"],
+            vec!["--application-session", "other"],
+        ] {
+            let arguments = [close.as_slice(), &extra].concat();
+            assert!(parse(&mut arguments.into_iter().map(str::to_owned)).is_err());
+        }
+        for args in [
+            vec!["build", "--event-args", "1"],
+            vec!["build", "--application-session", "counter"],
+            vec!["build", "--open-args", ""],
+        ] {
+            assert!(parse(&mut args.into_iter().map(str::to_owned)).is_err());
+        }
+    }
 
     #[test]
     fn provider_drain_is_opt_in_and_requires_explicit_cancellation() {
@@ -326,6 +423,7 @@ mod tests {
                 input: "build".into(),
                 json: false,
                 frame_output: None,
+                application_session: None,
                 window_session: Some(WindowSessionOptions {
                     id: "ui".to_owned(),
                     events: Some("32,128578".to_owned()),
@@ -384,6 +482,7 @@ mod tests {
                     json: false,
                     frame_output: Some(PathBuf::from("frames/a b.ppm")),
                     window_session: None,
+                    application_session: None,
                 }
             );
         }

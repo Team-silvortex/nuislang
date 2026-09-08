@@ -12,7 +12,7 @@ use crate::{
 const MAX_ARGUMENT_BYTES: usize = 512;
 const MAX_ARGC: usize = 2 * MAX_SCRIPT_EVENTS + 10;
 
-fn parse(arguments: &[&str]) -> Result<ApplicationScript, String> {
+pub(super) fn parse(arguments: &[&str]) -> Result<ApplicationScript, String> {
     if arguments.len() > MAX_ARGC
         || arguments
             .iter()
