@@ -1,0 +1,4 @@
+name = "buffer-while"
+entry = "buffer_while.ns"
+modules = ["buffer_while.ns"]
+application_sessions = ["counter open=start event=step close=stop state=state"]

@@ -77,6 +77,30 @@ fn bitwise_operations_keep_their_i64_contract() {
 }
 
 #[test]
+fn invalid_integer_divisors_report_errors_without_panicking() {
+    for instruction in ["cpu.div", "cpu.rem", "cpu.div_i32"] {
+        for (lhs, rhs, diagnostic) in [(7, 0, "zero"), (i64::MIN, -1, "overflow")] {
+            let mut state = ExecutionState::default();
+            if instruction == "cpu.div_i32" {
+                state.bind_value("lhs", Value::I32(if rhs == 0 { 7 } else { i32::MIN }));
+                state.bind_value("rhs", Value::I32(rhs as i32));
+            } else {
+                state.bind_value("lhs", Value::Int(lhs));
+                state.bind_value("rhs", Value::Int(rhs));
+            }
+            let error = CpuMod
+                .execute(
+                    &node("invalid", instruction, &["lhs", "rhs"]),
+                    &resource(),
+                    &mut state,
+                )
+                .unwrap_err();
+            assert!(error.contains(diagnostic), "{error}");
+        }
+    }
+}
+
+#[test]
 fn generic_comparisons_feed_logical_operations_as_bool_values() {
     let mut state = ExecutionState::default();
     state.bind_value("low", Value::Int(2));

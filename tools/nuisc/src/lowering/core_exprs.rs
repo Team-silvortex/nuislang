@@ -240,6 +240,7 @@ fn lower_load_at(
     });
     push_dep_edges(state, &buffer_name, &name);
     push_dep_edges(state, &index_name, &name);
+    body_lowering::chain_statement_effect(state, &name);
     Ok(name)
 }
 
@@ -339,6 +340,7 @@ fn lower_store_at(
     push_dep_edges(state, &index_name, &name);
     push_dep_edges(state, &value_name, &name);
     push_lifetime_edge(state, &buffer_name, &name);
+    body_lowering::chain_statement_effect(state, &name);
     Ok(name)
 }
 

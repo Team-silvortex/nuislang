@@ -77,6 +77,17 @@ fn folds_integer_binary_constants() {
 }
 
 #[test]
+fn invalid_integer_division_and_remainder_are_not_evaluated_by_constant_folding() {
+    for op in [NirBinaryOp::Div, NirBinaryOp::Rem] {
+        for (lhs, rhs) in [(1, 0), (0, 0), (i64::MIN, -1)] {
+            assert_eq!(super::fold_int_binary(op, lhs, rhs), None);
+        }
+    }
+    assert_eq!(super::fold_int_binary(NirBinaryOp::Div, -7, 2), Some(-3));
+    assert_eq!(super::fold_int_binary(NirBinaryOp::Rem, -7, 2), Some(-1));
+}
+
+#[test]
 fn folds_integer_comparison_constants() {
     let mut module = sample_module(vec![NirStmt::Return(Some(NirExpr::Binary {
         op: NirBinaryOp::Lt,

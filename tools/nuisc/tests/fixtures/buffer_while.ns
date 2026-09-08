@@ -1,0 +1,22 @@
+mod cpu Main {
+  fn fill(seed: i64) -> i64 {
+    let buffer: ref Buffer = alloc_buffer(8, 0);
+    let index: i64 = 0;
+    while index < 8 {
+      let value: i64 = seed + index * 3;
+      store_at(buffer, index, value);
+      let index: i64 = index + 1;
+    }
+    let result: i64 = load_at(buffer, 0) + load_at(buffer, 7) + index;
+    free(buffer);
+    return result;
+  }
+
+  struct Counter { count: i64 }
+  fn start(seed: i64) -> Counter { return Counter { count: seed }; }
+  fn step(state: Counter, input: i64) -> Counter {
+    return Counter { count: fill(state.count + input) };
+  }
+  fn stop(state: Counter) -> Counter { return state; }
+  fn main() -> i64 { return fill(4); }
+}

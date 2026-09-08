@@ -79,6 +79,11 @@ fn lowers_registered_buffer_owned_pointer_selection() {
 
     let llvm = yir_lower_llvm::emit_module(&yir).expect("buffer owner select LLVM lowering");
     assert!(llvm.contains("phi ptr"));
+    assert!(
+        llvm.contains("phi i64"),
+        "the selected buffer must retain its length"
+    );
+    assert!(llvm.contains("buffer_index_invalid"));
     assert!(!llvm.contains("deferred lowering for cpu.branch_effect"));
 }
 

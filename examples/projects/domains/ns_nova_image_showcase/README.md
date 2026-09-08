@@ -16,8 +16,10 @@ The linked contract includes reproducible build, event, close and drain commands
 ## Data Path
 
 1. `PixelMagicPixels.fill_checkerboard` fills a 32x24 image using packed RGBA8
-   integer pixels. The Nuis implementation uses bounded divide-and-conquer
-   recursion; general buffer-writing `while` lowering is still incomplete.
+   integer pixels. A bounded unit-step Nuis `while` now fills caller-owned storage
+   through a private registered YIR helper, replacing the recursive workaround.
+   Scalar division/remainder and buffer indices are checked; nested control flow
+   and arbitrary loop carries remain outside this supported subset.
 2. `copy_bytes` creates an owned snapshot. The app overwrites the original first
    pixel and frees the original Buffer before binding the snapshot.
 3. `shader_storage_binding(3, snapshot)` requests one immutable u32 array.
@@ -41,6 +43,18 @@ Run from the repository root:
 CARGO_INCREMENTAL=0 cargo run -q -p nuis -j 1 -- check examples/projects/domains/ns_nova_image_showcase
 CARGO_INCREMENTAL=0 NUIS_TEST_QUIET_SUCCESS_LOGS=1 cargo test -q -p nuis --bin nuis artifact_device_sample_shader_render -j 1 -- --test-threads=1
 ```
+
+The bounded pixel-loop regressions compare native/reference generator output and,
+on an Apple Silicon Metal host, the actual headless CLI build/run-artifact path:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test pixelmagic_buffer_loop -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_loop -j 1 -- --test-threads=1
+```
+
+The second test also checks direct-session replay, executable/YIR identity drift,
+argument admission and failure without successful close on exhausted replay.
+This is embedded-YIR callback execution with a real GPU, not a native callback ABI.
 
 ## Run The Compiled Artifact
 

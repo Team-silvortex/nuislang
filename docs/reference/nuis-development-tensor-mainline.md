@@ -215,7 +215,26 @@ JSON now select verified YIR before codegen, report LLVM as `not_requested` with
 no fabricated byte count, and retain default native errors. Command regressions
 cover directory/manifest inputs, dump roundtrips and rejected invalid inputs;
 semantic inspection is not executable or provider evidence. The score remains
-`active/86`: buffer-writing application callback loops are the next lowering gap.
+`active/86`: bounded Buffer-writing application callbacks now reuse private
+helpers and the existing scoped-call loop contract. The registered CPU executor
+performs actual helper calls under shared fuel. Memory-operation effect edges
+prevent reads from preceding writes, including nested expressions, and helper
+returns retain their effects. Native `load_at`/`store_at` require length metadata
+and trap on invalid accesses. Reference/native tests and repeated application events
+cover strict unit-step loops, ordered reads/writes, zero/one/descending iteration,
+declaration-order independence and fail-closed unsupported bodies. PixelMagic's
+checkerboard generator now uses this loop with checked scalar division/remainder.
+Both constant evaluators retain invalid arithmetic rather than panicking; native
+scalar integer operations trap on zero divisors and signed division overflow.
+The [CLI integration](../../tools/nuis/tests/headless_image_loop.rs) now builds
+the ordinary image project, runs two actual M2 Metal frames, compares every output
+byte with direct-session replay and rejects executable/YIR or callback-argument
+drift before application effects. Packaged replay exhaustion cannot close or publish
+success. Separate native/reference tests compare all generated pixels, including
+partial and empty regions. The score remains `active/86`; the next step is
+conditional pixel transforms with branch-local effects under the same admission
+and identity checks. This is not fully native CPU callbacks, arbitrary loop support
+or a complete memory-safety proof.
 Compound-condition `while` lowering now selects recursive descriptors,
 normalizes linear carries consistently and deduplicates shared effect inputs.
 CPU-owned cooperative execution replaces trace-only loop results; generic YIR

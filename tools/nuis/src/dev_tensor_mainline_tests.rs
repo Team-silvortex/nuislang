@@ -269,7 +269,26 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("Manifest-selected check/dump/inspection"));
     assert!(session.evidence.contains("LLVM as not_requested"));
-    assert!(session.next_step.contains("buffer-writing while"));
+    assert!(session
+        .evidence
+        .contains("Bounded Buffer-writing callbacks"));
+    assert!(session.next_step.contains("buffer-writing callbacks"));
+    assert!(session.next_step.contains("build/run-artifact"));
+    assert!(session.next_step.contains("conditional pixel transforms"));
+    assert!(session.evidence.contains("two real M2 Metal frames"));
+    assert!(session
+        .evidence
+        .contains("Native/reference tests compare every pixel"));
+    assert!(!session
+        .blocker
+        .contains("acceptance for this new subset is still missing"));
+    assert!(session.validation_command.contains("--test buffer_while"));
+    assert!(session
+        .validation_command
+        .contains("--test pixelmagic_buffer_loop"));
+    assert!(session
+        .validation_command
+        .contains("--test headless_image_loop"));
     assert!(session
         .validation_command
         .contains("--test checkpoint_inspection"));

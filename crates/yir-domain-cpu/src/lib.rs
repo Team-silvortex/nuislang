@@ -17,6 +17,7 @@ mod execute_loops;
 mod execute_memory;
 mod execute_scalar;
 mod execute_scalar_flow;
+mod execute_scoped_loop;
 mod execute_tasks;
 mod execute_values;
 mod loop_metadata;
@@ -64,6 +65,9 @@ impl RegisteredMod for CpuMod {
         resource: &Resource,
         state: &ExecutionState,
     ) -> Result<Option<Box<dyn yir_core::RegisteredExecution>>, String> {
+        if let Some(execution) = execute_scoped_loop::begin_execution(node, resource, state)? {
+            return Ok(Some(execution));
+        }
         execute_scalar_flow::begin_execution(node, resource, state)
     }
     fn execute(

@@ -633,6 +633,7 @@ pub(super) fn lower_direct_call_helper_function(
     state.call_stack.pop();
     let returned =
         lowered?.ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
+    let function_effect_anchor = state.last_effect_anchor.take();
     state.last_effect_anchor = saved_effect_anchor;
     let return_name = format!("__fn_{}_return", function.name);
     let owned_layout = function_owned_struct_layout(function, state);
@@ -687,14 +688,13 @@ pub(super) fn lower_direct_call_helper_function(
         },
     });
     push_dep_edges(state, &returned, &return_name);
+    if let Some(effect) = function_effect_anchor {
+        crate::lowering::edge_helpers::push_effect_edge(state, &effect, &return_name);
+    }
     if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
         push_lifetime_edge(state, &returned, &return_name);
     }
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: returned,
-        to: return_name.clone(),
-    });
+    crate::lowering::edge_helpers::push_effect_edge(state, &returned, &return_name);
     control_boundaries::order_guarded_function_nodes(state, start_index);
     let body_nodes = state.yir.nodes[start_index..]
         .iter()

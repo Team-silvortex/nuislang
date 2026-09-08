@@ -73,8 +73,19 @@ verified-YIR checkpoint without CPU LLVM codegen. The complete source-to-YIR
 handoff travels with the artifact; no empty LLVM file substitutes for a stage.
 Manifest-selected headless check/dump, benchmark/binding inspection and workflow JSON
 now use the same checkpoint, with `llvm_emit=not_requested` and no invented LLVM
-byte count. Default native diagnostics remain in place. Buffer-writing callback
-loops and richer carry payloads remain separate lowering gaps. Linux hardware and Windows transport
+byte count. Default native diagnostics remain in place. Bounded Buffer-writing
+callback loops now outline to private helpers under the existing scoped-call YIR
+contract. CPU-owned cooperative execution invokes the helpers rather than logging
+calls; expression-level memory effects preserve source order and native indices
+are checked. PixelMagic now uses these loops instead of recursive pixel filling.
+The actual CLI build/run-artifact regression passes two M2 Metal frames and exact
+direct-session replay, rejects executable/YIR drift and invalid callback arguments,
+and retains prior evidence on replay exhaustion. Independent native/reference
+tests compare every generated pixel; invalid scalar division/remainder no longer
+panics in constant evaluation or reaches undefined native arithmetic. Conditional
+pixel transforms are the next callback boundary, not arbitrary loop bodies,
+richer carry payloads or fully native CPU callbacks.
+Linux hardware and Windows transport
 are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.
 The default host-only path acknowledges its own scope, while the live provider

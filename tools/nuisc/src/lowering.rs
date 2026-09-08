@@ -29,6 +29,8 @@ mod bootstrap;
 mod branch_effect_lowering;
 #[path = "lowering/bridge_helpers.rs"]
 mod bridge_helpers;
+#[path = "lowering/buffer_loop_outline.rs"]
+mod buffer_loop_outline;
 #[path = "lowering/call_exprs.rs"]
 mod call_exprs;
 #[path = "lowering/conditional_owned_calls.rs"]

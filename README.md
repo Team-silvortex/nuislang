@@ -50,7 +50,7 @@ nuis source / nuis.toml
 | Surface | Verified Scope | Important Boundary |
 | --- | --- | --- |
 | Small host CLI tools | Native builds exercise argv, piped stdin, stdout/stderr, file reads/writes, text statistics, reports and simple PGM transformations. | Examples have bounded inputs; this is not blanket compatibility or production certification. |
-| Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions. | Supported syntax does not imply every combination lowers; general buffer-writing `while` and some aggregate early-return shapes remain incomplete. |
+| Compiler | Parsing, types, generics, control flow, NIR/YIR verification, LLVM lowering and AOT emission have focused regressions, including bounded Buffer-writing loops. | Supported syntax does not imply every combination lowers; arbitrary `while` bodies and some aggregate early-return shapes remain incomplete. |
 | Image application | Nuis generates RGBA8 data, inline WGSL runs RGB inversion on real Metal, and compiled host execution exports checked PPM frames. | The host embeds the YIR lifecycle runtime and uses registered providers; it is not fully native CPU execution or a self-contained Nsld image. |
 | Persistent window | Registered Nuis open/event/close callbacks retain state and one provider connection across AppKit events. A separate registered CPU parent can consume one terminal outcome. | Explicit mode, bounded dispatch/replay, one-child parent profile; not an unlimited engine loop or general supervisor. |
 | Cancellation | Independent tickets carry provider-worker drain into a typed, non-success result. AppKit and the headless build/run-artifact route share the classifier and launch policy; Metal regressions retain prior success evidence. | AppKit cancellation policy remains scripted; headless uses bounded scalar scripts. Linux hardware evidence, Windows transport, parent cancellation and resource reuse remain open. |
@@ -127,6 +127,13 @@ Native/window builds still require LLVM. With `packaging_mode = "headless-aot-bu
 in `nuis.toml`, check/dump, benchmark/binding inspection and `nuis workflow --json`
 select verified YIR and report LLVM as not requested. This is semantic-stage
 evidence, not proof of native AOT readiness or successful provider execution.
+Bounded Buffer-writing callback loops now reuse private YIR helpers and registered
+CPU execution, with ordered reads/writes, checked native indices and checked scalar
+integer division/remainder. PixelMagic fills its image with this loop instead of
+recursion. The CLI headless build/run-artifact test checks two real M2 Metal frames,
+direct-session replay, exact output identity and failure admission; independent
+native/reference tests compare every generated pixel. Conditional buffer-writing
+bodies and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

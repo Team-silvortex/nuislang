@@ -19,7 +19,7 @@ mod cpu PixelMagicPixels {
     return fill_checkerboard_region(pixels, 0, count, width, tile_size, phase);
   }
 
-  /// Fills a bounded pixel range; divide-and-conquer keeps recursion depth logarithmic.
+  /// Fills a bounded pixel range with a unit-step loop over caller-owned storage.
   pub fn fill_checkerboard_region(
     pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
   ) -> bool {
@@ -30,17 +30,16 @@ mod cpu PixelMagicPixels {
       return false;
     }
     if pixels.len > 4194304 || pixels.len % width != 0 { return false; }
-    if start == end { return true; }
-    let x: i64 = start % width;
-    let y: i64 = start / width;
-    let alternate: bool = (x / tile_size + y / tile_size + phase) % 2 == 1;
-    // RGBA8 little-endian channel order, not the host Buffer's i64 memory layout.
-    let pixel: i64 = if alternate { 4294901760 } else { 4278190335 };
-    pixels[start] = pixel;
-    if end - start == 1 { return true; }
-    let middle: i64 = start + 1 + (end - start - 1) / 2;
-    let left: bool = fill_checkerboard_region(pixels, start + 1, middle, width, tile_size, phase);
-    let right: bool = fill_checkerboard_region(pixels, middle, end, width, tile_size, phase);
-    return left && right;
+    let index: i64 = start;
+    while index < end {
+      let x: i64 = index % width;
+      let y: i64 = index / width;
+      let alternate: i64 = (x / tile_size + y / tile_size + phase) % 2;
+      // Select red/blue in packed little-endian RGBA8, not host i64 memory layout.
+      let pixel: i64 = 4278190335 + alternate * (4294901760 - 4278190335);
+      pixels[index] = pixel;
+      let index: i64 = index + 1;
+    }
+    return true;
   }
 }

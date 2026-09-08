@@ -63,12 +63,9 @@ pub(in crate::lowering) fn lower_call_expr(
         local_bindings.insert(param.name.clone(), lowered);
     }
 
-    let caller_effect_anchor = state.last_effect_anchor.take();
     state.call_stack.push(callee.to_owned());
     let returned = lower_function_body(function, state, &mut local_bindings, false)?;
     state.call_stack.pop();
-    let callee_effect_anchor = state.last_effect_anchor.take();
-    state.last_effect_anchor = callee_effect_anchor.or(caller_effect_anchor);
 
     returned.ok_or_else(|| format!("function `{callee}` did not return a value"))
 }

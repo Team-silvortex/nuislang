@@ -340,6 +340,7 @@ pub(super) fn emit_cpu_function(
             registers,
             &mut state.facts,
             &mut next_reg,
+            &mut next_block,
             last_cpu_value,
         )? {
             continue;

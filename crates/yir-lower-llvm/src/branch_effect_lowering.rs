@@ -16,6 +16,10 @@ pub enum BranchEffectLlvmValue {
     Unit,
     I64(String),
     OwnedPointer(String),
+    OwnedBuffer {
+        ptr: String,
+        len: String,
+    },
     OwnedExternalBuffer {
         ptr: String,
         len: String,
@@ -229,6 +233,28 @@ pub(crate) fn lower_cpu_branch_effect_node(
         }
         (
             BranchEffectResult::OwnedPointer,
+            BranchEffectLlvmValue::OwnedBuffer {
+                ptr: then_ptr,
+                len: then_len,
+            },
+            BranchEffectLlvmValue::OwnedBuffer {
+                ptr: else_ptr,
+                len: else_len,
+            },
+        ) => {
+            let ptr = fresh_reg(next_reg);
+            let len = fresh_reg(next_reg);
+            body.push(format!(
+                "  {ptr} = phi ptr [{then_ptr}, %{then_label}], [{else_ptr}, %{else_label}]"
+            ));
+            body.push(format!(
+                "  {len} = phi i64 [{then_len}, %{then_label}], [{else_len}, %{else_label}]"
+            ));
+            buffer_lengths.insert(node.name.clone(), len.clone());
+            LlvmValueRef::BorrowedBuffer { ptr, len }
+        }
+        (
+            BranchEffectResult::OwnedPointer,
             BranchEffectLlvmValue::OwnedExternalBuffer {
                 ptr: then_ptr,
                 len: then_len,
@@ -370,10 +396,16 @@ fn emit_cpu_take_ptr_drop_other(
             "cpu.take_ptr_drop_other branch action has an incompatible contract".to_owned(),
         );
     }
-    let selected = context.pointer_operand(action, 0)?;
+    let selected = match context.registers.get(action.operands[0].value) {
+        Some(LlvmValueRef::BorrowedBuffer { ptr, len }) => BranchEffectLlvmValue::OwnedBuffer {
+            ptr: ptr.clone(),
+            len: len.clone(),
+        },
+        _ => BranchEffectLlvmValue::OwnedPointer(context.pointer_operand(action, 0)?),
+    };
     let discarded = context.pointer_operand(action, 1)?;
     context.push(format!("  call void @free(ptr {discarded})"));
-    Ok(BranchEffectLlvmValue::OwnedPointer(selected))
+    Ok(selected)
 }
 
 fn emit_cpu_take_owned_buffer_drop_other(

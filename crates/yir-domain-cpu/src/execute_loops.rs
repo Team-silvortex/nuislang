@@ -78,7 +78,7 @@ pub(super) fn render_loop_effect_action(
                 node.name, args[7]
             )
         })?;
-    if args.len() != 8 + arity {
+    if arity.checked_add(8) != Some(args.len()) {
         return Err(format!(
             "node `{}` declares {arity} loop action operands but provides {}",
             node.name,

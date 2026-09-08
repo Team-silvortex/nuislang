@@ -187,14 +187,71 @@ step. Native reports retain their real LLVM byte counts. Neither kind of source
 inspection certifies a runnable image; artifact hash/identity checks and provider
 admission remain separate and unchanged.
 
+## Bounded Buffer Loops
+
+The [callback fixture](../../tools/nuisc/tests/fixtures/buffer_while.ns) allocates a
+small `ref Buffer`, fills it in a counted loop, reads the result and frees the
+buffer before returning scalar application state. Supported inline loop bodies
+contain scalar temporary bindings and ordered `store_at`/`load_at` operations.
+Scalar integer division and remainder are supported too: constant evaluation
+uses checked operations, registered execution reports invalid divisors/overflow,
+and native scalar lowering traps before division by zero or `MIN / -1` (also
+`MIN % -1`). This does not certify all specialized loop arithmetic opcodes.
+Induction is `i64`, with strict `<` and `+ 1`, or strict `>` and `- 1`, and an
+invariant scalar bound. These combinations reach the bound without induction
+overflow; they are not a general loop-termination proof.
+
+Lowering outlines the body to a collision-safe private helper, revalidates NIR,
+and uses the existing `cpu.loop_while_i64_effect ... cpu scoped_call` contract.
+Borrowed captures retain GLM lifetime edges. CPU Nustar owns the resumable loop;
+the generic executor invokes registered functions with the same invocation fuel.
+Buffer reads/writes carry effect edges at the memory operation, including reads
+nested in a larger expression, and helper returns follow their effects. Native
+`cpu.load_at`/`cpu.store_at` require length metadata and trap on negative or
+out-of-range indices; reference execution reports an error instead of accessing memory.
+Buffer owner selection merges the pointer and length from the same branch, so a
+subsequent loop capture cannot inherit the other candidate's bounds.
+This is not a proof of all allocation, pointer or FFI memory safety.
+
+The [regressions](../../tools/nuisc/tests/buffer_while.rs) compare reference/native
+results, repeated application callbacks, zero/one/descending loops, per-iteration
+read/write order, declaration-order independence, failed-state admission and shared
+fuel. Allocation, ownership transfer, nested control flow or captured-state
+rebinding inside an outlined body remain unsupported. General steps and mutable
+header reads are not silently hoisted.
+
+### Packaged Pixel Loop
+
+[PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses this
+straight-line loop instead of recursive pixel filling. The
+[native/reference test](../../tools/nuisc/tests/pixelmagic_buffer_loop.rs) checks
+every pixel for both 32x24 phases, a partial region and an empty region.
+The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
+ordinary image showcase with `headless-aot-bundle` and launches it through
+`run-artifact`. On M2 it verifies two actual Metal output hashes, all output bytes
+against direct-session replay, and all 768 writes plus the post-snapshot mutation
+per callback. Wrong callback arguments or executable/YIR drift are rejected before
+application effects. Exhausted packaged replay produces neither Close nor success,
+and preserves the earlier replay stream.
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test buffer_while --test pixelmagic_buffer_loop -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_loop -j 1 -- --test-threads=1
+```
+
+The second command is a macOS Metal device regression, not Linux/Windows evidence.
+CPU callbacks in the packaged host still execute embedded YIR; the native parity
+test independently compiles the generator, not the complete live callback ABI.
+Conditional pixel transforms with branch-local effects are the next boundary.
+
 ## Current Boundary
 
 Ordinary `nuis build` and `nuis run-artifact` now select and admit this profile.
 Headless build selection removes the unused CPU LLVM prerequisite without
 fabricating an empty intermediate or weakening the verified stage handoff.
 Checkpoint-aware source inspection now follows the explicit manifest selection.
-The next lowering gap is buffer-writing application callback loops, not more
-metadata claiming an executable that has not been produced.
+Bounded Buffer-writing callbacks now pass the lowering/execution boundary above;
+they still need packaged build/run-artifact evidence in the image workflow.
 Compound-condition `while` callbacks now pass the verified-YIR boundary and execute
 their current/carry state rather than returning trace-only unit values. CPU Nustar
 owns the scalar loop state machine; the generic reference executor only drives

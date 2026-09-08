@@ -59,8 +59,11 @@ Current source-asset status:
   replay; general textures and non-Metal resource parity remain open
 * [lib/pixels.ns](lib/pixels.ns) generates checked packed RGBA8 checkerboards in
   Nuis-owned buffers. Invalid dimensions, tile sizes, phases, and ranges return
-  false before writing. The bounded range helper uses logarithmic-depth recursion
-  while general buffer-writing `while` lowering remains incomplete
+  false before writing. The bounded range helper now uses a strict unit-step
+  `while`, with checked scalar division/remainder and indexed writes through a
+  private registered YIR helper. Native/reference regressions compare every pixel
+  for both phases, a partial range and an empty range. This is not general
+  nested-control or arbitrary loop-carry support
 * [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
   u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The
   [image showcase](../../examples/projects/domains/ns_nova_image_showcase) frees

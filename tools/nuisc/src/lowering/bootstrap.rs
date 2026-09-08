@@ -170,7 +170,8 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
             ));
         }
     }
-    let rewritten_module = rewrite_self_tail_recursive_functions(module);
+    let mut rewritten_module = rewrite_self_tail_recursive_functions(module);
+    super::buffer_loop_outline::outline_buffer_loops(&mut rewritten_module)?;
     let module = &rewritten_module;
     super::nested_owned_returns::validate_selected_owned_pointer_transfers(module)?;
     let exported_functions = module

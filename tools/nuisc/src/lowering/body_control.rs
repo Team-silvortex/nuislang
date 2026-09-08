@@ -89,7 +89,7 @@ pub(in crate::lowering) fn lower_function_body(
     bindings: &mut BTreeMap<String, String>,
     allow_implicit_return: bool,
 ) -> Result<Option<String>, String> {
-    let saved_effect_anchor = state.last_effect_anchor.take();
+    let saved_effect_anchor = state.last_effect_anchor.clone();
     if function
         .body
         .iter()
@@ -100,7 +100,6 @@ pub(in crate::lowering) fn lower_function_body(
         match super::if_lowering::lower_function_guard_return_chain(&function.body, state, bindings)
         {
             Ok(Some(returned)) => {
-                state.last_effect_anchor = saved_effect_anchor;
                 return Ok(Some(returned));
             }
             Ok(None) => checkpoint.rollback(state),
@@ -115,11 +114,9 @@ pub(in crate::lowering) fn lower_function_body(
     if let Some(returned) =
         lower_inline_stmts(&function.body, state, bindings, &mut const_bindings)?
     {
-        state.last_effect_anchor = saved_effect_anchor.clone();
         return Ok(Some(returned));
     }
 
-    state.last_effect_anchor = saved_effect_anchor.clone();
     if allow_implicit_return {
         Ok(None)
     } else {

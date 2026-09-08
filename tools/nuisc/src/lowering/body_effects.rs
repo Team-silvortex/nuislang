@@ -56,6 +56,21 @@ pub(in crate::lowering) fn chain_nonpure_expr_stmt(
     state: &mut LoweringState<'_>,
 ) {
     if expr_requires_statement_anchor(expr) {
+        if let Some(previous) = &state.last_effect_anchor {
+            // An inlined call can return a value computed before its final cleanup.
+            // Keep that later effect as the frontier instead of adding a backedge.
+            if previous != lowered
+                && state
+                    .yir
+                    .nodes
+                    .iter()
+                    .rev()
+                    .find(|node| node.name == *previous || node.name == lowered)
+                    .is_some_and(|node| node.name == *previous)
+            {
+                return;
+            }
+        }
         chain_statement_effect(state, lowered);
     }
 }
@@ -108,8 +123,8 @@ pub(in crate::lowering) fn eval_const_i64_with_env(
                 NirBinaryOp::Add => Some(lhs + rhs),
                 NirBinaryOp::Sub => Some(lhs - rhs),
                 NirBinaryOp::Mul => Some(lhs * rhs),
-                NirBinaryOp::Div => (rhs != 0).then_some(lhs / rhs),
-                NirBinaryOp::Rem => (rhs != 0).then_some(lhs % rhs),
+                NirBinaryOp::Div => lhs.checked_div(rhs),
+                NirBinaryOp::Rem => lhs.checked_rem(rhs),
                 NirBinaryOp::Eq => Some(i64::from(lhs == rhs)),
                 NirBinaryOp::Ne => Some(i64::from(lhs != rhs)),
                 NirBinaryOp::Lt => Some(i64::from(lhs < rhs)),

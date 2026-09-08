@@ -59,7 +59,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_SHADER_GRAPH_DRIFT_CHECKS: &[DevTensorDriftC
     DevTensorDriftCheckSpec {
         id: "pixelmagic-nuis-owned-image-generation",
         path: "stdlib/pixelmagic/lib/pixels.ns",
-        required_patterns: &["pub fn fill_checkerboard(", "pub fn fill_checkerboard_region(", "pixels[start] = pixel", "end > pixels.len", "pixels.len > 4194304"],
+        required_patterns: &["pub fn fill_checkerboard(", "pub fn fill_checkerboard_region(", "while index < end", "pixels[index] = pixel", "let index: i64 = index + 1", "end > pixels.len", "pixels.len > 4194304"],
     },
     DevTensorDriftCheckSpec {
         id: "ns-nova-real-owned-image-regression",

@@ -98,7 +98,9 @@ pub(crate) fn execute_cpu_scalar_node(
                 if rhs == 0 {
                     return Err(format!("node `{}` divides by zero", node.name));
                 }
-                Ok(Value::Int(lhs / rhs))
+                lhs.checked_div(rhs)
+                    .map(Value::Int)
+                    .ok_or_else(|| format!("node `{}` integer division overflow", node.name))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
@@ -122,7 +124,9 @@ pub(crate) fn execute_cpu_scalar_node(
             if rhs == 0 {
                 return Err(format!("node `{}` divides by zero", node.name));
             }
-            Ok(Value::I32(lhs / rhs))
+            lhs.checked_div(rhs)
+                .map(Value::I32)
+                .ok_or_else(|| format!("node `{}` integer division overflow", node.name))
         }
         "div_f32" => {
             let lhs = state.expect_f32(&node.op.args[0])?;
@@ -146,7 +150,9 @@ pub(crate) fn execute_cpu_scalar_node(
             if rhs == 0 {
                 return Err(format!("node `{}` computes remainder by zero", node.name));
             }
-            Ok(Value::Int(lhs % rhs))
+            lhs.checked_rem(rhs)
+                .map(Value::Int)
+                .ok_or_else(|| format!("node `{}` integer remainder overflow", node.name))
         }
         "eq" => {
             if let (Ok(lhs), Ok(rhs)) = (

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use yir_core::Node;
 
 use super::{
-    fresh_reg,
+    fresh_block, fresh_reg,
     value_ref::{get_f32, get_f64, get_i32, get_i64},
     KnownFacts, LlvmValueRef,
 };
@@ -14,6 +14,7 @@ pub(crate) fn lower_cpu_scalar_node(
     registers: &mut BTreeMap<String, LlvmValueRef>,
     facts: &mut KnownFacts,
     next_reg: &mut usize,
+    next_block: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
     if node.op.module != "cpu" {
@@ -352,6 +353,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 get_i64(registers, &node.op.args[0]),
                 get_i64(registers, &node.op.args[1]),
             ) {
+                check_integer_divisor(&lhs, &rhs, 64, body, next_reg, next_block);
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = sdiv i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
@@ -361,6 +363,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 get_i32(registers, &node.op.args[0]),
                 get_i32(registers, &node.op.args[1]),
             ) {
+                check_integer_divisor(&lhs, &rhs, 32, body, next_reg, next_block);
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = sdiv i32 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
@@ -386,6 +389,7 @@ pub(crate) fn lower_cpu_scalar_node(
                     ));
                 return Ok(true);
             };
+            check_integer_divisor(&lhs, &rhs, 32, body, next_reg, next_block);
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = sdiv i32 {lhs}, {rhs}"));
             registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
@@ -434,6 +438,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 get_i64(registers, &node.op.args[0]),
                 get_i64(registers, &node.op.args[1]),
             ) {
+                check_integer_divisor(&lhs, &rhs, 64, body, next_reg, next_block);
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = srem i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
@@ -443,6 +448,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 get_i32(registers, &node.op.args[0]),
                 get_i32(registers, &node.op.args[1]),
             ) {
+                check_integer_divisor(&lhs, &rhs, 32, body, next_reg, next_block);
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = srem i32 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
@@ -481,6 +487,42 @@ pub(crate) fn lower_cpu_scalar_node(
     }
 
     Ok(true)
+}
+
+// Both zero divisors and MIN / -1 (including srem) are undefined in LLVM.
+fn check_integer_divisor(
+    lhs: &str,
+    rhs: &str,
+    bits: u32,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    next_block: &mut usize,
+) {
+    if rhs.parse::<i64>().is_ok_and(|rhs| rhs != 0 && rhs != -1) {
+        return;
+    }
+    let minimum = if bits == 32 {
+        i64::from(i32::MIN)
+    } else {
+        i64::MIN
+    };
+    let zero = fresh_reg(next_reg);
+    let min = fresh_reg(next_reg);
+    let minus_one = fresh_reg(next_reg);
+    let overflow = fresh_reg(next_reg);
+    let invalid = fresh_reg(next_reg);
+    body.push(format!("  {zero} = icmp eq i{bits} {rhs}, 0"));
+    body.push(format!("  {min} = icmp eq i{bits} {lhs}, {minimum}"));
+    body.push(format!("  {minus_one} = icmp eq i{bits} {rhs}, -1"));
+    body.push(format!("  {overflow} = and i1 {min}, {minus_one}"));
+    body.push(format!("  {invalid} = or i1 {zero}, {overflow}"));
+    let trap = fresh_block(next_block, "integer_divisor_invalid");
+    let ready = fresh_block(next_block, "integer_divisor_ready");
+    body.push(format!("  br i1 {invalid}, label %{trap}, label %{ready}"));
+    body.push(format!("{trap}:"));
+    body.push("  call void @llvm.trap()".to_owned());
+    body.push("  unreachable".to_owned());
+    body.push(format!("{ready}:"));
 }
 
 fn record_known_i64_binary_op(

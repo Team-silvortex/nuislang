@@ -4,7 +4,7 @@ use yir_core::Node;
 
 use super::{
     fresh_block, fresh_reg, lower_buffer_fill,
-    value_ref::{get_i64, get_ptr},
+    value_ref::{borrowed_buffer_parts, get_i64, get_ptr},
     KnownFacts, LlvmValueRef,
 };
 
@@ -349,6 +349,15 @@ pub(crate) fn lower_cpu_memory_node(
                 *last_cpu_value = Some(reg);
                 return Ok(true);
             }
+            check_buffer_index(
+                node,
+                &index,
+                body,
+                registers,
+                buffer_lengths,
+                next_reg,
+                next_block,
+            )?;
             let slot = fresh_reg(next_reg);
             body.push(format!(
                 "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"
@@ -406,6 +415,15 @@ pub(crate) fn lower_cpu_memory_node(
                     ));
                 return Ok(true);
             };
+            check_buffer_index(
+                node,
+                &index,
+                body,
+                registers,
+                buffer_lengths,
+                next_reg,
+                next_block,
+            )?;
             let slot = fresh_reg(next_reg);
             body.push(format!(
                 "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"
@@ -488,6 +506,47 @@ pub(crate) fn lower_cpu_memory_node(
         _ => return Ok(false),
     }
     Ok(true)
+}
+
+fn check_buffer_index(
+    node: &Node,
+    index: &str,
+    body: &mut Vec<String>,
+    registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
+    next_reg: &mut usize,
+    next_block: &mut usize,
+) -> Result<(), String> {
+    let (_, len) =
+        borrowed_buffer_parts(registers, buffer_lengths, &node.op.args[0]).ok_or_else(|| {
+            format!(
+                "cpu.{} `{}` requires buffer length metadata for checked indexing",
+                node.op.instruction, node.name
+            )
+        })?;
+    if let (Ok(index), Ok(len)) = (index.parse::<i64>(), len.parse::<i64>()) {
+        if index >= 0 && index < len {
+            return Ok(());
+        }
+    }
+    let non_negative = fresh_reg(next_reg);
+    let below_len = fresh_reg(next_reg);
+    let in_bounds = fresh_reg(next_reg);
+    body.push(format!("  {non_negative} = icmp sge i64 {index}, 0"));
+    body.push(format!("  {below_len} = icmp slt i64 {index}, {len}"));
+    body.push(format!(
+        "  {in_bounds} = and i1 {non_negative}, {below_len}"
+    ));
+    let ready = fresh_block(next_block, "buffer_index_ready");
+    let invalid = fresh_block(next_block, "buffer_index_invalid");
+    body.push(format!(
+        "  br i1 {in_bounds}, label %{ready}, label %{invalid}"
+    ));
+    body.push(format!("{invalid}:"));
+    body.push("  call void @llvm.trap()".to_owned());
+    body.push("  unreachable".to_owned());
+    body.push(format!("{ready}:"));
+    Ok(())
 }
 
 fn stable_glm_token(name: &str) -> u64 {

@@ -470,4 +470,59 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "registered_execution_is_bounded_even_without_session_fuel",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-loop-lowering",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline.rs",
+        required_patterns: &[
+            "outline_buffer_loops", "verify_nir_module", "NirVisibility::Private",
+            "PreparedLoopCompare::Lt", "PreparedLoopCompare::Gt", "NirExpr::StoreAt",
+            "NirBinaryOp::Div", "NirBinaryOp::Rem",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-loop-registered-execution",
+        path: "crates/yir-domain-cpu/src/execute_scoped_loop.rs",
+        required_patterns: &[
+            "impl RegisteredExecution for ScopedLoop", "RegisteredExecutionStep::Call",
+            "wrapping_add", "wrapping_sub", "cannot repeat an owned Bytes move",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-loop-callback-native-parity",
+        path: "tools/nuisc/tests/buffer_while.rs",
+        required_patterns: &[
+            "buffer_writes_execute_in_reference_and_native",
+            "buffer_while_runs_in_a_registered_application_callback",
+            "buffer_effect_order_does_not_depend_on_yir_declaration_order",
+            "buffer_index_errors_fail_before_native_memory_access",
+            "selected_buffers_keep_the_chosen_length_through_loop_captures",
+            "callback_iterations_and_helpers_share_fuel_and_do_not_commit_failed_state",
+            "buffer_loop_invalid_integer_divisors_fail_without_panics_or_native_ub",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-bounded-buffer-loop",
+        path: "stdlib/pixelmagic/lib/pixels.ns",
+        required_patterns: &[
+            "pub fn fill_checkerboard_region", "while index < end",
+            "pixels[index] = pixel", "let index: i64 = index + 1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-buffer-loop-native-parity",
+        path: "tools/nuisc/tests/pixelmagic_buffer_loop.rs",
+        required_patterns: &[
+            "pixelmagic_loop_matches_every_reference_and_native_pixel",
+            "write_and_link_with_source", "reference pixels", "native pixels",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "headless-pixel-loop-frontdoor-execution",
+        path: "tools/nuis/tests/headless_image_loop.rs",
+        required_patterns: &[
+            "headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_rejects_drift",
+            "CARGO_BIN_EXE_nuis", "headless-aot-bundle", "run-artifact",
+            "ApplicationProviderSource::Replay", "saved_stream", "application_session_outcome=",
+        ],
+    },
 ];

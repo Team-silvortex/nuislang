@@ -47,7 +47,7 @@ pub(super) fn describe_cpu_loops_control_node(
                     node.name, node.op.args[7]
                 )
             })?;
-            if node.op.args.len() != 8 + arity {
+            if arity.checked_add(8) != Some(node.op.args.len()) {
                 return Err(format!(
                     "node `{}` declares {arity} loop action operands but provides {}",
                     node.name,
