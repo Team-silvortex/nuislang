@@ -59,14 +59,16 @@ fn invalid_events_and_disconnect_never_reach_device_execution() {
 fn zero_draw_lifecycle_closes_without_invoking_provider() {
     let mut wire = Vec::new();
     Message::Finish(0).write_to(&mut wire).unwrap();
-    let (count, output) = dispatch_loop(
+    let DispatchEnd::Finished(count, output) = dispatch_loop(
         &mut Cursor::new(wire),
         &target(),
         4,
         Message::read_from,
         |_| panic!("skipped draw executed device"),
     )
-    .unwrap();
+    .unwrap() else {
+        panic!("expected finished session")
+    };
     assert_eq!(count, 0);
     assert!(output.runtime_results.is_empty());
     assert!(output.runtime_session_evidence.is_none());
@@ -169,16 +171,20 @@ fn exact_dispatch_limit_can_still_finish_without_resetting_the_session() {
         output: Vec::new(),
     };
     let mut executed = 0;
-    let (count, outputs) = dispatch_loop(&mut stream, &target, 4, Message::read_from, |_| {
-        executed += 1;
-        let mut frame = crate::provider_runtime_result_stream_tests::result();
-        frame.source_yir_fnv1a64 = target.source_yir_fnv1a64.clone();
-        frame.node = target.node.clone();
-        let mut output = NativeProviderOutputs::empty();
-        output.runtime_results.push(frame);
-        Ok(output)
-    })
-    .unwrap();
+    let DispatchEnd::Finished(count, outputs) =
+        dispatch_loop(&mut stream, &target, 4, Message::read_from, |_| {
+            executed += 1;
+            let mut frame = crate::provider_runtime_result_stream_tests::result();
+            frame.source_yir_fnv1a64 = target.source_yir_fnv1a64.clone();
+            frame.node = target.node.clone();
+            let mut output = NativeProviderOutputs::empty();
+            output.runtime_results.push(frame);
+            Ok(output)
+        })
+        .unwrap()
+    else {
+        panic!("expected finished session")
+    };
     assert_eq!(executed, MAX_DISPATCHES);
     assert_eq!(count, MAX_DISPATCHES);
     assert_eq!(outputs.runtime_results.len(), MAX_DISPATCHES);
@@ -234,7 +240,7 @@ fn cleanup_and_publication_failures_keep_typed_first_fault_and_never_acknowledge
     assert_eq!(error.sequence, 2);
     assert_eq!(error.detail, "original; provider cleanup failed: cleanup");
     let error = complete_session(
-        Ok((2, NativeProviderOutputs::empty())),
+        Ok(DispatchEnd::Finished(2, NativeProviderOutputs::empty())),
         Err("cleanup".to_owned()),
     )
     .err()

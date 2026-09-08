@@ -7,6 +7,7 @@ mod application_scope_admission;
 mod application_session;
 mod frame_export;
 mod provider_application_session;
+mod provider_drain_observation;
 mod provider_result_stream;
 #[cfg(unix)]
 mod provider_runtime_ipc;
@@ -16,7 +17,9 @@ use std::{path::Path, ptr, slice};
 
 pub use application_cancellation::{
     nuis_application_cancellation_free, nuis_application_cancellation_poll,
-    ApplicationCancellation, ApplicationHostRetirementAck, APPLICATION_CANCELLATION_CONTRACT,
+    nuis_application_cancellation_poll_with_provider, ApplicationCancellation,
+    ApplicationHostRetirementAck, NuisApplicationCancellationReceipt,
+    APPLICATION_CANCELLATION_CONTRACT,
 };
 pub use application_event_pump::{
     ApplicationEventPump, ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,
@@ -35,6 +38,7 @@ pub use provider_application_session::{
     with_provider_application_session, with_registered_provider_application_session,
     ApplicationProviderSource, PROVIDER_APPLICATION_SESSION_CONTRACT,
 };
+pub use provider_drain_observation::ProviderDrainObservation;
 pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
 #[cfg(unix)]
 pub use provider_runtime_ipc::execute_module_source_with_provider_ipc;

@@ -20,6 +20,7 @@ An atomic gate arbitrates cancellation against provider Finish admission:
 | --- | --- |
 | Cancellation | No subsequent provider Finish; the host waits on its separate ticket. |
 | Finish | Cancellation rejects without consuming or modifying the original pending reply. |
+| Failed provider scope starts abandonment | Cancellation rejects before the provider is dropped; it cannot promise a late drain. |
 | Worker scope already returned | Cancellation rejects; it does not reconstruct a retired session. |
 
 Already admitted callback work may finish, including its nested functions and
@@ -39,7 +40,7 @@ Cancellation does not increase budgets, reset deadlines, reconnect or retry.
 
 The crate-local
 [`ScopeAdmission`](../../crates/yir-runtime-host/src/application_scope_admission.rs)
-interface exposes only `checkpoint` and `admit_finalization`. It owns neither
+interface exposes `checkpoint`, `admit_finalization` and `admit_abandonment`. It owns neither
 cancellation state nor a provider, window, registry, transport or result channel.
 It is a host-scope interface, not a new YIR wire format or Nustar registration.
 
@@ -49,6 +50,8 @@ It is a host-scope interface, not a new YIR wire format or Nustar registration.
 - The provider session accepts a statically selected generic admission policy.
   It does not depend on `CancellationControl`, a pump, a window or a ticket.
   Only after lifecycle success and admission does it perform its own Finish.
+  On failure, abandonment seals admission before provider drop and can request
+  a separate drain observation. The policy receives no transport or registry.
 - Existing synchronous callers use the unit policy with no additional admission
   restriction; application and provider checks remain mandatory. No dynamic
   trait dispatch, plugin loading or extra per-call policy allocation is added.
@@ -60,7 +63,8 @@ it does not receive child registry, transport or retirement authority.
 
 The [independent-policy tests](../../crates/yir-runtime-host/src/provider_application_session/admission_tests.rs)
 substitute a recording policy with no cancellation implementation. It can reject
-before provider I/O, after provider admission or before finalization. Driver and
+before provider I/O, after provider admission or before finalization. An independent
+abandonment policy can request drain without turning the failed driver into success. Driver and
 close failures still prevent Finish even when the policy allows it. A direct
 dependency guard accompanies these behavioral tests; it is not a complete
 transitive dependency or extensibility proof.
@@ -74,19 +78,22 @@ scope returns and its module, registry, execution state and provider transport
 have been dropped. The worker thread publishes it after that scope returns;
 this is not a thread join or a claim about unrelated allocations.
 
-The acknowledgement contains two independent observations:
+The acknowledgement contains independent observations:
 
 - `cleanup_completed()` is true only if an explicitly admitted Nuis close
   returned valid state and passed trace checks. Cancellation never runs close.
 - `failure_kind()` retains the first latched execution/provider category,
   including a failure received after cancellation admission. `None` means no
   category was latched, not that the abandoned application succeeded.
+- `provider_drain()` is `NotRequested` for ordinary cancellation. The explicit
+  drain variant below reports a separately validated provider observation.
 
 No retained frame history, resource capability, parent event or application-state
 mutation crosses this channel. A cancellation ticket is not an
 [application outcome delivery](nuis-yir-application-outcome-v1.md) and cannot
 certify success, authorize resource reuse or impersonate a provider completion.
-It reports host ownership retirement, **not provider/device resource retirement**.
+The host acknowledgement alone reports **no provider/device resource retirement**;
+only its independently validated drain observation can describe the provider scope.
 Caller-owned snapshots and resources outside this pump are not included.
 
 Channel disconnection without an acknowledgement returns an error, not a fabricated
@@ -94,6 +101,40 @@ retirement receipt. A worker panic cannot publish the normal acknowledgement.
 Dropping the ticket abandons observation without joining or running cleanup.
 Existing `abort` and handle Drop remain unacknowledged abandonment: notably they
 do not retract an already admitted close or promise to prevent its Finish.
+
+## Optional Provider Drain
+
+`ApplicationEventPump::cancel_with_provider_drain` uses the same atomic gate and
+one-shot host ticket, but requests the independent
+[provider-session drain extension](nuis-yir-provider-session-drain-v1.md).
+`WindowSession::cancel_with_provider_drain` only forwards it. Ordinary `cancel`,
+Drop/abort, successful close/Finish and existing synchronous callers are unchanged.
+
+The provider session attempts Drain only after the admitted callback and its
+borrowed application state leave scope. Its IPC client must still have a validated
+Hello/completed-Frame frontier. The first attempted write invalidates that frontier;
+only a fully validated Frame restores it. Rejected, partial, mismatched or terminal
+exchanges cannot send another Dispatch, Finish or Drain. This is conservative:
+even a fully parsed remote dispatch rejection does not authorize a new request.
+Local validation/budget rejection before any exchange can retain the frontier.
+
+The ticket exposes `ProviderDrainObservation`:
+
+| Status / C code | Meaning |
+| --- | --- |
+| `NotRequested` / 0 | Ordinary host-only cancellation. |
+| `NotObserved` / 1 | No drain observation was collected before scope exit, for example pre-admission failure. |
+| `ReplayOnly` / 2 | Replay was abandoned; it is not a live provider receipt. |
+| `Unavailable` / 3 | No trustworthy exchange frontier; no Drain sent. |
+| `Failed(kind)` / 4 | Drain exchange/receipt failed. Its category is independent of the first application failure. |
+| `Drained { completed_dispatches }` / 5 | Exact target and count validated on the original connection. |
+
+A failed drain latches its category only if no earlier execution/provider fault
+exists. Its separate category remains readable either way. A drain receipt never
+manufactures Nuis cleanup, an application/parent outcome, successful publication or
+resource-reuse authority. Host retirement is reported even when drain fails; the
+ticket is delivered only after all of that worker's borrowed scope has returned.
+Pending `poll`/`wait` does not renew a deadline, retry or certify provider retirement.
 
 ## Window And C ABI
 
@@ -116,6 +157,8 @@ The bootstrap host exports these thin adapters:
 | `nuis_window_session_cancel(session, ticket_out)` | `0` admitted; `-1` rejected. A null/nonempty output slot rejects before cancellation; it is never overwritten. No busy queue or implicit retry. |
 | `nuis_application_cancellation_poll(ticket, cleanup_out, failure_out)` | `0` pending/already consumed; `1` exactly one receipt; `-1` invalid input or missing acknowledgement. |
 | `nuis_application_cancellation_free(ticket_slot)` | Nulls the owned slot and abandons observation, without joining or cancelling additional work. |
+| `nuis_window_session_cancel_with_provider_drain(session, ticket_out)` | Opt-in drain cancellation with the same empty-slot ownership rules. |
+| `nuis_application_cancellation_poll_with_provider(ticket, receipt_out)` | Same 0/1/-1 result, with independent host/provider observations in one output struct. |
 
 Ticket poll outputs are `i32` cleanup and `i64` failure code, written only when
 the result is `1`. Null outputs reject before consuming the receipt. Invalid
@@ -123,6 +166,13 @@ input, pending, already-consumed and disconnected paths leave output values
 untouched; callers must check the return status rather than reuse stale values.
 Handles are exclusively owned, with no concurrent calls or copied-handle frees.
 The ticket has no window pointer and needs no provider access to be polled/freed.
+
+`NuisApplicationCancellationReceipt` has C-layout fields in order:
+`cleanup_completed: i32`, `provider_status: i32`, `failure_kind: i64`,
+`provider_failure_kind: i64`, `completed_dispatches: i64`. Count is -1 unless
+status is 5; provider failure is zero unless status is 4. Both poll variants
+consume the same receipt once. A null extended output is rejected before polling,
+and its contents remain unchanged unless a receipt is returned.
 
 The C ABI is a host boundary, not a new Nuis intrinsic or CFFI allowlist grant.
 The packaged AppKit host now forwards and consumes tickets through the explicit
@@ -150,8 +200,8 @@ retirement. Rejected cancellation preserves the window/reply for normal failure
 handling and never creates a ticket receipt.
 
 This is a bounded standalone scripted policy, not a general interactive or parent
-cancellation controller. The live provider has no cancellation message and sees
-EOF without Finish. Its existing supervision reports incomplete execution and
+cancellation controller. This path sends no provider drain request and the peer
+sees EOF without Finish. Its existing supervision reports incomplete execution and
 preserves prior replay evidence. No provider error is suppressed or reclassified
 as successful cancellation; device retirement still requires provider-owned
 protocol and resource-lifetime evidence.
@@ -193,9 +243,21 @@ Finish, keeps old replay bytes, and separately verifies replay exit 130. It also
 rejects invalid modes before window/parent admission. These tests do not prove
 device interruption, device drain or general interactive cancellation.
 
-The pump, registered `WindowSession` and its C ABI expose cancellation tickets;
-AppKit has the explicit standalone scripted policy; parent-pump cancellation is not yet wired.
-Normal window quit still uses explicit close. No IPC wire message is added and
-there is no general provider drain/cancel acknowledgement. Device resource
+The [host drain tests](../../crates/yir-runtime-host/tests/provider_application_session/provider_drain.rs)
+cover zero/two frames, delayed Hello/frame/Drain, explicit close and Finish races,
+first faults, unavailable frontiers and nonjoining ticket drop. The
+[window drain ABI test](../../crates/yir-runtime-host/tests/provider_application_session/window/provider_drain.rs)
+checks invalid slots and independent receipts after window free. The
+[Metal host regression](../../tools/nuis/src/artifact_device_sample_shader_host_drain_tests.rs)
+uses compiled Nuis callbacks through WindowSession, verifies exact GPU pixels,
+zero/two-frame drain, worker-image removal, no parent outcome and replay-only
+observation. It runs inside the image drain regression with a successful compiled
+binary baseline and unchanged prior output evidence.
+
+This verifies the host-library drain path, not a new drain-enabled AppKit binary.
+Next add explicit bundle capability admission and a typed non-success launcher
+outcome; the existing packaged script stays host-only and the success-only launcher
+still rejects Drained. Parent-pump cancellation is not yet wired. Normal window
+quit still uses explicit close. General device preemption, cross-session resource
 retirement, cancellation of resource-capability state, recovery, multi-child
 routing, fully native CPU execution and self-contained Nsld remain open.

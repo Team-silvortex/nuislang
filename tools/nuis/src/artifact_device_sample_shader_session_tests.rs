@@ -144,7 +144,7 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
     drop(session);
     let served = worker.join().unwrap();
     let live = live.unwrap();
-    assert_eq!(served.unwrap(), 2);
+    assert_eq!(served.unwrap().into_finished_count().unwrap(), 2);
     assert_ne!(live[0], live[1]);
     for (frame, phase) in live.iter().zip([false, true]) {
         let input = image_input(phase);

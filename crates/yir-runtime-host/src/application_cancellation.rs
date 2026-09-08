@@ -6,7 +6,10 @@ use std::{
     time::Duration,
 };
 
-use crate::application_scope_admission::ScopeAdmission;
+use crate::{
+    application_scope_admission::{ScopeAbandonment, ScopeAdmission},
+    ProviderDrainObservation,
+};
 use yir_core::ApplicationFailureKind;
 
 mod ffi;
@@ -18,21 +21,34 @@ const ACTIVE: u8 = 0;
 const CANCELLED: u8 = 1;
 const FINALIZING: u8 = 2;
 const EXITED: u8 = 3;
+const CANCELLED_DRAIN: u8 = 4;
+const ABANDONING: u8 = 5;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CancellationMode {
+    HostOnly,
+    ProviderDrain,
+}
 
 #[derive(Default)]
 pub(crate) struct CancellationControl(AtomicU8);
 
 impl CancellationControl {
-    pub(crate) fn request(&self) -> Result<(), String> {
+    pub(crate) fn request(&self, mode: CancellationMode) -> Result<(), String> {
+        let next = match mode {
+            CancellationMode::HostOnly => CANCELLED,
+            CancellationMode::ProviderDrain => CANCELLED_DRAIN,
+        };
         self.0
-            .compare_exchange(ACTIVE, CANCELLED, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(ACTIVE, next, Ordering::AcqRel, Ordering::Acquire)
             .map(|_| ())
             .map_err(|phase| {
                 match phase {
                     FINALIZING => {
                         "application cancellation rejected: finalization already admitted"
                     }
-                    CANCELLED => "application cancellation already admitted",
+                    CANCELLED | CANCELLED_DRAIN => "application cancellation already admitted",
+                    ABANDONING => "application cancellation rejected: scope already abandoning",
                     _ => "application cancellation rejected: worker already exited",
                 }
                 .to_owned()
@@ -40,12 +56,16 @@ impl CancellationControl {
     }
 
     pub(crate) fn cancelled(&self) -> bool {
-        self.0.load(Ordering::Acquire) == CANCELLED
+        matches!(self.0.load(Ordering::Acquire), CANCELLED | CANCELLED_DRAIN)
     }
 
     /// Called only after the worker's entire borrowed execution scope returns.
-    pub(crate) fn retire(&self) -> bool {
-        self.0.swap(EXITED, Ordering::AcqRel) == CANCELLED
+    pub(crate) fn retire(&self) -> Option<CancellationMode> {
+        match self.0.swap(EXITED, Ordering::AcqRel) {
+            CANCELLED => Some(CancellationMode::HostOnly),
+            CANCELLED_DRAIN => Some(CancellationMode::ProviderDrain),
+            _ => None,
+        }
     }
 }
 
@@ -64,6 +84,16 @@ impl ScopeAdmission for CancellationControl {
             .map(|_| ())
             .map_err(|_| "application finalization admission rejected".to_owned())
     }
+
+    fn admit_abandonment(&self) -> ScopeAbandonment {
+        match self
+            .0
+            .compare_exchange(ACTIVE, ABANDONING, Ordering::AcqRel, Ordering::Acquire)
+        {
+            Err(CANCELLED_DRAIN) => ScopeAbandonment::Drain,
+            _ => ScopeAbandonment::Drop,
+        }
+    }
 }
 
 /// Descriptive acknowledgement that the pump's worker-owned module, execution
@@ -73,6 +103,7 @@ impl ScopeAdmission for CancellationControl {
 pub struct ApplicationHostRetirementAck {
     cleanup_completed: bool,
     failure_kind: ApplicationFailureKind,
+    provider_drain: ProviderDrainObservation,
 }
 
 impl ApplicationHostRetirementAck {
@@ -80,6 +111,7 @@ impl ApplicationHostRetirementAck {
         Self {
             cleanup_completed,
             failure_kind,
+            provider_drain: ProviderDrainObservation::NotRequested,
         }
     }
 
@@ -93,6 +125,24 @@ impl ApplicationHostRetirementAck {
     /// None does not mean the abandoned application completed successfully.
     pub fn failure_kind(&self) -> ApplicationFailureKind {
         self.failure_kind
+    }
+
+    pub fn provider_drain(&self) -> ProviderDrainObservation {
+        self.provider_drain
+    }
+
+    pub(crate) fn with_provider_drain(mut self, observation: ProviderDrainObservation) -> Self {
+        self.provider_drain = observation;
+        self
+    }
+
+    pub(crate) fn for_cancellation(mut self, mode: CancellationMode) -> Self {
+        if mode == CancellationMode::ProviderDrain
+            && self.provider_drain == ProviderDrainObservation::NotRequested
+        {
+            self.provider_drain = ProviderDrainObservation::NotObserved;
+        }
+        self
     }
 }
 

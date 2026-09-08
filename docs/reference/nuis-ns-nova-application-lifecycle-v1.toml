@@ -189,7 +189,7 @@ contract = "nuis-yir-application-cancellation-v1"
 implementation = "crates/yir-runtime-host/src/application_cancellation.rs"
 entry = "ApplicationEventPump.cancel"
 admission = "atomic-cancellation-versus-provider-finish-one-winner"
-admission_boundary = "ScopeAdmission.checkpoint+admit_finalization"
+admission_boundary = "ScopeAdmission.checkpoint+admit_finalization+admit_abandonment"
 admission_binding = "compile-time-generic-no-concrete-cancellation-dependency"
 concrete_cancellation_owner = "host-worker-not-provider-or-window-policy"
 provider_finalization_owner = "provider-session-after-lifecycle-and-generic-admission"
@@ -201,7 +201,7 @@ timeout = "keep-ticket-no-retry-or-resource-reuse-authority"
 lost_acknowledgement = "error-not-retirement"
 provider_finish_after_accepted_cancel = false
 provider_device_retirement_claimed = false
-provider_wire_cancellation = false
+provider_wire_cancellation = false # Default cancel remains host-only; explicit drain is separate below.
 window_cancellation_wired = true
 window_entry = "WindowSession.cancel"
 window_ffi_entry = "nuis_window_session_cancel"
@@ -320,6 +320,29 @@ registered_draw_validation_retained = true
 legacy_packet_validation_retained = true
 provider_draw_event_source = "returned-provider-frame"
 provider_frame_extent_source = "validated-render-pass-target-viewport"
+
+[provider_session_drain]
+contract = "nuis-yir-provider-session-drain-v1"
+owner = "yir-core-wire-nsdb-provider-lifecycle"
+admission = "exact-hello-target-and-completed-frame-count-on-same-connection"
+terminal_request = "explicit-drain-not-eof-or-finish"
+acknowledgement = "after-logical-lease-close-worker-close-receipts-successful-exit-and-image-removal"
+outcome = "typed-drained-not-finished"
+replay_publication = false
+application_success = false
+host_cancellation_wired = true
+host_drain_policy = "explicit-opt-in-validated-frontier-only-no-retry"
+host_entry = "ApplicationEventPump.cancel_with_provider_drain"
+window_entry = "WindowSession.cancel_with_provider_drain"
+window_ffi_entry = "nuis_window_session_cancel_with_provider_drain"
+ticket_ffi_entry = "nuis_application_cancellation_poll_with_provider"
+observation = "not-requested-not-observed-replay-only-unavailable-failed-or-drained-with-count"
+failure_policy = "independent-drain-failure-preserves-application-first-fault"
+abandonment_admission = "atomic-seal-before-provider-drop-late-cancellation-rejected"
+packaged_host_drain_wired = false
+device_preemption = false
+cross_session_resource_reuse = false
+evidence = "framing-frontier-races-independent-policy-window-ffi-and-compiled-image-zero-two-frame-registered-metal-drain-plus-replay-only-observation"
 
 [runtime_arguments]
 contract = "nuis-shader-fragment-uniform-v1"
@@ -456,5 +479,5 @@ dynamic_render_target_extent = false
 legacy_packet_gpu_upload = false
 
 [next_slice]
-action = "wire an explicit packaged-host cancellation path through the existing independent window ticket, then establish provider-owned drain acknowledgement before resource reuse; never synthesize a child outcome, reinitialize the closed module, repeat close or reset provider clocks and budgets; retain rooted initialization, independent parent effects/fuel, typed rejection and compiled Metal window/export evidence"
+action = "wire the opt-in provider drain ticket through a declared packaged-host capability and preserve a typed non-success launcher outcome; keep existing host-only cancellation and normal close/Finish explicit, never infer drain from exit130 or EOF, synthesize a child outcome, reset budgets or grant resource reuse"
 validation = "retain compiled-binary image/uniform export, exact GPU pixels, live/replay equality without an external YIR read, fail-closed missing providers, no overwrite or output on rejected dispatch, cache reuse, physical completion and GLM release; do not conflate embedded-YIR execution with fully native CPU lowering, self-contained Nsld injection or continuous application state"

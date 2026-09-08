@@ -6,7 +6,7 @@ use std::{os::unix::net::UnixStream, path::Path, time::Duration};
 use yir_core::{
     provider_runtime_ipc::{
         hash_bytes, DispatchArguments, DispatchTarget, Message, Rejection, RejectionCode,
-        RejectionPhase, MAX_DISPATCHES,
+        RejectionPhase, SessionDrain, MAX_DISPATCHES,
     },
     ApplicationFailureKind, Node, YirModule,
 };
@@ -48,6 +48,7 @@ pub(super) fn connect_provider_runtime(
         stream,
         target,
         sequence: 0,
+        frontier: true,
     })
 }
 
@@ -55,6 +56,9 @@ pub(super) struct ProviderRuntimeClient {
     stream: UnixStream,
     target: DispatchTarget,
     sequence: usize,
+    // False from the first attempted write until the whole reply is validated.
+    // Failed or terminal exchanges never regain authority for another request.
+    frontier: bool,
 }
 
 impl ProviderRuntimeClient {
@@ -76,6 +80,7 @@ impl ProviderRuntimeClient {
                 "runtime IPC invocation limit rejected",
             ));
         }
+        self.begin_exchange()?;
         Message::Dispatch {
             sequence: self.sequence,
             target: self.target.clone(),
@@ -109,10 +114,12 @@ impl ProviderRuntimeClient {
         }
         let result = ProviderResultFrame::from_ipc(&self.target, frame)?;
         self.sequence += 1;
+        self.frontier = true;
         Ok(result)
     }
 
     pub(super) fn finish(&mut self) -> Result<(), ProviderFailure> {
+        self.begin_exchange()?;
         Message::Finish(self.sequence)
             .write_to(&mut self.stream)
             .map_err(ProviderFailure::exchange)?;
@@ -123,6 +130,40 @@ impl ProviderRuntimeClient {
                 .to_owned()
                 .into()),
         }
+    }
+
+    /// None means the connection is not at a validated dispatch frontier. Never
+    /// retry, reconnect, send Finish or reset timeouts to manufacture a receipt.
+    pub(super) fn drain(&mut self) -> Result<Option<usize>, ProviderFailure> {
+        if !self.frontier {
+            return Ok(None);
+        }
+        self.begin_exchange()?;
+        Message::Drain(SessionDrain {
+            sequence: self.sequence,
+            target: self.target.clone(),
+        })
+        .write_to(&mut self.stream)
+        .map_err(ProviderFailure::exchange)?;
+        match Message::read_from(&mut self.stream).map_err(ProviderFailure::exchange)? {
+            Message::Drained(receipt) => {
+                receipt.admit(&self.target, self.sequence)?;
+                Ok(Some(self.sequence))
+            }
+            Message::Rejected(error) => Err(self.rejected(error, RejectionPhase::Drain)),
+            _ => Err("runtime IPC drain acknowledgement mismatch"
+                .to_owned()
+                .into()),
+        }
+    }
+
+    fn begin_exchange(&mut self) -> Result<(), ProviderFailure> {
+        if !std::mem::replace(&mut self.frontier, false) {
+            return Err("runtime IPC has no validated dispatch frontier"
+                .to_owned()
+                .into());
+        }
+        Ok(())
     }
 
     fn rejected(&self, error: Rejection, phase: RejectionPhase) -> ProviderFailure {

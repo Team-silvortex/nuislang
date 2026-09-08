@@ -17,6 +17,7 @@ For the current `beta-0.12.*` application-led line, start with:
 * [Beta-0.12 checkpoint](../versioning/nuis-beta-0.12.0-snapshot.md)
 * [Window contract](nuis-yir-window-session-v3.md)
 * [Cancellation and host retirement](nuis-yir-application-cancellation-v1.md)
+* [Provider-owned session drain](nuis-yir-provider-session-drain-v1.md)
 * [Parent outcome pump](nuis-yir-application-outcome-pump-v1.md)
 * [Application lifecycle manifest](nuis-ns-nova-application-lifecycle-v1.toml)
 

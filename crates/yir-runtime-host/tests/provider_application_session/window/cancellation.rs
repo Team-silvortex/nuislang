@@ -6,6 +6,9 @@ use yir_runtime_host::{
     nuis_window_session_free, nuis_window_session_outcome_field, ApplicationCancellation,
 };
 
+#[path = "provider_drain.rs"]
+mod provider_drain;
+
 fn gated(at: Pause, reply: Reply) -> (Peer, mpsc::Receiver<()>, mpsc::SyncSender<()>) {
     let (ready, waiting) = mpsc::sync_channel(1);
     let (release, resume) = mpsc::sync_channel(1);

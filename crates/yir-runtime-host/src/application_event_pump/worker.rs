@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     path::PathBuf,
     sync::mpsc::{Receiver, SyncSender},
     sync::Arc,
@@ -69,6 +70,7 @@ pub(super) fn run(
     let mut final_state = None;
     let mut cleanup_completed = false;
     let failures = FailureState::default();
+    let drain = Cell::new(crate::ProviderDrainObservation::NotRequested);
     let result = with_registered_provider_application_session_checked(
         &source,
         provider.borrowed(),
@@ -78,6 +80,7 @@ pub(super) fn run(
         SessionControl {
             failures: failures.clone(),
             admission: control.as_ref(),
+            drain: Some(&drain),
         },
         |session, opened| {
             let send = |operation, trace, session: &crate::ApplicationSession<'_>| {
@@ -149,7 +152,8 @@ pub(super) fn run(
         },
     );
     if control.cancelled() {
-        return ApplicationHostRetirementAck::new(cleanup_completed, failures.kind());
+        return ApplicationHostRetirementAck::new(cleanup_completed, failures.kind())
+            .with_provider_drain(drain.get());
     }
     let phase = if result.is_ok() {
         ApplicationPumpPhase::Closed
@@ -166,4 +170,5 @@ pub(super) fn run(
         trace: result,
     });
     ApplicationHostRetirementAck::new(cleanup_completed, failures.kind())
+        .with_provider_drain(drain.get())
 }

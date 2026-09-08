@@ -162,7 +162,7 @@ impl RuntimeProviderServer {
                             .map_err(|_| "runtime IPC stream lock was poisoned")?
                             .take();
                         total = total
-                            .checked_add(result?)
+                            .checked_add(result?.into_finished_count()?)
                             .ok_or("runtime IPC invocation count overflow")?;
                         completed += 1;
                     }

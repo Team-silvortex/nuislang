@@ -25,6 +25,7 @@ struct RecordingAdmission {
     calls: RefCell<Vec<&'static str>>,
     reject_checkpoint: Option<usize>,
     reject_finalization: bool,
+    drain: bool,
 }
 
 impl ScopeAdmission for RecordingAdmission {
@@ -46,6 +47,14 @@ impl ScopeAdmission for RecordingAdmission {
             Ok(())
         }
     }
+
+    fn admit_abandonment(&self) -> ScopeAbandonment {
+        if self.drain {
+            ScopeAbandonment::Drain
+        } else {
+            ScopeAbandonment::Drop
+        }
+    }
 }
 
 struct Peer {
@@ -55,6 +64,10 @@ struct Peer {
 
 impl Peer {
     fn start(source: &str, finish: bool) -> Self {
+        Self::start_with_drain(source, finish, false)
+    }
+
+    fn start_with_drain(source: &str, finish: bool, drain: bool) -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "ns-admission-{}-{}",
@@ -72,13 +85,22 @@ impl Peer {
         };
         let worker = thread::spawn(move || {
             let mut stream = accept(listener);
-            Message::Hello(target).write_to(&mut stream).unwrap();
+            Message::Hello(target.clone())
+                .write_to(&mut stream)
+                .unwrap();
             if finish {
                 assert!(matches!(
                     Message::read_from(&mut stream).unwrap(),
                     Message::Finish(0)
                 ));
                 Message::Closed(0).write_to(&mut stream).unwrap();
+            }
+            if drain {
+                let Message::Drain(receipt) = Message::read_from(&mut stream).unwrap() else {
+                    panic!("independent abandonment policy did not request drain")
+                };
+                receipt.admit(&target, 0).unwrap();
+                Message::Drained(receipt).write_to(&mut stream).unwrap();
             }
             assert_eq!(stream.read(&mut [0_u8; 1]).unwrap(), 0);
         });
@@ -145,6 +167,7 @@ fn provider_scope_accepts_independent_admission_without_bypassing_lifecycle() {
             SessionControl {
                 admission: &admission,
                 failures: FailureState::default(),
+                drain: None,
             },
             |session, _| {
                 if driver_failure {
@@ -184,6 +207,7 @@ fn independent_policy_rejects_before_provider_io() {
         SessionControl {
             admission: &admission,
             failures: FailureState::default(),
+            drain: None,
         },
         |_, _| panic!("denied scope executed application driver"),
     );
@@ -210,6 +234,7 @@ fn independent_policy_rejects_after_provider_admission_without_application_deliv
         SessionControl {
             admission: &admission,
             failures: FailureState::default(),
+            drain: None,
         },
         |_, _| panic!("denied scope executed application driver"),
     );
@@ -218,6 +243,55 @@ fn independent_policy_rejects_after_provider_admission_without_application_deliv
         .contains("independent policy denied scope entry"));
     assert_eq!(*admission.calls.borrow(), ["checkpoint", "checkpoint"]);
     peer.finish();
+}
+
+#[test]
+fn independent_abandonment_policy_can_observe_drain_without_turning_error_into_success() {
+    for reject_checkpoint in [None, Some(2)] {
+        let source = source();
+        let peer = Peer::start_with_drain(&source, false, true);
+        let admission = RecordingAdmission {
+            reject_checkpoint,
+            drain: true,
+            ..Default::default()
+        };
+        let drain = Cell::new(ProviderDrainObservation::NotRequested);
+        let result: Result<(), String> = with_registered_provider_application_session_checked(
+            &source,
+            ApplicationProviderSource::Ipc(&peer.path),
+            "counter",
+            vec![Value::Int(10)],
+            |_, _| Ok(()),
+            SessionControl {
+                admission: &admission,
+                failures: FailureState::default(),
+                drain: Some(&drain),
+            },
+            |_, _| {
+                assert!(
+                    reject_checkpoint.is_none(),
+                    "denied scope executed a callback"
+                );
+                Err("driver abandoned".to_owned())
+            },
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            if reject_checkpoint.is_some() {
+                "independent policy denied scope entry"
+            } else {
+                "driver abandoned"
+            }
+        );
+        assert_eq!(
+            drain.get(),
+            ProviderDrainObservation::Drained {
+                completed_dispatches: 0
+            }
+        );
+        assert_eq!(*admission.calls.borrow(), ["checkpoint", "checkpoint"]);
+        peer.finish();
+    }
 }
 
 #[test]

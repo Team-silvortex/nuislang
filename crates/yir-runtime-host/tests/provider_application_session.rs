@@ -49,6 +49,10 @@ enum Reply {
     WrongHash,
     DisconnectedFrame,
     WrongSequence,
+    DrainGood,
+    DrainRejected,
+    DrainWrongTarget,
+    DrainDisconnected,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -56,6 +60,7 @@ enum Pause {
     Hello,
     Frame,
     Finish,
+    Drain,
 }
 
 struct Gate {
@@ -200,6 +205,39 @@ impl Peer {
                         .write_to(&mut stream)
                         .unwrap();
                         return (count, true);
+                    }
+                    Message::Drain(drain)
+                        if matches!(
+                            reply,
+                            Reply::DrainGood
+                                | Reply::DrainRejected
+                                | Reply::DrainWrongTarget
+                                | Reply::DrainDisconnected
+                        ) =>
+                    {
+                        drain.admit(&target, count).unwrap();
+                        if let Some(gate) = &gate {
+                            gate.wait(Pause::Drain);
+                        }
+                        match reply {
+                            Reply::DrainDisconnected => return (count, false),
+                            Reply::DrainRejected => Message::Rejected(Rejection::new(
+                                RejectionPhase::Drain,
+                                count,
+                                RejectionCode::Finalization,
+                                "drain close failed",
+                            )),
+                            Reply::DrainWrongTarget => {
+                                let mut wrong = drain;
+                                wrong.target.node = "other".to_owned();
+                                Message::Drained(wrong)
+                            }
+                            _ => Message::Drained(drain),
+                        }
+                        .write_to(&mut stream)
+                        .unwrap();
+                        assert_eq!(stream.read(&mut [0]).unwrap(), 0, "drain was not terminal");
+                        return (count, false);
                     }
                     other => panic!("unexpected client message: {other:?}"),
                 }

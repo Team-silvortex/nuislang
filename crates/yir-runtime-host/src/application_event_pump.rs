@@ -9,8 +9,8 @@ use yir_core::{ApplicationFailureKind, Value};
 use yir_exec::ExecutionTrace;
 
 use crate::{
-    application_cancellation::CancellationControl, ApplicationCancellation,
-    ApplicationHostRetirementAck, ApplicationProviderSource,
+    application_cancellation::{CancellationControl, CancellationMode},
+    ApplicationCancellation, ApplicationHostRetirementAck, ApplicationProviderSource,
 };
 
 mod outcome;
@@ -128,8 +128,8 @@ impl ApplicationEventPump {
                 );
                 // No borrowed execution state, registry or transport survives run.
                 // A panic/disconnect produces no affirmative acknowledgement.
-                if control.retire() {
-                    let _ = retired.send(ack);
+                if let Some(mode) = control.retire() {
+                    let _ = retired.send(ack.for_cancellation(mode));
                 }
             })
             .map_err(|error| format!("application event pump could not start: {error}"))?;
@@ -213,10 +213,24 @@ impl ApplicationEventPump {
     /// is made. Once Finish wins admission, cancellation rejects without changing
     /// the original pending request. Drop/abort remain unacknowledged abandonment.
     pub fn cancel(&mut self) -> Result<ApplicationCancellation, String> {
+        self.cancel_with_mode(CancellationMode::HostOnly)
+    }
+
+    /// Explicitly request a separate provider drain observation after the active
+    /// callback returns. Old peers may reject it; no retry or Finish fallback is
+    /// attempted. The ticket still reports host retirement even if drain fails.
+    pub fn cancel_with_provider_drain(&mut self) -> Result<ApplicationCancellation, String> {
+        self.cancel_with_mode(CancellationMode::ProviderDrain)
+    }
+
+    fn cancel_with_mode(
+        &mut self,
+        mode: CancellationMode,
+    ) -> Result<ApplicationCancellation, String> {
         if self.commands.is_none() {
             return Err("application cancellation requires a live pump".to_owned());
         }
-        self.cancellation.request()?;
+        self.cancellation.request(mode)?;
         let retirement = self
             .retirement
             .take()

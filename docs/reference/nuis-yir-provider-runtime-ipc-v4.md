@@ -21,16 +21,17 @@ rejected
 The previously admitted target and private connection bind the source identity.
 The sequence must exactly match the pending dispatch or Finish count. Integers
 are canonical decimal, without signs or leading zeros. Dispatch rejection uses
-`0..255`; receive/Finish rejection can also carry `256`, allowing a fully used
-session to finish without granting a 257th dispatch.
+`0..255`; receive/Finish/Drain rejection can also carry `256`, allowing a fully used
+session to finish or drain without granting a 257th dispatch.
 
 | Phase | Meaning | Permitted Codes |
 | --- | --- | --- |
 | `receive` | Request could not be read or admitted at the current frontier | Request, Exchange |
 | `dispatch` | Failure handling the admitted dispatch | Request, Budget, Execution, Result, Exchange |
 | `finish` | Failure validating/completing the received Finish | Result, Finalization, Exchange |
+| `drain` | Failure retiring an explicitly drained provider session | Finalization, Exchange |
 
-A client accepts `receive` at either pending operation because a failed request
+A client accepts `receive` at a pending dispatch, Finish or Drain because a failed request
 read may not identify its message kind. Otherwise the phase must match the
 pending operation. Unknown phases/codes, illegal phase/code pairs, stale/future
 sequences, missing/extra fields and out-of-range counts fail closed. No rejection
@@ -71,6 +72,11 @@ The server still reserves replay space before device work without refund.
 evidence persistence. A publication/close failure sends no success acknowledgement.
 Rejection delivery is best effort after a transport failure; inability to deliver
 it does not turn the server result into success.
+
+The explicit [session-drain extension](nuis-yir-provider-session-drain-v1.md)
+adds target/count-bound Drain/Drained messages under its own sub-contract.
+Its typed Drained outcome cannot be counted as Finish and never publishes replay.
+The existing window cancellation path does not yet send this request.
 
 The scoped application retains the first admitted failure through Nuis cleanup.
 Window v3's `(state, reason, failure)` close signature is unchanged; its failure

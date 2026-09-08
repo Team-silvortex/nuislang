@@ -24,14 +24,48 @@ use std::{
 };
 use yir_core::provider_runtime_ipc::{
     DispatchArguments, DispatchFrame, DispatchTarget, Message, Rejection, RejectionCode,
-    RejectionPhase, ReplayBudget, MAX_DISPATCHES,
+    RejectionPhase, ReplayBudget, SessionDrain, MAX_DISPATCHES,
 };
+
+/// Provider-owned terminal observations. A drained session is not a successful
+/// application lifecycle and does not publish replacement replay evidence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProviderRuntimeSessionOutcome {
+    Finished(usize),
+    Drained(SessionDrain),
+}
+
+impl ProviderRuntimeSessionOutcome {
+    /// Existing success-only launchers must reject, not count, a drained session.
+    pub fn into_finished_count(self) -> Result<usize, String> {
+        match self {
+            Self::Finished(count) => Ok(count),
+            Self::Drained(_) => {
+                Err("runtime provider drained without application completion".to_owned())
+            }
+        }
+    }
+}
+
+enum DispatchEnd {
+    Finished(usize, NativeProviderOutputs),
+    Drain(SessionDrain),
+}
+
+impl DispatchEnd {
+    fn boundary(&self) -> (RejectionPhase, usize) {
+        match self {
+            Self::Finished(count, _) => (RejectionPhase::Finish, *count),
+            Self::Drain(drain) => (RejectionPhase::Drain, drain.sequence),
+        }
+    }
+}
 
 /// Serve one bounded lifecycle. Device work starts only after a validated Dispatch message.
 pub fn serve_runtime_provider_session(
     output_dir: &Path,
     stream: &mut (impl Read + Write),
-) -> Result<usize, String> {
+) -> Result<ProviderRuntimeSessionOutcome, String> {
     serve_runtime_provider_session_with_request_reader(output_dir, stream, Message::read_from)
 }
 
@@ -42,7 +76,7 @@ pub fn serve_runtime_provider_session_with_request_reader<S: Read + Write>(
     output_dir: &Path,
     stream: &mut S,
     read_request: impl FnMut(&mut S) -> Result<Message, String>,
-) -> Result<usize, String> {
+) -> Result<ProviderRuntimeSessionOutcome, String> {
     let (record, target, adapter) = admit_target(output_dir)?;
     let payload_bytes = admitted_payload_bytes(&record, &target)?;
     Message::Hello(target.clone()).write_to(stream)?;
@@ -50,15 +84,17 @@ pub fn serve_runtime_provider_session_with_request_reader<S: Read + Write>(
     let execution = dispatch_loop(stream, &target, payload_bytes, read_request, |arguments| {
         session.execute_graph(output_dir, &record, &adapter, Some((&target, arguments)))
     });
-    let close = session.close();
-    let result = complete_session(execution, close).and_then(|(count, outputs)| {
-        finalize_session(stream, count, || {
+    let result = finalize_execution(
+        stream,
+        execution,
+        || session.close(),
+        |count, outputs| {
             if count > 0 {
-                persist_outputs(output_dir, &record, &adapter, &outputs)?;
+                persist_outputs(output_dir, &record, &adapter, outputs)?;
             }
             Ok(())
-        })
-    });
+        },
+    );
     if let Err(error) = &result {
         let _ = Message::Rejected(error.clone()).write_to(stream);
     }
@@ -66,9 +102,9 @@ pub fn serve_runtime_provider_session_with_request_reader<S: Read + Write>(
 }
 
 fn complete_session(
-    execution: Result<(usize, NativeProviderOutputs), Rejection>,
+    execution: Result<DispatchEnd, Rejection>,
     close: Result<(), String>,
-) -> Result<(usize, NativeProviderOutputs), Rejection> {
+) -> Result<DispatchEnd, Rejection> {
     match execution {
         Err(mut error) => {
             if let Err(close) = close {
@@ -78,16 +114,41 @@ fn complete_session(
             }
             Err(error)
         }
-        Ok((count, outputs)) => {
+        Ok(end) => {
+            let (phase, count) = end.boundary();
             close.map_err(|error| {
-                Rejection::new(
-                    RejectionPhase::Finish,
-                    count,
-                    RejectionCode::Finalization,
-                    error,
-                )
+                Rejection::new(phase, count, RejectionCode::Finalization, error)
             })?;
-            Ok((count, outputs))
+            Ok(end)
+        }
+    }
+}
+
+fn finalize_execution(
+    stream: &mut impl Write,
+    execution: Result<DispatchEnd, Rejection>,
+    close: impl FnOnce() -> Result<(), String>,
+    persist: impl FnOnce(usize, &NativeProviderOutputs) -> Result<(), String>,
+) -> Result<ProviderRuntimeSessionOutcome, Rejection> {
+    // Only the provider owns these leases. Closing validates worker receipts and
+    // joins their processes before either kind of terminal acknowledgement.
+    match complete_session(execution, close())? {
+        DispatchEnd::Finished(count, outputs) => {
+            finalize_session(stream, count, || persist(count, &outputs))
+                .map(ProviderRuntimeSessionOutcome::Finished)
+        }
+        DispatchEnd::Drain(drain) => {
+            Message::Drained(drain.clone())
+                .write_to(stream)
+                .map_err(|error| {
+                    Rejection::new(
+                        RejectionPhase::Drain,
+                        drain.sequence,
+                        RejectionCode::Exchange,
+                        error,
+                    )
+                })?;
+            Ok(ProviderRuntimeSessionOutcome::Drained(drain))
         }
     }
 }
@@ -226,7 +287,7 @@ fn dispatch_loop<S: Read + Write>(
     payload_bytes: usize,
     mut read_request: impl FnMut(&mut S) -> Result<Message, String>,
     mut execute: impl FnMut(&DispatchArguments) -> Result<NativeProviderOutputs, String>,
-) -> Result<(usize, NativeProviderOutputs), Rejection> {
+) -> Result<DispatchEnd, Rejection> {
     let mut count = 0;
     let mut retained = NativeProviderOutputs::empty();
     let mut observations = Vec::new();
@@ -320,14 +381,26 @@ fn dispatch_loop<S: Read + Write>(
                                 error,
                             )
                         })?;
-                return Ok((count, retained));
+                return Ok(DispatchEnd::Finished(count, retained));
+            }
+            Message::Drain(drain) => {
+                drain.admit(target, count).map_err(|error| {
+                    Rejection::new(
+                        RejectionPhase::Receive,
+                        count,
+                        RejectionCode::Request,
+                        error,
+                    )
+                })?;
+                // No success evidence is constructed or retained on this path.
+                return Ok(DispatchEnd::Drain(drain));
             }
             _ => {
                 return Err(Rejection::new(
                     RejectionPhase::Receive,
                     count,
                     RejectionCode::Request,
-                    "runtime IPC expected ordered dispatch or matching finish",
+                    "runtime IPC expected ordered dispatch, matching finish or drain",
                 ))
             }
         }
@@ -393,3 +466,7 @@ fn persist_outputs(
 #[cfg(test)]
 #[path = "provider_runtime_ipc_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "provider_runtime_ipc_drain_tests.rs"]
+mod drain_tests;

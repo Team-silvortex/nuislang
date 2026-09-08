@@ -125,6 +125,7 @@ pub use provider_conformance_capsule::{
 #[cfg(unix)]
 pub use provider_runtime_ipc::{
     serve_runtime_provider_session, serve_runtime_provider_session_with_request_reader,
+    ProviderRuntimeSessionOutcome,
 };
 pub use provider_runtime_result_stream::{
     provider_runtime_result_stream_path, provider_runtime_result_targets,

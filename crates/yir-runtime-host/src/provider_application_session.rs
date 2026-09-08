@@ -1,20 +1,22 @@
-use std::path::Path;
+use std::{cell::Cell, path::Path};
 
 use yir_core::Value;
 use yir_exec::ExecutionTrace;
 
 use crate::application_failure::FailureState;
-use crate::application_scope_admission::ScopeAdmission;
+use crate::application_scope_admission::{ScopeAbandonment, ScopeAdmission};
 use crate::provider_result_stream::{
-    finish_provider_source_with_failures, provider_registry_with_failures, replay_source,
+    drain_provider_source, finish_provider_source_with_failures, provider_registry_with_failures,
+    replay_source,
 };
-use crate::{ApplicationSession, ApplicationSessionEntries};
+use crate::{ApplicationSession, ApplicationSessionEntries, ProviderDrainObservation};
 
 pub const PROVIDER_APPLICATION_SESSION_CONTRACT: &str = "nuis-yir-provider-application-session-v1";
 
 pub(crate) struct SessionControl<'a, A: ScopeAdmission = ()> {
     pub failures: FailureState,
     pub admission: &'a A,
+    pub drain: Option<&'a Cell<ProviderDrainObservation>>,
 }
 
 impl Default for SessionControl<'_, ()> {
@@ -22,6 +24,7 @@ impl Default for SessionControl<'_, ()> {
         Self {
             failures: FailureState::default(),
             admission: &(),
+            drain: None,
         }
     }
 }
@@ -136,21 +139,33 @@ fn with_session<T, A: ScopeAdmission>(
         }
         ApplicationProviderSource::Replay(path) => replay_source(source, path)?,
     };
-    control.checkpoint()?;
     let (registry, provider) = provider_registry_with_failures(provider, control.failures.clone());
-    let (mut application, opened) = ApplicationSession::open_with_failures(
-        module,
-        &registry,
-        entries,
-        arguments,
-        control.failures.clone(),
-    )?;
-    let result = drive(&mut application, opened)?;
-    application.completion_status()?;
-    drop(application);
-    control.admit_finalization()?;
-    finish_provider_source_with_failures(&provider, &control.failures)?;
-    Ok(result)
+    let result = (|| {
+        control.checkpoint()?;
+        let (mut application, opened) = ApplicationSession::open_with_failures(
+            module,
+            &registry,
+            entries,
+            arguments,
+            control.failures.clone(),
+        )?;
+        let result = drive(&mut application, opened)?;
+        application.completion_status()?;
+        drop(application);
+        control.admit_finalization()?;
+        finish_provider_source_with_failures(&provider, &control.failures)?;
+        Ok(result)
+    })();
+    // No application can dispatch after this point. The admission policy seals
+    // the abandonment race; transport health independently decides drain safety.
+    drop(registry);
+    if result.is_err() && control.admission.admit_abandonment() == ScopeAbandonment::Drain {
+        let observation = drain_provider_source(&provider, &control.failures);
+        if let Some(slot) = control.drain {
+            slot.set(observation);
+        }
+    }
+    result
 }
 
 #[cfg(all(test, unix))]

@@ -2,6 +2,19 @@ use std::ptr;
 
 use super::ApplicationCancellation;
 
+/// Independent host and provider observations. Provider status codes: 0 not
+/// requested, 1 not observed, 2 replay only, 3 unavailable frontier, 4 failed,
+/// 5 drained. Dispatches is -1 unless status is 5. Cleanup never implies success.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NuisApplicationCancellationReceipt {
+    pub cleanup_completed: i32,
+    pub provider_status: i32,
+    pub failure_kind: i64,
+    pub provider_failure_kind: i64,
+    pub completed_dispatches: i64,
+}
+
 fn fail(error: impl std::fmt::Display) -> i32 {
     eprintln!("nuis application cancellation: {error}");
     -1
@@ -31,6 +44,42 @@ pub unsafe extern "C" fn nuis_application_cancellation_poll(
             unsafe {
                 *cleanup = i32::from(ack.cleanup_completed());
                 *failure = ack.failure_kind().code();
+            }
+            1
+        }
+        Ok(None) => 0,
+        Err(error) => fail(error),
+    }
+}
+
+/// Nonblocking: 0 pending/already consumed, 1 receipt, -1 invalid/lost receipt.
+/// This and the host-only poll consume the same one-shot acknowledgement.
+/// Invalid arguments and pending polls do not change outputs or consume it.
+/// # Safety
+/// Ticket must be exclusive and live; output must be writable, aligned and
+/// nonaliasing with the ticket. Poll and free calls must not overlap.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_application_cancellation_poll_with_provider(
+    ticket: *mut ApplicationCancellation,
+    output: *mut NuisApplicationCancellationReceipt,
+) -> i32 {
+    if output.is_null() {
+        return fail("null retirement output");
+    }
+    let Some(ticket) = (unsafe { ticket.as_mut() }) else {
+        return fail("null cancellation ticket");
+    };
+    match ticket.poll() {
+        Ok(Some(ack)) => {
+            let provider = ack.provider_drain();
+            unsafe {
+                *output = NuisApplicationCancellationReceipt {
+                    cleanup_completed: i32::from(ack.cleanup_completed()),
+                    provider_status: provider.code(),
+                    failure_kind: ack.failure_kind().code(),
+                    provider_failure_kind: provider.failure_kind().code(),
+                    completed_dispatches: provider.completed_dispatches().map_or(-1, |n| n as i64),
+                };
             }
             1
         }

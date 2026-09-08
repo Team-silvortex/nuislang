@@ -5,6 +5,7 @@ pub enum RejectionPhase {
     Receive,
     Dispatch,
     Finish,
+    Drain,
 }
 
 impl RejectionPhase {
@@ -13,6 +14,7 @@ impl RejectionPhase {
             Self::Receive => "receive",
             Self::Dispatch => "dispatch",
             Self::Finish => "finish",
+            Self::Drain => "drain",
         }
     }
 }
@@ -65,6 +67,7 @@ impl Rejection {
                 self.code,
                 Code::Result | Code::Finalization | Code::Exchange
             ),
+            Phase::Drain => matches!(self.code, Code::Finalization | Code::Exchange),
         };
         if !allowed
             || self.sequence > MAX_DISPATCHES
@@ -117,6 +120,7 @@ impl Rejection {
             "receive" => RejectionPhase::Receive,
             "dispatch" => RejectionPhase::Dispatch,
             "finish" => RejectionPhase::Finish,
+            "drain" => RejectionPhase::Drain,
             _ => return Err("runtime IPC rejection phase is unknown".to_owned()),
         };
         let code = match number(code)? {

@@ -102,6 +102,14 @@ impl WindowSession {
         Ok(ticket)
     }
 
+    /// Request provider drain through the common session boundary. The window
+    /// neither owns the transport nor turns the receipt into a parent outcome.
+    pub fn cancel_with_provider_drain(&mut self) -> Result<ApplicationCancellation, String> {
+        let ticket = self.pump.cancel_with_provider_drain()?;
+        self.cancellation_admitted = true;
+        Ok(ticket)
+    }
+
     pub fn close_reason(&self) -> Option<ApplicationCloseReason> {
         self.close_reason
     }

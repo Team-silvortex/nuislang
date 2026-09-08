@@ -103,13 +103,35 @@ pub unsafe extern "C" fn nuis_window_session_cancel(
     session: *mut WindowSession,
     output: *mut *mut ApplicationCancellation,
 ) -> i32 {
+    unsafe { cancel_session(session, output, WindowSession::cancel) }
+}
+
+/// Opt-in cancellation with a separate provider drain observation. Poll the
+/// ticket with nuis_application_cancellation_poll_with_provider. Acceptance is
+/// not retirement; legacy peers can reject drain, with no implicit fallback.
+/// # Safety
+/// Same exclusive handle and valid empty output-slot requirements as
+/// nuis_window_session_cancel. The ticket remains valid after window free.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_window_session_cancel_with_provider_drain(
+    session: *mut WindowSession,
+    output: *mut *mut ApplicationCancellation,
+) -> i32 {
+    unsafe { cancel_session(session, output, WindowSession::cancel_with_provider_drain) }
+}
+
+unsafe fn cancel_session(
+    session: *mut WindowSession,
+    output: *mut *mut ApplicationCancellation,
+    cancel: fn(&mut WindowSession) -> Result<ApplicationCancellation, String>,
+) -> i32 {
     if output.is_null() || !unsafe { *output }.is_null() {
         return fail("cancellation output must be a valid empty slot");
     }
     let Some(session) = (unsafe { session.as_mut() }) else {
         return fail("null session");
     };
-    match session.cancel() {
+    match cancel(session) {
         Ok(ticket) => {
             unsafe { *output = Box::into_raw(Box::new(ticket)) };
             0

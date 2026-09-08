@@ -102,9 +102,10 @@ their window; typed late faults are delivered without mutating old snapshots.
 The packaged host now admits `--window-cancel-after-events` with an explicit
 event script and no parent. Live Metal/replay regressions verify no implicit close,
 Finish, outcome or success; pending/lost receipts have generated-host tests.
-Next establish explicit provider-owned cancellation/drain acknowledgement before
-resource reuse. EOF remains an incomplete live provider lifecycle, not success.
-Provider sessions now depend only on the two-operation `ScopeAdmission` interface,
+Opt-in host-library cancellation now observes provider-owned drain separately;
+the packaged script has not adopted it. EOF remains an incomplete live provider
+lifecycle, not success. Provider sessions depend on the three-operation
+`ScopeAdmission` interface (checkpoint, finalization and abandonment admission),
 not on the concrete cancellation controller. Static policy-substitution tests
 preserve the lifecycle gate. The generic ticket C ABI has no window, concrete
 pump/controller or provider dependency; window adapters must not inherit provider
@@ -185,6 +186,18 @@ remain open. Fuel does not preempt provider-private work, blocking FFI or device
 do not replace explicit delivery with an unchecked post-close child callback.
 
 ## Validation And Scope
+
+The [provider-session drain boundary](nuis-yir-provider-session-drain-v1.md) now
+has target/count-bound terminal messages and a provider-owned close-before-receipt
+path. Drained and Finished are separate outcomes; cancelled work cannot replace
+successful replay. The selected session coordinate remains `active/86`: opt-in
+host-library pump/window/C ABI tickets now request drain only at a validated
+frontier, retain first faults and expose independent provider status/count.
+Compiled Nuis callbacks plus registered Metal verify zero/two-frame cancellation,
+worker-image removal and old replay preservation. Replay is only an observation,
+not device retirement. Capability-gated packaged-host drain and a typed non-success
+launcher result are next; no cross-session reuse permission or general device
+cancellation follows from this bounded boundary.
 
 Each cell separates existing `evidence`, the next action, baseline validation
 commands, and the new `expected_artifact`. Passing an existing three-frame test

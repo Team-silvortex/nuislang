@@ -5,6 +5,18 @@
 pub(crate) trait ScopeAdmission {
     fn checkpoint(&self) -> Result<(), String>;
     fn admit_finalization(&self) -> Result<(), String>;
+
+    /// Seal admission before dropping a failed scope's provider. A drain request
+    /// is only intent; the scope must independently validate its transport.
+    fn admit_abandonment(&self) -> ScopeAbandonment {
+        ScopeAbandonment::Drop
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ScopeAbandonment {
+    Drop,
+    Drain,
 }
 
 /// Existing synchronous callers have no additional host admission policy.

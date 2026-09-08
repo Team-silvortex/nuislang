@@ -6,6 +6,9 @@ use yir_runtime_host::{
     ApplicationPumpOperation, ApplicationPumpPhase, ApplicationPumpReply,
 };
 
+#[path = "provider_drain.rs"]
+mod provider_drain;
+
 fn source(drawing_close: bool) -> String {
     let callbacks = if drawing_close {
         "open close update"

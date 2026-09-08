@@ -9,6 +9,9 @@ pub use budget::{ReplayBudget, MAX_REPLAY_BYTES, MAX_REPLAY_MANIFEST_BYTES};
 #[path = "provider_runtime_rejection.rs"]
 mod rejection;
 pub use rejection::{Rejection, RejectionCode, RejectionPhase};
+#[path = "provider_runtime_drain.rs"]
+mod drain;
+pub use drain::{SessionDrain, SESSION_DRAIN_CONTRACT};
 
 pub const CONTRACT: &str = "nuis-yir-provider-runtime-ipc-v4";
 pub const SOCKET_ENV: &str = "NUIS_YIR_PROVIDER_DISPATCH_SOCKET";
@@ -82,6 +85,8 @@ pub enum Message {
     Frame(DispatchFrame),
     Finish(usize),
     Closed(usize),
+    Drain(SessionDrain),
+    Drained(SessionDrain),
     Rejected(Rejection),
 }
 
@@ -134,6 +139,17 @@ impl Message {
             }
             Self::Finish(sequence) => fields.extend(["finish".to_owned(), sequence.to_string()]),
             Self::Closed(sequence) => fields.extend(["closed".to_owned(), sequence.to_string()]),
+            Self::Drain(drain) | Self::Drained(drain) => {
+                fields.push(
+                    if matches!(self, Self::Drain(_)) {
+                        "drain"
+                    } else {
+                        "drained"
+                    }
+                    .to_owned(),
+                );
+                fields.extend(drain.fields()?);
+            }
             Self::Rejected(error) => {
                 fields.push("rejected".to_owned());
                 fields.extend(error.fields()?);
@@ -198,6 +214,12 @@ impl Message {
             }
             Some("finish") if fields.len() == 3 => Ok(Self::Finish(number(fields[2])?)),
             Some("closed") if fields.len() == 3 => Ok(Self::Closed(number(fields[2])?)),
+            Some("drain") if fields.len() == 9 => {
+                Ok(Self::Drain(SessionDrain::parse(&fields[2..])?))
+            }
+            Some("drained") if fields.len() == 9 => {
+                Ok(Self::Drained(SessionDrain::parse(&fields[2..])?))
+            }
             Some("rejected") if fields.len() == 6 => {
                 Ok(Self::Rejected(Rejection::parse(&fields[2..])?))
             }

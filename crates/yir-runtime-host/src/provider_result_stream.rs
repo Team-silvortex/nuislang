@@ -1,4 +1,5 @@
 use crate::application_failure::{FailureState, ProviderFailure};
+use crate::ProviderDrainObservation;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Component, Path},
@@ -82,6 +83,25 @@ pub(super) fn finish_provider_source_with_failures(
         .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
         .finish()
         .map_err(|failure| failures.report(failure))
+}
+
+pub(super) fn drain_provider_source(
+    state: &Arc<Mutex<ProviderResultSource>>,
+    failures: &FailureState,
+) -> ProviderDrainObservation {
+    let result = state
+        .lock()
+        .map_err(|_| {
+            ProviderFailure::from("provider runtime result queue lock was poisoned".to_owned())
+        })
+        .and_then(|mut source| source.drain());
+    match result {
+        Ok(observation) => observation,
+        Err(failure) => {
+            failures.record(failure.kind);
+            ProviderDrainObservation::Failed(failure.kind)
+        }
+    }
 }
 
 struct ProviderResultStream {
@@ -168,6 +188,19 @@ impl ProviderResultSource {
             Self::Replay(queue) => queue.ensure_consumed().map_err(Into::into),
             #[cfg(unix)]
             Self::Live(client) => client.finish(),
+        }
+    }
+
+    fn drain(&mut self) -> Result<ProviderDrainObservation, ProviderFailure> {
+        match self {
+            Self::Replay(_) => Ok(ProviderDrainObservation::ReplayOnly),
+            #[cfg(unix)]
+            Self::Live(client) => client.drain().map(|count| match count {
+                Some(completed_dispatches) => ProviderDrainObservation::Drained {
+                    completed_dispatches,
+                },
+                None => ProviderDrainObservation::Unavailable,
+            }),
         }
     }
 }

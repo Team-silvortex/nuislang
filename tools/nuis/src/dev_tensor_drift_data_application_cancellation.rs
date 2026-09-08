@@ -2,12 +2,79 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "provider-session-drain-wire-boundary",
+        path: "crates/yir-core/src/provider_runtime_drain.rs",
+        required_patterns: &[
+            "nuis-yir-provider-session-drain-v1",
+            "pub struct SessionDrain",
+            "pub fn admit",
+            "self.target != *target || self.sequence != sequence",
+            "self.sequence > MAX_DISPATCHES",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-session-drain-lifecycle-boundary",
+        path: "tools/nsdb/src/provider_runtime_ipc.rs",
+        required_patterns: &[
+            "pub enum ProviderRuntimeSessionOutcome",
+            "pub fn into_finished_count",
+            "complete_session(execution, close())?",
+            "Message::Drained(drain.clone())",
+            "drain.admit(target, count)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-session-drain-failure-evidence",
+        path: "tools/nsdb/src/provider_runtime_ipc_drain_tests.rs",
+        required_patterns: &[
+            "drain_is_terminal_at_zero_midstream_and_exact_dispatch_limit",
+            "drain_acknowledgement_waits_for_successful_provider_close",
+            "drain_cleanup_or_ack_write_failure_cannot_claim_retirement",
+            "disconnect_and_first_failure_are_not_reclassified_as_drain",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-session-drain-metal-evidence",
+        path: "tools/nuis/src/artifact_device_sample_shader_drain_tests.rs",
+        required_patterns: &[
+            "drains_registered_metal_session_without_replacing_success_evidence",
+            "--export-frame",
+            "Message::Drain(drain.clone())",
+            "Message::Drained(drain.clone())",
+            "metal.command-buffer.completed",
+            ".nuis-provider-worker-image",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-session-drain-host-finish-separation",
+        path: "crates/yir-runtime-host/src/provider_runtime_ipc_tests.rs",
+        required_patterns: &[
+            "finish_cannot_consume_a_provider_drain_receipt_as_completion",
+            "Message::Drained(drain)",
+            "ApplicationFailureKind::ProviderContract",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-session-drain-authority-boundary",
+        path: "docs/reference/nuis-ns-nova-application-lifecycle-v1.toml",
+        required_patterns: &[
+            "[provider_session_drain]",
+            "host_cancellation_wired = true",
+            "host_drain_policy = \"explicit-opt-in-validated-frontier-only-no-retry\"",
+            "packaged_host_drain_wired = false",
+            "cross_session_resource_reuse = false",
+            "outcome = \"typed-drained-not-finished\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "application-cancellation-host-retirement-contract",
         path: "crates/yir-runtime-host/src/application_cancellation.rs",
         required_patterns: &[
             "nuis-yir-application-cancellation-v1",
-            "compare_exchange(ACTIVE, CANCELLED",
+            "compare_exchange(ACTIVE, next",
             "compare_exchange(ACTIVE, FINALIZING",
+            "CANCELLED_DRAIN",
+            "ABANDONING",
             "pub struct ApplicationHostRetirementAck",
             "pub struct ApplicationCancellation",
             "without a host retirement acknowledgement",
@@ -20,6 +87,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "trait ScopeAdmission",
             "fn checkpoint",
             "fn admit_finalization",
+            "fn admit_abandonment",
             "impl ScopeAdmission for ()",
             "does not bypass application or provider completion checks",
         ],
@@ -32,7 +100,64 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "provider_scope_accepts_independent_admission_without_bypassing_lifecycle",
             "independent_policy_rejects_before_provider_io",
             "independent_policy_rejects_after_provider_admission_without_application_delivery",
+            "independent_abandonment_policy_can_observe_drain_without_turning_error_into_success",
             "provider_scope_has_no_direct_dependency_on_concrete_pump_or_cancellation",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-host-frontier-authority",
+        path: "crates/yir-runtime-host/src/provider_runtime_ipc.rs",
+        required_patterns: &[
+            "fn begin_exchange", "if !self.frontier", "self.begin_exchange()?",
+            "receipt.admit(&self.target, self.sequence)?", "RejectionPhase::Drain",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-host-independent-scope",
+        path: "crates/yir-runtime-host/src/provider_application_session.rs",
+        required_patterns: &[
+            "A: ScopeAdmission", "drop(registry)",
+            "control.admission.admit_abandonment() == ScopeAbandonment::Drain",
+            "drain_provider_source(&provider, &control.failures)", "slot.set(observation)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-host-race-and-fault-evidence",
+        path: "crates/yir-runtime-host/tests/provider_application_session/provider_drain.rs",
+        required_patterns: &[
+            "cancellation_observes_zero_and_two_frame_drain_without_application_success",
+            "in_flight_hello_frame_and_explicit_close_drain_only_after_their_boundary",
+            "drain_failures_are_separate_observations_and_do_not_replace_first_faults",
+            "damaged_frame_frontiers_drop_without_attempting_drain_or_clearing_faults",
+            "finish_winner_rejects_drain_cancel_without_consuming_its_close_reply",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-window-independent-ticket-evidence",
+        path: "crates/yir-runtime-host/tests/provider_application_session/window/provider_drain.rs",
+        required_patterns: &[
+            "window_drain_ffi_outlives_window_and_preserves_independent_observations",
+            "nuis_window_session_cancel_with_provider_drain",
+            "nuis_application_cancellation_poll_with_provider",
+            "assert_cancelled_without_outcome", "nuis_window_session_free",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-independent-ffi-observations",
+        path: "crates/yir-runtime-host/src/application_cancellation/ffi.rs",
+        required_patterns: &[
+            "NuisApplicationCancellationReceipt", "nuis_application_cancellation_poll_with_provider",
+            "provider.failure_kind().code()", "ack.failure_kind().code()",
+            "if output.is_null()", "provider.completed_dispatches()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "provider-drain-host-metal-and-replay-evidence",
+        path: "tools/nuis/src/artifact_device_sample_shader_host_drain_tests.rs",
+        required_patterns: &[
+            "verify_host_cancellation", "WindowSession::spawn", "cancel_with_provider_drain",
+            "ProviderDrainObservation::Drained", "ProviderDrainObservation::ReplayOnly",
+            "outcome.into_finished_count().is_err()", ".nuis-provider-worker-image",
         ],
     },
     DevTensorDriftCheckSpec {

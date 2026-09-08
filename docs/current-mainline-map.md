@@ -51,10 +51,17 @@ Current session evidence:
   outcome or parent delivery. The packaged host now consumes it through explicit
   `--window-cancel-after-events`, with real Metal and compiled replay regressions.
 - Cancellation admission, host-scope retirement and provider/device resource
-  retirement are distinct. The last still needs provider-owned evidence.
+  retirement are distinct. Explicit registered-worker drain now has provider-owned
+  evidence; an opt-in host-library cancellation ticket separately observes it.
 
-Next establish provider-owned cancellation/drain acknowledgement before resource
-reuse. The scripted host path acknowledges its own scope, while the live provider
+The [provider-session drain boundary](reference/nuis-yir-provider-session-drain-v1.md)
+now distinguishes explicit worker-scope retirement from successful completion,
+without publishing replacement replay. Pump/window/C ABI drain admission is now
+connected through the generic provider-scope boundary, with first-fault and damaged
+exchange guards. Next connect it to a declared packaged-host capability and a typed
+non-success launcher result. The generated AppKit script is still host-only;
+cross-session resource reuse remains a separate, unproven boundary.
+The scripted host path acknowledges its own scope, while the live provider
 still treats EOF without Finish as incomplete execution. Ordinary quit still uses
 close/Finish; parent cancellation remains unsupported. Do not import provider
 registries, transports or concrete cancellation state into the window adapter.

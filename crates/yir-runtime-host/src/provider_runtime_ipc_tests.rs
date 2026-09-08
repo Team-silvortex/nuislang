@@ -2,6 +2,9 @@ use super::*;
 use std::thread;
 use yir_core::{provider_runtime_ipc::DispatchFrame, Operation, ProviderPhysicalCompletion};
 
+#[path = "provider_runtime_ipc_drain_tests.rs"]
+mod drain_tests;
+
 fn fixture() -> (DispatchTarget, Node, DispatchFrame) {
     let target = DispatchTarget {
         source_yir_fnv1a64: hash_bytes(b"source"),
@@ -82,6 +85,7 @@ fn live_client_requires_matching_sequence_layout_and_close_receipt() {
             stream: client,
             target,
             sequence: 0,
+            frontier: true,
         };
         let result = client.take(&node, &arguments);
         if case < 2 || case == 4 {
@@ -103,6 +107,7 @@ fn live_client_rejects_disconnect_and_wrong_target() {
         stream,
         target,
         sequence: 0,
+        frontier: true,
     };
     let wrong = Node {
         name: "other".to_owned(),
@@ -177,6 +182,7 @@ fn typed_remote_rejections_are_admitted_before_category_delivery_and_never_advan
             stream,
             target,
             sequence: 0,
+            frontier: true,
         };
         let error = client.take(&node, &frame.arguments).err().unwrap();
         assert_eq!(error.kind, expected);
@@ -207,6 +213,12 @@ fn finish_rejection_requires_finish_identity_and_cannot_become_closed() {
             ApplicationFailureKind::ProviderContract,
         ),
         (
+            RejectionPhase::Drain,
+            1,
+            RejectionCode::Finalization,
+            ApplicationFailureKind::ProviderContract,
+        ),
+        (
             RejectionPhase::Finish,
             0,
             RejectionCode::Finalization,
@@ -228,9 +240,39 @@ fn finish_rejection_requires_finish_identity_and_cannot_become_closed() {
             stream,
             target,
             sequence: 1,
+            frontier: true,
         };
         assert_eq!(client.finish().unwrap_err().kind, expected);
         assert_eq!(client.sequence, 1);
         worker.join().unwrap();
     }
+}
+
+#[test]
+fn finish_cannot_consume_a_provider_drain_receipt_as_completion() {
+    let (target, _, _) = fixture();
+    let drain = yir_core::provider_runtime_ipc::SessionDrain {
+        sequence: 1,
+        target: target.clone(),
+    };
+    let (stream, mut peer) = UnixStream::pair().unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    let worker = thread::spawn(move || {
+        assert_eq!(Message::read_from(&mut peer).unwrap(), Message::Finish(1));
+        Message::Drained(drain).write_to(&mut peer).unwrap();
+    });
+    let mut client = ProviderRuntimeClient {
+        stream,
+        target,
+        sequence: 1,
+        frontier: true,
+    };
+    assert_eq!(
+        client.finish().unwrap_err().kind,
+        ApplicationFailureKind::ProviderContract
+    );
+    assert_eq!(client.sequence, 1);
+    worker.join().unwrap();
 }
