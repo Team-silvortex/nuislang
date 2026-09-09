@@ -218,8 +218,8 @@ This is not a proof of all allocation, pointer or FFI memory safety.
 The [regressions](../../tools/nuisc/tests/buffer_while.rs) compare reference/native
 results, repeated application callbacks, zero/one/descending loops, per-iteration
 read/write order, declaration-order independence, failed-state admission and shared
-fuel. Allocation, ownership transfer, nested loops or captured-state rebinding
-inside an outlined body remain unsupported. General steps and mutable
+fuel. Allocation, ownership transfer, nested loops or arbitrary captured-state rebinding
+inside an outlined body remain unsupported; one explicit i64 carry is described below. General steps and mutable
 header reads are not silently hoisted.
 
 ### Branch-Local Execution
@@ -252,12 +252,14 @@ outside the admitted subset.
 ### Source Scalar Helpers
 
 Source helper composition admits synchronous functions whose concrete parameters
-and result are `i64` or `bool`. Bodies contain only fresh scalar `let`/`const` bindings
-and a final scalar return. Calls may compose other admitted helpers; signature,
+and result are `i64` or `bool`. Bodies contain fresh scalar `let`/`const` bindings,
+nested statement `if`/`else` and typed returns, including early returns. Every path
+must return; bindings neither escape branches nor rebind captured locals.
+Calls may compose other admitted helpers; signature,
 arity, expression types and every reachable callee body are checked. Iterative
 leaf-to-caller admission excludes missing or invalid callees and recursive cycles,
 without recursive call-graph discovery. Buffer parameters, memory operations,
-allocation, I/O, FFI, tasks, branches and loops inside these source helpers are not
+allocation, I/O, FFI, tasks and loops inside these source helpers are not
 admitted. Unresolved generic signatures are not admitted either.
 
 Only helpers reached from accepted outlined loop bodies are retained as direct
@@ -275,6 +277,23 @@ reordered YIR declarations, repeated callbacks and failed shared-fuel admission.
 Admission unit tests also exercise a 4096-function dependency chain without
 recursive catalog traversal; this is not a runtime recursion-depth guarantee.
 
+Scalar-helper control flow is outlined into typed guarded functions. Each condition
+is evaluated once. Unselected arms return a typed inert value before branch-local
+bindings, arguments or callees run; a final select uses only the guarded results.
+Fallthroughs call a shared continuation, while early returns bypass it. Suffixes
+are not duplicated into both arms: a 64-branch regression checks linear function
+growth. Only named scalar captures cross these generated boundaries. In contrast,
+ordinary source-call arguments still evaluate left to right before the callee's
+entry guard. A callee's early return never returns from its caller or loop.
+Inactive generated guards still consume fuel; this is not a zero-overhead branch
+representation or a new runtime opcode.
+
+[Control-flow regressions](../../tools/nuisc/tests/buffer_while/scalar_control.rs)
+exercise nested/fallthrough/empty arms, both scalar result types, early returns,
+generated-name and sibling-scope isolation, ordered entry arguments, untaken
+division/remainder/overflow failures and selected traps. Reordered YIR declarations
+and repeated callbacks retain result, effect ordering and shared-fuel failure policy.
+
 Imported CPU modules retain referenced private implementation helpers in an
 owner-local signature scope, separate from their export table. Own-module names
 win over same-named consumer/import functions. The
@@ -284,17 +303,56 @@ access from consumers or sibling modules in either import order. This fixes the
 single-file/project discrepancy exposed by PixelMagic, without making its scalar
 helpers public or adding a library-specific compiler exception.
 
+### Scalar State Across Buffer Writes
+
+One existing `i64` binding can now be rebound at the tail of a bounded Buffer-writing
+iteration, immediately before its induction step. Its update may use fresh locals,
+ordered Buffer reads and admitted scalar helpers, including their guarded branches.
+The incoming value is available to the iteration's writes and helpers. The bound
+and step cannot depend on this changing binding. Other captured rebindings,
+branch-local accumulator updates, multiple accumulators and nested loops are not
+admitted by this extension.
+
+The outlined helper returns the updated scalar through the explicit action
+`cpu.loop_while_i64_effect ... cpu scoped_call_i64_carry <arity> <callee> <seed> <operands...>`.
+Arity includes callee and seed; exactly one helper operand is `$carry`, while
+`$current` supplies the induction value. Other operands are named scalar or borrowed
+Buffer captures, not owned-transfer markers. Shared payload validation keeps the
+registry, CPU implementation and LLVM lowering aligned. GLM reads the seed and
+captures, not the placeholders. Both seed and result must be i64, with no implicit
+i32 widening. No new generic-executor special case is needed.
+
+CPU Nustar updates its private carry only after a successful helper return. LLVM
+stores the actual return into an explicit i64 loop slot. Both produce the existing
+`LoopState { current, carry0 }` shape; ordinary `cpu.field` projections rebind the
+source variables. A zero-trip loop returns the incoming seed, even when the update
+would replace rather than read it. Projected values can feed subsequent loops.
+Calls still share the enclosing invocation fuel; failed application callbacks do
+not commit new scalar state. This is not rollback of Buffer effects already executed.
+
+[Carry regressions](../../tools/nuisc/tests/buffer_while/scalar_carry.rs) cover
+zero/one/descending trips, replacing updates, carry-dependent writes, write-before-read
+ordering, subsequent loops, malformed metadata, strict seed types, GLM dependencies,
+checked failures, shared fuel and failed-state admission in reference/native paths.
+
 ### Packaged Pixel Loop
 
 [PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses this
-bounded loop with two composed scalar coordinate/color helpers and explicit
+bounded loop with two composed scalar coordinate/color helpers, branch-local
+input guards before coordinate division, a phase-dependent early return, and explicit
 red/blue `if`/`else` writes instead of recursive pixel filling or arithmetic color
 selection. Both paths assert real source helper calls in YIR. The
 [native/reference test](../../tools/nuisc/tests/pixelmagic_buffer_loop.rs) checks
 every pixel for both 32x24 phases, a partial region and an empty region.
+`fill_checkerboard_region_red_count` also returns the number of red pixels using a
+single carried accumulator and a guarded scalar helper. Invalid input returns -1
+before writes; an empty range returns zero. Existing boolean fill APIs delegate
+without changing their success contract. Native/reference tests check exact counts
+as well as pixel bytes, including partial and empty ranges.
 The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
 ordinary image showcase with `headless-aot-bundle` and launches it through
-`run-artifact`. On M2 it verifies two actual Metal output hashes, all output bytes
+`run-artifact`. The carried generator and its real counting helper are present in
+packaged YIR. On M2 this route verifies two actual Metal output hashes, all output bytes
 against direct-session replay, and all 768 writes plus the post-snapshot mutation
 per callback. Wrong callback arguments or executable/YIR drift are rejected before
 application effects. Exhausted packaged replay produces neither Close nor success,
@@ -308,8 +366,8 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_
 The second command is a macOS Metal device regression, not Linux/Windows evidence.
 CPU callbacks in the packaged host still execute embedded YIR; the native parity
 test independently compiles the generator, not the complete live callback ABI.
-Branch-local control flow inside source scalar helpers is the next boundary;
-straight-line source helpers and compiler-generated guarded arms do not certify it.
+Multiple scalar loop carries alongside Buffer writes are the next boundary;
+one i64 accumulator does not certify arbitrary loop-carried state or fully native callbacks.
 
 ## Current Boundary
 

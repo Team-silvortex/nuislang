@@ -86,13 +86,23 @@ panics in constant evaluation or reaches undefined native arithmetic. Conditiona
 pixel writes now use nested guarded helpers and one-time condition snapshots;
 untaken invalid reads/writes or arithmetic do not execute. Scalar-only branch
 traps cannot be discarded as dead bindings. Source-level scalar helper composition
-now admits synchronous, acyclic `i64`/`bool` straight-line callees, with transitive
+now admits synchronous, acyclic `i64`/`bool` callees, with transitive
 body checks and real ordered calls under shared fuel. Buffer-read arguments remain
 inside the selected branch. PixelMagic's two-level coordinate/color helpers exercise
 this surface, with imported private helpers retained in their owner's scope rather
 than exposed as public functions or resolved against another module's same-named
-implementation. Control flow inside source helpers is the next callback boundary,
-not arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
+implementation. Nested scalar-helper `if`/`else` and early returns now use typed
+guarded function blocks with shared fallthrough continuations, rather than
+speculating branch-local arguments or callee bodies. Regressions cover scope
+isolation, both return types, traps, source order and shared callback fuel.
+One tail-rebound i64 accumulator now crosses Buffer-writing iterations through a
+shared scoped-call contract and ordinary LoopState field projections. Zero-trip
+loops preserve the seed; only successful helper returns update the private carry.
+PixelMagic exposes fill-and-red-count with exact native/reference pixel and count tests.
+The carried generator also passes ordinary M2 build/run-artifact with two exact
+Metal frames, direct-session byte parity and unchanged failure admission.
+The next callback boundary is multiple scalar loop carries alongside Buffer writes, not
+arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.

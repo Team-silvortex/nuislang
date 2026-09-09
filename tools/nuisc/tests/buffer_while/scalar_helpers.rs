@@ -1,6 +1,6 @@
 use super::*;
 
-fn with_helpers(source: &str, helpers: &str) -> String {
+pub(super) fn with_helpers(source: &str, helpers: &str) -> String {
     source.replace("fn main()", &format!("{helpers}\nfn main()"))
 }
 
@@ -88,7 +88,7 @@ fn scalar_helper_dag_executes_real_calls_with_ordered_buffer_arguments() {
     );
 }
 
-fn assert_traps(source: &str, diagnostic: &str) {
+pub(super) fn assert_traps(source: &str, diagnostic: &str) {
     let mut compiled = nuisc::pipeline::compile_source(source).unwrap();
     compiled.yir.nodes.reverse();
     for function in &mut compiled.yir.functions {
@@ -167,7 +167,7 @@ fn scalar_helper_effects_recursion_and_dynamic_headers_stay_fail_closed() {
         "fn candidate(v: i64) -> i64 { return impure(v); } fn impure(v: i64) -> i64 { print(v); return v; }",
         "fn candidate(v: i64) -> i64 { return candidate(v - 1) + 1; }",
         "fn candidate(v: i64) -> i64 { return cycle(v) + 1; } fn cycle(v: i64) -> i64 { return candidate(v) + 1; }",
-        "fn candidate(v: i64) -> i64 { if v > 0 { return v; } return 0; }",
+        "fn candidate(v: i64) -> i64 { if v > 0 { print(v); return v; } return 0; }",
         "async fn candidate(v: i64) -> i64 { return v; }",
     ] {
         let source = with_helpers(&SOURCE.replace("seed + index * 3", "candidate(seed)"), helpers);

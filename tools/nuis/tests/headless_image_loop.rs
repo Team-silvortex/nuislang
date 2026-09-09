@@ -139,6 +139,7 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     for (name, instruction) in [
         ("checkerboard_is_red", "call_bool"),
         ("checkerboard_parity", "call_i64"),
+        ("checkerboard_red_total", "call_i64"),
     ] {
         let helper = module
             .functions
@@ -157,7 +158,7 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     assert!(
         module.nodes.iter().any(|node| {
             node.op.instruction == "loop_while_i64_effect"
-                && node.op.args.get(6).map(String::as_str) == Some("scoped_call")
+                && node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carry")
                 && node
                     .op
                     .args
@@ -177,6 +178,22 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
                 })
         }),
         "packaged pixel branches must retain a real control boundary"
+    );
+    assert!(
+        module.functions.iter().any(|function| {
+            function.name.contains("__nuis_scalar_branch_")
+                && function
+                    .result
+                    .as_ref()
+                    .is_some_and(|result| result.ty == "bool")
+                && function.body_nodes.iter().any(|name| {
+                    module
+                        .nodes
+                        .iter()
+                        .any(|node| &node.name == name && node.op.instruction == "guard_return")
+                })
+        }),
+        "packaged source color helper must retain its typed branch guard"
     );
     let arguments = script().to_arguments().unwrap();
     let (status, stdout, stderr) = bounded(

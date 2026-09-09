@@ -237,15 +237,27 @@ one-time condition snapshots and the same shared callback fuel. Untaken invalid
 accesses or arithmetic are not evaluated; selected invalid operations still fail.
 Unused checked arithmetic survives dead-binding elimination and reordered YIR
 declarations cannot skip it. Source-level scalar helper composition now admits
-synchronous `i64`/`bool` straight-line bodies after transitive type/effect checks
+synchronous `i64`/`bool` bodies after transitive type/effect checks
 and iterative acyclic dependency admission. Only reachable helpers become real
 ordered YIR calls; Buffer-read arguments remain inside the current iteration and
 selected branch. PixelMagic composes private coordinate and color helpers on this
 path; imported helpers retain owner-local signatures without exposing their
-private declarations to consumers or sibling modules.
-The score remains `active/86`; the next step is branch-local control flow inside
-source scalar helpers under the same build/run-artifact admission and identity
-checks. This is not fully native CPU callbacks, arbitrary loop support or a
+private declarations to consumers or sibling modules. Source helpers now admit
+nested statement `if`/`else` and early returns through typed guarded blocks and
+shared fallthrough continuations. Unselected branch computation stays behind its
+guard, source-call arguments still evaluate at entry, and function-local returns
+do not escape into the caller. Scope, trap, shared-fuel and linear-growth regressions
+accompany the same native/reference pixel and M2 packaged image checks.
+One explicit i64 accumulator now survives Buffer-writing iterations, including
+zero trips, ordered reads and scalar helper control flow. CPU and LLVM share payload
+validation and return LoopState fields without an image-specific executor path.
+PixelMagic's fill-and-red-count API checks real scalar result composition with its
+existing boolean fill wrappers; native/reference tests compare pixels and counts.
+The carried image passes ordinary M2 build/run-artifact again, retaining both exact
+Metal frames, direct-session byte parity and failure-preserved replay evidence.
+The score remains `active/86`; the next step is multiple scalar loop carries alongside
+Buffer writes under the same build/run-artifact admission and identity checks.
+This is not fully native CPU callbacks, arbitrary loop support or a
 complete memory-safety proof.
 Compound-condition `while` lowering now selects recursive descriptors,
 normalizes linear carries consistently and deduplicates shared effect inputs.

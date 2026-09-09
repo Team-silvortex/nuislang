@@ -20,9 +20,15 @@ The linked contract includes reproducible build, event, close and drain commands
    selection as actual YIR calls. A bounded unit-step Nuis `while` fills caller-owned storage
    with guarded `if`/`else` color writes through private registered YIR helpers;
    unselected arms perform no pixel access, replacing the recursive workaround.
-   Scalar division/remainder and buffer indices are checked; source helper bodies
-   are acyclic and straight-line. Helper control flow, nested loops and arbitrary
-   loop carries remain outside this supported subset.
+   Scalar division/remainder and buffer indices are checked; the acyclic scalar
+   helpers also use branch-local input guards before coordinate division and
+   distinct early-return/fallthrough paths for the two phases. Nested
+   `if`/`else` and early returns lower to typed guarded blocks with shared suffixes.
+   The underlying fill-and-red-count API carries one i64 total between iterations;
+   its boolean wrapper admits non-negative counts, including an empty range's zero.
+   Native/reference tests compare exact red counts and pixels. The loop returns
+   ordinary LoopState fields, not a PixelMagic-specific runtime result.
+   Nested loops and arbitrary loop carries remain outside this supported subset.
 2. `copy_bytes` creates an owned snapshot. The app overwrites the original first
    pixel and frees the original Buffer before binding the snapshot.
 3. `shader_storage_binding(3, snapshot)` requests one immutable u32 array.

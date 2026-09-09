@@ -93,32 +93,73 @@ fn is_scalar(ty: &NirTypeRef) -> bool {
 }
 
 fn validate_body(function: &NirFunction, catalog: &ScalarHelpers) -> Option<()> {
-    let (NirStmt::Return(Some(result)), bindings) = function.body.split_last()? else {
-        return None;
-    };
     let mut locals = function
         .params
         .iter()
         .map(|p| (p.name.clone(), p.ty.clone()))
         .collect::<Scope>();
+    validate_block(
+        &function.body,
+        &mut locals,
+        function.return_type.as_ref()?,
+        catalog,
+    )?
+    .then_some(())
+}
+
+// Branch scopes never export bindings; every path through the helper must return.
+fn validate_block(
+    body: &[NirStmt],
+    locals: &mut Scope,
+    result: &NirTypeRef,
+    catalog: &ScalarHelpers,
+) -> Option<bool> {
+    let mut returned = false;
     let mut inputs = BTreeSet::new();
-    for stmt in bindings {
-        let (name, declared, value) = match stmt {
-            NirStmt::Let { name, ty, value } => (name, ty.as_ref(), value),
-            NirStmt::Const { name, ty, value } => (name, Some(ty), value),
+    for stmt in body {
+        if returned {
+            return None;
+        }
+        match stmt {
+            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                let declared = match stmt {
+                    NirStmt::Let { ty, .. } => ty.as_ref(),
+                    NirStmt::Const { ty, .. } => Some(ty),
+                    _ => unreachable!(),
+                };
+                if locals.contains_key(name) {
+                    return None;
+                }
+                let inferred = scalar_expr(value, locals, &mut inputs, false, catalog)?;
+                if declared.is_some_and(|ty| ty != &inferred) {
+                    return None;
+                }
+                locals.insert(name.clone(), inferred);
+            }
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                if scalar_expr(condition, locals, &mut inputs, false, catalog)?
+                    != scalar_type("bool")
+                {
+                    return None;
+                }
+                let then_returns = validate_block(then_body, &mut locals.clone(), result, catalog)?;
+                let else_returns = validate_block(else_body, &mut locals.clone(), result, catalog)?;
+                returned = then_returns && else_returns;
+            }
+            NirStmt::Return(Some(value)) => {
+                if &scalar_expr(value, locals, &mut inputs, false, catalog)? != result {
+                    return None;
+                }
+                returned = true;
+            }
             _ => return None,
-        };
-        if locals.contains_key(name) {
-            return None;
         }
-        let inferred = scalar_expr(value, &locals, &mut inputs, false, catalog)?;
-        if declared.is_some_and(|ty| ty != &inferred) {
-            return None;
-        }
-        locals.insert(name.clone(), inferred);
     }
-    let inferred = scalar_expr(result, &locals, &mut inputs, false, catalog)?;
-    (function.return_type.as_ref() == Some(&inferred)).then_some(())
+    Some(returned)
 }
 
 pub(super) fn call_type(
@@ -228,7 +269,7 @@ mod tests {
                 .keys()
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
-            ["good", "leaf", "main"]
+            ["branch", "good", "leaf", "main"]
         );
     }
 
@@ -305,5 +346,127 @@ mod tests {
         assert!(!retained.contains("main"));
         module.functions.reverse();
         assert!(collect(&module).keys().eq(catalog.keys()));
+    }
+
+    #[test]
+    fn scalar_helper_control_admission_checks_every_path_and_scope() {
+        let module = parse_nuis_module(
+            "mod cpu Main { fn main() -> i64 { return 0; } \
+            fn leaf(v: i64) -> i64 { return v; } \
+            fn caller(v: i64) -> i64 { return leaf(v); } }",
+        )
+        .unwrap();
+        let result = NirStmt::Return(Some(NirExpr::Var("v".into())));
+        let branch = |body| NirStmt::If {
+            condition: NirExpr::Bool(true),
+            then_body: body,
+            else_body: vec![],
+        };
+        let binding = |name: &str| NirStmt::Let {
+            name: name.into(),
+            ty: Some(scalar_type("i64")),
+            value: NirExpr::Int(1),
+        };
+        for body in [
+            vec![branch(vec![result.clone()])],
+            vec![
+                branch(vec![NirStmt::Return(Some(NirExpr::Bool(false)))]),
+                result.clone(),
+            ],
+            vec![
+                branch(vec![binding("inner")]),
+                NirStmt::Return(Some(NirExpr::Var("inner".into()))),
+            ],
+            vec![branch(vec![binding("v")]), result.clone()],
+            vec![
+                branch(vec![NirStmt::Print(NirExpr::Int(1))]),
+                result.clone(),
+            ],
+            vec![
+                branch(vec![NirStmt::Return(Some(NirExpr::Call {
+                    callee: "leaf".into(),
+                    args: vec![NirExpr::Var("v".into())],
+                }))]),
+                result.clone(),
+            ],
+            vec![
+                branch(vec![NirStmt::Return(Some(NirExpr::Call {
+                    callee: "missing".into(),
+                    args: vec![],
+                }))]),
+                result.clone(),
+            ],
+            vec![
+                branch(vec![NirStmt::While {
+                    condition: NirExpr::Bool(false),
+                    body: vec![],
+                }]),
+                result.clone(),
+            ],
+        ] {
+            let mut invalid = module.clone();
+            invalid
+                .functions
+                .iter_mut()
+                .find(|f| f.name == "leaf")
+                .unwrap()
+                .body = body;
+            let catalog = collect(&invalid);
+            assert!(!catalog.contains_key("leaf"));
+            assert!(!catalog.contains_key("caller"));
+        }
+    }
+
+    #[test]
+    fn scalar_helper_control_outlining_shares_linear_suffixes() {
+        let mut module = parse_nuis_module(
+            "mod cpu Main { fn main() -> i64 { return 0; } fn candidate(v: i64) -> i64 { return v; } }",
+        ).unwrap();
+        let candidate = module
+            .functions
+            .iter_mut()
+            .find(|f| f.name == "candidate")
+            .unwrap();
+        let mut body = Vec::new();
+        for index in 0..64 {
+            body.push(NirStmt::If {
+                condition: NirExpr::Binary {
+                    op: NirBinaryOp::Gt,
+                    lhs: Box::new(NirExpr::Var("v".into())),
+                    rhs: Box::new(NirExpr::Int(index)),
+                },
+                then_body: vec![NirStmt::Let {
+                    name: "local".into(),
+                    ty: Some(scalar_type("i64")),
+                    value: NirExpr::Binary {
+                        op: NirBinaryOp::Div,
+                        lhs: Box::new(NirExpr::Int(1)),
+                        rhs: Box::new(NirExpr::Var("v".into())),
+                    },
+                }],
+                else_body: vec![],
+            });
+        }
+        body.push(NirStmt::Return(Some(NirExpr::Var("v".into()))));
+        candidate.body = body;
+        let catalog = collect(&module);
+        assert!(catalog.contains_key("candidate"));
+        let mut names = module.functions.iter().map(|f| f.name.clone()).collect();
+        let mut helpers = Vec::new();
+        let mut guarded = BTreeSet::new();
+        scalar_control::outline(
+            &mut module,
+            &BTreeSet::from(["candidate".into()]),
+            &mut names,
+            &mut helpers,
+            &mut guarded,
+            &catalog,
+        );
+        assert_eq!(helpers.len(), 64 * 3);
+        assert_eq!(guarded.len(), 64 * 2);
+        assert!(helpers.iter().all(|f| f.params.len() <= 2));
+        assert!(helpers.iter().map(|f| f.body.len()).sum::<usize>() < 64 * 12);
+        module.functions.extend(helpers);
+        crate::nir_verify::verify_nir_module(&module).unwrap();
     }
 }

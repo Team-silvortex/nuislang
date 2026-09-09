@@ -443,13 +443,18 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
     let operand_start = match op.args.get(6).map(String::as_str) {
         Some("owned_bytes_copy_drop") => 8,
         Some("scoped_call") => 9,
+        // Include the seed, but not the per-iteration placeholders.
+        Some("scoped_call_i64_carry") => 9,
         Some("scoped_call_owned_return") => 10,
         Some("scoped_call_owned_struct_return") => 11,
         _ => op.args.len(),
     };
     let mut moves_owned = false;
     for operand in op.args.iter().skip(operand_start) {
-        if operand == "$current" {
+        if operand == "$current"
+            || (operand == "$carry"
+                && op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carry"))
+        {
             continue;
         }
         let carried = parse_loop_owned_struct_carry(operand)

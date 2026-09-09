@@ -131,13 +131,18 @@ Bounded Buffer-writing callback loops now reuse private YIR helpers and register
 CPU execution, with ordered reads/writes, checked native indices and checked scalar
 integer division/remainder. Nested `if`/`else` bodies use guarded private functions:
 conditions are read once and unselected arms perform no branch-local access or math.
-Reachable synchronous, acyclic `i64`/`bool` source helpers with straight-line bodies
-now remain real ordered YIR calls, including Buffer-read arguments inside selected
-branches. PixelMagic composes two such helpers before its red/blue writes. The CLI
+Reachable synchronous, acyclic `i64`/`bool` source helpers now support fresh scalar
+bindings, nested `if`/`else` and early returns as real ordered YIR calls. Guarded
+function blocks defer branch-local computation; shared suffixes avoid duplicating
+the rest of the function. PixelMagic uses guarded coordinate/color helpers before
+its red/blue writes. The CLI
 headless build/run-artifact test checks two real M2 Metal frames,
 direct-session replay, exact output identity and failure admission; independent
-native/reference tests compare every generated pixel. Control flow inside source
-helpers, arbitrary loop bodies and fully native CPU callbacks remain separate work.
+native/reference tests compare every generated pixel. One i64 accumulator now
+crosses Buffer-writing iterations through explicit LoopState fields, with strict
+seed/result types and zero-trip preservation. PixelMagic uses it for fill-and-red-count,
+with exact native/reference count checks and compatible boolean fill APIs.
+Multiple carries, arbitrary loop bodies and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

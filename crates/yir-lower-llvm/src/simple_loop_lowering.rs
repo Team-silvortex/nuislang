@@ -7,7 +7,7 @@ use super::{
     loop_effect_action::{begin_loop_effect_action, finish_loop_effect_action, LoopEffectCleanup},
     loop_owned_struct_lowering::prepare_owned_struct_loop_carry,
     value_ref::coerce_to_i64,
-    CpuHelperSignature, LlvmValueRef,
+    CpuHelperSignature, LlvmValueRef, StructLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_simple_loop_node(
@@ -97,6 +97,24 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 helper_signatures,
                 next_reg,
             )?;
+            let scalar_carry_slot = if node.op.instruction == "loop_while_i64_effect" {
+                yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?
+                    .map(|carry| {
+                        let Some(LlvmValueRef::I64(initial)) = registers.get(carry.initial) else {
+                            return Err(format!(
+                                "scoped carry seed `{}` must be an available i64",
+                                carry.initial
+                            ));
+                        };
+                        let slot = fresh_reg(next_reg);
+                        body.push(format!("  {slot} = alloca i64"));
+                        body.push(format!("  store i64 {initial}, ptr {slot}"));
+                        Ok(slot)
+                    })
+                    .transpose()?
+            } else {
+                None
+            };
             let loop_slot = fresh_reg(next_reg);
             body.push(format!("  {loop_slot} = alloca i64"));
             body.push(format!("  store i64 {initial}, ptr {loop_slot}"));
@@ -141,10 +159,15 @@ pub(crate) fn lower_cpu_simple_loop_node(
             }
             let effect_cleanup = (node.op.instruction == "loop_while_i64_effect")
                 .then(|| {
-                    let scalar_overrides = owned_struct_carry
+                    let mut scalar_overrides = owned_struct_carry
                         .as_ref()
                         .map(|carry| carry.load_operand_overrides(body, next_reg))
                         .unwrap_or_default();
+                    if let Some(slot) = &scalar_carry_slot {
+                        let value = fresh_reg(next_reg);
+                        body.push(format!("  {value} = load i64, ptr {slot}"));
+                        scalar_overrides.insert("$carry".to_owned(), LlvmValueRef::I64(value));
+                    }
                     begin_loop_effect_action(
                         node,
                         5,
@@ -179,6 +202,11 @@ pub(crate) fn lower_cpu_simple_loop_node(
             };
             body.push(format!("  store i64 {next_value}, ptr {loop_slot}"));
             if let Some(cleanup) = effect_cleanup {
+                if let (LoopEffectCleanup::ScalarResult(value), Some(slot)) =
+                    (&cleanup, &scalar_carry_slot)
+                {
+                    body.push(format!("  store i64 {value}, ptr {slot}"));
+                }
                 if let (LoopEffectCleanup::OwnedResult(blob), Some(slot)) = (&cleanup, &owned_slot)
                 {
                     body.push(format!("  store ptr {blob}, ptr {slot}"));
@@ -193,6 +221,20 @@ pub(crate) fn lower_cpu_simple_loop_node(
             body.push(format!("  br label %{loop_cond}"));
             body.push(format!("{loop_exit}:"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(current.clone()));
+            if let Some(slot) = scalar_carry_slot {
+                let carry = fresh_reg(next_reg);
+                body.push(format!("  {carry} = load i64, ptr {slot}"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Struct(StructLlvmValueRef {
+                        type_name: "LoopState".to_owned(),
+                        fields: vec![
+                            ("current".to_owned(), LlvmValueRef::I64(current.clone())),
+                            ("carry0".to_owned(), LlvmValueRef::I64(carry)),
+                        ],
+                    }),
+                );
+            }
             if let (Some((result, _, _)), Some(slot)) = (owned_return, owned_slot) {
                 let blob = fresh_reg(next_reg);
                 body.push(format!("  {blob} = load ptr, ptr {slot}"));

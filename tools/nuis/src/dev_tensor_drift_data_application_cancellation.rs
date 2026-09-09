@@ -507,7 +507,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "pub fn fill_checkerboard_region", "while index < end",
             "fn checkerboard_parity", "fn checkerboard_is_red", "if red", "pixels[index] = 4278190335",
+            "if phase == 0 { return base_red; }", "return base_red == false",
             "pixels[index] = 4294901760", "let index: i64 = index + 1",
+            "pub fn fill_checkerboard_region_red_count", "checkerboard_red_total(total, red)",
+            "let total: i64 = 0", "return total",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -520,6 +523,79 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "scalar_helper_admission_checks_transitive_bodies_and_cycles",
             "scalar_helper_admission_checks_signature_arity_and_return_types",
             "scalar_helper_discovery_and_reachability_are_iterative",
+            "validate_block", "then_returns && else_returns",
+            "scalar_helper_control_admission_checks_every_path_and_scope",
+            "scalar_helper_control_outlining_shares_linear_suffixes",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-control-outlining",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_control.rs",
+        required_patterns: &[
+            "retained.contains(&function.name)", "continuation: Option<NirExpr>",
+            "__nuis_scalar_continue", "__nuis_scalar_branch", "__nuis_scalar_condition",
+            "NirExpr::Bool(false)", "NirStmt::Return(Some(default))",
+            "collect_inputs", "captured_params", "self.guarded.insert",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-control-execution-evidence",
+        path: "tools/nuisc/tests/buffer_while/scalar_control.rs",
+        required_patterns: &[
+            "scalar_control_nested_early_returns_stay_inside_callees",
+            "scalar_control_untaken_arms_skip_local_math_arguments_and_callees",
+            "scalar_control_bool_returns_and_fallthrough_do_not_speculate",
+            "scalar_control_function_entry_arguments_still_evaluate_before_early_return",
+            "scalar_control_branch_scopes_do_not_capture_generated_or_sibling_bindings",
+            "scalar_control_callbacks_share_fuel_and_keep_failed_state_uncommitted",
+            "scalar_control_selected_branch_math_keeps_source_failure_order",
+            "scalar_control_selected_callee_failure_keeps_last_callback_state",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-carry-contract",
+        path: "crates/yir-core/src/loop_carry_contract/scoped_scalar.rs",
+        required_patterns: &[
+            "parse_scoped_i64_carry", "scoped_call_i64_carry", "checked_add(8)",
+            "exactly one $carry operand", "scoped_scalar_contract_is_explicit_and_checked",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-carry-compiler",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering.rs",
+        required_patterns: &[
+            "ScopedLoopResult::Scalar", "scoped_call_i64_carry", "is_scalar_i64",
+            "expr_references_names", "const_bindings.remove(binding)", "carry0",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-carry-cpu",
+        path: "crates/yir-domain-cpu/src/execute_scoped_loop.rs",
+        required_patterns: &[
+            "parse_scoped_i64_carry", "Argument::Carry", "i64 scoped carry result",
+            "carry0", "LoopState", "must be i64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-carry-native",
+        path: "crates/yir-lower-llvm/src/simple_loop_lowering.rs",
+        required_patterns: &[
+            "parse_scoped_i64_carry", "scalar_carry_slot", "LoopEffectCleanup::ScalarResult",
+            "LoopState", "carry0", "must be an available i64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-scalar-carry-evidence",
+        path: "tools/nuisc/tests/buffer_while/scalar_carry.rs",
+        required_patterns: &[
+            "scalar_carry_buffer_loop_matches_native_zero_one_and_descending_trips",
+            "scalar_carry_feeds_writes_and_order_is_independent_of_yir_declarations",
+            "scalar_carry_projects_into_subsequent_loops_and_helper_calls",
+            "scalar_carry_update_traps_after_prior_buffer_effects_in_source_order",
+            "scalar_carry_callbacks_share_fuel_and_never_commit_failed_state",
+            "scalar_carry_keeps_unsupported_mutations_and_mutable_headers_fail_closed",
+            "scalar_carry_malformed_yir_is_rejected_by_registry_and_llvm",
+            "scalar_carry_seed_and_glm_dependencies_remain_explicit",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -573,7 +649,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/direct_calls/control_boundaries.rs",
         required_patterns: &[
             "lower_guarded_body", "lower_guard_return", "preserve_source_order",
-            "windows(2)", "push_effect_edge",
+            "windows(2)", "push_effect_edge", "NirExpr::Bool(false)", "lower_expr(&default",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -608,8 +684,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/pixelmagic_buffer_loop.rs",
         required_patterns: &[
             "pixelmagic_loop_matches_every_reference_and_native_pixel",
+            "pixelmagic_red_count_matches_native_partial_and_empty_ranges", "scoped_call_i64_carry",
             "checkerboard_is_red", "checkerboard_parity", "call_bool", "call_i64",
-            "__nuis_buffer_branch_", "guard_return",
+            "__nuis_buffer_branch_", "__nuis_scalar_branch_", "guard_return",
             "write_and_link_with_source", "reference pixels", "native pixels",
         ],
     },
@@ -618,8 +695,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/headless_image_loop.rs",
         required_patterns: &[
             "headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_rejects_drift",
+            "checkerboard_red_total", "scoped_call_i64_carry",
             "checkerboard_is_red", "checkerboard_parity", "call_bool", "call_i64",
-            "__nuis_buffer_branch_", "guard_return",
+            "__nuis_buffer_branch_", "__nuis_scalar_branch_", "guard_return",
             "CARGO_BIN_EXE_nuis", "headless-aot-bundle", "run-artifact",
             "ApplicationProviderSource::Replay", "saved_stream", "application_session_outcome=",
         ],

@@ -2,6 +2,7 @@ use super::*;
 
 enum ScopedLoopResult<'a> {
     None,
+    Scalar(&'a str),
     OwnedBytes(&'a str),
     OwnedStruct {
         binding: &'a str,
@@ -67,7 +68,7 @@ pub(super) fn lower_scoped_call_while(
     body: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-    const_bindings: &BTreeMap<String, NirExpr>,
+    const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<bool, String> {
     let Some((action, counted_body)) = body.split_first() else {
         return Ok(false);
@@ -79,6 +80,7 @@ pub(super) fn lower_scoped_call_while(
             ty: Some(ty),
             value: NirExpr::Call { callee, args },
         } if (ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty())
+            || is_scalar_i64(ty)
             || state.struct_defs.contains_key(ty.name.as_str()) =>
         {
             (callee, args, Some((name.as_str(), ty)))
@@ -121,6 +123,31 @@ pub(super) fn lower_scoped_call_while(
     });
     let result = match (result_binding, returns_owned_bytes, owned_struct_layout) {
         (None, false, None) => ScopedLoopResult::None,
+        (Some((binding, ty)), false, None)
+            if is_scalar_i64(ty) && function.return_type.as_ref().is_some_and(is_scalar_i64) =>
+        {
+            let changed = BTreeSet::from([binding]);
+            if binding == prepared.binding_name
+                || !bindings.contains_key(binding)
+                || loop_purity::expr_references_names(&prepared.limit, &changed)
+                || loop_purity::expr_references_names(&prepared.step, &changed)
+                || !args.iter().all(|arg| matches!(arg, NirExpr::Var(_)))
+                || function.params.iter().any(|param| {
+                    !(is_scalar_i64(&param.ty)
+                        || (!param.ty.is_ref
+                            && !param.ty.is_optional
+                            && param.ty.name == "bool"
+                            && param.ty.generic_args.is_empty())
+                        || (param.ty.is_ref
+                            && !param.ty.is_optional
+                            && param.ty.name == "Buffer"
+                            && param.ty.generic_args.is_empty()))
+                })
+            {
+                return Ok(false);
+            }
+            ScopedLoopResult::Scalar(binding)
+        }
         (Some((binding, ty)), true, None)
             if ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty() =>
         {
@@ -174,11 +201,14 @@ pub(super) fn lower_scoped_call_while(
         ));
     }
     let owned_result = match &result {
-        ScopedLoopResult::None => None,
+        ScopedLoopResult::None | ScopedLoopResult::Scalar(_) => None,
         ScopedLoopResult::OwnedBytes(_) => Some(next_name(state, "loop_owned_result")),
         ScopedLoopResult::OwnedStruct { .. } => Some(next_name(state, "loop_owned_struct_result")),
     };
     let mut action_args = vec![callee.clone()];
+    if let ScopedLoopResult::Scalar(binding) = &result {
+        action_args.push(bindings[*binding].clone());
+    }
     if let Some(result) = &owned_result {
         action_args.push(result.clone());
     }
@@ -189,6 +219,9 @@ pub(super) fn lower_scoped_call_while(
     for (param, arg) in function.params.iter().zip(args) {
         if matches!(arg, NirExpr::Var(name) if name == &prepared.binding_name) {
             action_args.push("$current".to_owned());
+        } else if matches!((&result, arg), (ScopedLoopResult::Scalar(binding), NirExpr::Var(name)) if name == binding)
+        {
+            action_args.push("$carry".to_owned());
         } else if state.struct_defs.contains_key(param.ty.name.as_str()) {
             let lowered = lower_expr(arg, state, bindings)?;
             let flattened = direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?;
@@ -246,6 +279,7 @@ pub(super) fn lower_scoped_call_while(
         "cpu".to_owned(),
         match &result {
             ScopedLoopResult::None => "scoped_call",
+            ScopedLoopResult::Scalar(_) => "scoped_call_i64_carry",
             ScopedLoopResult::OwnedBytes(_) => "scoped_call_owned_return",
             ScopedLoopResult::OwnedStruct { .. } => "scoped_call_owned_struct_return",
         }
@@ -294,10 +328,33 @@ pub(super) fn lower_scoped_call_while(
         }
     }
     body_lowering::chain_statement_effect(state, &name);
+    if let ScopedLoopResult::Scalar(binding) = &result {
+        for (binding, field) in [
+            (prepared.binding_name.as_str(), "current"),
+            (*binding, "carry0"),
+        ] {
+            let result_name = next_name(state, "loop_scalar_result");
+            state.yir.nodes.push(Node {
+                name: result_name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "field".to_owned(),
+                    args: vec![name.clone(), field.to_owned()],
+                },
+            });
+            push_dep_edges(state, &name, &result_name);
+            bindings.insert(binding.to_owned(), result_name);
+            const_bindings.remove(binding);
+        }
+        return Ok(true);
+    }
     bindings.insert(prepared.binding_name, name.clone());
     if let Some(result_name) = owned_result {
         let (owner, instruction, args) = match &result {
-            ScopedLoopResult::None => unreachable!("result projection requires an owner"),
+            ScopedLoopResult::None | ScopedLoopResult::Scalar(_) => {
+                unreachable!("result projection requires an owner")
+            }
             ScopedLoopResult::OwnedBytes(owner) => {
                 (*owner, "loop_owned_result", vec![name.clone()])
             }
@@ -333,6 +390,20 @@ fn validate_loop_result_rebinding(
 ) -> Result<(), String> {
     match result {
         ScopedLoopResult::None => Ok(()),
+        ScopedLoopResult::Scalar(binding) => {
+            let count = function
+                .params
+                .iter()
+                .zip(args)
+                .filter(|(param, arg)| {
+                    is_scalar_i64(&param.ty) && matches!(arg, NirExpr::Var(name) if name == binding)
+                })
+                .count();
+            if count == 1 {
+                return Ok(());
+            }
+            Err(format!("scoped i64 return from `{callee}` must rebind exactly one i64 state argument named `{binding}`"))
+        }
         ScopedLoopResult::OwnedBytes(owner) => {
             if bindings.contains_key(*owner)
                 && args.iter().any(
@@ -363,6 +434,10 @@ fn validate_loop_result_rebinding(
             ))
         }
     }
+}
+
+fn is_scalar_i64(ty: &NirTypeRef) -> bool {
+    ty.name == "i64" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
 }
 
 fn counted_loop_runs_exactly_once(

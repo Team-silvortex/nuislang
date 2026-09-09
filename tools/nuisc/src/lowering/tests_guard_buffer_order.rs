@@ -71,11 +71,15 @@ fn pixelmagic_generator_rejects_invalid_inputs_without_writes_or_caller_return()
         let phase: bool = fill_checkerboard(pixels, 2, 2, 1, 2);
         let range: bool = fill_checkerboard_region(pixels, 0, 5, 2, 1, 0);
         let empty: bool = fill_checkerboard_region(pixels, 2, 2, 2, 1, 0);
+        let invalid_count: i64 = fill_checkerboard_region_red_count(pixels, 0, 5, 2, 1, 0);
+        let empty_count: i64 = fill_checkerboard_region_red_count(pixels, 2, 2, 2, 1, 0);
         let unchanged: i64 = pixels[0] + pixels[1] + pixels[2] + pixels[3];
         free(pixels);
         print(unchanged);
         print(zero || size || tile || phase || range);
         print(empty);
+        print(invalid_count);
+        print(empty_count);
         return 0;
       }
     "#
@@ -103,10 +107,12 @@ fn pixelmagic_generator_rejects_invalid_inputs_without_writes_or_caller_return()
         .collect::<Vec<_>>();
     assert_eq!(
         prints.len(),
-        3,
+        5,
         "helper guards must not return from their caller"
     );
     assert!(prints[0].ends_with("28"), "{prints:?}");
     assert!(prints[1].ends_with("false"), "{prints:?}");
     assert!(prints[2].ends_with("true"), "{prints:?}");
+    assert!(prints[3].ends_with("-1"), "{prints:?}");
+    assert!(prints[4].ends_with("0"), "{prints:?}");
 }

@@ -19,7 +19,17 @@ pub(super) fn lower_guarded_body(
             function.name
         ));
     };
-    if !else_body.is_empty() || then_body.as_slice() != [NirStmt::Return(Some(NirExpr::Int(0)))] {
+    let default = match function.return_type.as_ref().map(|ty| ty.name.as_str()) {
+        Some("bool") => NirExpr::Bool(false),
+        Some("i64") => NirExpr::Int(0),
+        _ => {
+            return Err(format!(
+                "outlined helper `{}` has an invalid guard return type",
+                function.name
+            ))
+        }
+    };
+    if !else_body.is_empty() || then_body.as_slice() != [NirStmt::Return(Some(default.clone()))] {
         return Err(format!(
             "outlined helper `{}` has an invalid leading guard",
             function.name
@@ -27,7 +37,7 @@ pub(super) fn lower_guarded_body(
     }
     // A speculative select is not equivalent: even unused branch arithmetic can trap.
     let condition = lower_expr(condition, state, bindings)?;
-    let returned = lower_expr(&NirExpr::Int(0), state, bindings)?;
+    let returned = lower_expr(&default, state, bindings)?;
     lower_guard_return(condition, returned, state);
     crate::lowering::body_lowering::lower_inline_stmts(tail, state, bindings, &mut BTreeMap::new())
 }

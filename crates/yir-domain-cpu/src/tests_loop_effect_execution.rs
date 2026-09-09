@@ -105,6 +105,111 @@ fn loop_state(initial: i64, limit: i64, step: i64) -> ExecutionState {
     state
 }
 
+fn scalar_carry_loop() -> Node {
+    let mut node = scoped_loop("$carry");
+    node.op.args[6] = "scoped_call_i64_carry".to_owned();
+    node.op.args[7] = "4".to_owned();
+    node.op.args.insert(9, "seed".to_owned());
+    node
+}
+
+fn carried_state(current: i64, carry: i64) -> Value {
+    Value::Struct(yir_core::StructValue {
+        type_name: "LoopState".to_owned(),
+        fields: vec![
+            ("current".to_owned(), Value::Int(current)),
+            ("carry0".to_owned(), Value::Int(carry)),
+        ],
+    })
+}
+
+#[test]
+fn scoped_i64_carry_tracks_results_and_zero_trip_seed() {
+    use yir_core::RegisteredExecutionStep as Step;
+    let node = scalar_carry_loop();
+    for (initial, limit) in [(0, 3), (3, 3)] {
+        let mut state = loop_state(initial, limit, 1);
+        state.bind_value("seed", Value::Int(10));
+        let mut execution = CpuMod
+            .begin_execution(&node, &resource(), &state)
+            .unwrap()
+            .unwrap();
+        let mut carry = 10;
+        for current in initial..limit {
+            let result = (current > initial).then_some(Value::Int(carry));
+            let Step::Call { arguments, .. } = execution.resume(&mut state, result).unwrap() else {
+                panic!("expected carried call");
+            };
+            assert_eq!(arguments, [Value::Int(current), Value::Int(carry)]);
+            assert!(state.events.is_empty());
+            carry += current + 1;
+        }
+        let Step::Complete(result) = execution
+            .resume(&mut state, (initial != limit).then_some(Value::Int(carry)))
+            .unwrap()
+        else {
+            panic!("expected loop completion");
+        };
+        assert_eq!(result, carried_state(limit, carry));
+        assert!(state.events[0].contains("scoped_call_i64_carry"));
+    }
+}
+
+#[test]
+fn scoped_i64_carry_rejects_wrong_seeds_and_results_without_advancing() {
+    use yir_core::RegisteredExecutionStep as Step;
+    let node = scalar_carry_loop();
+    let mut state = loop_state(0, 2, 1);
+    for value in [None, Some(Value::Bool(true)), Some(Value::I32(10))] {
+        if let Some(value) = value {
+            state.bind_value("seed", value);
+        }
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+    }
+    state.bind_value("seed", Value::Int(10));
+    let mut execution = CpuMod
+        .begin_execution(&node, &resource(), &state)
+        .unwrap()
+        .unwrap();
+    execution.resume(&mut state, None).unwrap();
+    for result in [None, Some(Value::Bool(true)), Some(Value::I32(20))] {
+        assert!(execution
+            .resume(&mut state, result)
+            .err()
+            .unwrap()
+            .contains("i64 scoped carry result"));
+        assert!(state.events.is_empty());
+    }
+    let Step::Call { arguments, .. } = execution.resume(&mut state, Some(Value::Int(11))).unwrap()
+    else {
+        panic!("failed result must not advance loop state");
+    };
+    assert_eq!(arguments, [Value::Int(1), Value::Int(11)]);
+}
+
+#[test]
+fn scoped_i64_carry_description_and_execution_share_payload_validation() {
+    let mut state = loop_state(0, 2, 1);
+    state.bind_value("seed", Value::Int(10));
+    let node = scalar_carry_loop();
+    let semantics = CpuMod.describe(&node, &resource()).unwrap();
+    assert_eq!(semantics.dependencies, ["initial", "limit", "step", "seed"]);
+    for (index, value) in [
+        (7, "3"),
+        (9, "$carry"),
+        (10, "$carry"),
+        (11, "$unknown"),
+        (11, "copy_owned:seed"),
+    ] {
+        let mut invalid = node.clone();
+        invalid.op.args[index] = value.to_owned();
+        assert!(CpuMod.describe(&invalid, &resource()).is_err());
+        assert!(CpuMod
+            .begin_execution(&invalid, &resource(), &state)
+            .is_err());
+    }
+}
+
 #[test]
 fn scoped_loop_dispatches_each_induction_value_before_advancing() {
     use yir_core::RegisteredExecutionStep as Step;

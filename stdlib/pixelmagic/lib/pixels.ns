@@ -1,13 +1,22 @@
 /// Packed RGBA8 image construction. Each Buffer element is one unsigned 32-bit pixel.
 mod cpu PixelMagicPixels {
-  fn checkerboard_parity(x: i64, y: i64, tile_size: i64, phase: i64) -> i64 {
-    return (x / tile_size + y / tile_size + phase) % 2;
+  fn checkerboard_parity(x: i64, y: i64, tile_size: i64) -> i64 {
+    return (x / tile_size + y / tile_size) % 2;
   }
 
   fn checkerboard_is_red(index: i64, width: i64, tile_size: i64, phase: i64) -> bool {
+    if width <= 0 || tile_size <= 0 || index < 0 { return false; }
+    if phase < 0 || phase > 1 { return false; }
     let x: i64 = index % width;
     let y: i64 = index / width;
-    return checkerboard_parity(x, y, tile_size, phase) == 0;
+    let base_red: bool = checkerboard_parity(x, y, tile_size) == 0;
+    if phase == 0 { return base_red; }
+    return base_red == false;
+  }
+
+  fn checkerboard_red_total(total: i64, red: bool) -> i64 {
+    if red { return total + 1; }
+    return total;
   }
 
   /// Fills caller-owned storage; rejects invalid dimensions before changing any pixel.
@@ -33,13 +42,21 @@ mod cpu PixelMagicPixels {
   pub fn fill_checkerboard_region(
     pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
   ) -> bool {
+    return fill_checkerboard_region_red_count(pixels, start, end, width, tile_size, phase) >= 0;
+  }
+
+  /// Fills the range and returns its red-pixel count, or -1 before any write on invalid input.
+  pub fn fill_checkerboard_region_red_count(
+    pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
+  ) -> i64 {
     if width <= 0 || width > 2048 || tile_size <= 0 || tile_size > 2048 {
-      return false;
+      return 0 - 1;
     }
     if phase < 0 || phase > 1 || start < 0 || start > end || end > pixels.len {
-      return false;
+      return 0 - 1;
     }
-    if pixels.len > 4194304 || pixels.len % width != 0 { return false; }
+    if pixels.len > 4194304 || pixels.len % width != 0 { return 0 - 1; }
+    let total: i64 = 0;
     let index: i64 = start;
     while index < end {
       let red: bool = checkerboard_is_red(index, width, tile_size, phase);
@@ -49,8 +66,9 @@ mod cpu PixelMagicPixels {
       } else {
         pixels[index] = 4294901760;
       }
+      let total: i64 = checkerboard_red_total(total, red);
       let index: i64 = index + 1;
     }
-    return true;
+    return total;
   }
 }

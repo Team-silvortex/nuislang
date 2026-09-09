@@ -431,7 +431,13 @@ generator = "Nuis-bounded-unit-step-while-with-scalar-helper-composition-and-gua
 bounded_buffer_mutating_while_lowering = true
 branch_local_buffer_mutation_lowering = true
 acyclic_straight_line_scalar_helper_composition = true
-source_scalar_helper_control_flow_lowering = false
+source_scalar_helper_control_flow_lowering = true
+source_scalar_helper_control_flow_scope = "acyclic-i64-bool-fresh-bindings-nested-if-else-early-return-shared-continuation"
+scalar_carries_alongside_buffer_writes = true
+scalar_buffer_carry_scope = "one-i64-tail-rebinding-invariant-bound-named-captures"
+scalar_buffer_carry_action = "cpu.scoped_call_i64_carry"
+scalar_buffer_carry_result = "LoopState.current-i64-and-carry0-i64"
+multiple_scalar_buffer_carries = false
 general_buffer_mutating_while_lowering = false
 
 [framework_package]

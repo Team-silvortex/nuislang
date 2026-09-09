@@ -1,5 +1,8 @@
 // Canonical payload arity rules for YIR loop/carry metadata.
 
+mod scoped_scalar;
+pub use scoped_scalar::{parse_scoped_i64_carry, ScopedI64Carry};
+
 pub fn carry_state_fragment_is_valid(fragment: &str) -> bool {
     match fragment {
         "current" | "prev_current" => true,

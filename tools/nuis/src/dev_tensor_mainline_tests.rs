@@ -275,7 +275,34 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session.next_step.contains("buffer-writing callbacks"));
     assert!(session.next_step.contains("build/run-artifact"));
     assert!(session.next_step.contains("scalar helper composition"));
-    assert!(session.next_step.contains("branch-local control flow"));
+    assert!(session.next_step.contains("scalar loop carries"));
+    assert!(session.next_step.contains("multiple scalar loop carries"));
+    assert!(session
+        .evidence
+        .contains("One explicit i64 scalar loop carry"));
+    assert!(session.evidence.contains("strict i64"));
+    assert!(session
+        .evidence
+        .contains("fill_checkerboard_region_red_count"));
+    assert!(session.evidence.contains(
+        "carried PixelMagic image passes ordinary headless build/run-artifact on real M2"
+    ));
+    assert!(!session
+        .blocker
+        .contains("Scalar accumulators alongside bounded Buffer writes remain outside"));
+    assert!(session
+        .evidence
+        .contains("Scalar-helper branch-local control flow now admits"));
+    assert!(session
+        .evidence
+        .contains("64-branch regression checks linear function growth"));
+    assert!(session
+        .evidence
+        .contains("phase-zero early-return and phase-one inversion"));
+    assert!(session.evidence.contains("branch-capable PixelMagic image passes ordinary headless build/run-artifact on real M2 again"));
+    assert!(!session
+        .blocker
+        .contains("control flow inside source scalar helpers remains outside"));
     assert!(session.evidence.contains("Owner-local signature scopes"));
     assert!(session
         .evidence

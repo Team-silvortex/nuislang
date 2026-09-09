@@ -82,7 +82,7 @@ pub(super) fn outline_branches(
     outlined
 }
 
-fn fresh_name(prefix: &str, names: &mut BTreeSet<String>) -> String {
+pub(super) fn fresh_name(prefix: &str, names: &mut BTreeSet<String>) -> String {
     for suffix in 0.. {
         let name = format!("{prefix}_{suffix}");
         if names.insert(name.clone()) {
@@ -92,10 +92,10 @@ fn fresh_name(prefix: &str, names: &mut BTreeSet<String>) -> String {
     unreachable!("unbounded helper name space")
 }
 
-fn collect_bindings(body: &[NirStmt], names: &mut BTreeSet<String>) {
+pub(super) fn collect_bindings(body: &[NirStmt], names: &mut BTreeSet<String>) {
     for stmt in body {
         match stmt {
-            NirStmt::Let { name, .. } => {
+            NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => {
                 names.insert(name.clone());
             }
             NirStmt::If {

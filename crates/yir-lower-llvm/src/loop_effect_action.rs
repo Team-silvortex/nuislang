@@ -15,6 +15,7 @@ pub(crate) enum LoopEffectCleanup {
     OwnedBlob(String),
     OwnedResult(String),
     OwnedStructResult(String),
+    ScalarResult(String),
 }
 
 pub(crate) fn begin_loop_effect_action(
@@ -73,6 +74,7 @@ pub(crate) fn begin_loop_effect_action(
         (
             "cpu",
             "scoped_call"
+            | "scoped_call_i64_carry"
             | "scoped_call_owned_return"
             | "scoped_call_owned_struct_return",
         ) => {
@@ -84,7 +86,17 @@ pub(crate) fn begin_loop_effect_action(
             })?;
             let returns_owned_bytes = action_instruction == "scoped_call_owned_return";
             let returns_owned_struct = action_instruction == "scoped_call_owned_struct_return";
-            let operands = if returns_owned_bytes {
+            let scalar_carry = if action_instruction == "scoped_call_i64_carry" {
+                if node.op.instruction != "loop_while_i64_effect" || action_offset != 5 {
+                    return Err("scoped_call_i64_carry requires a simple effect loop".to_owned());
+                }
+                yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?
+            } else {
+                None
+            };
+            let operands = if let Some(carry) = &scalar_carry {
+                carry.operands
+            } else if returns_owned_bytes {
                 action_tail.get(1..).ok_or_else(|| {
                     format!(
                         "cpu.loop_while_i64_effect `{}` has an owned scoped call without a result projection",
@@ -122,6 +134,9 @@ pub(crate) fn begin_loop_effect_action(
                     signature.params.len(),
                     operands.len()
                 ));
+            }
+            if scalar_carry.is_some() && signature.ret != CpuCallScalarKind::I64 {
+                return Err(format!("scoped helper `{callee}` must return i64 for a scalar carry"));
             }
             let lowered = operands
                 .iter()
@@ -164,7 +179,11 @@ pub(crate) fn begin_loop_effect_action(
                     cpu_scalar_kind_llvm_type(signature.ret),
                     lowered.join(", ")
                 ));
-                Ok(LoopEffectCleanup::None)
+                Ok(if scalar_carry.is_some() {
+                    LoopEffectCleanup::ScalarResult(ignored_result)
+                } else {
+                    LoopEffectCleanup::None
+                })
             }
         }
         (module, instruction) => {
@@ -184,6 +203,7 @@ pub(crate) fn finish_loop_effect_action(cleanup: &LoopEffectCleanup, body: &mut 
         )),
         LoopEffectCleanup::OwnedResult(_) => {}
         LoopEffectCleanup::OwnedStructResult(_) => {}
+        LoopEffectCleanup::ScalarResult(_) => {}
     }
 }
 

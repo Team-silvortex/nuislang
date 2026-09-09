@@ -66,9 +66,16 @@ Current source-asset status:
   the unselected arm returns before any branch-local access or arithmetic.
   Scalar helpers remain real ordered `call_i64`/`call_bool` functions under shared
   callback fuel, not a generator-specific intrinsic. Imported private helpers keep
-  their module scope without expanding the public API. Native/reference regressions
-  compare every pixel for both phases, a partial range and an empty range. This is not general
-  nested-loop, control flow inside source helpers or arbitrary loop-carry support
+  their module scope without expanding the public API. The color helper rejects
+  invalid inputs through typed early-return guards before coordinate division;
+  phase zero returns its base color while phase one inverts it. Source-helper
+  branches use shared continuations, not speculative arithmetic.
+  `fill_checkerboard_region_red_count` fills a region and returns its red-pixel
+  count using one carried i64 accumulator; invalid input returns -1 before writes,
+  and an empty range returns zero. Existing boolean fill APIs remain compatible.
+  Native/reference regressions
+  compare every pixel and the red counts for both phases, partial and empty ranges. This is not general
+  nested-loop or arbitrary loop-carry support
 * [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
   u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The
   [image showcase](../../examples/projects/domains/ns_nova_image_showcase) frees
