@@ -75,6 +75,7 @@ pub(crate) fn begin_loop_effect_action(
             "cpu",
             "scoped_call"
             | "scoped_call_i64_carry"
+            | "scoped_call_i64_carries"
             | "scoped_call_owned_return"
             | "scoped_call_owned_struct_return",
         ) => {
@@ -85,7 +86,13 @@ pub(crate) fn begin_loop_effect_action(
                 )
             })?;
             let returns_owned_bytes = action_instruction == "scoped_call_owned_return";
-            let returns_owned_struct = action_instruction == "scoped_call_owned_struct_return";
+            let returns_owned_struct = matches!(action_instruction.as_str(), "scoped_call_owned_struct_return" | "scoped_call_i64_carries");
+            let multi = if action_instruction == "scoped_call_i64_carries" {
+                if node.op.instruction != "loop_while_i64_effect" || action_offset != 5 {
+                    return Err("scoped_call_i64_carries requires a simple effect loop".to_owned());
+                }
+                yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?
+            } else { None };
             let scalar_carry = if action_instruction == "scoped_call_i64_carry" {
                 if node.op.instruction != "loop_while_i64_effect" || action_offset != 5 {
                     return Err("scoped_call_i64_carry requires a simple effect loop".to_owned());
@@ -94,7 +101,9 @@ pub(crate) fn begin_loop_effect_action(
             } else {
                 None
             };
-            let operands = if let Some(carry) = &scalar_carry {
+            let operands = if let Some(carry) = &multi {
+                carry.operands
+            } else if let Some(carry) = &scalar_carry {
                 carry.operands
             } else if returns_owned_bytes {
                 action_tail.get(1..).ok_or_else(|| {

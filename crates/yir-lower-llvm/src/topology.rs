@@ -31,8 +31,11 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
         }
     }
 
+    // Implicit serial queues may extend the explicit graph, never reverse its paths.
+    let explicit_order = sorted_indices(module, &adjacency, indegree.clone())?;
     let mut last_cpu_extern_on_resource = HashMap::<&str, usize>::new();
-    for (node_index, node) in module.nodes.iter().enumerate() {
+    for &node_index in &explicit_order {
+        let node = &module.nodes[node_index];
         if node.op.module == "cpu" && is_cpu_extern_call_instruction(&node.op.instruction) {
             if let Some(previous) =
                 last_cpu_extern_on_resource.insert(node.resource.as_str(), node_index)
@@ -44,7 +47,8 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
     }
 
     let mut last_cpu_node_on_lane = HashMap::<(&str, &str), usize>::new();
-    for (node_index, node) in module.nodes.iter().enumerate() {
+    for &node_index in &explicit_order {
+        let node = &module.nodes[node_index];
         if node.op.module != "cpu" {
             continue;
         }
@@ -63,6 +67,17 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
         }
     }
 
+    Ok(sorted_indices(module, &adjacency, indegree)?
+        .into_iter()
+        .map(|index| module.nodes[index].name.clone())
+        .collect())
+}
+
+fn sorted_indices(
+    module: &YirModule,
+    adjacency: &[Vec<usize>],
+    mut indegree: Vec<usize>,
+) -> Result<Vec<usize>, String> {
     let mut ready = indegree
         .iter()
         .enumerate()
@@ -71,7 +86,7 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
 
     let mut order = Vec::with_capacity(module.nodes.len());
     while let Some(Reverse(node_index)) = ready.pop() {
-        order.push(module.nodes[node_index].name.clone());
+        order.push(node_index);
         for &target_index in &adjacency[node_index] {
             indegree[target_index] -= 1;
             if indegree[target_index] == 0 {
@@ -145,5 +160,51 @@ mod tests {
             topological_order(&module).unwrap(),
             ["source", "unblocked", "independent"]
         );
+    }
+
+    #[test]
+    fn implicit_cpu_queues_respect_transitive_paths_in_every_declaration_order() {
+        for names in [
+            ["a", "b", "c"],
+            ["a", "c", "b"],
+            ["b", "a", "c"],
+            ["b", "c", "a"],
+            ["c", "a", "b"],
+            ["c", "b", "a"],
+        ] {
+            for instruction in ["const_i64", "extern_call_i64"] {
+                let mut module = YirModule::new("0.1");
+                module.nodes = names
+                    .iter()
+                    .map(|name| {
+                        let mut value = node(name);
+                        value.op.module = "cpu".to_owned();
+                        value.op.instruction = instruction.to_owned();
+                        value
+                    })
+                    .collect();
+                for name in names {
+                    module.node_lanes.insert(
+                        name.to_owned(),
+                        if name == "b" { "other" } else { "work" }.to_owned(),
+                    );
+                }
+                for (from, to, kind) in [("a", "b", EdgeKind::Dep), ("b", "c", EdgeKind::Lifetime)]
+                {
+                    module.edges.push(Edge {
+                        kind,
+                        from: from.to_owned(),
+                        to: to.to_owned(),
+                    });
+                }
+                assert_eq!(topological_order(&module).unwrap(), ["a", "b", "c"]);
+                module.edges.push(Edge {
+                    kind: EdgeKind::Effect,
+                    from: "c".to_owned(),
+                    to: "a".to_owned(),
+                });
+                assert!(topological_order(&module).is_err());
+            }
+        }
     }
 }

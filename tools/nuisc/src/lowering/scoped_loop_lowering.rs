@@ -1,8 +1,15 @@
 use super::*;
 
+#[path = "scoped_loop_lowering/scalar_carries.rs"]
+mod scalar_carries;
+
 enum ScopedLoopResult<'a> {
     None,
     Scalar(&'a str),
+    Scalars {
+        bindings: Vec<&'a str>,
+        layout: String,
+    },
     OwnedBytes(&'a str),
     OwnedStruct {
         binding: &'a str,
@@ -90,6 +97,13 @@ pub(super) fn lower_scoped_call_while(
     if !state.direct_call_functions.contains(callee) {
         return Ok(false);
     }
+    let projections = result_binding.and_then(|(binding, ty)| {
+        scalar_carries::projected_bindings(binding, ty, counted_body, state)
+    });
+    let counted_body = projections
+        .as_ref()
+        .map(|carries| &counted_body[carries.len()..])
+        .unwrap_or(counted_body);
     let Some(prepared) = prepare_counted_while(
         condition,
         counted_body,
@@ -123,6 +137,22 @@ pub(super) fn lower_scoped_call_while(
     });
     let result = match (result_binding, returns_owned_bytes, owned_struct_layout) {
         (None, false, None) => ScopedLoopResult::None,
+        (Some((_, ty)), false, Some(layout))
+            if projections.is_some()
+                && function
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|returned| returned == ty) =>
+        {
+            let carries = projections.expect("matched scalar projections");
+            if !scalar_carries::admissible(&carries, &prepared, function, args, bindings) {
+                return Ok(false);
+            }
+            ScopedLoopResult::Scalars {
+                bindings: carries,
+                layout,
+            }
+        }
         (Some((binding, ty)), false, None)
             if is_scalar_i64(ty) && function.return_type.as_ref().is_some_and(is_scalar_i64) =>
         {
@@ -201,13 +231,18 @@ pub(super) fn lower_scoped_call_while(
         ));
     }
     let owned_result = match &result {
-        ScopedLoopResult::None | ScopedLoopResult::Scalar(_) => None,
+        ScopedLoopResult::None | ScopedLoopResult::Scalar(_) | ScopedLoopResult::Scalars { .. } => {
+            None
+        }
         ScopedLoopResult::OwnedBytes(_) => Some(next_name(state, "loop_owned_result")),
         ScopedLoopResult::OwnedStruct { .. } => Some(next_name(state, "loop_owned_struct_result")),
     };
     let mut action_args = vec![callee.clone()];
     if let ScopedLoopResult::Scalar(binding) = &result {
         action_args.push(bindings[*binding].clone());
+    }
+    if let ScopedLoopResult::Scalars { layout, .. } = &result {
+        action_args.push(layout.clone());
     }
     if let Some(result) = &owned_result {
         action_args.push(result.clone());
@@ -222,6 +257,9 @@ pub(super) fn lower_scoped_call_while(
         } else if matches!((&result, arg), (ScopedLoopResult::Scalar(binding), NirExpr::Var(name)) if name == binding)
         {
             action_args.push("$carry".to_owned());
+        } else if let Some(index) = scalar_carries::argument_index(&result, arg) {
+            let lowered = lower_expr(arg, state, bindings)?;
+            action_args.push(yir_core::encode_loop_owned_struct_carry(index, &lowered));
         } else if state.struct_defs.contains_key(param.ty.name.as_str()) {
             let lowered = lower_expr(arg, state, bindings)?;
             let flattened = direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?;
@@ -280,6 +318,7 @@ pub(super) fn lower_scoped_call_while(
         match &result {
             ScopedLoopResult::None => "scoped_call",
             ScopedLoopResult::Scalar(_) => "scoped_call_i64_carry",
+            ScopedLoopResult::Scalars { .. } => "scoped_call_i64_carries",
             ScopedLoopResult::OwnedBytes(_) => "scoped_call_owned_return",
             ScopedLoopResult::OwnedStruct { .. } => "scoped_call_owned_struct_return",
         }
@@ -328,11 +367,20 @@ pub(super) fn lower_scoped_call_while(
         }
     }
     body_lowering::chain_statement_effect(state, &name);
-    if let ScopedLoopResult::Scalar(binding) = &result {
-        for (binding, field) in [
-            (prepared.binding_name.as_str(), "current"),
-            (*binding, "carry0"),
-        ] {
+    let scalar_bindings = match &result {
+        ScopedLoopResult::Scalar(binding) => Some(vec![*binding]),
+        ScopedLoopResult::Scalars { bindings, .. } => Some(bindings.clone()),
+        _ => None,
+    };
+    if let Some(scalar_bindings) = scalar_bindings {
+        for (binding, field) in
+            std::iter::once((prepared.binding_name.as_str(), "current".to_owned())).chain(
+                scalar_bindings
+                    .iter()
+                    .enumerate()
+                    .map(|(index, binding)| (*binding, format!("carry{index}"))),
+            )
+        {
             let result_name = next_name(state, "loop_scalar_result");
             state.yir.nodes.push(Node {
                 name: result_name.clone(),
@@ -340,7 +388,7 @@ pub(super) fn lower_scoped_call_while(
                 op: Operation {
                     module: "cpu".to_owned(),
                     instruction: "field".to_owned(),
-                    args: vec![name.clone(), field.to_owned()],
+                    args: vec![name.clone(), field],
                 },
             });
             push_dep_edges(state, &name, &result_name);
@@ -352,7 +400,9 @@ pub(super) fn lower_scoped_call_while(
     bindings.insert(prepared.binding_name, name.clone());
     if let Some(result_name) = owned_result {
         let (owner, instruction, args) = match &result {
-            ScopedLoopResult::None | ScopedLoopResult::Scalar(_) => {
+            ScopedLoopResult::None
+            | ScopedLoopResult::Scalar(_)
+            | ScopedLoopResult::Scalars { .. } => {
                 unreachable!("result projection requires an owner")
             }
             ScopedLoopResult::OwnedBytes(owner) => {
@@ -390,6 +440,20 @@ fn validate_loop_result_rebinding(
 ) -> Result<(), String> {
     match result {
         ScopedLoopResult::None => Ok(()),
+        ScopedLoopResult::Scalars {
+            bindings: carries, ..
+        } => {
+            for binding in carries {
+                validate_loop_result_rebinding(
+                    &ScopedLoopResult::Scalar(binding),
+                    function,
+                    args,
+                    bindings,
+                    callee,
+                )?;
+            }
+            Ok(())
+        }
         ScopedLoopResult::Scalar(binding) => {
             let count = function
                 .params

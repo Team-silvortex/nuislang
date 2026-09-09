@@ -208,7 +208,7 @@ fn scalar_carry_keeps_unsupported_mutations_and_mutable_headers_fail_closed() {
         ),
         source.replace(
             "let total: i64 = accumulate",
-            "let seed: i64 = seed + 1; let total: i64 = accumulate",
+            "let total: i64 = total + 1; let total: i64 = accumulate",
         ),
         source.replace(
             "store_at(buffer, index, value);",

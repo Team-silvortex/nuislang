@@ -29,7 +29,10 @@ pub(crate) fn prepare_owned_struct_loop_carry(
     next_reg: &mut usize,
 ) -> Result<Option<OwnedStructLoopCarry>, String> {
     if node.op.instruction != "loop_while_i64_effect"
-        || node.op.args.get(6).map(String::as_str) != Some("scoped_call_owned_struct_return")
+        || !matches!(
+            node.op.args.get(6).map(String::as_str),
+            Some("scoped_call_owned_struct_return" | "scoped_call_i64_carries")
+        )
     {
         return Ok(None);
     }
@@ -38,22 +41,32 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         .args
         .get(8)
         .ok_or_else(|| missing_metadata(node, "callee"))?;
-    let result_name = node
-        .op
-        .args
-        .get(9)
-        .ok_or_else(|| missing_metadata(node, "result projection"))?
-        .clone();
-    let layout = node
-        .op
-        .args
-        .get(10)
-        .ok_or_else(|| missing_metadata(node, "owned struct layout"))?;
-    let operands = node
-        .op
-        .args
-        .get(11..)
-        .ok_or_else(|| missing_metadata(node, "scoped operands"))?;
+    let multi = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?;
+    let result_name = if multi.is_some() {
+        node.name.clone()
+    } else {
+        node.op
+            .args
+            .get(9)
+            .ok_or_else(|| missing_metadata(node, "result projection"))?
+            .clone()
+    };
+    let layout = if let Some(multi) = &multi {
+        multi.encoded_layout
+    } else {
+        node.op
+            .args
+            .get(10)
+            .ok_or_else(|| missing_metadata(node, "owned struct layout"))?
+    };
+    let operands = if let Some(multi) = &multi {
+        multi.operands
+    } else {
+        node.op
+            .args
+            .get(11..)
+            .ok_or_else(|| missing_metadata(node, "scoped operands"))?
+    };
     let signature = helper_signatures.get(callee).ok_or_else(|| {
         format!(
             "cpu.loop_while_i64_effect `{}` cannot resolve aggregate helper `{callee}`",
@@ -65,6 +78,13 @@ pub(crate) fn prepare_owned_struct_loop_carry(
             "cpu.loop_while_i64_effect `{}` treats non-aggregate helper `{callee}` as an owned struct return",
             node.name
         ));
+    }
+    if let Some(multi) = &multi {
+        if signature.owned_struct_layout.as_ref() != Some(&multi.layout) {
+            return Err(format!(
+                "scoped carries helper `{callee}` does not declare the requested return layout"
+            ));
+        }
     }
     if signature.params.len() != operands.len() {
         return Err(format!(
@@ -80,6 +100,11 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         let Some((index, input)) = parse_loop_owned_struct_carry(operand)? else {
             continue;
         };
+        if multi.is_some() && kind != CpuCallScalarKind::I64 {
+            return Err(format!(
+                "scoped carry `{input}` must bind an i64 helper parameter"
+            ));
+        }
         let initial = scalar_value(registers.get(input), kind).ok_or_else(|| {
             format!(
                 "cpu.loop_while_i64_effect `{}` cannot resolve aggregate carry leaf `{input}`",

@@ -248,14 +248,16 @@ shared fallthrough continuations. Unselected branch computation stays behind its
 guard, source-call arguments still evaluate at entry, and function-local returns
 do not escape into the caller. Scope, trap, shared-fuel and linear-growth regressions
 accompany the same native/reference pixel and M2 packaged image checks.
-One explicit i64 accumulator now survives Buffer-writing iterations, including
-zero trips, ordered reads and scalar helper control flow. CPU and LLVM share payload
-validation and return LoopState fields without an image-specific executor path.
-PixelMagic's fill-and-red-count API checks real scalar result composition with its
-existing boolean fill wrappers; native/reference tests compare pixels and counts.
+Multiple explicit i64 accumulators now survive Buffer-writing iterations, including
+zero trips, source-order rebinding, ordered reads and scalar helper control flow.
+CPU and LLVM share layout validation and return LoopState fields without an
+image-specific executor path. Native returns currently allocate/release an aggregate
+per iteration. PixelMagic's fill-and-statistics API checks real scalar result
+composition with its existing red-count/boolean wrappers; native/reference tests
+compare pixels, red counts and packed-pixel sums.
 The carried image passes ordinary M2 build/run-artifact again, retaining both exact
 Metal frames, direct-session byte parity and failure-preserved replay evidence.
-The score remains `active/86`; the next step is multiple scalar loop carries alongside
+The score remains `active/86`; the next step is branch-local scalar carry updates alongside
 Buffer writes under the same build/run-artifact admission and identity checks.
 This is not fully native CPU callbacks, arbitrary loop support or a
 complete memory-safety proof.

@@ -183,5 +183,6 @@ pub(crate) struct CpuHelperSignature {
     pub(crate) mutex_permit_params: Vec<Option<MutexScalarKind>>,
     pub(crate) ret: CpuCallScalarKind,
     pub(crate) owned_struct_return: bool,
+    pub(crate) owned_struct_layout: Option<yir_core::OwnedStructLayout>,
     pub(crate) owned_external_buffer_return: Option<CpuOwnedExternalBufferAbi>,
 }

@@ -158,7 +158,7 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     assert!(
         module.nodes.iter().any(|node| {
             node.op.instruction == "loop_while_i64_effect"
-                && node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carry")
+                && node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carries")
                 && node
                     .op
                     .args

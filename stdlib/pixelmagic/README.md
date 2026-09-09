@@ -70,11 +70,13 @@ Current source-asset status:
   invalid inputs through typed early-return guards before coordinate division;
   phase zero returns its base color while phase one inverts it. Source-helper
   branches use shared continuations, not speculative arithmetic.
-  `fill_checkerboard_region_red_count` fills a region and returns its red-pixel
-  count using one carried i64 accumulator; invalid input returns -1 before writes,
-  and an empty range returns zero. Existing boolean fill APIs remain compatible.
-  Native/reference regressions
-  compare every pixel and the red counts for both phases, partial and empty ranges. This is not general
+  `fill_checkerboard_region_stats` returns `CheckerboardStats { red_count, checksum }`
+  using two carried i64 accumulators during the fill. The checksum is a sum of
+  packed pixel values, not a cryptographic digest. Invalid input returns `(-1, 0)`
+  before writes; an empty range returns `(0, 0)`. The red-count and boolean fill
+  APIs delegate and remain compatible. Native/reference regressions compare every
+  pixel, red count and sum for both phases, partial and empty ranges. Native
+  multi-carry returns currently allocate/release an aggregate per iteration. This is not general
   nested-loop or arbitrary loop-carry support
 * [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
   u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The

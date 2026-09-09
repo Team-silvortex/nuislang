@@ -510,6 +510,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if phase == 0 { return base_red; }", "return base_red == false",
             "pixels[index] = 4294901760", "let index: i64 = index + 1",
             "pub fn fill_checkerboard_region_red_count", "checkerboard_red_total(total, red)",
+            "pub fn fill_checkerboard_region_stats", "pub struct CheckerboardStats",
+            "let checksum: i64 = checksum + pixels[index]", "return stats.red_count",
             "let total: i64 = 0", "return total",
         ],
     },
@@ -565,7 +567,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/scoped_loop_lowering.rs",
         required_patterns: &[
             "ScopedLoopResult::Scalar", "scoped_call_i64_carry", "is_scalar_i64",
-            "expr_references_names", "const_bindings.remove(binding)", "carry0",
+            "expr_references_names", "const_bindings.remove(binding)", "carry{index}",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -599,6 +601,74 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "bounded-buffer-multiple-carry-contract",
+        path: "crates/yir-core/src/loop_carry_contract/scoped_scalars.rs",
+        required_patterns: &[
+            "parse_scoped_i64_carries", "parse_owned_struct_layout", "checked_add(8)",
+            "slot.replace(input).is_some()", "OwnedStructScalarLayout::I64",
+            "scoped_multi_scalar_layout_and_markers_are_checked_together",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-multiple-carry-projections",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
+        required_patterns: &[
+            "projected_bindings", "bindings.contains", "argument_index", "admissible",
+            "expr_references_names(&prepared.limit", "expr_references_names(&prepared.step",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-multiple-carry-aggregate-abi",
+        path: "crates/yir-lower-llvm/src/loop_owned_struct_lowering.rs",
+        required_patterns: &[
+            "parse_scoped_i64_carries", "signature.owned_struct_layout.as_ref()",
+            "Some(&multi.layout)", "must bind an i64 helper parameter", "store_return",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-multiple-carry-cpu-admission",
+        path: "crates/yir-domain-cpu/src/tests_loop_effect_execution.rs",
+        required_patterns: &[
+            "scoped_multiple_carries_validate_all_slots_before_advancing",
+            "scoped_multiple_carries_keep_zero_trip_seeds_and_shared_admission",
+            "wrong_fields", "wrong_type", "Value::I32(31)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-loop-explicit-order-extension",
+        path: "crates/yir-lower-llvm/src/topology.rs",
+        required_patterns: &[
+            "explicit_order", "sorted_indices", "last_cpu_node_on_lane",
+            "implicit_cpu_queues_respect_transitive_paths_in_every_declaration_order",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-early-return-layout",
+        path: "crates/yir-lower-llvm/src/tests/owned_return_contract_tests.rs",
+        required_patterns: &[
+            "aggregate_early_returns_enforce_the_function_layout_before_emitting",
+            "aggregate_early_returns_pack_in_declared_field_order",
+            "declared_entry_result_wins_over_last_scheduled_scalar",
+            "unavailable_declared_entry_result_traps_instead_of_using_an_unrelated_scalar",
+            "wrong_type", "wrong_scalar", "duplicate",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-multiple-carry-execution-evidence",
+        path: "tools/nuisc/tests/buffer_while/scalar_carries.rs",
+        required_patterns: &[
+            "multiple_carries_preserve_sequential_updates_zero_one_and_descending_trips",
+            "multiple_carries_feed_writes_and_three_slots_are_not_precombined",
+            "multiple_carries_replacing_updates_and_subsequent_loops_use_projected_values",
+            "multiple_carry_traps_preserve_source_order_across_writes_and_updates",
+            "multiple_carries_reject_branch_updates_duplicate_updates_and_mutable_headers",
+            "multiple_carries_callbacks_share_fuel_without_committing_failed_state",
+            "multiple_carries_keep_glm_seeds_and_run_independent_of_declaration_order",
+            "multiple_carries_fail_closed_on_layout_signature_and_seed_drift",
+            "twelve_scalar_slots_and_generated_names_have_no_fixed_precombination",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "imported-scalar-helper-owner-scope",
         path: "tools/nuisc/src/frontend/helper_scope.rs",
         required_patterns: &[
@@ -622,6 +692,15 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "lower_direct_call_helper_function", "outlined.guarded_functions.contains(&function.name)",
             "outlined.functions.contains(&function.name)",
+            "body_lowering::chain_statement_effect(&mut state, &name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "implicit-main-return-effect-order-evidence",
+        path: "tools/nuisc/src/lowering/tests_guard_buffer_order.rs",
+        required_patterns: &[
+            "implicit_main_return_waits_for_effects_in_any_declaration_order",
+            "yir.nodes.reverse()", "function.body_nodes.reverse()",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -684,7 +763,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/pixelmagic_buffer_loop.rs",
         required_patterns: &[
             "pixelmagic_loop_matches_every_reference_and_native_pixel",
-            "pixelmagic_red_count_matches_native_partial_and_empty_ranges", "scoped_call_i64_carry",
+            "pixelmagic_red_count_matches_native_partial_and_empty_ranges", "scoped_call_i64_carries",
+            "stats.checksum", "fill_checkerboard_region_stats",
             "checkerboard_is_red", "checkerboard_parity", "call_bool", "call_i64",
             "__nuis_buffer_branch_", "__nuis_scalar_branch_", "guard_return",
             "write_and_link_with_source", "reference pixels", "native pixels",
@@ -695,7 +775,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/headless_image_loop.rs",
         required_patterns: &[
             "headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_rejects_drift",
-            "checkerboard_red_total", "scoped_call_i64_carry",
+            "checkerboard_red_total", "scoped_call_i64_carries",
             "checkerboard_is_red", "checkerboard_parity", "call_bool", "call_i64",
             "__nuis_buffer_branch_", "__nuis_scalar_branch_", "guard_return",
             "CARGO_BIN_EXE_nuis", "headless-aot-bundle", "run-artifact",

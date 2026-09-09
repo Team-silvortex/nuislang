@@ -277,6 +277,16 @@ pub fn emit_module_with_registries(
                     .collect(),
                 ret,
                 owned_struct_return: return_node.op.instruction == "return_owned_struct",
+                owned_struct_layout: if return_node.op.instruction == "return_owned_struct" {
+                    return_node
+                        .op
+                        .args
+                        .get(1)
+                        .map(|layout| yir_core::parse_owned_struct_layout(layout))
+                        .transpose()?
+                } else {
+                    None
+                },
                 owned_external_buffer_return,
             },
         );
@@ -351,6 +361,10 @@ pub fn emit_module_with_registries(
                 .get(function_name)
                 .expect("helper signature should exist")
                 .ret,
+            helper_signatures
+                .get(function_name)
+                .and_then(|signature| signature.owned_struct_layout.as_ref()),
+            None,
             &mut global_counter,
         )?;
         globals.extend(emitted.globals);
@@ -405,6 +419,13 @@ pub fn emit_module_with_registries(
         &provider_completion_sources,
         emitter_registry,
         CpuCallScalarKind::I64,
+        None,
+        module
+            .functions
+            .iter()
+            .find(|function| function.role == yir_core::YirFunctionRole::Entry)
+            .and_then(|function| function.result.as_ref())
+            .map(|result| result.node.as_str()),
         &mut global_counter,
     )?;
     globals.extend(entry_emitted.globals);

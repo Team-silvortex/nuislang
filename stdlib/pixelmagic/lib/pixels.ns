@@ -1,5 +1,8 @@
 /// Packed RGBA8 image construction. Each Buffer element is one unsigned 32-bit pixel.
 mod cpu PixelMagicPixels {
+  /// Red-pixel count and sum of packed RGBA8 values. Invalid input returns (-1, 0).
+  pub struct CheckerboardStats { pub red_count: i64, pub checksum: i64 }
+
   fn checkerboard_parity(x: i64, y: i64, tile_size: i64) -> i64 {
     return (x / tile_size + y / tile_size) % 2;
   }
@@ -49,14 +52,25 @@ mod cpu PixelMagicPixels {
   pub fn fill_checkerboard_region_red_count(
     pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
   ) -> i64 {
+    let stats: CheckerboardStats = fill_checkerboard_region_stats(pixels, start, end, width, tile_size, phase);
+    return stats.red_count;
+  }
+
+  /// Computes statistics during the same pass that writes the bounded pixel range.
+  pub fn fill_checkerboard_region_stats(
+    pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
+  ) -> CheckerboardStats {
     if width <= 0 || width > 2048 || tile_size <= 0 || tile_size > 2048 {
-      return 0 - 1;
+      return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
     }
     if phase < 0 || phase > 1 || start < 0 || start > end || end > pixels.len {
-      return 0 - 1;
+      return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
     }
-    if pixels.len > 4194304 || pixels.len % width != 0 { return 0 - 1; }
+    if pixels.len > 4194304 || pixels.len % width != 0 {
+      return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
+    }
     let total: i64 = 0;
+    let checksum: i64 = 0;
     let index: i64 = start;
     while index < end {
       let red: bool = checkerboard_is_red(index, width, tile_size, phase);
@@ -67,8 +81,9 @@ mod cpu PixelMagicPixels {
         pixels[index] = 4294901760;
       }
       let total: i64 = checkerboard_red_total(total, red);
+      let checksum: i64 = checksum + pixels[index];
       let index: i64 = index + 1;
     }
-    return total;
+    return CheckerboardStats { red_count: total, checksum: checksum };
   }
 }

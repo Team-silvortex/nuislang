@@ -358,6 +358,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
                 },
             });
             push_dep_edges(&mut state, &value, &name);
+            body_lowering::chain_statement_effect(&mut state, &name);
             name
         } else if let Some(structured_return) = state.yir.nodes[main_start_index..]
             .iter()

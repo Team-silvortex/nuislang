@@ -8,6 +8,7 @@ use crate::loop_metadata::{validate_loop_compare_kind, validate_loop_step_kind};
 enum Argument {
     Current,
     Carry,
+    CarryAt(usize),
     Capture(Value),
     CopyBuffer(Option<usize>),
     MoveOwned(String),
@@ -22,6 +23,7 @@ struct ScopedLoop {
     limit: i64,
     step: i64,
     carry: Option<i64>,
+    carries: Option<StructValue>,
     pending_call: bool,
     iterations: usize,
 }
@@ -35,7 +37,7 @@ pub(super) fn begin_execution(
         || node.op.args.get(5).map(String::as_str) != Some("cpu")
         || !matches!(
             node.op.args.get(6).map(String::as_str),
-            Some("scoped_call" | "scoped_call_i64_carry")
+            Some("scoped_call" | "scoped_call_i64_carry" | "scoped_call_i64_carries")
         )
     {
         return Ok(None);
@@ -59,9 +61,11 @@ pub(super) fn begin_execution(
     validate_loop_compare_kind(&node.op.args[3], &node.name)?;
     validate_loop_step_kind(&node.op.args[4], &node.name)?;
     let carry = yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?;
-    let operands = carry
+    let carries = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?;
+    let operands = carries
         .as_ref()
         .map(|carry| carry.operands)
+        .or_else(|| carry.as_ref().map(|carry| carry.operands))
         .unwrap_or(&node.op.args[9..]);
     let mut moved = std::collections::BTreeSet::new();
     let arguments = operands
@@ -71,6 +75,11 @@ pub(super) fn begin_execution(
                 Ok(Argument::Current)
             } else if input == "$carry" && carry.is_some() {
                 Ok(Argument::Carry)
+            } else if let Some((index, _)) = yir_core::parse_loop_owned_struct_carry(input)? {
+                if carries.is_none() {
+                    return Err(invalid());
+                }
+                Ok(Argument::CarryAt(index))
             } else if let Some(input) = input.strip_prefix("copy_owned:") {
                 Ok(Argument::CopyBuffer(state.expect_pointer(input)?))
             } else if let Some(input) = input.strip_prefix("move_owned:") {
@@ -109,6 +118,23 @@ pub(super) fn begin_execution(
                 _ => Err(format!("scoped carry seed `{}` must be i64", carry.initial)),
             })
             .transpose()?,
+        carries: carries
+            .map(|carry| {
+                let fields = carry
+                    .seeds
+                    .iter()
+                    .enumerate()
+                    .map(|(index, seed)| match state.expect_value(seed)? {
+                        Value::Int(value) => Ok((format!("carry{index}"), Value::Int(*value))),
+                        _ => Err(format!("scoped carry seed `{seed}` must be i64")),
+                    })
+                    .collect::<Result<_, String>>()?;
+                Ok::<_, String>(StructValue {
+                    type_name: carry.layout.type_name,
+                    fields,
+                })
+            })
+            .transpose()?,
         pending_call: false,
         iterations: 0,
     })))
@@ -121,6 +147,25 @@ impl RegisteredExecution for ScopedLoop {
         call_result: Option<Value>,
     ) -> Result<RegisteredExecutionStep, String> {
         if self.pending_call {
+            if let Some(carries) = &mut self.carries {
+                let Some(Value::Struct(returned)) = call_result.as_ref() else {
+                    return Err("scoped carries require an aggregate result".to_owned());
+                };
+                if returned.type_name != carries.type_name
+                    || returned.fields.len() != carries.fields.len()
+                    || returned
+                        .fields
+                        .iter()
+                        .enumerate()
+                        .any(|(index, (name, value))| {
+                            name != &format!("carry{index}") || !matches!(value, Value::Int(_))
+                        })
+                {
+                    return Err("scoped carries result does not match its i64 layout".to_owned());
+                }
+                // Validate every slot before committing any carried state or advancing time.
+                *carries = returned.clone();
+            }
             if let Some(carry) = &mut self.carry {
                 let Some(Value::Int(value)) = call_result.as_ref() else {
                     return Err(format!(
@@ -130,7 +175,7 @@ impl RegisteredExecution for ScopedLoop {
                 };
                 *carry = *value;
             }
-            if !call_result.as_ref().is_some_and(scalar) {
+            if self.carries.is_none() && !call_result.as_ref().is_some_and(scalar) {
                 return Err(format!(
                     "node `{}` requires a scalar scoped-call result",
                     self.node.name
@@ -163,15 +208,24 @@ impl RegisteredExecution for ScopedLoop {
                 "effect cpu.loop_while_i64_effect @{} [{}]: iterations={} final={} action cpu.{} {}",
                 self.node.resource, self.resource.kind.raw, self.iterations, self.current, self.node.op.args[6], self.function
             ));
-            let result = match self.carry {
-                Some(carry) => Value::Struct(StructValue {
+            let result = if let Some(carries) = &self.carries {
+                let mut fields = vec![("current".to_owned(), Value::Int(self.current))];
+                fields.extend(carries.fields.clone());
+                Value::Struct(StructValue {
                     type_name: "LoopState".to_owned(),
-                    fields: vec![
-                        ("current".to_owned(), Value::Int(self.current)),
-                        ("carry0".to_owned(), Value::Int(carry)),
-                    ],
-                }),
-                None => Value::Int(self.current),
+                    fields,
+                })
+            } else {
+                match self.carry {
+                    Some(carry) => Value::Struct(StructValue {
+                        type_name: "LoopState".to_owned(),
+                        fields: vec![
+                            ("current".to_owned(), Value::Int(self.current)),
+                            ("carry0".to_owned(), Value::Int(carry)),
+                        ],
+                    }),
+                    None => Value::Int(self.current),
+                }
             };
             return Ok(RegisteredExecutionStep::Complete(result));
         }
@@ -181,6 +235,13 @@ impl RegisteredExecution for ScopedLoop {
             .map(|arg| match arg {
                 Argument::Current => Ok(Value::Int(self.current)),
                 Argument::Carry => Ok(Value::Int(self.carry.expect("validated carry operand"))),
+                Argument::CarryAt(index) => Ok(self
+                    .carries
+                    .as_ref()
+                    .expect("validated multi-carry operand")
+                    .fields[*index]
+                    .1
+                    .clone()),
                 Argument::Capture(value) => Ok(value.clone()),
                 // Snapshot at the iteration, not at loop entry: preceding calls may write it.
                 Argument::CopyBuffer(pointer) => Ok(Value::OwnedBytes(

@@ -28,9 +28,21 @@ pub(crate) fn lower_cpu_guard_return_node(
     next_reg: &mut usize,
     next_block: &mut usize,
     function_return_kind: CpuCallScalarKind,
+    function_return_layout: Option<&yir_core::OwnedStructLayout>,
 ) -> Result<GuardReturnLoweringOutcome, String> {
     if node.op.module != "cpu" {
         return Ok(GuardReturnLoweringOutcome::NotGuard);
+    }
+    if function_return_layout.is_some()
+        && node.op.instruction != "guard_return"
+        && (node.op.instruction.starts_with("guard_") || node.op.instruction.starts_with("branch_"))
+        && node.op.instruction.ends_with("_return")
+    {
+        return Err(format!(
+            "{} `{}` has no aggregate return-layout contract",
+            node.op.full_name(),
+            node.name
+        ));
     }
 
     match node.op.instruction.as_str() {
@@ -268,7 +280,29 @@ pub(crate) fn lower_cpu_guard_return_node(
                     ));
                 return Ok(GuardReturnLoweringOutcome::Continue);
             };
-            let structural_value = if let Some(layout) = node.op.args.get(2) {
+            let structural_value = if let Some(layout) = function_return_layout {
+                if let Some(local) = node.op.args.get(2) {
+                    if &yir_core::parse_owned_struct_layout(local)? != layout {
+                        return Err(format!(
+                            "cpu.guard_return `{}` changes its function return layout",
+                            node.name
+                        ));
+                    }
+                }
+                let template = super::call_lowering::owned_struct_layout_template(layout.clone());
+                let Some(LlvmValueRef::Struct(value)) =
+                    super::task_owned_payload::materialize_owned_value(
+                        &return_value,
+                        &LlvmValueRef::Struct(template),
+                    )
+                else {
+                    return Err(format!(
+                        "cpu.guard_return `{}` does not match its function return layout",
+                        node.name
+                    ));
+                };
+                Some(value)
+            } else if let Some(layout) = node.op.args.get(2) {
                 let template = parse_owned_struct_layout(layout)?;
                 Some(
                     materialize_owned_variant_storage(&return_value, &template).ok_or_else(

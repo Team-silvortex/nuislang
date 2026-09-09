@@ -38,12 +38,12 @@ fn compare_pixels(
         format!("fill_checkerboard_region(pixels, {start}, {end}, {width}, {tile}, {phase})")
     };
     let admission = if count_result {
-        format!("let red_count: i64 = {call}; let filled: bool = red_count >= 0;")
+        format!("let stats: CheckerboardStats = fill_checkerboard_region_stats(pixels, {start}, {end}, {width}, {tile}, {phase}); let red_count: i64 = stats.red_count; let filled: bool = red_count >= 0;")
     } else {
         format!("let filled: bool = {call};")
     };
     let count_output = if count_result {
-        "print(red_count);"
+        "print(red_count); print(stats.checksum);"
     } else {
         ""
     };
@@ -79,7 +79,7 @@ fn compare_pixels(
     }
     assert!(compiled.yir.nodes.iter().any(|node| {
         node.op.instruction == "loop_while_i64_effect"
-            && node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carry")
+            && node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carries")
     }));
     assert!(
         compiled.yir.functions.iter().any(|function| {
@@ -125,11 +125,13 @@ fn compare_pixels(
         })
         .collect::<Vec<_>>();
     if count_result {
+        let checksum: i64 = expected[start..end].iter().sum();
         let red_count = expected
             .iter()
             .filter(|pixel| **pixel == 4278190335)
             .count() as i64;
         expected.push(red_count);
+        expected.push(checksum);
     }
     let trace = yir_runtime_host::execute_module_source_with_registry(
         &nuisc::render::render_yir(&compiled.yir),

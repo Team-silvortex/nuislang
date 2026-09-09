@@ -113,6 +113,130 @@ fn scalar_carry_loop() -> Node {
     node
 }
 
+fn multiple_carry_loop() -> Node {
+    let mut node = scalar_carry_loop();
+    node.op.args[6] = "scoped_call_i64_carries".to_owned();
+    node.op.args[7] = "5".to_owned();
+    node.op.args[9] = "State{carry0:i64;carry1:i64}".to_owned();
+    node.op.args[11] = yir_core::encode_loop_owned_struct_carry(1, "second");
+    node.op
+        .args
+        .push(yir_core::encode_loop_owned_struct_carry(0, "seed"));
+    node
+}
+
+fn returned_carries(first: Value, second: Value) -> Value {
+    Value::Struct(yir_core::StructValue {
+        type_name: "State".to_owned(),
+        fields: vec![("carry0".to_owned(), first), ("carry1".to_owned(), second)],
+    })
+}
+
+#[test]
+fn scoped_multiple_carries_validate_all_slots_before_advancing() {
+    use yir_core::RegisteredExecutionStep as Step;
+    let node = multiple_carry_loop();
+    let mut state = loop_state(0, 2, 1);
+    state.bind_value("seed", Value::Int(10));
+    state.bind_value("second", Value::Int(20));
+    let mut execution = CpuMod
+        .begin_execution(&node, &resource(), &state)
+        .unwrap()
+        .unwrap();
+    let Step::Call { arguments, .. } = execution.resume(&mut state, None).unwrap() else {
+        panic!("call");
+    };
+    assert_eq!(arguments, [Value::Int(0), Value::Int(20), Value::Int(10)]);
+    let good = returned_carries(Value::Int(11), Value::Int(31));
+    let mut wrong_type = good.clone();
+    let Value::Struct(value) = &mut wrong_type else {
+        unreachable!()
+    };
+    value.type_name = "Other".to_owned();
+    let mut wrong_fields = good.clone();
+    let Value::Struct(value) = &mut wrong_fields else {
+        unreachable!()
+    };
+    value.fields.reverse();
+    let mut missing = good.clone();
+    let Value::Struct(value) = &mut missing else {
+        unreachable!()
+    };
+    value.fields.pop();
+    for invalid in [
+        Value::Int(2),
+        returned_carries(Value::Int(99), Value::I32(31)),
+        wrong_type,
+        wrong_fields,
+        missing,
+    ] {
+        assert!(execution.resume(&mut state, Some(invalid)).is_err());
+        assert!(state.events.is_empty());
+    }
+    let Step::Call { arguments, .. } = execution.resume(&mut state, Some(good)).unwrap() else {
+        panic!("call");
+    };
+    assert_eq!(arguments, [Value::Int(1), Value::Int(31), Value::Int(11)]);
+    let Step::Complete(Value::Struct(value)) = execution
+        .resume(
+            &mut state,
+            Some(returned_carries(Value::Int(12), Value::Int(43))),
+        )
+        .unwrap()
+    else {
+        panic!("complete");
+    };
+    assert_eq!(value.type_name, "LoopState");
+    assert_eq!(
+        value.fields,
+        [
+            ("current".to_owned(), Value::Int(2)),
+            ("carry0".to_owned(), Value::Int(12)),
+            ("carry1".to_owned(), Value::Int(43))
+        ]
+    );
+}
+
+#[test]
+fn scoped_multiple_carries_keep_zero_trip_seeds_and_shared_admission() {
+    let node = multiple_carry_loop();
+    let mut state = loop_state(3, 3, 1);
+    state.bind_value("seed", Value::Int(10));
+    for invalid in [Value::I32(20), Value::Bool(true)] {
+        state.bind_value("second", invalid);
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+    }
+    state.bind_value("second", Value::Int(20));
+    let yir_core::RegisteredExecutionStep::Complete(Value::Struct(value)) = CpuMod
+        .begin_execution(&node, &resource(), &state)
+        .unwrap()
+        .unwrap()
+        .resume(&mut state, None)
+        .unwrap()
+    else {
+        panic!("zero trip");
+    };
+    assert_eq!(value.fields[1].1, Value::Int(10));
+    assert_eq!(value.fields[2].1, Value::Int(20));
+    assert_eq!(
+        CpuMod.describe(&node, &resource()).unwrap().dependencies,
+        ["initial", "limit", "step", "second", "seed"]
+    );
+    for (index, value) in [
+        (7, "0"),
+        (9, "State{carry0:i64;carry1:bool}"),
+        (11, "$owned_struct_carry:0:second"),
+        (12, "$unknown"),
+    ] {
+        let mut invalid = node.clone();
+        invalid.op.args[index] = value.to_owned();
+        assert!(CpuMod.describe(&invalid, &resource()).is_err());
+        assert!(CpuMod
+            .begin_execution(&invalid, &resource(), &state)
+            .is_err());
+    }
+}
+
 fn carried_state(current: i64, carry: i64) -> Value {
     Value::Struct(yir_core::StructValue {
         type_name: "LoopState".to_owned(),

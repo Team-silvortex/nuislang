@@ -219,7 +219,7 @@ The [regressions](../../tools/nuisc/tests/buffer_while.rs) compare reference/nat
 results, repeated application callbacks, zero/one/descending loops, per-iteration
 read/write order, declaration-order independence, failed-state admission and shared
 fuel. Allocation, ownership transfer, nested loops or arbitrary captured-state rebinding
-inside an outlined body remain unsupported; one explicit i64 carry is described below. General steps and mutable
+inside an outlined body remain unsupported; explicit ordered i64 carries are described below. General steps and mutable
 header reads are not silently hoisted.
 
 ### Branch-Local Execution
@@ -305,12 +305,12 @@ helpers public or adding a library-specific compiler exception.
 
 ### Scalar State Across Buffer Writes
 
-One existing `i64` binding can now be rebound at the tail of a bounded Buffer-writing
-iteration, immediately before its induction step. Its update may use fresh locals,
+Existing `i64` bindings can now be rebound in an ordered tail of a bounded Buffer-writing
+iteration, immediately before its induction step. Their updates may use fresh locals,
 ordered Buffer reads and admitted scalar helpers, including their guarded branches.
 The incoming value is available to the iteration's writes and helpers. The bound
-and step cannot depend on this changing binding. Other captured rebindings,
-branch-local accumulator updates, multiple accumulators and nested loops are not
+and step cannot depend on these changing bindings. Other captured rebindings,
+branch-local accumulator updates and nested loops are not
 admitted by this extension.
 
 The outlined helper returns the updated scalar through the explicit action
@@ -335,6 +335,33 @@ zero/one/descending trips, replacing updates, carry-dependent writes, write-befo
 ordering, subsequent loops, malformed metadata, strict seed types, GLM dependencies,
 checked failures, shared fuel and failed-state admission in reference/native paths.
 
+Multiple carries use one aggregate-return helper, not multiple independently
+evaluated update calls. Tail rebindings retain source order: a later update sees
+the new value of an earlier binding. The action is
+`cpu.loop_while_i64_effect ... cpu scoped_call_i64_carries <arity> <callee> <layout> <operands...>`.
+The flat layout is `State{carry0:i64;carry1:i64;...}`; every slot appears exactly once
+as `$owned_struct_carry:<index>:<named-seed>` in the helper operands. Arity includes
+callee and layout. Named captures and `$current` retain their existing meaning.
+The shared layout parser bounds metadata size; there is no opcode per state count.
+CPU validates the complete returned type, field sequence and strict i64 values
+before advancing. LLVM requires the callee's declared return layout to match,
+including its early-return paths, then loads the returned aggregate into private loop slots.
+Direct LLVM emission now extends the explicit graph's topological order when
+adding implicit serial queues, rather than creating textual-order backedges after
+declaration reordering. Native entry emission also honors the declared YIR result
+instead of whichever scalar happened to be emitted last. Implicit unit-main returns
+join the last statement effect before returning zero. When a declared entry result
+is not natively lowered, partial LLVM remains inspectable but ends in `llvm.trap`
+and `unreachable`, never an unrelated successful result. Results are ordinary
+`LoopState { current, carry0, carry1, ... }` fields, including all zero-trip seeds.
+
+This first native implementation reuses the owned-aggregate return ABI: it allocates
+and releases an aggregate each iteration. It is not allocation-free or a performance
+parity claim. [Multi-carry regressions](../../tools/nuisc/tests/buffer_while/scalar_carries.rs)
+cover sequential rebinding, 2/3/12 slots, generated-name isolation, replacing
+updates, subsequent loops, reordered declarations, layout/seed drift, ordered traps,
+GLM dependencies and shared-fuel failure without callback-state commit.
+
 ### Packaged Pixel Loop
 
 [PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses this
@@ -344,11 +371,12 @@ red/blue `if`/`else` writes instead of recursive pixel filling or arithmetic col
 selection. Both paths assert real source helper calls in YIR. The
 [native/reference test](../../tools/nuisc/tests/pixelmagic_buffer_loop.rs) checks
 every pixel for both 32x24 phases, a partial region and an empty region.
-`fill_checkerboard_region_red_count` also returns the number of red pixels using a
-single carried accumulator and a guarded scalar helper. Invalid input returns -1
-before writes; an empty range returns zero. Existing boolean fill APIs delegate
-without changing their success contract. Native/reference tests check exact counts
-as well as pixel bytes, including partial and empty ranges.
+`fill_checkerboard_region_stats` returns `CheckerboardStats { red_count, checksum }`
+using two carried accumulators during the same pass. The checksum is the sum of
+the packed pixel values, not a cryptographic digest. Invalid input returns `(-1, 0)`
+before writes; an empty range returns `(0, 0)`. The red-count and boolean fill APIs
+delegate without changing their success contract. Native/reference tests check
+exact counts and sums as well as pixel bytes, including partial and empty ranges.
 The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
 ordinary image showcase with `headless-aot-bundle` and launches it through
 `run-artifact`. The carried generator and its real counting helper are present in
@@ -366,8 +394,8 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_
 The second command is a macOS Metal device regression, not Linux/Windows evidence.
 CPU callbacks in the packaged host still execute embedded YIR; the native parity
 test independently compiles the generator, not the complete live callback ABI.
-Multiple scalar loop carries alongside Buffer writes are the next boundary;
-one i64 accumulator does not certify arbitrary loop-carried state or fully native callbacks.
+Branch-local scalar loop carries alongside Buffer writes are the next boundary;
+ordered i64 accumulators do not certify arbitrary loop-carried state or fully native callbacks.
 
 ## Current Boundary
 

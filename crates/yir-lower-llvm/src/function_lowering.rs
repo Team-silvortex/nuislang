@@ -38,6 +38,8 @@ pub(super) fn emit_cpu_function(
     provider_completion_sources: &BTreeMap<String, (YirResultFamily, String)>,
     branch_effect_emitters: &BranchEffectLlvmEmitterRegistry,
     function_return_kind: CpuCallScalarKind,
+    function_return_layout: Option<&yir_core::OwnedStructLayout>,
+    declared_result: Option<&str>,
     global_counter: &mut usize,
 ) -> Result<EmittedCpuFunction, String> {
     let ordered_names = ordered_node_names
@@ -269,6 +271,25 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
+        if let Some(layout) = function_return_layout {
+            if node.op.instruction.starts_with("return_")
+                && (node.op.instruction != "return_owned_struct"
+                    || node
+                        .op
+                        .args
+                        .get(1)
+                        .map(|layout| yir_core::parse_owned_struct_layout(layout))
+                        .transpose()?
+                        .as_ref()
+                        != Some(layout))
+            {
+                return Err(format!(
+                    "{} `{}` changes its function return layout",
+                    node.op.full_name(),
+                    node.name
+                ));
+            }
+        }
         match lower_cpu_return_node(node, body, registers, &mut next_reg, last_cpu_value)? {
             ReturnLoweringOutcome::NotReturn => {}
             ReturnLoweringOutcome::Deferred => continue,
@@ -353,6 +374,7 @@ pub(super) fn emit_cpu_function(
             &mut next_reg,
             &mut next_block,
             function_return_kind,
+            function_return_layout,
         )? {
             GuardReturnLoweringOutcome::NotGuard => {}
             GuardReturnLoweringOutcome::Continue => continue,
@@ -537,7 +559,25 @@ pub(super) fn emit_cpu_function(
     }
 
     *global_counter = state.next_global;
-    let ret = state.last_cpu_value.unwrap_or_else(|| "0".to_owned());
+    let ret = if !state.ends_with_terminal_return && declared_result.is_some() {
+        let name = declared_result.expect("declared result");
+        let value = state
+            .registers
+            .get(name)
+            .and_then(|value| coerce_to_i64(value, &mut state.body, &mut state.next_reg));
+        if let Some(value) = value {
+            value
+        } else {
+            // Partial LLVM remains inspectable, but cannot fabricate a successful result.
+            state.body.push(format!("  ; deferred lowering for declared CPU function result `{name}` outside the native entry ABI"));
+            state.body.push("  call void @llvm.trap()".to_owned());
+            state.body.push("  unreachable".to_owned());
+            state.ends_with_terminal_return = true;
+            "0".to_owned()
+        }
+    } else {
+        state.last_cpu_value.unwrap_or_else(|| "0".to_owned())
+    };
     let body = if state.ends_with_terminal_return {
         state.body.join("\n")
     } else {

@@ -138,11 +138,13 @@ the rest of the function. PixelMagic uses guarded coordinate/color helpers befor
 its red/blue writes. The CLI
 headless build/run-artifact test checks two real M2 Metal frames,
 direct-session replay, exact output identity and failure admission; independent
-native/reference tests compare every generated pixel. One i64 accumulator now
-crosses Buffer-writing iterations through explicit LoopState fields, with strict
-seed/result types and zero-trip preservation. PixelMagic uses it for fill-and-red-count,
-with exact native/reference count checks and compatible boolean fill APIs.
-Multiple carries, arbitrary loop bodies and fully native CPU callbacks remain separate work.
+native/reference tests compare every generated pixel. Multiple i64 accumulators now
+cross Buffer-writing iterations through explicit LoopState fields, with strict
+seed/result layouts, source-order rebinding and zero-trip preservation. PixelMagic
+uses them for fill-and-statistics, with exact native/reference red-count and pixel-sum
+checks and compatible red-count/boolean APIs. Native multi-carry loops currently
+allocate and release one aggregate per iteration. Branch-local carry updates,
+arbitrary loop bodies and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

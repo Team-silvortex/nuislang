@@ -5,7 +5,7 @@ use yir_core::Node;
 use super::{
     call_lowering::parse_owned_struct_layout,
     fresh_reg,
-    task_owned_payload::{emit_owned_struct_data, materialize_owned_variant_storage},
+    task_owned_payload::emit_owned_struct_data,
     value_ref::{coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64},
     LlvmValueRef,
 };
@@ -162,12 +162,13 @@ pub(crate) fn lower_cpu_return_node(
             };
             let value = if let Some(layout) = node.op.args.get(1) {
                 let template = parse_owned_struct_layout(layout)?;
-                let Some(storage) = materialize_owned_variant_storage(value, &template) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.return_owned_struct `{}` because its variant value does not match `{layout}`",
-                        node.name
-                    ));
-                    return Ok(ReturnLoweringOutcome::Deferred);
+                let Some(LlvmValueRef::Struct(storage)) =
+                    super::task_owned_payload::materialize_owned_value(
+                        value,
+                        &LlvmValueRef::Struct(template),
+                    )
+                else {
+                    return Err(format!("cpu.return_owned_struct `{}` does not match its declared layout `{layout}`", node.name));
                 };
                 storage
             } else {

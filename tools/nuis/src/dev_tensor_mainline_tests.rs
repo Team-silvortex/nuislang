@@ -276,7 +276,24 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session.next_step.contains("build/run-artifact"));
     assert!(session.next_step.contains("scalar helper composition"));
     assert!(session.next_step.contains("scalar loop carries"));
-    assert!(session.next_step.contains("multiple scalar loop carries"));
+    assert!(session
+        .next_step
+        .contains("branch-local scalar loop carries"));
+    assert!(session
+        .evidence
+        .contains("Multiple i64 scalar carries now compose"));
+    assert!(session.evidence.contains("2/3/12-slot"));
+    assert!(session.evidence.contains("fill_checkerboard_region_stats"));
+    assert!(session.evidence.contains(
+        "multi-carry PixelMagic image passes ordinary headless build/run-artifact on real M2"
+    ));
+    assert!(session.evidence.contains("Implicit unit-main returns"));
+    assert!(session
+        .evidence
+        .contains("Missing declared native entry results"));
+    assert!(session
+        .blocker
+        .contains("per-iteration aggregate allocation"));
     assert!(session
         .evidence
         .contains("One explicit i64 scalar loop carry"));

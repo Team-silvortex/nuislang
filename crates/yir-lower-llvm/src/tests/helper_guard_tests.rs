@@ -274,6 +274,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
             mutex_permit_params: vec![None],
             ret: CpuCallScalarKind::F32,
             owned_struct_return: false,
+            owned_struct_layout: None,
             owned_external_buffer_return: None,
         },
     )
@@ -290,6 +291,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
             mutex_permit_params: vec![None, None],
             ret: CpuCallScalarKind::F64,
             owned_struct_return: false,
+            owned_struct_layout: None,
             owned_external_buffer_return: None,
         },
     )
@@ -707,6 +709,8 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         &BTreeMap::new(),
         &branch_effect_emitters,
         CpuCallScalarKind::I32,
+        None,
+        None,
         &mut global_counter,
     )
     .expect("i32 helper lowering should succeed");

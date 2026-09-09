@@ -5,6 +5,8 @@ type Scope = BTreeMap<String, NirTypeRef>;
 
 #[path = "buffer_loop_outline/branches.rs"]
 mod branches;
+#[path = "buffer_loop_outline/scalar_carries.rs"]
+mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]
 mod scalar_control;
 #[path = "buffer_loop_outline/scalar_helpers.rs"]
@@ -13,7 +15,7 @@ use scalar_helpers::ScalarHelpers;
 
 struct BufferLoopPlan {
     params: Vec<NirParam>,
-    carry: Option<String>,
+    carries: Vec<String>,
 }
 
 #[derive(Default)]
@@ -31,6 +33,18 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         .iter()
         .map(|function| function.name.clone())
         .chain(module.externs.iter().map(|function| function.name.clone()))
+        .chain(
+            module
+                .structs
+                .iter()
+                .map(|definition| definition.name.clone()),
+        )
+        .chain(
+            module
+                .enums
+                .iter()
+                .map(|definition| definition.name.clone()),
+        )
         .collect::<BTreeSet<_>>();
     let mut helpers = Vec::new();
     let mut outlined = BufferLoopOutlines::default();
@@ -48,6 +62,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
             &mut outlined.guarded_functions,
             &catalog,
             &mut outlined.functions,
+            &mut module.structs,
         );
     }
     scalar_control::outline(
@@ -76,6 +91,7 @@ fn outline_body(
     guarded: &mut BTreeSet<String>,
     catalog: &ScalarHelpers,
     retained: &mut BTreeSet<String>,
+    structs: &mut Vec<NirStructDef>,
 ) {
     for stmt in body {
         match stmt {
@@ -102,6 +118,7 @@ fn outline_body(
                     guarded,
                     catalog,
                     retained,
+                    structs,
                 );
                 outline_body(
                     else_body,
@@ -111,6 +128,7 @@ fn outline_body(
                     guarded,
                     catalog,
                     retained,
+                    structs,
                 );
             }
             NirStmt::While { condition, body } => {
@@ -125,7 +143,22 @@ fn outline_body(
                         suffix += 1;
                     };
                     let step = body.pop().expect("validated counted step");
-                    let returned = if plan.carry.is_some() {
+                    let aggregate = (plan.carries.len() > 1)
+                        .then(|| scalar_carries::state_type(&plan.carries, names, structs));
+                    let returned = if let Some(ty) = &aggregate {
+                        NirExpr::StructLiteral {
+                            type_name: ty.name.clone(),
+                            type_args: vec![],
+                            fields: plan
+                                .carries
+                                .iter()
+                                .enumerate()
+                                .map(|(index, name)| {
+                                    (format!("carry{index}"), NirExpr::Var(name.clone()))
+                                })
+                                .collect(),
+                        }
+                    } else if !plan.carries.is_empty() {
                         let NirStmt::Let { value, .. } =
                             body.pop().expect("validated carry update")
                         else {
@@ -153,16 +186,26 @@ fn outline_body(
                         callee: name.clone(),
                         args,
                     };
-                    let action = match plan.carry {
-                        Some(name) => NirStmt::Let {
-                            name,
-                            ty: Some(scalar_type("i64")),
-                            value: call,
-                        },
-                        None => NirStmt::Expr(call),
-                    };
-                    *body = vec![action, step];
-                    helpers.push(helper(name, plan.params, helper_body));
+                    let mut function = helper(name, plan.params, helper_body);
+                    if let Some(ty) = aggregate {
+                        let mut used = scope.keys().cloned().collect();
+                        branches::collect_bindings(&function.body, &mut used);
+                        let temporary = branches::fresh_name("__nuis_loop_state", &mut used);
+                        *body = scalar_carries::projected_call(temporary, &ty, &plan.carries, call);
+                        body.push(step);
+                        function.return_type = Some(ty);
+                    } else {
+                        let action = match plan.carries.into_iter().next() {
+                            Some(name) => NirStmt::Let {
+                                name,
+                                ty: Some(scalar_type("i64")),
+                                value: call,
+                            },
+                            None => NirStmt::Expr(call),
+                        };
+                        *body = vec![action, step];
+                    }
+                    helpers.push(function);
                 }
             }
             _ => {}
@@ -209,32 +252,41 @@ fn buffer_loop_params(
     }
     let mut inputs = BTreeSet::new();
     let mut locals = scope.clone();
-    let (effects, carry) = match effects.split_last() {
-        Some((NirStmt::Let { name, ty, value }, prefix)) if scope.contains_key(name) => {
+    let mut carry_start = effects.len();
+    while let Some(NirStmt::Let { name, .. }) = effects.get(carry_start.wrapping_sub(1)) {
+        if !scope.contains_key(name) {
+            break;
+        }
+        carry_start -= 1;
+    }
+    let (effects, updates) = effects.split_at(carry_start);
+    if !validate_effects(effects, &mut locals, &mut inputs, catalog)? {
+        return None;
+    }
+    let mut carries = Vec::new();
+    for update in updates {
+        if let NirStmt::Let { name, ty, value } = update {
             if name == &prepared.binding_name
                 || header_inputs.contains(name)
+                || carries.contains(name)
                 || scope.get(name)? != &scalar_type("i64")
                 || ty.as_ref().is_some_and(|ty| ty != &scalar_type("i64"))
             {
                 return None;
             }
-            (prefix, Some((name, value)))
-        }
-        _ => (effects, None),
-    };
-    if !validate_effects(effects, &mut locals, &mut inputs, catalog)? {
-        return None;
-    }
-    if let Some((name, value)) = carry {
-        if scalar_expr(value, &locals, &mut inputs, true, catalog)? != scalar_type("i64") {
+            if scalar_expr(value, &locals, &mut inputs, true, catalog)? != scalar_type("i64") {
+                return None;
+            }
+            // Keep all seeds, including replacing updates, for the zero-trip result.
+            inputs.insert(name.clone());
+            carries.push(name.clone());
+        } else {
             return None;
         }
-        // Even a replacing update keeps the seed for the zero-trip result.
-        inputs.insert(name.clone());
     }
     Some(BufferLoopPlan {
         params: captured_params(inputs, scope),
-        carry: carry.map(|(name, _)| name.clone()),
+        carries,
     })
 }
 

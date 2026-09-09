@@ -656,12 +656,7 @@ pub(super) fn lower_direct_call_helper_function(
     };
     let (return_instruction, mut return_args) = if struct_return {
         let mut args = vec![returned.clone()];
-        if owned_layout
-            .as_deref()
-            .is_some_and(owned_layout_is_variant_union)
-        {
-            args.push(owned_layout.expect("owned return layout"));
-        }
+        args.push(owned_layout.expect("owned return layout"));
         ("return_owned_struct", args)
     } else {
         let instruction = match return_kind.expect("non-struct return kind") {

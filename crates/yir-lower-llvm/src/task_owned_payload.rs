@@ -161,7 +161,10 @@ pub(crate) fn materialize_owned_variant_storage(
     })
 }
 
-fn materialize_owned_value(value: &LlvmValueRef, template: &LlvmValueRef) -> Option<LlvmValueRef> {
+pub(crate) fn materialize_owned_value(
+    value: &LlvmValueRef,
+    template: &LlvmValueRef,
+) -> Option<LlvmValueRef> {
     match template {
         LlvmValueRef::Struct(template)
             if template.type_name.starts_with(OWNED_VARIANT_UNION_PREFIX) =>
@@ -174,7 +177,8 @@ fn materialize_owned_value(value: &LlvmValueRef, template: &LlvmValueRef) -> Opt
             let LlvmValueRef::Struct(value) = value else {
                 return None;
             };
-            if value.type_name != template.type_name {
+            if value.type_name != template.type_name || value.fields.len() != template.fields.len()
+            {
                 return None;
             }
             let fields = template

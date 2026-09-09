@@ -9,6 +9,8 @@ const SOURCE: &str = include_str!("fixtures/buffer_while.ns");
 
 #[path = "buffer_while/branches.rs"]
 mod branches;
+#[path = "buffer_while/scalar_carries.rs"]
+mod scalar_carries;
 #[path = "buffer_while/scalar_carry.rs"]
 mod scalar_carry;
 #[path = "buffer_while/scalar_control.rs"]
@@ -52,7 +54,7 @@ fn check_execution(source: &str, expected: i32) {
         node.op.instruction == "loop_while_i64_effect"
             && matches!(
                 node.op.args.get(6).map(String::as_str),
-                Some("scoped_call" | "scoped_call_i64_carry")
+                Some("scoped_call" | "scoped_call_i64_carry" | "scoped_call_i64_carries")
             )
     }));
     let rendered = nuisc::render::render_yir(&compiled.yir);

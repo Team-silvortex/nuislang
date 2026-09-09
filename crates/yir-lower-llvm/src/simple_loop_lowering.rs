@@ -241,7 +241,14 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 registers.insert(result, LlvmValueRef::OwnedBytes { blob });
             }
             if let Some(carry) = owned_struct_carry {
-                let (result, value) = carry.finish(body, next_reg)?;
+                let (result, mut value) = carry.finish(body, next_reg)?;
+                if node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carries") {
+                    value.type_name = "LoopState".to_owned();
+                    value.fields.insert(
+                        0,
+                        ("current".to_owned(), LlvmValueRef::I64(current.clone())),
+                    );
+                }
                 registers.insert(result, LlvmValueRef::Struct(value));
             }
             *last_cpu_value = Some(current);

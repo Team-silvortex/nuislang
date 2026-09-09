@@ -95,13 +95,15 @@ implementation. Nested scalar-helper `if`/`else` and early returns now use typed
 guarded function blocks with shared fallthrough continuations, rather than
 speculating branch-local arguments or callee bodies. Regressions cover scope
 isolation, both return types, traps, source order and shared callback fuel.
-One tail-rebound i64 accumulator now crosses Buffer-writing iterations through a
-shared scoped-call contract and ordinary LoopState field projections. Zero-trip
-loops preserve the seed; only successful helper returns update the private carry.
-PixelMagic exposes fill-and-red-count with exact native/reference pixel and count tests.
+Multiple tail-rebound i64 accumulators now cross Buffer-writing iterations through a
+shared scoped-call contract and ordinary LoopState field projections. Updates keep
+source order; zero-trip loops preserve all seeds and only fully validated helper
+returns update the private state. PixelMagic exposes fill-and-statistics with exact
+native/reference pixel, red-count and pixel-sum tests. Native aggregate returns still
+allocate and release storage per iteration; this is not performance-parity evidence.
 The carried generator also passes ordinary M2 build/run-artifact with two exact
 Metal frames, direct-session byte parity and unchanged failure admission.
-The next callback boundary is multiple scalar loop carries alongside Buffer writes, not
+The next callback boundary is branch-local scalar carry updates alongside Buffer writes, not
 arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.

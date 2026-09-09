@@ -11,5 +11,6 @@ mod flow_reject_tests;
 mod flow_sync_tests;
 mod helper_guard_tests;
 mod loop_guard_tests;
+mod owned_return_contract_tests;
 mod support;
 mod unbounded_loop_tests;

@@ -596,7 +596,7 @@ pub(crate) fn parse_owned_struct_layout(layout: &str) -> Result<super::StructLlv
     ))
 }
 
-fn owned_struct_layout_template(layout: OwnedStructLayout) -> super::StructLlvmValueRef {
+pub(crate) fn owned_struct_layout_template(layout: OwnedStructLayout) -> super::StructLlvmValueRef {
     super::StructLlvmValueRef {
         type_name: layout.type_name,
         fields: layout

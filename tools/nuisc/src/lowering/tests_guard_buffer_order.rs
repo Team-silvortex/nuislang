@@ -2,6 +2,79 @@ use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
 #[test]
+fn implicit_main_return_waits_for_effects_in_any_declaration_order() {
+    let artifacts = crate::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let buffer: ref Buffer = alloc_buffer(2, 0);
+            buffer[0] = 72;
+            buffer[1] = 105;
+            print(buffer[0] + buffer[1]);
+            free(buffer);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    for reversed in [false, true] {
+        let mut yir = artifacts.yir.clone();
+        let returned = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.name.starts_with("implicit_main_return_")
+                    && node.op.instruction == "return_i64"
+            })
+            .unwrap();
+        assert!(yir
+            .edges
+            .iter()
+            .any(|edge| { edge.kind == yir_core::EdgeKind::Effect && edge.to == returned.name }));
+        if reversed {
+            yir.nodes.reverse();
+            for function in &mut yir.functions {
+                function.body_nodes.reverse();
+            }
+        }
+        let llvm = yir_lower_llvm::emit_module(&yir).unwrap();
+        let entry = llvm.split("define i64 @nuis_yir_entry").nth(1).unwrap();
+        let before_return = entry.split("ret i64").next().unwrap();
+        for value in [72, 105] {
+            let register = before_return
+                .lines()
+                .find_map(|line| line.trim().strip_suffix(&format!(" = add i64 0, {value}")))
+                .unwrap();
+            assert_eq!(
+                before_return
+                    .matches(&format!("store i64 {register}, ptr"))
+                    .count(),
+                1,
+                "{entry}"
+            );
+        }
+        assert!(
+            before_return.contains("call void @nuis_debug_print_i64"),
+            "{entry}"
+        );
+        assert!(before_return.contains("call void @free"), "{entry}");
+        let trace = yir_runtime_host::execute_module_source_with_registry(
+            &crate::render::render_yir(&yir),
+            &yir_verify::default_registry(),
+        )
+        .unwrap();
+        assert!(
+            trace
+                .events
+                .iter()
+                .any(|event| { event.contains("cpu.print") && event.ends_with("177") }),
+            "{:?}",
+            trace.events
+        );
+    }
+}
+
+#[test]
 fn guard_buffer_reads_precede_recursive_call_snapshot_and_free() {
     let module = parse_nuis_module(
         r#"
@@ -73,6 +146,8 @@ fn pixelmagic_generator_rejects_invalid_inputs_without_writes_or_caller_return()
         let empty: bool = fill_checkerboard_region(pixels, 2, 2, 2, 1, 0);
         let invalid_count: i64 = fill_checkerboard_region_red_count(pixels, 0, 5, 2, 1, 0);
         let empty_count: i64 = fill_checkerboard_region_red_count(pixels, 2, 2, 2, 1, 0);
+        let invalid_stats: CheckerboardStats = fill_checkerboard_region_stats(pixels, 0, 5, 2, 1, 0);
+        let empty_stats: CheckerboardStats = fill_checkerboard_region_stats(pixels, 2, 2, 2, 1, 0);
         let unchanged: i64 = pixels[0] + pixels[1] + pixels[2] + pixels[3];
         free(pixels);
         print(unchanged);
@@ -80,6 +155,10 @@ fn pixelmagic_generator_rejects_invalid_inputs_without_writes_or_caller_return()
         print(empty);
         print(invalid_count);
         print(empty_count);
+        print(invalid_stats.red_count);
+        print(invalid_stats.checksum);
+        print(empty_stats.red_count);
+        print(empty_stats.checksum);
         return 0;
       }
     "#
@@ -107,7 +186,7 @@ fn pixelmagic_generator_rejects_invalid_inputs_without_writes_or_caller_return()
         .collect::<Vec<_>>();
     assert_eq!(
         prints.len(),
-        5,
+        9,
         "helper guards must not return from their caller"
     );
     assert!(prints[0].ends_with("28"), "{prints:?}");
@@ -115,4 +194,9 @@ fn pixelmagic_generator_rejects_invalid_inputs_without_writes_or_caller_return()
     assert!(prints[2].ends_with("true"), "{prints:?}");
     assert!(prints[3].ends_with("-1"), "{prints:?}");
     assert!(prints[4].ends_with("0"), "{prints:?}");
+    assert!(prints[5].ends_with("-1"), "{prints:?}");
+    assert!(
+        prints[6..].iter().all(|line| line.ends_with("0")),
+        "{prints:?}"
+    );
 }

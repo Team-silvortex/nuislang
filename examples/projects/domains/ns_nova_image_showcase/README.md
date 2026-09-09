@@ -24,9 +24,11 @@ The linked contract includes reproducible build, event, close and drain commands
    helpers also use branch-local input guards before coordinate division and
    distinct early-return/fallthrough paths for the two phases. Nested
    `if`/`else` and early returns lower to typed guarded blocks with shared suffixes.
-   The underlying fill-and-red-count API carries one i64 total between iterations;
-   its boolean wrapper admits non-negative counts, including an empty range's zero.
-   Native/reference tests compare exact red counts and pixels. The loop returns
+   The underlying fill-and-statistics API carries two i64 totals between iterations:
+   red-pixel count and packed-pixel sum. Its red-count/boolean wrappers retain their
+   previous contract. Native/reference tests compare both statistics and pixels.
+   The native multi-carry helper currently allocates/releases one aggregate each iteration.
+   The loop returns
    ordinary LoopState fields, not a PixelMagic-specific runtime result.
    Nested loops and arbitrary loop carries remain outside this supported subset.
 2. `copy_bytes` creates an owned snapshot. The app overwrites the original first
