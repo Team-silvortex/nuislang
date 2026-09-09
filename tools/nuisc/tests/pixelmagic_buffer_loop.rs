@@ -61,6 +61,8 @@ fn compare_pixels(
         ("checkerboard_is_red", "call_bool"),
         ("checkerboard_parity", "call_i64"),
         ("checkerboard_red_total", "call_i64"),
+        ("checkerboard_row_start", "call_i64"),
+        ("checkerboard_row_end", "call_i64"),
     ] {
         assert!(compiled
             .yir
@@ -83,7 +85,34 @@ fn compare_pixels(
     }));
     assert!(
         compiled.yir.functions.iter().any(|function| {
+            function.name.starts_with("__nuis_buffer_iteration_")
+                && compiled.yir.nodes.iter().any(|node| {
+                    function.body_nodes.contains(&node.name)
+                        && node.op.instruction == "loop_while_i64_effect"
+                        && node.op.args.get(6).map(String::as_str)
+                            == Some("scoped_call_i64_carries")
+                })
+        }),
+        "row helpers must retain nested pixel loops, not flatten or unroll them"
+    );
+    assert!(
+        compiled.yir.functions.iter().any(|function| {
             function.name.starts_with("__nuis_buffer_branch_")
+                && function
+                    .result
+                    .as_ref()
+                    .is_some_and(|result| result.ty == "i64")
+                && function.body_nodes.iter().any(|name| {
+                    compiled.yir.nodes.iter().any(|node| {
+                        &node.name == name
+                            && node.op.instruction == "call_i64"
+                            && node
+                                .op
+                                .args
+                                .first()
+                                .is_some_and(|callee| callee == "checkerboard_red_total")
+                    })
+                })
                 && function.body_nodes.iter().any(|name| {
                     compiled
                         .yir
@@ -92,7 +121,7 @@ fn compare_pixels(
                         .any(|node| &node.name == name && node.op.instruction == "guard_return")
                 })
         }),
-        "pixel branches must retain a real control boundary"
+        "pixel branches must retain a real control boundary and branch-local count"
     );
     assert!(
         compiled.yir.functions.iter().any(|function| {

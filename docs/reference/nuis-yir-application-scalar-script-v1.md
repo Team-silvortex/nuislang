@@ -218,7 +218,7 @@ This is not a proof of all allocation, pointer or FFI memory safety.
 The [regressions](../../tools/nuisc/tests/buffer_while.rs) compare reference/native
 results, repeated application callbacks, zero/one/descending loops, per-iteration
 read/write order, declaration-order independence, failed-state admission and shared
-fuel. Allocation, ownership transfer, nested loops or arbitrary captured-state rebinding
+fuel. Allocation, ownership transfer or arbitrary captured-state rebinding
 inside an outlined body remain unsupported; explicit ordered i64 carries are described below. General steps and mutable
 header reads are not silently hoisted.
 
@@ -246,7 +246,7 @@ edge inference now extends a dependency-topological order instead of creating
 backedges against transitive dependencies, including paths through other lanes.
 Invalid explicit graphs are left for verification, not repaired. Branch-local
 bindings do not escape; captured-state rebinding, allocation, ownership transfer,
-nested loops, `break`, `continue` and early returns in these outlined bodies remain
+unbounded loops, `break`, `continue` and early returns in these outlined bodies remain
 outside the admitted subset.
 
 ### Source Scalar Helpers
@@ -305,13 +305,14 @@ helpers public or adding a library-specific compiler exception.
 
 ### Scalar State Across Buffer Writes
 
-Existing `i64` bindings can now be rebound in an ordered tail of a bounded Buffer-writing
-iteration, immediately before its induction step. Their updates may use fresh locals,
+Existing `i64` bindings can now be rebound in source order throughout a bounded Buffer-writing
+iteration, including nested `if`/`else` arms and repeated updates. Their updates may use fresh locals,
 ordered Buffer reads and admitted scalar helpers, including their guarded branches.
 The incoming value is available to the iteration's writes and helpers. The bound
-and step cannot depend on these changing bindings. Other captured rebindings,
-branch-local accumulator updates and nested loops are not
-admitted by this extension.
+and step cannot depend on these changing bindings. Rebinding fresh iteration locals,
+non-i64 state and ownership/control transfers are not admitted by this extension.
+The recursive bounded-loop composition described below is the explicit exception
+for updating fresh outer-iteration locals through an inner loop.
 
 The outlined helper returns the updated scalar through the explicit action
 `cpu.loop_while_i64_effect ... cpu scoped_call_i64_carry <arity> <callee> <seed> <operands...>`.
@@ -336,7 +337,7 @@ ordering, subsequent loops, malformed metadata, strict seed types, GLM dependenc
 checked failures, shared fuel and failed-state admission in reference/native paths.
 
 Multiple carries use one aggregate-return helper, not multiple independently
-evaluated update calls. Tail rebindings retain source order: a later update sees
+evaluated update calls. Rebindings retain source order: a later update sees
 the new value of an earlier binding. The action is
 `cpu.loop_while_i64_effect ... cpu scoped_call_i64_carries <arity> <callee> <layout> <operands...>`.
 The flat layout is `State{carry0:i64;carry1:i64;...}`; every slot appears exactly once
@@ -356,30 +357,80 @@ and `unreachable`, never an unrelated successful result. Results are ordinary
 `LoopState { current, carry0, carry1, ... }` fields, including all zero-trip seeds.
 
 This first native implementation reuses the owned-aggregate return ABI: it allocates
-and releases an aggregate each iteration. It is not allocation-free or a performance
+and releases an aggregate each iteration, with additional aggregates for multi-state
+branch returns. It is not allocation-free or a performance
 parity claim. [Multi-carry regressions](../../tools/nuisc/tests/buffer_while/scalar_carries.rs)
 cover sequential rebinding, 2/3/12 slots, generated-name isolation, replacing
 updates, subsequent loops, reordered declarations, layout/seed drift, ordered traps,
 GLM dependencies and shared-fuel failure without callback-state commit.
 
+Branch helpers return the scalar or flat aggregate of the slots changed by either
+arm. Their leading guard returns incoming parameter values when the arm is not
+selected, rather than resetting a slot to zero. The predicate is captured before
+any arm updates state or Buffer contents. Calls and projections remain in source
+order; later branches see earlier updates, while branch-local reads, writes and
+arithmetic remain behind their guard. Guard seeds admit only existing i64 parameters
+or an exactly matching flat i64 aggregate, not calls or speculative expressions.
+
+[Branch-carry regressions](../../tools/nuisc/tests/buffer_while/branch_carries.rs)
+cover nested and asymmetric arms, zero/descending trips, replacing/repeated updates,
+ordered traps, reordered YIR declarations, subsequent loops, callback fuel and
+failed-state admission. A 32-branch case also checks bounded helper growth and name
+isolation. It exposed reverse-substitution growth in pure-helper collection: the
+collector now preflights the whole body and bounds expression expansion before
+cloning. Exceeding that analysis budget declines expression inlining, not the
+source program's branch count. This is not a bound on all compiler optimizations.
+
+### Nested Bounded Loops
+
+Counted Buffer-writing loops now compose recursively through the same private
+function and scoped-call contracts, including loops inside guarded `if`/`else`
+arms. Each level retains its own current value, invariant bound and i64 carries;
+there is no flattening, unrolling or fixed two-dimensional image opcode. A child
+may perform only scalar updates when its enclosing loop tree also writes a Buffer.
+Every level uses strict `<`/`+ 1` or `>`/`- 1`. An inner body or induction step
+cannot modify any ancestor's induction variable or bound inputs. A bound may read
+an outer current value but is evaluated only when that child loop is reached.
+
+Fresh inner counters reset on each outer iteration. A counter initialized before
+the outer loop instead survives as an outer carry, including zero-trip children.
+Child results update both its induction and its scalar carries. A guarded branch
+returns updated locals already visible at branch entry, but does not export
+locals created inside the branch. Untaken branches preserve those incoming seeds
+without evaluating child bounds or Buffer accesses. Buffer effects remain ordered
+and are not rolled back on a later failure. All levels consume the same callback
+fuel; exhaustion does not commit new application scalar state.
+
+[Recursive regressions](../../tools/nuisc/tests/buffer_while/nested_loops.rs) check
+reference/native results, zero and descending trips, outer-dependent bounds,
+persistent and reset counters, guarded locals, source-ordered traps, reordered YIR,
+shared fuel and an eight-level/four-sibling helper-growth case. They exposed stale
+literal propagation across NIR branches: joins now invalidate changed literals,
+constant-selected branches use the selected outgoing environment, and arm binding
+pruning waits for enclosing-block liveness. These are compiler fixes, not runtime
+or PixelMagic exceptions. General control exits and non-i64 carries remain open.
+
 ### Packaged Pixel Loop
 
-[PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses this
-bounded loop with two composed scalar coordinate/color helpers, branch-local
+[PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses
+bounded row/pixel loops with composed scalar coordinate/color and row-range helpers, branch-local
 input guards before coordinate division, a phase-dependent early return, and explicit
 red/blue `if`/`else` writes instead of recursive pixel filling or arithmetic color
-selection. Both paths assert real source helper calls in YIR. The
+selection. Partial first/last rows are clamped before entering their pixel loop;
+an empty range returns without iterating. Both paths assert real source helper calls
+and an inner loop inside an outer iteration function in YIR. The
 [native/reference test](../../tools/nuisc/tests/pixelmagic_buffer_loop.rs) checks
 every pixel for both 32x24 phases, a partial region and an empty region.
 `fill_checkerboard_region_stats` returns `CheckerboardStats { red_count, checksum }`
-using two carried accumulators during the same pass. The checksum is the sum of
+using two carried accumulators during the same pass. The red count updates inside
+the selected red-pixel write arm; checksum updates follow either arm. The checksum is the sum of
 the packed pixel values, not a cryptographic digest. Invalid input returns `(-1, 0)`
 before writes; an empty range returns `(0, 0)`. The red-count and boolean fill APIs
 delegate without changing their success contract. Native/reference tests check
 exact counts and sums as well as pixel bytes, including partial and empty ranges.
 The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
 ordinary image showcase with `headless-aot-bundle` and launches it through
-`run-artifact`. The carried generator and its real counting helper are present in
+`run-artifact`. The carried generator and its real branch-local counting helper are present in
 packaged YIR. On M2 this route verifies two actual Metal output hashes, all output bytes
 against direct-session replay, and all 768 writes plus the post-snapshot mutation
 per callback. Wrong callback arguments or executable/YIR drift are rejected before
@@ -394,7 +445,7 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_
 The second command is a macOS Metal device regression, not Linux/Windows evidence.
 CPU callbacks in the packaged host still execute embedded YIR; the native parity
 test independently compiles the generator, not the complete live callback ABI.
-Branch-local scalar loop carries alongside Buffer writes are the next boundary;
+Guarded `break`/`continue` in bounded Buffer-writing callbacks are the next boundary;
 ordered i64 accumulators do not certify arbitrary loop-carried state or fully native callbacks.
 
 ## Current Boundary

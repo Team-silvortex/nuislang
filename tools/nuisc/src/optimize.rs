@@ -119,36 +119,36 @@ fn rewrite_stmt(
                 simplify_expr(condition, env, inline_templates, &mut BTreeSet::new());
             let mut then_env = env.clone();
             let mut else_env = env.clone();
-            if env.is_empty() {
-                let original_then = std::mem::take(&mut then_body);
-                let original_else = std::mem::take(&mut else_body);
-                let (rewritten_then, then_changed) = rewrite_stmt_block_without_prune(
-                    original_then,
-                    &mut then_env,
-                    inline_templates,
-                );
-                let (rewritten_else, else_changed) = rewrite_stmt_block_without_prune(
-                    original_else,
-                    &mut else_env,
-                    inline_templates,
-                );
-                then_body = rewritten_then;
-                else_body = rewritten_else;
-                changed |= then_changed || else_changed;
-            } else {
-                changed |= simplify_stmt_block(&mut then_body, &mut then_env, inline_templates);
-                changed |= simplify_stmt_block(&mut else_body, &mut else_env, inline_templates);
-            }
+            // Only the enclosing block knows which arm bindings remain live afterward.
+            let (rewritten_then, then_changed) = rewrite_stmt_block_without_prune(
+                std::mem::take(&mut then_body),
+                &mut then_env,
+                inline_templates,
+            );
+            let (rewritten_else, else_changed) = rewrite_stmt_block_without_prune(
+                std::mem::take(&mut else_body),
+                &mut else_env,
+                inline_templates,
+            );
+            then_body = rewritten_then;
+            else_body = rewritten_else;
+            changed |= then_changed || else_changed;
             match condition {
                 NirExpr::Bool(true) => {
+                    *env = then_env;
                     out.extend(then_body);
                     true
                 }
                 NirExpr::Bool(false) => {
+                    *env = else_env;
                     out.extend(else_body);
                     true
                 }
                 other => {
+                    // A literal survives a dynamic join only if both arms preserve it.
+                    env.retain(|name, value| {
+                        then_env.get(name) == Some(value) && else_env.get(name) == Some(value)
+                    });
                     out.push(NirStmt::If {
                         condition: other,
                         then_body,

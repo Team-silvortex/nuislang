@@ -1,6 +1,24 @@
 use super::*;
 use nuis_semantics::model::NirStructField;
 
+pub(super) fn value(carries: &[String], ty: Option<&NirTypeRef>) -> NirExpr {
+    if let Some(ty) = ty {
+        NirExpr::StructLiteral {
+            type_name: ty.name.clone(),
+            type_args: vec![],
+            fields: carries
+                .iter()
+                .enumerate()
+                .map(|(index, name)| (format!("carry{index}"), NirExpr::Var(name.clone())))
+                .collect(),
+        }
+    } else if let Some(name) = carries.first() {
+        NirExpr::Var(name.clone())
+    } else {
+        NirExpr::Int(0)
+    }
+}
+
 pub(super) fn state_type(
     carries: &[String],
     names: &mut BTreeSet<String>,

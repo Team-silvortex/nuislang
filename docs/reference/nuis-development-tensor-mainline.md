@@ -252,13 +252,35 @@ Multiple explicit i64 accumulators now survive Buffer-writing iterations, includ
 zero trips, source-order rebinding, ordered reads and scalar helper control flow.
 CPU and LLVM share layout validation and return LoopState fields without an
 image-specific executor path. Native returns currently allocate/release an aggregate
-per iteration. PixelMagic's fill-and-statistics API checks real scalar result
+per iteration and multi-state branch return. PixelMagic's fill-and-statistics API checks real scalar result
 composition with its existing red-count/boolean wrappers; native/reference tests
 compare pixels, red counts and packed-pixel sums.
 The carried image passes ordinary M2 build/run-artifact again, retaining both exact
 Metal frames, direct-session byte parity and failure-preserved replay evidence.
-The score remains `active/86`; the next step is branch-local scalar carry updates alongside
-Buffer writes under the same build/run-artifact admission and identity checks.
+Branch-local scalar carry updates now preserve untaken seeds, snapshot conditions
+once and compose nested/repeated updates in source order. PixelMagic counts red
+pixels inside the matching write arm. The 32-branch growth regression also exposed
+unbounded reverse substitution in pure-helper collection; body preflight and a
+bounded expression-inlining analysis prevent that expansion without a source branch limit.
+The branch-carry generator also passes the real M2 packaged workflow: both Metal
+frames retain exact bytes, the counting call stays inside its guarded branch, and
+pre-effect drift rejection plus failure-preserved replay remain intact. A warm-cache
+development run of the 32-branch compilation/reference/native regression took 2.71
+seconds with about 65 MiB peak RSS; this is a local measurement, not a general memory bound.
+Nested bounded Buffer-writing loops now compose recursively with independent
+counters and scalar carries, guarded child bounds, protected ancestor headers and
+shared callback fuel. Eight native/reference regressions cover zero/descending
+trips, reset/persistent counters, branch-visible locals, ordered traps and an
+eight-level/four-sibling helper-growth case. This exposed stale NIR literals after
+branch joins; join invalidation and enclosing-block liveness preserve outgoing state.
+PixelMagic now uses clamped row/pixel loops instead of a flat pixel loop.
+The nested generator passes ordinary M2 build/run-artifact: packaged row functions
+retain their inner pixel loops and real source helper calls. Both 76,800-byte Metal
+frames match direct-session bytes; argument/binary/YIR rejection happens before
+effects, and exhausted replay preserves the previous stream. Packaged CPU callbacks
+still execute embedded YIR, not a fully native callback ABI.
+The score remains `active/86`; the next step is guarded break/continue alongside
+bounded Buffer writes under the same build/run-artifact admission and identity checks.
 This is not fully native CPU callbacks, arbitrary loop support or a
 complete memory-safety proof.
 Compound-condition `while` lowering now selects recursive descriptors,

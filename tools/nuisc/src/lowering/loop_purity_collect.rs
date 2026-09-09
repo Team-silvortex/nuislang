@@ -122,19 +122,30 @@ fn extract_inlineable_pure_expr_from_block(
     let (NirStmt::Return(Some(expr)), prefix) = body.split_last()? else {
         return None;
     };
-    let mut substituted = expr.clone();
+    // Reject control/effects before reverse substitution can expand an ineligible body.
+    if !prefix
+        .iter()
+        .all(|stmt| matches!(stmt, NirStmt::Let { .. } | NirStmt::Const { .. }))
+    {
+        return None;
+    }
     let mut pure_memo = BTreeMap::<String, bool>::new();
-    for stmt in prefix.iter().rev() {
-        let (binding_name, binding_value) = match stmt {
+    if !is_pure_helper_expr(expr, function_map, &mut pure_memo, visiting) {
+        return None;
+    }
+    let bindings = prefix
+        .iter()
+        .map(|stmt| match stmt {
             NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
-                (name.clone(), value.clone())
+                is_pure_helper_expr(value, function_map, &mut pure_memo, visiting)
+                    .then_some((name, value))
             }
-            _ => return None,
-        };
-        if !is_pure_helper_expr(&binding_value, function_map, &mut pure_memo, visiting) {
-            return None;
-        }
-        substituted = substitute_branch_binding(&substituted, &binding_name, &binding_value);
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let mut substituted = bounded_inline_seed(expr)?;
+    for (name, value) in bindings.into_iter().rev() {
+        substituted = bounded_inline_substitution(&substituted, name, value)?;
     }
     Some(substituted)
 }

@@ -7,8 +7,12 @@ use std::{
 
 const SOURCE: &str = include_str!("fixtures/buffer_while.ns");
 
+#[path = "buffer_while/branch_carries.rs"]
+mod branch_carries;
 #[path = "buffer_while/branches.rs"]
 mod branches;
+#[path = "buffer_while/nested_loops.rs"]
+mod nested_loops;
 #[path = "buffer_while/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_while/scalar_carry.rs"]
@@ -287,7 +291,7 @@ fn unsupported_buffer_loop_effects_carries_and_mutable_bounds_remain_rejected() 
         SOURCE.replace("index < 8", "index <= 8"),
         SOURCE.replace("index < 8", "index < load_at(buffer, 0)"),
         SOURCE.replace("index < 8", "index < index + 8"),
-        SOURCE.replace("let value: i64 = seed + index * 3;", "let seed: i64 = seed + index; let value: i64 = seed;"),
+        SOURCE.replace("let value: i64 = seed + index * 3;", "let seed: bool = true; let value: i64 = seed;"),
         SOURCE.replace("store_at(buffer, index, value);", "if index > 3 { break; } store_at(buffer, index, value);"),
         SOURCE.replace("store_at(buffer, index, value);", "let snapshot: Bytes = copy_bytes(buffer); drop_bytes(snapshot); store_at(buffer, index, value);"),
     ] {

@@ -140,6 +140,8 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
         ("checkerboard_is_red", "call_bool"),
         ("checkerboard_parity", "call_i64"),
         ("checkerboard_red_total", "call_i64"),
+        ("checkerboard_row_start", "call_i64"),
+        ("checkerboard_row_end", "call_i64"),
     ] {
         let helper = module
             .functions
@@ -169,7 +171,34 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     );
     assert!(
         module.functions.iter().any(|function| {
+            function.name.contains("__nuis_buffer_iteration_")
+                && module.nodes.iter().any(|node| {
+                    function.body_nodes.contains(&node.name)
+                        && node.op.instruction == "loop_while_i64_effect"
+                        && node.op.args.get(6).map(String::as_str)
+                            == Some("scoped_call_i64_carries")
+                })
+        }),
+        "packaged row helpers must retain nested pixel loops"
+    );
+    assert!(
+        module.functions.iter().any(|function| {
             function.name.contains("__nuis_buffer_branch_")
+                && function
+                    .result
+                    .as_ref()
+                    .is_some_and(|result| result.ty == "i64")
+                && function.body_nodes.iter().any(|name| {
+                    module.nodes.iter().any(|node| {
+                        &node.name == name
+                            && node.op.instruction == "call_i64"
+                            && node
+                                .op
+                                .args
+                                .first()
+                                .is_some_and(|callee| callee.contains("checkerboard_red_total"))
+                    })
+                })
                 && function.body_nodes.iter().any(|name| {
                     module
                         .nodes
@@ -177,7 +206,7 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
                         .any(|node| &node.name == name && node.op.instruction == "guard_return")
                 })
         }),
-        "packaged pixel branches must retain a real control boundary"
+        "packaged pixel branches must retain a real control boundary and branch-local count"
     );
     assert!(
         module.functions.iter().any(|function| {

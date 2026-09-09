@@ -118,20 +118,20 @@ fn multiple_carry_traps_preserve_source_order_across_writes_and_updates() {
 }
 
 #[test]
-fn multiple_carries_reject_branch_updates_duplicate_updates_and_mutable_headers() {
+fn multiple_carries_reject_non_scalar_updates_and_mutable_headers() {
     for source in [
         source().replace("index < 8", "index < checksum"),
         source().replace(
             "let checksum: i64 = checksum + total;",
-            "if index > 0 { let checksum: i64 = checksum + total; }",
+            "if index > 0 { let checksum: bool = true; }",
         ),
         source().replace(
             "let checksum: i64 = checksum + total;",
-            "let checksum: i64 = checksum + total; let total: i64 = total + 1;",
+            "let checksum: i64 = checksum + total; let buffer: ref Buffer = alloc_buffer(8, 0);",
         ),
         source().replace(
             "store_at(buffer, index, value);",
-            "let checksum: i64 = checksum + value; store_at(buffer, index, value);",
+            "free(buffer); store_at(buffer, index, value);",
         ),
     ] {
         assert!(

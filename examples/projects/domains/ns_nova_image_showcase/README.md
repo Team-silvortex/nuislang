@@ -17,7 +17,7 @@ The linked contract includes reproducible build, event, close and drain commands
 
 1. `PixelMagicPixels.fill_checkerboard` fills a 32x24 image using packed RGBA8
    integer pixels. Two composed scalar Nuis helpers compute coordinates and color
-   selection as actual YIR calls. A bounded unit-step Nuis `while` fills caller-owned storage
+   selection as actual YIR calls. Nested unit-step Nuis row/pixel loops fill caller-owned storage
    with guarded `if`/`else` color writes through private registered YIR helpers;
    unselected arms perform no pixel access, replacing the recursive workaround.
    Scalar division/remainder and buffer indices are checked; the acyclic scalar
@@ -25,12 +25,16 @@ The linked contract includes reproducible build, event, close and drain commands
    distinct early-return/fallthrough paths for the two phases. Nested
    `if`/`else` and early returns lower to typed guarded blocks with shared suffixes.
    The underlying fill-and-statistics API carries two i64 totals between iterations:
-   red-pixel count and packed-pixel sum. Its red-count/boolean wrappers retain their
+   red-pixel count and packed-pixel sum. Red count changes only inside the red write
+   branch, with an untaken guard preserving its seed; the sum updates after either
+   color arm. Its red-count/boolean wrappers retain their
    previous contract. Native/reference tests compare both statistics and pixels.
    The native multi-carry helper currently allocates/releases one aggregate each iteration.
    The loop returns
    ordinary LoopState fields, not a PixelMagic-specific runtime result.
-   Nested loops and arbitrary loop carries remain outside this supported subset.
+   Private row-range helpers clamp partial rows, and inner counters reset each row.
+   Inner loops remain actual function-body YIR loops and share callback fuel.
+   Arbitrary loop carries and guarded break/continue remain outside this subset.
 2. `copy_bytes` creates an owned snapshot. The app overwrites the original first
    pixel and frees the original Buffer before binding the snapshot.
 3. `shader_storage_binding(3, snapshot)` requests one immutable u32 array.

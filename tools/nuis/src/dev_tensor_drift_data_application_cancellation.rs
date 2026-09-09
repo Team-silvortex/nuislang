@@ -475,7 +475,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline.rs",
         required_patterns: &[
             "outline_buffer_loops", "verify_nir_module", "NirVisibility::Private",
-            "PreparedLoopCompare::Lt", "PreparedLoopCompare::Gt", "NirExpr::StoreAt",
+            "buffer_loop_params", "plan.has_store", "scalar_carries::value",
             "NirBinaryOp::Div", "NirBinaryOp::Rem",
             "NirStmt::If", "validate_effects", "guarded_functions",
         ],
@@ -505,7 +505,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "pixelmagic-bounded-buffer-loop",
         path: "stdlib/pixelmagic/lib/pixels.ns",
         required_patterns: &[
-            "pub fn fill_checkerboard_region", "while index < end",
+            "pub fn fill_checkerboard_region", "while row < rows", "while index < row_end",
             "fn checkerboard_parity", "fn checkerboard_is_red", "if red", "pixels[index] = 4278190335",
             "if phase == 0 { return base_red; }", "return base_red == false",
             "pixels[index] = 4294901760", "let index: i64 = index + 1",
@@ -661,7 +661,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "multiple_carries_feed_writes_and_three_slots_are_not_precombined",
             "multiple_carries_replacing_updates_and_subsequent_loops_use_projected_values",
             "multiple_carry_traps_preserve_source_order_across_writes_and_updates",
-            "multiple_carries_reject_branch_updates_duplicate_updates_and_mutable_headers",
+            "multiple_carries_reject_non_scalar_updates_and_mutable_headers",
             "multiple_carries_callbacks_share_fuel_without_committing_failed_state",
             "multiple_carries_keep_glm_seeds_and_run_independent_of_declaration_order",
             "multiple_carries_fail_closed_on_layout_signature_and_seed_drift",
@@ -719,8 +719,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "bounded-buffer-branch-outlining",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/branches.rs",
         required_patterns: &[
-            "outline_branches", "collect_bindings", "fresh_name", "captured_params",
-            "NirBinaryOp::Ne", "guarded.insert", "NirStmt::Return(Some(NirExpr::Int(0)))",
+            "outline_effects", "collect_bindings", "fresh_name", "captured_params",
+            "NirBinaryOp::Ne", "guarded.insert", "NirStmt::Return(Some(returned.clone()))",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -728,7 +728,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/direct_calls/control_boundaries.rs",
         required_patterns: &[
             "lower_guarded_body", "lower_guard_return", "preserve_source_order",
-            "windows(2)", "push_effect_edge", "NirExpr::Bool(false)", "lower_expr(&default",
+            "windows(2)", "push_effect_edge", "NirExpr::Bool(false)", "lower_expr(default",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -740,7 +740,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "untaken_branches_do_not_read_write_or_evaluate_invalid_arithmetic",
             "scalar_only_branch_traps_are_neither_hoisted_nor_discarded",
             "branch_local_failures_and_nested_calls_share_callback_admission_and_fuel",
-            "branch_local_carries_and_ownership_operations_stay_fail_closed",
+            "branch_induction_and_ownership_operations_stay_fail_closed",
         ],
     },
     DevTensorDriftCheckSpec {

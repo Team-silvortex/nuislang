@@ -204,15 +204,15 @@ fn scalar_carry_keeps_unsupported_mutations_and_mutable_headers_fail_closed() {
         ),
         source.replace(
             "let total: i64 = accumulate(total, load_at(buffer, index), index);",
-            "if index > 0 { let total: i64 = total + value; }",
+            "if index > 0 { let total: bool = true; }",
         ),
         source.replace(
             "let total: i64 = accumulate",
-            "let total: i64 = total + 1; let total: i64 = accumulate",
+            "let index: i64 = index + 1; let total: i64 = accumulate",
         ),
         source.replace(
             "store_at(buffer, index, value);",
-            "let total: i64 = total + value; store_at(buffer, index, value);",
+            "free(buffer); store_at(buffer, index, value);",
         ),
     ] {
         assert!(
@@ -220,6 +220,35 @@ fn scalar_carry_keeps_unsupported_mutations_and_mutable_headers_fail_closed() {
             "must reject\n{invalid}"
         );
     }
+}
+
+#[test]
+fn scalar_carry_rebindings_can_precede_writes_and_repeat() {
+    let source = source().replace(
+        "total + load_at(buffer, 0) + load_at(buffer, 7) + index;",
+        "(total + load_at(buffer, 0) + load_at(buffer, 7) + index) % 200;",
+    );
+    check_execution(
+        &source.replace(
+            "let total: i64 = accumulate",
+            "let total: i64 = total + 1; let total: i64 = accumulate",
+        ),
+        162,
+    );
+    check_execution(
+        &source.replace(
+            "store_at(buffer, index, value);",
+            "let total: i64 = total + value; store_at(buffer, index, value);",
+        ),
+        70,
+    );
+    check_execution(
+        &source.replace(
+            "let total: i64 = accumulate(total, load_at(buffer, index), index);",
+            "if index > 0 { let total: i64 = total + value; }",
+        ),
+        150,
+    );
 }
 
 #[test]

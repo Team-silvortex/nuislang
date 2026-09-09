@@ -1,4 +1,6 @@
 use super::simplify_nir_module;
+#[path = "optimize_branch_tests.rs"]
+mod branch_state;
 use nuis_semantics::model::{
     NirAnnotation, NirBinaryOp, NirExpr, NirFunction, NirModule, NirParam, NirStmt, NirTypeRef,
     NirVisibility,

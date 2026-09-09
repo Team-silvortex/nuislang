@@ -278,7 +278,41 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session.next_step.contains("scalar loop carries"));
     assert!(session
         .next_step
-        .contains("branch-local scalar loop carries"));
+        .contains("guarded break/continue in bounded buffer-writing callbacks"));
+    assert!(session
+        .evidence
+        .contains("Nested bounded Buffer-writing loops now compose recursively"));
+    assert!(session
+        .evidence
+        .contains("eight-level/four-sibling helper growth"));
+    assert!(session.evidence.contains("stale NIR literal propagation"));
+    assert!(session.evidence.contains(
+        "nested-loop PixelMagic image passes ordinary headless build/run-artifact on real M2"
+    ));
+    assert!(session
+        .evidence
+        .contains("packaged row helpers retain their inner pixel loops"));
+    assert!(session
+        .evidence
+        .contains("Branch-local i64 state now composes"));
+    assert!(session.evidence.contains("32-branch growth regression"));
+    assert!(session
+        .validation_command
+        .contains("--lib lowering::loop_purity::"));
+    assert!(session.evidence.contains("pass through incoming seeds"));
+    assert!(session.evidence.contains(
+        "branch-carry PixelMagic image passes ordinary headless build/run-artifact on real M2"
+    ));
+    assert!(session
+        .evidence
+        .contains("guarded branch-local counting call"));
+    assert!(session.blocker.contains("guarded break/continue"));
+    assert!(!session
+        .blocker
+        .contains("Nested Buffer-writing loops, fresh-local rebinding"));
+    assert!(!session
+        .blocker
+        .contains("branch-local captured-state updates remain outside"));
     assert!(session
         .evidence
         .contains("Multiple i64 scalar carries now compose"));

@@ -6,12 +6,20 @@ mod loop_purity_collect;
 mod loop_purity_expr;
 #[path = "loop_purity_host_calls.rs"]
 mod loop_purity_host_calls;
+#[path = "loop_purity_inline_budget.rs"]
+mod loop_purity_inline_budget;
 #[path = "loop_purity_normalize.rs"]
 mod loop_purity_normalize;
 #[path = "loop_purity_refs.rs"]
 mod loop_purity_refs;
 #[path = "loop_purity_substitute.rs"]
 mod loop_purity_substitute;
+
+use loop_purity_inline_budget::{bounded_inline_seed, bounded_inline_substitution};
+
+#[cfg(test)]
+#[path = "loop_purity_inline_tests.rs"]
+mod loop_purity_inline_tests;
 
 pub(super) use loop_purity_collect::{
     collect_inlineable_pure_helper_exprs, collect_pure_helper_blocks,

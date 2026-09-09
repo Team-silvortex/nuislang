@@ -19,17 +19,19 @@ pub(super) fn lower_guarded_body(
             function.name
         ));
     };
-    let default = match function.return_type.as_ref().map(|ty| ty.name.as_str()) {
-        Some("bool") => NirExpr::Bool(false),
-        Some("i64") => NirExpr::Int(0),
-        _ => {
-            return Err(format!(
-                "outlined helper `{}` has an invalid guard return type",
-                function.name
-            ))
-        }
+    let [NirStmt::Return(Some(default))] = then_body.as_slice() else {
+        return Err(format!(
+            "outlined helper `{}` has an invalid leading guard",
+            function.name
+        ));
     };
-    if !else_body.is_empty() || then_body.as_slice() != [NirStmt::Return(Some(default.clone()))] {
+    let neutral = match function.return_type.as_ref().map(|ty| ty.name.as_str()) {
+        Some("bool") => default == &NirExpr::Bool(false),
+        Some("i64") => default == &NirExpr::Int(0),
+        _ => false,
+    };
+    if !else_body.is_empty() || (!neutral && !is_pass_through_guard_seed(function, default, state))
+    {
         return Err(format!(
             "outlined helper `{}` has an invalid leading guard",
             function.name
@@ -37,9 +39,54 @@ pub(super) fn lower_guarded_body(
     }
     // A speculative select is not equivalent: even unused branch arithmetic can trap.
     let condition = lower_expr(condition, state, bindings)?;
-    let returned = lower_expr(&default, state, bindings)?;
+    let returned = lower_expr(default, state, bindings)?;
     lower_guard_return(condition, returned, state);
     crate::lowering::body_lowering::lower_inline_stmts(tail, state, bindings, &mut BTreeMap::new())
+}
+
+fn is_pass_through_guard_seed(
+    function: &NirFunction,
+    value: &NirExpr,
+    state: &LoweringState<'_>,
+) -> bool {
+    let i64_parameter = |value: &NirExpr| {
+        matches!(value, NirExpr::Var(name)
+        if function.params.iter().any(|param| &param.name == name
+            && direct_call_scalar_kind(&param.ty) == Some(DirectCallScalarKind::I64)))
+    };
+    let Some(ty) = &function.return_type else {
+        return false;
+    };
+    if direct_call_scalar_kind(ty) == Some(DirectCallScalarKind::I64) {
+        return i64_parameter(value);
+    }
+    let NirExpr::StructLiteral {
+        type_name,
+        type_args,
+        fields,
+    } = value
+    else {
+        return false;
+    };
+    let Some(definition) = state.struct_defs.get(type_name.as_str()) else {
+        return false;
+    };
+    !ty.is_ref
+        && !ty.is_optional
+        && ty.generic_args.is_empty()
+        && type_name == &ty.name
+        && type_args.is_empty()
+        && definition.generic_params.is_empty()
+        && !fields.is_empty()
+        && fields.len() == definition.fields.len()
+        && fields
+            .iter()
+            .zip(&definition.fields)
+            .all(|((name, value), field)| {
+                name == &field.name
+                    && direct_call_scalar_kind(&field.ty) == Some(DirectCallScalarKind::I64)
+                    && i64_parameter(value)
+            })
 }
 
 pub(in crate::lowering) fn collect_guarded_loop_direct_call_functions(

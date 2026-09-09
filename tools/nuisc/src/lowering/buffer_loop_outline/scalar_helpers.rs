@@ -214,6 +214,10 @@ fn collect_calls(body: &[NirStmt], calls: &mut BTreeSet<String>) {
                 collect_calls(then_body, calls);
                 collect_calls(else_body, calls);
             }
+            NirStmt::While { condition, body } => {
+                collect_expr_calls(condition, calls);
+                collect_calls(body, calls);
+            }
             _ => {}
         }
     }

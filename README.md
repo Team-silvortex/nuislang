@@ -142,9 +142,17 @@ native/reference tests compare every generated pixel. Multiple i64 accumulators 
 cross Buffer-writing iterations through explicit LoopState fields, with strict
 seed/result layouts, source-order rebinding and zero-trip preservation. PixelMagic
 uses them for fill-and-statistics, with exact native/reference red-count and pixel-sum
-checks and compatible red-count/boolean APIs. Native multi-carry loops currently
-allocate and release one aggregate per iteration. Branch-local carry updates,
-arbitrary loop bodies and fully native CPU callbacks remain separate work.
+checks and compatible red-count/boolean APIs. State updates also compose inside
+nested `if`/`else` arms: untaken arms preserve their incoming values, conditions
+are snapshotted once, and repeated updates retain source order. PixelMagic counts
+red pixels inside the selected write branch. Native multi-carry loops still
+allocate aggregate return storage, including multi-state branch returns.
+Nested bounded loops now compose through those same function contracts, including
+branch-local child loops, reset/persistent counters and shared callback fuel.
+PixelMagic uses real row/pixel loops with clamped partial rows; native/reference
+tests check both pixels and carried statistics. Inner loops cannot mutate ancestor
+headers. Guarded loop exits, arbitrary carry types and fully native CPU callbacks
+remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

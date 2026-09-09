@@ -1,5 +1,7 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_buffer_state.rs"]
+mod buffer_state;
 #[path = "dev_tensor_drift_data_application_cancellation.rs"]
 mod cancellation;
 
@@ -7,6 +9,7 @@ pub(crate) fn mainline_drift_checks() -> impl Iterator<Item = &'static DevTensor
     DEV_TENSOR_MAINLINE_DRIFT_CHECKS
         .iter()
         .chain(cancellation::CHECKS.iter())
+        .chain(buffer_state::CHECKS.iter())
 }
 
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[

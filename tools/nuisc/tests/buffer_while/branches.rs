@@ -224,10 +224,9 @@ fn outlined_branch_names_do_not_capture_user_functions_or_locals() {
 }
 
 #[test]
-fn branch_local_carries_and_ownership_operations_stay_fail_closed() {
+fn branch_induction_and_ownership_operations_stay_fail_closed() {
     for bad in [
         "let index: i64 = index + 1; store_at(buffer, index, value);",
-        "let seed: i64 = seed + 1; store_at(buffer, index, seed);",
         "let allocated: ref Buffer = alloc_buffer(1, 0); free(allocated);",
         "let snapshot: Bytes = copy_bytes(buffer); drop_bytes(snapshot);",
         "free(buffer);",
@@ -243,6 +242,20 @@ fn branch_local_carries_and_ownership_operations_stay_fail_closed() {
             "must reject {bad}"
         );
     }
+}
+
+#[test]
+fn branch_carries_can_update_a_captured_function_parameter() {
+    check_execution(
+        &SOURCE.replace(
+            "let value: i64 = seed + index * 3;",
+            "let seed: i64 = seed + index; let value: i64 = seed;",
+        ),
+        44,
+    );
+    check_execution(&replacing_store(
+        "if index < 4 { let seed: i64 = seed + 1; store_at(buffer, index, seed); } else { store_at(buffer, index, value); }"
+    ), 42);
 }
 
 #[test]

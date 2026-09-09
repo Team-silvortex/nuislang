@@ -22,6 +22,18 @@ mod cpu PixelMagicPixels {
     return total;
   }
 
+  fn checkerboard_row_start(row: i64, width: i64, start: i64) -> i64 {
+    let first: i64 = row * width;
+    if first < start { return start; }
+    return first;
+  }
+
+  fn checkerboard_row_end(row: i64, width: i64, end: i64) -> i64 {
+    let last: i64 = (row + 1) * width;
+    if last > end { return end; }
+    return last;
+  }
+
   /// Fills caller-owned storage; rejects invalid dimensions before changing any pixel.
   pub fn fill_checkerboard(
     pixels: ref Buffer,
@@ -41,7 +53,7 @@ mod cpu PixelMagicPixels {
     return fill_checkerboard_region(pixels, 0, count, width, tile_size, phase);
   }
 
-  /// Fills a bounded pixel range with a unit-step loop over caller-owned storage.
+  /// Fills a bounded pixel range with unit-step row and pixel loops over caller-owned storage.
   pub fn fill_checkerboard_region(
     pixels: ref Buffer, start: i64, end: i64, width: i64, tile_size: i64, phase: i64
   ) -> bool {
@@ -69,20 +81,27 @@ mod cpu PixelMagicPixels {
     if pixels.len > 4194304 || pixels.len % width != 0 {
       return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
     }
+    if start == end { return CheckerboardStats { red_count: 0, checksum: 0 }; }
     let total: i64 = 0;
     let checksum: i64 = 0;
-    let index: i64 = start;
-    while index < end {
-      let red: bool = checkerboard_is_red(index, width, tile_size, phase);
-      // Only the selected arm writes its packed little-endian RGBA8 color.
-      if red {
-        pixels[index] = 4278190335;
-      } else {
-        pixels[index] = 4294901760;
+    let row: i64 = start / width;
+    let rows: i64 = (end + width - 1) / width;
+    while row < rows {
+      let index: i64 = checkerboard_row_start(row, width, start);
+      let row_end: i64 = checkerboard_row_end(row, width, end);
+      while index < row_end {
+        let red: bool = checkerboard_is_red(index, width, tile_size, phase);
+        // Only the selected arm writes its packed little-endian RGBA8 color.
+        if red {
+          pixels[index] = 4278190335;
+          let total: i64 = checkerboard_red_total(total, red);
+        } else {
+          pixels[index] = 4294901760;
+        }
+        let checksum: i64 = checksum + pixels[index];
+        let index: i64 = index + 1;
       }
-      let total: i64 = checkerboard_red_total(total, red);
-      let checksum: i64 = checksum + pixels[index];
-      let index: i64 = index + 1;
+      let row: i64 = row + 1;
     }
     return CheckerboardStats { red_count: total, checksum: checksum };
   }
