@@ -9,6 +9,7 @@ pub(super) fn outline_effects(
     catalog: &ScalarHelpers,
     mutations: &MutationScope,
     structs: &mut Vec<NirStructDef>,
+    break_controls: &mut BTreeMap<String, String>,
 ) -> Vec<NirStmt> {
     let mut bindings = scope.keys().cloned().collect::<BTreeSet<_>>();
     collect_bindings(&body, &mut bindings);
@@ -79,6 +80,7 @@ pub(super) fn outline_effects(
                         catalog,
                         mutations,
                         structs,
+                        break_controls,
                     ));
                     arm_body.push(NirStmt::Return(Some(returned.clone())));
                     // Only existing values cross this boundary, never branch-local reads/math.
@@ -117,7 +119,15 @@ pub(super) fn outline_effects(
                     buffer_loop_params(&condition, &body, scope, catalog, &mutations.protected)
                         .expect("validated nested loop");
                 outline_loop(
-                    &mut body, scope, names, helpers, guarded, catalog, structs, plan,
+                    &mut body,
+                    scope,
+                    names,
+                    helpers,
+                    guarded,
+                    catalog,
+                    structs,
+                    plan,
+                    break_controls,
                 );
                 outlined.push(NirStmt::While { condition, body });
             }

@@ -1,4 +1,5 @@
 use super::*;
+use nuis_semantics::model::NirParam;
 
 pub(super) fn projected_bindings<'a>(
     result: &str,
@@ -7,7 +8,7 @@ pub(super) fn projected_bindings<'a>(
     state: &LoweringState<'_>,
 ) -> Option<Vec<&'a str>> {
     let definition = state.struct_defs.get(ty.name.as_str())?;
-    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() || definition.fields.len() < 2 {
+    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() || definition.fields.is_empty() {
         return None;
     }
     let mut bindings = Vec::new();
@@ -36,7 +37,18 @@ pub(super) fn projected_bindings<'a>(
         }
         bindings.push(name.as_str());
     }
+    if bindings.len() == 1 && !break_guard(tail.get(1), bindings[0]) {
+        return None;
+    }
     Some(bindings)
+}
+
+pub(super) fn break_guard(stmt: Option<&NirStmt>, binding: &str) -> bool {
+    matches!(stmt, Some(NirStmt::If {
+        condition: NirExpr::Binary { op: NirBinaryOp::Eq, lhs, rhs }, then_body, else_body,
+    }) if matches!(lhs.as_ref(), NirExpr::Var(name) if name == binding)
+        && rhs.as_ref() == &NirExpr::Int(1)
+        && then_body == &[NirStmt::Break] && else_body.is_empty())
 }
 
 pub(super) fn admissible(
@@ -45,14 +57,22 @@ pub(super) fn admissible(
     function: &NirFunction,
     args: &[NirExpr],
     bindings: &BTreeMap<String, String>,
+    breaking: bool,
 ) -> bool {
+    let control = breaking.then(|| *carries.last().expect("nonempty projections"));
     let changed = carries.iter().copied().collect();
-    carries
-        .iter()
-        .all(|binding| *binding != prepared.binding_name && bindings.contains_key(*binding))
-        && !loop_purity::expr_references_names(&prepared.limit, &changed)
+    carries.iter().all(|binding| {
+        *binding != prepared.binding_name
+            && (control == Some(*binding) || bindings.contains_key(*binding))
+    }) && !loop_purity::expr_references_names(&prepared.limit, &changed)
         && !loop_purity::expr_references_names(&prepared.step, &changed)
-        && args.iter().all(|arg| matches!(arg, NirExpr::Var(_)))
+        && function.params.iter().zip(args).all(|(param, arg)| {
+            if control == Some(param.name.as_str()) {
+                arg == &NirExpr::Int(0)
+            } else {
+                matches!(arg, NirExpr::Var(_))
+            }
+        })
         && function.params.iter().all(|param| {
             is_scalar_i64(&param.ty)
                 || (!param.ty.is_optional
@@ -62,8 +82,22 @@ pub(super) fn admissible(
         })
 }
 
-pub(super) fn argument_index(result: &ScopedLoopResult<'_>, arg: &NirExpr) -> Option<usize> {
-    let (ScopedLoopResult::Scalars { bindings, .. }, NirExpr::Var(name)) = (result, arg) else {
+pub(super) fn argument_index(
+    result: &ScopedLoopResult<'_>,
+    param: &NirParam,
+    arg: &NirExpr,
+) -> Option<usize> {
+    let ScopedLoopResult::Scalars {
+        bindings, breaking, ..
+    } = result
+    else {
+        return None;
+    };
+    if *breaking && bindings.last().copied() == Some(param.name.as_str()) && arg == &NirExpr::Int(0)
+    {
+        return Some(bindings.len() - 1);
+    }
+    let NirExpr::Var(name) = arg else {
         return None;
     };
     bindings.iter().position(|binding| *binding == name)

@@ -58,6 +58,7 @@ pub(super) struct LoweringState<'a> {
     pub(super) struct_defs: BTreeMap<&'a str, &'a NirStructDef>,
     pub(super) enum_defs: BTreeMap<&'a str, &'a NirEnumDef>,
     pub(super) direct_call_functions: BTreeSet<String>,
+    pub(super) scoped_break_controls: BTreeMap<String, String>,
     pub(super) async_helper_functions: BTreeSet<String>,
     pub(super) pure_helpers: BTreeSet<String>,
     pub(super) inlineable_pure_helpers: BTreeMap<String, InlineablePureHelper>,

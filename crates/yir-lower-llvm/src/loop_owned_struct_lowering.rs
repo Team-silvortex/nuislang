@@ -5,7 +5,8 @@ use yir_core::{parse_loop_owned_struct_carry, Node};
 use super::{
     call_lowering::{parse_owned_struct_layout, unpack_immediate_owned_struct},
     call_return::cpu_scalar_kind_llvm_type,
-    fresh_reg, CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, StructLlvmValueRef,
+    fresh_block, fresh_reg, CpuCallScalarKind, CpuHelperSignature, LlvmValueRef,
+    StructLlvmValueRef,
 };
 
 struct OwnedStructLoopSlot {
@@ -19,6 +20,7 @@ pub(crate) struct OwnedStructLoopCarry {
     result_name: String,
     template: StructLlvmValueRef,
     slots: Vec<OwnedStructLoopSlot>,
+    break_on_return: bool,
 }
 
 pub(crate) fn prepare_owned_struct_loop_carry(
@@ -27,11 +29,16 @@ pub(crate) fn prepare_owned_struct_loop_carry(
     registers: &BTreeMap<String, LlvmValueRef>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     next_reg: &mut usize,
+    next_block: &mut usize,
 ) -> Result<Option<OwnedStructLoopCarry>, String> {
     if node.op.instruction != "loop_while_i64_effect"
         || !matches!(
             node.op.args.get(6).map(String::as_str),
-            Some("scoped_call_owned_struct_return" | "scoped_call_i64_carries")
+            Some(
+                "scoped_call_owned_struct_return"
+                    | "scoped_call_i64_carries"
+                    | "scoped_call_i64_carries_break"
+            )
         )
     {
         return Ok(None);
@@ -42,6 +49,7 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         .get(8)
         .ok_or_else(|| missing_metadata(node, "callee"))?;
     let multi = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?;
+    let break_on_return = multi.as_ref().is_some_and(|multi| multi.break_on_return);
     let result_name = if multi.is_some() {
         node.name.clone()
     } else {
@@ -111,6 +119,9 @@ pub(crate) fn prepare_owned_struct_loop_carry(
                 node.name
             )
         })?;
+        if break_on_return && index + 1 == multi.as_ref().expect("break carry layout").seeds.len() {
+            require_control_value(initial, 0, body, next_reg, next_block);
+        }
         let slot = fresh_reg(next_reg);
         let llvm_type = scalar_loop_type(kind).ok_or_else(|| {
             format!(
@@ -152,6 +163,7 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         result_name,
         template,
         slots,
+        break_on_return,
     }))
 }
 
@@ -172,13 +184,23 @@ impl OwnedStructLoopCarry {
         pointer_bits: &str,
         body: &mut Vec<String>,
         next_reg: &mut usize,
-    ) -> Result<(), String> {
+        next_block: &mut usize,
+    ) -> Result<Option<String>, String> {
         let returned = unpack_immediate_owned_struct(pointer_bits, &self.template, body, next_reg);
         let mut values = Vec::new();
         flatten_scalar_values(&returned, &mut values)?;
         if values.len() != self.slots.len() {
             return Err("owned struct loop return does not match its carry layout".to_owned());
         }
+        // Check the private control slot before committing any of the returned carries.
+        let control = if self.break_on_return {
+            let raw = scalar_value(values.last().copied(), CpuCallScalarKind::I64)
+                .ok_or_else(|| "scoped loop break flag must be i64".to_owned())?;
+            require_control_value(raw, 1, body, next_reg, next_block);
+            Some(raw.to_owned())
+        } else {
+            None
+        };
         for (slot, value) in self.slots.iter().zip(values) {
             let raw = scalar_value(Some(value), slot.kind)
                 .ok_or_else(|| "owned struct loop return changed scalar leaf type".to_owned())?;
@@ -188,7 +210,7 @@ impl OwnedStructLoopCarry {
                 slot.slot
             ));
         }
-        Ok(())
+        Ok(control)
     }
 
     pub(crate) fn finish(
@@ -208,6 +230,26 @@ impl OwnedStructLoopCarry {
         }
         Ok((self.result_name, value))
     }
+}
+
+fn require_control_value(
+    value: &str,
+    maximum: u8,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    next_block: &mut usize,
+) {
+    let valid = fresh_reg(next_reg);
+    let accepted = fresh_block(next_block, "loop_break_control_valid");
+    let invalid = fresh_block(next_block, "loop_break_control_invalid");
+    body.push(format!("  {valid} = icmp ule i64 {value}, {maximum}"));
+    body.push(format!(
+        "  br i1 {valid}, label %{accepted}, label %{invalid}"
+    ));
+    body.push(format!("{invalid}:"));
+    body.push("  call void @llvm.trap()".to_owned());
+    body.push("  unreachable".to_owned());
+    body.push(format!("{accepted}:"));
 }
 
 fn load_slot(

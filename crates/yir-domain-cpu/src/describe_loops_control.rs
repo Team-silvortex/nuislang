@@ -56,7 +56,7 @@ pub(super) fn describe_cpu_loops_control_node(
             }
             let action_inputs = match (node.op.args[5].as_str(), node.op.args[6].as_str(), arity) {
                 ("cpu", "owned_bytes_copy_drop", 1) => node.op.args[8..].to_vec(),
-                ("cpu", "scoped_call_i64_carries", _) => {
+                ("cpu", "scoped_call_i64_carries" | "scoped_call_i64_carries_break", _) => {
                     let carry =
                         yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?
                             .expect("matched multi-scalar carry action");

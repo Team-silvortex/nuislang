@@ -62,6 +62,10 @@ CARGO_INCREMENTAL=0 NUIS_TEST_QUIET_SUCCESS_LOGS=1 cargo test -q -p nuis --bin n
 The bounded pixel-loop regressions compare native/reference generator output and,
 on an Apple Silicon Metal host, the actual headless CLI build/run-artifact path:
 
+The Nuis generator uses nested row/pixel loops. Red pixels update both statistics,
+explicitly step and `continue`; the remaining blue write is skipped. This exercises
+iteration-local control through ordinary YIR functions, not a PixelMagic runtime opcode.
+
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test pixelmagic_buffer_loop -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_loop -j 1 -- --test-threads=1

@@ -184,10 +184,16 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     assert!(
         module.functions.iter().any(|function| {
             function.name.contains("__nuis_buffer_branch_")
-                && function
-                    .result
-                    .as_ref()
-                    .is_some_and(|result| result.ty == "i64")
+                && function.result.as_ref().is_some_and(|result| {
+                    result.ty.contains("__nuis_scalar_carries_")
+                        && module.nodes.iter().any(|node| {
+                            node.name == result.node
+                                && node.op.instruction == "return_owned_struct"
+                                && node.op.args.get(1).is_some_and(|layout| {
+                                    layout.ends_with("{carry0:i64;carry1:i64;carry2:i64}")
+                                })
+                        })
+                })
                 && function.body_nodes.iter().any(|name| {
                     module.nodes.iter().any(|node| {
                         &node.name == name

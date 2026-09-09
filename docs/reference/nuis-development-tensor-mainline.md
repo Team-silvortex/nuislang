@@ -279,10 +279,35 @@ retain their inner pixel loops and real source helper calls. Both 76,800-byte Me
 frames match direct-session bytes; argument/binary/YIR rejection happens before
 effects, and exhausted replay preserves the previous stream. Packaged CPU callbacks
 still execute embedded YIR, not a fully native callback ABI.
-The score remains `active/86`; the next step is guarded break/continue alongside
-bounded Buffer writes under the same build/run-artifact admission and identity checks.
+Guarded `continue` now skips each iteration's remaining suffix through existing
+guarded functions, preserving earlier writes and scalar carry changes. The source
+path must explicitly perform the matching unit step; the loop driver executes it
+once. Loop-local control flags reset per iteration and never enter application state.
+Nine reference/native and session regressions cover nested scope, signed boundary
+steps, skipped traps and bounds, shared fuel, rejected updates and 32-guard linear
+helper growth. PixelMagic exercises this path after red writes and statistics.
+The continue-based generator passes ordinary M2 headless build/run-artifact. Its
+guarded red branch returns both statistics plus private control state; both
+76,800-byte Metal frames match the independent pixel oracle and direct-session
+replay. Pre-effect identity rejection and exhausted-replay preservation still pass.
+Guarded `break` now returns a private i64 control slot through the shared scoped-call
+contract. CPU registered execution and LLVM exit before stepping, preserving all
+prefix writes/carries. Eleven reference/native and session regression families cover
+nested scope, mixed explicit-step continue, skipped traps and child bounds, zero trips,
+malformed seed/return controls, GLM dependencies, reordered declarations and private
+names with linear helper growth. A trillion-iteration bound exits on its third
+invocation within 1000 shared fuel; exhaustion still preserves prior application state.
+Partial helper lowering also honors its declared result and traps if that result
+is unavailable, rather than returning an unrelated scalar as an aggregate pointer.
+The malformed-return regression covers this native function-lane drift separately.
+The score remains `active/86`; next is a break-based packaged application proof under
+the same build/run-artifact admission and identity checks. The recorded M2 image proof
+above still exercises continue, not the new break action.
 This is not fully native CPU callbacks, arbitrary loop support or a
 complete memory-safety proof.
+A separate full-LLVM dump of the image showcase rejects
+`cpu.guard_drop_owned_bytes_return` without an aggregate return-layout contract.
+Headless success and standalone native pixel parity do not clear that callback-graph boundary.
 Compound-condition `while` lowering now selects recursive descriptors,
 normalizes linear carries consistently and deduplicates shared effect inputs.
 CPU-owned cooperative execution replaces trace-only loop results; generic YIR

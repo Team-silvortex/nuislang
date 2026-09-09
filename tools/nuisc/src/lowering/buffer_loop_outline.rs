@@ -5,6 +5,8 @@ type Scope = BTreeMap<String, NirTypeRef>;
 
 #[path = "buffer_loop_outline/branches.rs"]
 mod branches;
+#[path = "buffer_loop_outline/control_flow.rs"]
+mod control_flow;
 #[path = "buffer_loop_outline/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]
@@ -28,12 +30,15 @@ struct BufferLoopPlan {
     header_inputs: BTreeSet<String>,
     mutations: MutationScope,
     has_store: bool,
+    normalized_effects: Option<Vec<NirStmt>>,
+    break_flag: Option<String>,
 }
 
 #[derive(Default)]
 pub(super) struct BufferLoopOutlines {
     pub functions: BTreeSet<String>,
     pub guarded_functions: BTreeSet<String>,
+    pub break_controls: BTreeMap<String, String>,
 }
 
 // Keep iteration effects inside a private helper; the existing scoped-call contract
@@ -75,6 +80,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
             &catalog,
             &mut outlined.functions,
             &mut module.structs,
+            &mut outlined.break_controls,
         );
     }
     scalar_control::outline(
@@ -104,6 +110,7 @@ fn outline_body(
     catalog: &ScalarHelpers,
     retained: &mut BTreeSet<String>,
     structs: &mut Vec<NirStructDef>,
+    break_controls: &mut BTreeMap<String, String>,
 ) {
     for stmt in body {
         match stmt {
@@ -131,6 +138,7 @@ fn outline_body(
                     catalog,
                     retained,
                     structs,
+                    break_controls,
                 );
                 outline_body(
                     else_body,
@@ -141,6 +149,7 @@ fn outline_body(
                     catalog,
                     retained,
                     structs,
+                    break_controls,
                 );
             }
             NirStmt::While { condition, body } => {
@@ -149,7 +158,17 @@ fn outline_body(
                         .filter(|plan| plan.has_store)
                 {
                     scalar_helpers::retain_reachable(body, catalog, retained);
-                    outline_loop(body, scope, names, helpers, guarded, catalog, structs, plan);
+                    outline_loop(
+                        body,
+                        scope,
+                        names,
+                        helpers,
+                        guarded,
+                        catalog,
+                        structs,
+                        plan,
+                        break_controls,
+                    );
                 }
             }
             _ => {}
@@ -166,6 +185,7 @@ fn outline_loop(
     catalog: &ScalarHelpers,
     structs: &mut Vec<NirStructDef>,
     plan: BufferLoopPlan,
+    break_controls: &mut BTreeMap<String, String>,
 ) {
     let mut suffix = helpers.len();
     let name = loop {
@@ -176,11 +196,15 @@ fn outline_loop(
         suffix += 1;
     };
     let step = body.pop().expect("validated counted step");
-    let aggregate =
-        (plan.carries.len() > 1).then(|| scalar_carries::state_type(&plan.carries, names, structs));
+    if let Some(flag) = &plan.break_flag {
+        break_controls.insert(name.clone(), flag.clone());
+    }
+    let aggregate = (plan.carries.len() > 1 || plan.break_flag.is_some())
+        .then(|| scalar_carries::state_type(&plan.carries, names, structs));
     let returned = scalar_carries::value(&plan.carries, aggregate.as_ref());
+    let effects = std::mem::take(body);
     let mut helper_body = branches::outline_effects(
-        std::mem::take(body),
+        plan.normalized_effects.unwrap_or(effects),
         &mut scope.clone(),
         names,
         helpers,
@@ -188,12 +212,19 @@ fn outline_loop(
         catalog,
         &plan.mutations,
         structs,
+        break_controls,
     );
     helper_body.push(NirStmt::Return(Some(returned)));
     let args = plan
         .params
         .iter()
-        .map(|param| NirExpr::Var(param.name.clone()))
+        .map(|param| {
+            if plan.break_flag.as_ref() == Some(&param.name) {
+                NirExpr::Int(0)
+            } else {
+                NirExpr::Var(param.name.clone())
+            }
+        })
         .collect();
     let call = NirExpr::Call {
         callee: name.clone(),
@@ -205,6 +236,17 @@ fn outline_loop(
         branches::collect_bindings(&function.body, &mut used);
         let temporary = branches::fresh_name("__nuis_loop_state", &mut used);
         *body = scalar_carries::projected_call(temporary, &ty, &plan.carries, call);
+        if let Some(flag) = plan.break_flag {
+            body.push(NirStmt::If {
+                condition: NirExpr::Binary {
+                    op: NirBinaryOp::Eq,
+                    lhs: Box::new(NirExpr::Var(flag)),
+                    rhs: Box::new(NirExpr::Int(1)),
+                },
+                then_body: vec![NirStmt::Break],
+                else_body: vec![],
+            });
+        }
         body.push(step);
         function.return_type = Some(ty);
     } else {

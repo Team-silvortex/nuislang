@@ -26,6 +26,8 @@ struct ScopedLoop {
     carries: Option<StructValue>,
     pending_call: bool,
     iterations: usize,
+    break_on_return: bool,
+    exited: bool,
 }
 
 pub(super) fn begin_execution(
@@ -37,7 +39,12 @@ pub(super) fn begin_execution(
         || node.op.args.get(5).map(String::as_str) != Some("cpu")
         || !matches!(
             node.op.args.get(6).map(String::as_str),
-            Some("scoped_call" | "scoped_call_i64_carry" | "scoped_call_i64_carries")
+            Some(
+                "scoped_call"
+                    | "scoped_call_i64_carry"
+                    | "scoped_call_i64_carries"
+                    | "scoped_call_i64_carries_break"
+            )
         )
     {
         return Ok(None);
@@ -62,6 +69,15 @@ pub(super) fn begin_execution(
     validate_loop_step_kind(&node.op.args[4], &node.name)?;
     let carry = yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?;
     let carries = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?;
+    let break_on_return = carries
+        .as_ref()
+        .is_some_and(|carries| carries.break_on_return);
+    if let Some(carries) = carries.as_ref().filter(|_| break_on_return) {
+        let seed = carries.seeds.last().expect("validated nonempty layout");
+        if state.expect_value(seed)? != &Value::Int(0) {
+            return Err("scoped loop break flag requires an i64 zero seed".to_owned());
+        }
+    }
     let operands = carries
         .as_ref()
         .map(|carry| carry.operands)
@@ -137,6 +153,8 @@ pub(super) fn begin_execution(
             .transpose()?,
         pending_call: false,
         iterations: 0,
+        break_on_return,
+        exited: false,
     })))
 }
 
@@ -164,6 +182,13 @@ impl RegisteredExecution for ScopedLoop {
                     return Err("scoped carries result does not match its i64 layout".to_owned());
                 }
                 // Validate every slot before committing any carried state or advancing time.
+                if self.break_on_return {
+                    self.exited = match returned.fields.last().map(|(_, value)| value) {
+                        Some(Value::Int(0)) => false,
+                        Some(Value::Int(1)) => true,
+                        _ => return Err("scoped loop break flag must be i64 0 or 1".to_owned()),
+                    };
+                }
                 *carries = returned.clone();
             }
             if let Some(carry) = &mut self.carry {
@@ -182,11 +207,13 @@ impl RegisteredExecution for ScopedLoop {
                 ));
             }
             self.pending_call = false;
-            self.current = if self.node.op.args[4] == "add" {
-                self.current.wrapping_add(self.step)
-            } else {
-                self.current.wrapping_sub(self.step)
-            };
+            if !self.exited {
+                self.current = if self.node.op.args[4] == "add" {
+                    self.current.wrapping_add(self.step)
+                } else {
+                    self.current.wrapping_sub(self.step)
+                };
+            }
             self.iterations += 1;
         } else if call_result.is_some() {
             return Err(format!(
@@ -203,7 +230,7 @@ impl RegisteredExecution for ScopedLoop {
             "ne" => self.current != self.limit,
             _ => unreachable!("validated comparison"),
         };
-        if !active {
+        if self.exited || !active {
             state.push_resource_event(&self.resource, format!(
                 "effect cpu.loop_while_i64_effect @{} [{}]: iterations={} final={} action cpu.{} {}",
                 self.node.resource, self.resource.kind.raw, self.iterations, self.current, self.node.op.args[6], self.function

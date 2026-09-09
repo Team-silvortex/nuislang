@@ -245,9 +245,10 @@ and generated names cannot capture user functions or local bindings. Textual lan
 edge inference now extends a dependency-topological order instead of creating
 backedges against transitive dependencies, including paths through other lanes.
 Invalid explicit graphs are left for verification, not repaired. Branch-local
-bindings do not escape; captured-state rebinding, allocation, ownership transfer,
-unbounded loops, `break`, `continue` and early returns in these outlined bodies remain
-outside the admitted subset.
+bindings do not escape. The carried-state and guarded-continue extensions below
+admit specific rebindings and exits; allocation, ownership transfer, unbounded
+loops, `break`, unstepped `continue` and early returns from the loop body remain
+outside this Buffer-writing subset.
 
 ### Source Scalar Helpers
 
@@ -408,22 +409,92 @@ shared fuel and an eight-level/four-sibling helper-growth case. They exposed sta
 literal propagation across NIR branches: joins now invalidate changed literals,
 constant-selected branches use the selected outgoing environment, and arm binding
 pruning waits for enclosing-block liveness. These are compiler fixes, not runtime
-or PixelMagic exceptions. General control exits and non-i64 carries remain open.
+or PixelMagic exceptions. Non-i64 carries and general control exits remain open;
+the following subset adds explicit-step `continue`.
+
+### Guarded Continue
+
+A bounded Buffer-writing loop may end an `if`/`else` path with `continue` when its
+immediately preceding statement is the same explicit induction update as the
+loop's canonical final step. Strict `<`/`+ 1` and `>`/`- 1` remain required:
+
+```nuis
+while index < end {
+  if skip(index) {
+    let total: i64 = total + 1;
+    let index: i64 = index + 1;
+    continue;
+  }
+  store_at(buffer, index, value(index));
+  let index: i64 = index + 1;
+}
+```
+
+The compiler removes the duplicated path step and uses a private per-iteration
+i64 flag to guard the entire remaining suffix. The existing scoped-call driver
+performs the source-requested step exactly once after the helper returns. Nuis does
+not invent an increment for an ordinary `while`: missing, mismatched or nonterminal
+continue-path steps are rejected by this outlining path. Writes and carry changes
+before `continue` persist; skipped reads, arithmetic, source-call arguments and
+child-loop bounds are not evaluated. Each nested loop normalizes only its own
+exits, resets its flag every iteration, and never exports it into application state.
+No YIR instruction or runtime/backend-specific control mechanism is added.
+
+[Continue regressions](../../tools/nuisc/tests/buffer_while/continues.rs) check
+reference/native parity, zero/all/no-continue trips, signed integer boundary steps,
+nested/sequential predicates, source-ordered traps, nested-loop scope, reordered
+YIR, shared fuel, rejected steps and linear helper growth with 32 guards.
+
+### Guarded Break
+
+Bounded Buffer-writing loops also admit terminal guarded `break`, including nested
+conditions and coexistence with explicit-step `continue`. Each loop owns its exit;
+the breaking iteration retains prefix writes and scalar updates, skips its suffix
+and exits before the canonical induction step. A child break leaves the parent
+running and exposes the child's actual exit counter. This is not no-op execution
+of the remaining iterations. Induction mutation before break, unstepped continue
+and arbitrary loop bodies remain outside this subset.
+
+`cpu.loop_while_i64_effect` uses the registered action
+`cpu scoped_call_i64_carries_break`, sharing the flat `carryN:i64` layout, named
+captures and indexed seeds of `scoped_call_i64_carries`. The last slot is private
+control: seed `0` is required even for zero trips; return `0` advances and return
+`1` exits before stepping. The layout can contain only that control slot. Every
+field and the control value must validate before state commit. Other values or
+types fail in registered execution and trap or fail lowering in LLVM. Aggregate
+storage is released before taking the exit; no generic executor special case or
+engine-specific action is introduced. GLM retains the real seeds and Buffer captures.
+The compiler records the normalizer's canonical control binding explicitly; neither
+a generated-looking function name nor an ordinary user struct with the same shape
+authorizes this control interpretation. General integer data is not silently narrowed
+to a 0/1 signal.
+
+[Break regressions](../../tools/nuisc/tests/buffer_while/breaks.rs) cover reference
+execution, regenerated native LLVM and registered sessions, including a trillion
+upper bound that exits after three calls within 1000 shared fuel, skipped traps,
+nested scope, mixed exits, malformed controls and reordered YIR. This is CPU
+control-flow evidence; a break-based packaged application/device proof remains next.
+A fault injection also omits a returned field producer's native function lane.
+Declared helper results now use the same fail-closed fallback as entry results:
+partial LLVM remains inspectable but traps instead of treating the last integer
+as an aggregate pointer. This does not repair or certify the full native callback graph.
 
 ### Packaged Pixel Loop
 
 [PixelMagic's generator](../../stdlib/pixelmagic/lib/pixels.ns) now uses
 bounded row/pixel loops with composed scalar coordinate/color and row-range helpers, branch-local
 input guards before coordinate division, a phase-dependent early return, and explicit
-red/blue `if`/`else` writes instead of recursive pixel filling or arithmetic color
-selection. Partial first/last rows are clamped before entering their pixel loop;
+guarded red writes followed by explicit-step `continue`; blue writes occur only
+on fallthrough, not through recursive pixel filling or arithmetic color selection.
+Partial first/last rows are clamped before entering their pixel loop;
 an empty range returns without iterating. Both paths assert real source helper calls
 and an inner loop inside an outer iteration function in YIR. The
 [native/reference test](../../tools/nuisc/tests/pixelmagic_buffer_loop.rs) checks
 every pixel for both 32x24 phases, a partial region and an empty region.
 `fill_checkerboard_region_stats` returns `CheckerboardStats { red_count, checksum }`
 using two carried accumulators during the same pass. The red count updates inside
-the selected red-pixel write arm; checksum updates follow either arm. The checksum is the sum of
+the selected red-pixel write arm, which also updates checksum before continuing;
+fallthrough blue writes update checksum separately. The checksum is the sum of
 the packed pixel values, not a cryptographic digest. Invalid input returns `(-1, 0)`
 before writes; an empty range returns `(0, 0)`. The red-count and boolean fill APIs
 delegate without changing their success contract. Native/reference tests check
@@ -431,7 +502,8 @@ exact counts and sums as well as pixel bytes, including partial and empty ranges
 The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
 ordinary image showcase with `headless-aot-bundle` and launches it through
 `run-artifact`. The carried generator and its real branch-local counting helper are present in
-packaged YIR. On M2 this route verifies two actual Metal output hashes, all output bytes
+packaged YIR, including the red branch's two statistics and private continue flag.
+The continue-based generator passes this M2 route with two actual Metal output hashes, all output bytes
 against direct-session replay, and all 768 writes plus the post-snapshot mutation
 per callback. Wrong callback arguments or executable/YIR drift are rejected before
 application effects. Exhausted packaged replay produces neither Close nor success,
@@ -445,8 +517,12 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_
 The second command is a macOS Metal device regression, not Linux/Windows evidence.
 CPU callbacks in the packaged host still execute embedded YIR; the native parity
 test independently compiles the generator, not the complete live callback ABI.
-Guarded `break`/`continue` in bounded Buffer-writing callbacks are the next boundary;
+Induction changes before `break` and `continue` without the explicit matching step remain outside this subset;
 ordered i64 accumulators do not certify arbitrary loop-carried state or fully native callbacks.
+A diagnostic full-LLVM dump of the complete image showcase also rejects
+`cpu.guard_drop_owned_bytes_return` without an aggregate return-layout contract.
+The verified-YIR packaging route and standalone native generator test do not
+exercise that complete native callback graph.
 
 ## Current Boundary
 

@@ -445,7 +445,7 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
         Some("scoped_call") => 9,
         // Include the seed, but not the per-iteration placeholders.
         Some("scoped_call_i64_carry") => 9,
-        Some("scoped_call_i64_carries") => 10,
+        Some("scoped_call_i64_carries" | "scoped_call_i64_carries_break") => 10,
         Some("scoped_call_owned_return") => 10,
         Some("scoped_call_owned_struct_return") => 11,
         _ => op.args.len(),

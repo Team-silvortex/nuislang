@@ -76,6 +76,7 @@ pub(crate) fn begin_loop_effect_action(
             "scoped_call"
             | "scoped_call_i64_carry"
             | "scoped_call_i64_carries"
+            | "scoped_call_i64_carries_break"
             | "scoped_call_owned_return"
             | "scoped_call_owned_struct_return",
         ) => {
@@ -86,8 +87,8 @@ pub(crate) fn begin_loop_effect_action(
                 )
             })?;
             let returns_owned_bytes = action_instruction == "scoped_call_owned_return";
-            let returns_owned_struct = matches!(action_instruction.as_str(), "scoped_call_owned_struct_return" | "scoped_call_i64_carries");
-            let multi = if action_instruction == "scoped_call_i64_carries" {
+            let returns_owned_struct = matches!(action_instruction.as_str(), "scoped_call_owned_struct_return" | "scoped_call_i64_carries" | "scoped_call_i64_carries_break");
+            let multi = if matches!(action_instruction.as_str(), "scoped_call_i64_carries" | "scoped_call_i64_carries_break") {
                 if node.op.instruction != "loop_while_i64_effect" || action_offset != 5 {
                     return Err("scoped_call_i64_carries requires a simple effect loop".to_owned());
                 }

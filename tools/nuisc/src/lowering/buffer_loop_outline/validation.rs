@@ -39,7 +39,7 @@ pub(super) fn buffer_loop_params(
     {
         return None;
     }
-    let writable = scope
+    let mut writable: BTreeSet<String> = scope
         .iter()
         .filter_map(|(name, ty)| {
             (ty == &scalar_type("i64")
@@ -49,6 +49,15 @@ pub(super) fn buffer_loop_params(
             .then_some(name.clone())
         })
         .collect();
+    let normalized = control_flow::normalize(effects, scope, step)?;
+    if let Some(normalized) = &normalized {
+        writable.insert(normalized.running.clone());
+        writable.extend(normalized.breaking.iter().cloned());
+    }
+    let break_flag = normalized
+        .as_ref()
+        .and_then(|normalized| normalized.breaking.clone());
+    let normalized_effects = normalized.map(|normalized| normalized.effects);
     let mut protected = protected.clone();
     protected.insert(prepared.binding_name.clone());
     protected.extend(header_inputs.iter().cloned());
@@ -59,7 +68,7 @@ pub(super) fn buffer_loop_params(
     let mut inputs = BTreeSet::new();
     let mut carries = Vec::new();
     let has_store = validate_effects(
-        effects,
+        normalized_effects.as_deref().unwrap_or(effects),
         &mut scope.clone(),
         &mut inputs,
         catalog,
@@ -68,13 +77,23 @@ pub(super) fn buffer_loop_params(
     )?;
     // Inner-loop locals can change, but only entry bindings escape this iteration.
     carries.retain(|name| scope.contains_key(name));
+    let mut params = captured_params(inputs, scope);
+    if let Some(flag) = &break_flag {
+        carries.push(flag.clone());
+        params.push(NirParam {
+            name: flag.clone(),
+            ty: scalar_type("i64"),
+        });
+    }
     Some(BufferLoopPlan {
-        params: captured_params(inputs, scope),
+        params,
         carries,
         induction: prepared.binding_name,
         header_inputs,
         mutations,
         has_store,
+        normalized_effects,
+        break_flag,
     })
 }
 
@@ -153,10 +172,20 @@ pub(super) fn validate_effects(
             NirStmt::While { condition, body } => {
                 let plan =
                     buffer_loop_params(condition, body, locals, catalog, &mutations.protected)?;
-                inputs.extend(plan.params.into_iter().map(|param| param.name));
+                inputs.extend(
+                    plan.params
+                        .into_iter()
+                        .filter(|param| plan.break_flag.as_ref() != Some(&param.name))
+                        .map(|param| param.name),
+                );
                 inputs.extend(plan.header_inputs);
                 inputs.insert(plan.induction.clone());
-                for name in plan.carries.into_iter().chain([plan.induction]) {
+                for name in plan
+                    .carries
+                    .into_iter()
+                    .filter(|name| plan.break_flag.as_ref() != Some(name))
+                    .chain([plan.induction])
+                {
                     if !carries.contains(&name) {
                         carries.push(name);
                     }

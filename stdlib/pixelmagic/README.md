@@ -61,8 +61,8 @@ Current source-asset status:
   Nuis-owned buffers. Invalid dimensions, tile sizes, phases, and ranges return
   false before writing. The bounded range helper now uses nested strict unit-step
   row/pixel `while` loops, with composed Nuis coordinate/color helpers, checked scalar
-  division/remainder and explicit `if`/`else` pixel
-  writes through private guarded YIR helpers. Conditions are snapshotted once;
+  division/remainder and guarded red-pixel `continue`/blue-fallthrough writes
+  through private YIR helpers. Conditions are snapshotted once;
   the unselected arm returns before any branch-local access or arithmetic.
   Scalar helpers remain real ordered `call_i64`/`call_bool` functions under shared
   callback fuel, not a generator-specific intrinsic. Imported private helpers keep
@@ -72,8 +72,9 @@ Current source-asset status:
   branches use shared continuations, not speculative arithmetic.
   `fill_checkerboard_region_stats` returns `CheckerboardStats { red_count, checksum }`
   using two carried i64 accumulators during the fill. Red count updates inside
-  the red-pixel write branch; the untaken arm preserves its incoming count, while
-  checksum updates follow both color arms. The checksum is a sum of
+  the red-pixel write branch, which updates checksum and explicitly steps before
+  `continue`. That exit skips the blue write and its checksum update; blue pixels
+  preserve the incoming red count. The checksum is a sum of
   packed pixel values, not a cryptographic digest. Invalid input returns `(-1, 0)`
   before writes; an empty range returns `(0, 0)`. The red-count and boolean fill
   APIs delegate and remain compatible. Native/reference regressions compare every
@@ -82,7 +83,8 @@ Current source-asset status:
   multi-state branch returns also use aggregate storage. This is not general
   unbounded-loop or arbitrary loop-carry support. Private scalar row-range helpers
   clamp partial first/last rows; empty ranges return before any loop. Inner counters
-  reset per row while both totals return through existing scoped-call state.
+  reset per row while both totals return through existing scoped-call state. The
+  private continue flag resets per pixel and cannot escape into the row or result.
 * [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
   u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The
   [image showcase](../../examples/projects/domains/ns_nova_image_showcase) frees

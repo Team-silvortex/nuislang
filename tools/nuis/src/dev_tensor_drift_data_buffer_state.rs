@@ -2,6 +2,57 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "bounded-buffer-continue-admission",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/validation.rs",
+        required_patterns: &[
+            "control_flow::normalize(effects, scope, step)?",
+            "writable.insert(normalized.running.clone())",
+            "writable.extend(normalized.breaking.iter().cloned())",
+            "normalized_effects.as_deref().unwrap_or(effects)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-continue-local-suffix",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_flow.rs",
+        required_patterns: &[
+            "__nuis_buffer_continue",
+            "same_step(rewritten.last()?, step)",
+            "index + 1 != body.len()",
+            "body.insert(0, set_flag(&flag, 1))",
+            "rewritten.push(set_flag(flag, 0))",
+            "then_body: tail",
+            "A child loop owns its control scope",
+            "value == step",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-continue-execution",
+        path: "tools/nuisc/tests/buffer_while/continues.rs",
+        required_patterns: &[
+            "guarded_continue_preserves_prefix_state_and_steps_once",
+            "continue_unit_steps_do_not_wrap_at_integer_boundaries",
+            "nested_and_sequential_continue_guards_snapshot_each_predicate_once",
+            "continue_skips_suffix_reads_math_calls_and_nested_loop_bounds",
+            "nested_continue_targets_only_its_own_loop_and_resets_each_iteration",
+            "continue_rejects_missing_or_mismatched_steps_and_unsupported_exits",
+            "continue_helpers_grow_linearly_and_keep_private_names_and_real_scalar_calls",
+            "continue_effect_order_survives_yir_declaration_reordering",
+            "continue_shares_session_fuel_without_leaking_private_or_failed_state",
+            "let controls = 32",
+            "state.fields.len(), 1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-guarded-continue-source",
+        path: "stdlib/pixelmagic/lib/pixels.ns",
+        required_patterns: &[
+            "Finish red pixels early",
+            "continue;",
+            "let checksum: i64 = checksum + pixels[index]",
+            "let index: i64 = index + 1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "bounded-buffer-branch-carry-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/validation.rs",
         required_patterns: &[
@@ -108,7 +159,8 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "carries.retain(|name| scope.contains_key(name))",
             "&mutations.protected",
             "inputs.extend(plan.header_inputs)",
-            "plan.carries.into_iter().chain([plan.induction])",
+            ".filter(|name| plan.break_flag.as_ref() != Some(name))",
+            ".chain([plan.induction])",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -136,6 +188,82 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "let depth = 8",
             "native_run",
             "event_budgeted",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-helper-declared-result-fallback",
+        path: "crates/yir-lower-llvm/src/lib.rs",
+        required_patterns: &[
+            ".and_then(|function| function.result.as_ref())",
+            ".map(|result| result.node.as_str())",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-break-source-provenance",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering.rs",
+        required_patterns: &[
+            "scoped_break_controls",
+            "Only the normalizer proves",
+            "A user struct with the same shape",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-break-shared-contract",
+        path: "crates/yir-core/src/loop_carry_contract/scoped_scalars.rs",
+        required_patterns: &[
+            "scoped_call_i64_carries_break",
+            "pub break_on_return: bool",
+            "break_control_can_be_the_only_carried_slot",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-break-driver",
+        path: "crates/yir-domain-cpu/src/execute_scoped_loop.rs",
+        required_patterns: &[
+            "scoped loop break flag requires an i64 zero seed",
+            "scoped loop break flag must be i64 0 or 1",
+            "if !self.exited",
+            "if self.exited || !active",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-break-native-control",
+        path: "crates/yir-lower-llvm/src/simple_loop_lowering.rs",
+        required_patterns: &[
+            "scoped_call_i64_carries_break",
+            "carry.store_return(pointer_bits, body, next_reg, next_block)?",
+            "loop_while_i64_advance",
+            "label %{loop_exit}, label %{advance}",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-break-native-validation",
+        path: "crates/yir-lower-llvm/src/loop_owned_struct_lowering.rs",
+        required_patterns: &[
+            "require_control_value(initial, 0, body, next_reg, next_block)",
+            "require_control_value(raw, 1, body, next_reg, next_block)",
+            "loop_break_control_invalid",
+            "before committing any of the returned carries",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "bounded-buffer-break-execution",
+        path: "tools/nuisc/tests/buffer_while/breaks.rs",
+        required_patterns: &[
+            "break_preserves_current_and_prefix_effects_without_user_scalar_carries",
+            "break_commits_all_scalar_carries_and_does_not_run_the_remaining_iterations",
+            "break_skips_suffix_traps_calls_and_child_bounds_but_not_prefix_effects",
+            "nested_break_exits_only_its_loop_and_keeps_the_child_exit_counter",
+            "break_and_explicit_step_continue_have_distinct_nested_guard_semantics",
+            "break_rejects_unmodeled_induction_mutations_and_nonterminal_exits",
+            "break_keeps_effect_order_after_yir_declaration_reordering",
+            "break_uses_shared_session_fuel_and_never_exports_its_private_control_slot",
+            "break_contract_keeps_glm_inputs_and_rejects_payload_or_zero_trip_seed_drift",
+            "break_helpers_have_linear_growth_private_names_and_one_time_predicates",
+            "malformed_return_control_traps_in_native_and_reference_execution",
+            "index < 1000000000000",
+            "event_budgeted",
+            "native_run",
         ],
     },
     DevTensorDriftCheckSpec {

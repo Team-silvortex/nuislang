@@ -569,7 +569,7 @@ pub(super) fn emit_cpu_function(
             value
         } else {
             // Partial LLVM remains inspectable, but cannot fabricate a successful result.
-            state.body.push(format!("  ; deferred lowering for declared CPU function result `{name}` outside the native entry ABI"));
+            state.body.push(format!("  ; deferred lowering for declared CPU function result `{name}` outside the native return ABI"));
             state.body.push("  call void @llvm.trap()".to_owned());
             state.body.push("  unreachable".to_owned());
             state.ends_with_terminal_return = true;

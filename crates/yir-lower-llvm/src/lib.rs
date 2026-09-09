@@ -364,7 +364,10 @@ pub fn emit_module_with_registries(
             helper_signatures
                 .get(function_name)
                 .and_then(|signature| signature.owned_struct_layout.as_ref()),
-            None,
+            functions_by_name
+                .get(function_name)
+                .and_then(|function| function.result.as_ref())
+                .map(|result| result.node.as_str()),
             &mut global_counter,
         )?;
         globals.extend(emitted.globals);

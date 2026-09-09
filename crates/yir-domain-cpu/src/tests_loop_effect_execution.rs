@@ -133,6 +133,98 @@ fn returned_carries(first: Value, second: Value) -> Value {
 }
 
 #[test]
+fn break_control_exits_before_step_and_rejects_invalid_results_before_commit() {
+    use yir_core::RegisteredExecutionStep as Step;
+    let mut node = multiple_carry_loop();
+    node.op.args[6] = "scoped_call_i64_carries_break".to_owned();
+    let mut state = loop_state(0, i64::MAX, 1);
+    state.bind_value("seed", Value::Int(10));
+    state.bind_value("second", Value::Int(0));
+    let mut execution = CpuMod
+        .begin_execution(&node, &resource(), &state)
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        execution.resume(&mut state, None).unwrap(),
+        Step::Call { .. }
+    ));
+    for invalid in [
+        Value::Int(-1),
+        Value::Int(2),
+        Value::Bool(true),
+        Value::I32(1),
+    ] {
+        assert!(execution
+            .resume(&mut state, Some(returned_carries(Value::Int(99), invalid)))
+            .is_err());
+        assert!(state.events.is_empty());
+    }
+    let Step::Call { arguments, .. } = execution
+        .resume(
+            &mut state,
+            Some(returned_carries(Value::Int(11), Value::Int(0))),
+        )
+        .unwrap()
+    else {
+        panic!("advance only after a valid result");
+    };
+    assert_eq!(arguments, [Value::Int(1), Value::Int(0), Value::Int(11)]);
+    let Step::Complete(Value::Struct(value)) = execution
+        .resume(
+            &mut state,
+            Some(returned_carries(Value::Int(12), Value::Int(1))),
+        )
+        .unwrap()
+    else {
+        panic!("break must not dispatch another call");
+    };
+    assert_eq!(
+        value.fields,
+        [
+            ("current".to_owned(), Value::Int(1)),
+            ("carry0".to_owned(), Value::Int(12)),
+            ("carry1".to_owned(), Value::Int(1)),
+        ]
+    );
+    assert!(state.events[0].contains("iterations=2 final=1"));
+}
+
+#[test]
+fn break_control_requires_zero_seed_even_on_zero_trips() {
+    let mut node = multiple_carry_loop();
+    node.op.args[6] = "scoped_call_i64_carries_break".to_owned();
+    let mut state = loop_state(3, 3, 1);
+    state.bind_value("seed", Value::Int(10));
+    for invalid in [
+        Value::Int(-1),
+        Value::Int(1),
+        Value::Bool(false),
+        Value::I32(0),
+    ] {
+        state.bind_value("second", invalid);
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+        assert!(state.events.is_empty());
+    }
+    state.bind_value("second", Value::Int(0));
+    let yir_core::RegisteredExecutionStep::Complete(Value::Struct(value)) = CpuMod
+        .begin_execution(&node, &resource(), &state)
+        .unwrap()
+        .unwrap()
+        .resume(&mut state, None)
+        .unwrap()
+    else {
+        panic!("zero trips");
+    };
+    assert_eq!(value.fields[0].1, Value::Int(3));
+    assert_eq!(value.fields[1].1, Value::Int(10));
+    assert_eq!(value.fields[2].1, Value::Int(0));
+    assert_eq!(
+        CpuMod.describe(&node, &resource()).unwrap().dependencies,
+        ["initial", "limit", "step", "second", "seed"]
+    );
+}
+
+#[test]
 fn scoped_multiple_carries_validate_all_slots_before_advancing() {
     use yir_core::RegisteredExecutionStep as Step;
     let node = multiple_carry_loop();

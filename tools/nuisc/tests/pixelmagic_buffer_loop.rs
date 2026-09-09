@@ -98,10 +98,16 @@ fn compare_pixels(
     assert!(
         compiled.yir.functions.iter().any(|function| {
             function.name.starts_with("__nuis_buffer_branch_")
-                && function
-                    .result
-                    .as_ref()
-                    .is_some_and(|result| result.ty == "i64")
+                && function.result.as_ref().is_some_and(|result| {
+                    result.ty.starts_with("__nuis_scalar_carries_")
+                        && compiled.yir.nodes.iter().any(|node| {
+                            node.name == result.node
+                                && node.op.instruction == "return_owned_struct"
+                                && node.op.args.get(1).is_some_and(|layout| {
+                                    layout.ends_with("{carry0:i64;carry1:i64;carry2:i64}")
+                                })
+                        })
+                })
                 && function.body_nodes.iter().any(|name| {
                     compiled.yir.nodes.iter().any(|node| {
                         &node.name == name

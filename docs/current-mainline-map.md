@@ -110,8 +110,16 @@ Nested bounded Buffer-writing loops now compose through the same private functio
 with independent counters, scalar carries, guarded child bounds and shared fuel.
 PixelMagic uses row/pixel loops, not a fixed two-dimensional runtime operation.
 NIR branch joins invalidate stale literals and preserve live outgoing assignments.
-The next callback boundary is guarded break/continue alongside Buffer writes,
-not arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
+Guarded `continue` now preserves prefix writes/carries and skips the whole suffix,
+including nested loop bounds, when the source path explicitly performs the matching
+unit step. Each loop owns its control scope; no runtime-specific opcode is added.
+PixelMagic uses this path after finishing each red pixel.
+Guarded `break` now exits before stepping through a shared flat-i64 control contract
+consumed by the CPU registered driver and LLVM. Native/reference and session tests
+preserve prefix state, reject invalid control values and stop a trillion-bound loop
+within 1000 shared fuel. A break-based packaged application proof is the next
+integration boundary; the existing M2 image evidence remains continue-based.
+This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.
 Cross-session resource reuse remains a separate, unproven boundary.

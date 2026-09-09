@@ -91,13 +91,15 @@ mod cpu PixelMagicPixels {
       let row_end: i64 = checkerboard_row_end(row, width, end);
       while index < row_end {
         let red: bool = checkerboard_is_red(index, width, tile_size, phase);
-        // Only the selected arm writes its packed little-endian RGBA8 color.
+        // Finish red pixels early; continue skips the blue write and its checksum update.
         if red {
           pixels[index] = 4278190335;
           let total: i64 = checkerboard_red_total(total, red);
-        } else {
-          pixels[index] = 4294901760;
+          let checksum: i64 = checksum + pixels[index];
+          let index: i64 = index + 1;
+          continue;
         }
+        pixels[index] = 4294901760;
         let checksum: i64 = checksum + pixels[index];
         let index: i64 = index + 1;
       }

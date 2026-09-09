@@ -96,6 +96,7 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 registers,
                 helper_signatures,
                 next_reg,
+                next_block,
             )?;
             let scalar_carry_slot = if node.op.instruction == "loop_while_i64_effect" {
                 yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?
@@ -182,6 +183,33 @@ pub(crate) fn lower_cpu_simple_loop_node(
                     )
                 })
                 .transpose()?;
+            let mut break_control = None;
+            if let Some(cleanup) = effect_cleanup {
+                if let (LoopEffectCleanup::ScalarResult(value), Some(slot)) =
+                    (&cleanup, &scalar_carry_slot)
+                {
+                    body.push(format!("  store i64 {value}, ptr {slot}"));
+                }
+                if let (LoopEffectCleanup::OwnedResult(blob), Some(slot)) = (&cleanup, &owned_slot)
+                {
+                    body.push(format!("  store ptr {blob}, ptr {slot}"));
+                }
+                if let (LoopEffectCleanup::OwnedStructResult(pointer_bits), Some(carry)) =
+                    (&cleanup, &owned_struct_carry)
+                {
+                    break_control = carry.store_return(pointer_bits, body, next_reg, next_block)?;
+                }
+                finish_loop_effect_action(&cleanup, body);
+            }
+            if let Some(control) = break_control {
+                let exiting = fresh_reg(next_reg);
+                let advance = fresh_block(next_block, "loop_while_i64_advance");
+                body.push(format!("  {exiting} = icmp eq i64 {control}, 1"));
+                body.push(format!(
+                    "  br i1 {exiting}, label %{loop_exit}, label %{advance}"
+                ));
+                body.push(format!("{advance}:"));
+            }
             let next_value = match step_kind {
                 "add" => {
                     let reg = fresh_reg(next_reg);
@@ -201,23 +229,6 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 }
             };
             body.push(format!("  store i64 {next_value}, ptr {loop_slot}"));
-            if let Some(cleanup) = effect_cleanup {
-                if let (LoopEffectCleanup::ScalarResult(value), Some(slot)) =
-                    (&cleanup, &scalar_carry_slot)
-                {
-                    body.push(format!("  store i64 {value}, ptr {slot}"));
-                }
-                if let (LoopEffectCleanup::OwnedResult(blob), Some(slot)) = (&cleanup, &owned_slot)
-                {
-                    body.push(format!("  store ptr {blob}, ptr {slot}"));
-                }
-                if let (LoopEffectCleanup::OwnedStructResult(pointer_bits), Some(carry)) =
-                    (&cleanup, &owned_struct_carry)
-                {
-                    carry.store_return(pointer_bits, body, next_reg)?;
-                }
-                finish_loop_effect_action(&cleanup, body);
-            }
             body.push(format!("  br label %{loop_cond}"));
             body.push(format!("{loop_exit}:"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(current.clone()));
@@ -242,7 +253,10 @@ pub(crate) fn lower_cpu_simple_loop_node(
             }
             if let Some(carry) = owned_struct_carry {
                 let (result, mut value) = carry.finish(body, next_reg)?;
-                if node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carries") {
+                if matches!(
+                    node.op.args.get(6).map(String::as_str),
+                    Some("scoped_call_i64_carries" | "scoped_call_i64_carries_break")
+                ) {
                     value.type_name = "LoopState".to_owned();
                     value.fields.insert(
                         0,

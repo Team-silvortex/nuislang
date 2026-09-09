@@ -9,6 +9,7 @@ enum ScopedLoopResult<'a> {
     Scalars {
         bindings: Vec<&'a str>,
         layout: String,
+        breaking: bool,
     },
     OwnedBytes(&'a str),
     OwnedStruct {
@@ -100,9 +101,22 @@ pub(super) fn lower_scoped_call_while(
     let projections = result_binding.and_then(|(binding, ty)| {
         scalar_carries::projected_bindings(binding, ty, counted_body, state)
     });
+    let breaking = projections.as_ref().is_some_and(|carries| {
+        scalar_carries::break_guard(counted_body.get(carries.len()), carries[carries.len() - 1])
+    });
+    // Only the normalizer proves that this i64 projection is a canonical 0/1 signal.
+    // A user struct with the same shape may legitimately contain other integers.
+    if breaking
+        && state.scoped_break_controls.get(callee).map(String::as_str)
+            != projections
+                .as_ref()
+                .and_then(|carries| carries.last().copied())
+    {
+        return Ok(false);
+    }
     let counted_body = projections
         .as_ref()
-        .map(|carries| &counted_body[carries.len()..])
+        .map(|carries| &counted_body[carries.len() + usize::from(breaking)..])
         .unwrap_or(counted_body);
     let Some(prepared) = prepare_counted_while(
         condition,
@@ -145,12 +159,14 @@ pub(super) fn lower_scoped_call_while(
                     .is_some_and(|returned| returned == ty) =>
         {
             let carries = projections.expect("matched scalar projections");
-            if !scalar_carries::admissible(&carries, &prepared, function, args, bindings) {
+            if !scalar_carries::admissible(&carries, &prepared, function, args, bindings, breaking)
+            {
                 return Ok(false);
             }
             ScopedLoopResult::Scalars {
                 bindings: carries,
                 layout,
+                breaking,
             }
         }
         (Some((binding, ty)), false, None)
@@ -257,7 +273,7 @@ pub(super) fn lower_scoped_call_while(
         } else if matches!((&result, arg), (ScopedLoopResult::Scalar(binding), NirExpr::Var(name)) if name == binding)
         {
             action_args.push("$carry".to_owned());
-        } else if let Some(index) = scalar_carries::argument_index(&result, arg) {
+        } else if let Some(index) = scalar_carries::argument_index(&result, param, arg) {
             let lowered = lower_expr(arg, state, bindings)?;
             action_args.push(yir_core::encode_loop_owned_struct_carry(index, &lowered));
         } else if state.struct_defs.contains_key(param.ty.name.as_str()) {
@@ -318,7 +334,10 @@ pub(super) fn lower_scoped_call_while(
         match &result {
             ScopedLoopResult::None => "scoped_call",
             ScopedLoopResult::Scalar(_) => "scoped_call_i64_carry",
-            ScopedLoopResult::Scalars { .. } => "scoped_call_i64_carries",
+            ScopedLoopResult::Scalars { breaking: true, .. } => "scoped_call_i64_carries_break",
+            ScopedLoopResult::Scalars {
+                breaking: false, ..
+            } => "scoped_call_i64_carries",
             ScopedLoopResult::OwnedBytes(_) => "scoped_call_owned_return",
             ScopedLoopResult::OwnedStruct { .. } => "scoped_call_owned_struct_return",
         }
@@ -441,9 +460,29 @@ fn validate_loop_result_rebinding(
     match result {
         ScopedLoopResult::None => Ok(()),
         ScopedLoopResult::Scalars {
-            bindings: carries, ..
+            bindings: carries,
+            breaking,
+            ..
         } => {
             for binding in carries {
+                if *breaking && Some(binding) == carries.last() {
+                    let seeds = function
+                        .params
+                        .iter()
+                        .zip(args)
+                        .filter(|(param, arg)| {
+                            is_scalar_i64(&param.ty)
+                                && param.name == *binding
+                                && *arg == &NirExpr::Int(0)
+                        })
+                        .count();
+                    if seeds != 1 {
+                        return Err(format!(
+                            "scoped break flag `{binding}` requires exactly one i64 zero seed"
+                        ));
+                    }
+                    continue;
+                }
                 validate_loop_result_rebinding(
                     &ScopedLoopResult::Scalar(binding),
                     function,

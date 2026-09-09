@@ -151,8 +151,14 @@ Nested bounded loops now compose through those same function contracts, includin
 branch-local child loops, reset/persistent counters and shared callback fuel.
 PixelMagic uses real row/pixel loops with clamped partial rows; native/reference
 tests check both pixels and carried statistics. Inner loops cannot mutate ancestor
-headers. Guarded loop exits, arbitrary carry types and fully native CPU callbacks
-remain separate work.
+headers. Guarded `continue` now skips the remaining iteration through those same
+functions, provided its path explicitly performs the matching unit step. PixelMagic
+uses it after red-pixel writes and statistics. Guarded `break` now signals the CPU
+loop driver and LLVM to exit before stepping, preserving prefix writes and i64
+state without empty remaining iterations. Native/reference and budgeted-session
+regressions cover this subset; the existing M2 image proof still uses `continue`.
+Step-before-break, unstepped `continue`, arbitrary
+carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

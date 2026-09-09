@@ -278,7 +278,30 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session.next_step.contains("scalar loop carries"));
     assert!(session
         .next_step
-        .contains("guarded break/continue in bounded buffer-writing callbacks"));
+        .contains("guarded break in bounded buffer-writing callbacks"));
+    assert!(session
+        .evidence
+        .contains("Guarded continue now preserves prefix writes"));
+    assert!(session.evidence.contains("matching explicit unit step"));
+    assert!(session.evidence.contains("32-guard linear helper growth"));
+    assert!(session
+        .evidence
+        .contains("Loop-local flags reset per iteration"));
+    assert!(session
+        .evidence
+        .contains("Driver-level guarded break now exits before the induction step"));
+    assert!(session
+        .evidence
+        .contains("trillion-iteration bound within 1000 shared fuel"));
+    assert!(session
+        .next_action
+        .contains("break-based packaged application proof"));
+    assert!(session.evidence.contains(
+        "continue-based PixelMagic image passes ordinary headless build/run-artifact on real M2"
+    ));
+    assert!(session
+        .evidence
+        .contains("two statistics plus the private control flag"));
     assert!(session
         .evidence
         .contains("Nested bounded Buffer-writing loops now compose recursively"));
@@ -306,7 +329,13 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("guarded branch-local counting call"));
-    assert!(session.blocker.contains("guarded break/continue"));
+    assert!(session
+        .blocker
+        .contains("step-before-break, unstepped continue"));
+    assert!(session
+        .blocker
+        .contains("cpu.guard_drop_owned_bytes_return"));
+    assert!(session.blocker.contains("aggregate return-layout contract"));
     assert!(!session
         .blocker
         .contains("Nested Buffer-writing loops, fresh-local rebinding"));

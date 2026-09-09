@@ -230,7 +230,7 @@ fn branch_induction_and_ownership_operations_stay_fail_closed() {
         "let allocated: ref Buffer = alloc_buffer(1, 0); free(allocated);",
         "let snapshot: Bytes = copy_bytes(buffer); drop_bytes(snapshot);",
         "free(buffer);",
-        "break;",
+        "let index: i64 = index + 1; break;",
         "continue;",
         "return 0;",
     ] {

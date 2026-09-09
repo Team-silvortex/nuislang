@@ -11,10 +11,13 @@ pub struct ScopedI64Carries<'a> {
     pub layout: OwnedStructLayout,
     pub seeds: Vec<&'a str>,
     pub operands: &'a [String],
+    /// The last i64 slot is 0 to advance or 1 to break before the induction step.
+    pub break_on_return: bool,
 }
 
 pub fn parse_scoped_i64_carries(args: &[String]) -> Result<Option<ScopedI64Carries<'_>>, String> {
-    if args.get(6).map(String::as_str) != Some("scoped_call_i64_carries") {
+    let break_on_return = args.get(6).map(String::as_str) == Some("scoped_call_i64_carries_break");
+    if !break_on_return && args.get(6).map(String::as_str) != Some("scoped_call_i64_carries") {
         return Ok(None);
     }
     let invalid = || {
@@ -66,6 +69,7 @@ pub fn parse_scoped_i64_carries(args: &[String]) -> Result<Option<ScopedI64Carri
         layout,
         seeds,
         operands,
+        break_on_return,
     }))
 }
 
@@ -75,34 +79,46 @@ mod tests {
 
     #[test]
     fn scoped_multi_scalar_layout_and_markers_are_checked_together() {
-        let valid = "begin end step lt add cpu scoped_call_i64_carries 6 update State{carry0:i64;carry1:i64} $owned_struct_carry:1:second $current buffer $owned_struct_carry:0:first"
+        for action in ["scoped_call_i64_carries", "scoped_call_i64_carries_break"] {
+            let valid = format!("begin end step lt add cpu {action} 6 update State{{carry0:i64;carry1:i64}} $owned_struct_carry:1:second $current buffer $owned_struct_carry:0:first")
             .split_whitespace().map(str::to_owned).collect::<Vec<_>>();
-        let parsed = parse_scoped_i64_carries(&valid).unwrap().unwrap();
-        assert_eq!(parsed.seeds, ["first", "second"]);
-        for length in 7..valid.len() {
-            assert!(parse_scoped_i64_carries(&valid[..length]).is_err());
-        }
-        for (index, value) in [
-            (5, "shader"),
-            (7, "18446744073709551615"),
-            (8, "$current"),
-            (9, "State{}"),
-            (9, "State{carry0:i64;carry1:bool}"),
-            (9, "State{carry0:i64;carry0:i64}"),
-            (9, "State{carry0:Inner{x:i64}}"),
-            (10, "$owned_struct_carry:0:second"),
-            (10, "$owned_struct_carry:2:second"),
-            (10, "$owned_struct_carry:18446744073709551615:second"),
-            (10, "$owned_struct_carry:1:$current"),
-            (10, "second"),
-            (12, "copy_owned:buffer"),
-            (12, "move_owned:buffer"),
-            (12, "$carry"),
-        ] {
-            let mut invalid = valid.clone();
-            invalid[index] = value.to_owned();
-            assert!(parse_scoped_i64_carries(&invalid).is_err(), "{invalid:?}");
+            let parsed = parse_scoped_i64_carries(&valid).unwrap().unwrap();
+            assert_eq!(parsed.seeds, ["first", "second"]);
+            assert_eq!(parsed.break_on_return, action.ends_with("_break"));
+            for length in 7..valid.len() {
+                assert!(parse_scoped_i64_carries(&valid[..length]).is_err());
+            }
+            for (index, value) in [
+                (5, "shader"),
+                (7, "18446744073709551615"),
+                (8, "$current"),
+                (9, "State{}"),
+                (9, "State{carry0:i64;carry1:bool}"),
+                (9, "State{carry0:i64;carry0:i64}"),
+                (9, "State{carry0:Inner{x:i64}}"),
+                (10, "$owned_struct_carry:0:second"),
+                (10, "$owned_struct_carry:2:second"),
+                (10, "$owned_struct_carry:18446744073709551615:second"),
+                (10, "$owned_struct_carry:1:$current"),
+                (10, "second"),
+                (12, "copy_owned:buffer"),
+                (12, "move_owned:buffer"),
+                (12, "$carry"),
+            ] {
+                let mut invalid = valid.clone();
+                invalid[index] = value.to_owned();
+                assert!(parse_scoped_i64_carries(&invalid).is_err(), "{invalid:?}");
+            }
         }
         assert!(parse_scoped_i64_carries(&[]).unwrap().is_none());
+    }
+
+    #[test]
+    fn break_control_can_be_the_only_carried_slot() {
+        let args = "begin end step lt add cpu scoped_call_i64_carries_break 4 update Control{carry0:i64} $current $owned_struct_carry:0:zero"
+            .split_whitespace().map(str::to_owned).collect::<Vec<_>>();
+        let parsed = parse_scoped_i64_carries(&args).unwrap().unwrap();
+        assert!(parsed.break_on_return);
+        assert_eq!(parsed.seeds, ["zero"]);
     }
 }

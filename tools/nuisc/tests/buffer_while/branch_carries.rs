@@ -163,7 +163,7 @@ fn branch_carries_reject_mutable_headers_non_i64_state_and_ownership_control() {
         "let flag: bool = false;",
         "let local: i64 = seed + index; if index < 2 { let local: i64 = local + 1; } store_at(buffer, index, local);",
         "free(buffer);",
-        "break;",
+        "let index: i64 = index + 1; break;",
         "continue;",
         "return 0;",
         "while index < 8 { let index: i64 = index + 1; }",
