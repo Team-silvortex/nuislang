@@ -394,4 +394,137 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "dynamic_branch_keeps_unchanged_literals_without_leaking_branch_locals",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-bridge-api",
+        path: "crates/yir-lower-llvm/src/native_session/mod.rs",
+        required_patterns: &[
+            "pub fn emit_registered(",
+            "crate::emit_native_scalar_module(&selected)",
+            "yir_core::native_scalar_session",
+            "pub state_layout: ScalarStateLayout",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-shared-values",
+        path: "crates/yir-core/src/native_scalar_session.rs",
+        required_patterns: &[
+            "nuis-native-scalar-session-bridge-v1",
+            "pub const MAX_SCALAR_SLOTS: usize = 64",
+            "noncanonical scalar word",
+            "pub struct ScalarStateLayout",
+            "shared_layout_reconstructs_nested_nominal_state_without_losing_float_bits",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-host-binding",
+        path: "crates/yir-runtime-host/src/native_application_session.rs",
+        required_patterns: &[
+            "pub unsafe fn from_static(",
+            "self.module != module || self.id != id",
+            "artifact identity mismatch",
+            "self.layout.unpack(&output)?",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-host-policy",
+        path: "crates/yir-runtime-host/src/application_session/execution.rs",
+        required_patterns: &[
+            "Reference(FunctionSession",
+            "Native(NativeSessionBindings",
+            "reference-executor fuel cannot preempt a native session callback",
+            "Self::Native(binding) => binding.invoke",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-production-entry",
+        path: "crates/yir-runtime-host/src/native_application_session/entry.rs",
+        required_patterns: &[
+            "pub struct NativeSessionDescriptorV1",
+            "if module != compiled_module",
+            "ApplicationSession::open_native_registered",
+            "session.completion_status()?",
+            "pub unsafe extern \"C\" fn nuis_native_application_script_main",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-production-proof",
+        path: "tools/nuisc/tests/native_application_host.rs",
+        required_patterns: &[
+            "packaged_native_session_uses_shared_host_without_reference_fallback",
+            "--native-session",
+            "unreachable_callback_body",
+            "cleanup must use last accepted state",
+            "artifact identity mismatch",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-host-failure-proof",
+        path: "crates/yir-runtime-host/src/native_application_session/tests.rs",
+        required_patterns: &[
+            "native_host_admits_arguments_and_rejects_reference_fuel_before_entry",
+            "native_event_failure_retains_last_state_and_cannot_turn_cleanup_into_success",
+            "malformed_native_output_and_failed_close_never_publish_partial_state_or_retry",
+            "native_static_descriptor_rejects_drift_and_bad_scripts_before_any_callback",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-bridge-admission",
+        path: "crates/yir-lower-llvm/src/native_session/admission.rs",
+        required_patterns: &[
+            "ApplicationSessionSignature::bind",
+            "parameter node/signature drift",
+            "callback return layouts disagree",
+            "requires external initialization or calls",
+            "first native profile has no calls",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-bridge-emission",
+        path: "crates/yir-lower-llvm/src/native_session/emit.rs",
+        required_patterns: &[
+            "%counts_ok = and i1 %argc_ok, %outc_ok",
+            "label %bad_scalar",
+            "nuis_scheduler_owned_aggregate_get_v1",
+            "nuis_scheduler_owned_aggregate_drop_v1",
+            "store i64 %result",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-materialization",
+        path: "crates/yir-lower-llvm/src/function_lowering.rs",
+        required_patterns: &[
+            "require_scalar_values: bool",
+            "required_values.push(node.name.as_str())",
+            "native scalar callback did not materialize value",
+            "native scalar callback did not emit a terminal return",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-execution-proof",
+        path: "tools/nuisc/tests/native_application_bridge.rs",
+        required_patterns: &[
+            "registered_scalar_callbacks_execute_natively_without_main_replay_or_interpreter",
+            "native_bridge_rejects_signature_layout_lane_and_initialization_drift",
+            "scalar_words_reject_noncanonical_encodings_without_losing_float_bits",
+            "did not materialize value",
+            "0x7ff8_0000_0000_4321",
+            "write_and_link_with_source",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-boundaries-proof",
+        path: "tools/nuisc/tests/native_application_bridge/bounds.rs",
+        required_patterns: &[
+            "native_bridge_accepts_the_slot_bound_and_rejects_larger_signatures",
+            "zero_argument_native_open_accepts_null_input_without_accessing_it",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-float-parameter-binding",
+        path: "crates/yir-lower-llvm/src/param_lowering.rs",
+        required_patterns: &[
+            "mismatched LLVM binding",
+            "floating_parameters_remain_typed_and_never_convert_to_fallback_integers",
+        ],
+    },
 ];

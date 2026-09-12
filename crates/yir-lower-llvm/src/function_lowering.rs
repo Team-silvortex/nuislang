@@ -40,6 +40,7 @@ pub(super) fn emit_cpu_function(
     function_return_kind: CpuCallScalarKind,
     function_return_layout: Option<&yir_core::OwnedStructLayout>,
     declared_result: Option<&str>,
+    require_scalar_values: bool,
     global_counter: &mut usize,
 ) -> Result<EmittedCpuFunction, String> {
     let ordered_names = ordered_node_names
@@ -83,6 +84,7 @@ pub(super) fn emit_cpu_function(
         ends_with_terminal_return: false,
     };
     state.buffer_lengths.extend(param_buffer_lengths.clone());
+    let mut required_values = Vec::new();
 
     for (node_name, value) in param_bindings {
         state.registers.insert(node_name.clone(), value.clone());
@@ -114,6 +116,14 @@ pub(super) fn emit_cpu_function(
             .ok_or_else(|| format!("unknown resource `{}`", node.resource))?;
         if state.ends_with_terminal_return {
             continue;
+        }
+        if require_scalar_values
+            && !matches!(
+                node.op.instruction.as_str(),
+                "guard_return" | "return_owned_struct"
+            )
+        {
+            required_values.push(node.name.as_str());
         }
 
         if lower_domain_result_observer_node(node, &mut state) {
@@ -558,6 +568,18 @@ pub(super) fn emit_cpu_function(
         }
     }
 
+    if require_scalar_values {
+        for name in required_values {
+            if !state.registers.contains_key(name) {
+                return Err(format!(
+                    "native scalar callback did not materialize value `{name}`"
+                ));
+            }
+        }
+        if !state.ends_with_terminal_return {
+            return Err("native scalar callback did not emit a terminal return".to_owned());
+        }
+    }
     *global_counter = state.next_global;
     let ret = if !state.ends_with_terminal_return && declared_result.is_some() {
         let name = declared_result.expect("declared result");

@@ -18,11 +18,14 @@ use yir_verify::verify_module;
 
 mod host_application_script;
 mod host_ffi_stub;
+mod host_native_session;
 mod host_runtime_frame;
+mod host_runtime_library;
 mod host_text_runtime;
 mod host_window_session;
 
 use host_ffi_stub::render_host_ffi_stubs;
+use host_runtime_library::ensure_runtime_host_staticlib_built;
 use host_text_runtime::host_text_runtime_source;
 
 fn main() {
@@ -35,17 +38,26 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
     let input = args.next().ok_or_else(|| {
-        "usage: cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale] [--headless]".to_owned()
+        "usage: yir-pack-aot <module.yir> <output-dir> [frame-scale] [--headless | --native-session ID]".to_owned()
     })?;
     let output_dir = args.next().ok_or_else(|| {
-        "usage: cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale] [--headless]".to_owned()
+        "usage: yir-pack-aot <module.yir> <output-dir> [frame-scale] [--headless | --native-session ID]".to_owned()
     })?;
-    let (frame_scale, headless) = host_application_script::parse_options(args)?;
+    let (frame_scale, headless, native) = host_application_script::parse_options(args)?;
 
     let source =
         fs::read_to_string(&input).map_err(|error| format!("failed to read `{input}`: {error}"))?;
     let module = yir_syntax::parse_module(&source)?;
     verify_module(&module)?;
+    if let Some(id) = native {
+        return host_native_session::build(
+            &module,
+            &source,
+            Path::new(&input),
+            Path::new(&output_dir),
+            &id,
+        );
+    }
     if headless && module.application_sessions.is_empty() {
         return Err("headless packaging requires a registered application session".to_owned());
     }
@@ -3198,36 +3210,6 @@ fn maybe_prepare_embedded_runtime_support(
         embedded_module_bytes: bytes_to_c_array(source.as_bytes()),
         frame_scale,
     }))
-}
-
-fn ensure_runtime_host_staticlib_built() -> Result<PathBuf, String> {
-    let status = Command::new("cargo")
-        .arg("build")
-        .arg("-p")
-        .arg("yir-runtime-host")
-        .status()
-        .map_err(|error| format!("failed to invoke cargo build for yir-runtime-host: {error}"))?;
-    if !status.success() {
-        return Err("cargo build -p yir-runtime-host failed".to_owned());
-    }
-
-    let sibling_path = std::env::current_exe().ok().and_then(|path| {
-        path.parent()
-            .map(|parent| parent.join("libyir_runtime_host.a"))
-    });
-    if let Some(path) = sibling_path.filter(|path| path.exists()) {
-        return Ok(path);
-    }
-
-    let debug_path = PathBuf::from("target/debug/libyir_runtime_host.a");
-    if debug_path.exists() {
-        return Ok(debug_path);
-    }
-
-    Err(format!(
-        "expected built runtime host staticlib at `{}`",
-        debug_path.display()
-    ))
 }
 
 struct ObjcHostSourceSpec<'a> {

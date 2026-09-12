@@ -2,12 +2,23 @@ use std::{fs, path::Path, process::Command};
 
 pub const CONTRACT: &str = "nuis-yir-application-scalar-script-v1";
 
-pub fn parse_options(arguments: impl Iterator<Item = String>) -> Result<(usize, bool), String> {
+pub fn parse_options(
+    mut arguments: impl Iterator<Item = String>,
+) -> Result<(usize, bool, Option<String>), String> {
     let mut scale = None;
     let mut headless = false;
-    for argument in arguments {
+    let mut native = None;
+    while let Some(argument) = arguments.next() {
         if argument == "--headless" && !headless {
             headless = true;
+        } else if argument == "--native-session" && native.is_none() {
+            let id = arguments
+                .next()
+                .ok_or("--native-session requires a registration ID")?;
+            if id.is_empty() || id.starts_with('-') {
+                return Err("invalid native application session ID".to_owned());
+            }
+            native = Some(id);
         } else if scale.is_none() && !argument.starts_with('-') {
             scale = Some(
                 argument
@@ -20,7 +31,12 @@ pub fn parse_options(arguments: impl Iterator<Item = String>) -> Result<(usize, 
             ));
         }
     }
-    Ok((scale.unwrap_or(8), headless))
+    if native.is_some() && (headless || scale.is_some()) {
+        return Err(
+            "native session packaging cannot select a reference/window host profile".to_owned(),
+        );
+    }
+    Ok((scale.unwrap_or(8), headless, native))
 }
 
 pub fn source(embedded_module: &str) -> String {
@@ -107,15 +123,24 @@ mod tests {
     #[test]
     fn packaging_requires_an_explicit_host_profile_and_rejects_extra_options() {
         let parse = |args: &[&str]| parse_options(args.iter().map(|s| s.to_string()));
-        assert_eq!(parse(&[]).unwrap(), (8, false));
-        assert_eq!(parse(&["4"]).unwrap(), (4, false));
-        assert_eq!(parse(&["--headless"]).unwrap(), (8, true));
-        assert_eq!(parse(&["4", "--headless"]).unwrap(), (4, true));
+        assert_eq!(parse(&[]).unwrap(), (8, false, None));
+        assert_eq!(parse(&["4"]).unwrap(), (4, false, None));
+        assert_eq!(parse(&["--headless"]).unwrap(), (8, true, None));
+        assert_eq!(parse(&["4", "--headless"]).unwrap(), (4, true, None));
+        assert_eq!(
+            parse(&["--native-session", "counter"]).unwrap(),
+            (8, false, Some("counter".to_owned()))
+        );
         for invalid in [
             vec!["--headless", "--headless"],
             vec!["4", "5"],
             vec!["--unknown"],
             vec!["bad"],
+            vec!["--native-session"],
+            vec!["--native-session", "--headless"],
+            vec!["--native-session", "counter", "--headless"],
+            vec!["4", "--native-session", "counter"],
+            vec!["--native-session", "counter", "--native-session", "counter"],
         ] {
             assert!(parse(&invalid).is_err());
         }

@@ -308,8 +308,8 @@ build/run-artifact now retains and executes the break action: two real Metal fra
 include the expected magenta marker and match every direct-session replay byte.
 Replay confirms five helper invocations, stop index 4 and exactly four marker writes
 per callback. Pre-effect argument/binary/YIR rejection and exhausted-replay evidence
-preservation still pass. The score remains `active/86`; next is native CPU lifecycle
-callback dispatch, while retaining this packaged break proof.
+preservation still pass. The score remains `active/86`; next is explicit native
+application-session host integration, while retaining this packaged break proof.
 This is not fully native CPU callbacks, arbitrary loop support or a
 complete memory-safety proof.
 The default-AOT image regression now passes its LLVM checkpoint and real Metal
@@ -320,7 +320,22 @@ layout drift and directly known dropped-Bytes aliases reject before cleanup.
 The compiler records two terminal branches as a returned result, while registered
 function-exit hooks replace CPU operation-name dispatch in the generic executor.
 Other aggregate early-return operations remain incomplete. The compiled host still
-executes embedded YIR callbacks, so native CPU callback dispatch is not yet proven.
+executes embedded YIR callbacks, so native dispatch of that full callback graph is not yet proven.
+An isolated [static scalar bridge](nuis-native-scalar-session-bridge-v1.md) now has
+native registered open/event/close execution evidence. It validates signatures and
+slot encodings, preserves nested state and floating bits, supports in-place state,
+and rejects incomplete native value materialization. Native/reference tests include
+early return, reordering, invalid-input nonentry and the 64-slot boundary. Floating
+parameter lowering now recognizes typed bindings without integer fallback conversion.
+The real packer now explicitly selects a static native scalar host. It shares the
+existing session phase/failure policy, preserves last accepted state after failure,
+closes at most once, rejects reference fuel before native entry, and admits the
+complete bound YIR graph before open. Production-host native/reference parity,
+fault injection without fallback and stale-object rejection now have regressions.
+Shared scalar transport lives in YIR core, not LLVM-dependent runtime code.
+This is not the compiled image host's dispatch path. Ordinary `nuis build/run-artifact`
+profile selection remains next; helper calls, loops, resources and providers remain
+outside the native scalar profile.
 Compound-condition `while` lowering now selects recursive descriptors,
 normalizes linear carries consistently and deduplicates shared effect inputs.
 CPU-owned cooperative execution replaces trace-only loop results; generic YIR

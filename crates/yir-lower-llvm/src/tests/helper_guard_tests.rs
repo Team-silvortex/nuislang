@@ -711,6 +711,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         CpuCallScalarKind::I32,
         None,
         None,
+        false,
         &mut global_counter,
     )
     .expect("i32 helper lowering should succeed");

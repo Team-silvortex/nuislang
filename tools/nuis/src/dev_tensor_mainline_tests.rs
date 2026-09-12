@@ -306,9 +306,31 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
+    assert!(session.next_step.starts_with(
+        "thread the explicit native scalar session profile through identity-checked build/run-artifact"
+    ));
+    assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
-        .next_step
-        .starts_with("establish native CPU lifecycle callback dispatch"));
+        .evidence
+        .contains("Explicit yir-pack-aot --native-session selection"));
+    assert!(session
+        .evidence
+        .contains("Production native-host regressions"));
+    assert!(session
+        .evidence
+        .contains("reference fuel before native entry"));
+    assert!(session
+        .validation_command
+        .contains("--test native_application_host"));
+    assert!(session
+        .evidence
+        .contains("Strict native value materialization"));
+    assert!(session
+        .evidence
+        .contains("pure-scalar bridge excludes helper calls, loops, resource state and providers"));
+    assert!(session
+        .validation_command
+        .contains("--test native_application_bridge"));
     assert!(session
         .evidence
         .contains("default-AOT image regression now passes its LLVM checkpoint"));
@@ -355,7 +377,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("step-before-break, unstepped continue"));
     assert!(session
         .blocker
-        .contains("native CPU lifecycle callback dispatch remains unproven"));
+        .contains("native build/run-artifact profile selection remains unproven"));
     assert!(!session
         .blocker
         .contains("reject cpu.guard_drop_owned_bytes_return"));

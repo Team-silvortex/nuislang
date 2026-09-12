@@ -547,6 +547,14 @@ Non-CPU registration, nested-call continuation and rejected exits have regressio
 The compiled image host still uses embedded YIR for CPU callbacks. Passing the
 LLVM checkpoint is not evidence of complete native callback dispatch; other
 aggregate early-return operations and resource-bearing callback states remain open.
+The separate [native scalar bridge](nuis-native-scalar-session-bridge-v1.md) now
+executes a bounded registered open/event/close fixture through static exports,
+without interpreting YIR or replaying main. Its strict scalar-only admission and
+typed slot checks have native/reference regressions. A separate explicit packer
+profile now links it into the shared application-session lifecycle, with last-state
+preservation, one cleanup attempt and exact YIR binding before open. This provider
+scalar-script host does not select that profile; native calls do not inherit
+reference fuel or provider capabilities, and no interpreter fallback is permitted.
 
 ## Current Boundary
 

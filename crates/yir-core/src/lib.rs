@@ -14,6 +14,7 @@ pub mod loop_carry_contract;
 mod loop_owned_struct;
 mod module_graph;
 mod mutex_contract;
+pub mod native_scalar_session;
 mod operation_results;
 mod operation_semantics;
 mod owned_select_tree;

@@ -142,6 +142,7 @@ fn unavailable_declared_entry_result_traps_instead_of_using_an_unrelated_scalar(
             CpuCallScalarKind::I64,
             None,
             Some("result"),
+            false,
             &mut 0,
         )
         .unwrap();

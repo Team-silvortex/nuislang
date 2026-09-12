@@ -7,6 +7,7 @@ mod application_scope_admission;
 mod application_script;
 mod application_session;
 mod frame_export;
+mod native_application_session;
 mod provider_application_session;
 mod provider_drain_observation;
 mod provider_result_stream;
@@ -39,6 +40,10 @@ pub use application_session::{
     APPLICATION_SESSION_CONTRACT,
 };
 pub use frame_export::{export_module_frame, nuis_export_embedded_yir_ppm, FRAME_EXPORT_CONTRACT};
+pub use native_application_session::{
+    nuis_native_application_script_main, NativeScalarCallback, NativeSessionBindings,
+    NativeSessionDescriptorV1,
+};
 pub use provider_application_session::{
     with_provider_application_session, with_registered_provider_application_session,
     ApplicationProviderSource, PROVIDER_APPLICATION_SESSION_CONTRACT,

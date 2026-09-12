@@ -125,8 +125,15 @@ declared aggregate layouts through LLVM, restoring the default-AOT image checkpo
 Nested aggregate cleanup helpers have native/reference parity, declaration-order
 invariance and zero live native Bytes after execution. The executor asks each
 registered module for function exits instead of dispatching on CPU operation names.
-Native CPU lifecycle callback dispatch is the next integration boundary; the
-passing compiled image host still executes embedded YIR.
+A [static scalar callback bridge](reference/nuis-native-scalar-session-bridge-v1.md)
+now executes registered open/event/close helpers natively, with nested typed slots,
+reference parity, in-place state and rejection before callback entry. This first
+profile excludes helper calls, loops, resources and providers. Explicit packer
+selection now uses the shared application-session host with static exports, full
+YIR identity admission, last-valid-state preservation and one cleanup attempt.
+Production-host tests reject stale objects and native failures without interpreter
+fallback. The next boundary is selecting this profile through `nuis build/run-artifact`;
+the passing compiled image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.

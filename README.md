@@ -166,6 +166,14 @@ execution, also with reordered declarations. The default AOT image regression no
 passes its LLVM checkpoint and real Metal export again without switching packaging
 modes. Its compiled host still executes CPU callbacks as embedded YIR; this does not
 establish native CPU callback dispatch or self-contained Nsld packaging.
+An experimental [static scalar callback bridge](docs/reference/nuis-native-scalar-session-bridge-v1.md)
+now invokes registered open/event/close helpers in a native executable, with nested
+state, typed slot validation, declaration-order invariance and reference parity.
+An explicit `yir-pack-aot --native-session ID` profile now routes these static
+exports through the shared application-session host, preserving failure/cleanup
+state and rejecting mixed YIR artifacts before open without interpreter fallback.
+This is not default image-host or `nuis build/run-artifact` integration: helper
+calls, loops, resources and providers remain outside the native profile.
 Step-before-break, unstepped `continue`, arbitrary
 carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.

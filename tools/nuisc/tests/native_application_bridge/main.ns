@@ -1,0 +1,30 @@
+mod cpu Main {
+  struct Metrics { total: i64, tag: i32, active: bool, gain: f32, scale: f64 }
+  struct State { frame: i64, metrics: Metrics }
+
+  fn start(seed: i64, tag: i32, active: bool, gain: f32, scale: f64) -> State {
+    return State { frame: 0, metrics: Metrics {
+      total: seed, tag: tag, active: active, gain: gain, scale: scale
+    } };
+  }
+
+  fn step(state: State, delta: i64, paused: bool) -> State {
+    if paused { return state; }
+    return State { frame: state.frame + 1, metrics: Metrics {
+      total: state.metrics.total + delta, tag: state.metrics.tag,
+      active: state.metrics.active, gain: state.metrics.gain, scale: state.metrics.scale
+    } };
+  }
+
+  fn stop(state: State, reason: i64) -> State {
+    return State { frame: state.frame, metrics: Metrics {
+      total: state.metrics.total + reason, tag: state.metrics.tag,
+      active: false, gain: state.metrics.gain, scale: state.metrics.scale
+    } };
+  }
+
+  fn main() -> i64 {
+    print(999);
+    return 0;
+  }
+}

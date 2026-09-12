@@ -3,7 +3,9 @@ use yir_core::{ApplicationFailureKind, ModRegistry, Value, YirModule};
 use yir_exec::{ExecutionTrace, FunctionSession};
 
 mod boundary;
+mod execution;
 use boundary::SessionBoundary;
+use execution::SessionExecution;
 
 pub use yir_core::{ApplicationSessionEntries, APPLICATION_SESSION_CONTRACT};
 
@@ -20,11 +22,11 @@ pub enum ApplicationSessionPhase {
 /// entry replay occurs. The caller must explicitly close; Drop does not run Nuis
 /// code. A failed event stops event delivery, but permits one close attempt with
 /// the last accepted scalar state. Effects are never rolled back or retried.
-/// Resource handles in state and native CPU dispatch are not part of this
-/// boundary. Window/parent pumps are separate adapters; the registry is explicit
-/// and no backend fallback is chosen.
+/// Resource handles in state are not part of this boundary. Native scalar
+/// dispatch is an explicit static binding, never a reference fallback.
+/// Window/parent pumps remain separate adapters.
 pub struct ApplicationSession<'a> {
-    execution: FunctionSession<'a>,
+    execution: SessionExecution<'a>,
     boundary: SessionBoundary<'a>,
     state: Value,
     phase: ApplicationSessionPhase,
@@ -34,6 +36,35 @@ pub struct ApplicationSession<'a> {
 }
 
 impl<'a> ApplicationSession<'a> {
+    /// Explicit native selection shares lifecycle policy with reference sessions,
+    /// but does not construct an interpreter or run unrelated global/main nodes.
+    pub fn open_native_registered(
+        module: &'a YirModule,
+        id: &str,
+        binding: crate::NativeSessionBindings<'a>,
+        arguments: Vec<Value>,
+    ) -> Result<(Self, ExecutionTrace), String> {
+        let binding = binding.admit(module, id)?;
+        let registration = yir_core::registered_application_session(module, id)?;
+        let boundary = SessionBoundary::bind(module, registration.entries())?;
+        FunctionSession::validate_arguments(&boundary.open.parameters, &arguments)?;
+        let mut execution = SessionExecution::Native(binding);
+        let opened = execution.invoke(&boundary.open.name, arguments, None)?;
+        boundary.state_arguments(&opened.value)?;
+        Ok((
+            Self {
+                execution,
+                boundary,
+                state: opened.value,
+                phase: ApplicationSessionPhase::Open,
+                close_error: None,
+                event_error: None,
+                failures: FailureState::default(),
+            },
+            opened.trace,
+        ))
+    }
+
     pub fn open_registered(
         module: &'a YirModule,
         registry: &'a ModRegistry,
@@ -142,7 +173,7 @@ impl<'a> ApplicationSession<'a> {
             .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
         Ok((
             Self {
-                execution,
+                execution: SessionExecution::Reference(execution),
                 boundary,
                 state: opened.value,
                 phase: ApplicationSessionPhase::Open,
@@ -232,16 +263,13 @@ impl<'a> ApplicationSession<'a> {
                 self.phase
             ));
         }
+        self.execution.admit_limit(max_steps)?;
         let arguments =
             self.boundary
                 .call_arguments(&self.state, self.boundary.event, arguments)?;
-        let result = match max_steps {
-            Some(limit) => {
-                self.execution
-                    .invoke_budgeted(&self.boundary.event.name, arguments, limit)
-            }
-            None => self.execution.invoke(&self.boundary.event.name, arguments),
-        };
+        let result = self
+            .execution
+            .invoke(&self.boundary.event.name, arguments, max_steps);
         match result.and_then(|invocation| {
             self.boundary.state_arguments(&invocation.value)?;
             Ok(invocation)
@@ -284,17 +312,14 @@ impl<'a> ApplicationSession<'a> {
                 None => Ok(None),
             };
         }
+        self.execution.admit_limit(max_steps)?;
         let arguments =
             self.boundary
                 .call_arguments(&self.state, self.boundary.close, arguments)?;
         self.phase = ApplicationSessionPhase::Closed;
-        let result = match max_steps {
-            Some(limit) => {
-                self.execution
-                    .invoke_budgeted(&self.boundary.close.name, arguments, limit)
-            }
-            None => self.execution.invoke(&self.boundary.close.name, arguments),
-        };
+        let result = self
+            .execution
+            .invoke(&self.boundary.close.name, arguments, max_steps);
         match result.and_then(|invocation| {
             self.boundary.state_arguments(&invocation.value)?;
             Ok(invocation)

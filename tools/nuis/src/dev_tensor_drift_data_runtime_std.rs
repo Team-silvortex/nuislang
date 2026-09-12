@@ -456,7 +456,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
     },
     DevTensorDriftCheckSpec {
         id: "scheduler-task-invoker-wrapper",
-        path: "crates/yir-lower-llvm/src/lib.rs",
+        path: "crates/yir-lower-llvm/src/scalar_task_invoker.rs",
         required_patterns: &[
             "render_scalar_task_invoker",
             "signature.params.iter().copied().enumerate()",
