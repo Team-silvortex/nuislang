@@ -25,6 +25,7 @@ mod loop_post_flow_cond_chain;
 #[macro_use]
 mod loop_flow_cond_chain;
 mod invariant_pattern_gate;
+mod strict_scalar;
 
 use invariant_pattern_gate::lower_false_invariant_post_flow_loop;
 
@@ -120,7 +121,13 @@ pub(super) fn emit_cpu_function(
         if require_scalar_values
             && !matches!(
                 node.op.instruction.as_str(),
-                "guard_return" | "return_owned_struct"
+                "guard_return"
+                    | "return_owned_struct"
+                    | "return_bool"
+                    | "return_i32"
+                    | "return_i64"
+                    | "return_f32"
+                    | "return_f64"
             )
         {
             required_values.push(node.name.as_str());
@@ -254,6 +261,24 @@ pub(super) fn emit_cpu_function(
             last_cpu_value,
         )? {
             continue;
+        }
+
+        if require_scalar_values {
+            strict_scalar::validate(
+                node,
+                registers,
+                helper_signatures,
+                function_return_kind,
+                function_return_layout.is_some(),
+            )?;
+            native_session::loops::emit_guard(
+                node,
+                nodes,
+                registers,
+                body,
+                &mut next_reg,
+                &mut next_block,
+            )?;
         }
 
         if lower_cpu_branch_owned_call_node(

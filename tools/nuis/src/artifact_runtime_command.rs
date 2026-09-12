@@ -192,10 +192,13 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
 
 #[path = "artifact_runtime_launch.rs"]
 mod launch;
+#[path = "artifact_runtime_native_session.rs"]
+mod native_session;
 pub(crate) use launch::{
     handle_run_artifact, handle_run_artifact_with_application_script,
     handle_run_artifact_with_frame_output, handle_run_artifact_with_window, ArtifactRunOutcome,
 };
+pub(crate) use native_session::handle_run_artifact_with_native_session;
 
 fn run_artifact_host_runner_surface(
     doctor: &crate::artifact_doctor::ArtifactDoctorReport,

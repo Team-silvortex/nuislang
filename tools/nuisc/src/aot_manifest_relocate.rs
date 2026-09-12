@@ -24,7 +24,7 @@ pub fn render_relocated_unpacked_build_manifest(
     binary_path: &Path,
 ) -> Result<String, String> {
     let source = &artifact.build_manifest_source;
-    let headless_inputs = if artifact.packaging_mode == "headless-aot-bundle" {
+    let bound_inputs = if crate::aot_native_session::has_bound_inputs(&artifact.packaging_mode) {
         crate::aot_application_bundle::restore_sources(source, output_dir, &artifact.binary_name)?
     } else {
         Vec::new()
@@ -92,6 +92,25 @@ pub fn render_relocated_unpacked_build_manifest(
                 out,
                 "output_dir = \"{}\"",
                 escape_toml_string(&output_dir.display().to_string())
+            )
+            .unwrap();
+            continue;
+        }
+        if let Some((key, value)) = line.split_once('=').and_then(|(key, _)| {
+            crate::aot_application_bundle::METADATA
+                .iter()
+                .find(|(candidate, _, _)| *candidate == key.trim())
+                .and_then(|(key, kind, _)| {
+                    bound_inputs
+                        .iter()
+                        .find(|(candidate, _)| candidate == kind)
+                        .map(|(_, path)| (*key, path))
+                })
+        }) {
+            writeln!(
+                out,
+                "{key} = \"{}\"",
+                escape_toml_string(&value.display().to_string())
             )
             .unwrap();
             continue;
@@ -207,7 +226,7 @@ pub fn render_relocated_unpacked_build_manifest(
     out.push('\n');
 
     out.push_str("[artifacts]\n");
-    for (kind, path) in &headless_inputs {
+    for (kind, path) in &bound_inputs {
         writeln!(
             out,
             "{kind} = \"{}\"",
@@ -248,7 +267,7 @@ pub fn render_relocated_unpacked_build_manifest(
         writeln!(out, "fnv1a64 = \"{}\"", fnv1a64_hex(&bytes)).unwrap();
         out.push('\n');
     }
-    crate::aot_artifact_hash::append_artifact_hash_manifest_sections(&mut out, &headless_inputs)?;
+    crate::aot_artifact_hash::append_artifact_hash_manifest_sections(&mut out, &bound_inputs)?;
 
     Ok(out)
 }

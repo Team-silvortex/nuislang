@@ -192,6 +192,7 @@ pub enum CommandKind {
         frame_output: Option<PathBuf>,
         window_session: Option<WindowSessionOptions>,
         application_session: Option<yir_runtime_host::ApplicationScript>,
+        native_session: Option<Vec<String>>,
     },
     DebugResume {
         input: PathBuf,

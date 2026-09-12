@@ -127,13 +127,32 @@ invariance and zero live native Bytes after execution. The executor asks each
 registered module for function exits instead of dispatching on CPU operation names.
 A [static scalar callback bridge](reference/nuis-native-scalar-session-bridge-v1.md)
 now executes registered open/event/close helpers natively, with nested typed slots,
-reference parity, in-place state and rejection before callback entry. This first
-profile excludes helper calls, loops, resources and providers. Explicit packer
+reference parity, in-place state and rejection before callback entry. This selected
+profile now admits bounded acyclic scalar helper calls and bounded i64 loops with
+constant or runtime-checked induction, but excludes resources and providers. Explicit packer
 selection now uses the shared application-session host with static exports, full
 YIR identity admission, last-valid-state preservation and one cleanup attempt.
 Production-host tests reject stale objects and native failures without interpreter
-fallback. The next boundary is selecting this profile through `nuis build/run-artifact`;
-the passing compiled image host still executes embedded YIR.
+fallback. Explicit `native-session-aot-bundle:<id>` selection now passes ordinary
+`nuis build` and `run-artifact --native-session`, with real LLVM checkpoint
+regeneration, cache registration isolation and standalone materialization after
+removing the original output. Required documentation/package metadata is restored
+with bound inputs rather than read from the old host paths. Nested helper calls
+now retain all five scalar kinds, reject recursive/effectful/type-drifted closures,
+and survive cache reuse and independent artifact restoration. Counted i64 loops
+now compose with those helpers, source-ordered add/multiply carries and zero-trip
+seeds. Constant induction is proven before emission; runtime i64 start, limit
+and step receive an in-place preflight before loop entry. Both require finite,
+non-wrapping induction within 65536 iterations per loop. The CPU registered driver now returns real
+plain-chain state under shared reference fuel instead of logging a unit value;
+shared loop input dependencies no longer duplicate effect edges. Real native
+executions and the build/run-artifact restoration regression cover this subset.
+A 1680-case native guard probe matches checked-step simulation across six
+comparisons and add/sub, including signed extremes, zero trips and skipped guards.
+Rejected inputs enter no loop iterations; six unmodified native trap executions
+confirm process failure rather than a catchable callback/fuel result. The next
+native boundary is scoped scalar loop-body calls; the passing default image host
+still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.

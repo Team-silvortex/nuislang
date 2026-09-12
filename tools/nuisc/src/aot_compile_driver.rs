@@ -90,6 +90,22 @@ fn write_and_link_impl(
         llvm_ir,
     } = program;
     let packaging_mode = select_packaging_mode(yir, requested_packaging_mode)?;
+    let native_id = crate::aot_native_session::registration_id(packaging_mode)?;
+    if let Some(id) = native_id {
+        if source.is_none() || cpu_target.cross_compile {
+            return Err(
+                "native session packaging requires source handoff and the current host target"
+                    .to_owned(),
+            );
+        }
+        let bridge = yir_lower_llvm::native_session::emit_registered(yir, id)?;
+        if llvm_ir != Some(bridge.llvm_ir.as_str()) {
+            return Err(
+                "native session packaging requires the selected registration LLVM checkpoint"
+                    .to_owned(),
+            );
+        }
+    }
     if packaging_mode == "headless-aot-bundle" {
         if llvm_ir.is_some() || source.is_none() {
             return Err(
@@ -130,18 +146,17 @@ fn write_and_link_impl(
     if let Some(llvm_ir) = llvm_ir {
         fs::write(&ll_path, llvm_ir)
             .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-        fs::write(&shim_path, render_c_shim_source(ast))
-            .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
+        if native_id.is_none() {
+            fs::write(&shim_path, render_c_shim_source(ast))
+                .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
+        }
     }
 
     let (binary_path, host_objects) =
-        if matches!(packaging_mode, "window-aot-bundle" | "headless-aot-bundle") {
-            build_application_bundle(
-                &yir_path,
-                output_dir,
-                cpu_target,
-                packaging_mode == "headless-aot-bundle",
-            )?;
+        if matches!(packaging_mode, "window-aot-bundle" | "headless-aot-bundle")
+            || native_id.is_some()
+        {
+            build_application_bundle(&yir_path, output_dir, cpu_target, packaging_mode)?;
             (exe_path.display().to_string(), Vec::new())
         } else {
             compile_native_binary(
@@ -244,16 +259,26 @@ fn native_host_objects(
 }
 
 fn is_supported_packaging_mode(packaging_mode: &str) -> bool {
-    matches!(
-        packaging_mode,
-        "window-aot-bundle"
-            | "headless-aot-bundle"
-            | "native-cpu-llvm"
-            | "nuis-self-contained-image"
-    )
+    crate::aot_native_session::registration_id(packaging_mode).is_ok_and(|id| id.is_some())
+        || matches!(
+            packaging_mode,
+            "window-aot-bundle"
+                | "headless-aot-bundle"
+                | "native-cpu-llvm"
+                | "nuis-self-contained-image"
+        )
 }
 
-fn select_packaging_mode(yir: &YirModule, requested: Option<&str>) -> Result<&'static str, String> {
+fn select_packaging_mode<'a>(
+    yir: &YirModule,
+    requested: Option<&'a str>,
+) -> Result<&'a str, String> {
+    if let Some(mode) = requested {
+        if let Some(id) = crate::aot_native_session::registration_id(mode)? {
+            yir_core::registered_application_session(yir, id)?;
+            return Ok(mode);
+        }
+    }
     let window = requires_window_bundle(yir);
     match requested {
         Some("headless-aot-bundle") if !yir.application_sessions.is_empty() => {

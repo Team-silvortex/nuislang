@@ -41,8 +41,8 @@ pub use application_session::{
 };
 pub use frame_export::{export_module_frame, nuis_export_embedded_yir_ppm, FRAME_EXPORT_CONTRACT};
 pub use native_application_session::{
-    nuis_native_application_script_main, NativeScalarCallback, NativeSessionBindings,
-    NativeSessionDescriptorV1,
+    nuis_native_application_script_main, validate_native_application_script, NativeScalarCallback,
+    NativeSessionBindings, NativeSessionDescriptorV1,
 };
 pub use provider_application_session::{
     with_provider_application_session, with_registered_provider_application_session,

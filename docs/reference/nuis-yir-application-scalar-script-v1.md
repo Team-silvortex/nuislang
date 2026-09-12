@@ -552,8 +552,11 @@ executes a bounded registered open/event/close fixture through static exports,
 without interpreting YIR or replaying main. Its strict scalar-only admission and
 typed slot checks have native/reference regressions. A separate explicit packer
 profile now links it into the shared application-session lifecycle, with last-state
-preservation, one cleanup attempt and exact YIR binding before open. This provider
-scalar-script host does not select that profile; native calls do not inherit
+preservation, one cleanup attempt and exact YIR binding before open. It now has an
+explicit `native-session-aot-bundle:<id>` build mode and typed
+`run-artifact --native-session <id>` ingress, including bound LLVM checkpoints,
+cache identity and independent artifact materialization. This provider
+scalar-script host still does not select that profile; native calls do not inherit
 reference fuel or provider capabilities, and no interpreter fallback is permitted.
 
 ## Current Boundary

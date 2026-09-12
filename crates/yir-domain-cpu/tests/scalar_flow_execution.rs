@@ -134,3 +134,78 @@ fn scalar_flow_async_step_requires_a_typed_function_result() {
     );
     assert!(state.events.is_empty());
 }
+
+#[test]
+fn plain_scalar_chain_is_cooperative_and_returns_source_ordered_carries() {
+    for instruction in ["loop_while_scalar_chain", "loop_while_i64_chain"] {
+        let (mut node, resource, mut state) = fixture();
+        node.op.instruction = instruction.to_owned();
+        node.op.args.truncate(5);
+        node.op
+            .args
+            .extend(["product", "mul_current", "sum", "add_carry0"].map(str::to_owned));
+        state.values.insert("limit".to_owned(), Value::Int(3));
+        state.values.insert("product".to_owned(), Value::Int(1));
+        state.values.insert("sum".to_owned(), Value::Int(2));
+        let mut execution = CpuMod
+            .begin_execution(&node, &resource, &state)
+            .unwrap()
+            .unwrap();
+        for _ in 0..3 {
+            assert!(matches!(
+                execution.resume(&mut state, None).unwrap(),
+                RegisteredExecutionStep::Continue
+            ));
+            assert!(
+                state.events.is_empty(),
+                "unfinished loop cannot publish completion"
+            );
+        }
+        let RegisteredExecutionStep::Complete(Value::Struct(result)) =
+            execution.resume(&mut state, None).unwrap()
+        else {
+            panic!("plain loop did not return its state");
+        };
+        assert_eq!(
+            result.fields,
+            [
+                ("current".to_owned(), Value::Int(3)),
+                ("carry0".to_owned(), Value::Int(6)),
+                ("carry1".to_owned(), Value::Int(11)),
+            ]
+        );
+        assert_eq!(state.events.len(), 1);
+
+        state.values.insert("initial".to_owned(), Value::Int(3));
+        let Value::Struct(result) = CpuMod.execute(&node, &resource, &mut state).unwrap() else {
+            panic!("zero-trip loop did not return its seeds");
+        };
+        assert_eq!(result.fields[1].1, Value::Int(1));
+        assert_eq!(result.fields[2].1, Value::Int(2));
+    }
+}
+
+#[test]
+fn plain_scalar_chain_carry_overflow_wraps_and_invalid_kinds_fail_closed() {
+    let (mut node, resource, mut state) = fixture();
+    node.op.instruction = "loop_while_scalar_chain".to_owned();
+    node.op.args.truncate(5);
+    node.op
+        .args
+        .extend(["seed", "mul_current"].map(str::to_owned));
+    state.values.insert("limit".to_owned(), Value::Int(2));
+    state.values.insert("seed".to_owned(), Value::Int(i64::MAX));
+    let Value::Struct(result) = CpuMod.execute(&node, &resource, &mut state).unwrap() else {
+        panic!("missing scalar loop state");
+    };
+    assert_eq!(result.fields[1].1, Value::Int(-2));
+    state.events.clear();
+    node.op.args[6] = "mul_carry9".to_owned();
+    assert!(CpuMod
+        .execute(&node, &resource, &mut state)
+        .unwrap_err()
+        .contains("unavailable scalar loop source"));
+    state.values.insert("seed".to_owned(), Value::F64(1.0));
+    assert!(CpuMod.execute(&node, &resource, &mut state).is_err());
+    assert!(state.events.is_empty());
+}

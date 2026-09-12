@@ -20,7 +20,7 @@ struct ScalarFlow {
     current: i64,
     carries: Vec<i64>,
     updates: Vec<ParsedConditionalCarry>,
-    control: LoopFlowExpr,
+    control: Option<LoopFlowExpr>,
     post_flow: bool,
     pending_step: bool,
     iterations: usize,
@@ -40,6 +40,7 @@ pub(super) fn begin_execution(
         return Ok(None);
     };
     let (is_async, post_flow, conditional) = match instruction {
+        "chain" => (false, false, false),
         "flow_chain" => (false, false, false),
         "flow_cond_chain" => (false, false, true),
         "post_flow_chain" => (false, true, false),
@@ -78,13 +79,18 @@ pub(super) fn begin_execution(
     } else {
         validate_flow_control_kind
     };
-    let (control, carry_start) = parse_loop_flow_expr(
-        &node.op.args,
-        if is_async { 4 } else { 5 },
-        &node.name,
-        &validate,
-    )?;
-    validate_flow(&control)?;
+    let (control, carry_start) = if instruction == "chain" {
+        (None, 5)
+    } else {
+        let (control, start) = parse_loop_flow_expr(
+            &node.op.args,
+            if is_async { 4 } else { 5 },
+            &node.name,
+            &validate,
+        )?;
+        validate_flow(&control)?;
+        (Some(control), start)
+    };
     let updates = if conditional {
         parse_conditional_carries(&node.op.args, carry_start, &node.name, true)?
     } else {
@@ -187,7 +193,12 @@ impl RegisteredExecution for ScalarFlow {
             old_carries: &old_carries,
             carries: &self.carries,
         };
-        let action = evaluate_flow(&self.control, &values, state)?;
+        let action = self
+            .control
+            .as_ref()
+            .map(|control| evaluate_flow(control, &values, state))
+            .transpose()?
+            .flatten();
         let should_break = action == Some("break");
         if !self.post_flow && action.is_none() {
             self.update_carries(previous, &old_carries, state)?;
@@ -222,8 +233,16 @@ impl ScalarFlow {
             let updated = if matches!(source.kind.as_str(), "keep" | "keep_prev_carry") {
                 old_carries[index]
             } else {
-                let operand = values.get(source.kind.strip_prefix("add_").unwrap())?;
-                old_carries[index].wrapping_add(operand)
+                let (operation, name) = source
+                    .kind
+                    .split_once('_')
+                    .ok_or_else(|| "invalid scalar carry source".to_owned())?;
+                let operand = values.get(name)?;
+                match operation {
+                    "add" => old_carries[index].wrapping_add(operand),
+                    "mul" => old_carries[index].wrapping_mul(operand),
+                    _ => return Err("unsupported scalar carry operation".to_owned()),
+                }
             };
             next.push(updated);
         }
@@ -366,14 +385,18 @@ fn validate_flow(expr: &LoopFlowExpr) -> Result<(), String> {
 
 fn validate_source(source: &ParsedCarryBranchSource) -> Result<(), String> {
     let kind = source.kind.as_str();
+    let operand = kind
+        .strip_prefix("add_")
+        .or_else(|| kind.strip_prefix("mul_"));
     if source.payload.is_empty()
-        && (matches!(
-            kind,
-            "keep" | "keep_prev_carry" | "add_current" | "add_prev_current"
-        ) || kind
-            .strip_prefix("add_carry")
-            .or_else(|| kind.strip_prefix("add_prev_carry"))
-            .is_some_and(|index| index.parse::<usize>().is_ok()))
+        && (matches!(kind, "keep" | "keep_prev_carry")
+            || operand.is_some_and(|source| {
+                matches!(source, "current" | "prev_current")
+                    || source
+                        .strip_prefix("carry")
+                        .or_else(|| source.strip_prefix("prev_carry"))
+                        .is_some_and(|index| index.parse::<usize>().is_ok())
+            }))
     {
         Ok(())
     } else {

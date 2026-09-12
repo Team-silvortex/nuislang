@@ -55,3 +55,6 @@ pub use nuis_artifact::{
 #[cfg(test)]
 #[path = "aot_tests.rs"]
 mod tests;
+pub mod native_session {
+    pub use crate::aot_native_session::{registration_id, verify_checkpoint, PACKAGING_PREFIX};
+}

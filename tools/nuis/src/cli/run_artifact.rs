@@ -11,9 +11,20 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     let mut cancel_after_events = false;
     let mut drain_provider = false;
     let mut application_arguments = Vec::new();
+    let mut native = false;
+    let mut reference = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--native-session" if !native => {
+                native = true;
+                let id = args
+                    .next()
+                    .ok_or("--native-session requires a registration ID")?;
+                yir_core::YirApplicationSession::validate_identifier(&id)?;
+                application_arguments.extend(["--application-session".to_owned(), id]);
+            }
             "--application-session" | "--open-args" | "--event-args" | "--close-args" => {
+                reference |= arg == "--application-session";
                 let value = args
                     .next()
                     .ok_or_else(|| format!("{arg} requires a value"))?;
@@ -79,8 +90,8 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
             "--json is inspection-only and cannot be combined with --export-frame".to_owned(),
         );
     }
-    let application_session = if application_arguments.is_empty() {
-        None
+    let (application_session, native_session) = if application_arguments.is_empty() {
+        (None, None)
     } else {
         if window_session.is_some()
             || window_events.is_some()
@@ -94,15 +105,30 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
                     .to_owned(),
             );
         }
-        if drain_provider {
-            application_arguments.push("--drain-provider".to_owned());
+        if native {
+            if reference
+                || drain_provider
+                || application_arguments
+                    .iter()
+                    .any(|arg| arg == "--cancel-after-events")
+            {
+                return Err("native scripts cannot be combined with provider, reference or cancellation options".to_owned());
+            }
+            (None, Some(application_arguments))
+        } else {
+            if drain_provider {
+                application_arguments.push("--drain-provider".to_owned());
+            }
+            (
+                Some(yir_runtime_host::ApplicationScript::from_arguments(
+                    &application_arguments
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>(),
+                )?),
+                None,
+            )
         }
-        Some(yir_runtime_host::ApplicationScript::from_arguments(
-            &application_arguments
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-        )?)
     };
     if window_events.is_some() && window_session.is_none() {
         return Err("--window-events requires --window-session".to_owned());
@@ -123,13 +149,14 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
         return Err("--window-session cannot be combined with --json or --export-frame".to_owned());
     }
     let input = input.ok_or(
-        "usage: nuis run-artifact <artifact> [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]] | --application-session ID --open-args I64,... [--event-args I64,...] (--close-args I64,... | --cancel-after-events --drain-provider)]",
+        "usage: nuis run-artifact <artifact> [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]] | --application-session ID --open-args I64,... [--event-args I64,...] (--close-args I64,... | --cancel-after-events --drain-provider) | --native-session ID --open-args SCALARS [--event-args SCALARS] --close-args SCALARS]",
     )?;
     Ok(CommandKind::RunArtifact {
         input,
         json,
         frame_output,
         application_session,
+        native_session,
         window_session: window_session.map(|id| WindowSessionOptions {
             id,
             events: window_events,
@@ -143,6 +170,55 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_scripts_select_a_distinct_typed_profile() {
+        let base = [
+            "build",
+            "--native-session",
+            "counter",
+            "--open-args",
+            "true,-2,1.25",
+            "--close-args",
+            "",
+        ];
+        let CommandKind::RunArtifact {
+            native_session: Some(args),
+            application_session: None,
+            ..
+        } = parse(&mut base.into_iter().map(str::to_owned)).unwrap()
+        else {
+            panic!("native profile required")
+        };
+        assert_eq!(
+            args,
+            [
+                "--application-session",
+                "counter",
+                "--open-args",
+                "true,-2,1.25",
+                "--close-args",
+                ""
+            ]
+        );
+        for extra in [
+            vec!["--application-session", "counter"],
+            vec!["--native-session", "other"],
+            vec!["--drain-provider"],
+            vec!["--cancel-after-events"],
+            vec!["--window-session", "ui"],
+            vec!["--json"],
+            vec!["--export-frame", "out.ppm"],
+        ] {
+            assert!(parse(
+                &mut [base.as_slice(), &extra]
+                    .concat()
+                    .into_iter()
+                    .map(str::to_owned)
+            )
+            .is_err());
+        }
+    }
 
     #[test]
     fn application_scripts_use_the_same_scalar_grammar_as_the_packaged_entry() {
@@ -424,6 +500,7 @@ mod tests {
                 json: false,
                 frame_output: None,
                 application_session: None,
+                native_session: None,
                 window_session: Some(WindowSessionOptions {
                     id: "ui".to_owned(),
                     events: Some("32,128578".to_owned()),
@@ -483,6 +560,7 @@ mod tests {
                     frame_output: Some(PathBuf::from("frames/a b.ppm")),
                     window_session: None,
                     application_session: None,
+                    native_session: None,
                 }
             );
         }

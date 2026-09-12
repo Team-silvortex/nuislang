@@ -73,6 +73,19 @@ impl ResolvedCompileInput {
             Some("headless-aot-bundle") => self
                 .compile_to_verified_yir(&Default::default())
                 .map(InspectedPipeline::VerifiedYir),
+            Some(mode) if crate::aot_native_session::registration_id(mode)?.is_some() => {
+                let checkpoint = self.compile_to_verified_yir(&Default::default())?;
+                let id = crate::aot_native_session::registration_id(mode)?.unwrap();
+                let llvm_ir =
+                    yir_lower_llvm::native_session::emit_registered(&checkpoint.yir, id)?.llvm_ir;
+                Ok(InspectedPipeline::Native(PipelineArtifacts {
+                    ast: checkpoint.ast,
+                    nir: checkpoint.nir,
+                    yir: checkpoint.yir,
+                    loaded_nustar: checkpoint.loaded_nustar,
+                    llvm_ir,
+                }))
+            }
             _ => self.compile().map(InspectedPipeline::Native),
         }
     }

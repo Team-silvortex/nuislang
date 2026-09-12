@@ -172,8 +172,19 @@ state, typed slot validation, declaration-order invariance and reference parity.
 An explicit `yir-pack-aot --native-session ID` profile now routes these static
 exports through the shared application-session host, preserving failure/cleanup
 state and rejecting mixed YIR artifacts before open without interpreter fallback.
-This is not default image-host or `nuis build/run-artifact` integration: helper
-calls, loops, resources and providers remain outside the native profile.
+The explicit `native-session-aot-bundle:<id>` build profile now carries that
+registration through LLVM checkpoints, cache identity, standalone materialization
+and `nuis run-artifact --native-session <id>`. Real M2 regressions reject argument
+and artifact drift before open and run again after deleting the original build
+directory. The selected native profile now includes bounded, acyclic scalar helper
+calls with exact parameter/result kinds and all-five-scalar native/reference parity.
+Supported synchronous `@noinline` boundaries survive NIR-to-YIR lowering rather than
+silently expanding. Counted i64 loops now compose with those helpers and ordered
+add/multiply carries. Constant induction is proven at compile time; runtime i64
+start/bound/step values are checked before loop entry for finite, non-wrapping
+induction within 65536 iterations. Native/reference and real process-trap tests
+cover this boundary. Loop-body calls, effectful loops, resources and providers
+remain outside this profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary
 carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.

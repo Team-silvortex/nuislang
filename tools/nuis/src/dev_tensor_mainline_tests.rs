@@ -306,10 +306,20 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
-    assert!(session.next_step.starts_with(
-        "thread the explicit native scalar session profile through identity-checked build/run-artifact"
-    ));
+    assert!(session
+        .next_step
+        .starts_with("extend scoped scalar loop-body calls in the native session profile"));
     assert!(session.evidence.contains("Seven native executable runs"));
+    assert!(session
+        .evidence
+        .contains("Acyclic scalar helper closure now retains real typed YIR/LLVM calls"));
+    assert!(session
+        .evidence
+        .contains("Six additional native executable runs"));
+    assert!(session
+        .evidence
+        .contains("64 reachable functions, 32 call-path functions"));
+    assert!(!session.blocker.contains("but helper calls, loops"));
     assert!(session
         .evidence
         .contains("Explicit yir-pack-aot --native-session selection"));
@@ -327,7 +337,17 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("Strict native value materialization"));
     assert!(session
         .evidence
-        .contains("pure-scalar bridge excludes helper calls, loops, resource state and providers"));
+        .contains("Counted i64 loops now compose with the native scalar helper closure"));
+    assert!(session.evidence.contains("65536 iterations per loop"));
+    assert!(session
+        .evidence
+        .contains("plain-chain state instead of a trace-only unit"));
+    assert!(session.blocker.contains("scoped scalar loop-body calls"));
+    assert!(!session.blocker.contains("dynamic induction and"));
+    assert!(session.evidence.contains("1680 runtime induction cases"));
+    assert!(session
+        .evidence
+        .contains("Six unmodified native trap executions"));
     assert!(session
         .validation_command
         .contains("--test native_application_bridge"));
@@ -375,9 +395,15 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .blocker
         .contains("step-before-break, unstepped continue"));
-    assert!(session
+    assert!(!session
         .blocker
         .contains("native build/run-artifact profile selection remains unproven"));
+    assert!(session
+        .evidence
+        .contains("Native frontdoor regression now proves"));
+    assert!(session
+        .validation_command
+        .contains("--test native_session_workflow"));
     assert!(!session
         .blocker
         .contains("reject cpu.guard_drop_owned_bytes_return"));

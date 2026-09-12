@@ -58,16 +58,21 @@ impl YirApplicationSession {
 
     pub fn validate_declaration(&self) -> Result<(), String> {
         for value in [&self.id, &self.open, &self.event, &self.close] {
-            if value.is_empty()
-                || value.len() > 256
-                || value.chars().any(|ch| {
-                    ch.is_whitespace() || ch.is_control() || matches!(ch, '"' | '\\' | '#')
-                })
-            {
-                return Err("application session requires nonempty bounded identifiers".to_owned());
-            }
+            Self::validate_identifier(value)?;
         }
         validate_entries(self.entries())
+    }
+
+    pub fn validate_identifier(value: &str) -> Result<(), String> {
+        if value.is_empty()
+            || value.len() > 256
+            || value
+                .chars()
+                .any(|ch| ch.is_whitespace() || ch.is_control() || matches!(ch, '"' | '\\' | '#'))
+        {
+            return Err("application session requires nonempty bounded identifiers".to_owned());
+        }
+        Ok(())
     }
 }
 

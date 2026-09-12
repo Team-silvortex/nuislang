@@ -472,10 +472,108 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-lower-llvm/src/native_session/admission.rs",
         required_patterns: &[
             "ApplicationSessionSignature::bind",
-            "parameter node/signature drift",
             "callback return layouts disagree",
-            "requires external initialization or calls",
-            "first native profile has no calls",
+            "calls::validate_graph(&graph)",
+            "MAX_TOTAL_NODES",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-function-admission",
+        path: "crates/yir-lower-llvm/src/native_session/function.rs",
+        required_patterns: &[
+            "parameter node/signature drift",
+            "requires external initialization or cross-function values",
+            "one declared typed return",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-call-closure",
+        path: "crates/yir-lower-llvm/src/native_session/calls.rs",
+        required_patterns: &[
+            "MAX_FUNCTIONS: usize = 64",
+            "MAX_CALL_DEPTH: usize = 32",
+            "helper signature drift",
+            "rejects recursive helper call cycles",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-helper-proof",
+        path: "tools/nuisc/tests/native_application_bridge/helpers.rs",
+        required_patterns: &[
+            "acyclic_scalar_helpers_execute_with_typed_native_reference_parity",
+            "reachable_helpers_reject_signature_lane_effect_and_dependency_drift",
+            "selected_call_graph_is_bounded_acyclic_and_ignores_unreachable_effects",
+            "strict_native_helpers_reject_implicit_scalar_coercions_and_unmaterialized_values",
+            "reachable_helper_node_limits_apply_to_each_body_and_the_whole_closure",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-exact-helper-values",
+        path: "crates/yir-lower-llvm/src/function_lowering/strict_scalar.rs",
+        required_patterns: &[
+            "lower_scalar_value_arg",
+            "exactly match its declared scalar kind",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-counted-loop-admission",
+        path: "crates/yir-lower-llvm/src/native_session/loops.rs",
+        required_patterns: &[
+            "MAX_ITERATIONS: i128 = 65536",
+            "fn constant_inputs",
+            "finite non-wrapping induction",
+            "does not admit this scalar carry source",
+            "counted_loop_proof_matches_small_independent_step_simulation",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-counted-loop-proof",
+        path: "tools/nuisc/tests/native_application_bridge/loops.rs",
+        required_patterns: &[
+            "counted_scalar_loops_compose_with_native_helpers_and_reference_state",
+            "native_counted_loops_reject_hidden_effects",
+            "native_counted_loops_reject_induction_and_carry_drift",
+            "plain_loop_reference_fuel_exhaustion_retains_the_accepted_session_state",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-dynamic-loop-admission",
+        path: "crates/yir-lower-llvm/src/native_session/loops/dynamic.rs",
+        required_patterns: &[
+            "native_loop_preflight",
+            "select i1 {nonzero}, i64 {magnitude}, i64 1",
+            "udiv i64",
+            "icmp ule i128 {trips}, {MAX_ITERATIONS}",
+            "call void @llvm.trap()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-dynamic-loop-parity",
+        path: "tools/nuisc/tests/native_application_bridge/dynamic_loops.rs",
+        required_patterns: &[
+            "dynamic_scalar_loops_preserve_native_reference_and_typed_helper_parity",
+            "dynamic_bound_may_share_a_carry_seed_without_duplicate_effect_edges",
+            "assert_native_parity(DYNAMIC, true)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-dynamic-loop-guard-proof",
+        path: "tools/nuisc/tests/native_application_bridge/dynamic_loop_guard.rs",
+        required_patterns: &[
+            "dynamic_loop_guard_matches_checked_simulation_before_any_iteration",
+            "invalid_dynamic_induction_traps_instead_of_returning_a_callback_error",
+            "dynamic_induction_rejects_implicit_boolean_bounds",
+            "checked_add(step)",
+            "checked_sub(step)",
+            "Duration::from_secs(10)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "cpu-plain-scalar-chain-execution-proof",
+        path: "crates/yir-domain-cpu/tests/scalar_flow_execution.rs",
+        required_patterns: &[
+            "plain_scalar_chain_is_cooperative_and_returns_source_ordered_carries",
+            "plain_scalar_chain_carry_overflow_wraps_and_invalid_kinds_fail_closed",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -497,6 +595,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "required_values.push(node.name.as_str())",
             "native scalar callback did not materialize value",
             "native scalar callback did not emit a terminal return",
+            "native_session::loops::emit_guard",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -525,6 +624,39 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "mismatched LLVM binding",
             "floating_parameters_remain_typed_and_never_convert_to_fallback_integers",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-frontdoor-launch",
+        path: "tools/nuis/src/artifact_runtime_native_session.rs",
+        required_patterns: &[
+            "verify_nuis_compiled_artifact",
+            "validate_native_application_script",
+            "native launch binary does not match",
+            "no fallback was attempted",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-frontdoor-checkpoint",
+        path: "tools/nuisc/src/aot_native_session.rs",
+        required_patterns: &[
+            "native-session-aot-bundle:",
+            "emit_registered(module, id)",
+            "bridge.llvm_ir != llvm_ir",
+            "native_session_layout",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-frontdoor-relocation-proof",
+        path: "tools/nuis/tests/native_session_workflow.rs",
+        required_patterns: &[
+            "native_build_run_artifact_cache_and_standalone_relocation",
+            "compile_cache: hit",
+            "fs::remove_dir_all(&output)",
+            "materialize-artifact",
+            "rejected_before_open",
+            "native_loop_preflight",
+            "dynamic_loops.ns",
         ],
     },
 ];

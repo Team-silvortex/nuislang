@@ -1,6 +1,6 @@
-use super::{CallbackExport, ScalarKind, ScalarStateLayout, MAX_SCALAR_SLOTS};
+use super::{calls, function::FunctionAdmission, CallbackExport, ScalarKind, ScalarStateLayout};
 use std::collections::{BTreeMap, BTreeSet};
-use yir_core::{ApplicationSessionSignature, YirModule, YirValueOwnership};
+use yir_core::{ApplicationSessionSignature, YirModule};
 
 pub(super) fn select(
     module: &YirModule,
@@ -10,21 +10,69 @@ pub(super) fn select(
     yir_verify::verify_module_with_registry(module, &registry)?;
     let registration = yir_core::registered_application_session(module, id)?;
     let signature = ApplicationSessionSignature::bind(module, registration.entries())?;
-    let nodes = module
-        .nodes
-        .iter()
-        .map(|node| (node.name.as_str(), node))
-        .collect::<BTreeMap<_, _>>();
-    let resources = module
-        .resources
-        .iter()
-        .map(|resource| (resource.name.as_str(), resource))
-        .collect::<BTreeMap<_, _>>();
-    let mut selected_nodes = BTreeSet::new();
-    let mut incoming = BTreeMap::<&str, Vec<&str>>::new();
+    let mut admission = FunctionAdmission {
+        module,
+        registry: &registry,
+        nodes: module
+            .nodes
+            .iter()
+            .map(|node| (node.name.as_str(), node))
+            .collect(),
+        resources: module
+            .resources
+            .iter()
+            .map(|r| (r.name.as_str(), r))
+            .collect(),
+        incoming: BTreeMap::new(),
+    };
     for edge in &module.edges {
-        incoming.entry(&edge.to).or_default().push(&edge.from);
+        admission
+            .incoming
+            .entry(&edge.to)
+            .or_default()
+            .push(&edge.from);
     }
+    let functions = module
+        .functions
+        .iter()
+        .map(|f| (f.name.as_str(), f))
+        .collect::<BTreeMap<_, _>>();
+    let roots = [signature.open, signature.event, signature.close];
+    let root_names = roots
+        .iter()
+        .map(|f| f.name.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut pending = root_names.clone();
+    let mut selected_functions = BTreeMap::new();
+    let mut selected_nodes = BTreeSet::new();
+    let mut graph = BTreeMap::new();
+    while let Some(name) = pending.pop_first() {
+        if selected_functions.contains_key(name) {
+            continue;
+        }
+        if selected_functions.len() == calls::MAX_FUNCTIONS {
+            return Err("native scalar bridge exceeds its reachable-function bound".to_owned());
+        }
+        let function = functions[name];
+        admission.validate(function, root_names.contains(name))?;
+        selected_nodes.extend(function.body_nodes.iter().cloned());
+        if selected_nodes.len() > calls::MAX_TOTAL_NODES {
+            return Err("native scalar bridge exceeds its total-node bound".to_owned());
+        }
+        let mut callees = BTreeSet::new();
+        for node in &function.body_nodes {
+            if let Some(callee) = calls::target(admission.nodes[node.as_str()], &functions)? {
+                callees.insert(callee.name.clone());
+                if !selected_functions.contains_key(callee.name.as_str()) {
+                    pending.insert(callee.name.as_str());
+                }
+            }
+        }
+        graph.insert(name.to_owned(), callees);
+        selected_functions.insert(name, function.clone());
+    }
+    calls::validate_graph(&graph)?;
+
     let mut layouts = Vec::new();
     let mut state_layout = None;
     let mut callbacks = Vec::new();
@@ -33,99 +81,10 @@ pub(super) fn select(
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect::<String>();
-    for (role, function) in [
-        ("open", signature.open),
-        ("event", signature.event),
-        ("close", signature.close),
-    ] {
-        if function.domain != "cpu" || !symbol_name(&function.name) {
-            return Err(format!(
-                "native scalar bridge requires a CPU helper with a supported symbol: `{}`",
-                function.name
-            ));
-        }
-        let body = function
-            .body_nodes
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>();
-        if body.is_empty() || body.len() > 4096 || function.parameters.len() > MAX_SCALAR_SLOTS {
-            return Err("native scalar bridge exceeds its function/argument bounds".to_owned());
-        }
-        let lane = format!("fn:{}", function.name);
-        if module.nodes.iter().any(|node| {
-            module.node_lanes.get(&node.name) == Some(&lane) && !body.contains(node.name.as_str())
-        }) {
-            return Err("native scalar bridge lane contains undeclared function nodes".to_owned());
-        }
-        let mut returns = Vec::new();
-        for name in &function.body_nodes {
-            let node = nodes[name.as_str()];
-            if module.node_lanes.get(name) != Some(&lane)
-                || node.op.module != "cpu"
-                || !resources[node.resource.as_str()].kind.is_family("cpu")
-                || !admitted(&node.op.instruction)
-            {
-                return Err(format!(
-                    "native scalar bridge does not admit {} `{name}`",
-                    node.op.full_name()
-                ));
-            }
-            if node.op.instruction == "return_owned_struct" {
-                returns.push(node);
-            }
-            let semantics = registry
-                .lookup("cpu")
-                .unwrap()
-                .describe(node, resources[node.resource.as_str()])?;
-            if semantics
-                .dependencies
-                .iter()
-                .any(|dependency| !body.contains(dependency.as_str()))
-                || incoming
-                    .get(name.as_str())
-                    .is_some_and(|sources| sources.iter().any(|source| !body.contains(source)))
-            {
-                return Err(format!(
-                    "native scalar bridge `{}` requires external initialization or calls",
-                    function.name
-                ));
-            }
-            if node.op.instruction.starts_with("param_") {
-                let index = node
-                    .op
-                    .args
-                    .first()
-                    .and_then(|arg| arg.parse::<usize>().ok());
-                let parameter = index.and_then(|index| function.parameters.get(index));
-                if !parameter.is_some_and(|p| {
-                    p.node == *name && node.op.instruction == format!("param_{}", p.ty)
-                }) {
-                    return Err("native scalar bridge parameter node/signature drift".to_owned());
-                }
-            }
-            selected_nodes.insert(name.clone());
-        }
-        for parameter in &function.parameters {
-            let node = nodes
-                .get(parameter.node.as_str())
-                .ok_or("native scalar bridge parameter node missing")?;
-            if !node.op.instruction.starts_with("param_")
-                || parameter.ownership != YirValueOwnership::Value
-            {
-                return Err(
-                    "native scalar bridge parameter must bind a scalar param node".to_owned(),
-                );
-            }
-        }
+    for (role, function) in ["open", "event", "close"].into_iter().zip(roots) {
         let result = function.result.as_ref().unwrap();
-        if returns.len() != 1
-            || returns[0].name != result.node
-            || result.ownership != YirValueOwnership::Owned
-        {
-            return Err("native scalar bridge requires one declared aggregate return".to_owned());
-        }
-        let layout = returns[0]
+        let returned = admission.nodes[result.node.as_str()];
+        let layout = returned
             .op
             .args
             .get(1)
@@ -155,10 +114,7 @@ pub(super) fn select(
     let state_layout = state_layout.unwrap();
     state_layout.bind(module, id)?;
     let mut selected = YirModule::new(module.version.clone());
-    selected.functions = [signature.open, signature.event, signature.close]
-        .into_iter()
-        .cloned()
-        .collect();
+    selected.functions = selected_functions.into_values().collect();
     selected.application_sessions.push(registration.clone());
     selected.nodes = module
         .nodes
@@ -187,16 +143,9 @@ pub(super) fn select(
     Ok((selected, callbacks, state_layout))
 }
 
-fn symbol_name(name: &str) -> bool {
-    !name.is_empty()
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'$'))
-}
-
-// This first native profile has no calls, loops, provider effects or global init.
-// Admission is deliberately smaller than general CPU lowering, not a backend dispatch table.
-fn admitted(instruction: &str) -> bool {
+// Calls are admitted only through the bounded, acyclic scalar helper closure.
+// Counted scalar loops need a separate termination proof; effects remain excluded.
+pub(super) fn admitted(instruction: &str) -> bool {
     matches!(
         instruction,
         "param_bool"
@@ -215,6 +164,19 @@ fn admitted(instruction: &str) -> bool {
             | "select"
             | "guard_return"
             | "return_owned_struct"
+            | "return_bool"
+            | "return_i32"
+            | "return_i64"
+            | "return_f32"
+            | "return_f64"
+            | "call_bool"
+            | "call_i32"
+            | "call_i64"
+            | "call_f32"
+            | "call_f64"
+            | "loop_while_i64"
+            | "loop_while_i64_chain"
+            | "loop_while_scalar_chain"
             | "add"
             | "sub"
             | "mul"

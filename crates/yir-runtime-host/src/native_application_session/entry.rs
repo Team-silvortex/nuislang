@@ -6,6 +6,20 @@ use yir_core::native_scalar_session::MAX_BINDING_SOURCE_BYTES;
 #[path = "input.rs"]
 mod input;
 
+/// Frontdoors and the packaged host use the same typed, bounded script grammar.
+/// This admits arguments only; it never opens a session or resolves a provider.
+pub fn validate_native_application_script(
+    module: &yir_core::YirModule,
+    id: &str,
+    layout: &str,
+    arguments: &[&str],
+) -> Result<(), String> {
+    yir_verify::verify_module(module)?;
+    let layout = yir_core::native_scalar_session::ScalarStateLayout::parse(layout)?;
+    let kinds = layout.bind(module, id)?;
+    input::parse(arguments, id, &kinds, layout.fields().len()).map(|_| ())
+}
+
 /// Internal static-link descriptor. Lengths and callback slot counts are u64 on
 /// every target, rather than platform size_t. Version 1 has exactly three roles.
 /// The producer emits this beside its native callbacks, not in a mutable sidecar.

@@ -9,7 +9,7 @@ pub(super) fn verify(source: &str, path: &Path, inputs: &[(&str, Vec<u8>)]) -> R
         let bytes = &inputs
             .iter()
             .find(|(key, _)| *key == kind)
-            .ok_or_else(|| format!("missing headless checkpoint `{kind}`"))?
+            .ok_or_else(|| format!("missing application checkpoint `{kind}`"))?
             .1;
         std::str::from_utf8(bytes).map_err(|error| error.to_string())
     };
@@ -46,7 +46,7 @@ pub(super) fn verify(source: &str, path: &Path, inputs: &[(&str, Vec<u8>)]) -> R
     .map_err(|error| error.to_string())?;
     if rebuilt != handoff || render_compiler_stage_handoff(&rebuilt) != handoff_source {
         return Err(
-            "headless compiler handoff does not match its source-to-YIR payloads".to_owned(),
+            "application compiler handoff does not match its source-to-YIR payloads".to_owned(),
         );
     }
     crate::frontend::verify_stage_neutral_token_stream(
@@ -57,7 +57,16 @@ pub(super) fn verify(source: &str, path: &Path, inputs: &[(&str, Vec<u8>)]) -> R
     let yir = yir_syntax::parse_explicit_module(yir_source)?;
     yir_verify::verify_module(&yir)?;
     if crate::render::render_yir(&yir) != yir_source {
-        return Err("headless checkpoint YIR is not canonical".to_owned());
+        return Err("application checkpoint YIR is not canonical".to_owned());
+    }
+    let mode = unique_value(source, "packaging_mode", path)?;
+    if let Some(id) = crate::aot_native_session::registration_id(&mode)? {
+        crate::aot_native_session::verify_checkpoint(
+            &yir,
+            id,
+            text("llvm_ir")?,
+            text("application_bundle")?,
+        )?;
     }
     Ok(())
 }

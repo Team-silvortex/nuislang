@@ -71,21 +71,9 @@ pub(super) fn lower_counted_while(
     push_dep_edges(state, &initial_name, &name);
     push_dep_edges(state, &limit_name, &name);
     push_dep_edges(state, &step_name, &name);
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: initial_name,
-        to: name.clone(),
-    });
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: limit_name,
-        to: name.clone(),
-    });
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: step_name,
-        to: name.clone(),
-    });
+    push_effect_edge(state, &initial_name, &name);
+    push_effect_edge(state, &limit_name, &name);
+    push_effect_edge(state, &step_name, &name);
     super::body_lowering::chain_statement_effect(state, &name);
     bindings.insert(prepared.binding_name, name);
     Ok(())
@@ -208,34 +196,14 @@ pub(super) fn lower_chained_while(
     for extra_dep_input in &extra_dep_inputs {
         push_dep_edges(state, extra_dep_input, &name);
     }
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: initial_name.clone(),
-        to: name.clone(),
-    });
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: limit_name.clone(),
-        to: name.clone(),
-    });
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: step_name.clone(),
-        to: name.clone(),
-    });
+    push_effect_edge(state, &initial_name, &name);
+    push_effect_edge(state, &limit_name, &name);
+    push_effect_edge(state, &step_name, &name);
     for carry_initial_name in &carry_initial_names {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: carry_initial_name.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, carry_initial_name, &name);
     }
     for extra_effect_input in &extra_effect_inputs {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: extra_effect_input.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, extra_effect_input, &name);
     }
     super::body_lowering::chain_statement_effect(state, &name);
 

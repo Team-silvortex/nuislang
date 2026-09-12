@@ -187,6 +187,15 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .map(|function| function.name.clone())
         .collect::<BTreeSet<_>>();
     let owned_external_buffer_return_helpers = collect_owned_external_buffer_return_helpers(module);
+    // Preserve supported synchronous @noinline boundaries past NIR optimization.
+    let noinline_functions = module
+        .functions
+        .iter()
+        .filter(|function| function.name != "main" && !function.is_async)
+        .filter(|function| direct_calls::supports_direct_call_signature(function))
+        .filter(|function| function.annotations.iter().any(|a| a.name == "noinline"))
+        .map(|function| function.name.clone())
+        .collect::<BTreeSet<_>>();
     let owned_external_buffer_helper_order =
         owned_external_buffer_helper_lowering_order(module, &owned_external_buffer_return_helpers)?;
     let direct_call_functions = collect_recursive_direct_call_functions(module)
@@ -209,6 +218,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&exported_functions)
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .union(&noinline_functions)
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(host_entries)

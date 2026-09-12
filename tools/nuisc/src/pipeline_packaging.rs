@@ -17,10 +17,13 @@ impl ResolvedCompileInput {
 }
 
 fn validate_packaging_mode(packaging_mode: &str) -> Result<&str, String> {
+    if crate::aot_native_session::registration_id(packaging_mode)?.is_some() {
+        return Ok(packaging_mode);
+    }
     match packaging_mode {
         "native-cpu-llvm" | "window-aot-bundle" | "headless-aot-bundle" | "nuis-self-contained-image" => Ok(packaging_mode),
         other => Err(format!(
-            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, `headless-aot-bundle`, or `nuis-self-contained-image`"
+            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, `headless-aot-bundle`, `native-session-aot-bundle:<registration-id>`, or `nuis-self-contained-image`"
         )),
     }
 }

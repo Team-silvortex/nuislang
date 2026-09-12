@@ -49,6 +49,12 @@ pub(super) fn derive_final_stage(
                 "heterogeneous window packaging is currently assembled as an AOT bundle rather than a plain native executable link".to_owned(),
             ],
         ),
+        mode if crate::aot_native_session::registration_id(mode).is_ok_and(|id| id.is_some()) => (
+            "native-session-bundle-pack".to_owned(),
+            "yir-pack-aot".to_owned(),
+            "host-toolchain-finalize".to_owned(),
+            vec!["explicit scalar callbacks lower to LLVM and statically link into the native session host via clang; no provider or interpreter fallback, and not pure Nsld finalization".to_owned()],
+        ),
         other => (
             "custom-finalize".to_owned(),
             "custom".to_owned(),

@@ -136,36 +136,6 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Int(final_current))
             }
-            "loop_while_i64_chain" | "loop_while_scalar_chain" => {
-                let initial = state.expect_value(&node.op.args[0])?.clone();
-                let limit = state.expect_value(&node.op.args[1])?.clone();
-                let step = state.expect_value(&node.op.args[2])?.clone();
-                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
-                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
-                let carries = node.op.args[5..]
-                    .chunks(2)
-                    .map(|chunk| {
-                        let initial = state.expect_value(&chunk[0])?.clone();
-                        Ok(format!("{}:{}", initial, chunk[1]))
-                    })
-                    .collect::<Result<Vec<_>, String>>()?;
-                state.push_resource_event(
-                    resource,
-                    format!(
-                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
-                        node.op.instruction,
-                        node.resource,
-                        resource.kind.raw,
-                        initial,
-                        cmp,
-                        limit,
-                        step_kind,
-                        step,
-                        carries.join(", ")
-                    ),
-                );
-                Ok(Value::Unit)
-            }
             "loop_while_i64_async_chain" | "loop_while_scalar_async_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();

@@ -14,7 +14,7 @@ pub(crate) fn build_application_bundle(
     yir_path: &Path,
     output_dir: &Path,
     cpu_target: &CpuBuildTarget,
-    headless: bool,
+    packaging_mode: &str,
 ) -> Result<(), String> {
     if cpu_target.cross_compile {
         return Err(format!(
@@ -29,10 +29,14 @@ pub(crate) fn build_application_bundle(
         .arg("yir-pack-aot")
         .arg("--")
         .arg(yir_path)
-        .arg(output_dir)
-        .arg("4");
-    if headless {
-        command.arg("--headless");
+        .arg(output_dir);
+    if let Some(id) = crate::aot_native_session::registration_id(packaging_mode)? {
+        command.args(["--native-session", id]);
+    } else {
+        command.arg("4");
+        if packaging_mode == "headless-aot-bundle" {
+            command.arg("--headless");
+        }
     }
     let output = command
         .output()

@@ -195,6 +195,12 @@ pub(crate) fn run_compile_resolved(
             .map_err(|error| format!("targeted project compilation failed: {error}"))?;
         let llvm_ir = if requested_packaging_mode == Some("headless-aot-bundle") {
             None
+        } else if let Some(id) = requested_packaging_mode
+            .map(crate::aot_native_session::registration_id)
+            .transpose()?
+            .flatten()
+        {
+            Some(yir_lower_llvm::native_session::emit_registered(&checkpoint.yir, id)?.llvm_ir)
         } else {
             Some(
                 crate::nustar_codegen_registry::emit_module_with_loaded_nustar(
@@ -226,7 +232,7 @@ pub(crate) fn run_compile_resolved(
             .and_then(|manifest| {
                 if requested_packaging_mode.is_some_and(|mode| mode != manifest.packaging_mode)
                     || (requested_packaging_mode.is_none()
-                        && manifest.packaging_mode == "headless-aot-bundle")
+                        && crate::aot_native_session::has_bound_inputs(&manifest.packaging_mode))
                 {
                     return Err(
                         "cached AOT packaging does not match the requested host profile".to_owned(),

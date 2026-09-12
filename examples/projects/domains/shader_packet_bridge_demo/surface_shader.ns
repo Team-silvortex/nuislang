@@ -34,8 +34,7 @@ mod shader SurfaceShader {
 
       stage fragment {
         fn fs_main(location(0) uv: vec2<f32>) -> location(0) vec4<f32> {
-          let color = vec3<f32>(0.18 + uv.x * 0.22, 0.28 + uv.y * 0.18, 0.86);
-          return vec4<f32>(color, 1.0);
+          return vec4<f32>(0.18 + uv.x * 0.22, 0.28 + uv.y * 0.18, 0.86, 1.0);
         }
       }
     });

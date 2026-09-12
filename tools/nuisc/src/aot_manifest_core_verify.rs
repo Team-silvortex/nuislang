@@ -170,9 +170,9 @@ pub(crate) fn verify_manifest_artifacts(
             path,
         )?;
     }
-    if core.packaging_mode == "headless-aot-bundle" {
+    if crate::aot_native_session::has_bound_inputs(&core.packaging_mode) {
         crate::aot_application_bundle::verify_sources(source, path, &artifacts)?;
-        for (kind, name) in [
+        let mut required = vec![
             ("application_bundle", "bundle.txt".to_owned()),
             ("yir", format!("{}.yir", core.artifact_binary_name)),
             (
@@ -190,7 +190,17 @@ pub(crate) fn verify_manifest_artifacts(
                 "nuis.compiler-stage-handoff.toml".to_owned(),
             ),
             ("binary", core.artifact_binary_name.clone()),
-        ] {
+        ];
+        if crate::aot_native_session::registration_id(&core.packaging_mode)?.is_some() {
+            required.push(("llvm_ir", format!("{}.ll", core.artifact_binary_name)));
+        }
+        for (kind, _) in crate::aot_application_bundle::metadata_inputs(source, path)? {
+            required.push((
+                kind,
+                crate::aot_application_bundle::input_file_name(kind, &core.artifact_binary_name),
+            ));
+        }
+        for (kind, name) in required {
             let rows = artifacts
                 .iter()
                 .filter(|item| item.kind == kind)
@@ -198,7 +208,7 @@ pub(crate) fn verify_manifest_artifacts(
             let expected = Path::new(&core.output_dir).join(name);
             if rows.len() != 1 || Path::new(&rows[0].path) != expected {
                 return Err(format!(
-                    "headless bundle requires exactly one hash-bound `{kind}` at `{}`",
+                    "application bundle requires exactly one hash-bound `{kind}` at `{}`",
                     expected.display()
                 ));
             }
@@ -262,12 +272,12 @@ pub(crate) fn verify_manifest_artifacts(
             path.display()
         ));
     }
-    if core.packaging_mode == "headless-aot-bundle" {
+    if crate::aot_native_session::has_bound_inputs(&core.packaging_mode) {
         let binary = Path::new(&core.output_dir).join(&core.artifact_binary_name);
-        let bytes =
-            fs::read(&binary).map_err(|error| format!("cannot read headless binary: {error}"))?;
+        let bytes = fs::read(&binary)
+            .map_err(|error| format!("cannot read application binary: {error}"))?;
         if bytes != parsed_artifact.binary_blob {
-            return Err("headless binary does not match the compiled artifact image".to_owned());
+            return Err("application binary does not match the compiled artifact image".to_owned());
         }
     }
     if parsed_artifact.envelope != parsed_envelope {

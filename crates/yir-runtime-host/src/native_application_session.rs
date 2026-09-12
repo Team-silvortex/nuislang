@@ -8,7 +8,10 @@ use yir_core::{
 use yir_exec::{ExecutionTrace, FunctionInvocation};
 
 mod entry;
-pub use entry::{nuis_native_application_script_main, NativeSessionDescriptorV1};
+pub use entry::{
+    nuis_native_application_script_main, validate_native_application_script,
+    NativeSessionDescriptorV1,
+};
 
 pub type NativeScalarCallback = unsafe extern "C" fn(*const u64, u64, *mut u64, u64) -> i32;
 

@@ -64,6 +64,7 @@ mod aot_manifest_types;
 mod aot_manifest_verify;
 mod aot_manifest_writer;
 mod aot_native_runner;
+mod aot_native_session;
 mod aot_network_sidecar;
 mod aot_output_layout;
 mod aot_project_metadata_verify;

@@ -7,7 +7,10 @@ pub use yir_core::native_scalar_session::{
 use yir_core::YirModule;
 
 mod admission;
+mod calls;
 mod emit;
+mod function;
+pub(crate) mod loops;
 
 #[derive(Debug, Clone)]
 pub struct CallbackExport {
@@ -19,7 +22,7 @@ pub struct CallbackExport {
 
 #[derive(Debug)]
 pub struct NativeSessionBridge {
-    /// Complete LLVM unit containing only the admitted registered roots and bridges.
+    /// Complete LLVM unit containing admitted roots, reachable scalar helpers and bridges.
     pub llvm_ir: String,
     pub session_id: String,
     pub callbacks: Vec<CallbackExport>,

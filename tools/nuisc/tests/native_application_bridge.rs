@@ -12,11 +12,23 @@ use yir_runtime_host::ApplicationSession;
 mod bounds;
 #[path = "native_application_bridge/driver.rs"]
 mod driver;
+#[path = "native_application_bridge/dynamic_loop_guard.rs"]
+mod dynamic_loop_guard;
+#[path = "native_application_bridge/dynamic_loops.rs"]
+mod dynamic_loops;
+#[path = "native_application_bridge/helpers.rs"]
+mod helpers;
+#[path = "native_application_bridge/loops.rs"]
+mod loops;
 
 const SOURCE: &str = include_str!("native_application_bridge/main.ns");
 struct Project(PathBuf);
 impl Project {
     fn new() -> Self {
+        Self::with_source(SOURCE)
+    }
+
+    fn with_source(source: &str) -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "nuis-native-session-{}-{}",
@@ -24,7 +36,7 @@ impl Project {
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&path).unwrap();
-        fs::write(path.join("main.ns"), SOURCE).unwrap();
+        fs::write(path.join("main.ns"), source).unwrap();
         fs::write(path.join("nuis.toml"), "name = \"native_session\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\napplication_sessions = [\"counter open=start event=step close=stop state=state\"]\n").unwrap();
         Self(path)
     }
@@ -90,7 +102,11 @@ fn reference(module: &YirModule, gain: u32, scale: u64) -> Vec<Vec<u64>> {
 
 #[test]
 fn registered_scalar_callbacks_execute_natively_without_main_replay_or_interpreter() {
-    let project = Project::new();
+    assert_native_parity(SOURCE, false);
+}
+
+fn assert_native_parity(source: &str, helper_calls: bool) {
+    let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     for reversed in [false, true] {
         let mut module = compiled.yir.clone();
@@ -102,6 +118,34 @@ fn registered_scalar_callbacks_execute_natively_without_main_replay_or_interpret
             }
         }
         let bridge = emit_registered(&module, "counter").unwrap();
+        if helper_calls {
+            for ty in ["i1", "i32", "i64", "float", "double"] {
+                assert!(
+                    bridge.llvm_ir.contains(&format!(" = call {ty} @nuis_fn_")),
+                    "missing {ty} call; nodes={:?}",
+                    module
+                        .nodes
+                        .iter()
+                        .filter(|n| n.op.instruction.starts_with("call_"))
+                        .collect::<Vec<_>>()
+                );
+            }
+            let roots = bridge
+                .callbacks
+                .iter()
+                .map(|c| c.function.as_str())
+                .collect::<Vec<_>>();
+            assert!(
+                module.nodes.iter().any(|node| {
+                    node.op.instruction == "call_i64"
+                        && module.node_lanes.get(&node.name).is_some_and(|lane| {
+                            lane.strip_prefix("fn:")
+                                .is_some_and(|name| !roots.contains(&name))
+                        })
+                }),
+                "fixture must retain a nested helper call after optimization"
+            );
+        }
         assert_eq!(
             bridge.state_fields,
             vec![
@@ -134,7 +178,7 @@ fn registered_scalar_callbacks_execute_natively_without_main_replay_or_interpret
             let artifact = nuisc::aot::write_and_link_with_source(
                 &project.0.join("main.ns"),
                 &project.0.join(format!("out-{reversed}-{case}")),
-                SOURCE,
+                source,
                 nuisc::aot::AotCompileProgram {
                     ast: &compiled.ast,
                     nir: &compiled.nir,

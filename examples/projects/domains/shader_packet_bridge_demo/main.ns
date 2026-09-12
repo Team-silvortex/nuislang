@@ -3,7 +3,6 @@ use shader SurfaceShader;
 
 mod cpu Main {
   type FabricBindings = HandleTable<FabricPlaneBindings>;
-  type PassStatus = ShaderResult<Pass>;
   type FrameStatus = ShaderResult<Frame>;
   type ShaderPacketWindow = Window<SurfaceShaderPacket>;
   type HostFrameWindow = Window<Frame>;
@@ -44,9 +43,6 @@ mod cpu Main {
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
-    let pass_result: PassStatus =
-      shader_result(shader_profile_begin_pass("SurfaceShader"));
-    let pass_ready: bool = shader_pass_ready(pass_result);
     let frame_packet: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", render_controls);
     let frame_result: FrameStatus =
@@ -64,7 +60,6 @@ mod cpu Main {
         + pass_kind
         + packet_field_count
     );
-    print(pass_ready);
     print(frame_ready);
 
     cpu_present_frame(host_frame);

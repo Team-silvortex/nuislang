@@ -98,6 +98,25 @@ fn native_frontdoor_workflow_keeps_native_stage_evidence() {
 }
 
 #[test]
+fn native_session_inspection_emits_only_the_selected_callback_checkpoint() {
+    let project = Project::new("native-session-aot-bundle:counter");
+    let check = success(project.run(&["check"]));
+    assert!(check.contains("compiler_checkpoint: llvm-ir"), "{check}");
+    assert!(check.contains("llvm_emit: emitted"), "{check}");
+    let path = project.0.join("nuis.toml");
+    let source = fs::read_to_string(&path).unwrap();
+    fs::write(
+        &path,
+        source.replace(
+            "native-session-aot-bundle:counter",
+            "native-session-aot-bundle:missing",
+        ),
+    )
+    .unwrap();
+    assert!(!project.run(&["check"]).status.success());
+}
+
+#[test]
 fn workflow_does_not_turn_invalid_headless_yir_into_success_evidence() {
     let project = Project::new("headless-aot-bundle");
     let path = project.0.join("main.ns");

@@ -62,10 +62,14 @@ pub(super) fn build(
             String::from_utf8_lossy(&result.stderr)
         ));
     }
-    let manifest = format!(
+    let mut manifest = format!(
         "module={}\ncpu_host_binary_mode=native_scalar_session\nruntime_bootstrap_mode=static_native_session\napplication_session_id={id}\nnative_session_contract={}\nnative_session_identity=exact-yir-graph\nllvm_ir={}\ncpu_host_source={}\nruntime_host_staticlib={}\ncpu_host_binary={}\nsingle_binary=true\n",
         input.display(), yir_core::native_scalar_session::CONTRACT, callbacks.display(), host.display(), runtime.display(), binary.display()
     );
+    manifest.push_str(&format!(
+        "native_session_layout={}\n",
+        bridge.state_layout.source()
+    ));
     fs::write(output.join("bundle.txt"), manifest).map_err(|e| e.to_string())
 }
 

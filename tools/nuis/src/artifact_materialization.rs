@@ -87,6 +87,15 @@ fn materialize_artifact_bundle(input: &Path, output_dir: &Path) -> Result<Vec<Pa
         nuis_artifact::materialize_embedded_artifact_support(&relocated_artifact, output_dir)
             .map_err(|error| error.to_string())?,
     );
+    nuisc::aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml"))?;
+    #[cfg(unix)]
+    if artifact.packaging_mode != "nuis-self-contained-image" {
+        use std::os::unix::fs::PermissionsExt;
+        // Enable execution only after the restored artifact identity is verified.
+        let binary = output_dir.join(&artifact.binary_name);
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o755))
+            .map_err(|error| format!("cannot restore executable permissions: {error}"))?;
+    }
     written.sort();
     written.dedup();
     Ok(written)
