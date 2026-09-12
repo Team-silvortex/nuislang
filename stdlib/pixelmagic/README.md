@@ -85,6 +85,15 @@ Current source-asset status:
   clamp partial first/last rows; empty ranges return before any loop. Inner counters
   reset per row while both totals return through existing scoped-call state. The
   private continue flag resets per pixel and cannot escape into the row or result.
+  `recolor_run(pixels, start, end, expected, replacement)` replaces only the
+  matching prefix of a linear half-open range, stopping before the first different
+  pixel with a real guarded `break`. `PixelRunStats { end, written, checksum }`
+  reports the stop index, number of writes and sum of replacement pixels. Equal
+  colors still count as writes. Invalid bounds or non-u32 color parameters return
+  `(-1, 0, 0)` before any write, including on empty ranges; valid empty ranges
+  return `(start, 0, 0)`. The 4,194,304-element cap keeps the sum within i64.
+  Native/reference tests cover 22 cases, exact statistics, unchanged suffixes and
+  write counts. This is a CPU buffer operation, not a flood fill or a GPU kernel.
 * [lib/image_surface.ns](lib/image_surface.ns) consumes one immutable 768-element
   u32 snapshot at fragment slot 3 and inverts RGB in inline WGSL. The
   [image showcase](../../examples/projects/domains/ns_nova_image_showcase) frees

@@ -402,7 +402,13 @@ pub(super) fn lower_if_pair(
                     let then_returned = lower_expr(&then_returned, state, bindings)?;
                     let else_bytes = lower_expr(&else_bytes, state, bindings)?;
                     let else_returned = lower_expr(&else_returned, state, bindings)?;
-                    lower_branch_drop_owned_bytes_return(
+                    let selected = lower_select(
+                        condition_name.clone(),
+                        then_returned.clone(),
+                        else_returned.clone(),
+                        state,
+                    )?;
+                    let returned = lower_branch_drop_owned_bytes_return(
                         condition_name,
                         then_bytes,
                         then_returned,
@@ -410,7 +416,8 @@ pub(super) fn lower_if_pair(
                         else_returned,
                         state,
                     );
-                    return Ok(LoweredIfOutcome::Continued);
+                    push_dep_edges(state, &returned, &selected);
+                    return Ok(LoweredIfOutcome::Returned(selected));
                 }
                 (
                     PreparedTerminalBranch::HostCallReturn {

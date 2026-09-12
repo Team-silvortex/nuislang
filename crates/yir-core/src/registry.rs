@@ -112,6 +112,17 @@ pub trait RegisteredMod: Send + Sync {
         state: &mut ExecutionState,
     ) -> Result<Value, String>;
 
+    /// Observe a successfully executed node inside a function. A returned value
+    /// exits only that invocation; this hook must not execute work or reset fuel.
+    fn function_exit(
+        &self,
+        _node: &Node,
+        _resource: &Resource,
+        _state: &ExecutionState,
+    ) -> Result<Option<Value>, String> {
+        Ok(None)
+    }
+
     fn execute_branch_effect_action(
         &self,
         action: &BranchEffectAction<'_>,

@@ -3,6 +3,33 @@ mod cpu PixelMagicPixels {
   /// Red-pixel count and sum of packed RGBA8 values. Invalid input returns (-1, 0).
   pub struct CheckerboardStats { pub red_count: i64, pub checksum: i64 }
 
+  /// Stop index, number of writes and sum of replacement pixels; invalid input returns (-1, 0, 0).
+  pub struct PixelRunStats { pub end: i64, pub written: i64, pub checksum: i64 }
+
+  /// Recolors the matching prefix of [start, end), stopping before the first different pixel.
+  /// The range is linear, not row-aware. Validate bounds and packed RGBA8 colors before writes.
+  pub fn recolor_run(
+    pixels: ref Buffer, start: i64, end: i64, expected: i64, replacement: i64
+  ) -> PixelRunStats {
+    if start < 0 || start > end || end > pixels.len || pixels.len > 4194304 {
+      return PixelRunStats { end: 0 - 1, written: 0, checksum: 0 };
+    }
+    if expected < 0 || expected > 4294967295 || replacement < 0 || replacement > 4294967295 {
+      return PixelRunStats { end: 0 - 1, written: 0, checksum: 0 };
+    }
+    let index: i64 = start;
+    let written: i64 = 0;
+    let checksum: i64 = 0;
+    while index < end {
+      if pixels[index] != expected { break; }
+      pixels[index] = replacement;
+      let written: i64 = written + 1;
+      let checksum: i64 = checksum + pixels[index];
+      let index: i64 = index + 1;
+    }
+    return PixelRunStats { end: index, written: written, checksum: checksum };
+  }
+
   fn checkerboard_parity(x: i64, y: i64, tile_size: i64) -> i64 {
     return (x / tile_size + y / tile_size) % 2;
   }

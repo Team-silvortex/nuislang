@@ -2,6 +2,55 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "pixelmagic-color-run-break-source",
+        path: "stdlib/pixelmagic/lib/pixels.ns",
+        required_patterns: &[
+            "pub struct PixelRunStats",
+            "pub fn recolor_run(",
+            "end > pixels.len || pixels.len > 4194304",
+            "expected > 4294967295 || replacement < 0 || replacement > 4294967295",
+            "if pixels[index] != expected { break; }",
+            "pixels[index] = replacement",
+            "end: index, written: written, checksum: checksum",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-color-run-native-evidence",
+        path: "tools/nuisc/tests/pixelmagic_buffer_loop/color_runs.rs",
+        required_patterns: &[
+            "recolor_run_matches_native_and_reference_boundaries_without_touching_the_tail",
+            "scoped_call_i64_carries_break",
+            "reference run statistics and every pixel",
+            "native run statistics and every pixel",
+            "invalid input and the nonmatching suffix must perform no writes",
+            "write_and_link_with_source",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-color-run-application-consumer",
+        path: "examples/projects/domains/ns_nova_image_showcase/main.ns",
+        required_patterns: &[
+            "PixelMagicPixels.recolor_run(pixels, 0, 32, pixels[0], 4278255360)",
+            "marker.end != 4 || marker.written != 4 || marker.checksum != 17113021440",
+            "let snapshot: Bytes = copy_bytes(pixels)",
+            "free(pixels)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-color-run-packaged-evidence",
+        path: "tools/nuis/tests/headless_image_loop.rs",
+        required_patterns: &[
+            "scoped_call_i64_carries_break",
+            "packaged recoloring must retain driver-level break",
+            "iterations=5 final=4 action cpu.scoped_call_i64_carries_break",
+            "y < 5 && x < 20",
+            "2 * (768 + 4 + 1)",
+            "each callback exits at the first nonmatching pixel",
+            "ApplicationProviderSource::Replay",
+            "saved_stream",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "bounded-buffer-continue-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/validation.rs",
         required_patterns: &[
@@ -274,6 +323,65 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "*env = then_env",
             "*env = else_env",
             "then_env.get(name) == Some(value) && else_env.get(name) == Some(value)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "owned-cleanup-return-layout",
+        path: "crates/yir-lower-llvm/src/guard_return_lowering/cleanup_return.rs",
+        required_patterns: &[
+            "Both arms must have a valid ABI before emitting either branch or cleanup",
+            "materialize_owned_value(pair[1], &template)",
+            "aggregate value requires a function return layout",
+            "return value contains the Bytes being dropped",
+            "emit_owned_struct_return(value, body, next_reg)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "owned-cleanup-return-native-reference-proof",
+        path: "tools/nuisc/tests/owned_cleanup_return.rs",
+        required_patterns: &[
+            "native_nested_aggregate_cleanup_returns_preserve_both_paths_and_release_blobs",
+            "guard_drop_owned_bytes_return",
+            "branch_drop_owned_bytes_return",
+            "function.body_nodes.reverse()",
+            "reference cleanup return paths",
+            "nuis_scheduler_owned_blob_live_count_get_v1",
+            "write_and_link_with_source",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "registered-function-exit-contract",
+        path: "crates/yir-core/src/registry.rs",
+        required_patterns: &[
+            "fn function_exit(",
+            "exits only that invocation",
+            "must not execute work or reset fuel",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "registered-function-exit-dispatch",
+        path: "crates/yir-exec/src/execution_engine.rs",
+        required_patterns: &[
+            "module.function_exit(node, self.resources[&node.resource], &self.state)?",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "registered-function-exit-proof",
+        path: "crates/yir-exec/tests/registered_execution.rs",
+        required_patterns: &[
+            "registered_function_exit_skips_tail_and_returns_only_from_the_nested_invocation",
+            "registered_function_exit_errors_propagate_without_fallback_or_retry",
+            "exit_probe.stop",
+            "step budget exhausted",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "owned-cleanup-terminal-source-result",
+        path: "tools/nuisc/src/lowering/if_lowering.rs",
+        required_patterns: &[
+            "let returned = lower_branch_drop_owned_bytes_return(",
+            "push_dep_edges(state, &returned, &selected)",
+            "return Ok(LoweredIfOutcome::Returned(selected))",
         ],
     },
     DevTensorDriftCheckSpec {

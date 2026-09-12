@@ -1,3 +1,4 @@
+use super::edge_helpers::push_effect_edge;
 use super::*;
 
 pub(super) fn lower_guard_return(
@@ -106,12 +107,9 @@ pub(super) fn lower_guard_drop_owned_bytes_return(
     });
     for input in [condition_name, bytes_name, return_name] {
         push_dep_edges(state, &input, &name);
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: input,
-            to: name.clone(),
-        });
+        push_effect_edge(state, &input, &name);
     }
+    chain_statement_effect(state, &name);
 }
 
 pub(super) fn lower_branch_drop_owned_bytes_return(
@@ -121,7 +119,7 @@ pub(super) fn lower_branch_drop_owned_bytes_return(
     else_bytes_name: String,
     else_return_name: String,
     state: &mut LoweringState<'_>,
-) {
+) -> String {
     let name = next_name(state, "branch_drop_owned_bytes_return");
     let inputs = vec![
         condition_name,
@@ -141,12 +139,10 @@ pub(super) fn lower_branch_drop_owned_bytes_return(
     });
     for input in inputs {
         push_dep_edges(state, &input, &name);
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: input,
-            to: name.clone(),
-        });
+        push_effect_edge(state, &input, &name);
     }
+    chain_statement_effect(state, &name);
+    name
 }
 
 pub(super) fn lower_guard_print(

@@ -300,14 +300,27 @@ invocation within 1000 shared fuel; exhaustion still preserves prior application
 Partial helper lowering also honors its declared result and traps if that result
 is unavailable, rather than returning an unrelated scalar as an aggregate pointer.
 The malformed-return regression covers this native function-lane drift separately.
-The score remains `active/86`; next is a break-based packaged application proof under
-the same build/run-artifact admission and identity checks. The recorded M2 image proof
-above still exercises continue, not the new break action.
+PixelMagic `recolor_run` now replaces only the matching prefix of a bounded range.
+Twenty-two native/reference cases check stop index, write count, checksum, untouched
+suffixes, empty ranges and invalid inputs. The image app marks four first-row pixels
+green and checks all three statistics before GPU submission. Ordinary M2 headless
+build/run-artifact now retains and executes the break action: two real Metal frames
+include the expected magenta marker and match every direct-session replay byte.
+Replay confirms five helper invocations, stop index 4 and exactly four marker writes
+per callback. Pre-effect argument/binary/YIR rejection and exhausted-replay evidence
+preservation still pass. The score remains `active/86`; next is native CPU lifecycle
+callback dispatch, while retaining this packaged break proof.
 This is not fully native CPU callbacks, arbitrary loop support or a
 complete memory-safety proof.
-A separate full-LLVM dump of the image showcase rejects
-`cpu.guard_drop_owned_bytes_return` without an aggregate return-layout contract.
-Headless success and standalone native pixel parity do not clear that callback-graph boundary.
+The default-AOT image regression now passes its LLVM checkpoint and real Metal
+export without changing packaging mode. Guarded and two-arm owned-Bytes cleanup
+returns validate and pack the declared aggregate layout. Native/reference tests
+cover nested fields, both paths, reordered declarations and zero live native Bytes;
+layout drift and directly known dropped-Bytes aliases reject before cleanup.
+The compiler records two terminal branches as a returned result, while registered
+function-exit hooks replace CPU operation-name dispatch in the generic executor.
+Other aggregate early-return operations remain incomplete. The compiled host still
+executes embedded YIR callbacks, so native CPU callback dispatch is not yet proven.
 Compound-condition `while` lowering now selects recursive descriptors,
 normalizes linear carries consistently and deduplicates shared effect inputs.
 CPU-owned cooperative execution replaces trace-only loop results; generic YIR

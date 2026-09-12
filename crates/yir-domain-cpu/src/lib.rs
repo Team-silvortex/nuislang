@@ -20,6 +20,7 @@ mod execute_scalar_flow;
 mod execute_scoped_loop;
 mod execute_tasks;
 mod execute_values;
+mod function_exit;
 mod loop_metadata;
 mod runtime_helpers;
 #[cfg(test)]
@@ -58,6 +59,14 @@ impl RegisteredMod for CpuMod {
     }
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {
         describe_cpu_node(node, resource)
+    }
+    fn function_exit(
+        &self,
+        node: &Node,
+        _resource: &Resource,
+        state: &ExecutionState,
+    ) -> Result<Option<Value>, String> {
+        function_exit::selected_return(node, state)
     }
     fn begin_execution(
         &self,

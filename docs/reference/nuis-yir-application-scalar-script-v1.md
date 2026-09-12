@@ -472,8 +472,8 @@ to a 0/1 signal.
 [Break regressions](../../tools/nuisc/tests/buffer_while/breaks.rs) cover reference
 execution, regenerated native LLVM and registered sessions, including a trillion
 upper bound that exits after three calls within 1000 shared fuel, skipped traps,
-nested scope, mixed exits, malformed controls and reordered YIR. This is CPU
-control-flow evidence; a break-based packaged application/device proof remains next.
+nested scope, mixed exits, malformed controls and reordered YIR. PixelMagic's
+packaged recoloring operation below now adds real Metal application evidence.
 A fault injection also omits a returned field producer's native function lane.
 Declared helper results now use the same fail-closed fallback as entry results:
 partial LLVM remains inspectable but traps instead of treating the last integer
@@ -503,26 +503,50 @@ The [CLI regression](../../tools/nuis/tests/headless_image_loop.rs) builds the
 ordinary image showcase with `headless-aot-bundle` and launches it through
 `run-artifact`. The carried generator and its real branch-local counting helper are present in
 packaged YIR, including the red branch's two statistics and private continue flag.
-The continue-based generator passes this M2 route with two actual Metal output hashes, all output bytes
-against direct-session replay, and all 768 writes plus the post-snapshot mutation
-per callback. Wrong callback arguments or executable/YIR drift are rejected before
+After filling, `recolor_run(pixels, 0, 32, pixels[0], 4278255360)` marks the first
+same-color run green, stopping before the first different pixel. The callback
+checks `PixelRunStats { end: 4, written: 4, checksum: 17113021440 }` before submitting.
+Its shared `scoped_call_i64_carries_break` action remains in packaged YIR, with
+two statistics and the private exit slot. The [native/reference color-run test](../../tools/nuisc/tests/pixelmagic_buffer_loop/color_runs.rs)
+checks 22 boundary cases, all output pixels and exact write counts; invalid input
+does not mutate storage and the nonmatching tail remains untouched.
+This combined continue/break workflow passes the M2 route with two actual Metal
+output hashes, including the 20x5 magenta marker after inversion. Every output byte
+matches the independent oracle and direct-session replay. Replay verifies five
+recoloring helper invocations with stop index 4, plus exactly 768 fill writes,
+four marker writes and the post-snapshot mutation per callback.
+Wrong callback arguments or executable/YIR drift are rejected before
 application effects. Exhausted packaged replay produces neither Close nor success,
 and preserves the earlier replay stream.
 
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test buffer_while --test pixelmagic_buffer_loop -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo build -p yir-pack-aot -p yir-runtime-host -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_loop -j 1 -- --test-threads=1
 ```
 
-The second command is a macOS Metal device regression, not Linux/Windows evidence.
+The last command is a macOS Metal device regression, not Linux/Windows evidence.
 CPU callbacks in the packaged host still execute embedded YIR; the native parity
 test independently compiles the generator, not the complete live callback ABI.
 Induction changes before `break` and `continue` without the explicit matching step remain outside this subset;
 ordered i64 accumulators do not certify arbitrary loop-carried state or fully native callbacks.
-A diagnostic full-LLVM dump of the complete image showcase also rejects
-`cpu.guard_drop_owned_bytes_return` without an aggregate return-layout contract.
-The verified-YIR packaging route and standalone native generator test do not
-exercise that complete native callback graph.
+The default-AOT compiled-image regression now passes its LLVM checkpoint without
+changing packaging mode. `cpu.guard_drop_owned_bytes_return` and
+`cpu.branch_drop_owned_bytes_return` use the declared function aggregate layout,
+validate all return arms before emitting cleanup, and pack nested fields in ABI
+order. Missing/mismatched layouts and directly known dropped-Bytes aliases reject
+rather than treating an unrelated integer as a returned aggregate pointer.
+The [cleanup return regression](../../tools/nuisc/tests/owned_cleanup_return.rs)
+compiles pure Nuis helpers into a native binary and compares all four branch
+outcomes with reference execution, including reversed declarations. A native
+live-Bytes probe must be zero at completion. Two terminal source branches now
+provide a real helper result and deduplicated, ordered cleanup effects.
+The generic executor observes the registered module's `function_exit` hook after
+successful node execution; the hook neither repeats work nor resets shared fuel.
+Non-CPU registration, nested-call continuation and rejected exits have regressions.
+The compiled image host still uses embedded YIR for CPU callbacks. Passing the
+LLVM checkpoint is not evidence of complete native callback dispatch; other
+aggregate early-return operations and resource-bearing callback states remain open.
 
 ## Current Boundary
 

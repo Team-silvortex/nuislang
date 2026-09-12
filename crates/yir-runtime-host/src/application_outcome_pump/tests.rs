@@ -74,6 +74,17 @@ impl RegisteredMod for CountingCpu {
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {
         self.base.lookup("cpu").unwrap().describe(node, resource)
     }
+    fn function_exit(
+        &self,
+        node: &Node,
+        resource: &Resource,
+        state: &ExecutionState,
+    ) -> Result<Option<Value>, String> {
+        self.base
+            .lookup("cpu")
+            .unwrap()
+            .function_exit(node, resource, state)
+    }
     fn execute(
         &self,
         node: &Node,

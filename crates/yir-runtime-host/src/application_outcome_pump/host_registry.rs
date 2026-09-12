@@ -93,4 +93,13 @@ impl RegisteredMod for HostParentMod {
         self.admitted()?
             .execute_branch_effect_action(action, parent, resource, state)
     }
+
+    fn function_exit(
+        &self,
+        node: &Node,
+        resource: &Resource,
+        state: &ExecutionState,
+    ) -> Result<Option<Value>, String> {
+        self.admitted()?.function_exit(node, resource, state)
+    }
 }

@@ -117,8 +117,16 @@ PixelMagic uses this path after finishing each red pixel.
 Guarded `break` now exits before stepping through a shared flat-i64 control contract
 consumed by the CPU registered driver and LLVM. Native/reference and session tests
 preserve prefix state, reject invalid control values and stop a trillion-bound loop
-within 1000 shared fuel. A break-based packaged application proof is the next
-integration boundary; the existing M2 image evidence remains continue-based.
+within 1000 shared fuel. PixelMagic `recolor_run` now passes ordinary M2 headless
+build/run-artifact: four same-color pixels are marked before real Metal inversion,
+the fifth helper invocation stops at index 4, and exact pixels, writes, identity
+admission and replay remain verified. Owned-Bytes cleanup returns now propagate
+declared aggregate layouts through LLVM, restoring the default-AOT image checkpoint.
+Nested aggregate cleanup helpers have native/reference parity, declaration-order
+invariance and zero live native Bytes after execution. The executor asks each
+registered module for function exits instead of dispatching on CPU operation names.
+Native CPU lifecycle callback dispatch is the next integration boundary; the
+passing compiled image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.

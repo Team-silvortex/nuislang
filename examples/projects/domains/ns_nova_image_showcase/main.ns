@@ -60,10 +60,13 @@ mod cpu Main {
       shader_profile_instance_count("PixelMagicImageSurface") + frame_index;
     let pixels: ref Buffer = alloc_buffer(768, 0);
     let filled: bool = PixelMagicPixels.fill_checkerboard(pixels, 32, 24, 4, frame_index / 2);
+    // Mark only the first same-color run in green; the GPU will invert it to magenta.
+    let marker: PixelRunStats = PixelMagicPixels.recolor_run(pixels, 0, 32, pixels[0], 4278255360);
     let snapshot: Bytes = copy_bytes(pixels);
     pixels[0] = 0;
     free(pixels);
     if filled == false { return state; }
+    if marker.end != 4 || marker.written != 4 || marker.checksum != 17113021440 { return state; }
     let storage: Binding = shader_storage_binding(3, snapshot);
     let pipeline: Pipeline = shader_profile_pipeline("PixelMagicImageSurface");
     let bindings: BindingSet = shader_bind_set(pipeline, storage);

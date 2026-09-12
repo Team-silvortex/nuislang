@@ -7,6 +7,9 @@ use std::{
 
 const LIBRARY: &str = include_str!("../../../stdlib/pixelmagic/lib/pixels.ns");
 
+#[path = "pixelmagic_buffer_loop/color_runs.rs"]
+mod color_runs;
+
 struct Artifacts(PathBuf);
 impl Drop for Artifacts {
     fn drop(&mut self) {

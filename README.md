@@ -156,7 +156,16 @@ functions, provided its path explicitly performs the matching unit step. PixelMa
 uses it after red-pixel writes and statistics. Guarded `break` now signals the CPU
 loop driver and LLVM to exit before stepping, preserving prefix writes and i64
 state without empty remaining iterations. Native/reference and budgeted-session
-regressions cover this subset; the existing M2 image proof still uses `continue`.
+regressions cover this subset. PixelMagic's `recolor_run` now exercises it in the
+ordinary M2 headless build/run-artifact path: the first same-color run is marked
+before GPU inversion, with exact stop state, write counts, frame bytes and replay.
+Owned-Bytes cleanup returns now use the declared aggregate layout for LLVM packing,
+including nested fields and two terminal branches. A pure Nuis regression compares
+both return paths with reference execution and checks zero live Bytes after native
+execution, also with reordered declarations. The default AOT image regression now
+passes its LLVM checkpoint and real Metal export again without switching packaging
+modes. Its compiled host still executes CPU callbacks as embedded YIR; this does not
+establish native CPU callback dispatch or self-contained Nsld packaging.
 Step-before-break, unstepped `continue`, arbitrary
 carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.

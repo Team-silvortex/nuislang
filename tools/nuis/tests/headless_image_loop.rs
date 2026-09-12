@@ -75,7 +75,9 @@ fn expected_frame(phase: usize) -> Vec<u8> {
     for y in 0..120 {
         for x in 0..160 {
             let alternate = (x / 5 / 4 + y / 5 / 4 + phase) % 2;
-            bytes.extend(if alternate == 0 {
+            bytes.extend(if y < 5 && x < 20 {
+                [255, 0, 255, 255]
+            } else if alternate == 0 {
                 [0, 255, 255, 255]
             } else {
                 [255, 255, 0, 255]
@@ -136,6 +138,22 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     let yir_path = output.join(format!("{}.yir", report.artifact_binary_name));
     let source = fs::read_to_string(&yir_path).unwrap();
     let module = yir_syntax::parse_module(&source).unwrap();
+    let recolor = module
+        .functions
+        .iter()
+        .find(|function| function.name.ends_with("recolor_run"))
+        .expect("packaged YIR must retain the source run recoloring helper");
+    let break_loop = module
+        .nodes
+        .iter()
+        .find(|node| {
+            recolor.body_nodes.contains(&node.name)
+                && node.op.instruction == "loop_while_i64_effect"
+                && node.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carries_break")
+        })
+        .expect("packaged recoloring must retain driver-level break, not unroll or no-op the tail");
+    let break_helper = &break_loop.op.args[8];
+    assert!(break_loop.op.args[9].ends_with("{carry0:i64;carry1:i64;carry2:i64}"));
     for (name, instruction) in [
         ("checkerboard_is_red", "call_bool"),
         ("checkerboard_parity", "call_i64"),
@@ -254,6 +272,7 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     let saved_stream = fs::read(&stream).unwrap();
     let mut frames = Vec::new();
     let mut writes = 0;
+    let mut run_exits = 0;
     let outcome = run_application_script(
         source.clone(),
         ApplicationProviderSource::Replay(&stream),
@@ -261,6 +280,14 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
         Duration::from_secs(90),
         |reply| {
             let trace = reply.trace.as_ref().unwrap();
+            run_exits += trace
+                .events
+                .iter()
+                .filter(|event| {
+                    event.contains("iterations=5 final=4 action cpu.scoped_call_i64_carries_break")
+                        && event.ends_with(break_helper)
+                })
+                .count();
             writes += trace
                 .lane_steps
                 .values()
@@ -279,9 +306,13 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     assert!(matches!(outcome, ApplicationScriptOutcome::Finished(_)));
     assert_eq!(frames, vec![expected_frame(0), expected_frame(1)]);
     assert_eq!(
+        run_exits, 2,
+        "each callback exits at the first nonmatching pixel"
+    );
+    assert_eq!(
         writes,
-        2 * (768 + 1),
-        "pixel loop plus post-snapshot mutation per frame"
+        2 * (768 + 4 + 1),
+        "pixel fill, four recolor writes and post-snapshot mutation per frame"
     );
 
     let mut invalid = script();

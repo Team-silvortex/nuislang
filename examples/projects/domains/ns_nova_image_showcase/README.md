@@ -34,7 +34,13 @@ The linked contract includes reproducible build, event, close and drain commands
    ordinary LoopState fields, not a PixelMagic-specific runtime result.
    Private row-range helpers clamp partial rows, and inner counters reset each row.
    Inner loops remain actual function-body YIR loops and share callback fuel.
-   Arbitrary loop carries and guarded break/continue remain outside this subset.
+   The app then calls `PixelMagicPixels.recolor_run` on the first row, marking its
+   first same-color run green. A guarded `break` stops at the first different pixel:
+   exactly four pixels are written and the fifth helper invocation exits at index 4.
+   The callback checks all three returned fields before submitting the image.
+   The range is linear; the app supplies a row boundary rather than teaching the
+   library or CPU driver about this particular image. Arbitrary loop carries,
+   step-before-break and unstepped continue remain outside the admitted subset.
 2. `copy_bytes` creates an owned snapshot. The app overwrites the original first
    pixel and frees the original Buffer before binding the snapshot.
 3. `shader_storage_binding(3, snapshot)` requests one immutable u32 array.
@@ -48,7 +54,8 @@ The linked contract includes reproducible build, event, close and drain commands
    Generated MSL bounds-checks array reads, returning zero outside the array.
    Reflection checks the exact read-only u32 array length and slot before upload.
 6. Full/clear/full GPU frames return through ns-nova completion, presentation,
-   and commit. The first and third images invert complementary checkerboards.
+   and commit. The first and third images invert complementary checkerboards,
+   each with the same 20x5 magenta marker at the top left.
 
 ## Verify
 
@@ -65,17 +72,29 @@ on an Apple Silicon Metal host, the actual headless CLI build/run-artifact path:
 The Nuis generator uses nested row/pixel loops. Red pixels update both statistics,
 explicitly step and `continue`; the remaining blue write is skipped. This exercises
 iteration-local control through ordinary YIR functions, not a PixelMagic runtime opcode.
+The subsequent recoloring operation exercises a real early exit. The packaged YIR
+must retain its `scoped_call_i64_carries_break` action; direct-session replay checks
+five helper invocations, stop index 4 and four marker writes in each callback.
+The independent output oracle includes the marker, so skipping the operation or
+continuing into a later same-color run changes the expected image.
 
 ```sh
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test pixelmagic_buffer_loop -j 1 -- --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo build -p yir-pack-aot -p yir-runtime-host -j 1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test headless_image_loop -j 1 -- --test-threads=1
 ```
 
-The second test also checks direct-session replay, executable/YIR identity drift,
+The headless test also checks direct-session replay, executable/YIR identity drift,
 argument admission and failure without successful close on exhausted replay.
 This is embedded-YIR callback execution with a real GPU, not a native callback ABI.
 
 ## Run The Compiled Artifact
+
+The default AOT route below now passes its LLVM checkpoint and compiled-image
+regression: owned-Bytes cleanup returns pack the declared aggregate return layout.
+This fix does not switch the regression to `headless-aot-bundle`. The resulting
+window-capable bundle still runs CPU callbacks through embedded YIR, so a passing
+compiled host plus real Metal is not a claim of fully native CPU callback dispatch.
 
 On an Apple Silicon host with the registered Metal adapter, run from the repository
 root. `CARGO_BUILD_JOBS=1` also bounds the packer's nested runtime build:

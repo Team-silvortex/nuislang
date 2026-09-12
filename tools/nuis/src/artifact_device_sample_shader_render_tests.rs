@@ -559,7 +559,9 @@ fn execute_nova_projection(image: bool) {
 fn image_input(phase: bool) -> Vec<u8> {
     (0..768)
         .flat_map(|index| {
-            if ((index % 32 / 4 + index / 32 / 4) % 2 == 1) != phase {
+            if index < 4 {
+                [0, 255, 0, 255]
+            } else if ((index % 32 / 4 + index / 32 / 4) % 2 == 1) != phase {
                 [0, 0, 255, 255]
             } else {
                 [255, 0, 0, 255]

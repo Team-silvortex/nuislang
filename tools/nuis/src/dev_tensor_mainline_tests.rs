@@ -296,6 +296,27 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .next_action
         .contains("break-based packaged application proof"));
+    assert!(session.evidence.contains("PixelMagic recolor_run"));
+    assert!(session
+        .evidence
+        .contains("22 native/reference boundary cases"));
+    assert!(session
+        .evidence
+        .contains("five helper invocations, final index 4"));
+    assert!(session
+        .evidence
+        .contains("two exact 76800-byte Metal frames"));
+    assert!(session
+        .next_step
+        .starts_with("establish native CPU lifecycle callback dispatch"));
+    assert!(session
+        .evidence
+        .contains("default-AOT image regression now passes its LLVM checkpoint"));
+    assert!(session.evidence.contains("zero live native Bytes"));
+    assert!(session.evidence.contains("registered function_exit hook"));
+    assert!(session
+        .validation_command
+        .contains("--test owned_cleanup_return"));
     assert!(session.evidence.contains(
         "continue-based PixelMagic image passes ordinary headless build/run-artifact on real M2"
     ));
@@ -334,8 +355,10 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("step-before-break, unstepped continue"));
     assert!(session
         .blocker
-        .contains("cpu.guard_drop_owned_bytes_return"));
-    assert!(session.blocker.contains("aggregate return-layout contract"));
+        .contains("native CPU lifecycle callback dispatch remains unproven"));
+    assert!(!session
+        .blocker
+        .contains("reject cpu.guard_drop_owned_bytes_return"));
     assert!(!session
         .blocker
         .contains("Nested Buffer-writing loops, fresh-local rebinding"));
