@@ -138,7 +138,7 @@ fn driver(bridge: &NativeSessionBridge, helper: &str, cases: &[Case], probe: boo
     llvm
 }
 
-fn run_bounded(binary: &Path, directory: &Path) -> Output {
+pub(super) fn run_bounded(binary: &Path, directory: &Path) -> Output {
     let stdout = directory.join("probe.stdout");
     let stderr = directory.join("probe.stderr");
     let mut child = Command::new(binary)

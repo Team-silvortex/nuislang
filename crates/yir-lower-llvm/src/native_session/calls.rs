@@ -11,16 +11,25 @@ pub(super) fn target<'a>(
     node: &Node,
     functions: &BTreeMap<&str, &'a YirFunction>,
 ) -> Result<Option<&'a YirFunction>, String> {
-    let Some(kind) = node.op.instruction.strip_prefix("call_") else {
+    let scoped = super::loops::scoped::parse(node)?;
+    let (callee, arity, kind) = if let Some(call) = scoped {
+        (
+            call.callee,
+            call.operands.len(),
+            call.initial.map(|_| "i64"),
+        )
+    } else if let Some(kind) = node.op.instruction.strip_prefix("call_") {
+        ScalarKind::parse(kind)?;
+        let callee = node
+            .op
+            .args
+            .first()
+            .ok_or("native scalar call missing target")?;
+        (callee.as_str(), node.op.args.len() - 1, Some(kind))
+    } else {
         return Ok(None);
     };
-    ScalarKind::parse(kind)?;
-    let callee = node
-        .op
-        .args
-        .first()
-        .ok_or("native scalar call missing target")?;
-    let function = functions.get(callee.as_str()).copied().ok_or_else(|| {
+    let function = functions.get(callee).copied().ok_or_else(|| {
         format!(
             "native scalar call `{}` references unknown helper `{callee}`",
             node.name
@@ -28,9 +37,12 @@ pub(super) fn target<'a>(
     })?;
     let result = function.result.as_ref();
     if function.role != YirFunctionRole::Helper
-        || !result
-            .is_some_and(|result| result.ty == kind && result.ownership == YirValueOwnership::Value)
-        || function.parameters.len() != node.op.args.len() - 1
+        || !result.is_some_and(|result| {
+            ScalarKind::parse(&result.ty).is_ok()
+                && kind.is_none_or(|kind| result.ty == kind)
+                && result.ownership == YirValueOwnership::Value
+        })
+        || function.parameters.len() != arity
     {
         return Err(format!(
             "native scalar call `{}` helper signature drift",

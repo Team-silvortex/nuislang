@@ -20,6 +20,12 @@ mod dynamic_loops;
 mod helpers;
 #[path = "native_application_bridge/loops.rs"]
 mod loops;
+#[path = "native_application_bridge/scoped_admission.rs"]
+mod scoped_admission;
+#[path = "native_application_bridge/scoped_execution.rs"]
+mod scoped_execution;
+#[path = "native_application_bridge/scoped_loops.rs"]
+mod scoped_loops;
 
 const SOURCE: &str = include_str!("native_application_bridge/main.ns");
 struct Project(PathBuf);

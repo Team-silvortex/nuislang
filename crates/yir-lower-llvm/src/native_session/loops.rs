@@ -7,6 +7,7 @@ const MAX_ITERATIONS: i128 = 65536;
 
 mod dynamic;
 pub(crate) use dynamic::emit_guard;
+pub(crate) mod scoped;
 
 fn constant_inputs(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Option<[i64; 3]> {
     let constant = |name: &str| {
@@ -30,11 +31,15 @@ pub(super) fn validate(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Result<(),
     let chain = match node.op.instruction.as_str() {
         "loop_while_i64" => false,
         "loop_while_i64_chain" | "loop_while_scalar_chain" => true,
+        "loop_while_i64_effect" => {
+            scoped::parse(node)?;
+            false
+        }
         _ => return Ok(()),
     };
     let fail = |message: &str| format!("native scalar loop `{}` {message}", node.name);
     let args = &node.op.args;
-    if args.len() < 5 || (!chain && args.len() != 5) {
+    if args.len() < 5 || (node.op.instruction == "loop_while_i64" && args.len() != 5) {
         return Err(fail("has an invalid counted-loop shape"));
     }
     if !matches!(args[3].as_str(), "eq" | "ne" | "lt" | "le" | "gt" | "ge") {

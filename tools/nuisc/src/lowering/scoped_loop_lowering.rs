@@ -179,11 +179,13 @@ pub(super) fn lower_scoped_call_while(
                 || loop_purity::expr_references_names(&prepared.step, &changed)
                 || !args.iter().all(|arg| matches!(arg, NirExpr::Var(_)))
                 || function.params.iter().any(|param| {
-                    !(is_scalar_i64(&param.ty)
-                        || (!param.ty.is_ref
-                            && !param.ty.is_optional
-                            && param.ty.name == "bool"
-                            && param.ty.generic_args.is_empty())
+                    !((!param.ty.is_ref
+                        && !param.ty.is_optional
+                        && matches!(
+                            param.ty.name.as_str(),
+                            "bool" | "i32" | "i64" | "f32" | "f64"
+                        )
+                        && param.ty.generic_args.is_empty())
                         || (param.ty.is_ref
                             && !param.ty.is_optional
                             && param.ty.name == "Buffer"

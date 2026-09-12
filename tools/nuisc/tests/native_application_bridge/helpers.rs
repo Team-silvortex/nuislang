@@ -117,7 +117,7 @@ fn reachable_helpers_reject_signature_lane_effect_and_dependency_drift() {
     rejected(&effects, "does not admit cpu.print");
 }
 
-fn edge(module: &mut YirModule, from: &str, to: &str) {
+pub(super) fn edge(module: &mut YirModule, from: &str, to: &str) {
     module.edges.push(yir_core::Edge {
         kind: yir_core::EdgeKind::Dep,
         from: from.to_owned(),
@@ -125,7 +125,7 @@ fn edge(module: &mut YirModule, from: &str, to: &str) {
     });
 }
 
-fn push_node(
+pub(super) fn push_node(
     module: &mut YirModule,
     function: &str,
     name: &str,
@@ -149,7 +149,7 @@ fn push_node(
         .insert(name.to_owned(), format!("fn:{function}"));
 }
 
-fn helper(module: &mut YirModule, name: &str, callees: &[String], nodes: usize) {
+pub(super) fn helper(module: &mut YirModule, name: &str, callees: &[String], nodes: usize) {
     let mut body = Vec::<String>::new();
     for index in 0..nodes - 1 {
         let node = format!("{name}_v{index}");
@@ -183,7 +183,7 @@ fn helper(module: &mut YirModule, name: &str, callees: &[String], nodes: usize) 
     });
 }
 
-fn root_call(module: &mut YirModule, callee: &str) -> String {
+pub(super) fn root_call(module: &mut YirModule, callee: &str) -> String {
     let name = module.application_sessions[0].open.clone();
     let call = format!("root_call_{callee}");
     push_node(module, &name, &call, "call_i64", vec![callee.to_owned()]);

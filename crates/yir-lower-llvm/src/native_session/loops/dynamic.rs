@@ -15,7 +15,10 @@ pub(crate) fn emit_guard(
 ) -> Result<(), String> {
     if !matches!(
         node.op.instruction.as_str(),
-        "loop_while_i64" | "loop_while_i64_chain" | "loop_while_scalar_chain"
+        "loop_while_i64"
+            | "loop_while_i64_chain"
+            | "loop_while_scalar_chain"
+            | "loop_while_i64_effect"
     ) {
         return Ok(());
     }

@@ -494,6 +494,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "MAX_CALL_DEPTH: usize = 32",
             "helper signature drift",
             "rejects recursive helper call cycles",
+            "super::loops::scoped::parse",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -513,6 +514,8 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "lower_scalar_value_arg",
             "exactly match its declared scalar kind",
+            "native_session::loops::scoped::parse",
+            "exact i64 loop-state parameters",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -545,6 +548,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "udiv i64",
             "icmp ule i128 {trips}, {MAX_ITERATIONS}",
             "call void @llvm.trap()",
+            "loop_while_i64_effect",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -566,6 +570,45 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "checked_add(step)",
             "checked_sub(step)",
             "Duration::from_secs(10)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-scoped-loop-contract",
+        path: "crates/yir-lower-llvm/src/native_session/loops/scoped.rs",
+        required_patterns: &[
+            "parse_scoped_i64_carry",
+            "does not admit this scoped action",
+            "arity.checked_add(8)",
+            "args[6] != \"scoped_call\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-scoped-loop-admission-proof",
+        path: "tools/nuisc/tests/native_application_bridge/scoped_admission.rs",
+        required_patterns: &[
+            "scoped_call_edges_share_recursion_depth_and_function_bounds",
+            "scoped_actions_reject_target_payload_and_result_drift",
+            "scoped_captures_require_exact_types_and_the_callers_own_lane",
+            "scoped_callee_effects_are_checked_even_for_discarded_and_zero_trip_calls",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-scoped-loop-execution-proof",
+        path: "tools/nuisc/tests/native_application_bridge/scoped_execution.rs",
+        required_patterns: &[
+            "scoped_native_calls_observe_pre_step_carry_and_all_five_exact_scalar_kinds",
+            "scoped_native_preflight_traps_before_the_first_helper_invocation",
+            "scoped_reference_fuel_failure_preserves_the_last_accepted_session_state",
+            "0x7fc0_1234",
+            "0x7ff8_0000_0000_4321",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-scalar-session-scoped-loop-parity",
+        path: "tools/nuisc/tests/native_application_bridge/scoped_loops.rs",
+        required_patterns: &[
+            "scoped_scalar_loop_calls_keep_native_reference_and_typed_state_parity",
+            "assert_native_parity(SCOPED, true)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -656,7 +699,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "materialize-artifact",
             "rejected_before_open",
             "native_loop_preflight",
-            "dynamic_loops.ns",
+            "scoped_loops.ns",
         ],
     },
 ];

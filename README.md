@@ -183,8 +183,11 @@ silently expanding. Counted i64 loops now compose with those helpers and ordered
 add/multiply carries. Constant induction is proven at compile time; runtime i64
 start/bound/step values are checked before loop entry for finite, non-wrapping
 induction within 65536 iterations. Native/reference and real process-trap tests
-cover this boundary. Loop-body calls, effectful loops, resources and providers
-remain outside this profile; the default image host is unchanged.
+cover this boundary. Scoped loop bodies now call admitted scalar helpers, either
+discarding the scalar result or carrying one i64 return into the next iteration.
+All five scalar capture kinds retain exact typing; scoped edges share the same
+acyclic call-graph limits. Multi-value scoped returns, guarded break, resources
+and provider effects remain outside this profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary
 carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.

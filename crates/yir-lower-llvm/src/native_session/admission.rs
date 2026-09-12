@@ -144,7 +144,8 @@ pub(super) fn select(
 }
 
 // Calls are admitted only through the bounded, acyclic scalar helper closure.
-// Counted scalar loops need a separate termination proof; effects remain excluded.
+// Counted loops need a termination proof; scoped actions require a scalar helper
+// in that same closure, not arbitrary effects hidden inside loop metadata.
 pub(super) fn admitted(instruction: &str) -> bool {
     matches!(
         instruction,
@@ -177,6 +178,7 @@ pub(super) fn admitted(instruction: &str) -> bool {
             | "loop_while_i64"
             | "loop_while_i64_chain"
             | "loop_while_scalar_chain"
+            | "loop_while_i64_effect"
             | "add"
             | "sub"
             | "mul"

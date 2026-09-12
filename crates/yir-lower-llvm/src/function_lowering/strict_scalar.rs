@@ -10,13 +10,44 @@ pub(super) fn validate(
 ) -> Result<(), String> {
     if matches!(
         node.op.instruction.as_str(),
-        "loop_while_i64" | "loop_while_i64_chain" | "loop_while_scalar_chain"
+        "loop_while_i64"
+            | "loop_while_i64_chain"
+            | "loop_while_scalar_chain"
+            | "loop_while_i64_effect"
     ) {
-        for name in node.op.args[..3]
-            .iter()
-            .chain(node.op.args[5..].chunks_exact(2).map(|carry| &carry[0]))
-        {
+        for name in &node.op.args[..3] {
             require_value(node, name, CpuCallScalarKind::I64, registers)?;
+        }
+        if node.op.instruction.ends_with("_chain") {
+            for pair in node.op.args[5..].chunks_exact(2) {
+                require_value(node, &pair[0], CpuCallScalarKind::I64, registers)?;
+            }
+        }
+    }
+    if let Some(call) = native_session::loops::scoped::parse(node)? {
+        let signature = signatures
+            .get(call.callee)
+            .ok_or_else(|| format!("native scoped call `{}` has no emitted helper", node.name))?;
+        if signature.params.len() != call.operands.len() {
+            return Err(format!(
+                "native scoped call `{}` argument count drift",
+                node.name
+            ));
+        }
+        if let Some(initial) = call.initial {
+            require_value(node, initial, CpuCallScalarKind::I64, registers)?;
+        }
+        for (operand, kind) in call.operands.iter().zip(&signature.params) {
+            if matches!(operand.as_str(), "$current" | "$carry") {
+                if *kind != CpuCallScalarKind::I64 {
+                    return Err(format!(
+                        "native scoped call `{}` requires exact i64 loop-state parameters",
+                        node.name
+                    ));
+                }
+            } else {
+                require_value(node, operand, *kind, registers)?;
+            }
         }
     }
     if node.op.instruction == "guard_return" {

@@ -306,9 +306,9 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
-    assert!(session
-        .next_step
-        .starts_with("extend scoped scalar loop-body calls in the native session profile"));
+    assert!(session.next_step.starts_with(
+        "extend multi-i64 scoped carry returns and guarded break in the native session profile"
+    ));
     assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
         .evidence
@@ -342,7 +342,18 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("plain-chain state instead of a trace-only unit"));
-    assert!(session.blocker.contains("scoped scalar loop-body calls"));
+    assert!(session
+        .blocker
+        .contains("multi-i64 scoped carry returns and guarded break"));
+    assert!(!session
+        .blocker
+        .contains("scoped scalar loop-body calls, resource state"));
+    assert!(session
+        .evidence
+        .contains("36 callback cases and 84 actual helper invocations"));
+    assert!(session
+        .evidence
+        .contains("Scoped loop edges now join the same bounded acyclic helper closure"));
     assert!(!session.blocker.contains("dynamic induction and"));
     assert!(session.evidence.contains("1680 runtime induction cases"));
     assert!(session

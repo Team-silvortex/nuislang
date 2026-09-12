@@ -150,9 +150,18 @@ executions and the build/run-artifact restoration regression cover this subset.
 A 1680-case native guard probe matches checked-step simulation across six
 comparisons and add/sub, including signed extremes, zero trips and skipped guards.
 Rejected inputs enter no loop iterations; six unmodified native trap executions
-confirm process failure rather than a catchable callback/fuel result. The next
-native boundary is scoped scalar loop-body calls; the passing default image host
-still executes embedded YIR.
+confirm process failure rather than a catchable callback/fuel result. Scoped
+scalar loop-body calls now reuse the existing YIR action and LLVM emitter, with
+discarded scalar results or one carried i64 return. Scoped targets join the same
+bounded acyclic closure; captures require exact scalar kinds and caller-local
+values. Six native/reference runs cover the scoped Nuis fixture and declaration
+reordering. Two additional executables observe 36 callback cases and 84 actual
+helper invocations, including all five scalar kinds, NaN/signed-zero bits,
+pre-step carry order and zero-trip preservation. Three process-trap cases prove
+invalid induction never enters the helper. The build/run-artifact restoration
+regression now uses the scoped-loop fixture. Multi-i64 scoped carry returns and
+guarded break are the next native boundary; the passing default image host still
+executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.

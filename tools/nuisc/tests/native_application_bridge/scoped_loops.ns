@@ -1,0 +1,109 @@
+mod cpu Main {
+  struct Metrics { total: i64, tag: i32, active: bool, gain: f32, scale: f64 }
+  struct State { frame: i64, metrics: Metrics }
+
+  @noinline
+  fn sum(left: i64, right: i64) -> i64 { return left + right; }
+
+  @noinline
+  fn accumulate(total: i64, index: i64, enabled: bool) -> i64 {
+    if enabled { return sum(total, index); }
+    return total;
+  }
+
+  @noinline
+  fn counted(value: i64, initial: i64, limit: i64, stride: i64, enabled: bool) -> i64 {
+    let index: i64 = initial;
+    let total: i64 = value;
+    while index < limit {
+      let total: i64 = accumulate(total, index, enabled);
+      let index: i64 = index + stride;
+    }
+    return total;
+  }
+
+  @noinline
+  fn descending(value: i64, initial: i64, limit: i64, stride: i64, enabled: bool) -> i64 {
+    let index: i64 = initial;
+    let total: i64 = value;
+    while index > limit {
+      let total: i64 = accumulate(total, index, enabled);
+      let index: i64 = index - stride;
+    }
+    return total;
+  }
+
+  @noinline
+  fn touch(index: i64, tag: i32, flag: bool, gain: f32, scale: f64) -> bool {
+    return keep_flag(flag);
+  }
+
+  @noinline
+  fn ignored(initial: i64, limit: i64, stride: i64, tag: i32, flag: bool, gain: f32, scale: f64) -> i64 {
+    let index: i64 = initial;
+    while index < limit {
+      touch(index, tag, flag, gain, scale);
+      let index: i64 = index + stride;
+    }
+    return index;
+  }
+
+  @noinline
+  fn ping() -> i64 { return 0; }
+  @noinline
+  fn idle(limit: i64) -> i64 {
+    let index: i64 = 0;
+    while index < limit {
+      ping();
+      let index: i64 = index + 1;
+    }
+    return index;
+  }
+
+  @noinline
+  fn adjust(value: i64, delta: i64) -> i64 {
+    if delta == 0 { return value; }
+    let up: i64 = counted(value, delta, delta + 4, 1, true);
+    let down: i64 = descending(up - delta * 4 - 6, delta + 4, delta, 1, true);
+    let unchanged: i64 = counted(down - delta * 4 - 10, delta + 4, delta, 0, true);
+    return sum(unchanged, delta);
+  }
+  @noinline
+  fn zero() -> i64 {
+    return idle(3) - 3;
+  }
+  @noinline
+  fn keep_tag(value: i32) -> i32 { return value; }
+  @noinline
+  fn keep_flag(value: bool) -> bool { return value; }
+  @noinline
+  fn keep_gain(value: f32) -> f32 { return value; }
+  @noinline
+  fn keep_scale(value: f64) -> f64 { return value; }
+
+  fn start(seed: i64, tag: i32, active: bool, gain: f32, scale: f64) -> State {
+    return State { frame: zero() + ignored(0, 4, 1, tag, active, gain, scale) - 4, metrics: Metrics {
+      total: adjust(seed, zero()), tag: keep_tag(tag), active: keep_flag(active),
+      gain: keep_gain(gain), scale: keep_scale(scale)
+    } };
+  }
+
+  fn step(state: State, delta: i64, paused: bool) -> State {
+    if keep_flag(paused) { return state; }
+    return State { frame: sum(state.frame, 1), metrics: Metrics {
+      total: adjust(state.metrics.total, delta), tag: keep_tag(state.metrics.tag),
+      active: keep_flag(state.metrics.active), gain: keep_gain(state.metrics.gain),
+      scale: keep_scale(state.metrics.scale)
+    } };
+  }
+
+  fn stop(state: State, reason: i64) -> State {
+    return State { frame: state.frame, metrics: Metrics {
+      total: adjust(state.metrics.total, reason), tag: keep_tag(state.metrics.tag),
+      active: keep_flag(false), gain: keep_gain(state.metrics.gain),
+      scale: keep_scale(state.metrics.scale)
+    } };
+  }
+
+  fn main() -> i64 { print(999); return 0; }
+}

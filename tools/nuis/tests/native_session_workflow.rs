@@ -5,7 +5,7 @@ use std::{
     process::{Command, Output},
 };
 
-const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/dynamic_loops.ns");
+const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/scoped_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -125,7 +125,7 @@ fn native_build_run_artifact_cache_and_standalone_relocation() {
         assert!(llvm.contains(&format!(" = call {ty} @nuis_fn_")));
     }
     assert!(llvm.contains("loop_while_i64_cond"));
-    assert!(llvm.contains("loop_while_scalar_chain_cond"));
+    assert!(llvm.contains("loop_while_i64_body"));
     assert!(llvm.contains("native_loop_preflight"));
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");

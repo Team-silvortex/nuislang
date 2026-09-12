@@ -23,10 +23,12 @@ The first admitted profile is deliberately small:
   including nested calls, zero-argument helpers and guarded scalar returns.
 - Counted i64 loops with constant or runtime-checked induction inputs and ordered
   scalar add/multiply carries, with at most 64 carries and 65536 iterations per loop.
+- Scoped loop-body calls to admitted scalar helpers, with a discarded scalar
+  result or one i64 carry returned before the induction step.
 - At most 64 input slots, 64 state slots and 4096 body nodes per function.
 - At most 64 reachable functions (including registered roots), 16384 total body
   nodes and 32 functions on any root-to-leaf call path.
-- No recursion, unbounded/effectful loops, provider effects, resource-bearing state
+- No recursion, unbounded loops, resource/provider effects, resource-bearing state
   or global init.
 
 Each callback must have one canonical owned-aggregate return whose nominal type,
@@ -77,14 +79,42 @@ previous-iteration carry, or an already-updated sibling carry. Future sibling
 reads, implicit float/bool/i32 conversion and payload-bearing carry operations
 are not admitted. LLVM reuses the ordinary loop lowering; carry arithmetic wraps
 as i64 and no per-iteration owned aggregate is allocated for this flat chain.
-Scalar helper calls may surround loops, including in nested helpers, but calls
-inside loop bodies and conditional/scoped-effect loop forms remain separate work.
+Scalar helper calls may surround loops, including in nested helpers, or become
+the admitted scoped body action described below. Other conditional/effectful
+loop forms remain separate work.
 
 The CPU module reuses its cooperative registered driver for plain i64 chains,
 publishes `LoopState` only at completion and shares reference execution fuel.
 No CPU loop dispatch is added to the generic executor or application host. This
 per-loop native bound is not whole-callback fuel, native preemption or a wall-time
 guarantee; native budgeted calls still reject before entry.
+
+### Scoped Calls
+
+The existing `cpu.loop_while_i64_effect` opcode is admitted only when its action
+is `cpu.scoped_call` or `cpu.scoped_call_i64_carry`. This is not blanket admission
+of effect metadata. The first form discards a scalar return; the second consumes
+the shared `parse_scoped_i64_carry` contract with one named i64 seed and exactly
+one `$carry` operand. Neither form introduces an interpreter or new runtime ABI.
+
+Each body target must be a scalar-returning helper in the same admitted closure.
+It participates in cycle, depth, function-count and total-node checks, including
+when a loop is statically zero-trip or its result is discarded. Hidden printing,
+resource access, unknown/drifted signatures and cross-function value captures
+reject before emission. The ordinary loop emitter and CPU registered execution
+driver are reused, not copied into the application host.
+
+`$current` is the counter before its step; `$carry` is the preceding return or
+initial seed. Both require exact i64 helper parameters. Named captures support
+`bool/i32/i64/f32/f64` without coercion, including source lowering of a single-i64
+carry with i32/float captures. Calls complete, update the carry, then step the
+counter. Zero-trip loops preserve the seed and do not invoke the helper. The
+native induction preflight runs before the first invocation; invalid values trap
+the process. Pure scalar carry transport adds no owned aggregate per iteration.
+
+The current source shape is a scoped helper call followed by a counted induction
+step. Multi-i64/aggregate returns, guarded break, move/copy/resource captures and
+arbitrary conditional loop bodies are not admitted by this native subset.
 
 ## Call ABI
 
@@ -260,7 +290,8 @@ adds runtime start/limit/step parameters from callback values, descending and
 inactive zero-step chains. [Dynamic parity tests](../../tools/nuisc/tests/native_application_bridge/dynamic_loops.rs)
 perform six additional native runs with exact typed state and reversed declarations,
 and retain general-lowering policy isolation and shared bound/carry dependencies.
-The native frontdoor/cache/standalone regression now consumes this fixture.
+The native frontdoor/cache/standalone regression also covered this fixture before
+advancing to scoped loop calls.
 [Guard regressions](../../tools/nuisc/tests/native_application_bridge/dynamic_loop_guard.rs)
 run 1680 parameter cases in twelve native executables across six comparisons and
 add/sub. Volatile inputs prevent constant-only evaluation. A test-only rejection
@@ -271,8 +302,24 @@ require process failure without a returned ABI status. Boolean induction drift
 rejects instead of silently coercing to i64.
 Every guard-probe process has a deadline so a regression cannot hang the test suite.
 
+The [scoped-loop fixture](../../tools/nuisc/tests/native_application_bridge/scoped_loops.ns)
+retains four scoped loops, shared/nested helpers, a zero-argument discarded call,
+single-i64 carry returns and dynamic induction. Six native/reference executions
+retain exact session slots and reversed-declaration parity.
+[Admission regressions](../../tools/nuisc/tests/native_application_bridge/scoped_admission.rs)
+check scoped-only and mixed direct/scoped cycles, exact depth/function boundaries,
+unknown/drifted targets, malformed captures, hidden effects and caller-lane isolation.
+[Execution regressions](../../tools/nuisc/tests/native_application_bridge/scoped_execution.rs)
+observe the actual helper arguments in 36 callback cases and 84 invocations across
+two native binaries, with old-counter/old-carry ordering, wrapping i64 carries,
+all five scalar kinds, signed zero and NaN payloads. Three more binaries retain
+real traps and prove invalid induction enters no helper or publication path.
+Reference fuel exhaustion retains the accepted state and cleanup cannot clear
+the failure. This is not native fuel/preemption evidence.
+
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
-compiles that Nuis fixture and invokes the real packer for normal and reversed YIR
+compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
+and invokes the real packer for normal and reversed YIR
 declarations. Actual statically linked host calls match reference states. Invalid
 later arguments reject before open. A generated-object event failure preserves the
 last accepted state, runs cleanup and exits unsuccessfully without reference
@@ -283,7 +330,7 @@ open failure, Drop, descriptor drift, argument validation and fuel rejection.
 These test doubles are policy evidence, not additional lowering proofs.
 
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
-the real five-scalar dynamic-loop fixture with two registrations, runs typed events and close,
+the real five-scalar scoped-loop fixture with two registrations, runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
 and switches registrations through a shared cache/output directory. It removes
 the original output, verifies the standalone compiled artifact, materializes it
@@ -305,7 +352,7 @@ Linux/Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Extend scoped scalar loop-body calls within the selected native profile,
+Extend multi-i64 scoped carry returns and guarded break within the selected native profile,
 keeping admission explicit and retaining the frontdoor/relocation regressions.
 Native scheduling limits, loops, Buffer callbacks, resource
 state, provider dispatch and ordinary image-host selection still need separate
