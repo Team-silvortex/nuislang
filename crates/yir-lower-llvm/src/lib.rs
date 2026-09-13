@@ -27,6 +27,7 @@ mod guard_host_call;
 mod guard_return_lowering;
 mod loop_async_post_flow_payload;
 mod loop_async_post_flow_source;
+mod loop_carry_condition;
 mod loop_carry_payload;
 mod loop_carry_read_source;
 mod loop_carry_scaled_source;

@@ -104,7 +104,7 @@ fn carries_reject_seed_order_effect_and_header_mutation_drift() {
         ),
         (
             "let total: i64 = total + index;",
-            "if index > 0 { let total: i64 = total + index; }",
+            "if index > 0 { let total: i64 = total + index; print(total); }",
         ),
         (
             "let total: i64 = total + index;",

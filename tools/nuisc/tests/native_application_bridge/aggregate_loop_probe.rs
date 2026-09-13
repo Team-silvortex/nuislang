@@ -10,6 +10,19 @@ pub(super) struct Invocation {
 }
 
 pub(super) fn execute(source: &str, cases: &[Invocation], loop_label: &str, checked: bool) {
+    execute_with_predicates(source, cases, loop_label, checked, None);
+}
+
+pub(super) fn execute_with_predicates(
+    source: &str,
+    cases: &[Invocation],
+    loop_label: &str,
+    checked: bool,
+    predicate_counts: Option<&[i64]>,
+) {
+    if let Some(counts) = predicate_counts {
+        assert_eq!(counts.len(), cases.len());
+    }
     assert!(!cases.is_empty());
     let trap = cases.last().unwrap().state.is_none();
     assert!(cases[..cases.len() - 1]
@@ -41,6 +54,9 @@ pub(super) fn execute(source: &str, cases: &[Invocation], loop_label: &str, chec
             "call void @probe_drop(",
         );
     // Observe actual execution without replacing preflight or process traps.
+    if predicate_counts.is_some() {
+        llvm = predicate_probe::instrument(&llvm, loop_label);
+    }
     let labels = llvm
         .match_indices(&format!("\n{loop_label}"))
         .map(|(offset, _)| offset)
@@ -100,9 +116,15 @@ pub(super) fn execute(source: &str, cases: &[Invocation], loop_label: &str, chec
             oracle.extend(state);
             oracle.extend([0, case.iterations]);
         } else {
+            if let Some(counts) = predicate_counts {
+                oracle.extend([83, counts[case_index]]);
+            }
             oracle.extend([73, case.iterations]);
         }
         llvm.push_str("  store volatile i64 0, ptr @probe_iterations\n");
+        if predicate_counts.is_some() {
+            llvm.push_str("  store volatile i64 0, ptr @probe_predicates\n");
+        }
         let words = case
             .arguments
             .iter()
@@ -117,6 +139,12 @@ pub(super) fn execute(source: &str, cases: &[Invocation], loop_label: &str, chec
             llvm.push_str(&format!("  %o{case_index}_{slot} = getelementptr i64, ptr %out, i64 {slot}\n  %v{case_index}_{slot} = load i64, ptr %o{case_index}_{slot}, align 8\n  call void @nuis_debug_print_i64(i64 %v{case_index}_{slot})\n"));
         }
         llvm.push_str(&format!("  %allocs{case_index} = load i64, ptr @probe_allocs\n  %drops{case_index} = load i64, ptr @probe_drops\n  %live{case_index} = sub i64 %allocs{case_index}, %drops{case_index}\n  call void @nuis_debug_print_i64(i64 %live{case_index})\n  %trips{case_index} = load volatile i64, ptr @probe_iterations\n  call void @nuis_debug_print_i64(i64 %trips{case_index})\n  %flush{case_index} = call i32 @fflush(ptr null)\n"));
+        if let Some(counts) = predicate_counts {
+            llvm.push_str("  call void @probe_predicate_evidence()\n");
+            if case.state.is_some() {
+                oracle.extend([83, counts[case_index]]);
+            }
+        }
     }
     llvm.push_str("  ret i64 0\n}\n");
     let artifact = nuisc::aot::write_and_link_with_source(

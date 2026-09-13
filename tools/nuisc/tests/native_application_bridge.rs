@@ -12,6 +12,8 @@ use yir_runtime_host::ApplicationSession;
 mod aggregate_admission;
 #[path = "native_application_bridge/aggregate_carried.rs"]
 mod aggregate_carried;
+#[path = "native_application_bridge/aggregate_compound.rs"]
+mod aggregate_compound;
 #[path = "native_application_bridge/aggregate_conditional.rs"]
 mod aggregate_conditional;
 #[path = "native_application_bridge/aggregate_counted.rs"]
@@ -24,6 +26,8 @@ mod aggregate_execution;
 mod aggregate_guards;
 #[path = "native_application_bridge/aggregate_loop_probe.rs"]
 mod aggregate_loop_probe;
+#[path = "native_application_bridge/aggregate_one_sided.rs"]
+mod aggregate_one_sided;
 #[path = "native_application_bridge/bounds.rs"]
 mod bounds;
 #[path = "native_application_bridge/branch_loops.rs"]
@@ -54,6 +58,8 @@ mod multi_admission;
 mod multi_execution;
 #[path = "native_application_bridge/multi_loops.rs"]
 mod multi_loops;
+#[path = "native_application_bridge/predicate_probe.rs"]
+mod predicate_probe;
 #[path = "native_application_bridge/scoped_admission.rs"]
 mod scoped_admission;
 #[path = "native_application_bridge/scoped_execution.rs"]

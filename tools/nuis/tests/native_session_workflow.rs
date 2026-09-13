@@ -20,6 +20,10 @@ const AGGREGATE_CARRIED_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_carried_loops.ns");
 const AGGREGATE_CONDITIONAL_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_conditional_loops.ns");
+const AGGREGATE_ONE_SIDED_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_one_sided_loops.ns");
+const AGGREGATE_COMPOUND_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_compound_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -153,6 +157,16 @@ fn native_guarded_conditional_aggregate_build_cache_and_standalone_relocation() 
     check_workflow(AGGREGATE_CONDITIONAL_SOURCE);
 }
 
+#[test]
+fn native_guarded_one_sided_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_ONE_SIDED_SOURCE);
+}
+
+#[test]
+fn native_guarded_compound_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_COMPOUND_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -192,6 +206,8 @@ fn check_workflow(source: &str) {
         AGGREGATE_COUNTED_SOURCE,
         AGGREGATE_CARRIED_SOURCE,
         AGGREGATE_CONDITIONAL_SOURCE,
+        AGGREGATE_ONE_SIDED_SOURCE,
+        AGGREGATE_COMPOUND_SOURCE,
     ]
     .contains(&source)
     {
@@ -204,6 +220,8 @@ fn check_workflow(source: &str) {
         AGGREGATE_COUNTED_SOURCE,
         AGGREGATE_CARRIED_SOURCE,
         AGGREGATE_CONDITIONAL_SOURCE,
+        AGGREGATE_ONE_SIDED_SOURCE,
+        AGGREGATE_COMPOUND_SOURCE,
     ]
     .contains(&source)
     {
@@ -214,6 +232,8 @@ fn check_workflow(source: &str) {
         AGGREGATE_COUNTED_SOURCE,
         AGGREGATE_CARRIED_SOURCE,
         AGGREGATE_CONDITIONAL_SOURCE,
+        AGGREGATE_ONE_SIDED_SOURCE,
+        AGGREGATE_COMPOUND_SOURCE,
     ]
     .contains(&source)
     {
@@ -222,8 +242,19 @@ fn check_workflow(source: &str) {
     if source == AGGREGATE_CARRIED_SOURCE {
         assert!(llvm.contains("loop_while_scalar_chain_body"));
     }
-    if source == AGGREGATE_CONDITIONAL_SOURCE {
+    if [
+        AGGREGATE_CONDITIONAL_SOURCE,
+        AGGREGATE_ONE_SIDED_SOURCE,
+        AGGREGATE_COMPOUND_SOURCE,
+    ]
+    .contains(&source)
+    {
         assert!(llvm.contains("loop_while_scalar_cond_chain_body"));
+    }
+    if source == AGGREGATE_COMPOUND_SOURCE {
+        assert!(llvm.contains("carry_predicate_and_rhs"));
+        assert!(llvm.contains("carry_predicate_or_rhs"));
+        assert!(llvm.contains("phi i1"));
     }
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");

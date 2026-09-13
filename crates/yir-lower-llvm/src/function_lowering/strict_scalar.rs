@@ -39,8 +39,8 @@ pub(super) fn validate(
         if native_session::loops::conditional::is_conditional(node) {
             for carry in native_session::loops::conditional::parse(node)? {
                 require_value(node, &carry.initial, CpuCallScalarKind::I64, registers)?;
-                if let yir_domain_cpu::LoopCondExpr::Leaf { rhs: Some(rhs), .. } = carry.condition {
-                    require_value(node, &rhs, CpuCallScalarKind::I64, registers)?;
+                for rhs in crate::loop_carry_condition::rhs_names(&carry.condition) {
+                    require_value(node, rhs, CpuCallScalarKind::I64, registers)?;
                 }
             }
         } else if node.op.instruction.ends_with("_chain") {

@@ -81,7 +81,7 @@ fn conditional_carries_reject_stale_state_fallible_predicates_and_body_effects()
         ("total < bound", "total < index"),
         ("index > initial", "index > (bound / initial)"),
         ("index > initial", "index > wrap(initial, bound, step)"),
-        ("index > initial", "index > initial && index < bound"),
+        ("index > initial", "index > initial && index < (bound / initial)"),
         ("let total: i64 = total * index;", "let checksum: i64 = checksum * index;"),
         ("let total: i64 = total * index;", "let total: i64 = total / index;"),
         ("let total: i64 = total * index;", "let total: i64 = total + checksum;"),
@@ -89,7 +89,7 @@ fn conditional_carries_reject_stale_state_fallible_predicates_and_body_effects()
         ("let total: i64 = total * index;", "let total: i64 = total + index; let total: i64 = total * index;"),
         ("let total: i64 = total * index;", "if index > initial { let total: i64 = total * index; } else { let total: i64 = total; }"),
         ("let total: i64 = initial;", "const total: i64 = initial;"),
-        ("let checksum: i64 = checksum;", ""),
+        ("let checksum: i64 = checksum;", "print(checksum);"),
     ] {
         let module = parse_nuis_module(&source().replace(from, to)).unwrap();
         let catalog = scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module));

@@ -25,6 +25,7 @@ macro_rules! lower_loop_cond_chain {
                 let mut carry_initial_values = Vec::new();
                 let mut carry_specs = Vec::new();
                 let mut carry_source_values = Vec::new();
+                let mut condition_values = Vec::new();
                 let mut deferred = false;
                 let parsed_carries = match yir_domain_cpu::parse_conditional_carries(
                     &node.op.args,
@@ -52,31 +53,15 @@ macro_rules! lower_loop_cond_chain {
                         break;
                     };
                     carry_initial_values.push(carry_initial_value);
-                    let (cond_kind, cond_rhs_name) = match carry.condition {
-                        yir_domain_cpu::LoopCondExpr::Leaf { kind, rhs } => (kind, rhs),
-                        yir_domain_cpu::LoopCondExpr::Binary { .. } => {
-                            body.push(format!(
-                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because compound conditional carries are not yet in the current CPU LLVM slice",
-                                node.name,
-                            ));
-                            deferred = true;
-                            break;
-                        }
-                    };
-                    let cond_rhs = if let Some(cond_rhs_name) = cond_rhs_name {
-                        let cond_rhs_value = registers.get(&cond_rhs_name).cloned();
-                        let Some(cond_rhs_value) = cond_rhs_value else {
-                            body.push(format!(
-                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more condition rhs values are outside the current CPU LLVM slice",
-                                node.name,
-                            ));
+                    for name in crate::loop_carry_condition::rhs_names(&carry.condition) {
+                        let Some(value) = registers.get(name).cloned() else {
+                            body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because condition rhs `{name}` is outside the current CPU LLVM slice", node.name));
                             deferred = true;
                             break;
                         };
-                        Some(cond_rhs_value)
-                    } else {
-                        None
-                    };
+                        condition_values.push(value);
+                    }
+                    if deferred { break; }
                     let mut lower_source = |source: yir_domain_cpu::ParsedCarryBranchSource| {
                         let mut payload_values = Vec::new();
                         for payload_name in source.payload {
@@ -103,8 +88,7 @@ macro_rules! lower_loop_cond_chain {
                         break;
                     };
                     carry_specs.push((
-                        cond_kind,
-                        cond_rhs,
+                        carry.condition,
                         then_source,
                         else_source,
                     ));
@@ -117,11 +101,7 @@ macro_rules! lower_loop_cond_chain {
                         .into_iter()
                         .chain(carry_initial_values.iter())
                         .chain(carry_source_values.iter())
-                        .chain(
-                            carry_specs
-                                .iter()
-                                .filter_map(|(_, cond_rhs, _, _)| cond_rhs.as_ref()),
-                        ),
+                        .chain(condition_values.iter()),
                 ) else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.{loop_instruction} `{}` because its loop values are not representable as one scalar kind",
@@ -180,24 +160,14 @@ macro_rules! lower_loop_cond_chain {
                     continue;
                 }
                 let mut lowered_carry_specs = Vec::new();
-                for (cond_kind, cond_rhs, then_source, else_source) in carry_specs {
-                    let lowered_cond_rhs = if let Some(cond_rhs) = cond_rhs {
-                        let Some(cond_rhs) = coerce_to_loop_scalar(
-                            &cond_rhs,
-                            loop_scalar_kind,
-                            &mut body,
-                            &mut next_reg,
-                        ) else {
-                            body.push(format!(
-                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more condition rhs values are not coercible to the selected loop scalar kind",
-                                node.name,
-                            ));
-                            deferred = true;
-                            break;
-                        };
-                        Some(cond_rhs)
-                    } else {
-                        None
+                for (condition, then_source, else_source) in carry_specs {
+                    let Some(condition) = crate::loop_carry_condition::resolve_rhs(
+                        &condition,
+                        &mut |name| coerce_to_loop_scalar(registers.get(name)?, loop_scalar_kind, &mut body, &mut next_reg),
+                    ) else {
+                        body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because a condition rhs is not coercible to the selected scalar kind", node.name));
+                        deferred = true;
+                        break;
                     };
                     let mut lower_source_payload = |(kind, payload): (String, Vec<LlvmValueRef>)| {
                         let mut lowered = Vec::new();
@@ -221,8 +191,7 @@ macro_rules! lower_loop_cond_chain {
                         break;
                     };
                     lowered_carry_specs.push((
-                        cond_kind,
-                        lowered_cond_rhs,
+                        condition,
                         then_source,
                         else_source,
                     ));
@@ -387,7 +356,7 @@ macro_rules! lower_loop_cond_chain {
                         ))
                 };
                 let mut next_carries = Vec::new();
-                for (index, (cond_kind, cond_rhs, then_source, else_source)) in
+                for (index, (condition, then_source, else_source)) in
                     lowered_carry_specs.iter().enumerate()
                 {
                     let then_value = if matches!(then_source.0.as_str(), "keep" | "keep_prev_carry") {
@@ -430,137 +399,19 @@ macro_rules! lower_loop_cond_chain {
                             )
                         })?
                     };
-                    let next_carry = if cond_kind == "always" {
-                        then_value
-                    } else {
-                        let lhs = if matches!(
-                            cond_kind.as_str(),
-                            "current_eq"
-                                | "current_ne"
-                                | "current_lt"
-                                | "current_le"
-                                | "current_gt"
-                                | "current_ge"
-                        ) {
-                            next_current.clone()
-                        } else if matches!(
-                            cond_kind.as_str(),
-                            "prev_current_eq"
-                                | "prev_current_ne"
-                                | "prev_current_lt"
-                                | "prev_current_le"
-                                | "prev_current_gt"
-                                | "prev_current_ge"
-                        ) {
-                            current.clone()
-                        } else if let Some(rest) = cond_kind.strip_prefix("prev_carry") {
-                            let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                )
-                            })?;
-                            let source_index = index_text.parse::<usize>().map_err(|_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                )
-                            })?;
-                            if suffix != "eq"
-                                && suffix != "ne"
-                                && suffix != "lt"
-                                && suffix != "le"
-                                && suffix != "gt"
-                                && suffix != "ge"
-                            {
-                                return Err(format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                ));
-                            }
-                            current_carries.get(source_index).cloned().ok_or_else(|| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` references unavailable conditional carry source `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                )
-                            })?
-                        } else if let Some(rest) = cond_kind.strip_prefix("carry") {
-                            let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                )
-                            })?;
-                            let source_index = index_text.parse::<usize>().map_err(|_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                )
-                            })?;
-                            if suffix != "eq"
-                                && suffix != "ne"
-                                && suffix != "lt"
-                                && suffix != "le"
-                                && suffix != "gt"
-                                && suffix != "ge"
-                            {
-                                return Err(format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                ));
-                            }
-                            next_carries.get(source_index).cloned().ok_or_else(|| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` references unavailable conditional carry source `{cond_kind}` during LLVM lowering",
-                                    node.name,
-                                )
-                            })?
-                        } else {
-                            return Err(format!(
-                                "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
-                                node.name,
-                            ));
-                        };
-                        let rhs = cond_rhs.clone().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` is missing condition rhs during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        let cond_compare =
-                            if cond_kind.ends_with("_eq") || cond_kind == "current_eq" {
-                                "eq"
-                            } else if cond_kind.ends_with("_ne") || cond_kind == "current_ne" {
-                                "ne"
-                            } else if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
-                                "lt"
-                            } else if cond_kind.ends_with("_le") || cond_kind == "current_le" {
-                                "le"
-                            } else if cond_kind.ends_with("_gt") || cond_kind == "current_gt" {
-                                "gt"
-                            } else {
-                                "ge"
-                            };
-                        let cond_reg = emit_loop_compare(
-                            &mut body,
-                            &mut next_reg,
-                            loop_scalar_kind,
-                            cond_compare,
-                            &lhs,
-                            &rhs,
-                        )
-                        .map_err(|error| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        let select_reg = fresh_reg(&mut next_reg);
-                        body.push(format!(
-                            "  {select_reg} = select i1 {cond_reg}, {scalar_ty} {then_value}, {scalar_ty} {else_value}"
-                        ));
-                        select_reg
-                    };
+                    let cond_reg = crate::loop_carry_condition::emit(
+                        condition,
+                        &crate::loop_carry_condition::State {
+                            kind: loop_scalar_kind,
+                            current: &next_current,
+                            previous_current: &current,
+                            carries: &next_carries,
+                            previous_carries: &current_carries,
+                        },
+                        &mut body, &mut next_reg, &mut next_block,
+                    ).map_err(|error| format!("cpu.{loop_instruction} `{}` {error} during LLVM lowering", node.name))?;
+                    let next_carry = fresh_reg(&mut next_reg);
+                    body.push(format!("  {next_carry} = select i1 {cond_reg}, {scalar_ty} {then_value}, {scalar_ty} {else_value}"));
                     next_carries.push(next_carry);
                 }
                 body.push(format!(

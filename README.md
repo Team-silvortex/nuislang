@@ -209,11 +209,16 @@ suffixes. An i64 induction update can precede ordered i64 cumulative updates via
 the existing chained-loop contract. Selected loops keep finite/non-wrapping
 induction preflight; unselected loops skip it, even without division. Cumulative
 arithmetic wraps, and reference scalar arithmetic now agrees in debug builds too.
-Full `if/else` carry updates now reuse the existing conditional-chain contract:
-each arm updates the same local i64, or explicitly keeps its old value. Leaf
+Conditional carry updates now reuse the existing conditional-chain contract:
+each nonempty arm updates the same local i64; an omitted or empty arm keeps that
+carry's own value, just like an explicit self-assignment. Leaf
 comparisons read the stepped index or an earlier updated carry against an invariant
 atom; reversed comparisons share normalization. Native preflight and cooperative
-reference execution remain separate. One-sided and compound carry conditions remain
+reference execution remain separate. Pure leaf comparisons now compose with
+`&&`/`||`, including nesting and grouping, through the same YIR condition tree.
+LLVM emits short-circuit blocks; every RHS retains exact-kind checking, including
+unreached leaves. General verification and native admission have independent
+condition-depth limits. Nested carry-update arms and general loop bodies remain
 the next automatic-normalization boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.

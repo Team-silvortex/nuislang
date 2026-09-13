@@ -1,4 +1,5 @@
 mod branch_effect_tests;
+mod compound_carry_tests;
 mod core_runtime_tests;
 mod core_tests;
 mod extern_tests;

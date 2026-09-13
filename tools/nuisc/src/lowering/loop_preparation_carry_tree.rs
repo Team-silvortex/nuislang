@@ -336,12 +336,18 @@ pub(super) fn extract_single_stmt_carry_name(
                 normalize_pure_stmt_prefix_body(then_body, pure_helpers, inlineable_pure_helpers)?;
             let normalized_else =
                 normalize_pure_stmt_prefix_body(else_body, pure_helpers, inlineable_pure_helpers)?;
-            let [then_stmt] = normalized_then.as_slice() else {
-                return None;
-            };
-            let [else_stmt] = normalized_else.as_slice() else {
-                return None;
-            };
+            let (then_stmt, else_stmt) =
+                match (normalized_then.as_slice(), normalized_else.as_slice()) {
+                    ([update], []) | ([], [update]) => {
+                        return extract_single_stmt_carry_name(
+                            update,
+                            pure_helpers,
+                            inlineable_pure_helpers,
+                        );
+                    }
+                    ([then_stmt], [else_stmt]) => (then_stmt, else_stmt),
+                    _ => return None,
+                };
             let then_name =
                 extract_single_stmt_carry_name(then_stmt, pure_helpers, inlineable_pure_helpers)?;
             let else_name =
@@ -434,11 +440,24 @@ pub(super) fn parse_stmt_carry_decision_tree(
                 normalize_pure_stmt_prefix_body(then_body, pure_helpers, inlineable_pure_helpers)?;
             let normalized_else =
                 normalize_pure_stmt_prefix_body(else_body, pure_helpers, inlineable_pure_helpers)?;
-            let [then_stmt] = normalized_then.as_slice() else {
+            if normalized_then.is_empty() && normalized_else.is_empty() {
                 return None;
-            };
-            let [else_stmt] = normalized_else.as_slice() else {
-                return None;
+            }
+            let parse_arm = |body: &[NirStmt]| match body {
+                // An absent update retains this carry's value, not the index,
+                // an earlier sibling or a newly synthesized zero seed.
+                [] => Some(PreparedCarryDecisionTree::Leaf(Box::new(
+                    PreparedCarryBranchSource::KeepCurrentValue,
+                ))),
+                [stmt] => parse_stmt_carry_decision_tree(
+                    stmt,
+                    carry_name,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                ),
+                _ => None,
             };
             Some(PreparedCarryDecisionTree::Branch {
                 condition: parse_loop_flow_condition(
@@ -448,22 +467,8 @@ pub(super) fn parse_stmt_carry_decision_tree(
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?,
-                then_tree: Box::new(parse_stmt_carry_decision_tree(
-                    then_stmt,
-                    carry_name,
-                    binding_name,
-                    carries,
-                    pure_helpers,
-                    inlineable_pure_helpers,
-                )?),
-                else_tree: Box::new(parse_stmt_carry_decision_tree(
-                    else_stmt,
-                    carry_name,
-                    binding_name,
-                    carries,
-                    pure_helpers,
-                    inlineable_pure_helpers,
-                )?),
+                then_tree: Box::new(parse_arm(&normalized_then)?),
+                else_tree: Box::new(parse_arm(&normalized_else)?),
             })
         }
         _ => None,
@@ -507,23 +512,12 @@ pub(super) fn diagnose_unsupported_stmt_carry_tree(
             else_body,
             ..
         } => {
-            let [then_stmt] = then_body.as_slice() else {
+            if then_body.len() > 1 || else_body.len() > 1 {
                 return None;
-            };
-            let [else_stmt] = else_body.as_slice() else {
-                return None;
-            };
-            diagnose_unsupported_stmt_carry_tree(
-                then_stmt,
-                carry_name,
-                binding_name,
-                carries,
-                pure_helpers,
-                inlineable_pure_helpers,
-            )
-            .or_else(|| {
+            }
+            then_body.iter().chain(else_body).find_map(|stmt| {
                 diagnose_unsupported_stmt_carry_tree(
-                    else_stmt,
+                    stmt,
                     carry_name,
                     binding_name,
                     carries,

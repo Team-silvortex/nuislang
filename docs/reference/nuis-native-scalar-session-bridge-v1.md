@@ -97,23 +97,38 @@ not prove termination or duplicate backend slot/opcode admission.
 Each carry uses the existing linear add/multiply preparation, reading the stepped
 index or earlier updated carries. Full `if/else` may update the same carry once in
 each arm, including explicit `let carry: i64 = carry;` to keep its previous value.
+An omitted `else`, empty `else`, or empty `then` uses the same shared `keep`
+contract for that carry. It never synthesizes a seed or copies a sibling's value.
+Both-empty arms reject; value-producing conditional expressions still require
+both values. This does not relax local initialization or mutable exact-i64 checks.
 Leaf comparisons use an already stepped index or earlier updated carry against an
 invariant i64 literal/variable. Reversed comparisons share the ordinary loop
 preparation; mutable predicate RHS values are not captured as stale seeds.
+These leaves may form nested `&&`/`||` predicates. Source grouping and precedence
+are retained in the existing `LoopCondExpr` tree; no new condition IR or opcode
+is introduced. LLVM branches around the right operand and merges the boolean
+result. Calls, fallible expressions and mutable RHS values are still excluded
+from every leaf, including a right operand that could be skipped at runtime.
 Header/stride mutation, forward sibling reads,
 duplicate updates, body calls and fallible update expressions are rejected.
 Fallible seed expressions outside the loop retain ordinary source-order checks.
-Constants, parameter rebinding, one-sided/compound carry conditions and arbitrary loop bodies
+Constants, parameter rebinding, nested carry-update arms and arbitrary loop bodies
 are not admitted by this automatic normalizer. The narrower Buffer catalog is unchanged.
 
 Native conditional chains reuse the existing shared metadata parser and LLVM
-emitter, but admit only bounded leaf predicates and nonfallible add/multiply/keep
-branches. Every seed and predicate RHS requires exact i64, even on zero trips.
-Before recursive parsing, a metadata-size bound rejects oversized input; hidden
+emitter, but admit only bounded trees of pure comparisons and nonfallible add/multiply/keep
+branches. Every seed and every predicate RHS requires exact i64, even on zero trips
+or an unreachable condition leaf. Native admission limits each condition to
+127 tree nodes and depth 32, with at most 64 carries and a total argument bound.
+An iterative shape scan precedes the native entry's recursive parser; hidden
 payloads, forward state and arbitrary ignored `always` tokens reject. Both the
 canonical `always` encoding and the compiler's induction-seed placeholder remain
 supported. No opcode or ABI is added. The reference CPU routes these chains through
 the existing cooperative scalar driver; this is not native preemption.
+General YIR verification runs before native admission. Its shared conditional
+parser independently rejects depth above 256, so native-only bounds cannot leave
+the earlier verifier exposed. These are parser/profile budgets, not limits copied
+into the source value catalog or commitments to a stable ABI.
 
 The acyclic catalog propagates loop presence from callees to callers, retaining
 guarded lowering even without division/remainder. The reached branch performs
@@ -590,7 +605,7 @@ it keeps the actual process trap and never substitutes reference fuel for prefli
 The [aggregate-carried fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_carried_loops.ns)
 adds six typed lifecycle runs and build/cache/standalone restoration with the
 existing break/continue paths. Source policy tests retain exact i64/local-seed
-requirements and invariant headers; one-sided carry updates remain fail-closed.
+requirements and invariant headers; nested carry-update arms remain fail-closed.
 Extreme seeds also exposed and fixed host-debug-dependent scalar integer overflow
 in the reference CPU. Dedicated CPU tests keep wrapping arithmetic separate from
 checked division/remainder errors.
@@ -612,6 +627,36 @@ The [aggregate-conditional fixture](../../tools/nuisc/tests/native_application_b
 adds six typed lifecycle runs and the eighth build/cache/standalone-restoration
 fixture, retaining earlier break/continue and checked arithmetic evidence.
 
+The [one-sided aggregate regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_one_sided.rs)
+reuse that independent oracle and execution probe for omitted `else`, empty
+`else`, empty `then`, and mixed conditional/linear carry sequences. Thirty-nine
+native binaries cover 2502 accepted/skipped callbacks and nine real process traps.
+Every carry keeps its own prior value when its update is skipped, including with
+extreme seeds, earlier updated siblings, all six comparisons, reversed operands
+and 1/3/7-carry widths. Dynamic strides, zero trips, the exact 65536-trip limit,
+overflowing induction and selected-path arithmetic retain their existing checks.
+The [aggregate-one-sided fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_one_sided_loops.ns)
+adds six typed lifecycle runs; a reference-fuel failure preserves accepted state
+and cleanup without pretending to preempt native execution. The ninth frontdoor
+fixture verifies build/cache isolation, tamper rejection and standalone restoration.
+
+The [compound aggregate regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_compound.rs)
+add 1216 accepted/skipped callbacks and nine real process traps across 31 native
+binaries. In addition to state slots, iterations, leaf operands and allocation
+balance, a [comparison probe](../../tools/nuisc/tests/native_application_bridge/predicate_probe.rs)
+counts comparisons in the emitted loop body with volatile observations. Counts
+match an independent short-circuit oracle across `&&`, `||`, mixed precedence,
+explicit grouping, variable widths, wrapping and selected/skipped guards.
+The exact trip limit and invalid induction still distinguish preflight from
+reference fuel. Nested RHS type drift rejects before execution. A 10000-leaf
+malformed condition is rejected during general verification rather than relying
+on later native admission. Generic backend regressions retain i64/f32/f64 scalar
+selection without admitting float carries into this native profile.
+The [aggregate-compound fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_compound_loops.ns)
+adds six typed lifecycle runs and reference-budget failure with accepted-state
+retention and cleanup. The tenth frontdoor fixture also passes build/cache
+isolation, tamper rejection and standalone restoration of the compiled artifact.
+
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
 compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
 and invokes the real packer for normal and reversed YIR
@@ -626,7 +671,8 @@ These test doubles are policy evidence, not additional lowering proofs.
 
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
-aggregate-division, aggregate-counted, aggregate-carried and aggregate-conditional
+aggregate-division, aggregate-counted, aggregate-carried, aggregate-conditional
+and aggregate-one-sided/aggregate-compound
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -650,11 +696,11 @@ Linux/Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Extend one-sided conditional carry updates inside guarded flat-value helper branches
-beyond the admitted full if/else forms, without introducing eager evaluation.
+Extend nested conditional carry-update arms inside guarded flat-value helpers
+through the shared decision-tree preparation, without introducing eager evaluation.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried/conditional-aggregate
+checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

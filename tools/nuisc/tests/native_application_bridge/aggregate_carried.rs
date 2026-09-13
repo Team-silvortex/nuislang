@@ -332,19 +332,22 @@ fn guarded_carries_trap_before_updates_and_never_speculate_skipped_calls() {
 }
 
 #[test]
-fn one_sided_carry_updates_inside_flat_branches_still_fail_closed() {
+fn one_sided_carry_updates_inside_flat_branches_gain_shared_keep_lowering() {
     let source = source(Shape::Callee, 3, false, "/").replace(
         "let carry1: i64 = carry1 + carry0;",
         "if index > 0 { let carry1: i64 = carry1 + carry0; }",
     );
     let project = Project::with_source(&source);
-    let error = nuisc::pipeline::compile_project(&project.0)
-        .err()
-        .expect("conditional carry must reject");
-    assert!(
-        error.contains("not reducible to supported carry updates"),
-        "{error}"
-    );
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    assert!(compiled
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "loop_while_scalar_cond_chain"
+            && node.op.args.contains(&"keep".to_owned())));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    assert!(bridge.llvm_ir.contains("loop_while_scalar_cond_chain_body"));
+    assert!(bridge.llvm_ir.contains("native_loop_preflight"));
 }
 
 #[test]

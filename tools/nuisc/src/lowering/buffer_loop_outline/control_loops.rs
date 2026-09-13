@@ -98,19 +98,42 @@ fn update_name<'a>(stmt: &'a NirStmt, scope: &Scope, locals: &BTreeSet<String>) 
             then_body,
             else_body,
             ..
-        } => {
-            let ([then_update], [else_update]) = (then_body.as_slice(), else_body.as_slice())
-            else {
-                return None;
-            };
-            let name = binding(then_update)?;
-            (name == binding(else_update)?).then_some(name)
-        }
+        } => match (then_body.as_slice(), else_body.as_slice()) {
+            ([update], []) | ([], [update]) => binding(update),
+            ([then_update], [else_update]) => {
+                let name = binding(then_update)?;
+                (name == binding(else_update)?).then_some(name)
+            }
+            _ => None,
+        },
         _ => binding(stmt),
     }
 }
 
 fn validate_condition(
+    condition: &NirExpr,
+    scope: &Scope,
+    updates: &BTreeSet<String>,
+    available: &BTreeSet<String>,
+) -> Option<()> {
+    let mut pending = vec![condition];
+    while let Some(condition) = pending.pop() {
+        if let NirExpr::Binary {
+            op: NirBinaryOp::And | NirBinaryOp::Or,
+            lhs,
+            rhs,
+        } = condition
+        {
+            pending.push(rhs);
+            pending.push(lhs);
+        } else {
+            validate_condition_leaf(condition, scope, updates, available)?;
+        }
+    }
+    Some(())
+}
+
+fn validate_condition_leaf(
     condition: &NirExpr,
     scope: &Scope,
     updates: &BTreeSet<String>,
@@ -160,8 +183,14 @@ fn nonfallible_i64(value: &NirExpr, scope: &Scope) -> bool {
 #[path = "control_loops/carries_tests.rs"]
 mod carries_tests;
 #[cfg(test)]
+#[path = "control_loops/compound_tests.rs"]
+mod compound_tests;
+#[cfg(test)]
 #[path = "control_loops/conditional_tests.rs"]
 mod conditional_tests;
+#[cfg(test)]
+#[path = "control_loops/one_sided_tests.rs"]
+mod one_sided_tests;
 
 #[cfg(test)]
 mod tests {

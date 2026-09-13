@@ -323,6 +323,23 @@ pub(crate) fn parse_loop_carry_condition_expr(
     node_name: &str,
     allow_prev: bool,
 ) -> Result<(LoopCondExpr, usize), String> {
+    parse_loop_carry_condition_at_depth(args, start, node_name, allow_prev, 1)
+}
+
+fn parse_loop_carry_condition_at_depth(
+    args: &[String],
+    start: usize,
+    node_name: &str,
+    allow_prev: bool,
+    depth: usize,
+) -> Result<(LoopCondExpr, usize), String> {
+    // General YIR verification runs before backend-specific admission. Keep
+    // that shared parser safe independently of any narrower native profile.
+    if depth > 256 {
+        return Err(format!(
+            "node `{node_name}` exceeds the loop condition depth limit of 256"
+        ));
+    }
     let Some(token) = args.get(start).map(String::as_str) else {
         return Err(format!(
             "node `{}` is missing conditional carry metadata",
@@ -331,9 +348,9 @@ pub(crate) fn parse_loop_carry_condition_expr(
     };
     if token == "and" || token == "or" {
         let (lhs, after_lhs) =
-            parse_loop_carry_condition_expr(args, start + 1, node_name, allow_prev)?;
+            parse_loop_carry_condition_at_depth(args, start + 1, node_name, allow_prev, depth + 1)?;
         let (rhs, after_rhs) =
-            parse_loop_carry_condition_expr(args, after_lhs, node_name, allow_prev)?;
+            parse_loop_carry_condition_at_depth(args, after_lhs, node_name, allow_prev, depth + 1)?;
         Ok((
             LoopCondExpr::Binary {
                 op: token.to_owned(),

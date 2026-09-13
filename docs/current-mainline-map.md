@@ -213,11 +213,24 @@ exact-i64 and metadata checks before emission. The reference CPU now executes th
 same scalar conditional chains cooperatively rather than returning trace-only Unit.
 Another 1357 accepted/skipped callbacks and 27 real traps check selected updates,
 source order, all six comparisons, reversed operands, wrapping and preflight.
-One-sided/compound carry conditions and arbitrary loop bodies remain fail-closed;
+Omitted and explicit empty carry arms now share `keep` preparation without a new
+opcode or ABI. Thirty-nine native binaries add 2502 accepted/skipped callbacks
+and nine real traps, including own-value retention, earlier updated carry reads,
+all six comparisons, variable widths, dynamic stride and the exact trip bound.
+Six more typed lifecycle runs and reference-fuel failure preserve accepted state
+and cleanup. Both-empty arms, invalid seeds and effectful/fallible updates still
+reject. Pure comparison leaves now compose through existing `and/or` condition
+trees and short-circuit LLVM blocks. Thirty-one native binaries add 1216
+accepted/skipped callbacks and nine real traps; volatile comparison counters
+agree with independent short-circuit evaluation, not just final state values.
+Nested RHS kind drift rejects even on zero trips. A shared parser depth guard
+also protects the general verifier, which runs before native admission.
+Nested carry-update arms and arbitrary loop bodies remain fail-closed;
 per-return allocation remains an optimization target.
-The division, aggregate-division, aggregate-counted, aggregate-carried and
-aggregate-conditional fixtures compose with typed
-lifecycle, multi-state break/continue, cache isolation and standalone restoration.
+The division, aggregate-division, aggregate-counted, aggregate-carried,
+aggregate-conditional, aggregate-one-sided and aggregate-compound fixtures compose
+with typed lifecycle and multi-state break/continue. All ten frontdoor regressions
+pass, including cache isolation, tamper rejection and standalone restoration.
 The passing default image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport

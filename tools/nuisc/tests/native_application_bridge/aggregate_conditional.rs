@@ -56,13 +56,14 @@ fn guarded_conditional_carries_gain_native_preflight_and_existing_cond_chain_emi
 }
 
 #[derive(Clone, Copy)]
-struct Fixture {
-    shape: Shape,
-    count: usize,
-    descending: bool,
-    op: &'static str,
-    compare: &'static str,
-    reversed: bool,
+pub(super) struct Fixture {
+    pub(super) shape: Shape,
+    pub(super) count: usize,
+    pub(super) descending: bool,
+    pub(super) op: &'static str,
+    pub(super) compare: &'static str,
+    pub(super) reversed: bool,
+    pub(super) keep_first_else: bool,
 }
 
 impl Default for Fixture {
@@ -74,12 +75,56 @@ impl Default for Fixture {
             op: "/",
             compare: ">",
             reversed: false,
+            keep_first_else: false,
         }
     }
 }
 
 impl Fixture {
-    fn expected(self, case: Case, pivot: i64) -> Invocation {
+    pub(super) fn source(self) -> String {
+        let source = source(
+            self.shape,
+            self.count,
+            self.descending,
+            self.op,
+            self.compare,
+            self.reversed,
+        );
+        if self.keep_first_else {
+            source.replace(
+                "let carry0: i64 = carry0 * index;",
+                "let carry0: i64 = carry0;",
+            )
+        } else {
+            source
+        }
+    }
+
+    pub(super) fn expected(self, case: Case, pivot: i64) -> Invocation {
+        self.expected_with_predicate(case, pivot, &mut |state| {
+            let (lhs, rhs) = if self.reversed {
+                (pivot, state)
+            } else {
+                (state, pivot)
+            };
+            match self.compare {
+                "==" => lhs == rhs,
+                "!=" => lhs != rhs,
+                "<" => lhs < rhs,
+                "<=" => lhs <= rhs,
+                ">" => lhs > rhs,
+                ">=" => lhs >= rhs,
+                _ => unreachable!(),
+            }
+        })
+    }
+
+    pub(super) fn expected_with_predicate(
+        self,
+        case: Case,
+        pivot: i64,
+        predicate: &mut impl FnMut(i64) -> bool,
+    ) -> Invocation {
         let mut observation = Invocation {
             arguments: vec![
                 Value::Bool(case.enabled),
@@ -123,21 +168,15 @@ impl Fixture {
                 trips += 1;
                 for slot in 0..self.count {
                     let rhs = if slot == 0 { index } else { carries[slot - 1] };
-                    let (lhs, bound) = if self.reversed {
-                        (pivot, rhs)
+                    let selected = if slot == 0 || slot % 2 == 1 {
+                        predicate(rhs)
                     } else {
-                        (rhs, pivot)
-                    };
-                    let selected = match self.compare {
-                        "==" => lhs == bound,
-                        "!=" => lhs != bound,
-                        "<" => lhs < bound,
-                        "<=" => lhs <= bound,
-                        ">" => lhs > bound,
-                        ">=" => lhs >= bound,
-                        _ => unreachable!(),
+                        true
                     };
                     let multiply = if slot == 0 && !selected {
+                        if self.keep_first_else {
+                            continue;
+                        }
                         true
                     } else if slot % 2 == 1 && !selected {
                         continue;
@@ -190,14 +229,7 @@ impl Fixture {
 
     fn execute(self, cases: &[(Case, i64)]) {
         aggregate_loop_probe::execute(
-            &source(
-                self.shape,
-                self.count,
-                self.descending,
-                self.op,
-                self.compare,
-                self.reversed,
-            ),
+            &self.source(),
             &cases
                 .iter()
                 .map(|&(case, pivot)| self.expected(case, pivot))
@@ -208,7 +240,7 @@ impl Fixture {
     }
 }
 
-const BASE: Case = Case {
+pub(super) const BASE: Case = Case {
     enabled: true,
     initial: 0,
     limit: 4,
@@ -472,7 +504,10 @@ fn conditional_native_admission_rejects_missing_operands_and_hidden_branch_paylo
 
 #[test]
 fn conditional_reference_fuel_failure_retains_accepted_state_and_cleanup() {
-    let baseline = include_str!("aggregate_conditional_loops.ns");
+    assert_reference_fuel_failure(include_str!("aggregate_conditional_loops.ns"));
+}
+
+pub(super) fn assert_reference_fuel_failure(baseline: &str) {
     let source = baseline.replace("decompose(corrected, 3)", "decompose(corrected, 1000)");
     let project = Project::with_source(&source);
     let module = nuisc::pipeline::compile_project(&project.0).unwrap().yir;
