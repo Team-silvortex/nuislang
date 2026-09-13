@@ -205,13 +205,21 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .union(&collect_guarded_loop_direct_call_functions(module))
         .cloned()
         .collect::<BTreeSet<_>>()
-        .union(&super::scoped_loop_lowering::collect_scoped_loop_helper_functions(module))
+        .union(
+            &super::scoped_loop_lowering::collect_scoped_loop_helper_functions(
+                module,
+                host_entries,
+            ),
+        )
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&collect_conditional_owned_return_helpers(module))
         .cloned()
         .collect::<BTreeSet<_>>()
-        .union(&collect_aggregate_param_direct_call_functions(module))
+        .union(&collect_aggregate_param_direct_call_functions(
+            module,
+            host_entries,
+        ))
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&owned_external_buffer_return_helpers)
@@ -282,6 +290,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         scoped_break_controls: outlined.break_controls.clone(),
         async_helper_functions: all_async_helper_functions.clone(),
         pure_helpers: collect_pure_helper_functions(module),
+        checked_arithmetic_helpers: speculation::collect_checked_arithmetic(module),
         inlineable_pure_helpers: collect_inlineable_pure_helper_exprs(module),
         pure_helper_blocks: collect_pure_helper_blocks(module),
         value_counter: 0,

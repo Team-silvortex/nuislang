@@ -77,7 +77,8 @@ pub(super) fn admissible(
             is_scalar_i64(&param.ty)
                 || (!param.ty.is_optional
                     && param.ty.generic_args.is_empty()
-                    && ((!param.ty.is_ref && param.ty.name == "bool")
+                    && ((!param.ty.is_ref
+                        && matches!(param.ty.name.as_str(), "bool" | "i32" | "f32" | "f64"))
                         || (param.ty.is_ref && param.ty.name == "Buffer")))
         })
 }

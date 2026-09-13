@@ -306,9 +306,9 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
-    assert!(session.next_step.starts_with(
-        "extend multi-i64 scoped carry returns and guarded break in the native session profile"
-    ));
+    assert!(session
+        .next_step
+        .starts_with("normalize fallible flat-i64 aggregate branch returns"));
     assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
         .evidence
@@ -343,6 +343,46 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("plain-chain state instead of a trace-only unit"));
     assert!(session
+        .blocker
+        .contains("general aggregate calls, resource state"));
+    assert!(session
+        .evidence
+        .contains("Scoped guarded break now reuses the shared"));
+    assert!(session.evidence.contains("180 callback cases"));
+    assert!(session.evidence.contains("Eleven real trap runs"));
+    assert!(session
+        .evidence
+        .contains("40 cases, including nested-loop scope"));
+    assert!(session
+        .blocker
+        .contains("Unoutlined fallible aggregate branch returns still reject"));
+    assert!(session.evidence.contains("1840 callbacks"));
+    assert!(session
+        .evidence
+        .contains("20 dynamic and four literal invalid cases"));
+    assert!(session
+        .evidence
+        .contains("Purity no longer licenses checked arithmetic speculation"));
+    assert!(session.evidence.contains("576 inner helper invocations"));
+    assert!(session
+        .evidence
+        .contains("no previous temporary remains live"));
+    assert!(session
+        .evidence
+        .contains("selected excessive-loop case traps"));
+    assert!(session
+        .evidence
+        .contains("Checked flat-i64 branch-helper returns now reuse ordinary call_owned_struct"));
+    assert!(session
+        .evidence
+        .contains("144 callback cases and 288 actual helper invocations"));
+    assert!(session
+        .evidence
+        .contains("Multi-i64 scoped carry returns now reuse parse_scoped_i64_carries"));
+    assert!(session
+        .evidence
+        .contains("counter-only fallback rejects unsupported outer-state updates"));
+    assert!(!session
         .blocker
         .contains("multi-i64 scoped carry returns and guarded break"));
     assert!(!session

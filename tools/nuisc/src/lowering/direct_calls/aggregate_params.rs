@@ -2,13 +2,14 @@ use super::*;
 
 pub(in crate::lowering) fn collect_aggregate_param_direct_call_functions(
     module: &NirModule,
+    host_entries: &BTreeSet<String>,
 ) -> BTreeSet<String> {
     let definitions = module
         .structs
         .iter()
         .map(|definition| (definition.name.as_str(), definition))
         .collect::<BTreeMap<_, _>>();
-    let reachable = reachable_function_names(module);
+    let reachable = reachable_function_names(module, host_entries);
     module
         .functions
         .iter()
@@ -38,7 +39,10 @@ pub(in crate::lowering) fn collect_aggregate_param_direct_call_functions(
         .collect()
 }
 
-fn reachable_function_names(module: &NirModule) -> BTreeSet<String> {
+fn reachable_function_names(
+    module: &NirModule,
+    host_entries: &BTreeSet<String>,
+) -> BTreeSet<String> {
     let definitions = module
         .functions
         .iter()
@@ -47,6 +51,19 @@ fn reachable_function_names(module: &NirModule) -> BTreeSet<String> {
     let eligible = definitions.keys().copied().collect::<BTreeSet<_>>();
     let mut reachable = BTreeSet::new();
     let mut pending = vec!["main".to_owned()];
+    pending.extend(host_entries.iter().cloned());
+    pending.extend(
+        module
+            .functions
+            .iter()
+            .filter(|function| {
+                function
+                    .annotations
+                    .iter()
+                    .any(|annotation| matches!(annotation.name.as_str(), "export" | "noinline"))
+            })
+            .map(|function| function.name.clone()),
+    );
     while let Some(name) = pending.pop() {
         if !reachable.insert(name.clone()) {
             continue;

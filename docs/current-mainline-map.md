@@ -159,9 +159,41 @@ reordering. Two additional executables observe 36 callback cases and 84 actual
 helper invocations, including all five scalar kinds, NaN/signed-zero bits,
 pre-step carry order and zero-trip preservation. Three process-trap cases prove
 invalid induction never enters the helper. The build/run-artifact restoration
-regression now uses the scoped-loop fixture. Multi-i64 scoped carry returns and
-guarded break are the next native boundary; the passing default image host still
-executes embedded YIR.
+regression now uses a multi-carry scoped-loop fixture. Flat multi-i64 scoped
+returns now use the shared layout/seed contract and the same bounded helper
+closure. Six more native/reference runs cover the multi-carry session fixture.
+Six native executables observe 144 callback cases and 288 helper invocations
+with 2/3/7 carries, reversed argument order, sequential updates, zero/one trips,
+exact scalar captures and balanced real aggregate allocation/drop. Three more
+process-trap runs reject invalid induction before the first helper call.
+Aggregate helper reachability now includes registered, exported and noinline
+roots, not only main; counter-only fallback rejects discarded outer updates.
+Scoped guarded break now reuses the shared return/control contract: validate the
+zero seed and binary returned control, release the aggregate, commit all carries
+and exit before stepping. Pure scalar source loops reuse private normalization;
+break-only loops need one control bit rather than an aggregate branch result.
+The full bounded induction preflight still applies even for an immediate break.
+Six native binaries cover 180 callback cases and balanced aggregate release;
+eleven real traps cover seed/return/induction rejection. The frontdoor restoration
+suite retains the multi-carry fixture and adds the guarded-break fixture.
+Checked flat-i64 branch-helper returns now reuse ordinary aggregate calls with
+exact return-layout, scalar-parameter and bounded-closure validation. Multi-state
+guarded updates, break and explicit-step continue now execute natively, including
+nested scope and both induction directions. Six nested-call binaries cover 144
+callback cases and 576 inner helper calls with balanced real aggregate release;
+selected-path tests skip an unreachable excessive-loop preflight but trap when it
+is reached. The frontdoor adds the multi-state branch fixture through cache
+isolation and standalone restoration. Checked i64 division/remainder now have
+exact-kind native admission and reuse existing zero/overflow guards. Eight native
+binaries compare 1840 callbacks against reference execution and a wide-integer
+oracle; 20 dynamic and four literal invalid cases trap without returned state.
+Four unselected invalid literal cases return safely. Frontend purity no longer
+licenses arithmetic speculation: acyclic i64/bool helpers reuse guarded outlining,
+and unoutlined fallible aggregate branch returns reject before select shortcuts.
+Their guarded normalization is the next boundary; per-return allocation remains
+an optimization target. The division fixture composes with typed lifecycle,
+multi-state break/continue, cache isolation and standalone restoration.
+The passing default image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport
 are not certified by the portable tests.

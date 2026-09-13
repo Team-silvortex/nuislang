@@ -87,6 +87,8 @@ mod scoped_loop_lowering;
 mod shader_exprs;
 #[path = "lowering/shader_packets.rs"]
 mod shader_packets;
+#[path = "lowering/speculation.rs"]
+mod speculation;
 #[path = "lowering/state.rs"]
 mod state;
 #[path = "lowering/tail_recursion.rs"]

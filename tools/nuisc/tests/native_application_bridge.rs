@@ -8,8 +8,26 @@ use yir_core::{Value, YirModule};
 use yir_lower_llvm::native_session::{emit_registered, NativeSessionBridge, ScalarKind};
 use yir_runtime_host::ApplicationSession;
 
+#[path = "native_application_bridge/aggregate_admission.rs"]
+mod aggregate_admission;
+#[path = "native_application_bridge/aggregate_execution.rs"]
+mod aggregate_execution;
+#[path = "native_application_bridge/aggregate_guards.rs"]
+mod aggregate_guards;
 #[path = "native_application_bridge/bounds.rs"]
 mod bounds;
+#[path = "native_application_bridge/branch_loops.rs"]
+mod branch_loops;
+#[path = "native_application_bridge/break_execution.rs"]
+mod break_execution;
+#[path = "native_application_bridge/break_loops.rs"]
+mod break_loops;
+#[path = "native_application_bridge/break_source.rs"]
+mod break_source;
+#[path = "native_application_bridge/division_admission.rs"]
+mod division_admission;
+#[path = "native_application_bridge/division_execution.rs"]
+mod division_execution;
 #[path = "native_application_bridge/driver.rs"]
 mod driver;
 #[path = "native_application_bridge/dynamic_loop_guard.rs"]
@@ -20,6 +38,12 @@ mod dynamic_loops;
 mod helpers;
 #[path = "native_application_bridge/loops.rs"]
 mod loops;
+#[path = "native_application_bridge/multi_admission.rs"]
+mod multi_admission;
+#[path = "native_application_bridge/multi_execution.rs"]
+mod multi_execution;
+#[path = "native_application_bridge/multi_loops.rs"]
+mod multi_loops;
 #[path = "native_application_bridge/scoped_admission.rs"]
 mod scoped_admission;
 #[path = "native_application_bridge/scoped_execution.rs"]

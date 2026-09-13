@@ -10,9 +10,13 @@ const MAX_CALL_DEPTH: usize = 32;
 pub(super) fn target<'a>(
     node: &Node,
     functions: &BTreeMap<&str, &'a YirFunction>,
+    nodes: &BTreeMap<&str, &Node>,
 ) -> Result<Option<&'a YirFunction>, String> {
     let scoped = super::loops::scoped::parse(node)?;
-    let (callee, arity, kind) = if let Some(call) = scoped {
+    let aggregate = super::aggregates::parse(node)?;
+    let (callee, arity, kind) = if let Some(call) = &aggregate {
+        (call.callee, call.operands.len(), None)
+    } else if let Some(call) = &scoped {
         (
             call.callee,
             call.operands.len(),
@@ -35,13 +39,23 @@ pub(super) fn target<'a>(
             node.name
         )
     })?;
-    let result = function.result.as_ref();
-    if function.role != YirFunctionRole::Helper
-        || !result.is_some_and(|result| {
+    let layout = aggregate.as_ref().map(|call| &call.layout).or_else(|| {
+        scoped
+            .as_ref()
+            .and_then(|call| call.carries.as_ref())
+            .map(|carries| &carries.layout)
+    });
+    let valid_result = if let Some(layout) = layout {
+        &super::aggregates::result_layout(function, nodes)? == layout
+    } else {
+        function.result.as_ref().is_some_and(|result| {
             ScalarKind::parse(&result.ty).is_ok()
                 && kind.is_none_or(|kind| result.ty == kind)
                 && result.ownership == YirValueOwnership::Value
         })
+    };
+    if function.role != YirFunctionRole::Helper
+        || !valid_result
         || function.parameters.len() != arity
     {
         return Err(format!(

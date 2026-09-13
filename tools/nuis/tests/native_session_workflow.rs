@@ -5,7 +5,13 @@ use std::{
     process::{Command, Output},
 };
 
-const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/scoped_loops.ns");
+const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/multi_loops.ns");
+const BREAK_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/break_loops.ns");
+const BRANCH_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/branch_loops.ns");
+const DIVISION_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/division_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -23,7 +29,7 @@ const SCRIPT: &[&str] = &[
 
 struct Project(PathBuf);
 impl Project {
-    fn new() -> Self {
+    fn new(source: &str) -> Self {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -33,7 +39,7 @@ impl Project {
             std::process::id()
         ));
         fs::create_dir(&path).unwrap();
-        fs::write(path.join("main.ns"), SOURCE).unwrap();
+        fs::write(path.join("main.ns"), source).unwrap();
         fs::write(path.join("nuis.toml"), "name = \"native_workflow\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\npackaging_mode = \"native-session-aot-bundle:counter\"\napplication_sessions = [\"counter open=start event=step close=stop state=state\", \"other open=start event=step close=stop state=state\"]\n").unwrap();
         Self(path)
     }
@@ -101,13 +107,32 @@ fn rejected_before_open(output: Output) {
 
 #[test]
 fn native_build_run_artifact_cache_and_standalone_relocation() {
+    check_workflow(SOURCE);
+}
+
+#[test]
+fn native_guarded_break_build_cache_and_standalone_relocation() {
+    check_workflow(BREAK_SOURCE);
+}
+
+#[test]
+fn native_multi_state_branch_build_cache_and_standalone_relocation() {
+    check_workflow(BRANCH_SOURCE);
+}
+
+#[test]
+fn native_checked_division_build_cache_and_standalone_relocation() {
+    check_workflow(DIVISION_SOURCE);
+}
+
+fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
         target_pointer_width = "64"
     )) {
         return;
     }
-    let project = Project::new();
+    let project = Project::new(source);
     project.build(None);
     let output = project.0.join("build");
     let manifest_path = output.join("nuis.build.manifest.toml");
@@ -126,7 +151,18 @@ fn native_build_run_artifact_cache_and_standalone_relocation() {
     }
     assert!(llvm.contains("loop_while_i64_cond"));
     assert!(llvm.contains("loop_while_i64_body"));
+    if source == SOURCE {
+        assert!(llvm.contains(" = call i64 @nuis_fn_advance("));
+    } else {
+        assert!(llvm.contains(" = call i64 @nuis_fn_counted("));
+        assert!(llvm.contains("loop_break_control_invalid"));
+    }
     assert!(llvm.contains("native_loop_preflight"));
+    if source == DIVISION_SOURCE {
+        assert!(llvm.contains("sdiv i64"));
+        assert!(llvm.contains("srem i64"));
+        assert!(llvm.contains("integer_divisor_invalid"));
+    }
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");
     let expected = states(&run);

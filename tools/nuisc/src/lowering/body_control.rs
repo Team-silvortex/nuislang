@@ -95,6 +95,10 @@ pub(in crate::lowering) fn lower_function_body(
         .iter()
         .any(|stmt| matches!(stmt, NirStmt::If { else_body, .. } if else_body.is_empty()))
         && !function_guard_prefix_contains_task_survivor(function)
+        && !speculation::block_has_checked_arithmetic(
+            &function.body,
+            &state.checked_arithmetic_helpers,
+        )
     {
         let checkpoint = GuardReturnAttemptCheckpoint::capture(state);
         match super::if_lowering::lower_function_guard_return_chain(&function.body, state, bindings)
@@ -275,6 +279,13 @@ pub(in crate::lowering) fn lower_while_stmt(
         &state.inlineable_pure_helpers,
         &state.pure_helper_blocks,
     ) {
+        // Prefix temporaries are not permission to discard a carried outer binding.
+        if body.iter().any(|stmt| {
+            matches!(stmt, NirStmt::Let { name, .. }
+            if name != &prepared.binding_name && bindings.contains_key(name))
+        }) {
+            return Err("counted loop cannot discard an unsupported outer-state update".to_owned());
+        }
         lower_counted_while(prepared, state, bindings)?;
         return Ok(None);
     }

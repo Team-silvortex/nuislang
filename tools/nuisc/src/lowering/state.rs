@@ -61,6 +61,7 @@ pub(super) struct LoweringState<'a> {
     pub(super) scoped_break_controls: BTreeMap<String, String>,
     pub(super) async_helper_functions: BTreeSet<String>,
     pub(super) pure_helpers: BTreeSet<String>,
+    pub(super) checked_arithmetic_helpers: BTreeSet<String>,
     pub(super) inlineable_pure_helpers: BTreeMap<String, InlineablePureHelper>,
     pub(super) pure_helper_blocks: BTreeMap<String, PureHelperBlock>,
     pub(super) value_counter: usize,

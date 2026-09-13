@@ -67,7 +67,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "__nuis_buffer_continue",
             "same_step(rewritten.last()?, step)",
             "index + 1 != body.len()",
-            "body.insert(0, set_flag(&flag, 1))",
+            "body.insert(0, set_flag(&flag, running_value))",
             "rewritten.push(set_flag(flag, 0))",
             "then_body: tail",
             "A child loop owns its control scope",
@@ -516,6 +516,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "exactly match its declared scalar kind",
             "native_session::loops::scoped::parse",
             "exact i64 loop-state parameters",
+            "for initial in &carries.seeds",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -577,6 +578,9 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-lower-llvm/src/native_session/loops/scoped.rs",
         required_patterns: &[
             "parse_scoped_i64_carry",
+            "parse_scoped_i64_carries",
+            "carries.break_on_return",
+            "native_scoped_multi_carry_slot_bound_is_not_a_precombined_arity",
             "does not admit this scoped action",
             "arity.checked_add(8)",
             "args[6] != \"scoped_call\"",
@@ -699,7 +703,51 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "materialize-artifact",
             "rejected_before_open",
             "native_loop_preflight",
-            "scoped_loops.ns",
+            "multi_loops.ns",
+            " = call i64 @nuis_fn_advance(",
         ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-multi-carry-parity",
+        path: "tools/nuisc/tests/native_application_bridge/multi_loops.rs",
+        required_patterns: &[
+            "multi_carry_scoped_calls_preserve_native_reference_and_typed_session_parity",
+            "extra_carries_cannot_disappear_behind_a_single_scoped_call",
+            "multi_carry_reference_fuel_failure_preserves_the_accepted_state",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-multi-carry-execution",
+        path: "tools/nuisc/tests/native_application_bridge/multi_execution.rs",
+        required_patterns: &[
+            "multi_carry_native_calls_preserve_sequential_values_exact_captures_and_drop_balance",
+            "multi_carry_native_preflight_traps_before_any_call_or_output",
+            "nuis_scheduler_owned_aggregate_alloc_v1",
+            "nuis_scheduler_owned_aggregate_drop_v1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-multi-carry-admission",
+        path: "tools/nuisc/tests/native_application_bridge/multi_admission.rs",
+        required_patterns: &[
+            "multi_carry_admission_rejects_layout_ownership_marker_and_action_drift",
+            "multi_carry_admission_requires_exact_seed_capture_parameter_and_return_kinds",
+            "multi_carry_edges_reject_recursive_closures_foreign_lanes_and_hidden_effects",
+            "multi_carry_returns_reject_discarded_layout_drift_and_resource_aggregate_calls",
+            "unsupported_outer_updates_are_not_erased_by_counted_loop_fallback",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "aggregate-helper-host-root-reachability",
+        path: "tools/nuisc/src/lowering/direct_calls/aggregate_params.rs",
+        required_patterns: &[
+            "pending.extend(host_entries.iter().cloned())",
+            "\"export\" | \"noinline\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "counted-loop-outer-state-fail-closed",
+        path: "tools/nuisc/src/lowering/body_control.rs",
+        required_patterns: &["counted loop cannot discard an unsupported outer-state update"],
     },
 ];

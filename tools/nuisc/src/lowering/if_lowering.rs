@@ -247,6 +247,13 @@ pub(super) fn lower_if_pair(
         return Ok(lowered);
     }
 
+    // The remaining shortcuts may materialize both branches before selecting.
+    for branch in [then_body, else_body] {
+        if speculation::block_has_checked_arithmetic(branch, &state.checked_arithmetic_helpers) {
+            return Err("conditional fallible return requires guarded helper lowering".to_owned());
+        }
+    }
+
     if let Some(lowered) = lower_guard_return_with_surviving_binding(
         &condition_name,
         then_body,

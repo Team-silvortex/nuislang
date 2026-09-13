@@ -19,8 +19,12 @@ enum ScopedLoopResult<'a> {
     },
 }
 
-pub(super) fn collect_scoped_loop_helper_functions(module: &NirModule) -> BTreeSet<String> {
-    let aggregate_helpers = direct_calls::collect_aggregate_param_direct_call_functions(module);
+pub(super) fn collect_scoped_loop_helper_functions(
+    module: &NirModule,
+    host_entries: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let aggregate_helpers =
+        direct_calls::collect_aggregate_param_direct_call_functions(module, host_entries);
     let eligible = module
         .functions
         .iter()
@@ -127,6 +131,14 @@ pub(super) fn lower_scoped_call_while(
     ) else {
         return Ok(false);
     };
+    // The action/projections own the carried updates. The counted tail may only
+    // change the induction binding, not silently consume another outer update.
+    if counted_body.iter().any(|stmt| {
+        matches!(stmt, NirStmt::Let { name, .. }
+        if name != &prepared.binding_name && bindings.contains_key(name))
+    }) {
+        return Ok(false);
+    }
     let function = state
         .function_map
         .get(callee.as_str())

@@ -104,13 +104,17 @@ impl<'a> FunctionAdmission<'a> {
             .result
             .as_ref()
             .ok_or("native scalar helper result missing")?;
-        let expected = if callback {
+        let aggregate = callback || result.ownership == YirValueOwnership::Owned;
+        if aggregate && !callback {
+            super::aggregates::result_layout(function, &self.nodes)?;
+        }
+        let expected = if aggregate {
             "return_owned_struct".to_owned()
         } else {
             ScalarKind::parse(&result.ty)?;
             format!("return_{}", result.ty)
         };
-        let ownership = if callback {
+        let ownership = if aggregate {
             YirValueOwnership::Owned
         } else {
             YirValueOwnership::Value

@@ -7,6 +7,7 @@ pub use yir_core::native_scalar_session::{
 use yir_core::YirModule;
 
 mod admission;
+pub(crate) mod aggregates;
 mod calls;
 mod emit;
 mod function;

@@ -696,7 +696,16 @@ pub(super) fn lower_direct_call_helper_function(
         push_lifetime_edge(state, &returned, &return_name);
     }
     crate::lowering::edge_helpers::push_effect_edge(state, &returned, &return_name);
-    control_boundaries::order_guarded_function_nodes(state, start_index, preserve_source_order);
+    control_boundaries::order_guarded_function_nodes(
+        state,
+        start_index,
+        preserve_source_order
+            || (state.checked_arithmetic_helpers.contains(&function.name)
+                && function
+                    .body
+                    .iter()
+                    .any(|stmt| matches!(stmt, NirStmt::If { .. }))),
+    );
     let body_nodes = state.yir.nodes[start_index..]
         .iter()
         .map(|node| node.name.clone())

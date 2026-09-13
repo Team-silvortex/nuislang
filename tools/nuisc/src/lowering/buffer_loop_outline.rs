@@ -42,7 +42,7 @@ pub(super) struct BufferLoopOutlines {
 }
 
 // Keep iteration effects inside a private helper; the existing scoped-call contract
-// supplies the induction value and preserves borrowed-buffer lifetime edges.
+// supplies induction/carry values, validated break control and borrowed-buffer lifetimes.
 pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopOutlines, String> {
     let catalog = scalar_helpers::collect(module);
     let mut names = module
@@ -65,6 +65,13 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         .collect::<BTreeSet<_>>();
     let mut helpers = Vec::new();
     let mut outlined = BufferLoopOutlines::default();
+    let checked_arithmetic = speculation::collect_checked_arithmetic(module);
+    for function in &module.functions {
+        if catalog.contains_key(&function.name) && checked_arithmetic.contains(&function.name) {
+            outlined.functions.insert(function.name.clone());
+            scalar_helpers::retain_reachable(&function.body, &catalog, &mut outlined.functions);
+        }
+    }
     for function in &mut module.functions {
         let mut scope = function
             .params
@@ -155,7 +162,7 @@ fn outline_body(
             NirStmt::While { condition, body } => {
                 if let Some(plan) =
                     buffer_loop_params(condition, body, scope, catalog, &BTreeSet::new())
-                        .filter(|plan| plan.has_store)
+                        .filter(|plan| plan.has_store || plan.break_flag.is_some())
                 {
                     scalar_helpers::retain_reachable(body, catalog, retained);
                     outline_loop(

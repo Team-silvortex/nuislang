@@ -8,6 +8,18 @@ pub(super) fn validate(
     return_kind: CpuCallScalarKind,
     aggregate_return: bool,
 ) -> Result<(), String> {
+    // The generic opcodes also accept other kinds; this native slice is i64-only.
+    if matches!(node.op.instruction.as_str(), "div" | "rem") {
+        let [left, right] = node.op.args.as_slice() else {
+            return Err(format!(
+                "native integer division/remainder `{}` requires two operands",
+                node.name
+            ));
+        };
+        for operand in [left, right] {
+            require_value(node, operand, CpuCallScalarKind::I64, registers)?;
+        }
+    }
     if matches!(
         node.op.instruction.as_str(),
         "loop_while_i64"
@@ -37,8 +49,15 @@ pub(super) fn validate(
         if let Some(initial) = call.initial {
             require_value(node, initial, CpuCallScalarKind::I64, registers)?;
         }
+        if let Some(carries) = &call.carries {
+            for initial in &carries.seeds {
+                require_value(node, initial, CpuCallScalarKind::I64, registers)?;
+            }
+        }
         for (operand, kind) in call.operands.iter().zip(&signature.params) {
-            if matches!(operand.as_str(), "$current" | "$carry") {
+            if matches!(operand.as_str(), "$current" | "$carry")
+                || yir_core::parse_loop_owned_struct_carry(operand)?.is_some()
+            {
                 if *kind != CpuCallScalarKind::I64 {
                     return Err(format!(
                         "native scoped call `{}` requires exact i64 loop-state parameters",
@@ -65,16 +84,30 @@ pub(super) fn validate(
         }
     }
     if node.op.instruction.starts_with("call_") {
+        let aggregate = native_session::aggregates::parse(node)?;
         let signature = signatures
             .get(&node.op.args[0])
             .ok_or_else(|| format!("native scalar call `{}` has no emitted helper", node.name))?;
-        if node.op.args.len() - 1 != signature.params.len() {
+        if let Some(call) = &aggregate {
+            if !signature.owned_struct_return
+                || signature.owned_struct_layout.as_ref() != Some(&call.layout)
+            {
+                return Err(format!(
+                    "native aggregate call `{}` emitted layout drift",
+                    node.name
+                ));
+            }
+        }
+        let operands = aggregate
+            .as_ref()
+            .map_or(&node.op.args[1..], |call| call.operands);
+        if operands.len() != signature.params.len() {
             return Err(format!(
                 "native scalar call `{}` argument count drift",
                 node.name
             ));
         }
-        for (name, kind) in node.op.args[1..].iter().zip(&signature.params) {
+        for (name, kind) in operands.iter().zip(&signature.params) {
             require_value(node, name, *kind, registers)?;
         }
     }

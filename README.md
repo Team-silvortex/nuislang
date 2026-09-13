@@ -184,10 +184,26 @@ add/multiply carries. Constant induction is proven at compile time; runtime i64
 start/bound/step values are checked before loop entry for finite, non-wrapping
 induction within 65536 iterations. Native/reference and real process-trap tests
 cover this boundary. Scoped loop bodies now call admitted scalar helpers, either
-discarding the scalar result or carrying one i64 return into the next iteration.
+discarding a scalar result or carrying one or multiple i64 returns into the next iteration.
 All five scalar capture kinds retain exact typing; scoped edges share the same
-acyclic call-graph limits. Multi-value scoped returns, guarded break, resources
-and provider effects remain outside this profile; the default image host is unchanged.
+acyclic call-graph limits. Multi-carry calls bind a checked flat return layout and
+release the temporary aggregate before the next iteration. Registered callback
+roots now retain their aggregate helpers even when main does not call them;
+unsupported outer updates cannot silently degrade to a counter-only loop.
+Scoped guarded break now commits validated carries, releases the returned aggregate
+and exits before the induction step. Pure scalar source loops reuse the existing
+normalizer with one private break bit; full induction preflight still applies.
+Checked flat-i64 branch-helper returns now support multi-state guarded updates,
+`break` and matching explicit-step `continue`, including nested-loop scope.
+Ordinary and scoped edges share exact layout/kind checks and bounded call-graph
+admission; nested temporary returns are unpacked and released before the next call.
+Checked i64 division/remainder now reuse the existing native emitter with exact
+operand kinds and zero/overflow traps before LLVM arithmetic. Guarded scalar helpers
+preserve selected-path evaluation, including discarded results and unused arguments.
+Unoutlined fallible aggregate branch returns reject instead of being speculated;
+generalizing their guarded normalization is the next source-lowering boundary.
+Unrestricted aggregate calls, resources and provider effects remain outside this
+profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary
 carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.

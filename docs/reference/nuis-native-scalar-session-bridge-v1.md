@@ -10,7 +10,7 @@ YIR callbacks.
 `yir_lower_llvm::native_session::emit_registered(module, id)` consumes an existing
 YIR application-session registration and its shared `ApplicationSessionSignature`.
 It emits a complete LLVM unit containing the registered open/event/close helpers,
-their admitted scalar helper closure and one static export per role. No source function names or application policies
+their admitted helper closure and one static export per role. No source function names or application policies
 are hardcoded. Export symbols encode the registration ID as UTF-8 bytes in hex.
 The contract identifier is `nuis-native-scalar-session-bridge-v1`.
 
@@ -21,10 +21,13 @@ The first admitted profile is deliberately small:
 - Nested nonempty scalar state made of `bool`, `i32`, `i64`, `f32` and `f64`.
 - Acyclic helper calls with scalar parameters and one declared scalar return,
   including nested calls, zero-argument helpers and guarded scalar returns.
+- Checked flat-i64 aggregate helper returns through ordinary or scoped calls,
+  including multi-state guarded branches and matching explicit-step continue.
+- Checked i64 division/remainder, with exact operands and reached-path failure.
 - Counted i64 loops with constant or runtime-checked induction inputs and ordered
   scalar add/multiply carries, with at most 64 carries and 65536 iterations per loop.
-- Scoped loop-body calls to admitted scalar helpers, with a discarded scalar
-  result or one i64 carry returned before the induction step.
+- Scoped loop-body calls with a discarded scalar result, one i64 carry, or a
+  checked flat aggregate of at most 64 i64 carries returned before the induction step.
 - At most 64 input slots, 64 state slots and 4096 body nodes per function.
 - At most 64 reachable functions (including registered roots), 16384 total body
   nodes and 32 functions on any root-to-leaf call path.
@@ -49,7 +52,42 @@ including guarded returns; the generic backend's bool-to-i64 compatibility is no
 admitted here. Guards require bool/i64 conditions; scalar helper guards cannot carry
 an aggregate layout. General LLVM inspection keeps its existing partial-lowering behavior.
 Supported synchronous `@noinline` functions now retain their NIR-to-YIR call boundary.
+Aggregate-helper reachability includes registered host entries and explicit
+export/noinline roots, not only main. This is a common lowering rule, not a
+hardcoded application-session name. Unsupported outer-state updates reject
+instead of degrading to a counter-only loop after scoped lowering declines.
+Likewise, a single-carry scoped call cannot absorb another outer-state update
+as a temporary prefix; multi-carry updates need the explicit supported shape.
 This is not a guarantee that downstream LLVM optimization preserves machine calls.
+
+## Checked Arithmetic
+
+The profile admits existing `cpu.div` and `cpu.rem` only for two exact i64 values.
+It reuses the ordinary LLVM scalar emitter: reached operations check zero divisors
+and `i64::MIN` with `-1` before `sdiv` or `srem`. Both invalid cases trap for both
+operators. Valid signed results truncate toward zero and remainder follows the
+dividend. Implicit bool/i32/float conversion and typed i32/f32/f64 division are
+not admitted by this profile. No new opcode, callback ABI or arithmetic runtime
+is introduced.
+
+Purity is not permission to speculate checked arithmetic. Shared source lowering
+propagates division/remainder through a cached, iterative call graph, independent
+of declaration order. Eligible acyclic i64/bool scalar helpers reuse the existing
+guarded branch/continuation outliner. Prefix work keeps source order; an unselected
+branch skips its arithmetic, even when its result is discarded or passed to a
+callee that ignores the argument. Work before the guard still executes.
+
+A flat-i64 aggregate helper may return already available fields before a later
+checked operation. More general fallible aggregate branch returns have not yet
+been normalized: early-return, two-arm and same-callee argument shapes reject
+before select-style shortcuts can speculate them. This is a known source-lowering
+boundary, not full aggregate control-flow support. Other runtime families retain
+their own branch contracts; this analysis is not a whole-language effect proof.
+
+Native failure terminates the process, not a catchable callback result or fuel
+error. It cannot promise cleanup, rollback or a returned state. The reference
+session instead reports an arithmetic error, preserves its last accepted state
+and retains failure through close. These are distinct failure mechanisms.
 
 ## Counted Loops
 
@@ -92,12 +130,15 @@ guarantee; native budgeted calls still reject before entry.
 ### Scoped Calls
 
 The existing `cpu.loop_while_i64_effect` opcode is admitted only when its action
-is `cpu.scoped_call` or `cpu.scoped_call_i64_carry`. This is not blanket admission
+is `cpu.scoped_call`, `cpu.scoped_call_i64_carry`, `cpu.scoped_call_i64_carries`
+or `cpu.scoped_call_i64_carries_break`.
+This is not blanket admission
 of effect metadata. The first form discards a scalar return; the second consumes
 the shared `parse_scoped_i64_carry` contract with one named i64 seed and exactly
 one `$carry` operand. Neither form introduces an interpreter or new runtime ABI.
 
-Each body target must be a scalar-returning helper in the same admitted closure.
+Each body target must be a scalar-returning helper or the checked multi-carry
+helper described below, in the same admitted closure.
 It participates in cycle, depth, function-count and total-node checks, including
 when a loop is statically zero-trip or its result is discarded. Hidden printing,
 resource access, unknown/drifted signatures and cross-function value captures
@@ -112,9 +153,82 @@ counter. Zero-trip loops preserve the seed and do not invoke the helper. The
 native induction preflight runs before the first invocation; invalid values trap
 the process. Pure scalar carry transport adds no owned aggregate per iteration.
 
-The current source shape is a scoped helper call followed by a counted induction
-step. Multi-i64/aggregate returns, guarded break, move/copy/resource captures and
-arbitrary conditional loop bodies are not admitted by this native subset.
+Multi-carry calls use `parse_scoped_i64_carries`, not a new opcode or ABI. Each
+`$owned_struct_carry:N:seed` binds exactly one named i64 seed to the corresponding
+flat `carryN:i64` field. The declared helper result must be owned and match the
+action's nominal type, field order and kinds; parameters remain exact scalar
+values. At most 64 slots are allowed, within the existing 64-parameter bound.
+Operand order need not equal field order. Scalar i32/float captures are also
+supported by the source multi-carry path, without widening carried state kinds.
+
+The helper sees the previous iteration's carries and pre-step counter. Its own
+ordered updates produce one returned aggregate; all leaves are extracted and
+the temporary aggregate is dropped before stepping or invoking it again.
+Zero-trip loops preserve every seed. Unlike a plain scalar chain or single-i64
+call, this route currently allocates one aggregate per iteration. Release
+balance is tested; eliminating that allocation remains an optimization, not a
+claim of allocation-free execution or whole-program memory safety.
+
+The explicit source shape is a scoped helper call, ordered scalar projections
+and a counted induction step. Source guarded breaks can instead use the private
+normalization described below. Unrestricted aggregate calls, move/copy/resource
+captures and arbitrary conditional loop bodies are not admitted.
+
+### Guarded Break
+
+`scoped_call_i64_carries_break` reuses the same parser, typed layout, bounded helper
+closure and aggregate loop emitter. The last i64 slot is private control: its seed
+must be zero even on zero trips, and each returned value must be 0 (advance) or 1
+(break). A control-only layout is valid and the control slot counts toward the
+64-slot/parameter bounds. It is not an arbitrary user-data or boolean carry.
+
+The returned aggregate is unpacked and released, then the control value is checked
+before committing any returned carries. A valid return commits every carry; 1 exits
+with the current pre-step counter, while 0 reaches the ordinary induction step.
+An invalid seed/return traps the process and never publishes callback output.
+This is not a catchable callback status or reference-fuel error.
+
+Native admission still requires the **entire induction sequence**, ignoring any
+possible early break, to be finite, non-wrapping and within 65536 iterations. An
+immediate break does not excuse an active zero step, overflow or excessive bound.
+Constant proofs and reached-loop runtime preflight are unchanged.
+
+Pure scalar source loops now reuse the existing effect-loop normalizer for strict
+ascending/descending unit steps and i64/bool helper composition. Break-only loops
+use one private bit instead of two complementary flags. This avoids an unnecessary
+aggregate branch call while preserving selected-path suffix evaluation and nested
+loop scope. The compiler still requires generated control provenance; a user
+aggregate followed by `if signal == 1 { break; }` is not automatically trusted.
+YIR scoped captures retain all five exact scalar kinds, independently of this more
+restricted automatic source normalizer.
+
+Branches that update multiple values, including a user carry plus the break bit,
+and mixed break/continue normalization can generate ordinary aggregate helper
+calls. The checked flat-i64 subset below now admits these calls. A continue still
+requires its matching explicit unit step; step-before-break remains unsupported.
+
+### Flat Helper Returns
+
+Ordinary `cpu.call_owned_struct` and scoped multi-carry calls share one native
+return-layout validator. The helper must return an owned nominal aggregate with
+1..64 ordered `carry0:i64` through `carryN:i64` fields. The call, declared result,
+terminal return and any explicit guarded-return layout must agree. Actual return
+leaves and all scalar input values retain exact types; there is no implicit
+bool/i32/float conversion, resource input or nested aggregate admission.
+
+This is a structural contract, not an allowlist of generated helper names or
+precombined arities. Ordinary and mixed scoped edges share the existing acyclic
+closure and size/depth limits, including discarded and guard-bypassed calls.
+Unknown targets, foreign-lane values, hidden effects and signature drift reject.
+The generic LLVM call lowering unpacks and drops each temporary return immediately;
+no interpreter, host dispatcher, new opcode or new aggregate ABI is introduced.
+
+Multi-state guarded break and explicit-step continue now preserve source-ordered
+updates, selected-path suffix evaluation and child-loop exit scope. A guarded
+return bypasses later dynamic induction preflight; reaching an excessive bound
+still traps the process. These checks do not add callback fuel/preemption or
+resource-bearing returns. Every reached aggregate return still allocates, even
+when nested inside one loop iteration; release balance is not allocation freedom.
 
 ## Call ABI
 
@@ -317,6 +431,70 @@ real traps and prove invalid induction enters no helper or publication path.
 Reference fuel exhaustion retains the accepted state and cleanup cannot clear
 the failure. This is not native fuel/preemption evidence.
 
+The [multi-carry fixture](../../tools/nuisc/tests/native_application_bridge/multi_loops.ns)
+adds shared aggregate-returning helpers with two carries, ascending/descending
+loops and zero-trip seeds. Six more native/reference runs retain exact session
+slots and reversed-declaration parity. The
+[multi-carry execution tests](../../tools/nuisc/tests/native_application_bridge/multi_execution.rs)
+run 144 callback cases and 288 actual helper invocations across six native
+executables with 2/3/7 carries, reversed operand order, source-ordered updates,
+wrapping carried arithmetic, zero/one trips and all five scalar capture kinds.
+Test-only wrappers delegate to the real aggregate allocator/drop functions,
+checking release before the next helper and equal allocation/drop counts after
+each export. Three additional binaries retain real preflight traps.
+[Multi-carry admission tests](../../tools/nuisc/tests/native_application_bridge/multi_admission.rs)
+reject layout/ownership/seed/parameter drift, recursive zero-trip edges, hidden
+effects, foreign lanes and attempts to enable general aggregate calls. They also
+guard against silently discarded outer-state updates in counted-loop fallback.
+
+The [guarded-break fixture](../../tools/nuisc/tests/native_application_bridge/break_loops.ns)
+adds source-normalized two-carry and control-only loops. Six native/reference runs
+retain typed state and reversed-declaration parity. The
+[break execution tests](../../tools/nuisc/tests/native_application_bridge/break_execution.rs)
+exercise 180 callback cases in six native binaries with 2/3/7 slots, early/middle/
+last/no break, zero trips, both directions, reversed operands/declarations, wrapping
+user carries and exact five-scalar captures. Real allocation/drop counters include
+the exiting iteration and callback State. Eleven unmodified process-trap runs
+cover nonzero seeds (including zero trips), invalid returned control and invalid
+induction even when the helper would immediately break. Helper-entry probes flush
+their output before execution so a trap cannot hide buffered evidence.
+[Source tests](../../tools/nuisc/tests/native_application_bridge/break_source.rs)
+compare native, reference and independent expected states in 40 cases across eight
+binaries: nested/flat loops, both directions, pre-step exit counters, skipped suffix
+updates, multi-state guarded break and matching explicit-step continue.
+Shared negative checks retain
+layout/kind/closure restrictions and reject unmodeled source updates or forged
+control provenance. Reference budget exhaustion retains the last accepted state;
+native budget/preemption remains unimplemented.
+
+The [multi-state branch fixture](../../tools/nuisc/tests/native_application_bridge/branch_loops.ns)
+adds six typed native/reference lifecycle runs with guarded updates and mixed
+break/continue. [Nested aggregate execution](../../tools/nuisc/tests/native_application_bridge/aggregate_execution.rs)
+uses six native binaries for 144 callback cases and 576 inner helper calls, with
+2/3/7 slots, reversed capture/declaration order, wrapping updates, signed-zero/NaN
+bits and real allocator/drop balance, including early returns. Entry probes verify
+that the previous temporary has already been released before the next inner call.
+[Aggregate admission](../../tools/nuisc/tests/native_application_bridge/aggregate_admission.rs)
+rejects malformed layouts, result/parameter/return-field drift, hidden effects,
+foreign captures and recursive calls, while shared unit tests exercise slot bounds.
+[Guard execution](../../tools/nuisc/tests/native_application_bridge/aggregate_guards.rs)
+proves that an early return skips a later excessive-loop preflight, while actually
+entering that loop traps without publishing callback state.
+
+The [division/remainder tests](../../tools/nuisc/tests/native_application_bridge/division_execution.rs)
+compare 1840 callbacks across eight native binaries with reference execution and
+an independent i128 oracle. Inputs cover signed extremes, signs, zero, scalar and
+flat aggregate returns, unused results and unused arguments. Twenty invalid
+dynamic cases and four invalid literal cases trap; four unselected literal cases
+return safely. Flushed leaf-entry probes prove actual evaluation order, including
+failing prefix work before an unselected branch. Every process run is bounded.
+[Admission tests](../../tools/nuisc/tests/native_application_bridge/division_admission.rs)
+reject either/both operand kind drift, malformed arity, non-i64 typed opcodes and
+unoutlined fallible aggregate return branches. The
+[division fixture](../../tools/nuisc/tests/native_application_bridge/division_loops.ns)
+adds six typed lifecycle native/reference runs with multi-state loop exits and
+reordered declarations; it also passes the real build/cache/standalone workflow.
+
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
 compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
 and invokes the real packer for normal and reversed YIR
@@ -330,7 +508,9 @@ open failure, Drop, descriptor drift, argument validation and fuel rejection.
 These test doubles are policy evidence, not additional lowering proofs.
 
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
-the real five-scalar scoped-loop fixture with two registrations, runs typed events and close,
+the five-scalar multi-carry, guarded-break, multi-state branch and checked-division
+fixtures with two registrations,
+runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
 and switches registrations through a shared cache/output directory. It removes
 the original output, verifies the standalone compiled artifact, materializes it
@@ -352,9 +532,12 @@ Linux/Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Extend multi-i64 scoped carry returns and guarded break within the selected native profile,
-keeping admission explicit and retaining the frontdoor/relocation regressions.
-Native scheduling limits, loops, Buffer callbacks, resource
+Normalize fallible flat-i64 aggregate branch returns without speculating branch
+expressions or call arguments, retaining exact layout/kind checks and real
+zero/overflow execution evidence. Keep checked division/remainder, flat-helper
+and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
+is a separate optimization boundary.
+Whole-callback native scheduling limits, general loops, Buffer callbacks, resource
 state, provider dispatch and ordinary image-host selection still need separate
 implementation and evidence. The bridge alone does not impose call order; the
 shared application session host does. Existing embedded-YIR image and guarded-loop

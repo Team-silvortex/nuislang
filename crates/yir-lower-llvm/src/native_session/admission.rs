@@ -61,7 +61,9 @@ pub(super) fn select(
         }
         let mut callees = BTreeSet::new();
         for node in &function.body_nodes {
-            if let Some(callee) = calls::target(admission.nodes[node.as_str()], &functions)? {
+            if let Some(callee) =
+                calls::target(admission.nodes[node.as_str()], &functions, &admission.nodes)?
+            {
                 callees.insert(callee.name.clone());
                 if !selected_functions.contains_key(callee.name.as_str()) {
                     pending.insert(callee.name.as_str());
@@ -143,9 +145,10 @@ pub(super) fn select(
     Ok((selected, callbacks, state_layout))
 }
 
-// Calls are admitted only through the bounded, acyclic scalar helper closure.
-// Counted loops need a termination proof; scoped actions require a scalar helper
+// Calls are admitted only through the bounded, acyclic helper closure.
+// Counted loops need a termination proof; scoped actions require a checked helper
 // in that same closure, not arbitrary effects hidden inside loop metadata.
+// Flat i64 carry returns use checked scoped/ordinary edges, not general owned inputs.
 pub(super) fn admitted(instruction: &str) -> bool {
     matches!(
         instruction,
@@ -175,6 +178,7 @@ pub(super) fn admitted(instruction: &str) -> bool {
             | "call_i64"
             | "call_f32"
             | "call_f64"
+            | "call_owned_struct"
             | "loop_while_i64"
             | "loop_while_i64_chain"
             | "loop_while_scalar_chain"
@@ -182,6 +186,8 @@ pub(super) fn admitted(instruction: &str) -> bool {
             | "add"
             | "sub"
             | "mul"
+            | "div"
+            | "rem"
             | "add_i32"
             | "sub_i32"
             | "mul_i32"
