@@ -99,6 +99,12 @@ mod tests {
                     let carries = parse(&node).unwrap().unwrap().carries.unwrap();
                     assert_eq!(carries.seeds.len(), count);
                     assert_eq!(carries.break_on_return, action.ends_with("_break"));
+                    let mut renamed = node.clone();
+                    renamed.op.args[9] = renamed.op.args[9].replace("carry0:", "value:");
+                    assert!(
+                        parse(&renamed).is_err(),
+                        "ordinary field names cannot redefine a scoped carry"
+                    );
                 } else {
                     assert!(parse(&node)
                         .err()

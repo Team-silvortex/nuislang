@@ -7,7 +7,10 @@ pub(crate) fn execute_cpu_scalar_node(
     state: &ExecutionState,
 ) -> Result<Option<Value>, String> {
     let value = match node.op.instruction.as_str() {
-        "neg" => Ok(Value::Int(-state.expect_int(&node.op.args[0])?)),
+        // Match unflagged LLVM integer arithmetic in every host build profile.
+        "neg" => Ok(Value::Int(
+            state.expect_int(&node.op.args[0])?.wrapping_neg(),
+        )),
         "not" => match state.expect_value(&node.op.args[0])? {
             Value::Bool(value) => Ok(Value::Bool(!value)),
             _ => Ok(Value::Int(!state.expect_int(&node.op.args[0])?)),
@@ -17,7 +20,7 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int(lhs + rhs))
+                Ok(Value::Int(lhs.wrapping_add(rhs)))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
@@ -30,7 +33,9 @@ pub(crate) fn execute_cpu_scalar_node(
             }
         }
         "add_i32" => Ok(Value::I32(
-            state.expect_i32(&node.op.args[0])? + state.expect_i32(&node.op.args[1])?,
+            state
+                .expect_i32(&node.op.args[0])?
+                .wrapping_add(state.expect_i32(&node.op.args[1])?),
         )),
         "add_f32" => Ok(Value::F32(
             state.expect_f32(&node.op.args[0])? + state.expect_f32(&node.op.args[1])?,
@@ -43,7 +48,7 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int(lhs - rhs))
+                Ok(Value::Int(lhs.wrapping_sub(rhs)))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
@@ -56,7 +61,9 @@ pub(crate) fn execute_cpu_scalar_node(
             }
         }
         "sub_i32" => Ok(Value::I32(
-            state.expect_i32(&node.op.args[0])? - state.expect_i32(&node.op.args[1])?,
+            state
+                .expect_i32(&node.op.args[0])?
+                .wrapping_sub(state.expect_i32(&node.op.args[1])?),
         )),
         "sub_f32" => Ok(Value::F32(
             state.expect_f32(&node.op.args[0])? - state.expect_f32(&node.op.args[1])?,
@@ -69,7 +76,7 @@ pub(crate) fn execute_cpu_scalar_node(
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
-                Ok(Value::Int(lhs * rhs))
+                Ok(Value::Int(lhs.wrapping_mul(rhs)))
             } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_f32(&node.op.args[0]),
                 state.expect_f32(&node.op.args[1]),
@@ -82,7 +89,9 @@ pub(crate) fn execute_cpu_scalar_node(
             }
         }
         "mul_i32" => Ok(Value::I32(
-            state.expect_i32(&node.op.args[0])? * state.expect_i32(&node.op.args[1])?,
+            state
+                .expect_i32(&node.op.args[0])?
+                .wrapping_mul(state.expect_i32(&node.op.args[1])?),
         )),
         "mul_f32" => Ok(Value::F32(
             state.expect_f32(&node.op.args[0])? * state.expect_f32(&node.op.args[1])?,

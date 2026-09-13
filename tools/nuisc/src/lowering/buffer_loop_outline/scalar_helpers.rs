@@ -4,11 +4,27 @@ pub(super) struct ScalarHelper {
     params: Vec<NirTypeRef>,
     result: NirTypeRef,
     dependencies: BTreeSet<String>,
+    pub(super) may_loop: bool,
 }
 
 pub(super) type ScalarHelpers = BTreeMap<String, ScalarHelper>;
 
 pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
+    collect_profile(module, &control_values::FlatLayouts::new(), false)
+}
+
+pub(super) fn collect_with_layouts(
+    module: &NirModule,
+    layouts: &control_values::FlatLayouts,
+) -> ScalarHelpers {
+    collect_profile(module, layouts, true)
+}
+
+fn collect_profile(
+    module: &NirModule,
+    layouts: &control_values::FlatLayouts,
+    allow_loops: bool,
+) -> ScalarHelpers {
     let mut candidates = module
         .functions
         .iter()
@@ -16,8 +32,14 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
             !function.is_async
                 && function.generic_params.is_empty()
                 && function.where_bounds.is_empty()
-                && function.params.iter().all(|param| is_scalar(&param.ty))
-                && function.return_type.as_ref().is_some_and(is_scalar)
+                && function
+                    .params
+                    .iter()
+                    .all(|param| control_values::supported_type(&param.ty, layouts))
+                && function
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|ty| control_values::supported_type(ty, layouts))
         })
         .map(|function| {
             (
@@ -30,6 +52,7 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
                         .collect(),
                     result: function.return_type.clone().expect("scalar return"),
                     dependencies: BTreeSet::new(),
+                    may_loop: control_loops::contains_loop(&function.body),
                 },
             )
         })
@@ -38,7 +61,7 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
         .functions
         .iter()
         .filter(|function| candidates.contains_key(&function.name))
-        .filter(|function| validate_body(function, &candidates).is_some())
+        .filter(|function| validate_body(function, &candidates, layouts, allow_loops).is_some())
         .map(|function| {
             let mut dependencies = BTreeSet::new();
             collect_calls(&function.body, &mut dependencies);
@@ -73,10 +96,12 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
     }
     let mut admitted = ScalarHelpers::new();
     while let Some(name) = ready.pop_first() {
-        admitted.insert(
-            name.clone(),
-            candidates.remove(&name).expect("ready helper"),
-        );
+        let mut helper = candidates.remove(&name).expect("ready helper");
+        helper.may_loop |= helper
+            .dependencies
+            .iter()
+            .any(|name| admitted[name].may_loop);
+        admitted.insert(name.clone(), helper);
         for caller in callers.get(&name).into_iter().flatten() {
             let count = remaining.get_mut(caller).expect("known caller");
             *count -= 1;
@@ -88,11 +113,12 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
     admitted
 }
 
-fn is_scalar(ty: &NirTypeRef) -> bool {
-    ty == &scalar_type("i64") || ty == &scalar_type("bool")
-}
-
-fn validate_body(function: &NirFunction, catalog: &ScalarHelpers) -> Option<()> {
+fn validate_body(
+    function: &NirFunction,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
+    allow_loops: bool,
+) -> Option<()> {
     let mut locals = function
         .params
         .iter()
@@ -101,8 +127,11 @@ fn validate_body(function: &NirFunction, catalog: &ScalarHelpers) -> Option<()> 
     validate_block(
         &function.body,
         &mut locals,
+        &mut BTreeSet::new(),
         function.return_type.as_ref()?,
         catalog,
+        layouts,
+        allow_loops,
     )?
     .then_some(())
 }
@@ -111,11 +140,13 @@ fn validate_body(function: &NirFunction, catalog: &ScalarHelpers) -> Option<()> 
 fn validate_block(
     body: &[NirStmt],
     locals: &mut Scope,
+    loop_bindings: &mut BTreeSet<String>,
     result: &NirTypeRef,
     catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
+    allow_loops: bool,
 ) -> Option<bool> {
     let mut returned = false;
-    let mut inputs = BTreeSet::new();
     for stmt in body {
         if returned {
             return None;
@@ -130,28 +161,45 @@ fn validate_block(
                 if locals.contains_key(name) {
                     return None;
                 }
-                let inferred = scalar_expr(value, locals, &mut inputs, false, catalog)?;
+                let inferred = control_values::value_type(value, locals, catalog, layouts)?;
                 if declared.is_some_and(|ty| ty != &inferred) {
                     return None;
                 }
                 locals.insert(name.clone(), inferred);
+                if matches!(stmt, NirStmt::Let { .. }) {
+                    loop_bindings.insert(name.clone());
+                }
             }
             NirStmt::If {
                 condition,
                 then_body,
                 else_body,
             } => {
-                if scalar_expr(condition, locals, &mut inputs, false, catalog)?
+                if control_values::value_type(condition, locals, catalog, layouts)?
                     != scalar_type("bool")
                 {
                     return None;
                 }
-                let then_returns = validate_block(then_body, &mut locals.clone(), result, catalog)?;
-                let else_returns = validate_block(else_body, &mut locals.clone(), result, catalog)?;
+                let validate_arm = |body: &[NirStmt]| {
+                    validate_block(
+                        body,
+                        &mut locals.clone(),
+                        &mut loop_bindings.clone(),
+                        result,
+                        catalog,
+                        layouts,
+                        allow_loops,
+                    )
+                };
+                let then_returns = validate_arm(then_body)?;
+                let else_returns = validate_arm(else_body)?;
                 returned = then_returns && else_returns;
             }
+            NirStmt::While { condition, body } if allow_loops => {
+                control_loops::validate(condition, body, locals, loop_bindings)?;
+            }
             NirStmt::Return(Some(value)) => {
-                if &scalar_expr(value, locals, &mut inputs, false, catalog)? != result {
+                if &control_values::value_type(value, locals, catalog, layouts)? != result {
                     return None;
                 }
                 returned = true;
@@ -176,6 +224,25 @@ pub(super) fn call_type(
     }
     for (arg, expected) in args.iter().zip(&helper.params) {
         if &scalar_expr(arg, scope, inputs, reads, catalog)? != expected {
+            return None;
+        }
+    }
+    Some(helper.result.clone())
+}
+
+pub(super) fn value_call_type(
+    callee: &str,
+    args: &[NirExpr],
+    scope: &Scope,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
+) -> Option<NirTypeRef> {
+    let helper = catalog.get(callee)?;
+    if args.len() != helper.params.len() {
+        return None;
+    }
+    for (arg, expected) in args.iter().zip(&helper.params) {
+        if &control_values::value_type(arg, scope, catalog, layouts)? != expected {
             return None;
         }
     }
@@ -235,6 +302,12 @@ fn collect_expr_calls(expr: &NirExpr, calls: &mut BTreeSet<String>) {
             collect_expr_calls(lhs, calls);
             collect_expr_calls(rhs, calls);
         }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                collect_expr_calls(value, calls);
+            }
+        }
+        NirExpr::FieldAccess { base, .. } => collect_expr_calls(base, calls),
         NirExpr::LoadAt { index, .. } => collect_expr_calls(index, calls),
         NirExpr::StoreAt { index, value, .. } => {
             collect_expr_calls(index, calls);
@@ -465,6 +538,7 @@ mod tests {
             &mut helpers,
             &mut guarded,
             &catalog,
+            &control_values::FlatLayouts::new(),
         );
         assert_eq!(helpers.len(), 64 * 3);
         assert_eq!(guarded.len(), 64 * 2);

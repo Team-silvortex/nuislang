@@ -12,6 +12,12 @@ const BRANCH_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/branch_loops.ns");
 const DIVISION_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/division_loops.ns");
+const AGGREGATE_DIVISION_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_division_loops.ns");
+const AGGREGATE_COUNTED_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_counted_loops.ns");
+const AGGREGATE_CARRIED_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_carried_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -125,6 +131,21 @@ fn native_checked_division_build_cache_and_standalone_relocation() {
     check_workflow(DIVISION_SOURCE);
 }
 
+#[test]
+fn native_fallible_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_DIVISION_SOURCE);
+}
+
+#[test]
+fn native_guarded_counted_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_COUNTED_SOURCE);
+}
+
+#[test]
+fn native_guarded_carried_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_CARRIED_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -158,10 +179,33 @@ fn check_workflow(source: &str) {
         assert!(llvm.contains("loop_break_control_invalid"));
     }
     assert!(llvm.contains("native_loop_preflight"));
-    if source == DIVISION_SOURCE {
+    if [
+        DIVISION_SOURCE,
+        AGGREGATE_DIVISION_SOURCE,
+        AGGREGATE_COUNTED_SOURCE,
+        AGGREGATE_CARRIED_SOURCE,
+    ]
+    .contains(&source)
+    {
         assert!(llvm.contains("sdiv i64"));
         assert!(llvm.contains("srem i64"));
         assert!(llvm.contains("integer_divisor_invalid"));
+    }
+    if [
+        AGGREGATE_DIVISION_SOURCE,
+        AGGREGATE_COUNTED_SOURCE,
+        AGGREGATE_CARRIED_SOURCE,
+    ]
+    .contains(&source)
+    {
+        assert!(llvm.contains("@nuis_fn_decompose("));
+        assert!(llvm.contains("@nuis_fn___nuis_scalar_branch_"));
+    }
+    if [AGGREGATE_COUNTED_SOURCE, AGGREGATE_CARRIED_SOURCE].contains(&source) {
+        assert!(llvm.contains("@nuis_fn_rebalance("));
+    }
+    if source == AGGREGATE_CARRIED_SOURCE {
+        assert!(llvm.contains("loop_while_scalar_chain_body"));
     }
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");

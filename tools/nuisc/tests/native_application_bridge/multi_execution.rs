@@ -79,7 +79,7 @@ pub(super) fn source(slots: usize, compare: &str) -> String {
 
 // The wrappers delegate to the real allocator/drop functions. Counting actual
 // calls tests lifecycle balance without substituting a fake aggregate runtime.
-const ALLOCATION_PROBE: &str = "
+pub(super) const ALLOCATION_PROBE: &str = "
 declare i32 @fflush(ptr)
 @probe_allocs = internal global i64 0
 @probe_drops = internal global i64 0

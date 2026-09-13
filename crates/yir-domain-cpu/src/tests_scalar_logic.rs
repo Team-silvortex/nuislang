@@ -101,6 +101,68 @@ fn invalid_integer_divisors_report_errors_without_panicking() {
 }
 
 #[test]
+fn scalar_integer_arithmetic_wraps_independently_of_host_build_profile() {
+    for (instruction, lhs, rhs, expected) in [
+        ("cpu.add", i64::MAX, 1, i64::MIN),
+        ("cpu.add", i64::MIN, -1, i64::MAX),
+        ("cpu.sub", i64::MIN, 1, i64::MAX),
+        ("cpu.sub", i64::MAX, -1, i64::MIN),
+        ("cpu.mul", i64::MIN, -1, i64::MIN),
+        ("cpu.mul", i64::MAX, 2, -2),
+        ("cpu.mul", i64::MIN, 2, 0),
+    ] {
+        let mut state = ExecutionState::default();
+        state.bind_value("lhs", Value::Int(lhs));
+        state.bind_value("rhs", Value::Int(rhs));
+        assert_eq!(
+            CpuMod
+                .execute(
+                    &node("wrap", instruction, &["lhs", "rhs"]),
+                    &resource(),
+                    &mut state
+                )
+                .unwrap(),
+            Value::Int(expected)
+        );
+    }
+    for (instruction, lhs, rhs, expected) in [
+        ("cpu.add_i32", i32::MAX, 1, i32::MIN),
+        ("cpu.add_i32", i32::MIN, -1, i32::MAX),
+        ("cpu.sub_i32", i32::MIN, 1, i32::MAX),
+        ("cpu.sub_i32", i32::MAX, -1, i32::MIN),
+        ("cpu.mul_i32", i32::MIN, -1, i32::MIN),
+        ("cpu.mul_i32", i32::MAX, 2, -2),
+        ("cpu.mul_i32", i32::MIN, 2, 0),
+    ] {
+        let mut state = ExecutionState::default();
+        state.bind_value("lhs", Value::I32(lhs));
+        state.bind_value("rhs", Value::I32(rhs));
+        assert_eq!(
+            CpuMod
+                .execute(
+                    &node("wrap", instruction, &["lhs", "rhs"]),
+                    &resource(),
+                    &mut state
+                )
+                .unwrap(),
+            Value::I32(expected)
+        );
+    }
+    let mut state = ExecutionState::default();
+    state.bind_value("minimum", Value::Int(i64::MIN));
+    assert_eq!(
+        CpuMod
+            .execute(
+                &node("negated", "cpu.neg", &["minimum"]),
+                &resource(),
+                &mut state
+            )
+            .unwrap(),
+        Value::Int(i64::MIN)
+    );
+}
+
+#[test]
 fn generic_comparisons_feed_logical_operations_as_bool_values() {
     let mut state = ExecutionState::default();
     state.bind_value("low", Value::Int(2));

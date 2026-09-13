@@ -308,7 +308,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("normalize fallible flat-i64 aggregate branch returns"));
+        .starts_with("extend conditional carry updates inside guarded flat-value helpers"));
     assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
         .evidence
@@ -355,7 +355,27 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("40 cases, including nested-loop scope"));
     assert!(session
         .blocker
-        .contains("Unoutlined fallible aggregate branch returns still reject"));
+        .contains("Conditional carry updates inside flat-value branch helpers still reject"));
+    assert!(session.evidence.contains("2090 accepted/skipped callbacks"));
+    assert!(session.evidence.contains("26 real process traps"));
+    assert!(session.evidence.contains("2849 accepted/skipped callbacks"));
+    assert!(session.evidence.contains("27 real process traps"));
+    assert!(session
+        .evidence
+        .contains("existing chained-loop preparation"));
+    assert!(session
+        .evidence
+        .contains("Rust debug overflow in the reference CPU scalar path"));
+    assert!(session
+        .evidence
+        .contains("loop presence from callees to callers"));
+    assert!(session.evidence.contains("3220 callbacks"));
+    assert!(session
+        .evidence
+        .contains("32 dynamic and four literal invalid cases"));
+    assert!(session
+        .evidence
+        .contains("Ordinary return fields now retain declared names"));
     assert!(session.evidence.contains("1840 callbacks"));
     assert!(session
         .evidence

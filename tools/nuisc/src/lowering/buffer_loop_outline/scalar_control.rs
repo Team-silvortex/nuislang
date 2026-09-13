@@ -8,9 +8,11 @@ pub(super) fn outline(
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
     catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
 ) {
     for function in &mut module.functions {
         if !retained.contains(&function.name)
+            || !catalog.contains_key(&function.name)
             || !function
                 .body
                 .iter()
@@ -30,6 +32,7 @@ pub(super) fn outline(
             helpers,
             guarded,
             catalog,
+            layouts,
             bindings,
             result: function
                 .return_type
@@ -45,6 +48,7 @@ struct Builder<'a> {
     helpers: &'a mut Vec<NirFunction>,
     guarded: &'a mut BTreeSet<String>,
     catalog: &'a ScalarHelpers,
+    layouts: &'a control_values::FlatLayouts,
     bindings: BTreeSet<String>,
     result: NirTypeRef,
 }
@@ -70,7 +74,7 @@ impl Builder<'_> {
                     ref value,
                     ..
                 } => {
-                    let ty = scalar_expr(value, &scope, &mut BTreeSet::new(), false, self.catalog)
+                    let ty = control_values::value_type(value, &scope, self.catalog, self.layouts)
                         .expect("admitted scalar binding");
                     scope.insert(name.clone(), ty);
                     output.push(stmt);
@@ -79,6 +83,9 @@ impl Builder<'_> {
                     output.push(stmt);
                     return output;
                 }
+                // Preserve the loop as a control boundary. Its admitted update
+                // changes existing i64 bindings, not the lexical type scope.
+                NirStmt::While { .. } => output.push(stmt),
                 NirStmt::If {
                     condition,
                     then_body,
@@ -102,11 +109,7 @@ impl Builder<'_> {
                     scope.insert(predicate.clone(), scalar_type("bool"));
                     let mut values = Vec::new();
                     for (selected, arm) in [(true, then_body), (false, else_body)] {
-                        let default = if self.result == scalar_type("bool") {
-                            NirExpr::Bool(false)
-                        } else {
-                            NirExpr::Int(0)
-                        };
+                        let default = control_values::zero_value(&self.result, self.layouts);
                         let mut body = vec![NirStmt::If {
                             condition: NirExpr::Binary {
                                 op: NirBinaryOp::Ne,
@@ -185,6 +188,10 @@ fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {
                 collect_inputs(then_body, inputs);
                 collect_inputs(else_body, inputs);
             }
+            NirStmt::While { condition, body } => {
+                collect_expr_inputs(condition, inputs);
+                collect_inputs(body, inputs);
+            }
             _ => unreachable!("normalized scalar body"),
         }
     }
@@ -204,6 +211,12 @@ fn collect_expr_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
                 collect_expr_inputs(arg, inputs);
             }
         }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                collect_expr_inputs(value, inputs);
+            }
+        }
+        NirExpr::FieldAccess { base, .. } => collect_expr_inputs(base, inputs),
         NirExpr::Int(_) | NirExpr::Bool(_) => {}
         _ => unreachable!("normalized scalar expression"),
     }

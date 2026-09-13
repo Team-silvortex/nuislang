@@ -1,0 +1,95 @@
+mod cpu Main {
+  struct Metrics { total: i64, tag: i32, active: bool, gain: f32, scale: f64 }
+  struct State { frame: i64, metrics: Metrics }
+  struct Parts { quotient: i64, remainder: i64 }
+
+  @noinline
+  fn quotient(value: i64, width: i64) -> i64 { return value / width; }
+  @noinline
+  fn remainder(value: i64, width: i64) -> i64 { return value % width; }
+  @noinline
+  fn sum(left: i64, right: i64) -> i64 {
+    let value: i64 = left + right;
+    return quotient(value, 3) * 3 + remainder(value, 3);
+  }
+  @noinline
+  fn counted(value: i64, initial: i64, limit: i64, stop: i64) -> i64 {
+    let index: i64 = initial;
+    let total: i64 = value;
+    let checksum: i64 = 0;
+    while index < limit {
+      let total: i64 = sum(total, index);
+      let checksum: i64 = sum(checksum, total);
+      if index == stop {
+        let total: i64 = total + 10;
+        let checksum: i64 = checksum + total;
+        break;
+      }
+      if index < stop {
+        let total: i64 = total + 2;
+        let checksum: i64 = checksum + total;
+        let index: i64 = index + 1;
+        continue;
+      }
+      let total: i64 = total + 100;
+      let checksum: i64 = checksum + total;
+      let index: i64 = index + 1;
+    }
+    return total + checksum + index;
+  }
+  @noinline
+  fn decompose(value: i64, width: i64) -> Parts {
+    if value < 0 {
+      return Parts { quotient: quotient(value, width), remainder: remainder(value, width) };
+    }
+    return Parts { quotient: quotient(value, width), remainder: remainder(value, width) };
+  }
+  @noinline
+  fn adjust(value: i64, delta: i64) -> i64 {
+    if delta == 0 { return value; }
+    let result: i64 = counted(value, delta, delta + 4, delta + 1);
+    let corrected: i64 = result - value * 4 - delta * 8 - 32;
+    let parts: Parts = decompose(corrected, 3);
+    return parts.quotient * 3 + parts.remainder;
+  }
+  @noinline
+  fn zero(limit: i64) -> i64 {
+    let index: i64 = 0;
+    while index < limit {
+      if index == 2 { break; }
+      let index: i64 = index + 1;
+    }
+    return index - 2;
+  }
+  @noinline
+  fn keep_tag(value: i32) -> i32 { return value; }
+  @noinline
+  fn keep_flag(value: bool) -> bool { return value; }
+  @noinline
+  fn keep_gain(value: f32) -> f32 { return value; }
+  @noinline
+  fn keep_scale(value: f64) -> f64 { return value; }
+
+  fn start(seed: i64, tag: i32, active: bool, gain: f32, scale: f64) -> State {
+    return State { frame: zero(4), metrics: Metrics {
+      total: adjust(seed, 0), tag: keep_tag(tag), active: keep_flag(active),
+      gain: keep_gain(gain), scale: keep_scale(scale)
+    } };
+  }
+  fn step(state: State, delta: i64, paused: bool) -> State {
+    if keep_flag(paused) { return state; }
+    return State { frame: sum(state.frame, 1), metrics: Metrics {
+      total: adjust(state.metrics.total, delta), tag: keep_tag(state.metrics.tag),
+      active: keep_flag(state.metrics.active), gain: keep_gain(state.metrics.gain),
+      scale: keep_scale(state.metrics.scale)
+    } };
+  }
+  fn stop(state: State, reason: i64) -> State {
+    return State { frame: state.frame, metrics: Metrics {
+      total: adjust(state.metrics.total, reason), tag: keep_tag(state.metrics.tag),
+      active: keep_flag(false), gain: keep_gain(state.metrics.gain),
+      scale: keep_scale(state.metrics.scale)
+    } };
+  }
+  fn main() -> i64 { print(999); return 0; }
+}

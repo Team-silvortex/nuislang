@@ -58,10 +58,10 @@ pub(super) fn source(op: &str, shape: Shape) -> String {
 }
 
 #[derive(Clone, Copy)]
-struct Case {
-    enabled: bool,
-    left: i64,
-    right: i64,
+pub(super) struct Case {
+    pub enabled: bool,
+    pub left: i64,
+    pub right: i64,
 }
 
 fn expected(op: &str, shape: Shape, case: Case) -> Result<(i64, bool), &'static str> {
@@ -104,6 +104,10 @@ fn execute_variant(op: &str, shape: Shape, cases: &[Case], trap: bool, literal: 
             &format!("return {left} {op} {right};"),
         );
     }
+    execute_source(op, shape, cases, trap, &source);
+}
+
+pub(super) fn execute_source(op: &str, shape: Shape, cases: &[Case], trap: bool, source: &str) {
     let project = Project::with_source(&source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     compiled.yir.nodes.reverse();
@@ -116,16 +120,27 @@ fn execute_variant(op: &str, shape: Shape, cases: &[Case], trap: bool, literal: 
     assert!(bridge
         .llvm_ir
         .contains(if op == "/" { "sdiv i64" } else { "srem i64" }));
-    let mut llvm = bridge.llvm_ir.replacen(
-        "define i64 @nuis_yir_entry()",
-        "define i64 @unused_native_entry()",
-        1,
-    );
+    let mut llvm = bridge
+        .llvm_ir
+        .replacen(
+            "define i64 @nuis_yir_entry()",
+            "define i64 @unused_native_entry()",
+            1,
+        )
+        .replace(
+            "call ptr @nuis_scheduler_owned_aggregate_alloc_v1(",
+            "call ptr @probe_alloc(",
+        )
+        .replace(
+            "call void @nuis_scheduler_owned_aggregate_drop_v1(",
+            "call void @probe_drop(",
+        );
     let start = llvm.find("define i64 @nuis_fn_leaf(").unwrap();
     let insert = start + llvm[start..].find("{\n").unwrap() + 2;
     // Flush real helper-entry evidence before a possible process trap.
-    llvm.insert_str(insert, "  call void @nuis_debug_print_i64(i64 93)\n  call void @nuis_debug_print_i64(i64 %arg0)\n  call void @nuis_debug_print_i64(i64 %arg1)\n  %flushed = call i32 @fflush(ptr null)\n");
-    llvm.push_str("\ndeclare i32 @fflush(ptr)\ndefine i64 @nuis_yir_entry() {\n  %args = alloca [4 x i64], align 8\n  %out = alloca [2 x i64], align 8\n");
+    llvm.insert_str(insert, "  %allocated = load i64, ptr @probe_allocs\n  %dropped = load i64, ptr @probe_drops\n  %live = sub i64 %allocated, %dropped\n  call void @nuis_debug_print_i64(i64 %live)\n  call void @nuis_debug_print_i64(i64 93)\n  call void @nuis_debug_print_i64(i64 %arg0)\n  call void @nuis_debug_print_i64(i64 %arg1)\n  %flushed = call i32 @fflush(ptr null)\n");
+    llvm.push_str(multi_execution::ALLOCATION_PROBE);
+    llvm.push_str("\ndefine i64 @nuis_yir_entry() {\n  %args = alloca [4 x i64], align 8\n  %out = alloca [2 x i64], align 8\n");
     let registry = yir_verify::default_registry();
     let mut oracle = Vec::new();
     for (index, case) in cases.iter().copied().enumerate() {
@@ -151,9 +166,9 @@ fn execute_variant(op: &str, shape: Shape, cases: &[Case], trap: bool, literal: 
                 });
                 assert_eq!(state_words(session.state()), [value as u64, 41]);
                 if entered {
-                    oracle.extend([93, case.left, case.right]);
+                    oracle.extend([0, 93, case.left, case.right]);
                 }
-                oracle.extend([0, value, 41]);
+                oracle.extend([0, value, 41, 0, 1]);
             }
             Err(wanted) => {
                 assert!(trap);
@@ -161,7 +176,7 @@ fn execute_variant(op: &str, shape: Shape, cases: &[Case], trap: bool, literal: 
                     .err()
                     .expect("reference must reject invalid arithmetic");
                 assert!(error.contains(wanted), "{error}");
-                oracle.extend([93, case.left, case.right]);
+                oracle.extend([0, 93, case.left, case.right]);
             }
         }
         for (slot, word) in [i64::from(case.enabled), case.left, case.right, 41]
@@ -174,7 +189,7 @@ fn execute_variant(op: &str, shape: Shape, cases: &[Case], trap: bool, literal: 
         for slot in 0..2 {
             llvm.push_str(&format!("  %o{index}_{slot} = getelementptr i64, ptr %out, i64 {slot}\n  %v{index}_{slot} = load i64, ptr %o{index}_{slot}, align 8\n  call void @nuis_debug_print_i64(i64 %v{index}_{slot})\n"));
         }
-        llvm.push_str(&format!("  %flush{index} = call i32 @fflush(ptr null)\n"));
+        llvm.push_str(&format!("  %allocs{index} = load i64, ptr @probe_allocs\n  %drops{index} = load i64, ptr @probe_drops\n  %live{index} = sub i64 %allocs{index}, %drops{index}\n  call void @nuis_debug_print_i64(i64 %live{index})\n  %positive{index} = icmp ugt i64 %allocs{index}, 0\n  %observed{index} = zext i1 %positive{index} to i64\n  call void @nuis_debug_print_i64(i64 %observed{index})\n  %flush{index} = call i32 @fflush(ptr null)\n"));
     }
     llvm.push_str("  ret i64 0\n}\n");
     let artifact = nuisc::aot::write_and_link_with_source(

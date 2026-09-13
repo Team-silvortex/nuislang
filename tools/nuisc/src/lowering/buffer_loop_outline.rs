@@ -7,6 +7,10 @@ type Scope = BTreeMap<String, NirTypeRef>;
 mod branches;
 #[path = "buffer_loop_outline/control_flow.rs"]
 mod control_flow;
+#[path = "buffer_loop_outline/control_loops.rs"]
+mod control_loops;
+#[path = "buffer_loop_outline/control_values.rs"]
+mod control_values;
 #[path = "buffer_loop_outline/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]
@@ -45,6 +49,8 @@ pub(super) struct BufferLoopOutlines {
 // supplies induction/carry values, validated break control and borrowed-buffer lifetimes.
 pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopOutlines, String> {
     let catalog = scalar_helpers::collect(module);
+    let layouts = control_values::layouts(module);
+    let control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
     let mut names = module
         .functions
         .iter()
@@ -67,9 +73,16 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let mut outlined = BufferLoopOutlines::default();
     let checked_arithmetic = speculation::collect_checked_arithmetic(module);
     for function in &module.functions {
-        if catalog.contains_key(&function.name) && checked_arithmetic.contains(&function.name) {
+        if control_catalog
+            .get(&function.name)
+            .is_some_and(|helper| helper.may_loop || checked_arithmetic.contains(&function.name))
+        {
             outlined.functions.insert(function.name.clone());
-            scalar_helpers::retain_reachable(&function.body, &catalog, &mut outlined.functions);
+            scalar_helpers::retain_reachable(
+                &function.body,
+                &control_catalog,
+                &mut outlined.functions,
+            );
         }
     }
     for function in &mut module.functions {
@@ -96,7 +109,8 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut names,
         &mut helpers,
         &mut outlined.guarded_functions,
-        &catalog,
+        &control_catalog,
+        &layouts,
     );
     if !helpers.is_empty() {
         outlined
@@ -291,32 +305,7 @@ fn scalar_expr(
         NirExpr::Binary { op, lhs, rhs } => {
             let lhs = scalar_expr(lhs, scope, inputs, reads, catalog)?;
             let rhs = scalar_expr(rhs, scope, inputs, reads, catalog)?;
-            if lhs != rhs {
-                return None;
-            }
-            match op {
-                NirBinaryOp::Add
-                | NirBinaryOp::Sub
-                | NirBinaryOp::Mul
-                | NirBinaryOp::Div
-                | NirBinaryOp::Rem
-                    if lhs == scalar_type("i64") =>
-                {
-                    Some(lhs)
-                }
-                NirBinaryOp::Lt | NirBinaryOp::Le | NirBinaryOp::Gt | NirBinaryOp::Ge
-                    if lhs == scalar_type("i64") =>
-                {
-                    Some(scalar_type("bool"))
-                }
-                NirBinaryOp::Eq | NirBinaryOp::Ne => Some(scalar_type("bool")),
-                NirBinaryOp::And | NirBinaryOp::Or | NirBinaryOp::Xor
-                    if lhs == scalar_type("bool") =>
-                {
-                    Some(lhs)
-                }
-                _ => None,
-            }
+            control_values::binary_type(*op, lhs, rhs)
         }
         NirExpr::BufferLen(buffer) if reads => {
             buffer_input(buffer, scope, inputs)?;

@@ -22,9 +22,9 @@ pub(crate) fn parse(node: &Node) -> Result<Option<AggregateCall<'_>>, String> {
         ));
     };
     let layout = yir_core::parse_owned_struct_layout(encoded)?;
-    if !flat_i64_carries(&layout) {
+    if !flat_i64_values(&layout) {
         return Err(format!(
-            "native aggregate call `{}` requires a flat i64 carry layout",
+            "native aggregate call `{}` requires a flat i64 value layout",
             node.name
         ));
     }
@@ -35,8 +35,8 @@ pub(crate) fn parse(node: &Node) -> Result<Option<AggregateCall<'_>>, String> {
     }))
 }
 
-// Scoped iterations and ordinary branch helpers share the same bounded, owned
-// flat-value return shape. No resource, nested aggregate or ownership input enters.
+// Ordinary returns keep declared field names. Scoped iterations separately check
+// their carry schema before sharing this bounded, resource-free value contract.
 pub(super) fn result_layout(
     function: &YirFunction,
     nodes: &BTreeMap<&str, &Node>,
@@ -56,23 +56,20 @@ pub(super) fn result_layout(
         return Err(fail());
     }
     let layout = yir_core::parse_owned_struct_layout(&node.op.args[1])?;
-    if layout.type_name != result.ty || !flat_i64_carries(&layout) {
+    if layout.type_name != result.ty || !flat_i64_values(&layout) {
         return Err(fail());
     }
     Ok(layout)
 }
 
-fn flat_i64_carries(layout: &OwnedStructLayout) -> bool {
+fn flat_i64_values(layout: &OwnedStructLayout) -> bool {
+    let mut names = std::collections::BTreeSet::new();
     !layout.fields.is_empty()
         && layout.fields.len() <= super::MAX_SCALAR_SLOTS
-        && layout
-            .fields
-            .iter()
-            .enumerate()
-            .all(|(index, (name, kind))| {
-                name == &format!("carry{index}")
-                    && kind == &OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::I64)
-            })
+        && layout.fields.iter().all(|(name, kind)| {
+            names.insert(name)
+                && kind == &OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::I64)
+        })
 }
 
 #[cfg(test)]
@@ -105,8 +102,6 @@ mod tests {
             assert!(parse(&call(args)).is_err());
         }
         for layout in [
-            "Values{value:i64}",
-            "Values{carry1:i64;carry0:i64}",
             "Values{carry0:i64;carry0:i64}",
             "Values{carry0:bool}",
             "Values{carry0:i32}",
@@ -119,6 +114,17 @@ mod tests {
             assert!(
                 parse(&call(vec!["branch".to_owned(), layout.to_owned()])).is_err(),
                 "{layout}"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_flat_returns_preserve_declared_names_without_a_loop_carry_schema() {
+        for layout in ["Values{value:i64}", "Values{second:i64;first:i64}"] {
+            let node = call(vec!["branch".to_owned(), layout.to_owned()]);
+            assert_eq!(
+                parse(&node).unwrap().unwrap().layout,
+                yir_core::parse_owned_struct_layout(layout).unwrap()
             );
         }
     }

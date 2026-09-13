@@ -63,20 +63,22 @@ fn flat_aggregate_calls_require_exact_call_result_and_parameter_contracts() {
         (0, "missing_helper", "unknown helper"),
         (1, "Wrong{carry0:i64;carry1:i64}", "signature drift"),
         (1, "Carries{carry0:i64}", "signature drift"),
+        (1, "Carries{carry1:i64;carry0:i64}", "signature drift"),
+        (1, "Carries{carry0:i64;carry0:i64}", "flat i64 value layout"),
         (
             1,
             "Carries{carry0:i64;carry1:bool}",
-            "flat i64 carry layout",
+            "flat i64 value layout",
         ),
         (
             1,
             "Carries{carry0:i64;carry1:Nested{x:i64}}",
-            "flat i64 carry layout",
+            "flat i64 value layout",
         ),
         (
             1,
             "Carries{carry0:i64;carry1:Bytes}",
-            "flat i64 carry layout",
+            "flat i64 value layout",
         ),
     ] {
         let mut drift = base.clone();

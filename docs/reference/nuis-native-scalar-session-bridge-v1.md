@@ -77,12 +77,44 @@ guarded branch/continuation outliner. Prefix work keeps source order; an unselec
 branch skips its arithmetic, even when its result is discarded or passed to a
 callee that ignores the argument. Work before the guard still executes.
 
-A flat-i64 aggregate helper may return already available fields before a later
-checked operation. More general fallible aggregate branch returns have not yet
-been normalized: early-return, two-arm and same-callee argument shapes reject
-before select-style shortcuts can speculate them. This is a known source-lowering
-boundary, not full aggregate control-flow support. Other runtime families retain
-their own branch contracts; this analysis is not a whole-language effect proof.
+Acyclic helpers with i64/bool and flat-i64 record values now share this outliner.
+It supports early/two-arm/nested returns, aggregate locals and captures, field
+projections, same-callee arguments and shared fallthrough suffixes. Only existing
+values cross a generated branch boundary; captures are flattened through the
+existing scalar-parameter contract. An unselected private helper returns a typed
+zero record before user arithmetic or callees execute. The final select operates
+on already guarded values, never on deferred branch expressions.
+
+The source value catalog is independent of the narrower Buffer-loop catalog and
+the backend's slot/call-graph bounds. It rejects effects, recursive dependencies,
+general rebinding and unsupported payloads. A shared suffix is outlined once
+rather than copied into every branch. Counted loops now compose inside these
+helpers: one induction update followed by ordered i64 carry updates, with invariant
+i64 literal/variable limit and stride. Every updated name must be a distinct,
+already initialized local `let` of exact i64 type. The existing counted/chained-loop
+parsers and native preflight remain authoritative; this source shape check does
+not prove termination or duplicate backend slot/opcode admission.
+Each carry uses the existing linear add/multiply preparation, reading the stepped
+index or earlier updated carries. Header/stride mutation, forward sibling reads,
+duplicate updates, body calls and fallible update expressions are rejected.
+Fallible seed expressions outside the loop retain ordinary source-order checks.
+Constants, parameter rebinding, conditional carry updates and arbitrary loop bodies
+are not admitted by this automatic normalizer. The narrower Buffer catalog is unchanged.
+
+The acyclic catalog propagates loop presence from callees to callers, retaining
+guarded lowering even without division/remainder. The reached branch performs
+preflight before the first iteration; an unselected branch performs neither.
+Inline arms and shared suffixes preserve the resulting induction and carry values, while
+source-prefix work still runs before a later branch. Carry arithmetic wraps; scalar
+i64/i32 add/subtract/multiply and i64 negation in the reference CPU now explicitly
+wrap too, instead of depending on Rust debug overflow checks. Division/remainder
+remain checked, and induction still requires finite, non-wrapping progress.
+This is not full aggregate
+control flow, a whole-language effect proof or a new runtime loop dispatcher.
+
+An unselected private helper can still allocate its neutral aggregate return.
+Immediate unpack/drop retains lifecycle balance, not zero-cost branching or
+allocation freedom. Trap cleanup remains unpromised.
 
 Native failure terminates the process, not a catchable callback result or fuel
 error. It cannot promise cleanup, rollback or a returned state. The reference
@@ -211,7 +243,9 @@ requires its matching explicit unit step; step-before-break remains unsupported.
 
 Ordinary `cpu.call_owned_struct` and scoped multi-carry calls share one native
 return-layout validator. The helper must return an owned nominal aggregate with
-1..64 ordered `carry0:i64` through `carryN:i64` fields. The call, declared result,
+1..64 uniquely named, ordered i64 fields. Ordinary helpers use their declared field
+names; only scoped multi-carry payloads require `carry0` through `carryN`, checked
+by the separate loop contract. The call, declared result,
 terminal return and any explicit guarded-return layout must agree. Actual return
 leaves and all scalar input values retain exact types; there is no implicit
 bool/i32/float conversion, resource input or nested aggregate admission.
@@ -489,11 +523,63 @@ dynamic cases and four invalid literal cases trap; four unselected literal cases
 return safely. Flushed leaf-entry probes prove actual evaluation order, including
 failing prefix work before an unselected branch. Every process run is bounded.
 [Admission tests](../../tools/nuisc/tests/native_application_bridge/division_admission.rs)
-reject either/both operand kind drift, malformed arity, non-i64 typed opcodes and
-unoutlined fallible aggregate return branches. The
+reject either/both operand kind drift, malformed arity and non-i64 typed opcodes,
+and admit guarded flat-value branches without speculating their arguments. The
 [division fixture](../../tools/nuisc/tests/native_application_bridge/division_loops.ns)
 adds six typed lifecycle native/reference runs with multi-state loop exits and
 reordered declarations; it also passes the real build/cache/standalone workflow.
+
+The [aggregate arithmetic regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_division.rs)
+add 3220 callbacks across fourteen native binaries, with the same reference and
+independent i128 oracles. They cover early/two-arm/nested branches, record captures,
+shared suffixes, unused results/arguments and registered State fields whose names
+are not loop carry names. Thirty-two dynamic and four literal invalid cases trap;
+four unselected literal cases return safely. The probes delegate to the real
+allocator/drop functions, require balanced release after each accepted callback
+and before leaf entry, and verify that allocations really occurred. They do not
+promise cleanup after a trap. The former counted-loop rejection now has guarded
+lowering evidence. Source tests separately prove 32 guards produce linear
+helper growth and that effects/cycles do not enter the value catalog.
+The [aggregate-division fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_division_loops.ns)
+adds six typed lifecycle runs and standalone restoration, using declared
+quotient/remainder fields alongside the existing bounded loop exits.
+
+The [counted aggregate regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_counted.rs)
+add 2064 callbacks across sixteen binaries for helper calls, inline arms, prefix
+work and shared suffixes, with ascending/descending dynamic induction and checked
+division/remainder. Independent checked-step simulation and reference execution
+agree with actual result slots, iteration counters and balanced real allocation/drop.
+Twenty-four skipped invalid inputs and two loop-only success cases bring this
+slice to 2090 accepted/skipped callbacks. Twenty-six real process traps cover zero
+step, wrong direction, induction overflow, excessive trips and invalid arithmetic;
+loop preflight failures report zero iterations and no arithmetic-leaf invocation.
+An unselected inclusive-overflow loop succeeds without any division in its source,
+and the exact 65536-trip case succeeds. Reference fuel is not a substitute for
+native preflight and is not used to certify preflight rejection. The former
+loop-carried rejection now has guarded chained-loop lowering evidence.
+The [aggregate-counted fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_counted_loops.ns)
+adds six typed lifecycle runs and the same build/cache/standalone restoration
+workflow, with a counted helper called inside an aggregate arithmetic branch.
+
+The [carried aggregate regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_carried.rs)
+add 2752 callbacks across sixteen binaries for the same four branch shapes, both
+induction directions, checked division/remainder and ordered add/multiply carries.
+All result fields agree with reference execution and an independent i128 wrapping
+oracle. Variable 1/7-carry cases, skipped invalid inputs and the exact trip-limit
+case bring this slice to 2849 accepted/skipped callbacks. Twenty-seven real process
+traps cover preflight failure before any update, reached zero/overflow arithmetic,
+unconditional prefix work and loop-only guards. Ascending overflow and descending
+underflow execute zero iterations. A shared
+[execution probe](../../tools/nuisc/tests/native_application_bridge/aggregate_loop_probe.rs)
+observes result slots, actual iterations and balanced real allocation/drop;
+it keeps the actual process trap and never substitutes reference fuel for preflight.
+The [aggregate-carried fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_carried_loops.ns)
+adds six typed lifecycle runs and build/cache/standalone restoration with the
+existing break/continue paths. Source policy tests retain exact i64/local-seed
+requirements and invariant headers; conditional carry updates remain fail-closed.
+Extreme seeds also exposed and fixed host-debug-dependent scalar integer overflow
+in the reference CPU. Dedicated CPU tests keep wrapping arithmetic separate from
+checked division/remainder errors.
 
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
 compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
@@ -508,7 +594,8 @@ open failure, Drop, descriptor drift, argument validation and fuel rejection.
 These test doubles are policy evidence, not additional lowering proofs.
 
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
-the five-scalar multi-carry, guarded-break, multi-state branch and checked-division
+the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
+aggregate-division, aggregate-counted and aggregate-carried
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -532,9 +619,10 @@ Linux/Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Normalize fallible flat-i64 aggregate branch returns without speculating branch
-expressions or call arguments, retaining exact layout/kind checks and real
-zero/overflow execution evidence. Keep checked division/remainder, flat-helper
+Extend conditional carry updates inside guarded flat-value helper branches beyond
+the admitted ordered linear updates. Retain induction preflight, invariant header
+inputs, exact layouts, source order and selected-path failure semantics. Keep
+checked division/remainder, flat-helper, counted/carried-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

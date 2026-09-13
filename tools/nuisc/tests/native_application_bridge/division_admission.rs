@@ -103,7 +103,7 @@ fn generic_division_and_remainder_require_two_exact_i64_operands() {
 }
 
 #[test]
-fn unoutlined_fallible_aggregate_guard_rejects_instead_of_speculating() {
+fn fallible_aggregate_returns_use_guarded_helpers_instead_of_speculation() {
     for op in ["/", "%"] {
         for body in [
             "if enabled { return Carries { carry0: leaf(a, b), carry1: seed }; }
@@ -125,12 +125,14 @@ fn unoutlined_fallible_aggregate_guard_rejects_instead_of_speculating() {
                     } fn main()",
                 );
             let project = Project::with_source(&source);
-            let error = nuisc::pipeline::compile_project(&project.0)
-                .err()
-                .expect("unsafe guard must reject");
+            let module = nuisc::pipeline::compile_project(&project.0).unwrap().yir;
+            emit_registered(&module, "counter").unwrap();
             assert!(
-                error.contains("conditional fallible return requires guarded helper lowering"),
-                "{body}: {error}"
+                module
+                    .nodes
+                    .iter()
+                    .any(|n| n.op.instruction == "guard_return"),
+                "{body}"
             );
         }
     }

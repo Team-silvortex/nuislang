@@ -85,7 +85,7 @@ fn is_pass_through_guard_seed(
             .all(|((name, value), field)| {
                 name == &field.name
                     && direct_call_scalar_kind(&field.ty) == Some(DirectCallScalarKind::I64)
-                    && i64_parameter(value)
+                    && (i64_parameter(value) || value == &NirExpr::Int(0))
             })
 }
 

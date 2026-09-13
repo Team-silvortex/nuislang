@@ -188,11 +188,29 @@ exact-kind native admission and reuse existing zero/overflow guards. Eight nativ
 binaries compare 1840 callbacks against reference execution and a wide-integer
 oracle; 20 dynamic and four literal invalid cases trap without returned state.
 Four unselected invalid literal cases return safely. Frontend purity no longer
-licenses arithmetic speculation: acyclic i64/bool helpers reuse guarded outlining,
-and unoutlined fallible aggregate branch returns reject before select shortcuts.
-Their guarded normalization is the next boundary; per-return allocation remains
-an optimization target. The division fixture composes with typed lifecycle,
-multi-state break/continue, cache isolation and standalone restoration.
+licenses arithmetic speculation: acyclic i64/bool helpers reuse guarded outlining.
+Flat-i64 aggregate values now use the same outliner with neutral guards, existing
+record captures and shared suffixes. Fourteen more native binaries compare 3220
+callbacks across early/two-arm/nested returns, unused results/arguments and direct
+registered-state branches; 32 dynamic and four literal invalid cases trap, while
+four unselected literal cases return safely. Real allocation/drop probes stay
+balanced after every successful callback and before the observed arithmetic leaf.
+Ordinary fields retain declared names; scoped carry/control schemas remain strict.
+Thirty-two source guards have linear helper growth. Single-induction counted
+loops now compose in flat-value helper branches, including inline arms, prefix
+work and shared suffixes. An iterative call-graph flag retains the loop boundary
+even without checked arithmetic. Independent checked-step/reference probes cover
+2090 accepted or skipped callbacks and 26 real traps, including zero iterations
+before rejected preflight and the exact 65536-trip bound. Guarded helpers now also
+admit ordered linear i64 carry updates through shared chained-loop preparation.
+Another 2849 accepted/skipped callbacks cover all carry slots, wrapping arithmetic,
+1/3/7-carry widths and selected-path evaluation; 27 real traps retain preflight
+before any update and reached arithmetic failure. Extreme seeds exposed and fixed
+Rust-debug-dependent scalar integer overflow in the reference CPU. No backend loop
+opcode or Buffer admission was added. Conditional carries and arbitrary loop
+bodies remain fail-closed; per-return allocation remains an optimization target.
+The division, aggregate-division, aggregate-counted and aggregate-carried fixtures compose with typed
+lifecycle, multi-state break/continue, cache isolation and standalone restoration.
 The passing default image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport

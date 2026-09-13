@@ -10,10 +10,18 @@ use yir_runtime_host::ApplicationSession;
 
 #[path = "native_application_bridge/aggregate_admission.rs"]
 mod aggregate_admission;
+#[path = "native_application_bridge/aggregate_carried.rs"]
+mod aggregate_carried;
+#[path = "native_application_bridge/aggregate_counted.rs"]
+mod aggregate_counted;
+#[path = "native_application_bridge/aggregate_division.rs"]
+mod aggregate_division;
 #[path = "native_application_bridge/aggregate_execution.rs"]
 mod aggregate_execution;
 #[path = "native_application_bridge/aggregate_guards.rs"]
 mod aggregate_guards;
+#[path = "native_application_bridge/aggregate_loop_probe.rs"]
+mod aggregate_loop_probe;
 #[path = "native_application_bridge/bounds.rs"]
 mod bounds;
 #[path = "native_application_bridge/branch_loops.rs"]

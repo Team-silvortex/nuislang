@@ -476,7 +476,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "outline_buffer_loops", "verify_nir_module", "NirVisibility::Private",
             "buffer_loop_params", "plan.has_store", "scalar_carries::value",
-            "NirBinaryOp::Div", "NirBinaryOp::Rem",
+            "control_values::binary_type(*op, lhs, rhs)",
             "NirStmt::If", "validate_effects", "guarded_functions",
         ],
     },
@@ -536,7 +536,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "retained.contains(&function.name)", "continuation: Option<NirExpr>",
             "__nuis_scalar_continue", "__nuis_scalar_branch", "__nuis_scalar_condition",
-            "NirExpr::Bool(false)", "NirStmt::Return(Some(default))",
+            "control_values::zero_value(&self.result, self.layouts)", "NirStmt::Return(Some(default))",
             "collect_inputs", "captured_params", "self.guarded.insert",
         ],
     },

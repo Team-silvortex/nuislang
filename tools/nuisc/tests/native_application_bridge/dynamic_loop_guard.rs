@@ -86,14 +86,14 @@ fn cases() -> Vec<Case> {
     cases
 }
 
-fn driver(bridge: &NativeSessionBridge, helper: &str, cases: &[Case], probe: bool) -> String {
+fn driver(bridge: &NativeSessionBridge, loop_helper: &str, cases: &[Case], probe: bool) -> String {
     let mut llvm = bridge.llvm_ir.replacen(
         "define i64 @nuis_yir_entry()",
         "define i64 @unused_native_entry()",
         1,
     );
     let start = llvm
-        .find(&format!("define i64 @nuis_fn_{helper}("))
+        .find(&format!("define i64 @nuis_fn_{loop_helper}("))
         .unwrap();
     let end = start + llvm[start..].find("\n}").unwrap() + 2;
     let original = &llvm[start..end];
@@ -128,7 +128,8 @@ fn driver(bridge: &NativeSessionBridge, helper: &str, cases: &[Case], probe: boo
             llvm.push_str(&format!("  %p{index}_{slot} = getelementptr i64, ptr %args, i64 {slot}\n  store volatile i64 {value}, ptr %p{index}_{slot}, align 8\n  %v{index}_{slot} = load volatile i64, ptr %p{index}_{slot}, align 8\n"));
         }
         if probe {
-            llvm.push_str(&format!("  store volatile i64 0, ptr @probe_iterations, align 8\n  %skip{index} = icmp ne i64 %v{index}_3, 0\n  %result{index} = call i64 @nuis_fn_{helper}(i64 %v{index}_0, i64 %v{index}_1, i64 %v{index}_2, i1 %skip{index})\n  call void @nuis_debug_print_i64(i64 %result{index})\n  %trips{index} = load volatile i64, ptr @probe_iterations, align 8\n  call void @nuis_debug_print_i64(i64 %trips{index})\n"));
+            // Invoke the source entry, including its guard, not a generated continuation.
+            llvm.push_str(&format!("  store volatile i64 0, ptr @probe_iterations, align 8\n  %skip{index} = icmp ne i64 %v{index}_3, 0\n  %result{index} = call i64 @nuis_fn_walk(i64 %v{index}_0, i64 %v{index}_1, i64 %v{index}_2, i1 %skip{index})\n  call void @nuis_debug_print_i64(i64 %result{index})\n  %trips{index} = load volatile i64, ptr @probe_iterations, align 8\n  call void @nuis_debug_print_i64(i64 %trips{index})\n"));
         } else {
             let symbol = &bridge.callbacks[0].symbol;
             llvm.push_str(&format!("  %status{index} = call i32 @{symbol}(ptr %args, i64 4, ptr %out, i64 1)\n  %status_wide{index} = zext i32 %status{index} to i64\n  call void @nuis_debug_print_i64(i64 %status_wide{index})\n"));
@@ -171,15 +172,21 @@ fn execute(compare: &str, operation: &str, cases: &[Case], probe: bool) -> Outpu
     let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     let bridge = emit_registered(&compiled.yir, "counter").unwrap();
-    let helper = &compiled
+    let loop_node = &compiled
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.instruction == "call_i64")
+        .find(|node| node.op.instruction == "loop_while_i64")
         .unwrap()
-        .op
-        .args[0];
-    let llvm = driver(&bridge, helper, cases, probe);
+        .name;
+    let loop_helper = &compiled
+        .yir
+        .functions
+        .iter()
+        .find(|function| function.body_nodes.contains(loop_node))
+        .unwrap()
+        .name;
+    let llvm = driver(&bridge, loop_helper, cases, probe);
     let artifact = nuisc::aot::write_and_link_with_source(
         &project.0.join("main.ns"),
         &project.0.join("out"),
@@ -234,24 +241,27 @@ fn dynamic_induction_rejects_implicit_boolean_bounds() {
         .iter()
         .find(|n| n.op.instruction == "loop_while_i64")
         .unwrap()
-        .name
         .clone();
+    // Use a function-local bool constant rather than assuming the loop still
+    // captures the entry's skip parameter after continuation outlining.
+    let condition = format!("{}_bool_bound", loop_node.name);
+    let mut constant = loop_node.clone();
+    constant.name = condition.clone();
+    constant.op = yir_core::Operation::parse("cpu.const_bool", vec!["true".into()]).unwrap();
+    module.nodes.push(constant);
     let function = module
         .functions
-        .iter()
-        .find(|f| f.body_nodes.contains(&loop_node))
+        .iter_mut()
+        .find(|f| f.body_nodes.contains(&loop_node.name))
         .unwrap();
-    let condition = function
-        .parameters
-        .iter()
-        .find(|p| p.ty == "bool")
-        .unwrap()
-        .node
-        .clone();
+    function.body_nodes.push(condition.clone());
+    module
+        .node_lanes
+        .insert(condition.clone(), format!("fn:{}", function.name));
     module
         .nodes
         .iter_mut()
-        .find(|n| n.name == loop_node)
+        .find(|n| n.name == loop_node.name)
         .unwrap()
         .op
         .args[1] = condition.clone();
@@ -259,7 +269,7 @@ fn dynamic_induction_rejects_implicit_boolean_bounds() {
         module.edges.push(yir_core::Edge {
             kind,
             from: condition.clone(),
-            to: loop_node.clone(),
+            to: loop_node.name.clone(),
         });
     }
     let error = emit_registered(&module, "counter").unwrap_err();

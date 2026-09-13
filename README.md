@@ -200,8 +200,16 @@ admission; nested temporary returns are unpacked and released before the next ca
 Checked i64 division/remainder now reuse the existing native emitter with exact
 operand kinds and zero/overflow traps before LLVM arithmetic. Guarded scalar helpers
 preserve selected-path evaluation, including discarded results and unused arguments.
-Unoutlined fallible aggregate branch returns reject instead of being speculated;
-generalizing their guarded normalization is the next source-lowering boundary.
+Fallible flat-i64 aggregate branches now share that guarded normalization, including
+nested returns, existing record captures, shared suffixes and same-callee arguments.
+Ordinary helper fields keep their declared names; scoped carry/control schemas stay
+separate. Real allocation/drop probes cover selected and skipped paths. Counted
+loops now compose inside these guarded helpers, including inline arms and shared
+suffixes. An i64 induction update can precede ordered i64 cumulative updates via
+the existing chained-loop contract. Selected loops keep finite/non-wrapping
+induction preflight; unselected loops skip it, even without division. Cumulative
+arithmetic wraps, and reference scalar arithmetic now agrees in debug builds too.
+Conditional carry updates remain the next automatic-normalization boundary.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary
