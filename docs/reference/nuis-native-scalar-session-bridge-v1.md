@@ -95,11 +95,25 @@ already initialized local `let` of exact i64 type. The existing counted/chained-
 parsers and native preflight remain authoritative; this source shape check does
 not prove termination or duplicate backend slot/opcode admission.
 Each carry uses the existing linear add/multiply preparation, reading the stepped
-index or earlier updated carries. Header/stride mutation, forward sibling reads,
+index or earlier updated carries. Full `if/else` may update the same carry once in
+each arm, including explicit `let carry: i64 = carry;` to keep its previous value.
+Leaf comparisons use an already stepped index or earlier updated carry against an
+invariant i64 literal/variable. Reversed comparisons share the ordinary loop
+preparation; mutable predicate RHS values are not captured as stale seeds.
+Header/stride mutation, forward sibling reads,
 duplicate updates, body calls and fallible update expressions are rejected.
 Fallible seed expressions outside the loop retain ordinary source-order checks.
-Constants, parameter rebinding, conditional carry updates and arbitrary loop bodies
+Constants, parameter rebinding, one-sided/compound carry conditions and arbitrary loop bodies
 are not admitted by this automatic normalizer. The narrower Buffer catalog is unchanged.
+
+Native conditional chains reuse the existing shared metadata parser and LLVM
+emitter, but admit only bounded leaf predicates and nonfallible add/multiply/keep
+branches. Every seed and predicate RHS requires exact i64, even on zero trips.
+Before recursive parsing, a metadata-size bound rejects oversized input; hidden
+payloads, forward state and arbitrary ignored `always` tokens reject. Both the
+canonical `always` encoding and the compiler's induction-seed placeholder remain
+supported. No opcode or ABI is added. The reference CPU routes these chains through
+the existing cooperative scalar driver; this is not native preemption.
 
 The acyclic catalog propagates loop presence from callees to callers, retaining
 guarded lowering even without division/remainder. The reached branch performs
@@ -576,10 +590,27 @@ it keeps the actual process trap and never substitutes reference fuel for prefli
 The [aggregate-carried fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_carried_loops.ns)
 adds six typed lifecycle runs and build/cache/standalone restoration with the
 existing break/continue paths. Source policy tests retain exact i64/local-seed
-requirements and invariant headers; conditional carry updates remain fail-closed.
+requirements and invariant headers; one-sided carry updates remain fail-closed.
 Extreme seeds also exposed and fixed host-debug-dependent scalar integer overflow
 in the reference CPU. Dedicated CPU tests keep wrapping arithmetic separate from
 checked division/remainder errors.
+
+The [conditional aggregate regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_conditional.rs)
+add 1152 callbacks across sixteen binaries for all four branch positions, both
+directions, checked division/remainder and conditional add/multiply/keep updates.
+Another twelve binaries cover all six comparisons, reversed operands and 1/7-carry
+widths. With skipped invalid calls and the exact trip limit, this slice covers
+1357 accepted/skipped callbacks and 27 real process traps. The same independent
+i128 oracle and shared execution probe compare every returned slot, actual
+iterations, leaf operands and real allocation/drop balance. Preflight rejects
+before the first update; selected arithmetic failure is still a process trap.
+Exact-kind drift, including zero-trip inputs, missing operands, hidden branches,
+source predicate/arm restrictions and cooperative reference-fuel failure have
+dedicated regressions. Shared comparison normalization now accepts invariant-on-left
+comparisons without changing which iteration's state is read.
+The [aggregate-conditional fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_conditional_loops.ns)
+adds six typed lifecycle runs and the eighth build/cache/standalone-restoration
+fixture, retaining earlier break/continue and checked arithmetic evidence.
 
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
 compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
@@ -595,7 +626,7 @@ These test doubles are policy evidence, not additional lowering proofs.
 
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
-aggregate-division, aggregate-counted and aggregate-carried
+aggregate-division, aggregate-counted, aggregate-carried and aggregate-conditional
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -619,10 +650,11 @@ Linux/Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Extend conditional carry updates inside guarded flat-value helper branches beyond
-the admitted ordered linear updates. Retain induction preflight, invariant header
+Extend one-sided conditional carry updates inside guarded flat-value helper branches
+beyond the admitted full if/else forms, without introducing eager evaluation.
+Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried-aggregate
+checked division/remainder, flat-helper, counted/carried/conditional-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

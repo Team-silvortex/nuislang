@@ -7,6 +7,7 @@ const MAX_ITERATIONS: i128 = 65536;
 
 mod dynamic;
 pub(crate) use dynamic::emit_guard;
+pub(crate) mod conditional;
 pub(crate) mod scoped;
 
 fn constant_inputs(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Option<[i64; 3]> {
@@ -31,6 +32,10 @@ pub(super) fn validate(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Result<(),
     let chain = match node.op.instruction.as_str() {
         "loop_while_i64" => false,
         "loop_while_i64_chain" | "loop_while_scalar_chain" => true,
+        "loop_while_i64_cond_chain" | "loop_while_scalar_cond_chain" => {
+            conditional::parse(node)?;
+            false
+        }
         "loop_while_i64_effect" => {
             scoped::parse(node)?;
             false
@@ -62,29 +67,29 @@ pub(super) fn validate(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Result<(),
     }
     for (index, pair) in carries.chunks_exact(2).enumerate() {
         let kind = pair[1].as_str();
-        if matches!(
-            kind,
-            "add_current" | "add_prev_current" | "mul_current" | "mul_prev_current"
-        ) {
-            continue;
-        }
-        let valid = [
-            ("add_prev_carry", count),
-            ("mul_prev_carry", count),
-            ("add_carry", index),
-            ("mul_carry", index),
-        ]
-        .into_iter()
-        .any(|(prefix, available)| {
-            kind.strip_prefix(prefix)
-                .and_then(|index| index.parse::<usize>().ok())
-                .is_some_and(|index| index < available)
-        });
-        if !valid {
+        if !linear_source(kind, index, count) {
             return Err(fail("does not admit this scalar carry source"));
         }
     }
     Ok(())
+}
+
+fn linear_source(kind: &str, index: usize, count: usize) -> bool {
+    matches!(
+        kind,
+        "add_current" | "add_prev_current" | "mul_current" | "mul_prev_current"
+    ) || [
+        ("add_prev_carry", count),
+        ("mul_prev_carry", count),
+        ("add_carry", index),
+        ("mul_carry", index),
+    ]
+    .into_iter()
+    .any(|(prefix, available)| {
+        kind.strip_prefix(prefix)
+            .and_then(|index| index.parse::<usize>().ok())
+            .is_some_and(|index| index < available)
+    })
 }
 
 // Prove the existing non-wrapping induction in wide arithmetic, without executing

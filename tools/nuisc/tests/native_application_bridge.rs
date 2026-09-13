@@ -12,6 +12,8 @@ use yir_runtime_host::ApplicationSession;
 mod aggregate_admission;
 #[path = "native_application_bridge/aggregate_carried.rs"]
 mod aggregate_carried;
+#[path = "native_application_bridge/aggregate_conditional.rs"]
+mod aggregate_conditional;
 #[path = "native_application_bridge/aggregate_counted.rs"]
 mod aggregate_counted;
 #[path = "native_application_bridge/aggregate_division.rs"]

@@ -1,7 +1,7 @@
 use super::*;
 use crate::frontend::parse_nuis_module;
 
-const SOURCE: &str = "mod cpu Main {
+pub(super) const SOURCE: &str = "mod cpu Main {
   struct Pair { value: i64, seed: i64 }
   fn walk(initial: i64, bound: i64, step: i64) -> i64 {
     let limit: i64 = bound;

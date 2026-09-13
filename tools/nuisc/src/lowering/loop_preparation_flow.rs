@@ -66,11 +66,26 @@ fn parse_loop_flow_condition_atom(
         }
         _ => lhs,
     };
-    let lhs = loop_state_ref_into_cond_source(parse_prepared_loop_state_ref_expr(
-        lhs,
-        binding_name,
-        carries,
-    )?);
+    let (lhs, compare, rhs) =
+        if let Some(state) = parse_prepared_loop_state_ref_expr(lhs, binding_name, carries) {
+            (loop_state_ref_into_cond_source(state), compare, rhs)
+        } else {
+            if !matches!(lhs, NirExpr::Int(_) | NirExpr::Var(_)) {
+                return None;
+            }
+            let state = parse_prepared_loop_state_ref_expr(&rhs, binding_name, carries)?;
+            // Normalize invariant < state to state > invariant in the shared
+            // condition contract, without changing which iteration's state is read.
+            let compare = match compare {
+                PreparedLoopCompare::Eq => PreparedLoopCompare::Eq,
+                PreparedLoopCompare::Ne => PreparedLoopCompare::Ne,
+                PreparedLoopCompare::Lt => PreparedLoopCompare::Gt,
+                PreparedLoopCompare::Le => PreparedLoopCompare::Ge,
+                PreparedLoopCompare::Gt => PreparedLoopCompare::Lt,
+                PreparedLoopCompare::Ge => PreparedLoopCompare::Le,
+            };
+            (loop_state_ref_into_cond_source(state), compare, lhs.clone())
+        };
     Some(PreparedLoopCarryCondition { lhs, compare, rhs })
 }
 

@@ -209,3 +209,64 @@ fn plain_scalar_chain_carry_overflow_wraps_and_invalid_kinds_fail_closed() {
     assert!(CpuMod.execute(&node, &resource, &mut state).is_err());
     assert!(state.events.is_empty());
 }
+
+#[test]
+fn conditional_chain_returns_ordered_state_and_retains_cooperative_steps() {
+    for instruction in ["loop_while_scalar_cond_chain", "loop_while_i64_cond_chain"] {
+        let (mut node, resource, mut state) = fixture();
+        node.op.instruction = instruction.into();
+        node.op.args.truncate(5);
+        node.op.args.extend(
+            [
+                "zero",
+                "current_lt",
+                "threshold",
+                "add_current",
+                "keep",
+                "zero",
+                "carry0_gt",
+                "zero",
+                "add_carry0",
+                "keep",
+            ]
+            .map(str::to_owned),
+        );
+        state.bind_value("limit", Value::Int(4));
+        let mut execution = CpuMod
+            .begin_execution(&node, &resource, &state)
+            .unwrap()
+            .unwrap();
+        for _ in 0..4 {
+            assert!(matches!(
+                execution.resume(&mut state, None).unwrap(),
+                RegisteredExecutionStep::Continue
+            ));
+        }
+        let RegisteredExecutionStep::Complete(Value::Struct(value)) =
+            execution.resume(&mut state, None).unwrap()
+        else {
+            panic!("missing conditional state");
+        };
+        // index=1,2,3 update total to 1,3,6; index=4 keeps 6, so checksum=16.
+        assert_eq!(
+            value.fields,
+            [
+                ("current".into(), Value::Int(4)),
+                ("carry0".into(), Value::Int(6)),
+                ("carry1".into(), Value::Int(16))
+            ]
+        );
+        state.bind_value("limit", Value::Int(0));
+        let Value::Struct(value) = CpuMod.execute(&node, &resource, &mut state).unwrap() else {
+            panic!("zero-trip state");
+        };
+        assert_eq!(
+            value.fields,
+            [
+                ("current".into(), Value::Int(0)),
+                ("carry0".into(), Value::Int(0)),
+                ("carry1".into(), Value::Int(0))
+            ]
+        );
+    }
+}

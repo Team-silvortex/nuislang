@@ -18,6 +18,8 @@ pub(crate) fn emit_guard(
         "loop_while_i64"
             | "loop_while_i64_chain"
             | "loop_while_scalar_chain"
+            | "loop_while_i64_cond_chain"
+            | "loop_while_scalar_cond_chain"
             | "loop_while_i64_effect"
     ) {
         return Ok(());

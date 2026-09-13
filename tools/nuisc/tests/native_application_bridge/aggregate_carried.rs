@@ -2,7 +2,7 @@ use super::*;
 use aggregate_loop_probe::Invocation;
 
 #[derive(Clone, Copy, Debug)]
-enum Shape {
+pub(super) enum Shape {
     Callee,
     Inline,
     Prefix,
@@ -10,16 +10,16 @@ enum Shape {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Case {
-    enabled: bool,
-    initial: i64,
-    limit: i64,
-    stride: i64,
-    divisor: i64,
-    seed: i64,
+pub(super) struct Case {
+    pub(super) enabled: bool,
+    pub(super) initial: i64,
+    pub(super) limit: i64,
+    pub(super) stride: i64,
+    pub(super) divisor: i64,
+    pub(super) seed: i64,
 }
 
-fn source(shape: Shape, count: usize, descending: bool, op: &str) -> String {
+pub(super) fn source(shape: Shape, count: usize, descending: bool, op: &str) -> String {
     let (compare, step) = if descending { (">", "-") } else { ("<", "+") };
     let mut fields = "value: i64, index: i64, ".to_owned();
     let mut seeds = "let index: i64 = initial;".to_owned();
@@ -332,7 +332,7 @@ fn guarded_carries_trap_before_updates_and_never_speculate_skipped_calls() {
 }
 
 #[test]
-fn conditional_carry_updates_inside_flat_branches_still_fail_closed() {
+fn one_sided_carry_updates_inside_flat_branches_still_fail_closed() {
     let source = source(Shape::Callee, 3, false, "/").replace(
         "let carry1: i64 = carry1 + carry0;",
         "if index > 0 { let carry1: i64 = carry1 + carry0; }",

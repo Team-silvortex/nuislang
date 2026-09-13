@@ -306,9 +306,9 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
-    assert!(session
-        .next_step
-        .starts_with("extend conditional carry updates inside guarded flat-value helpers"));
+    assert!(session.next_step.starts_with(
+        "extend one-sided conditional carry updates inside guarded flat-value helpers"
+    ));
     assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
         .evidence
@@ -353,9 +353,16 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("40 cases, including nested-loop scope"));
+    assert!(session.blocker.contains(
+        "One-sided and compound carry conditions inside flat-value branch helpers still reject"
+    ));
+    assert!(session.evidence.contains("1357 accepted/skipped callbacks"));
     assert!(session
-        .blocker
-        .contains("Conditional carry updates inside flat-value branch helpers still reject"));
+        .evidence
+        .contains("existing cooperative scalar driver instead of returning trace-only Unit"));
+    assert!(session
+        .evidence
+        .contains("eighth aggregate-conditional build/cache/standalone fixture"));
     assert!(session.evidence.contains("2090 accepted/skipped callbacks"));
     assert!(session.evidence.contains("26 real process traps"));
     assert!(session.evidence.contains("2849 accepted/skipped callbacks"));

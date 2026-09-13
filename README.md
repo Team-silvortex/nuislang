@@ -209,7 +209,12 @@ suffixes. An i64 induction update can precede ordered i64 cumulative updates via
 the existing chained-loop contract. Selected loops keep finite/non-wrapping
 induction preflight; unselected loops skip it, even without division. Cumulative
 arithmetic wraps, and reference scalar arithmetic now agrees in debug builds too.
-Conditional carry updates remain the next automatic-normalization boundary.
+Full `if/else` carry updates now reuse the existing conditional-chain contract:
+each arm updates the same local i64, or explicitly keeps its old value. Leaf
+comparisons read the stepped index or an earlier updated carry against an invariant
+atom; reversed comparisons share normalization. Native preflight and cooperative
+reference execution remain separate. One-sided and compound carry conditions remain
+the next automatic-normalization boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary

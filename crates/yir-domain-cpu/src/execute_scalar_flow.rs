@@ -41,6 +41,7 @@ pub(super) fn begin_execution(
     };
     let (is_async, post_flow, conditional) = match instruction {
         "chain" => (false, false, false),
+        "cond_chain" => (false, false, true),
         "flow_chain" => (false, false, false),
         "flow_cond_chain" => (false, false, true),
         "post_flow_chain" => (false, true, false),
@@ -79,7 +80,7 @@ pub(super) fn begin_execution(
     } else {
         validate_flow_control_kind
     };
-    let (control, carry_start) = if instruction == "chain" {
+    let (control, carry_start) = if matches!(instruction, "chain" | "cond_chain") {
         (None, 5)
     } else {
         let (control, start) = parse_loop_flow_expr(

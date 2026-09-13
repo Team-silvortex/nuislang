@@ -25,12 +25,25 @@ pub(super) fn validate(
         "loop_while_i64"
             | "loop_while_i64_chain"
             | "loop_while_scalar_chain"
+            | "loop_while_i64_cond_chain"
+            | "loop_while_scalar_cond_chain"
             | "loop_while_i64_effect"
     ) {
-        for name in &node.op.args[..3] {
+        let inputs =
+            node.op.args.get(..3).ok_or_else(|| {
+                format!("native scalar loop `{}` lacks induction inputs", node.name)
+            })?;
+        for name in inputs {
             require_value(node, name, CpuCallScalarKind::I64, registers)?;
         }
-        if node.op.instruction.ends_with("_chain") {
+        if native_session::loops::conditional::is_conditional(node) {
+            for carry in native_session::loops::conditional::parse(node)? {
+                require_value(node, &carry.initial, CpuCallScalarKind::I64, registers)?;
+                if let yir_domain_cpu::LoopCondExpr::Leaf { rhs: Some(rhs), .. } = carry.condition {
+                    require_value(node, &rhs, CpuCallScalarKind::I64, registers)?;
+                }
+            }
+        } else if node.op.instruction.ends_with("_chain") {
             for pair in node.op.args[5..].chunks_exact(2) {
                 require_value(node, &pair[0], CpuCallScalarKind::I64, registers)?;
             }

@@ -34,18 +34,20 @@ pub(super) fn validate(
         return None;
     }
     let mut updates = BTreeSet::new();
+    let mut ordered = Vec::new();
     for stmt in body {
-        let NirStmt::Let { name, ty, value } = stmt else {
-            return None;
-        };
-        if !loop_bindings.contains(name)
-            || scope.get(name)? != &scalar_type("i64")
-            || ty.as_ref().is_some_and(|ty| ty != &scalar_type("i64"))
-            || !updates.insert(name.clone())
-            || !nonfallible_i64(value, scope)
-        {
+        let name = update_name(stmt, scope, loop_bindings)?;
+        if !updates.insert(name.to_owned()) {
             return None;
         }
+        ordered.push(name);
+    }
+    let mut available = BTreeSet::new();
+    for (stmt, name) in body.iter().zip(&ordered) {
+        if let NirStmt::If { condition, .. } = stmt {
+            validate_condition(condition, scope, &updates, &available)?;
+        }
+        available.insert((*name).to_owned());
     }
     // Captured atoms are invariant. No body-only calls or fallible stride
     // expressions may be hoisted into the preflight, including on zero trips.
@@ -68,16 +70,77 @@ pub(super) fn validate(
             &BTreeMap::new(),
         )?;
         if chained.carries.len() != tail.len()
-            || !chained.carries.iter().zip(tail).all(|(carry, stmt)| {
-                matches!(stmt, NirStmt::Let { name, .. }
-                    if name == &carry.binding_name
-                        && matches!(carry.kind, PreparedCarryUpdateKind::Linear { .. }))
-            })
+            || !chained
+                .carries
+                .iter()
+                .zip(&ordered[1..])
+                .all(|(carry, name)| carry.binding_name == *name)
         {
             return None;
         }
     }
     Some(())
+}
+
+fn update_name<'a>(stmt: &'a NirStmt, scope: &Scope, locals: &BTreeSet<String>) -> Option<&'a str> {
+    let binding = |stmt: &'a NirStmt| {
+        let NirStmt::Let { name, ty, value } = stmt else {
+            return None;
+        };
+        (locals.contains(name)
+            && scope.get(name) == Some(&scalar_type("i64"))
+            && ty.as_ref().is_none_or(|ty| ty == &scalar_type("i64"))
+            && nonfallible_i64(value, scope))
+        .then_some(name.as_str())
+    };
+    match stmt {
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            let ([then_update], [else_update]) = (then_body.as_slice(), else_body.as_slice())
+            else {
+                return None;
+            };
+            let name = binding(then_update)?;
+            (name == binding(else_update)?).then_some(name)
+        }
+        _ => binding(stmt),
+    }
+}
+
+fn validate_condition(
+    condition: &NirExpr,
+    scope: &Scope,
+    updates: &BTreeSet<String>,
+    available: &BTreeSet<String>,
+) -> Option<()> {
+    let NirExpr::Binary {
+        op:
+            NirBinaryOp::Eq
+            | NirBinaryOp::Ne
+            | NirBinaryOp::Lt
+            | NirBinaryOp::Le
+            | NirBinaryOp::Gt
+            | NirBinaryOp::Ge,
+        lhs,
+        rhs,
+    } = condition
+    else {
+        return None;
+    };
+    let state = |value: &NirExpr| matches!(value, NirExpr::Var(name) if available.contains(name));
+    let invariant = |value: &NirExpr| match value {
+        NirExpr::Int(_) => true,
+        NirExpr::Var(name) => {
+            !updates.contains(name) && scope.get(name) == Some(&scalar_type("i64"))
+        }
+        _ => false,
+    };
+    // Condition metadata captures its rhs before the loop. A mutable rhs must
+    // not silently become a stale seed, even when it is an earlier carry.
+    ((state(lhs) && invariant(rhs)) || (invariant(lhs) && state(rhs))).then_some(())
 }
 
 fn nonfallible_i64(value: &NirExpr, scope: &Scope) -> bool {
@@ -96,6 +159,9 @@ fn nonfallible_i64(value: &NirExpr, scope: &Scope) -> bool {
 #[cfg(test)]
 #[path = "control_loops/carries_tests.rs"]
 mod carries_tests;
+#[cfg(test)]
+#[path = "control_loops/conditional_tests.rs"]
+mod conditional_tests;
 
 #[cfg(test)]
 mod tests {

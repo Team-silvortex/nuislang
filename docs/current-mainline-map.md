@@ -207,9 +207,16 @@ Another 2849 accepted/skipped callbacks cover all carry slots, wrapping arithmet
 1/3/7-carry widths and selected-path evaluation; 27 real traps retain preflight
 before any update and reached arithmetic failure. Extreme seeds exposed and fixed
 Rust-debug-dependent scalar integer overflow in the reference CPU. No backend loop
-opcode or Buffer admission was added. Conditional carries and arbitrary loop
-bodies remain fail-closed; per-return allocation remains an optimization target.
-The division, aggregate-division, aggregate-counted and aggregate-carried fixtures compose with typed
+opcode or Buffer admission was added. Full if/else carry updates now reuse the
+existing conditional-chain opcode and LLVM emitter, with strict leaf-condition,
+exact-i64 and metadata checks before emission. The reference CPU now executes the
+same scalar conditional chains cooperatively rather than returning trace-only Unit.
+Another 1357 accepted/skipped callbacks and 27 real traps check selected updates,
+source order, all six comparisons, reversed operands, wrapping and preflight.
+One-sided/compound carry conditions and arbitrary loop bodies remain fail-closed;
+per-return allocation remains an optimization target.
+The division, aggregate-division, aggregate-counted, aggregate-carried and
+aggregate-conditional fixtures compose with typed
 lifecycle, multi-state break/continue, cache isolation and standalone restoration.
 The passing default image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.

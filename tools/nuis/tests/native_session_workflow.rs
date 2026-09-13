@@ -18,6 +18,8 @@ const AGGREGATE_COUNTED_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_counted_loops.ns");
 const AGGREGATE_CARRIED_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_carried_loops.ns");
+const AGGREGATE_CONDITIONAL_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_conditional_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -146,6 +148,11 @@ fn native_guarded_carried_aggregate_build_cache_and_standalone_relocation() {
     check_workflow(AGGREGATE_CARRIED_SOURCE);
 }
 
+#[test]
+fn native_guarded_conditional_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_CONDITIONAL_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -184,6 +191,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_DIVISION_SOURCE,
         AGGREGATE_COUNTED_SOURCE,
         AGGREGATE_CARRIED_SOURCE,
+        AGGREGATE_CONDITIONAL_SOURCE,
     ]
     .contains(&source)
     {
@@ -195,17 +203,27 @@ fn check_workflow(source: &str) {
         AGGREGATE_DIVISION_SOURCE,
         AGGREGATE_COUNTED_SOURCE,
         AGGREGATE_CARRIED_SOURCE,
+        AGGREGATE_CONDITIONAL_SOURCE,
     ]
     .contains(&source)
     {
         assert!(llvm.contains("@nuis_fn_decompose("));
         assert!(llvm.contains("@nuis_fn___nuis_scalar_branch_"));
     }
-    if [AGGREGATE_COUNTED_SOURCE, AGGREGATE_CARRIED_SOURCE].contains(&source) {
+    if [
+        AGGREGATE_COUNTED_SOURCE,
+        AGGREGATE_CARRIED_SOURCE,
+        AGGREGATE_CONDITIONAL_SOURCE,
+    ]
+    .contains(&source)
+    {
         assert!(llvm.contains("@nuis_fn_rebalance("));
     }
     if source == AGGREGATE_CARRIED_SOURCE {
         assert!(llvm.contains("loop_while_scalar_chain_body"));
+    }
+    if source == AGGREGATE_CONDITIONAL_SOURCE {
+        assert!(llvm.contains("loop_while_scalar_cond_chain_body"));
     }
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");
