@@ -112,8 +112,34 @@ from every leaf, including a right operand that could be skipped at runtime.
 Header/stride mutation, forward sibling reads,
 duplicate updates, body calls and fallible update expressions are rejected.
 Fallible seed expressions outside the loop retain ordinary source-order checks.
-Constants, parameter rebinding, nested carry-update arms and arbitrary loop bodies
-are not admitted by this automatic normalizer. The narrower Buffer catalog is unchanged.
+Constants, parameter rebinding and arbitrary loop bodies are not admitted by this
+automatic normalizer. The narrower Buffer catalog is unchanged.
+
+### Nested Carry-Update Arms
+
+Nested `if`/`else`, including `else if` and empty arms, may update the same local i64
+carry once along each selected path. Different leaves may compute three or more
+distinct nonfallible i64 results; an empty arm retains that carry's incoming value.
+Every condition still compares the stepped index or an earlier updated carry with
+an invariant i64 atom. Every leaf is checked, including unreachable leaves, and
+forward sibling reads, effects, calls, fallible update arithmetic, multiple updates
+inside one arm and header mutation remain rejected. The source shape scan allows
+at most 32 nested guards; native closure and slot limits remain independent.
+
+The normalizer outlines one private iteration function through the existing
+scoped-call and flat-i64 return contracts. It advances a private index copy before
+the branch tree, then returns the carries. The outer driver advances its own index
+exactly once, preserving the source's step-first semantics and the original finite,
+non-wrapping induction preflight. Multi-carry projection retains source order and
+existing aggregate allocation/drop ownership. No new loop opcode or ABI is added.
+
+The effect outliner snapshots branch decisions and calls guarded helpers; a skipped
+branch returns before its own decisions or updates execute. Boolean `&&`/`||` inside
+these new helpers use guarded scalar calls, not eager boolean arithmetic. Both use
+the existing neutral-false guard contract (`a || b = !(!a && !b)`), without duplicating
+arm bodies or relaxing native guard admission. One helper per logical edge keeps
+this part of normalization linear. An unselected branch can still allocate its
+neutral aggregate return; balanced release does not imply allocation-free execution.
 
 Native conditional chains reuse the existing shared metadata parser and LLVM
 emitter, but admit only bounded trees of pure comparisons and nonfallible add/multiply/keep
@@ -605,7 +631,8 @@ it keeps the actual process trap and never substitutes reference fuel for prefli
 The [aggregate-carried fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_carried_loops.ns)
 adds six typed lifecycle runs and build/cache/standalone restoration with the
 existing break/continue paths. Source policy tests retain exact i64/local-seed
-requirements and invariant headers; nested carry-update arms remain fail-closed.
+requirements and invariant headers; nested carry-update acceptance is now covered
+separately by the scoped-iteration regressions below.
 Extreme seeds also exposed and fixed host-debug-dependent scalar integer overflow
 in the reference CPU. Dedicated CPU tests keep wrapping arithmetic separate from
 checked division/remainder errors.
@@ -657,6 +684,20 @@ adds six typed lifecycle runs and reference-budget failure with accepted-state
 retention and cleanup. The tenth frontdoor fixture also passes build/cache
 isolation, tamper rejection and standalone restoration of the compiled artifact.
 
+The [nested aggregate regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_nested.rs)
+compare native execution, registered reference execution and an independent i128
+wrapping/checked-induction oracle. They cover 1/3/7 carries, both induction directions,
+callee/inline/prefix/suffix positions, three distinct update leaves, implicit keep,
+zero trips and signed extremes. Volatile probes check actual iteration counts,
+source comparison counts and aggregate allocation/drop balance. Packed boolean
+normalization is excluded by operand provenance, not by discarding integer `==` or
+`!=` comparisons. Separate process-trap cases reject zero/negative strides,
+overflowing/excessive induction and reached division by zero; skipped calls retain
+state. Source admission tests reject invalid leaves and over-deep guard trees.
+The [aggregate-nested fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_nested_loops.ns)
+adds the eleventh frontdoor build/cache/relocation case with the existing typed
+lifecycle, checked arithmetic and multi-state break/continue paths.
+
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
 compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
 and invokes the real packer for normal and reversed YIR
@@ -672,7 +713,7 @@ These test doubles are policy evidence, not additional lowering proofs.
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
 aggregate-division, aggregate-counted, aggregate-carried, aggregate-conditional
-and aggregate-one-sided/aggregate-compound
+and aggregate-one-sided/aggregate-compound/aggregate-nested
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -691,16 +732,18 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib aot_application_bundle -j 1 -- --test-threads=1
 ```
 
-Native execution evidence currently comes from Apple Silicon. It does not certify
-Linux/Windows execution or device-provider parity.
+The earlier native evidence was recorded on Apple Silicon. The nested-carry
+extension additionally has Linux x86-64 native/reference execution checks; retain
+its runner, toolchain, source identity and test logs with the acceptance record.
+Neither platform's CPU results certify Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Extend nested conditional carry-update arms inside guarded flat-value helpers
-through the shared decision-tree preparation, without introducing eager evaluation.
+Extend ordered multi-statement loop bodies inside guarded flat-value helpers,
+without introducing eager evaluation or bypassing the scoped iteration contract.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound-aggregate
+checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

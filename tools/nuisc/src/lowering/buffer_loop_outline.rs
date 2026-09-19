@@ -103,6 +103,15 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
             &mut outlined.break_controls,
         );
     }
+    control_loops::outline(
+        module,
+        &mut names,
+        &mut helpers,
+        &mut outlined.guarded_functions,
+        &catalog,
+        &control_catalog,
+        &layouts,
+    );
     scalar_control::outline(
         module,
         &outlined.functions,

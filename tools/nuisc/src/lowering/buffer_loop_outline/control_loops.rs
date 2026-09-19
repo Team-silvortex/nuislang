@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "control_loops/nested.rs"]
+mod nested;
+pub(super) use nested::outline;
+
 pub(super) fn contains_loop(body: &[NirStmt]) -> bool {
     body.iter().any(|stmt| match stmt {
         NirStmt::While { .. } => true,
@@ -44,9 +48,7 @@ pub(super) fn validate(
     }
     let mut available = BTreeSet::new();
     for (stmt, name) in body.iter().zip(&ordered) {
-        if let NirStmt::If { condition, .. } = stmt {
-            validate_condition(condition, scope, &updates, &available)?;
-        }
+        validate_update(stmt, name, scope, &updates, &available)?;
         available.insert((*name).to_owned());
     }
     // Captured atoms are invariant. No body-only calls or fallible stride
@@ -58,6 +60,11 @@ pub(super) fn validate(
                 if !updates.contains(input) && scope.get(input)? == &scalar_type("i64") => {}
             _ => return None,
         }
+    }
+    if nested::present(body) {
+        // Nested decisions use one scoped iteration helper, not a lossy
+        // collapse to two leaf values or speculative select-style evaluation.
+        return Some(());
     }
     if !tail.is_empty() {
         // Share ordered carry interpretation with ordinary lowering. No prefix
@@ -83,31 +90,79 @@ pub(super) fn validate(
 }
 
 fn update_name<'a>(stmt: &'a NirStmt, scope: &Scope, locals: &BTreeSet<String>) -> Option<&'a str> {
-    let binding = |stmt: &'a NirStmt| {
-        let NirStmt::Let { name, ty, value } = stmt else {
-            return None;
-        };
-        (locals.contains(name)
-            && scope.get(name) == Some(&scalar_type("i64"))
-            && ty.as_ref().is_none_or(|ty| ty == &scalar_type("i64"))
-            && nonfallible_i64(value, scope))
-        .then_some(name.as_str())
-    };
-    match stmt {
-        NirStmt::If {
-            then_body,
-            else_body,
-            ..
-        } => match (then_body.as_slice(), else_body.as_slice()) {
-            ([update], []) | ([], [update]) => binding(update),
-            ([then_update], [else_update]) => {
-                let name = binding(then_update)?;
-                (name == binding(else_update)?).then_some(name)
+    // Bound normalization work independently of the native call-graph budget.
+    let mut pending = vec![(stmt, 0)];
+    let mut name = None;
+    while let Some((stmt, depth)) = pending.pop() {
+        match stmt {
+            NirStmt::Let {
+                name: binding,
+                ty,
+                value,
+            } if locals.contains(binding)
+                && scope.get(binding) == Some(&scalar_type("i64"))
+                && ty.as_ref().is_none_or(|ty| ty == &scalar_type("i64"))
+                && nonfallible_i64(value, scope) =>
+            {
+                if name.is_some_and(|name| name != binding.as_str()) {
+                    return None;
+                }
+                name = Some(binding.as_str());
             }
-            _ => None,
-        },
-        _ => binding(stmt),
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } if depth < 32
+                && then_body.len() <= 1
+                && else_body.len() <= 1
+                && !(then_body.is_empty() && else_body.is_empty()) =>
+            {
+                pending.extend(
+                    else_body
+                        .iter()
+                        .chain(then_body)
+                        .map(|stmt| (stmt, depth + 1)),
+                );
+            }
+            _ => return None,
+        }
     }
+    name
+}
+
+fn validate_update(
+    stmt: &NirStmt,
+    name: &str,
+    scope: &Scope,
+    updates: &BTreeSet<String>,
+    available: &BTreeSet<String>,
+) -> Option<()> {
+    let unavailable = updates
+        .iter()
+        .filter(|binding| binding.as_str() != name && !available.contains(*binding))
+        .map(String::as_str)
+        .collect();
+    let mut pending = vec![stmt];
+    while let Some(stmt) = pending.pop() {
+        match stmt {
+            NirStmt::Let { value, .. } => {
+                if loop_purity::expr_references_names(value, &unavailable) {
+                    return None;
+                }
+            }
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                validate_condition(condition, scope, updates, available)?;
+                pending.extend(else_body.iter().chain(then_body));
+            }
+            _ => return None,
+        }
+    }
+    Some(())
 }
 
 fn validate_condition(
@@ -283,3 +338,7 @@ mod tests {
         assert!(!catalog.contains_key("choose"));
     }
 }
+
+#[cfg(test)]
+#[path = "control_loops/nested_tests.rs"]
+mod nested_tests;

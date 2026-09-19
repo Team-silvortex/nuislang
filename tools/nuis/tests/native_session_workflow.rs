@@ -24,6 +24,8 @@ const AGGREGATE_ONE_SIDED_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_one_sided_loops.ns");
 const AGGREGATE_COMPOUND_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_compound_loops.ns");
+const AGGREGATE_NESTED_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_nested_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -167,6 +169,11 @@ fn native_guarded_compound_aggregate_build_cache_and_standalone_relocation() {
     check_workflow(AGGREGATE_COMPOUND_SOURCE);
 }
 
+#[test]
+fn native_guarded_nested_aggregate_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_NESTED_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -208,6 +215,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_CONDITIONAL_SOURCE,
         AGGREGATE_ONE_SIDED_SOURCE,
         AGGREGATE_COMPOUND_SOURCE,
+        AGGREGATE_NESTED_SOURCE,
     ]
     .contains(&source)
     {
@@ -222,6 +230,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_CONDITIONAL_SOURCE,
         AGGREGATE_ONE_SIDED_SOURCE,
         AGGREGATE_COMPOUND_SOURCE,
+        AGGREGATE_NESTED_SOURCE,
     ]
     .contains(&source)
     {
@@ -234,6 +243,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_CONDITIONAL_SOURCE,
         AGGREGATE_ONE_SIDED_SOURCE,
         AGGREGATE_COMPOUND_SOURCE,
+        AGGREGATE_NESTED_SOURCE,
     ]
     .contains(&source)
     {
@@ -255,6 +265,10 @@ fn check_workflow(source: &str) {
         assert!(llvm.contains("carry_predicate_and_rhs"));
         assert!(llvm.contains("carry_predicate_or_rhs"));
         assert!(llvm.contains("phi i1"));
+    }
+    if source == AGGREGATE_NESTED_SOURCE {
+        assert!(llvm.contains("@nuis_fn___nuis_scalar_iteration_"));
+        assert!(llvm.contains("@nuis_fn___nuis_buffer_branch_"));
     }
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");
