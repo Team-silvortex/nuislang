@@ -6,20 +6,23 @@ before changing a capability claim.
 
 ## Fast Reading Order
 
-The current `beta-0.12.*` priority is the ns-nova application-led dependency
+The current `beta-0.14.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The [beta-0.12 snapshot](versioning/nuis-beta-0.12.0-snapshot.md) records
-`505c820c` (`beta-0.12.2`); Git remains authoritative for later patches.
+The [beta-0.14 snapshot](versioning/nuis-beta-0.14.0-snapshot.md) records
+`1fcfd65` (`beta-0.14.1`, 2026-09-13); Git remains authoritative for later patches.
 
 1. [Repository overview](../README.md)
 2. [Mainline selection and acceptance coordinates](reference/nuis-development-tensor-mainline.md)
 3. [Machine-readable application boundary](reference/nuis-ns-nova-application-lifecycle-v1.toml)
-4. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
-5. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
-6. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
-7. [Focused validation checklist](versioning/nuis-beta-0.12.0-release-checklist.md)
+4. [Native scalar session bridge](reference/nuis-native-scalar-session-bridge-v1.md)
+5. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
+6. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
+7. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
+8. [Focused validation checklist](versioning/nuis-beta-0.14.0-release-checklist.md)
 
-Use the [versioning index](versioning/README.md) for the earlier
+Use the [versioning index](versioning/README.md) for the historical
+[beta-0.12 snapshot](versioning/nuis-beta-0.12.0-snapshot.md) and
+[checklist](versioning/nuis-beta-0.12.0-release-checklist.md), earlier
 [beta-0.10 migration entry](versioning/nuis-beta-0.10.0-self-hosting-entry.md),
 [beta-0.6 foundation](versioning/nuis-beta-0.6.0-mainline-entry.md) and older
 alpha/pre-alpha anchors. Those checkpoints must not replace current behavior.

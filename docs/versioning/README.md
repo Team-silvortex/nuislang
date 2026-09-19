@@ -7,13 +7,22 @@ workflow/history checkpoints, and policy notes.
 
 ### Current Line
 
-If you want the current line instead of historical backfill, start with:
+For the current `beta-0.14.*` line instead of historical backfill, start with:
+
+* [nuis-beta-0.14.0-snapshot.md](nuis-beta-0.14.0-snapshot.md)
+* [nuis-beta-0.14.0-release-checklist.md](nuis-beta-0.14.0-release-checklist.md)
+
+These record `1fcfd65` (`beta-0.14.1`, 2026-09-13); the `.0` filenames identify
+the minor series rather than retroactively assigning every feature to its first
+patch. Git remains authoritative for later source checkpoints. This documentation
+update does not create a release or certify every suite listed in the checklist.
+
+The previous application-session checkpoint remains historical:
 
 * [nuis-beta-0.12.0-snapshot.md](nuis-beta-0.12.0-snapshot.md)
 * [nuis-beta-0.12.0-release-checklist.md](nuis-beta-0.12.0-release-checklist.md)
 
-These record `beta-0.12.2`; the `.0` filenames identify the minor series rather
-than retroactively assigning every feature to its first patch. The governing
+Those files still record `505c820c` (`beta-0.12.2`). The governing
 application-led agreement and migration-entry history remain:
 
 * [nuis-beta-0.11-application-led-mainline.md](nuis-beta-0.11-application-led-mainline.md)
@@ -31,9 +40,9 @@ The previous curated beta anchors are:
 * [nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md)
 * [nuis-beta-0.0.1-doc-sync-inventory.md](nuis-beta-0.0.1-doc-sync-inventory.md)
 
-The `beta-0.2.*`, `beta-0.4.*`, and `beta-0.5.*` patch sequences remain
-available in Git history. No retrospective phase documents are invented for
-them after the fact.
+The `beta-0.2.*`, `beta-0.4.*`, `beta-0.5.*`, and `beta-0.13.*` patch sequences
+remain available in Git history. No retrospective phase documents are invented
+for them after the fact.
 
 Earlier alpha anchors are:
 
@@ -53,6 +62,8 @@ Earlier alpha anchors are:
 
 Use this section when the question is:
 
+* what beta-0.14 records for bounded native scalar sessions, conditional loop
+  carries, artifact restoration, and the distinction between build and execution evidence
 * what beta-0.12 established for persistent windows, independent cancellation
   tickets and the remaining AppKit/provider-retirement boundary
 * why ns-nova application work drives general foundation fixes and measured
@@ -128,7 +139,7 @@ Use this set when the question is:
 * what the current compile workflow grew out of
 * which ABI terms are now canonical
 * where frontend/NIR truth currently outruns the deeper CLI/source-compile route
-* which branch-local runtime-lowering rewrites are already test-backed
+* which branch-local runtime-lowering rewrites are already regression-backed
 * which generic validation surfaces are already regression-backed across
   explicit calls, struct literals, `if` / `match`, and lambda bodies
 * which receiver explicit-generic method-call surfaces are already
@@ -192,7 +203,8 @@ Read:
 
 Practical rule:
 
-* start at the current `beta-0.12.*` application-session snapshot first
+* start at the current `beta-0.14.*` native-session checkpoint and validation checklist
+* use `beta-0.12.*` for the previous application-session snapshot
 * use `beta-0.11.*` for the governing application-led direction
 * use `beta-0.10.*` for the historical staged-migration entry
 * use `beta-0.6.*` for the previous curated foundation snapshot
