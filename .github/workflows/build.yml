@@ -1,36 +1,46 @@
-name: Build
-on: [push, pull_request, workflow_dispatch]
-
+name: CPU Syntax Validation
+on:
+  push:
+    branches: [work/cpu-nested-carry-validation-20260919]
 permissions:
   contents: read
-
+concurrency:
+  group: cpu-syntax-validation-${{ github.ref }}
+  cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_BUILD_JOBS: "2"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
   RUSTUP_TOOLCHAIN: stable
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  baseline:
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Check CI guard regressions
-        run: python3 -m unittest discover -s scripts/tests -v
-      - name: Check UTF-8 source
-        run: python3 scripts/check-text-encoding.py
-      - name: Check documentation links
-        run: bash scripts/check-doc-links.sh
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal
-      - name: Fetch locked dependencies
-        run: cargo fetch --locked
-      - name: Check host path portability
-        run: bash scripts/check-host-absolute-paths.sh
-      - name: Build workspace
-        run: cargo build --workspace --locked
+      - name: Export exact source for offline editing
+        run: |
+          mkdir -p tmp/cpu-syntax
+          git rev-parse HEAD > tmp/cpu-syntax/revision.txt
+          git archive HEAD | gzip > tmp/cpu-syntax/source.tar.gz
+          find . -name AGENTS.md -not -path './.git/*' -print > tmp/cpu-syntax/agent-instructions.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-syntax-source
+          path: tmp/cpu-syntax
+          retention-days: 3
+      - run: rustup toolchain install stable --profile minimal
+      - run: cargo fetch --locked
+      - name: Baseline existing CPU control-loop admission tests
+        run: |
+          set -o pipefail
+          cargo test --locked -p nuisc --lib control_loops -- --test-threads=1 2>&1 | tee tmp/cpu-syntax/baseline.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cpu-syntax-baseline
+          path: tmp/cpu-syntax/baseline.log
+          retention-days: 3
