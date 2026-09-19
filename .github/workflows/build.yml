@@ -1,12 +1,9 @@
-name: CPU Syntax Validation
+name: CPU Metadata Validation
 on:
   push:
-    branches: [work/cpu-nested-carry-validation-20260919]
+    branches: [work/cpu-nested-metadata-validation-20260919]
 permissions:
   contents: read
-concurrency:
-  group: cpu-syntax-validation-${{ github.ref }}
-  cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_BUILD_JOBS: "2"
@@ -14,14 +11,9 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
   RUSTUP_TOOLCHAIN: stable
 jobs:
-  validate:
-    name: cpu-${{ matrix.suite }}
+  metadata:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [source, native, frontdoor]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -29,47 +21,63 @@ jobs:
           fetch-depth: 0
       - run: rustup toolchain install stable --profile minimal --component rustfmt
       - run: cargo fetch --locked
-      - name: Apply exact final source with input and output identity guards
-        run: python3 .cpu-apply-final.py
-      - name: Validate the complete selected CPU regression lane
-        env:
-          SUITE: ${{ matrix.suite }}
+      - run: python3 .cpu-apply-final.py
+      - name: Remove stale capability prose without changing CPU algorithms
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, tarfile, subprocess
+          out = Path('tmp/cpu-final')
+          original = json.loads((out / 'manifest.json').read_text())
+          files = {i['path']: i for i in original}
+          edits = json.loads(Path('.cpu-metadata-delta.json').read_text())
+          assert {i['path'] for i in edits} == {'docs/reference/nuis-development-tensor.md', 'tools/nuis/src/dev_tensor_data.rs', 'tools/nuis/src/dev_tensor_mainline_tests.rs'}
+          for item in edits:
+              p = Path(item['path'])
+              data = p.read_bytes()
+              assert hashlib.sha256(data).hexdigest() == item['before_sha256']
+              s = data.decode()
+              for old, new in item['replacements']:
+                  assert s.count(old) == 1
+                  s = s.replace(old, new)
+              data = s.encode()
+              assert hashlib.sha256(data).hexdigest() == item['after_sha256']
+              p.write_bytes(data)
+              files[str(p)] = {'path': str(p), 'sha256': item['after_sha256'], 'git_blob_sha': hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest(), 'size': len(data)}
+          unchanged = set(files) - {i['path'] for i in edits}
+          assert len(unchanged) == 16
+          for item in original:
+              if item['path'] in unchanged:
+                  assert hashlib.sha256(Path(item['path']).read_bytes()).hexdigest() == item['sha256']
+          manifest = [files[p] for p in sorted(files)]
+          (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          (out / 'metadata-manifest.json').write_text(json.dumps([files[i['path']] for i in edits], indent=2) + '\n')
+          (out / 'review.patch').write_bytes(subprocess.check_output(['git', 'diff', '--binary', '09d097fd070ceb0a633d161c0c34d7185530abee', '--', *files]))
+          with tarfile.open(out / 'source.tar.gz', 'w:gz') as archive:
+              for p in sorted(files):
+                  archive.add(p, arcname=p)
+          print('Only two tensor data/test files and one reference document differ from full CPU validation; 16 source files are byte-identical.')
+          PY
+      - name: Validate final metadata and compiled Nuis frontdoor
         run: |
           set -euo pipefail
-          rustc -Vv > tmp/cpu-final/toolchain.txt
-          clang --version >> tmp/cpu-final/toolchain.txt
-          case "$SUITE" in
-            source)
-              python3 -m unittest discover -s scripts/tests -v 2>&1 | tee tmp/cpu-final/python.log
-              python3 scripts/check-text-encoding.py 2>&1 | tee tmp/cpu-final/encoding.log
-              bash scripts/check-doc-links.sh 2>&1 | tee tmp/cpu-final/doclinks.log
-              python3 - <<'PY'
-          import json, subprocess
-          from pathlib import Path
-          for item in json.loads(Path('tmp/cpu-final/manifest.json').read_text()):
-              if item['path'].endswith('.rs'):
-                  subprocess.run(['rustfmt', '--check', '--edition', '2021', '--config', 'skip_children=true', item['path']], check=True)
-          PY
-              cargo test --locked -p nuisc --lib buffer_loop_outline -- --test-threads=1 2>&1 | tee tmp/cpu-final/outline.log
-              cargo test --locked -p nuis --bin nuis dev_tensor -- --test-threads=1 2>&1 | tee tmp/cpu-final/tensor.log
-              cargo test --locked -p nuisc --test file_line_limit -- --test-threads=1 2>&1 | tee tmp/cpu-final/lines.log
-              ;;
-            native)
-              cargo test --locked -p nuisc --test native_application_bridge -- --test-threads=1 2>&1 | tee tmp/cpu-final/native.log
-              ;;
-            frontdoor)
-              cargo test --locked -p nuis --test native_session_workflow -- --test-threads=1 2>&1 | tee tmp/cpu-final/frontdoor.log
-              ;;
-          esac
+          git diff --check
+          rustfmt --check --edition 2021 --config skip_children=true tools/nuis/src/dev_tensor_data.rs tools/nuis/src/dev_tensor_mainline_tests.rs
+          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee tmp/cpu-final/python.log
+          python3 scripts/check-text-encoding.py 2>&1 | tee tmp/cpu-final/encoding.log
+          bash scripts/check-doc-links.sh 2>&1 | tee tmp/cpu-final/doclinks.log
+          cargo test --locked -p nuis --bin nuis dev_tensor -- --test-threads=1 2>&1 | tee tmp/cpu-final/tensor.log
+          cargo test --locked -p nuisc --test file_line_limit -- --test-threads=1 2>&1 | tee tmp/cpu-final/lines.log
+          cargo test --locked -p nuis --test native_session_workflow native_guarded_nested_aggregate_build_cache_and_standalone_relocation -- --exact --test-threads=1 2>&1 | tee tmp/cpu-final/final-frontdoor.log
           echo passed > tmp/cpu-final/acceptance.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cpu-final-${{ matrix.suite }}
+          name: cpu-final-metadata
           path: tmp/cpu-final
           retention-days: 7
   publish:
-    needs: validate
+    needs: metadata
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -78,26 +86,21 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: cpu-final-*
+          name: cpu-final-metadata
           path: evidence
-      - name: Verify all lanes and create unattached source blobs only
+      - name: Create unattached verified metadata blobs only
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
           import base64, hashlib, json, os, tarfile, urllib.request
           from pathlib import Path
-          manifests = []
-          for suite in ('source', 'native', 'frontdoor'):
-              root = Path('evidence') / ('cpu-final-' + suite)
-              assert (root / 'acceptance.txt').read_text().strip() == 'passed'
-              manifests.append(json.loads((root / 'manifest.json').read_text()))
-          assert manifests[0] == manifests[1] == manifests[2]
-          manifest = manifests[0]
-          assert len(manifest) == 18
+          root = Path('evidence')
+          assert (root / 'acceptance.txt').read_text().strip() == 'passed'
+          manifest = json.loads((root / 'metadata-manifest.json').read_text())
+          assert {i['path'] for i in manifest} == {'docs/reference/nuis-development-tensor.md', 'tools/nuis/src/dev_tensor_data.rs', 'tools/nuis/src/dev_tensor_mainline_tests.rs'}
           blobs = []
-          with tarfile.open('evidence/cpu-final-source/source.tar.gz', 'r:gz') as archive:
-              assert sorted(archive.getnames()) == sorted(item['path'] for item in manifest)
+          with tarfile.open(root / 'source.tar.gz', 'r:gz') as archive:
               for item in manifest:
                   member = archive.getmember(item['path'])
                   assert member.isfile()
@@ -106,14 +109,14 @@ jobs:
                   assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == item['git_blob_sha']
                   request = urllib.request.Request('https://api.github.com/repos/Team-silvortex/nuislang/git/blobs', data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(), method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
                   with urllib.request.urlopen(request) as response:
-                      created = json.load(response)
-                  assert created['sha'] == item['git_blob_sha']
-                  blobs.append({'path': item['path'], 'sha': created['sha'], 'sha256': item['sha256'], 'size': item['size']})
-          Path('evidence/verified-blobs.json').write_text(json.dumps(blobs, indent=2) + '\n')
-          print('All three complete lanes passed; 18 unattached blobs created. No ref, branch or PR was changed.')
+                      result = json.load(response)
+                  assert result['sha'] == item['git_blob_sha']
+                  blobs.append({'path': item['path'], 'sha': result['sha'], 'sha256': item['sha256'], 'size': item['size']})
+          (root / 'verified-blobs.json').write_text(json.dumps(blobs, indent=2) + '\n')
+          print('Three validated metadata blobs created. No refs or branches modified.')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: cpu-nested-verified-source
+          name: cpu-metadata-verified-source
           path: evidence
           retention-days: 7
