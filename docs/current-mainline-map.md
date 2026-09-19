@@ -228,12 +228,19 @@ accepted/skipped callbacks and nine real traps; volatile comparison counters
 agree with independent short-circuit evaluation, not just final state values.
 Nested RHS kind drift rejects even on zero trips. A shared parser depth guard
 also protects the general verifier, which runs before native admission.
-Nested carry-update arms and arbitrary loop bodies remain fail-closed;
-per-return allocation remains an optimization target.
+Nested carry-update arms now use scoped iteration helpers with guarded branch
+calls. The driver retains finite, non-wrapping induction preflight; decisions see
+the source's stepped index and earlier updated carries. Three distinct leaf
+updates and implicit keep no longer require collapse to two values. Compound
+conditions inside these helpers use neutral-false guards and preserve actual
+short-circuit comparison counts. General multi-statement loop bodies remain
+fail-closed; per-return allocation remains an optimization target.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
-aggregate-conditional, aggregate-one-sided and aggregate-compound fixtures compose
-with typed lifecycle and multi-state break/continue. All ten frontdoor regressions
-pass, including cache isolation, tamper rejection and standalone restoration.
+aggregate-conditional, aggregate-one-sided, aggregate-compound and aggregate-nested
+fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
+suite now contains eleven regressions for cache isolation, tamper rejection and
+standalone restoration. Use the execution logs for the tested revision/platform,
+not the test count alone, as acceptance evidence.
 The passing default image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.
 Linux hardware and Windows transport

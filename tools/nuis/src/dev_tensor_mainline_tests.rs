@@ -307,8 +307,15 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("two exact 76800-byte Metal frames"));
     assert!(session.next_step.starts_with(
-        "extend nested conditional carry-update arms inside guarded flat-value helpers"
+        "extend ordered multi-statement loop bodies inside guarded flat-value helpers"
     ));
+    assert!(session
+        .evidence
+        .contains("private scoped iteration helpers and guarded bool predicates"));
+    assert!(session.evidence.contains("aggregate-nested fixture"));
+    assert!(!session
+        .evidence
+        .contains("Nested conditional carry-update arms remain fail-closed"));
     assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
         .evidence
@@ -353,9 +360,9 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("40 cases, including nested-loop scope"));
-    assert!(session.blocker.contains(
-        "Nested conditional carry-update arms inside flat-value branch helpers still reject"
-    ));
+    assert!(session
+        .blocker
+        .contains("Nested conditional carry-update arms now use private scoped iteration helpers"));
     assert!(session.evidence.contains("1357 accepted/skipped callbacks"));
     assert!(session
         .evidence

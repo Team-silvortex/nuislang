@@ -221,8 +221,12 @@ reference execution remain separate. Pure leaf comparisons now compose with
 `&&`/`||`, including nesting and grouping, through the same YIR condition tree.
 LLVM emits short-circuit blocks; every RHS retains exact-kind checking, including
 unreached leaves. General verification and native admission have independent
-condition-depth limits. Nested carry-update arms and general loop bodies remain
-the next automatic-normalization boundaries.
+condition-depth limits. Nested carry-update arms now normalize to one private
+scoped iteration helper, preserving step-first decisions, ordered sibling reads
+and each carry's own value on empty arms. Guarded bool helpers preserve short-circuit
+`&&`/`||` inside the outlined iteration; no new CPU opcode or callback ABI is added.
+Source guard depth and native call-graph/induction budgets remain independently
+checked. General multi-statement loop bodies remain a separate normalization boundary.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary
