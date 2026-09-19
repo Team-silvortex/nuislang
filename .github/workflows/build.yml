@@ -14,33 +14,42 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
   RUSTUP_TOOLCHAIN: stable
 jobs:
-  baseline:
+  validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Export exact source for offline editing
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - run: cargo fetch --locked
+      - name: Apply and format exact proposed source
         run: |
           mkdir -p tmp/cpu-syntax
+          base64 --decode .cpu-syntax.patch.b64 | gzip -d > tmp/cpu-syntax/source.patch
+          echo 'a39540dfe6c52d25cbf5477a6f5a8bb89a213c7909026566ff2bc98afee6ca77  tmp/cpu-syntax/source.patch' | sha256sum --check
+          git apply --check tmp/cpu-syntax/source.patch
+          git apply tmp/cpu-syntax/source.patch
+          git add -N tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested_tests.rs tools/nuisc/tests/native_application_bridge/aggregate_nested.rs
+          git diff --name-only > tmp/cpu-syntax/changed-files.txt
+          while IFS= read -r file; do rustfmt --edition 2021 --config skip_children=true "$file"; done < tmp/cpu-syntax/changed-files.txt
+          git diff --check
+          git diff --binary > tmp/cpu-syntax/formatted.patch
+          tar czf tmp/cpu-syntax/changed-source.tar.gz -T tmp/cpu-syntax/changed-files.txt
           git rev-parse HEAD > tmp/cpu-syntax/revision.txt
-          git archive HEAD | gzip > tmp/cpu-syntax/source.tar.gz
-          find . -name AGENTS.md -not -path './.git/*' -print > tmp/cpu-syntax/agent-instructions.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cpu-syntax-source
-          path: tmp/cpu-syntax
-          retention-days: 3
-      - run: rustup toolchain install stable --profile minimal
-      - run: cargo fetch --locked
-      - name: Baseline existing CPU control-loop admission tests
+          rustc -Vv > tmp/cpu-syntax/toolchain.txt
+          clang --version >> tmp/cpu-syntax/toolchain.txt
+      - name: CPU admission and safety regressions
         run: |
           set -o pipefail
-          cargo test --locked -p nuisc --lib control_loops -- --test-threads=1 2>&1 | tee tmp/cpu-syntax/baseline.log
+          cargo test --locked -p nuisc --lib control_loops -- --test-threads=1 2>&1 | tee tmp/cpu-syntax/admission.log
+      - name: Native and reference nested-carry regressions
+        run: |
+          set -o pipefail
+          cargo test --locked -p nuisc --test native_application_bridge aggregate_nested -- --test-threads=1 2>&1 | tee tmp/cpu-syntax/native.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cpu-syntax-baseline
-          path: tmp/cpu-syntax/baseline.log
+          name: cpu-syntax-validation
+          path: tmp/cpu-syntax
           retention-days: 3
