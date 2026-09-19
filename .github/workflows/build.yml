@@ -30,6 +30,14 @@ jobs:
           echo 'a39540dfe6c52d25cbf5477a6f5a8bb89a213c7909026566ff2bc98afee6ca77  tmp/cpu-syntax/source.patch' | sha256sum --check
           git apply --check tmp/cpu-syntax/source.patch
           git apply tmp/cpu-syntax/source.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs')
+          s = p.read_text()
+          old = 'pub(super) fn outline('
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, 'pub(in crate::lowering::buffer_loop_outline) fn outline('))
+          PY
           git add -N tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested_tests.rs tools/nuisc/tests/native_application_bridge/aggregate_nested.rs
           git diff --name-only > tmp/cpu-syntax/changed-files.txt
           while IFS= read -r file; do rustfmt --edition 2021 --config skip_children=true "$file"; done < tmp/cpu-syntax/changed-files.txt
@@ -53,3 +61,26 @@ jobs:
           name: cpu-syntax-validation
           path: tmp/cpu-syntax
           retention-days: 3
+  offline-tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Package only public toolchain binaries and vendored locked dependencies
+        run: |
+          mkdir -p tmp/offline
+          cargo vendor --locked tmp/offline/vendor > tmp/offline/vendor-config.toml
+          sysroot="$(rustc --print sysroot)"
+          tar czf tmp/offline/rust-toolchain.tar.gz -C "$sysroot" bin/cargo bin/rustc bin/rustfmt lib
+          tar czf tmp/offline/vendor.tar.gz -C tmp/offline vendor
+          rm -rf tmp/offline/vendor
+          sha256sum tmp/offline/*.tar.gz > tmp/offline/digests.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-offline-tools
+          path: tmp/offline
+          retention-days: 1
+          compression-level: 0
