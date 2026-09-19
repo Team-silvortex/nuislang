@@ -16,10 +16,13 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.12.*`. Git history is authoritative for the exact
-patch checkpoint; Cargo package versions are independent of the project release.
-The [beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) records
-checkpoint `505c820c` (`beta-0.12.2`), not a new release or compatibility freeze.
+The repository is on `beta-0.14.*`. The recorded source checkpoint is
+`1fcfd65` (`beta-0.14.1`, 2026-09-13). Git history is authoritative for later
+patches; Cargo package versions are independent of the project release.
+The [beta-0.14 snapshot](docs/versioning/nuis-beta-0.14.0-snapshot.md) records
+this checkpoint, not a new release or compatibility freeze. The
+[beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) remains the
+historical record of `505c820c` (`beta-0.12.2`).
 
 The mainline is **ns-nova application-led development**: grow one Nuis-owned
 interactive image application, fix the foundation gaps it exposes, measure
@@ -340,6 +343,11 @@ source-only checks, locked dependency fetch, focused portability validation and
 the workspace build. A clean checkout must not need existing Cargo caches or
 generated `target/` files to pass its source guards.
 
+The current Ubuntu [Build workflow](.github/workflows/build.yml) runs those
+checks, including one exact host-path portability test; it does not run the full
+compiler semantic, native-session, self-hosting candidate or physical GPU suites.
+A green Build is not whole-toolchain or cross-platform certification.
+
 Prefer focused checks rather than rebuilding the workspace on every edit:
 
 ```bash
@@ -350,8 +358,10 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-The [beta-0.12 validation checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
-lists the separate lifecycle, compiled-Nuis and real Metal checks.
+The [beta-0.14 validation checklist](docs/versioning/nuis-beta-0.14.0-release-checklist.md)
+separates existing CI coverage from focused native, migration and provider checks.
+The [beta-0.12 checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
+remains historical evidence, not a current acceptance result.
 For disk cleanup, inspect `scripts/disk-clean-safe.sh` output before choosing
 `--apply`; do not remove source or unrelated project data.
 
