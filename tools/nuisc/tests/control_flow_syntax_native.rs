@@ -520,3 +520,73 @@ fn dynamic_while_let_bool_payload_drives_native_replacement() {
     );
     assert_eq!(status.code(), Some(33));
 }
+
+#[test]
+fn nested_carry_scoped_iteration_preserves_native_entry_result() {
+    let status = compile_and_run(
+        "nested_carry_entry",
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = value + 1;
+              if value > 3 {
+                let acc: i64 = acc + value;
+              } else {
+                if value > 1 {
+                  let acc: i64 = acc + value;
+                } else {
+                  let acc: i64 = acc + 0;
+                }
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(14));
+}
+
+#[test]
+fn callable_main_wrapper_avoids_user_helper_collisions_natively() {
+    let source = r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = value + 1;
+              if value > 3 {
+                let acc: i64 = acc + value;
+              } else {
+                if value > 1 {
+                  let acc: i64 = acc + value;
+                } else {
+                  let acc: i64 = acc + 0;
+                }
+              }
+            }
+            return acc;
+          }
+        }
+        "#
+    .replace(
+        "fn main()",
+        "@noinline fn __nuis_entry_main_0() -> i64 { return 3; }
+@noinline fn __nuis_entry_main_1() -> i64 { return 5; }
+fn main()",
+    )
+    .replace(
+        "return acc;",
+        "return acc + __nuis_entry_main_0() + __nuis_entry_main_1();",
+    )
+    .replace(
+        "let acc: i64 = acc + value;",
+        "let acc: i64 = acc + value; let acc: i64 = acc + 1;",
+    );
+    let status = compile_and_run("sequence_main_collision", &source);
+    assert_eq!(status.code(), Some(26));
+}

@@ -101,8 +101,6 @@ fn empty_or_malformed_carry_arms_cannot_create_or_erase_state() {
         "if index > initial { let fresh: i64 = index; }",
         "if index > initial { let total: i64 = total + index; print(total); }",
         "if index > initial { print(total); } else { let total: i64 = total + index; }",
-        "if index > initial { let total: i64 = total + index; let total: i64 = total * index; }",
-        "if index > initial { let total: i64 = total + index; } else { let checksum: i64 = checksum + index; }",
         "if index > initial { let total: i64 = total / index; }",
         "if index > initial { let total: i64 = total + checksum; }",
         "if index > total { let total: i64 = total + index; }",

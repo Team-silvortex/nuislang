@@ -226,7 +226,11 @@ scoped iteration helper, preserving step-first decisions, ordered sibling reads
 and each carry's own value on empty arms. Guarded bool helpers preserve short-circuit
 `&&`/`||` inside the outlined iteration; no new CPU opcode or callback ABI is added.
 Source guard depth and native call-graph/induction budgets remain independently
-checked. General multi-statement loop bodies remain a separate normalization boundary.
+checked. Ordered multi-statement carry bodies now use the same helper: repeated
+writes share one return slot, branch arms may update different carry sets, and
+untaken arms retain incoming values. Later statements observe preceding writes;
+short-circuit guards and source-order sibling restrictions remain enforced.
+Iteration-local temporaries, body calls/effects and fallible updates remain separate.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary

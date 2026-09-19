@@ -307,12 +307,13 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("two exact 76800-byte Metal frames"));
     assert!(session.next_step.starts_with(
-        "extend ordered multi-statement loop bodies inside guarded flat-value helpers"
+        "extend iteration-local scalar temporaries inside guarded multi-statement loops"
     ));
     assert!(session
         .evidence
         .contains("private scoped iteration helpers and guarded bool predicates"));
     assert!(session.evidence.contains("aggregate-nested fixture"));
+    assert!(session.evidence.contains("aggregate-sequences fixture"));
     assert!(!session
         .evidence
         .contains("Nested conditional carry-update arms remain fail-closed"));

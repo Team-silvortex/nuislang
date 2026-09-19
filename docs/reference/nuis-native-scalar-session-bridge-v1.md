@@ -118,12 +118,12 @@ automatic normalizer. The narrower Buffer catalog is unchanged.
 ### Nested Carry-Update Arms
 
 Nested `if`/`else`, including `else if` and empty arms, may update the same local i64
-carry once along each selected path. Different leaves may compute three or more
+carry in source order along each selected path. Different leaves may compute three or more
 distinct nonfallible i64 results; an empty arm retains that carry's incoming value.
 Every condition still compares the stepped index or an earlier updated carry with
 an invariant i64 atom. Every leaf is checked, including unreachable leaves, and
-forward sibling reads, effects, calls, fallible update arithmetic, multiple updates
-inside one arm and header mutation remain rejected. The source shape scan allows
+forward sibling reads, effects, calls, fallible update arithmetic and header mutation
+remain rejected. Ordered multi-statement updates are described below. The source shape scan allows
 at most 32 nested guards; native closure and slot limits remain independent.
 
 The normalizer outlines one private iteration function through the existing
@@ -140,6 +140,50 @@ the existing neutral-false guard contract (`a || b = !(!a && !b)`), without dupl
 arm bodies or relaxing native guard admission. One helper per logical edge keeps
 this part of normalization linear. An unselected branch can still allocate its
 neutral aggregate return; balanced release does not imply allocation-free execution.
+
+### Ordered Multi-Statement Carry Bodies
+
+The scoped iteration route also admits sequential writes to pre-existing mutable
+i64 locals, multiple statements in either arm, and different write sets in the
+then/else arms. Each unique carry is captured and returned once in first lexical
+write order; repeated assignments do not add return slots or driver steps.
+Branch decisions are snapshotted before their arms execute, so mutations cannot
+retroactively change which arm was selected. Prefixes and suffixes run in order.
+
+```text
+let index: i64 = initial;
+let total: i64 = seed;
+let checksum: i64 = 0;
+while index < limit {
+  let index: i64 = index + stride;
+  let total: i64 = total + index;
+  if total < pivot {
+    let total: i64 = total * 2;
+    let checksum: i64 = checksum + total;
+  } else {
+    let total: i64 = total - 1;
+  }
+  let total: i64 = total + checksum;
+}
+```
+
+The no-forward-sibling-read policy is unchanged: an update reads its own current
+value, invariant atoms, or carries made available by preceding statements.
+Conditions still compare the stepped index or a preceding carry with an invariant
+i64 atom. Each arm is checked from the same incoming availability, independently
+of the other arm. At the join, both write sets become available because all names
+were seeded before the loop and every untaken write retains its own input.
+All leaves, including unreachable ones, retain type, ownership and effect checks.
+New iteration-local bindings, constants/parameters as update targets, body calls,
+fallible updates, general inner loops and a second induction write remain rejected.
+This is a bounded multi-statement carry profile, not arbitrary imperative code.
+
+[Sequence execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_sequences.rs)
+compare registered reference and native CPU execution with an independent wrapping
+oracle and actual predicate/iteration/allocation counters. The
+[sequence lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_sequences_loops.ns)
+also crosses the ordinary build, cache, tamper rejection and standalone-restoration
+path. These test definitions are not Windows, macOS or GPU execution evidence.
 
 Native conditional chains reuse the existing shared metadata parser and LLVM
 emitter, but admit only bounded trees of pure comparisons and nonfallible add/multiply/keep
@@ -739,11 +783,12 @@ Neither platform's CPU results certify Windows execution or device-provider pari
 
 ## Next Boundary
 
-Extend ordered multi-statement loop bodies inside guarded flat-value helpers,
-without introducing eager evaluation or bypassing the scoped iteration contract.
+Extend iteration-local scalar temporaries inside guarded multi-statement loops,
+without leaking branch-local bindings, introducing eager evaluation or bypassing
+the scoped iteration contract.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested-aggregate
+checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested/sequence-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

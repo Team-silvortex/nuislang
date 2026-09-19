@@ -233,12 +233,17 @@ calls. The driver retains finite, non-wrapping induction preflight; decisions se
 the source's stepped index and earlier updated carries. Three distinct leaf
 updates and implicit keep no longer require collapse to two values. Compound
 conditions inside these helpers use neutral-false guards and preserve actual
-short-circuit comparison counts. General multi-statement loop bodies remain
-fail-closed; per-return allocation remains an optimization target.
+short-circuit comparison counts. Multi-statement bodies now support repeated
+writes, asymmetric branch write sets, and ordered prefix/branch/suffix updates
+through the same iteration helper. Each seeded carry has one return slot regardless
+of its write count. Branch-local validation does not borrow writes from a sibling
+arm; after the join, an untaken arm preserves the binding's own input value.
+Iteration-local temporaries and effectful/fallible body operations remain separate;
+per-return allocation remains an optimization target.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
-aggregate-conditional, aggregate-one-sided, aggregate-compound and aggregate-nested
-fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
-suite now contains eleven regressions for cache isolation, tamper rejection and
+aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested
+and aggregate-sequences fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
+suite now contains twelve regressions for cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.
 The passing default image host still executes embedded YIR.

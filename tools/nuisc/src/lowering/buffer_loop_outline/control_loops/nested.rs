@@ -4,15 +4,27 @@ use super::*;
 mod conditions;
 
 pub(super) fn present(body: &[NirStmt]) -> bool {
+    let mut seen = BTreeSet::new();
     body.iter().any(|stmt| match stmt {
+        NirStmt::Let { name, .. } => !seen.insert(name.as_str()),
         NirStmt::If {
             then_body,
             else_body,
             ..
-        } => then_body
-            .iter()
-            .chain(else_body)
-            .any(|stmt| matches!(stmt, NirStmt::If { .. })),
+        } => {
+            let arms = then_body.iter().chain(else_body);
+            let mut names = BTreeSet::new();
+            for stmt in arms {
+                let NirStmt::Let { name, .. } = stmt else {
+                    return true;
+                };
+                names.insert(name.as_str());
+            }
+            then_body.len() > 1
+                || else_body.len() > 1
+                || names.len() > 1
+                || names.into_iter().any(|name| !seen.insert(name))
+        }
         _ => false,
     })
 }
@@ -96,15 +108,9 @@ impl Builder<'_> {
             unreachable!("admitted induction binding")
         };
         let effects = original.collect::<Vec<_>>();
-        let locals = scope.keys().cloned().collect();
-        let carries = effects
-            .iter()
-            .map(|stmt| {
-                update_name(stmt, scope, &locals)
-                    .expect("admitted nested carry")
-                    .to_owned()
-            })
-            .collect::<Vec<_>>();
+        // A state field belongs to a binding, not to a statement. Repeated
+        // writes and different branch write sets return each carry exactly once.
+        let carries = sequences::carry_names(&effects);
         let mut mutations = MutationScope {
             writable: carries.iter().cloned().collect(),
             protected: BTreeSet::new(),
