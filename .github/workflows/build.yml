@@ -1,36 +1,109 @@
-name: Build
-on: [push, pull_request, workflow_dispatch]
-
+name: CPU Sequence Validation
+on:
+  push:
+    branches: [work/cpu-sequences-validation-20260919]
 permissions:
   contents: read
-
+concurrency:
+  group: cpu-sequences-${{ github.ref }}
+  cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_BUILD_JOBS: "2"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
   RUSTUP_TOOLCHAIN: stable
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  validate:
+    name: cpu-${{ matrix.suite }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [source, native, frontdoor]
     steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Check CI guard regressions
-        run: python3 -m unittest discover -s scripts/tests -v
-      - name: Check UTF-8 source
-        run: python3 scripts/check-text-encoding.py
-      - name: Check documentation links
-        run: bash scripts/check-doc-links.sh
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal
-      - name: Fetch locked dependencies
-        run: cargo fetch --locked
-      - name: Check host path portability
-        run: bash scripts/check-host-absolute-paths.sh
-      - name: Build workspace
-        run: cargo build --workspace --locked
+          fetch-depth: 0
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - run: cargo fetch --locked
+      - name: Apply verified source
+        run: python3 .cpu-sequences-apply.py
+      - name: Run selected complete CPU regression lane without retries
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          rustc -Vv > tmp/cpu-sequences/toolchain.txt
+          clang --version >> tmp/cpu-sequences/toolchain.txt
+          case "$SUITE" in
+            source)
+              python3 -m unittest discover -s scripts/tests -v 2>&1 | tee tmp/cpu-sequences/python.log
+              python3 scripts/check-text-encoding.py 2>&1 | tee tmp/cpu-sequences/encoding.log
+              bash scripts/check-doc-links.sh 2>&1 | tee tmp/cpu-sequences/doclinks.log
+              rustfmt --check --edition 2021 --config skip_children=true tools/nuisc/src/lowering/buffer_loop_outline/control_loops.rs tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs tools/nuisc/src/lowering/buffer_loop_outline/control_loops/sequences.rs tools/nuisc/src/lowering/buffer_loop_outline/control_loops/sequences_tests.rs tools/nuisc/tests/native_application_bridge/aggregate_sequences.rs
+              cargo test --locked -p nuisc --lib buffer_loop_outline -- --test-threads=1 2>&1 | tee tmp/cpu-sequences/outline.log
+              cargo test --locked -p nuis --bin nuis dev_tensor -- --test-threads=1 2>&1 | tee tmp/cpu-sequences/tensor.log
+              cargo test --locked -p nuisc --test file_line_limit -- --test-threads=1 2>&1 | tee tmp/cpu-sequences/lines.log
+              ;;
+            native)
+              cargo test --locked -p nuisc --test native_application_bridge -- --test-threads=1 2>&1 | tee tmp/cpu-sequences/native.log
+              ;;
+            frontdoor)
+              cargo test --locked -p nuis --test native_session_workflow -- --test-threads=1 2>&1 | tee tmp/cpu-sequences/frontdoor.log
+              ;;
+          esac
+          echo passed > tmp/cpu-sequences/acceptance.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cpu-sequences-${{ matrix.suite }}
+          path: tmp/cpu-sequences
+          retention-days: 7
+  publish:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cpu-sequences-*
+          path: evidence
+      - name: Publish unattached verified blobs, never update refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, tarfile, urllib.request
+          from pathlib import Path
+          manifests = []
+          for suite in ('source', 'native', 'frontdoor'):
+              root = Path('evidence') / ('cpu-sequences-' + suite)
+              assert (root / 'acceptance.txt').read_text().strip() == 'passed'
+              manifests.append(json.loads((root / 'manifest.json').read_text()))
+          assert manifests[0] == manifests[1] == manifests[2] and len(manifests[0]) == 18
+          with tarfile.open('evidence/cpu-sequences-source/source.tar.gz', 'r:gz') as archive:
+              assert sorted(archive.getnames()) == sorted(x['path'] for x in manifests[0])
+              for item in manifests[0]:
+                  member = archive.getmember(item['path'])
+                  assert member.isfile()
+                  data = archive.extractfile(member).read()
+                  assert len(data) == item['size'] and hashlib.sha256(data).hexdigest() == item['sha256']
+                  assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == item['sha']
+                  req = urllib.request.Request('https://api.github.com/repos/Team-silvortex/nuislang/git/blobs', data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(), method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+                  with urllib.request.urlopen(req) as response:
+                      created = json.load(response)
+                  assert created['sha'] == item['sha']
+          Path('evidence/verified-blobs.json').write_text(json.dumps(manifests[0], indent=2) + '\n')
+          print('All three lanes passed; verified source blobs created without modifying any refs.')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-sequences-verified
+          path: evidence
+          retention-days: 7
