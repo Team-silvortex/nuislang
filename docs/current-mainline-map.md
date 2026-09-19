@@ -238,12 +238,17 @@ writes, asymmetric branch write sets, and ordered prefix/branch/suffix updates
 through the same iteration helper. Each seeded carry has one return slot regardless
 of its write count. Branch-local validation does not borrow writes from a sibling
 arm; after the join, an untaken arm preserves the binding's own input value.
-Iteration-local temporaries and effectful/fallible body operations remain separate;
-per-return allocation remains an optimization target.
+Iteration-local i64/bool temporaries now use lexical initialization scopes and
+stay inside the iteration helper. Inferred bool expressions use the same lazy
+predicate lowering as annotated ones; stored values survive later mutations.
+Branch-local names do not escape even when both arms declare the same spelling.
+Mutable i64 temporaries can cross inner branch joins, but only pre-existing carries
+return to the outer driver. Body effects, fallible local arithmetic and mutable
+bool temporaries remain separate; per-return allocation is still an optimization target.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
-aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested
-and aggregate-sequences fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
-suite now contains twelve regressions for cache isolation, tamper rejection and
+aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested,
+aggregate-sequences and aggregate-temporaries fixtures compose with typed lifecycle
+and multi-state break/continue. The frontdoor suite now contains thirteen regressions for cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.
 The passing default image host still executes embedded YIR.

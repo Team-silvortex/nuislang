@@ -15,16 +15,19 @@ pub(super) fn outline(
         .map(|p| (p.name.clone(), p.ty.clone()))
         .collect::<Scope>();
     for stmt in &mut function.body {
-        if let NirStmt::Let {
-            name,
-            ty: Some(ty),
-            value,
-        } = stmt
-        {
-            if *ty == scalar_type("bool") {
-                *value = predicate(value.clone(), &scope, names, helpers, guarded);
+        if let NirStmt::Let { name, ty, value } = stmt {
+            // Inferred boolean temporaries need the same lazy lowering as
+            // explicit bool bindings and generated branch predicates.
+            let inferred = ty
+                .clone()
+                .or_else(|| infer_local(value, &scope, &ScalarHelpers::new()));
+            if let Some(inferred) = inferred {
+                if inferred == scalar_type("bool") {
+                    *value = predicate(value.clone(), &scope, names, helpers, guarded);
+                    *ty = Some(inferred.clone());
+                }
+                scope.insert(name.clone(), inferred);
             }
-            scope.insert(name.clone(), ty.clone());
         }
     }
 }

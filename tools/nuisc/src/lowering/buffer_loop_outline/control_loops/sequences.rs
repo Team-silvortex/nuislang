@@ -39,8 +39,13 @@ pub(super) fn validate(
     if update_name(first, scope, loop_bindings)? != prepared.binding_name {
         return None;
     }
-    let updates = carry_names(effects).into_iter().collect::<BTreeSet<_>>();
-    if updates.is_empty() || updates.contains(&prepared.binding_name) {
+    let writes = carry_names(effects);
+    let has_temporaries = writes.iter().any(|name| !scope.contains_key(name));
+    let updates = writes
+        .into_iter()
+        .filter(|name| scope.contains_key(name))
+        .collect::<BTreeSet<_>>();
+    if (!has_temporaries && updates.is_empty()) || updates.contains(&prepared.binding_name) {
         return None;
     }
     for input in [&prepared.limit, &prepared.step] {
@@ -55,6 +60,15 @@ pub(super) fn validate(
     }
     let mut mutable = updates;
     mutable.insert(prepared.binding_name.clone());
+    if has_temporaries {
+        return temporaries::validate(
+            effects,
+            scope,
+            loop_bindings,
+            &mutable,
+            &prepared.binding_name,
+        );
+    }
     validate_block(
         effects,
         scope,

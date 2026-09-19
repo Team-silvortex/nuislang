@@ -28,6 +28,8 @@ const AGGREGATE_NESTED_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_nested_loops.ns");
 const AGGREGATE_SEQUENCES_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_sequences_loops.ns");
+const AGGREGATE_TEMPORARIES_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_temporaries_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -181,6 +183,11 @@ fn native_multi_statement_aggregate_build_cache_and_standalone_relocation() {
     check_workflow(AGGREGATE_SEQUENCES_SOURCE);
 }
 
+#[test]
+fn native_iteration_temporaries_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_TEMPORARIES_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -224,6 +231,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_COMPOUND_SOURCE,
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
+        AGGREGATE_TEMPORARIES_SOURCE,
     ]
     .contains(&source)
     {
@@ -240,6 +248,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_COMPOUND_SOURCE,
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
+        AGGREGATE_TEMPORARIES_SOURCE,
     ]
     .contains(&source)
     {
@@ -254,6 +263,7 @@ fn check_workflow(source: &str) {
         AGGREGATE_COMPOUND_SOURCE,
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
+        AGGREGATE_TEMPORARIES_SOURCE,
     ]
     .contains(&source)
     {
@@ -276,7 +286,13 @@ fn check_workflow(source: &str) {
         assert!(llvm.contains("carry_predicate_or_rhs"));
         assert!(llvm.contains("phi i1"));
     }
-    if [AGGREGATE_NESTED_SOURCE, AGGREGATE_SEQUENCES_SOURCE].contains(&source) {
+    if [
+        AGGREGATE_NESTED_SOURCE,
+        AGGREGATE_SEQUENCES_SOURCE,
+        AGGREGATE_TEMPORARIES_SOURCE,
+    ]
+    .contains(&source)
+    {
         assert!(llvm.contains("@nuis_fn___nuis_scalar_iteration_"));
         assert!(llvm.contains("@nuis_fn___nuis_buffer_branch_"));
     }

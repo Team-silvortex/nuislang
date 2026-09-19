@@ -98,7 +98,6 @@ fn empty_or_malformed_carry_arms_cannot_create_or_erase_state() {
     for arm in [
         "if index > initial {}",
         "if index > initial {} else {}",
-        "if index > initial { let fresh: i64 = index; }",
         "if index > initial { let total: i64 = total + index; print(total); }",
         "if index > initial { print(total); } else { let total: i64 = total + index; }",
         "if index > initial { let total: i64 = total / index; }",
@@ -110,7 +109,8 @@ fn empty_or_malformed_carry_arms_cannot_create_or_erase_state() {
         "if index > initial { let index: i64 = index + stride; }",
     ] {
         let module = parse_nuis_module(&source(arm)).unwrap();
-        let catalog = scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module));
+        let catalog =
+            scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module));
         assert!(!catalog.contains_key("walk"), "{arm}");
         assert!(!catalog.contains_key("choose"), "{arm}");
     }

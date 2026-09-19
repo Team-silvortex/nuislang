@@ -3,10 +3,10 @@ use super::*;
 #[path = "nested_conditions.rs"]
 mod conditions;
 
-pub(super) fn present(body: &[NirStmt]) -> bool {
+pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
     let mut seen = BTreeSet::new();
     body.iter().any(|stmt| match stmt {
-        NirStmt::Let { name, .. } => !seen.insert(name.as_str()),
+        NirStmt::Let { name, .. } => !scope.contains_key(name) || !seen.insert(name.as_str()),
         NirStmt::If {
             then_body,
             else_body,
@@ -18,6 +18,9 @@ pub(super) fn present(body: &[NirStmt]) -> bool {
                 let NirStmt::Let { name, .. } = stmt else {
                     return true;
                 };
+                if !scope.contains_key(name) {
+                    return true;
+                }
                 names.insert(name.as_str());
             }
             then_body.len() > 1
@@ -92,7 +95,9 @@ impl Builder<'_> {
                     self.block(then_body, scope.clone());
                     self.block(else_body, scope.clone());
                 }
-                NirStmt::While { body, .. } if present(body) => self.iteration(body, &scope),
+                NirStmt::While { body, .. } if present(body, &scope) => {
+                    self.iteration(body, &scope)
+                }
                 _ => {}
             }
         }
@@ -110,9 +115,14 @@ impl Builder<'_> {
         let effects = original.collect::<Vec<_>>();
         // A state field belongs to a binding, not to a statement. Repeated
         // writes and different branch write sets return each carry exactly once.
-        let carries = sequences::carry_names(&effects);
+        let writes = sequences::carry_names(&effects);
+        let carries = writes
+            .iter()
+            .filter(|name| scope.contains_key(*name))
+            .cloned()
+            .collect::<Vec<_>>();
         let mut mutations = MutationScope {
-            writable: carries.iter().cloned().collect(),
+            writable: writes.into_iter().collect(),
             protected: BTreeSet::new(),
         };
         mutations.writable.insert(induction.clone());
@@ -173,12 +183,16 @@ impl Builder<'_> {
             let temporary = branches::fresh_name("__nuis_nested_state", &mut bindings);
             *body = scalar_carries::projected_call(temporary, &ty, &carries, call);
             function.return_type = Some(ty);
-        } else {
+        } else if let Some(carry) = carries.first() {
             body.push(NirStmt::Let {
-                name: carries[0].clone(),
+                name: carry.clone(),
                 ty: Some(scalar_type("i64")),
                 value: call,
             });
+        } else {
+            // The iteration may have only local work. Its scalar result is not
+            // a new state slot and must not become a seed for the next trip.
+            body.push(NirStmt::Expr(call));
         }
         body.push(step);
         // The generic effect outliner has already checked these source predicates.

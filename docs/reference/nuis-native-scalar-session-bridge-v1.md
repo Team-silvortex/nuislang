@@ -174,8 +174,9 @@ i64 atom. Each arm is checked from the same incoming availability, independently
 of the other arm. At the join, both write sets become available because all names
 were seeded before the loop and every untaken write retains its own input.
 All leaves, including unreachable ones, retain type, ownership and effect checks.
-New iteration-local bindings, constants/parameters as update targets, body calls,
-fallible updates, general inner loops and a second induction write remain rejected.
+Iteration-local scalar bindings follow the scoped profile below. Constants/parameters
+as update targets, body calls, fallible updates, general inner loops and a second
+induction write remain rejected.
 This is a bounded multi-statement carry profile, not arbitrary imperative code.
 
 [Sequence execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_sequences.rs)
@@ -184,6 +185,72 @@ oracle and actual predicate/iteration/allocation counters. The
 [sequence lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_sequences_loops.ns)
 also crosses the ordinary build, cache, tamper rejection and standalone-restoration
 path. These test definitions are not Windows, macOS or GPU execution evidence.
+
+
+### Iteration-Local Scalar Temporaries
+
+A fresh `let` inside an admitted counted loop may hold i64 or bool, with an exact
+annotation or inferred type. Initializers read already-visible values and execute
+at their source position on each selected iteration. The compiler retains a value
+binding, not an expression substitution: later changes to an initializer's inputs
+do not retroactively change the temporary. Nonfallible i64 add/subtract/multiply
+use the existing wrapping arithmetic contract.
+
+```text
+let index: i64 = 0;
+let total: i64 = 0;
+while index < limit {
+  let index: i64 = index + 1;
+  let delta = index * 2;
+  let selected = delta < 5 || index == 4;
+  let delta: i64 = delta + 100;
+  if selected {
+    let local = delta - 100;
+    let total: i64 = total + local;
+  } else {
+    let local = 1;
+    let total: i64 = total + local;
+  }
+}
+```
+
+The example leaves total at 15 when limit is 4. `selected` observes `delta` before
+its later update. Annotation-free bool declarations receive the same guarded
+short-circuit normalization as explicit bool declarations. Logical `&&`/`||`
+compose at logical edges; equality of bool atoms is supported, but a compound
+logical expression hidden beneath bool equality is not admitted by this profile.
+
+Fresh bindings are initialized before entering their lexical scope. A declaration
+in one arm cannot initialize another arm or the continuation; even two arms using
+the same spelling do not export that name. A variable initialized before a branch
+may be updated there when it is mutable i64. Bool temporaries are read-only
+snapshots; bool rebinding, new const declarations and richer local types are not
+part of this slice. Parameters/constants never gain write authority.
+
+Only pre-existing mutable carries are captured and returned to the outer driver;
+iteration locals are never seeded from a preceding iteration. An iteration with
+local work but no carried output discards its scalar helper result. Inner branch
+helpers may return updated i64 temporaries to their enclosing iteration without
+turning them into driver state. Protected induction, bound and stride still cannot
+be changed by the body. The existing no-forward-sibling-read rule also applies to
+initializer reads; creating a temporary cannot hide an unavailable carry read.
+
+Both arms and every logical operand are type/availability checked even on zero
+trips or unreachable paths. The local expression walk is bounded at depth 64,
+independently of the existing 32-guard, native closure, slot and induction limits.
+Source admission is not a guarantee of native admission: a 32-level decision tree
+can exceed the native call-depth bound after expansion into scoped helpers and
+callback frames. The two limits are checked independently; this integration keeps
+the explicit rejection rather than increasing the backend budget.
+Division/remainder, calls, provider/resource effects and general inner loops remain
+outside this new local-expression profile.
+
+[Temporary execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_temporaries.rs)
+reuse the independent sequence oracle and observe actual comparison/iteration and
+allocation/drop counts. The [temporary lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_temporaries_loops.ns)
+also crosses ordinary build, registration-specific cache reuse, tamper rejection
+and standalone restoration. Test definitions alone do not certify a platform;
+Linux results must not be relabeled as Windows, macOS or GPU validation.
 
 Native conditional chains reuse the existing shared metadata parser and LLVM
 emitter, but admit only bounded trees of pure comparisons and nonfallible add/multiply/keep
@@ -738,6 +805,10 @@ normalization is excluded by operand provenance, not by discarding integer `==` 
 `!=` comparisons. Separate process-trap cases reject zero/negative strides,
 overflowing/excessive induction and reached division by zero; skipped calls retain
 state. Source admission tests reject invalid leaves and over-deep guard trees.
+The retained [original-decision oracle](../../tools/nuisc/tests/native_application_bridge/aggregate_nested_tree.rs)
+and its [execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_nested_oracle.rs)
+also cover short-circuit paths, empty arms, own-value retention, exact induction
+limits and reference-fuel cleanup without depending on the old two-value collapse.
 The [aggregate-nested fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_nested_loops.ns)
 adds the eleventh frontdoor build/cache/relocation case with the existing typed
 lifecycle, checked arithmetic and multi-state break/continue paths.
@@ -757,7 +828,8 @@ These test doubles are policy evidence, not additional lowering proofs.
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
 aggregate-division, aggregate-counted, aggregate-carried, aggregate-conditional
-and aggregate-one-sided/aggregate-compound/aggregate-nested
+and aggregate-one-sided/aggregate-compound/aggregate-nested/
+aggregate-sequences/aggregate-temporaries
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -781,14 +853,21 @@ extension additionally has Linux x86-64 native/reference execution checks; retai
 its runner, toolchain, source identity and test logs with the acceptance record.
 Neither platform's CPU results certify Windows execution or device-provider parity.
 
+Mainline integration on 2026-09-19 was checked on macOS aarch64: 496 lowering,
+17 syntax, 89 Buffer-loop, four compound-loop and 13 frontdoor tests passed, along
+with native-host, owned-cleanup and 26 tensor tests. The 112-case native suite had
+111 passes; the remaining depth expectation was corrected to distinguish source
+and call-depth admission, then passed its focused rerun. This is CPU integration
+evidence, not a new Linux or GPU certification.
+
 ## Next Boundary
 
-Extend iteration-local scalar temporaries inside guarded multi-statement loops,
-without leaking branch-local bindings, introducing eager evaluation or bypassing
-the scoped iteration contract.
+Extend checked iteration-local division/remainder inside guarded loops,
+without speculating an unselected failure or weakening the scoped iteration
+contract. Preserve temporary initialization, lexical visibility and stored snapshots.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested/sequence-aggregate
+checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested/sequence/temporary-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

@@ -570,7 +570,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-session-nested-source-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops.rs",
         required_patterns: &[
-            "nested::present(body)",
+            "nested::present(body, scope)",
             "validate_update",
             "depth < 32",
             "nonfallible_i64",
@@ -651,6 +651,61 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "aggregate_sequences_loops.ns",
             "native_multi_statement_aggregate_build_cache_and_standalone_relocation",
             "check_workflow(AGGREGATE_SEQUENCES_SOURCE)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-iteration-temporary-scope",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries.rs",
+        required_patterns: &[
+            "struct Locals",
+            "depth > 64",
+            "locals.scope.contains_key(name)",
+            "locals.writable.contains(name)",
+            "bool_atom",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-nested-oracle-registration",
+        path: "tools/nuisc/tests/native_application_bridge.rs",
+        required_patterns: &["mod aggregate_nested_oracle;", "mod aggregate_nested_tree;"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-nested-original-decision-oracle",
+        path: "tools/nuisc/tests/native_application_bridge/aggregate_nested_tree.rs",
+        required_patterns: &[
+            "fn evaluate(",
+            "fn render(",
+            "Interpret the original nested decisions",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-nested-original-path-execution",
+        path: "tools/nuisc/tests/native_application_bridge/aggregate_nested_oracle.rs",
+        required_patterns: &[
+            "nested_carry_paths_match_original_decision_oracle_and_actual_comparison_counts",
+            "nested_updates_retain_preflight_selected_traps_and_exact_trip_limit",
+            "nested_tree_admission_retains_source_and_call_depth_budgets",
+            "nested_aggregate_reference_fuel_failure_retains_state_and_cleanup",
+            "aggregate_nested_oracle_loops.ns",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-iteration-temporary-execution",
+        path: "tools/nuisc/tests/native_application_bridge/aggregate_temporaries.rs",
+        required_patterns: &[
+            "temporary_snapshots_preserve_values_and_short_circuit_counts",
+            "typed_and_inferred_temporaries_match_reference_across_shapes_and_extremes",
+            "temporary_paths_keep_native_preflight_traps_and_skipped_branches",
+            "execute_with_predicates",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-iteration-temporary-frontdoor",
+        path: "tools/nuis/tests/native_session_workflow.rs",
+        required_patterns: &[
+            "aggregate_temporaries_loops.ns",
+            "native_iteration_temporaries_build_cache_and_standalone_relocation",
+            "check_workflow(AGGREGATE_TEMPORARIES_SOURCE)",
         ],
     },
 ];

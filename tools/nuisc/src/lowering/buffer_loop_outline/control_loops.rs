@@ -7,6 +7,9 @@ pub(super) use nested::outline;
 #[path = "control_loops/sequences.rs"]
 mod sequences;
 
+#[path = "control_loops/temporaries.rs"]
+mod temporaries;
+
 pub(super) fn contains_loop(body: &[NirStmt]) -> bool {
     body.iter().any(|stmt| match stmt {
         NirStmt::While { .. } => true,
@@ -40,7 +43,7 @@ pub(super) fn validate(
     if name != &prepared.binding_name {
         return None;
     }
-    if nested::present(body) {
+    if nested::present(body, scope) {
         return sequences::validate(&prepared, body, scope, loop_bindings);
     }
     let mut updates = BTreeSet::new();
@@ -347,3 +350,7 @@ mod nested_tests;
 #[cfg(test)]
 #[path = "control_loops/sequences_tests.rs"]
 mod sequences_tests;
+
+#[cfg(test)]
+#[path = "control_loops/temporaries_tests.rs"]
+mod temporaries_tests;

@@ -590,3 +590,86 @@ fn main()",
     let status = compile_and_run("sequence_main_collision", &source);
     assert_eq!(status.code(), Some(26));
 }
+
+#[test]
+fn iteration_temporaries_preserve_boolean_snapshots_in_native_entry() {
+    let status = compile_and_run(
+        "temporary_snapshot_entry",
+        r#"mod cpu Main {
+          @noinline fn calculate(limit: i64) -> i64 {
+            let index: i64 = 0;
+            let total: i64 = 0;
+            while index < limit {
+              let index: i64 = index + 1;
+              let delta = index * 2;
+              let selected = delta < 5 || index == 4;
+              let delta: i64 = delta + 100;
+              if selected {
+                let local = delta - 100;
+                let total: i64 = total + local;
+              } else {
+                let local = 1;
+                let total: i64 = total + local;
+              }
+            }
+            return total;
+          }
+          fn main() -> i64 { return calculate(4); }
+        }"#,
+    );
+    assert_eq!(status.code(), Some(15));
+}
+
+#[test]
+fn temporary_only_iteration_has_no_extra_native_carry() {
+    let status = compile_and_run(
+        "temporary_only_entry",
+        r#"mod cpu Main {
+          @noinline fn calculate(limit: i64) -> i64 {
+            let index: i64 = 0;
+            while index < limit {
+              let index: i64 = index + 1;
+              let scratch = index * 2;
+              let selected = scratch < limit || index == limit;
+              if selected { let local = scratch + 3; }
+            }
+            return index;
+          }
+          fn main() -> i64 { return calculate(4); }
+        }"#,
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[test]
+fn inline_bool_match_temporary_preserves_native_entry_result() {
+    let status = compile_and_run(
+        "inline_match_temporary",
+        r#"
+        mod cpu Main {
+          @inline
+          fn hot(value: i64) -> bool {
+            return value > 2;
+          }
+
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = value + 1;
+              match hot(value) {
+                true => {
+                  let acc: i64 = acc + value;
+                },
+                _ => {
+                  let acc: i64 = acc + 0;
+                }
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    );
+    assert_eq!(status.code(), Some(12));
+}

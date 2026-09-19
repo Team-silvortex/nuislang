@@ -3,7 +3,7 @@ use aggregate_carried::{Case, Shape};
 use aggregate_conditional::BASE;
 use aggregate_loop_probe::Invocation;
 
-fn source(shape: Shape, count: usize, descending: bool, op: &str) -> String {
+pub(super) fn source(shape: Shape, count: usize, descending: bool, op: &str) -> String {
     let source = aggregate_carried::source(shape, count, descending, op)
         .replace("seed: i64) ->", "seed: i64, pivot: i64) ->")
         .replace("divisor, seed)", "divisor, seed, pivot)");
@@ -57,7 +57,7 @@ fn source(shape: Shape, count: usize, descending: bool, op: &str) -> String {
     source.replace(&original, &body)
 }
 
-fn expected(
+pub(super) fn expected(
     case: Case,
     shape: Shape,
     count: usize,

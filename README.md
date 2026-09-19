@@ -230,7 +230,11 @@ checked. Ordered multi-statement carry bodies now use the same helper: repeated
 writes share one return slot, branch arms may update different carry sets, and
 untaken arms retain incoming values. Later statements observe preceding writes;
 short-circuit guards and source-order sibling restrictions remain enforced.
-Iteration-local temporaries, body calls/effects and fallible updates remain separate.
+Iteration-local i64/bool temporaries now remain inside that helper rather than
+becoming loop state. Typed and inferred bindings preserve initialized snapshots;
+branch-local names never escape their arms, and mutable i64 locals may feed later
+statements without adding driver return slots. Body calls/effects, fallible local
+arithmetic and mutable bool temporaries remain separate.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary

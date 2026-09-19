@@ -306,14 +306,24 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
-    assert!(session.next_step.starts_with(
-        "extend iteration-local scalar temporaries inside guarded multi-statement loops"
-    ));
+    assert!(session
+        .next_step
+        .starts_with("extend checked iteration-local division/remainder inside guarded loops"));
     assert!(session
         .evidence
         .contains("private scoped iteration helpers and guarded bool predicates"));
     assert!(session.evidence.contains("aggregate-nested fixture"));
     assert!(session.evidence.contains("aggregate-sequences fixture"));
+    assert!(session.evidence.contains("aggregate-temporaries fixture"));
+    assert!(session
+        .evidence
+        .contains("independent original-decision-tree oracle"));
+    assert!(!session
+        .blocker
+        .contains("multi-statement carry arms and general rebinding still need"));
+    assert!(session
+        .evidence
+        .contains("only seeded carries escape the iteration"));
     assert!(!session
         .evidence
         .contains("Nested conditional carry-update arms remain fail-closed"));

@@ -71,7 +71,6 @@ fn statement_sequences_check_unselected_arms_and_keep_header_immutable() {
         "let limit: i64 = limit + 1;",
         "let stride: i64 = stride + 1;",
         "let bound: i64 = bound + 1;", // A parameter, not a mutable local.
-        "let fresh: i64 = index;",     // New iteration-local names are a later slice.
         "print(total);",
         "break;",
         "continue;",
