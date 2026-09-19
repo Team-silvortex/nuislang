@@ -44,9 +44,7 @@ pub(super) fn validate(
     }
     let mut available = BTreeSet::new();
     for (stmt, name) in body.iter().zip(&ordered) {
-        if let NirStmt::If { condition, .. } = stmt {
-            validate_condition(condition, scope, &updates, &available)?;
-        }
+        validate_update_conditions(stmt, scope, &updates, &available)?;
         available.insert((*name).to_owned());
     }
     // Captured atoms are invariant. No body-only calls or fallible stride
@@ -93,21 +91,58 @@ fn update_name<'a>(stmt: &'a NirStmt, scope: &Scope, locals: &BTreeSet<String>) 
             && nonfallible_i64(value, scope))
         .then_some(name.as_str())
     };
-    match stmt {
-        NirStmt::If {
+    let mut name = None;
+    let mut pending = vec![stmt];
+    while let Some(stmt) = pending.pop() {
+        match stmt {
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                // Empty arms keep this carry. Nonempty arms are one update
+                // or one nested decision, never a hidden sequence of writes.
+                if then_body.len() > 1
+                    || else_body.len() > 1
+                    || (then_body.is_empty() && else_body.is_empty())
+                {
+                    return None;
+                }
+                pending.extend(else_body);
+                pending.extend(then_body);
+            }
+            _ => {
+                let branch_name = binding(stmt)?;
+                if name.is_some_and(|name| name != branch_name) {
+                    return None;
+                }
+                name = Some(branch_name);
+            }
+        }
+    }
+    name
+}
+
+fn validate_update_conditions(
+    stmt: &NirStmt,
+    scope: &Scope,
+    updates: &BTreeSet<String>,
+    available: &BTreeSet<String>,
+) -> Option<()> {
+    let mut pending = vec![stmt];
+    while let Some(stmt) = pending.pop() {
+        if let NirStmt::If {
+            condition,
             then_body,
             else_body,
-            ..
-        } => match (then_body.as_slice(), else_body.as_slice()) {
-            ([update], []) | ([], [update]) => binding(update),
-            ([then_update], [else_update]) => {
-                let name = binding(then_update)?;
-                (name == binding(else_update)?).then_some(name)
-            }
-            _ => None,
-        },
-        _ => binding(stmt),
+        } = stmt
+        {
+            validate_condition(condition, scope, updates, available)?;
+            pending.extend(else_body);
+            pending.extend(then_body);
+        }
     }
+    Some(())
 }
 
 fn validate_condition(
@@ -188,6 +223,9 @@ mod compound_tests;
 #[cfg(test)]
 #[path = "control_loops/conditional_tests.rs"]
 mod conditional_tests;
+#[cfg(test)]
+#[path = "control_loops/nested_tests.rs"]
+mod nested_tests;
 #[cfg(test)]
 #[path = "control_loops/one_sided_tests.rs"]
 mod one_sided_tests;

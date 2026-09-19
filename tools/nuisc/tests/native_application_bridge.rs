@@ -26,6 +26,10 @@ mod aggregate_execution;
 mod aggregate_guards;
 #[path = "native_application_bridge/aggregate_loop_probe.rs"]
 mod aggregate_loop_probe;
+#[path = "native_application_bridge/aggregate_nested.rs"]
+mod aggregate_nested;
+#[path = "native_application_bridge/aggregate_nested_tree.rs"]
+mod aggregate_nested_tree;
 #[path = "native_application_bridge/aggregate_one_sided.rs"]
 mod aggregate_one_sided;
 #[path = "native_application_bridge/bounds.rs"]

@@ -225,11 +225,17 @@ accepted/skipped callbacks and nine real traps; volatile comparison counters
 agree with independent short-circuit evaluation, not just final state values.
 Nested RHS kind drift rejects even on zero trips. A shared parser depth guard
 also protects the general verifier, which runs before native admission.
-Nested carry-update arms and arbitrary loop bodies remain fail-closed;
-per-return allocation remains an optimization target.
+Nested carry-update arms now reuse the existing short-circuit-compatible decision
+tree collapse. Iterative source checks cover every arm and condition while keeping
+invariant headers, exact i64 seeds and one update of the same local on each path.
+Forty native binaries add 1794 accepted/skipped callbacks and nine real traps;
+comparison counts agree with the original nested decisions, including a fully
+traversed 32-condition path. Noncollapsible two-outcome and multi-outcome trees,
+body calls and arbitrary loop bodies remain fail-closed. Per-return allocation
+remains an optimization target.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
-aggregate-conditional, aggregate-one-sided and aggregate-compound fixtures compose
-with typed lifecycle and multi-state break/continue. All ten frontdoor regressions
+aggregate-conditional, aggregate-one-sided, aggregate-compound and aggregate-nested
+fixtures compose with typed lifecycle and multi-state break/continue. All eleven frontdoor regressions
 pass, including cache isolation, tamper rejection and standalone restoration.
 The passing default image host still executes embedded YIR.
 This does not certify arbitrary loop bodies, richer carry payloads or fully native CPU callbacks.

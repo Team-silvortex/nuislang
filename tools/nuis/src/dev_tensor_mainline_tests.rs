@@ -307,7 +307,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("two exact 76800-byte Metal frames"));
     assert!(session.next_step.starts_with(
-        "extend nested conditional carry-update arms inside guarded flat-value helpers"
+        "extend noncollapsible and multi-outcome carry decision trees inside guarded flat-value helpers"
     ));
     assert!(session.evidence.contains("Seven native executable runs"));
     assert!(session
@@ -354,7 +354,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("40 cases, including nested-loop scope"));
     assert!(session.blocker.contains(
-        "Nested conditional carry-update arms inside flat-value branch helpers still reject"
+        "Noncollapsible two-outcome and multi-outcome carry decision trees inside flat-value branch helpers still reject"
     ));
     assert!(session.evidence.contains("1357 accepted/skipped callbacks"));
     assert!(session
@@ -372,6 +372,21 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("tenth aggregate-compound build/cache/standalone fixture"));
+    assert!(session
+        .evidence
+        .contains("1794 accepted/skipped callbacks and 9 real process traps"));
+    assert!(session
+        .evidence
+        .contains("eleventh aggregate-nested build/cache/standalone fixture"));
+    assert!(session
+        .evidence
+        .contains("independent original-tree interpreter"));
+    assert!(session
+        .evidence
+        .contains("A full 32-condition path executes"));
+    assert!(session
+        .evidence
+        .contains("without backend opcode or ABI changes"));
     assert!(session
         .evidence
         .contains("actual volatile comparison counts"));

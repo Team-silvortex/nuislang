@@ -218,8 +218,12 @@ reference execution remain separate. Pure leaf comparisons now compose with
 `&&`/`||`, including nesting and grouping, through the same YIR condition tree.
 LLVM emits short-circuit blocks; every RHS retains exact-kind checking, including
 unreached leaves. General verification and native admission have independent
-condition-depth limits. Nested carry-update arms and general loop bodies remain
-the next automatic-normalization boundaries.
+condition-depth limits. Nested carry-update arms now reuse shared decision-tree
+preparation when their paths collapse directly to short-circuit `And/Or` conditions.
+Every nested condition and update is checked; empty arms retain their own carry.
+Real native comparisons match an independent interpretation of the original tree.
+Noncollapsible two-outcome trees, multi-outcome trees and general loop bodies remain
+separate normalization boundaries rather than silently duplicated or erased work.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary

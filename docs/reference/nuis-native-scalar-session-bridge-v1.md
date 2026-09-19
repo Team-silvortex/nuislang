@@ -112,8 +112,19 @@ from every leaf, including a right operand that could be skipped at runtime.
 Header/stride mutation, forward sibling reads,
 duplicate updates, body calls and fallible update expressions are rejected.
 Fallible seed expressions outside the loop retain ordinary source-order checks.
-Constants, parameter rebinding, nested carry-update arms and arbitrary loop bodies
-are not admitted by this automatic normalizer. The narrower Buffer catalog is unchanged.
+Nested carry-update arms now use the same shared decision-tree preparation. Every
+nonempty arm contains one update or one nested decision, and all leaf updates
+target the same initialized local. Iterative source validation checks conditions
+at every depth against the state available before this carry; an inner predicate
+cannot read a forward/self carry, a mutable RHS or a fallible expression.
+The admitted trees collapse directly through common `then` or `else` sources to
+short-circuit `Or` or `And`. This covers nested guards, compatible `else if`
+chains, reversed keep/update arms and mixtures of compound predicates. It does
+not cover every two-outcome tree: two branching children or a redundant inner
+decision may need a richer decision representation. Those forms and multi-outcome
+trees reject rather than duplicating or erasing comparisons. No new backend
+opcode or ABI is introduced. Constants, parameter rebinding, body-call updates
+and arbitrary loop bodies remain excluded. The narrower Buffer catalog is unchanged.
 
 Native conditional chains reuse the existing shared metadata parser and LLVM
 emitter, but admit only bounded trees of pure comparisons and nonfallible add/multiply/keep
@@ -605,7 +616,7 @@ it keeps the actual process trap and never substitutes reference fuel for prefli
 The [aggregate-carried fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_carried_loops.ns)
 adds six typed lifecycle runs and build/cache/standalone restoration with the
 existing break/continue paths. Source policy tests retain exact i64/local-seed
-requirements and invariant headers; nested carry-update arms remain fail-closed.
+requirements and invariant headers; noncollapsible carry trees remain fail-closed.
 Extreme seeds also exposed and fixed host-debug-dependent scalar integer overflow
 in the reference CPU. Dedicated CPU tests keep wrapping arithmetic separate from
 checked division/remainder errors.
@@ -657,6 +668,24 @@ adds six typed lifecycle runs and reference-budget failure with accepted-state
 retention and cleanup. The tenth frontdoor fixture also passes build/cache
 isolation, tamper rejection and standalone restoration of the compiled artifact.
 
+The [nested carry regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_nested.rs)
+add 1794 accepted/skipped callbacks and nine real process traps across 40 native
+binaries. A separate [original-tree oracle](../../tools/nuisc/tests/native_application_bridge/aggregate_nested_tree.rs)
+interprets each source decision instead of evaluating the collapsed predicate.
+Its observed comparison counts match the native volatile probe, alongside all
+state slots, iteration counts, reached leaf operands and allocation/drop balance.
+Callee, inline, prefix and shared-suffix positions cover both induction directions,
+explicit/empty/omitted keep arms, common multiply fallbacks, compound predicates,
+dependent 1/3/7-carry widths, wrapping and the exact 65536-trip limit.
+A path that really evaluates all 32 conditions executes; depth 33/40 trees pass
+the source catalog but reject under the existing native shape budget. The source
+catalog does not duplicate backend limits. The [nested lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_nested_loops.ns)
+adds six typed lifecycle runs and reference-fuel failure with accepted state and
+cleanup retained. Noncollapsible two-outcome and multi-outcome trees, hidden
+sequences, effects, stale inputs and type/seed drift remain explicit rejection cases.
+The eleventh frontdoor fixture passes build/cache isolation, tamper rejection
+before open and standalone restoration with the same typed lifecycle states.
+
 The [production-host regression](../../tools/nuisc/tests/native_application_host.rs)
 compiles the [basic scalar callback fixture](../../tools/nuisc/tests/native_application_bridge/main.ns)
 and invokes the real packer for normal and reversed YIR
@@ -672,7 +701,7 @@ These test doubles are policy evidence, not additional lowering proofs.
 The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) builds
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
 aggregate-division, aggregate-counted, aggregate-carried, aggregate-conditional
-and aggregate-one-sided/aggregate-compound
+and aggregate-one-sided/aggregate-compound/aggregate-nested
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -696,11 +725,12 @@ Linux/Windows execution or device-provider parity.
 
 ## Next Boundary
 
-Extend nested conditional carry-update arms inside guarded flat-value helpers
-through the shared decision-tree preparation, without introducing eager evaluation.
+Extend noncollapsible and multi-outcome carry decision trees inside guarded
+flat-value helpers through shared decision-tree preparation and execution,
+without duplicating, erasing or eagerly evaluating source decisions.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound-aggregate
+checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource
