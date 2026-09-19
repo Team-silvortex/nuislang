@@ -4,6 +4,9 @@ use super::*;
 mod nested;
 pub(super) use nested::outline;
 
+#[path = "control_loops/sequences.rs"]
+mod sequences;
+
 pub(super) fn contains_loop(body: &[NirStmt]) -> bool {
     body.iter().any(|stmt| match stmt {
         NirStmt::While { .. } => true,
@@ -37,6 +40,9 @@ pub(super) fn validate(
     if name != &prepared.binding_name {
         return None;
     }
+    if nested::present(body) {
+        return sequences::validate(&prepared, body, scope, loop_bindings);
+    }
     let mut updates = BTreeSet::new();
     let mut ordered = Vec::new();
     for stmt in body {
@@ -60,11 +66,6 @@ pub(super) fn validate(
                 if !updates.contains(input) && scope.get(input)? == &scalar_type("i64") => {}
             _ => return None,
         }
-    }
-    if nested::present(body) {
-        // Nested decisions use one scoped iteration helper, not a lossy
-        // collapse to two leaf values or speculative select-style evaluation.
-        return Some(());
     }
     if !tail.is_empty() {
         // Share ordered carry interpretation with ordinary lowering. No prefix
@@ -342,3 +343,7 @@ mod tests {
 #[cfg(test)]
 #[path = "control_loops/nested_tests.rs"]
 mod nested_tests;
+
+#[cfg(test)]
+#[path = "control_loops/sequences_tests.rs"]
+mod sequences_tests;

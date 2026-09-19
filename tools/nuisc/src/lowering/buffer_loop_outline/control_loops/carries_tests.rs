@@ -88,10 +88,6 @@ fn carries_reject_seed_order_effect_and_header_mutation_drift() {
         ("let checksum: i64 = checksum * total;", "print(total);"),
         (
             "let checksum: i64 = checksum * total;",
-            "let total: i64 = total + index;",
-        ),
-        (
-            "let checksum: i64 = checksum * total;",
             "let limit: i64 = limit + index;",
         ),
         (

@@ -424,8 +424,25 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
                 .expect("non-unit entry result ownership"),
         )
     };
+    // A retained/callable main already owns a helper boundary named `main`.
+    // Entry selection is role-based; give its wrapper a distinct identity while
+    // preserving every call's source-level target and the native entry ABI.
+    let mut entry_name = main.name.clone();
+    if direct_call_functions.contains(&main.name) {
+        let mut suffix = 0usize;
+        loop {
+            entry_name = format!("__nuis_entry_main_{suffix}");
+            if !module.functions.iter().any(|f| f.name == entry_name)
+                && !module.externs.iter().any(|f| f.name == entry_name)
+                && !state.yir.functions.iter().any(|f| f.name == entry_name)
+            {
+                break;
+            }
+            suffix += 1;
+        }
+    }
     state.yir.functions.push(YirFunction {
-        name: main.name.clone(),
+        name: entry_name,
         domain: module.domain.clone(),
         role: YirFunctionRole::Entry,
         parameters: Vec::new(),

@@ -30,6 +30,8 @@ mod aggregate_loop_probe;
 mod aggregate_nested;
 #[path = "native_application_bridge/aggregate_one_sided.rs"]
 mod aggregate_one_sided;
+#[path = "native_application_bridge/aggregate_sequences.rs"]
+mod aggregate_sequences;
 #[path = "native_application_bridge/bounds.rs"]
 mod bounds;
 #[path = "native_application_bridge/branch_loops.rs"]

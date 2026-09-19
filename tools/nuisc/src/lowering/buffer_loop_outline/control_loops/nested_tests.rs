@@ -54,18 +54,10 @@ fn nested_arms_check_every_path_for_order_type_effect_and_header_safety() {
         ("total - index", "total % index"),
         (
             "let total: i64 = total - index;",
-            "let checksum: i64 = checksum + index;",
-        ),
-        (
-            "let total: i64 = total - index;",
             "let total: i64 = total - index; print(total);",
         ),
         ("let total: i64 = total - index;", "break;"),
         ("let total: i64 = total - index;", "continue;"),
-        (
-            "let total: i64 = total - index;",
-            "let total: i64 = total + index; let total: i64 = total * index;",
-        ),
         (
             "let total: i64 = total - index;",
             "while index < bound { let index: i64 = index + 1; }",

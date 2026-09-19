@@ -623,4 +623,34 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "check_workflow(AGGREGATE_NESTED_SOURCE)",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "native-session-statement-sequence-admission",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/sequences.rs",
+        required_patterns: &[
+            "fn carry_names",
+            "fn validate_block",
+            "depth < 32",
+            "updates.contains(&prepared.binding_name)",
+            "let mut then_available = available.clone()",
+            "let mut else_available = available.clone()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-statement-sequence-execution",
+        path: "tools/nuisc/tests/native_application_bridge/aggregate_sequences.rs",
+        required_patterns: &[
+            "sequence_statements_match_native_reference_wrapping_and_comparison_counts",
+            "sequence_preflight_and_arithmetic_traps_preserve_skipped_path",
+            "execute_with_predicates",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-statement-sequence-frontdoor",
+        path: "tools/nuis/tests/native_session_workflow.rs",
+        required_patterns: &[
+            "aggregate_sequences_loops.ns",
+            "native_multi_statement_aggregate_build_cache_and_standalone_relocation",
+            "check_workflow(AGGREGATE_SEQUENCES_SOURCE)",
+        ],
+    },
 ];
