@@ -15,72 +15,105 @@ env:
   RUSTUP_TOOLCHAIN: stable
 jobs:
   validate:
+    name: cpu-${{ matrix.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [source, native, frontdoor]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - run: rustup toolchain install stable --profile minimal --component rustfmt
       - run: cargo fetch --locked
-      - name: Apply and format exact proposed source
+      - name: Apply exact final source with input and output identity guards
+        run: python3 .cpu-apply-final.py
+      - name: Validate the complete selected CPU regression lane
+        env:
+          SUITE: ${{ matrix.suite }}
         run: |
-          mkdir -p tmp/cpu-syntax
-          base64 --decode .cpu-syntax.patch.b64 | gzip -d > tmp/cpu-syntax/source.patch
-          echo 'a39540dfe6c52d25cbf5477a6f5a8bb89a213c7909026566ff2bc98afee6ca77  tmp/cpu-syntax/source.patch' | sha256sum --check
-          git apply --check tmp/cpu-syntax/source.patch
-          git apply tmp/cpu-syntax/source.patch
-          python3 - <<'PY'
+          set -euo pipefail
+          rustc -Vv > tmp/cpu-final/toolchain.txt
+          clang --version >> tmp/cpu-final/toolchain.txt
+          case "$SUITE" in
+            source)
+              python3 -m unittest discover -s scripts/tests -v 2>&1 | tee tmp/cpu-final/python.log
+              python3 scripts/check-text-encoding.py 2>&1 | tee tmp/cpu-final/encoding.log
+              bash scripts/check-doc-links.sh 2>&1 | tee tmp/cpu-final/doclinks.log
+              python3 - <<'PY'
+          import json, subprocess
           from pathlib import Path
-          p = Path('tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs')
-          s = p.read_text()
-          old = 'pub(super) fn outline('
-          assert s.count(old) == 1
-          p.write_text(s.replace(old, 'pub(in crate::lowering::buffer_loop_outline) fn outline('))
+          for item in json.loads(Path('tmp/cpu-final/manifest.json').read_text()):
+              if item['path'].endswith('.rs'):
+                  subprocess.run(['rustfmt', '--check', '--edition', '2021', '--config', 'skip_children=true', item['path']], check=True)
           PY
-          git add -N tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested_tests.rs tools/nuisc/tests/native_application_bridge/aggregate_nested.rs
-          git diff --name-only > tmp/cpu-syntax/changed-files.txt
-          while IFS= read -r file; do rustfmt --edition 2021 --config skip_children=true "$file"; done < tmp/cpu-syntax/changed-files.txt
-          git diff --check
-          git diff --binary > tmp/cpu-syntax/formatted.patch
-          tar czf tmp/cpu-syntax/changed-source.tar.gz -T tmp/cpu-syntax/changed-files.txt
-          git rev-parse HEAD > tmp/cpu-syntax/revision.txt
-          rustc -Vv > tmp/cpu-syntax/toolchain.txt
-          clang --version >> tmp/cpu-syntax/toolchain.txt
-      - name: CPU admission and safety regressions
-        run: |
-          set -o pipefail
-          cargo test --locked -p nuisc --lib control_loops -- --test-threads=1 2>&1 | tee tmp/cpu-syntax/admission.log
-      - name: Native and reference nested-carry regressions
-        run: |
-          set -o pipefail
-          cargo test --locked -p nuisc --test native_application_bridge aggregate_nested -- --test-threads=1 2>&1 | tee tmp/cpu-syntax/native.log
+              cargo test --locked -p nuisc --lib buffer_loop_outline -- --test-threads=1 2>&1 | tee tmp/cpu-final/outline.log
+              cargo test --locked -p nuis --bin nuis dev_tensor -- --test-threads=1 2>&1 | tee tmp/cpu-final/tensor.log
+              cargo test --locked -p nuisc --test file_line_limit -- --test-threads=1 2>&1 | tee tmp/cpu-final/lines.log
+              ;;
+            native)
+              cargo test --locked -p nuisc --test native_application_bridge -- --test-threads=1 2>&1 | tee tmp/cpu-final/native.log
+              ;;
+            frontdoor)
+              cargo test --locked -p nuis --test native_session_workflow -- --test-threads=1 2>&1 | tee tmp/cpu-final/frontdoor.log
+              ;;
+          esac
+          echo passed > tmp/cpu-final/acceptance.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cpu-syntax-validation
-          path: tmp/cpu-syntax
-          retention-days: 3
-  offline-tools:
+          name: cpu-final-${{ matrix.suite }}
+          path: tmp/cpu-final
+          retention-days: 7
+  publish:
+    needs: validate
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@v4
         with:
-          persist-credentials: false
-      - run: rustup toolchain install stable --profile minimal --component rustfmt
-      - name: Package only public toolchain binaries and vendored locked dependencies
+          pattern: cpu-final-*
+          path: evidence
+      - name: Verify all lanes and create unattached source blobs only
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p tmp/offline
-          cargo vendor --locked tmp/offline/vendor > tmp/offline/vendor-config.toml
-          sysroot="$(rustc --print sysroot)"
-          tar czf tmp/offline/rust-toolchain.tar.gz -C "$sysroot" bin/cargo bin/rustc bin/rustfmt lib
-          tar czf tmp/offline/vendor.tar.gz -C tmp/offline vendor
-          rm -rf tmp/offline/vendor
-          sha256sum tmp/offline/*.tar.gz > tmp/offline/digests.txt
+          python3 - <<'PY'
+          import base64, hashlib, json, os, tarfile, urllib.request
+          from pathlib import Path
+          manifests = []
+          for suite in ('source', 'native', 'frontdoor'):
+              root = Path('evidence') / ('cpu-final-' + suite)
+              assert (root / 'acceptance.txt').read_text().strip() == 'passed'
+              manifests.append(json.loads((root / 'manifest.json').read_text()))
+          assert manifests[0] == manifests[1] == manifests[2]
+          manifest = manifests[0]
+          assert len(manifest) == 18
+          blobs = []
+          with tarfile.open('evidence/cpu-final-source/source.tar.gz', 'r:gz') as archive:
+              assert sorted(archive.getnames()) == sorted(item['path'] for item in manifest)
+              for item in manifest:
+                  member = archive.getmember(item['path'])
+                  assert member.isfile()
+                  data = archive.extractfile(member).read()
+                  assert len(data) == item['size'] and hashlib.sha256(data).hexdigest() == item['sha256']
+                  assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == item['git_blob_sha']
+                  request = urllib.request.Request('https://api.github.com/repos/Team-silvortex/nuislang/git/blobs', data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(), method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+                  with urllib.request.urlopen(request) as response:
+                      created = json.load(response)
+                  assert created['sha'] == item['git_blob_sha']
+                  blobs.append({'path': item['path'], 'sha': created['sha'], 'sha256': item['sha256'], 'size': item['size']})
+          Path('evidence/verified-blobs.json').write_text(json.dumps(blobs, indent=2) + '\n')
+          print('All three complete lanes passed; 18 unattached blobs created. No ref, branch or PR was changed.')
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: cpu-offline-tools
-          path: tmp/offline
-          retention-days: 1
-          compression-level: 0
+          name: cpu-nested-verified-source
+          path: evidence
+          retention-days: 7
