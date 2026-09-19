@@ -233,8 +233,31 @@ short-circuit guards and source-order sibling restrictions remain enforced.
 Iteration-local i64/bool temporaries now remain inside that helper rather than
 becoming loop state. Typed and inferred bindings preserve initialized snapshots;
 branch-local names never escape their arms, and mutable i64 locals may feed later
-statements without adding driver return slots. Body calls/effects, fallible local
-arithmetic and mutable bool temporaries remain separate.
+statements without adding driver return slots. Checked i64 `/` and `%` now execute
+inside selected iterations, including local initializers, carry updates and lazy
+predicates. Zero-trip/unselected paths do not evaluate them; reached zero divisors
+and signed overflow trap even for unused results. Invariant induction preflight
+still runs before any body work. Loop-local expressions can now call exact i64/bool
+helpers from the completed pure, acyclic catalog. Logical arguments stay
+lazy even inside an i64-returning call, and unused arguments retain reached-path
+checks. Flat-i64 helper results now work as iteration-local snapshots: exact-layout
+copies, field projections, aggregate arguments and branch captures use the shared
+value-aware outliner without widening Buffer admission. Dependency-ordered validation
+now admits bounded loop-bearing callees, including transitive wrappers. In the
+native-session profile, each selected invocation preflights its own complete
+induction after argument evaluation. Newly emitted callbacks also share one
+stack-owned loop-work counter across synchronous helpers: each selected loop reserves
+its full induction count before its body, with a default total of 1,048,576 per callback.
+Early exits do not refund work; zero-trip and unselected paths do not consume it.
+An independent stack counter now limits actual YIR function entries to 1,048,576,
+including roots and outlined guards, closing loop-free call-tree expansion as well.
+Conditional calls in the admitted scalar catalog retain guards rather than executing
+both branches before a select. Exhaustion traps without publishing callback output;
+cache and standalone restoration retain both policies. These are not elapsed-time,
+memory or device-work bounds. Literal nested loop
+bodies, nested/resource aggregates and mutable bool/aggregate locals remain separate.
+Deep call/group nesting now reports a bounded parser diagnostic;
+other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
 Step-before-break, unstepped `continue`, arbitrary

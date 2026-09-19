@@ -1,5 +1,30 @@
 use super::*;
 
+// Share scoped outlining without granting Buffer effects to pure-value loops.
+#[derive(Clone, Copy)]
+pub(super) enum EffectTypes<'a> {
+    Buffer(&'a ScalarHelpers),
+    Values(&'a ScalarHelpers, &'a control_values::FlatLayouts),
+}
+
+impl EffectTypes<'_> {
+    pub(super) fn expression(
+        self,
+        value: &NirExpr,
+        scope: &Scope,
+        inputs: &mut BTreeSet<String>,
+    ) -> Option<NirTypeRef> {
+        match self {
+            Self::Buffer(catalog) => scalar_expr(value, scope, inputs, true, catalog),
+            Self::Values(catalog, layouts) => {
+                let ty = control_values::value_type(value, scope, catalog, layouts)?;
+                control_values::collect_inputs(value, inputs);
+                Some(ty)
+            }
+        }
+    }
+}
+
 pub(super) fn buffer_loop_params(
     condition: &NirExpr,
     body: &[NirStmt],
@@ -71,7 +96,7 @@ pub(super) fn buffer_loop_params(
         normalized_effects.as_deref().unwrap_or(effects),
         &mut scope.clone(),
         &mut inputs,
-        catalog,
+        EffectTypes::Buffer(catalog),
         &mutations,
         &mut carries,
     )?;
@@ -113,7 +138,7 @@ pub(super) fn validate_effects(
     effects: &[NirStmt],
     locals: &mut Scope,
     inputs: &mut BTreeSet<String>,
-    catalog: &ScalarHelpers,
+    types: EffectTypes<'_>,
     mutations: &MutationScope,
     carries: &mut Vec<String>,
 ) -> Option<bool> {
@@ -121,7 +146,7 @@ pub(super) fn validate_effects(
     for stmt in effects {
         match stmt {
             NirStmt::Let { name, ty, value } => {
-                let inferred = scalar_expr(value, locals, inputs, true, catalog)?;
+                let inferred = types.expression(value, locals, inputs)?;
                 if ty.as_ref().is_some_and(|ty| ty != &inferred) {
                     return None;
                 }
@@ -142,6 +167,9 @@ pub(super) fn validate_effects(
                 index,
                 value,
             }) => {
+                let EffectTypes::Buffer(catalog) = types else {
+                    return None;
+                };
                 buffer_input(buffer, locals, inputs)?;
                 if scalar_expr(index, locals, inputs, true, catalog)? != scalar_type("i64")
                     || scalar_expr(value, locals, inputs, true, catalog)? != scalar_type("i64")
@@ -155,7 +183,7 @@ pub(super) fn validate_effects(
                 then_body,
                 else_body,
             } => {
-                if scalar_expr(condition, locals, inputs, true, catalog)? != scalar_type("bool") {
+                if types.expression(condition, locals, inputs)? != scalar_type("bool") {
                     return None;
                 }
                 for arm in [then_body, else_body] {
@@ -163,13 +191,16 @@ pub(super) fn validate_effects(
                         arm,
                         &mut locals.clone(),
                         inputs,
-                        catalog,
+                        types,
                         mutations,
                         carries,
                     )?;
                 }
             }
             NirStmt::While { condition, body } => {
+                let EffectTypes::Buffer(catalog) = types else {
+                    return None;
+                };
                 let plan =
                     buffer_loop_params(condition, body, locals, catalog, &mutations.protected)?;
                 inputs.extend(

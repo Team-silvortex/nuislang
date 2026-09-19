@@ -243,12 +243,43 @@ stay inside the iteration helper. Inferred bool expressions use the same lazy
 predicate lowering as annotated ones; stored values survive later mutations.
 Branch-local names do not escape even when both arms declare the same spelling.
 Mutable i64 temporaries can cross inner branch joins, but only pre-existing carries
-return to the outer driver. Body effects, fallible local arithmetic and mutable
-bool temporaries remain separate; per-return allocation is still an optimization target.
+return to the outer driver. Checked i64 division/remainder now use that same scoped
+route for direct carry updates, local initializers and short-circuit conditions,
+without requiring a temporary declaration. Unselected and zero-trip paths skip
+arithmetic; reached zero/signed-overflow errors trap even for unused values.
+Independent result/iteration oracles retain induction preflight and successful-path
+allocation/drop checks. Scalar helper calls now use the completed pure,
+acyclic closure with exact i64/bool arguments and results. Logical call arguments
+stay lazy, even in i64 initializers; native probes match actual argument values,
+call order and iteration positions. Flat-i64 helper results now compose with scoped
+locals, exact-layout copies, projections, aggregate arguments and guarded captures.
+Shared effect outlining distinguishes pure values from Buffer access explicitly;
+Buffer admission is unchanged. Dependency-ordered validation now admits bounded
+loop-bearing helpers and their wrappers inside iterations without a fixed number of
+catalog passes. In the native-session profile, every selected invocation checks its
+own complete induction after argument evaluation; invalid or cyclic dependencies
+never release callers. Newly emitted native callbacks also reserve complete induction
+counts against one callback-stack counter forwarded through synchronous helpers.
+The default is 1,048,576 per callback; early exits do not refund reservations,
+zero-trip/skipped paths cost nothing, and exhaustion traps before the rejected body
+or callback output. A second independent stack counter now limits actual YIR function
+entries to 1,048,576, including roots, scoped helpers and neutral-return guards.
+Conditional calls in the admitted scalar catalog stay behind guards even without
+loops or checked arithmetic. Loop-free binary call-tree expansion now has real
+native rejection evidence. Both policies survive cache reuse and standalone
+restoration; neither promises wall-time, peak-memory or device-work bounds.
+Literal nested loop bodies, effects, nested/resource aggregates and
+mutable bool/aggregate locals remain separate; per-return allocation is still an
+optimization target.
+The parser also rejects excessive call/group expression re-entry before stack
+exhaustion, independently of other frontend recursion, NIR expression-depth and
+native call-graph admission.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
 aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested,
-aggregate-sequences and aggregate-temporaries fixtures compose with typed lifecycle
-and multi-state break/continue. The frontdoor suite now contains thirteen regressions for cache isolation, tamper rejection and
+aggregate-sequences, aggregate-temporaries, aggregate-checked, aggregate-calls and
+aggregate-local-values and aggregate-loop-calls fixtures compose with typed lifecycle
+and multi-state break/continue. The frontdoor suite now contains nineteen regressions,
+including loop-work/helper-entry exhaustion and lifecycle reset, cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.
 The passing default image host still executes embedded YIR.

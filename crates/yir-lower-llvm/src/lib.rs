@@ -287,6 +287,14 @@ fn emit_module_with_checks(
             function_name,
             CpuHelperSignature {
                 params: params.iter().map(|(_, _, kind)| *kind).collect(),
+                implicit_parameters: if require_scalar_values {
+                    vec![
+                        native_session::COUNTER_PARAMETER.to_owned(),
+                        native_session::HELPER_ENTRY_PARAMETER.to_owned(),
+                    ]
+                } else {
+                    Vec::new()
+                },
                 mutex_permit_params: params
                     .iter()
                     .map(|(index, _, _)| {
@@ -394,17 +402,18 @@ fn emit_module_with_checks(
             &mut global_counter,
         )?;
         globals.extend(emitted.globals);
-        let args_sig = params
-            .iter()
-            .map(|(index, _, kind)| {
-                if *kind == CpuCallScalarKind::BorrowedBuffer {
-                    format!("ptr %arg{index}, i64 %arg{index}_len")
-                } else {
-                    format!("{} %arg{index}", cpu_scalar_kind_llvm_type(*kind))
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
+        let args_sig = helper_signature.call_arguments(
+            params
+                .iter()
+                .map(|(index, _, kind)| {
+                    if *kind == CpuCallScalarKind::BorrowedBuffer {
+                        format!("ptr %arg{index}, i64 %arg{index}_len")
+                    } else {
+                        format!("{} %arg{index}", cpu_scalar_kind_llvm_type(*kind))
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
         let ret_sig = cpu_scalar_kind_llvm_type(
             helper_signatures
                 .get(function_name)

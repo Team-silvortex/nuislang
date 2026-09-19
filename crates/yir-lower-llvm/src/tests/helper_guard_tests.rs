@@ -264,6 +264,31 @@ fn normalizes_spawned_bool_result_through_i64_slot() {
 }
 
 #[test]
+fn synchronous_context_is_forwarded_but_never_captured_by_a_task_invoker() {
+    use super::super::{render_scalar_task_invoker, CpuHelperSignature};
+    let mut signature = CpuHelperSignature {
+        params: vec![CpuCallScalarKind::I64],
+        implicit_parameters: vec!["ptr %context".to_owned()],
+        mutex_permit_params: vec![None],
+        ret: CpuCallScalarKind::I64,
+        owned_struct_return: false,
+        owned_struct_layout: None,
+        owned_external_buffer_return: None,
+    };
+    assert_eq!(
+        signature.call_arguments(vec!["i64 %arg0".to_owned()]),
+        "i64 %arg0, ptr %context"
+    );
+    assert!(render_scalar_task_invoker("identity", &signature).is_none());
+    signature.implicit_parameters.clear();
+    assert_eq!(
+        signature.call_arguments(vec!["i64 %arg0".to_owned()]),
+        "i64 %arg0"
+    );
+    assert!(render_scalar_task_invoker("identity", &signature).is_some());
+}
+
+#[test]
 fn renders_bit_preserving_f32_and_f64_task_invokers() {
     use super::super::{render_scalar_task_invoker, CpuHelperSignature};
 
@@ -271,6 +296,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
         "identity_f32",
         &CpuHelperSignature {
             params: vec![CpuCallScalarKind::F32],
+            implicit_parameters: Vec::new(),
             mutex_permit_params: vec![None],
             ret: CpuCallScalarKind::F32,
             owned_struct_return: false,
@@ -288,6 +314,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
         "pick_f64",
         &CpuHelperSignature {
             params: vec![CpuCallScalarKind::Bool, CpuCallScalarKind::F64],
+            implicit_parameters: Vec::new(),
             mutex_permit_params: vec![None, None],
             ret: CpuCallScalarKind::F64,
             owned_struct_return: false,

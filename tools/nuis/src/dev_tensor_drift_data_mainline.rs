@@ -6,6 +6,8 @@ mod buffer_state;
 mod cancellation;
 #[path = "dev_tensor_drift_data_native_break.rs"]
 mod native_break;
+#[path = "dev_tensor_drift_data_native_iteration_calls.rs"]
+mod native_iteration_calls;
 
 pub(crate) fn mainline_drift_checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
     DEV_TENSOR_MAINLINE_DRIFT_CHECKS
@@ -13,6 +15,7 @@ pub(crate) fn mainline_drift_checks() -> impl Iterator<Item = &'static DevTensor
         .chain(cancellation::CHECKS.iter())
         .chain(buffer_state::CHECKS.iter())
         .chain(native_break::CHECKS.iter())
+        .chain(native_iteration_calls::checks())
 }
 
 pub(crate) const DEV_TENSOR_MAINLINE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[

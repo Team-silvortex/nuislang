@@ -73,10 +73,16 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let mut outlined = BufferLoopOutlines::default();
     let checked_arithmetic = speculation::collect_checked_arithmetic(module);
     for function in &module.functions {
-        if control_catalog
-            .get(&function.name)
-            .is_some_and(|helper| helper.may_loop || checked_arithmetic.contains(&function.name))
-        {
+        if control_catalog.get(&function.name).is_some_and(|helper| {
+            // Pure calls can still expand into substantial work. Keep
+            // conditional calls behind guards, not an eager value select.
+            let conditional_calls = function
+                .body
+                .iter()
+                .any(|stmt| matches!(stmt, NirStmt::If { .. }))
+                && scalar_helpers::contains_calls(&function.body);
+            helper.may_loop || checked_arithmetic.contains(&function.name) || conditional_calls
+        }) {
             outlined.functions.insert(function.name.clone());
             scalar_helpers::retain_reachable(
                 &function.body,
@@ -108,7 +114,6 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut names,
         &mut helpers,
         &mut outlined.guarded_functions,
-        &catalog,
         &control_catalog,
         &layouts,
     );
@@ -239,7 +244,7 @@ fn outline_loop(
         names,
         helpers,
         guarded,
-        catalog,
+        validation::EffectTypes::Buffer(catalog),
         &plan.mutations,
         structs,
         break_controls,

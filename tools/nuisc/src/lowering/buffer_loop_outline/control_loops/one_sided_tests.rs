@@ -100,11 +100,11 @@ fn empty_or_malformed_carry_arms_cannot_create_or_erase_state() {
         "if index > initial {} else {}",
         "if index > initial { let total: i64 = total + index; print(total); }",
         "if index > initial { print(total); } else { let total: i64 = total + index; }",
-        "if index > initial { let total: i64 = total / index; }",
+        "if index > initial { let total: i64 = total / checksum; }",
         "if index > initial { let total: i64 = total + checksum; }",
         "if index > total { let total: i64 = total + index; }",
         "if checksum > initial { let total: i64 = total + index; }",
-        "if index > initial && index < (bound / initial) { let total: i64 = total + index; }",
+        "if index > initial && index < (checksum / initial) { let total: i64 = total + index; }",
         "if index > initial { break; }",
         "if index > initial { let index: i64 = index + stride; }",
     ] {
@@ -124,7 +124,7 @@ fn one_sided_updates_require_existing_exact_i64_mutable_seeds_and_invariants() {
         ("total", "limit"),
         ("total", "stride"),
         ("total < bound", "total < index"),
-        ("index > initial", "index > (bound / initial)"),
+        ("index > initial", "index > (checksum / initial)"),
         ("index > initial", "index > wrap(initial, bound, step)"),
     ] {
         let module = parse_nuis_module(&source.replace(from, to)).unwrap();

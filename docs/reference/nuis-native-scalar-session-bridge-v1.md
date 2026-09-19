@@ -89,7 +89,8 @@ The source value catalog is independent of the narrower Buffer-loop catalog and
 the backend's slot/call-graph bounds. It rejects effects, recursive dependencies,
 general rebinding and unsupported payloads. A shared suffix is outlined once
 rather than copied into every branch. Counted loops now compose inside these
-helpers: one induction update followed by ordered i64 carry updates, with invariant
+helpers. The compact metadata profile uses one induction update followed by ordered
+i64 carry updates, with invariant
 i64 literal/variable limit and stride. Every updated name must be a distinct,
 already initialized local `let` of exact i64 type. The existing counted/chained-loop
 parsers and native preflight remain authoritative; this source shape check does
@@ -113,17 +114,20 @@ Header/stride mutation, forward sibling reads,
 duplicate updates, body calls and fallible update expressions are rejected.
 Fallible seed expressions outside the loop retain ordinary source-order checks.
 Constants, parameter rebinding and arbitrary loop bodies are not admitted by this
-automatic normalizer. The narrower Buffer catalog is unchanged.
+compact profile. Sequences, calls, projections and checked expressions use the scoped
+normalization described below instead of widening metadata operands. The narrower Buffer catalog
+is unchanged.
 
 ### Nested Carry-Update Arms
 
 Nested `if`/`else`, including `else if` and empty arms, may update the same local i64
 carry in source order along each selected path. Different leaves may compute three or more
-distinct nonfallible i64 results; an empty arm retains that carry's incoming value.
-Every condition still compares the stepped index or an earlier updated carry with
-an invariant i64 atom. Every leaf is checked, including unreachable leaves, and
-forward sibling reads, effects, calls, fallible update arithmetic and header mutation
-remain rejected. Ordered multi-statement updates are described below. The source shape scan allows
+distinct i64 results; an empty arm retains that carry's incoming value.
+The basic nested profile compares the stepped index or an earlier updated carry
+with an invariant i64 atom; local and checked conditions use the scoped expression
+rules below. Every leaf is checked, including unreachable leaves, and forward
+sibling reads, effects, unsupported calls and header mutation remain rejected. Ordered
+multi-statement updates are described below. The source shape scan allows
 at most 32 nested guards; native closure and slot limits remain independent.
 
 The normalizer outlines one private iteration function through the existing
@@ -175,7 +179,7 @@ of the other arm. At the join, both write sets become available because all name
 were seeded before the loop and every untaken write retains its own input.
 All leaves, including unreachable ones, retain type, ownership and effect checks.
 Iteration-local scalar bindings follow the scoped profile below. Constants/parameters
-as update targets, body calls, fallible updates, general inner loops and a second
+as update targets, unsupported body calls, general inner loops and a second
 induction write remain rejected.
 This is a bounded multi-statement carry profile, not arbitrary imperative code.
 
@@ -242,8 +246,8 @@ Source admission is not a guarantee of native admission: a 32-level decision tre
 can exceed the native call-depth bound after expansion into scoped helpers and
 callback frames. The two limits are checked independently; this integration keeps
 the explicit rejection rather than increasing the backend budget.
-Division/remainder, calls, provider/resource effects and general inner loops remain
-outside this new local-expression profile.
+Provider/resource effects and general inner loops remain outside this local-expression
+profile. Checked arithmetic and scalar helper calls follow the scoped rules below.
 
 [Temporary execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_temporaries.rs)
 reuse the independent sequence oracle and observe actual comparison/iteration and
@@ -251,6 +255,260 @@ allocation/drop counts. The [temporary lifecycle fixture](../../tools/nuisc/test
 also crosses ordinary build, registration-specific cache reuse, tamper rejection
 and standalone restoration. Test definitions alone do not certify a platform;
 Linux results must not be relabeled as Windows, macOS or GPU validation.
+
+### Checked Iteration Expressions
+
+Exact-i64 `/` and `%` may appear in local initializers, direct carry updates,
+nested branch bodies and lazy boolean conditions. Shared non-speculation analysis
+selects the scoped iteration route even without a fresh local declaration; a
+fallible expression is never captured as an eagerly evaluated loop-metadata operand.
+The existing guarded branch and boolean helpers keep evaluation at its source
+position. Stored results remain snapshots across later writes.
+
+Zero iterations, untaken arms and short-circuited RHSs perform no arithmetic.
+Reached zero divisors and `i64::MIN` with `-1` trap for both operators, including
+when the result is unused or the iteration has no carried output. A failure on a
+later iteration is not hoisted to an earlier one. Header bounds and strides remain
+invariant atoms: whole-bound induction preflight rejects invalid strides, overflow
+and excessive trips before executing any body expression. Scope, forward-sibling,
+exact-type, effect and depth admission still checks unreachable paths.
+
+[Checked-iteration regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_checked.rs)
+compare native and registered reference execution with an independent i128 oracle
+across branch positions, both directions, signed extremes and 1/3/7 carry widths.
+Volatile probes observe actual iterations and traps; allocation/drop balance is
+checked on successful paths, not promised after process termination. Reference
+event failure retains accepted state and permits close, but native process traps
+are not catchable session errors. Ordinary native-entry regressions also cover a
+discarded checked expression without carries.
+The [checked-iteration lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_checked_loops.ns)
+crosses build/cache reuse, tamper rejection and standalone artifact restoration.
+
+### Iteration-Local Helper Calls
+
+Local initializers, carry updates and conditions may call helpers with exact i64/bool
+or flat-i64 value arguments and results. The loop-enabled source catalog validates
+dependencies before callers and consults only completed, admitted callees, never
+provisional signatures. Bounded loop-bearing helpers and their transitive wrappers
+are eligible; transitive effects, recursion, cycles, nested/resource aggregates,
+references, async functions and unresolved generic
+signatures cannot gain admission through a hidden call. Declaration order does not
+change closure discovery. All arguments retain scope, availability, type, arity and
+the NIR expression-depth checks, including on unreachable paths.
+
+Calls select scoped iteration lowering even without a fresh binding or checked
+arithmetic in the caller. Recursive expression normalization preserves logical edges
+inside arguments, including arguments to i64-returning calls. Inferred bool results
+are retained as snapshots; comparisons may consume exact bool call results. An
+unselected call does not evaluate its arguments, but a selected call must evaluate
+even an argument its callee ignores. No new opcode, callback ABI or runtime dispatcher
+is introduced. Bounds/strides remain invariant atoms, and native closure/depth limits
+still apply after private helpers are generated.
+
+[Call execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_calls.rs)
+reuse the independent checked-arithmetic oracle with an ordered operand/iteration
+trace. A test-only probe observes real native callee entries, while existing probes
+retain whole-bound preflight, state results, successful-path allocation/drop and
+process traps. The [call lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_calls_loops.ns)
+also uses bool arguments with skipped invalid helper calls and crosses ordinary
+build/cache/standalone restoration. These probes are correctness, not performance evidence.
+
+The source parser separately permits at most 32 simultaneously active expression
+parse entries, counting the outer expression. Deep call arguments and parenthesized
+groups now return a diagnostic before exhausting its precedence-parser stack.
+Sibling expressions reuse this budget, including after errors. This is distinct from
+the scoped NIR expression limit of 64 and the native function-call depth limit of 32;
+it is not a claim that all recursive frontend structures have been made stack-safe.
+
+### Iteration-Local Flat Values
+
+Nonempty, nongeneric records containing only exact i64 fields may be constructed,
+returned by helpers, copied to fresh local bindings, passed as arguments and projected
+inside the iteration. Type identity is nominal, not just a matching field count;
+initializers require each declared field exactly once. Field operands keep source
+evaluation order even when their order differs from the declaration. Field accesses
+and aggregate constructors retain the scoped expression-depth/availability checks.
+
+Aggregate locals are immutable snapshots, not extra loop carries. Later scalar
+mutations do not change their contents, and branch-local names never escape. Guarded
+branches and short-circuit predicates capture already-available aggregates; calls and
+field expressions on skipped paths do not run. Reached unused results and ignored
+aggregate arguments still evaluate checked arithmetic. Successful execution must
+release aggregate allocations; process traps do not promise recoverable cleanup.
+
+The shared effect validator/outliner now takes an explicit Buffer or pure-value type
+mode. Capture discovery is shared with ordinary value control flow, while Buffer's
+scalar-only helper catalog and effect authority remain unchanged. This does not admit
+mutable aggregate/bool locals, resource or mixed/nested records, or literal nested
+loop bodies. Native layout/slot and closure limits remain independent of
+source layout discovery, including source-only tests with 65-field records.
+
+[Flat-local native regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_local_values.rs)
+check independent states, real operand/iteration traces, source-order field evaluation,
+snapshots across branch captures, whole-bound preflight and allocation/drop balance.
+The [flat-local lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_local_values_loops.ns)
+also crosses formal build/run-artifact, cache reuse and standalone restoration.
+
+### Loop-Bearing Iteration Calls
+
+The value catalog uses a dependency queue rather than a fixed two-pass profile.
+Only a successfully validated callee releases its callers; invalid leaves, unknown
+names and recursive components remain excluded. Source-only regression covers a
+2048-level acyclic loop-helper chain in both declaration orders. This tests catalog
+discovery, not native acceptance at that depth: generated helper nodes still count
+toward the separate native function, node and call-depth budgets. Buffer's catalog
+continues to exclude loop-bearing and aggregate helpers.
+Dependency collection also uses explicit stacks for statements and expressions,
+because collection now precedes body admission. A synthetic deep-structure test
+checks this traversal separately, without claiming arbitrary source-depth admission.
+
+Calls preserve exact i64/bool/flat-i64 types and lexical snapshots. Arguments execute
+in source order before entering the callee. Each selected invocation preflights its
+own full induction before entering its loop body, including when the result is
+discarded. A skipped branch or zero-trip caller does not enter the callee or check its
+induction. A later invocation may fail after earlier caller iterations have completed;
+those earlier operations are not rolled back. Reached checked arithmetic remains a
+process trap, not a catchable session error.
+
+Ordinary native-entry regressions check result and arithmetic-failure preservation,
+not this profile's bounded induction policy. General CLI loops do not acquire the
+native-session trip limit simply by calling a loop-bearing helper. Both native test
+runners use deadlines to prevent a bad negative fixture from hanging the test suite.
+
+[Loop-call execution regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_loop_calls.rs)
+compare native and reference results against an independent nested-loop oracle, with
+real callee/iteration traces, success-path allocation/drop balance and selected-path
+traps. They cover both directions, multiple call layers, scalar/record results,
+logical/branch skipping, changing child strides and argument failure before child
+preflight. The [loop-call lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_loop_calls_loops.ns)
+scans divisors in a helper called from another loop and crosses build/run-artifact,
+cache reuse and standalone restoration.
+
+Per-invocation induction limits alone are not a whole-callback work budget. The
+additional reservation policy below bounds their sum across selected synchronous
+calls, without broadening the iteration-helper source catalog. In particular,
+guarded-break helpers still have ordinary-call evidence, not admission as arbitrary
+iteration callees.
+
+### Shared Callback Loop-Work Reservations
+
+Each newly emitted exported callback allocates a fresh stack-owned i64 counter.
+Lowering forwards its pointer as a private synchronous helper parameter, including
+scoped iteration calls and transitive wrappers. Helpers never reset it. The exported
+four-argument scalar-slot ABI, YIR function slots and shared transport contract are
+unchanged. No global or thread-local counter is introduced, and the stack context
+cannot be captured by a generated deferred-task invoker. This profile still excludes
+async tasks and provider effects.
+
+`emit_registered` uses `DEFAULT_LOOP_WORK_LIMIT = 1_048_576` per callback invocation.
+The producer API `emit_registered_with_loop_work_limit` bakes an explicit u64 limit
+into the generated LLVM for direct bridge consumers; there is no CLI budget flag.
+The formal native-session package profile verifies the current default policy,
+so custom-limit LLVM is not interchangeable with that profile's checkpoint.
+A zero loop limit permits loop-free,
+unselected and zero-trip paths, subject to the separate function-entry limit below.
+Each open, event and close invocation owns a new
+budget, rather than sharing one for the whole application session.
+
+For each selected loop, the existing finite/non-wrapping induction check and
+65,536 per-loop limit run first. The loop then reserves its **complete induction
+trip count** before any body work. Both constant and runtime induction use the same
+unsigned compare-before-subtract operation. Argument evaluation still precedes
+callee admission; invalid induction does not debit the budget. Early `break` and
+`continue` do not refund reservations. A skipped child or zero-trip loop consumes
+nothing; repeated child calls reserve repeatedly against the caller's remaining
+counter. This conservative policy can reject work whose actual early-exit iteration
+count would fit. It is not instruction-by-instruction fuel.
+
+Exhaustion executes a native process trap before the rejected loop body. Earlier
+completed operations are not rolled back, but the failing callback does not publish
+its output state. The host may retain previously accepted states. A trap is not a
+catchable callback error, reference-fuel exhaustion or cooperative cancellation.
+Reservation bounds alone do not bound loop-free function fanout. The independent
+helper-entry policy below addresses that gap, not total node execution, aggregate
+memory, elapsed time, FFI/device work or preemption.
+
+[Native reservation probes](../../tools/nuisc/tests/native_application_bridge/loop_work.rs)
+observe real debits, argument order, body counts, process traps and untouched output
+sentinels. They cover exact/insufficient/zero/u64-max budgets, constant/dynamic loops,
+ordinary and scoped calls, early exits, lifecycle resets and a reentrant transport
+probe. Reentry is test instrumentation, not recursive Nuis admission or a thread
+stress certification. The [loop-work fixture](../../tools/nuisc/tests/native_application_bridge/loop_work.ns)
+and [frontdoor regression](../../tools/nuis/tests/native_session_workflow/loop_work.rs)
+execute the default 1,048,576 reservation boundary through build/run-artifact, cache
+reuse and standalone materialization after deleting the source project files.
+Budget exhaustion on an event does not publish an additional state or completion.
+
+The budget is embedded in the LLVM already bound to the artifact identity. Older
+compiled artifacts are not retroactively budgeted; rebuild them to adopt this
+producer policy. Existing executable instructions do not change, while the current
+artifact verifier rejects stale or rehashed budget-changed LLVM checkpoints instead
+of silently injecting a counter. Compile-cache restoration revalidates the checkpoint
+and rebuilds mismatches. General CLI LLVM emission does not gain a hidden budget parameter
+or the native-session loop limit. Its invariant add/multiply carry regression also
+guards the ordinary chain-emitter fix found while constructing these probes.
+That repair lowers existing `add_invariant`/`mul_invariant` YIR payloads; the native
+entry regression uses literal invariants. Direct source variable-invariant carry
+normalization and admission of richer carry payloads in this native-session profile
+remain separate boundaries.
+
+### Shared Callback Helper-Entry Accounting
+
+Shared callback-wide helper-entry accounting for loop-free fanout now accompanies
+loop reservations. Each exported invocation owns a second stack i64 counter, with
+`DEFAULT_HELPER_ENTRY_LIMIT = 1_048_576`. The private context travels through the same
+ordinary and scoped synchronous call paths; there is no global/TLS state or reset
+inside a helper. The external four-argument callback ABI and YIR parameter slots
+remain unchanged. Task invokers cannot capture either stack counter.
+
+Every **actual admitted YIR function entry** consumes one unit before parameter
+conversion or body work. This includes lifecycle roots, user helpers, iteration
+helpers, guarded branches and continuations. An outlined guard that immediately
+returns a neutral result still costs one entry. This is not a count of source calls,
+LLVM instructions or post-inlining machine calls, and outlining changes may change
+the charge. Calls not entered consume no entries. Caller-side argument evaluation
+has already happened; argument helpers themselves consume entries in source order.
+Returned or unused results do not refund entries. Reentrant exported invocations
+receive independent counters, while nested synchronous calls share their caller's.
+
+The producer API `emit_registered_with_work_limits` accepts independent u64 loop
+and entry limits. Existing `emit_registered_with_loop_work_limit` retains the default
+entry limit. Zero entry allowance rejects even a loop-free root, unlike zero loop
+allowance. Invalid shape and noncanonical transport still return statuses 1/2 before
+root entry, even with zero budgets. Unsigned compare-before-subtract prevents wrap.
+No CLI override is added; the formal package still verifies the current defaults.
+
+Exhaustion traps before the rejected function body and publishes no callback output.
+Earlier argument evaluation and completed calls are not rolled back. Loop induction
+admission remains independent and runs after entry to its containing function;
+invalid induction does not debit loop reservations. A rejected child function has
+not yet reserved its own loops. Neither budget promises native cancellation,
+elapsed-time bounds, peak-memory bounds or instruction/node-level accounting.
+
+The shared scalar-control outliner now preserves conditional calls in its admitted
+i64/bool/flat-i64 catalog even without loops or checked arithmetic. Pure calls may
+expand into substantial work: evaluating both arms before a `select` is not an
+acceptable replacement for selecting which call to execute. Existing guarded
+continuations keep argument work and callees behind the source decision. Their own
+entries remain charged, including neutral guard returns; this does not expand the
+catalog to arbitrary types, effects or control flow. Ordinary CLI emission receives
+this control-flow correction, but not the native-session counters or limits.
+
+[Entry probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
+exercise exact/insufficient/zero/u64-max limits, root-only and ignored-result calls,
+argument ordering, skipped business calls, neutral guards, scoped iterations,
+independent induction/loop debits and lifecycle reset. The reentrant loop-work probe
+now checks isolation of both counters. The [frontdoor fanout regression](../../tools/nuis/tests/native_session_workflow/helper_entries.rs)
+uses an acyclic, loop-free binary call tree: depth-18 work succeeds, while depth-19
+work exceeds the shared default once lifecycle/wrapper entries are included. Build,
+cache reuse and standalone materialization retain both the successful states and
+failure-before-publication behavior. Source-predicate probes exclude budget checks
+by operand provenance, not by removing all unsigned comparisons or weakening the
+independent short-circuit oracle. Rehashing modified entry limits does not bypass
+the bound LLVM checkpoint verifier. These are CPU proofs, not provider scheduling
+or thread-stress certification.
+
+### Metadata And Closure Limits
 
 Native conditional chains reuse the existing shared metadata parser and LLVM
 emitter, but admit only bounded trees of pure comparisons and nonfallible add/multiply/keep
@@ -829,7 +1087,7 @@ The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) bu
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
 aggregate-division, aggregate-counted, aggregate-carried, aggregate-conditional
 and aggregate-one-sided/aggregate-compound/aggregate-nested/
-aggregate-sequences/aggregate-temporaries
+aggregate-sequences/aggregate-temporaries/aggregate-checked/aggregate-calls/aggregate-local-values/aggregate-loop-calls
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
@@ -853,21 +1111,44 @@ extension additionally has Linux x86-64 native/reference execution checks; retai
 its runner, toolchain, source identity and test logs with the acceptance record.
 Neither platform's CPU results certify Windows execution or device-provider parity.
 
-Mainline integration on 2026-09-19 was checked on macOS aarch64: 496 lowering,
-17 syntax, 89 Buffer-loop, four compound-loop and 13 frontdoor tests passed, along
-with native-host, owned-cleanup and 26 tensor tests. The 112-case native suite had
-111 passes; the remaining depth expectation was corrected to distinguish source
-and call-depth admission, then passed its focused rerun. This is CPU integration
-evidence, not a new Linux or GPU certification.
+Shared loop-work integration on 2026-09-19 was checked on macOS aarch64:
+141 LLVM unit tests, all 144 native bridge regressions, 27 native-entry tests,
+48 Buffer-outliner unit tests, four compound-loop regressions and four bound-artifact
+unit tests passed. The seven loop-work regressions were rerun after adding constant
+zero-trip and invalid-induction-before-debit probes. All eighteen frontdoor
+build/cache/standalone restoration fixtures passed, including exact/default budget
+exhaustion and lifecycle resets. All 26 tensor tests passed. The live CLI reported
+1221 drift checks with zero
+failures and clean coverage, hierarchy and lineage. These are targeted CPU integration
+checks, not a full-workspace run or a new Linux/GPU certification. Native-entry tests
+preserve checked failures but do not claim the native-session induction or reservation
+policy. Reentrant transport isolation is not concurrent-thread stress evidence.
+
+The subsequent helper-entry integration on the same host passed 141 LLVM unit
+tests, 71 targeted compiler unit tests (outlining, optimization, artifact binding
+and portable document paths), 31 ordinary native control-flow tests, all nineteen
+frontdoor fixtures and 26 tensor tests. The first 150-case bridge run passed 136
+and exposed fourteen source-comparison probe mismatches: private budget checks
+were being counted as source predicates. After the provenance-only probe repair,
+all 33 affected/additional checks passed, including the fourteen failures, entry
+and loop budgets, reentry and the new probe regression. Together these runs cover
+151 bridge cases; this was not a second full-suite run after the test-only repair.
+The live tensor reported 1232 drift checks, zero failures and clean coverage,
+hierarchy and lineage. No new Linux/GPU certification or whole-workspace test run
+is claimed. The broad session coordinate remains active at 86.
 
 ## Next Boundary
 
-Extend checked iteration-local division/remainder inside guarded loops,
-without speculating an unselected failure or weakening the scoped iteration
-contract. Preserve temporary initialization, lexical visibility and stored snapshots.
+Extend iteration-local bool rebinding through build/run-artifact, with lexical
+initialization, branch-local scope and stored predicate snapshots. Keep aggregate
+rebinding separate. Retain shared helper-entry accounting, loop-work reservations
+and independent per-invocation induction preflight; do not mistake these policies
+for bounded total node work, memory or scheduling latency. Preserve
+flat-i64 snapshots, exact nominal layouts, field/argument order and allocation cleanup,
+temporary initialization, lexical visibility and stored snapshots.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
-checked division/remainder, flat-helper, counted/carried/conditional/one-sided/compound/nested/sequence/temporary-aggregate
+checked iteration expressions, flat-local and loop-call values, flat-helper, counted/carried/conditional/one-sided/compound/nested/sequence/temporary-aggregate
 and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
 is a separate optimization boundary.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource

@@ -14,6 +14,9 @@ mod parser_attributes;
 mod parser_blocks;
 #[path = "parser_destructure.rs"]
 mod parser_destructure;
+#[cfg(test)]
+#[path = "parser_expression_limits.rs"]
+mod parser_expression_limits;
 #[path = "parser_exprs.rs"]
 mod parser_exprs;
 #[path = "parser_externs.rs"]
@@ -35,6 +38,7 @@ pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
     allow_struct_literals: bool,
+    expression_depth: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +57,7 @@ impl Parser {
             tokens,
             cursor: 0,
             allow_struct_literals: true,
+            expression_depth: 0,
         }
     }
 

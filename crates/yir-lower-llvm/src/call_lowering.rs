@@ -402,7 +402,7 @@ pub(crate) fn lower_cpu_call_node(
     let call = format!(
         "call {} @{symbol}({})",
         cpu_scalar_kind_llvm_type(signature.ret),
-        lowered_args.join(", ")
+        signature.call_arguments(lowered_args)
     );
     body.push(format!("  {reg} = {call}"));
 

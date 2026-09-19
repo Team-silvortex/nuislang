@@ -29,6 +29,8 @@ pub(super) fn validate(
     body: &[NirStmt],
     scope: &Scope,
     loop_bindings: &BTreeSet<String>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
 ) -> Option<()> {
     let (first @ NirStmt::Let { name, .. }, tail) = body.split_first()? else {
         return None;
@@ -44,7 +46,7 @@ pub(super) fn validate(
         return None;
     }
     if nested::present(body, scope) {
-        return sequences::validate(&prepared, body, scope, loop_bindings);
+        return sequences::validate(&prepared, body, scope, loop_bindings, catalog, layouts);
     }
     let mut updates = BTreeSet::new();
     let mut ordered = Vec::new();
@@ -351,6 +353,18 @@ mod nested_tests;
 #[path = "control_loops/sequences_tests.rs"]
 mod sequences_tests;
 
+#[cfg(test)]
+#[path = "control_loops/aggregate_calls_tests.rs"]
+mod aggregate_calls_tests;
+#[cfg(test)]
+#[path = "control_loops/calls_tests.rs"]
+mod calls_tests;
+#[cfg(test)]
+#[path = "control_loops/checked_tests.rs"]
+mod checked_tests;
+#[cfg(test)]
+#[path = "control_loops/loop_calls_tests.rs"]
+mod loop_calls_tests;
 #[cfg(test)]
 #[path = "control_loops/temporaries_tests.rs"]
 mod temporaries_tests;

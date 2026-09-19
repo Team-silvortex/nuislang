@@ -1,6 +1,50 @@
 use super::support::*;
 
 #[test]
+fn lowers_unconditional_loop_carries_with_invariant_payloads() {
+    for instruction in ["cpu.loop_while_i64_chain", "cpu.loop_while_scalar_chain"] {
+        let mut module = module_with_cpu0();
+        for (name, value) in [
+            ("initial", "0"),
+            ("limit", "3"),
+            ("step", "1"),
+            ("seed", "2"),
+            ("offset", "7"),
+            ("scale", "11"),
+        ] {
+            push_cpu_const_i64(&mut module, name, value);
+        }
+        push_cpu_node(
+            &mut module,
+            "loop",
+            instruction,
+            vec![
+                "initial",
+                "limit",
+                "step",
+                "lt",
+                "add",
+                "seed",
+                "add_invariant",
+                "offset",
+                "seed",
+                "mul_invariant",
+                "scale",
+            ],
+        );
+        for name in ["initial", "limit", "step", "seed", "offset", "scale"] {
+            push_dep(&mut module, name, "loop");
+        }
+        let llvm = emit_module(&module).unwrap();
+        assert!(!llvm.contains("deferred lowering"));
+        // Payload constants may be retained in SSA registers; native execution
+        // separately checks the actual additive and multiplicative results.
+        assert!(llvm.contains(" = add i64 %"));
+        assert!(llvm.contains(" = mul i64 %"));
+    }
+}
+
+#[test]
 fn emits_module_with_contract_metadata_nodes_on_cpu_without_fake_cycles() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

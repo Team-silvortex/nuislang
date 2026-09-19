@@ -117,7 +117,7 @@ fn driver(bridge: &NativeSessionBridge, loop_helper: &str, cases: &[Case], probe
     function.insert_str(insertion,
         "  %probe_count = load volatile i64, ptr @probe_iterations, align 8\n  %probe_next = add i64 %probe_count, 1\n  store volatile i64 %probe_next, ptr @probe_iterations, align 8\n");
     llvm.replace_range(start..end, &function);
-    llvm.push_str("\n@probe_iterations = internal global i64 0, align 8\n\ndefine i64 @nuis_yir_entry() {\n  %args = alloca [4 x i64], align 8\n  %out = alloca i64, align 8\n");
+    llvm.push_str("\n@probe_iterations = internal global i64 0, align 8\n\ndefine i64 @nuis_yir_entry() {\n  %args = alloca [4 x i64], align 8\n  %out = alloca i64, align 8\n  %work = alloca i64, align 8\n  %entries = alloca i64, align 8\n");
     for (index, &(initial, limit, step, skip)) in cases.iter().enumerate() {
         for (slot, value) in [initial, limit, step, i64::from(skip)]
             .into_iter()
@@ -129,7 +129,7 @@ fn driver(bridge: &NativeSessionBridge, loop_helper: &str, cases: &[Case], probe
         }
         if probe {
             // Invoke the source entry, including its guard, not a generated continuation.
-            llvm.push_str(&format!("  store volatile i64 0, ptr @probe_iterations, align 8\n  %skip{index} = icmp ne i64 %v{index}_3, 0\n  %result{index} = call i64 @nuis_fn_walk(i64 %v{index}_0, i64 %v{index}_1, i64 %v{index}_2, i1 %skip{index})\n  call void @nuis_debug_print_i64(i64 %result{index})\n  %trips{index} = load volatile i64, ptr @probe_iterations, align 8\n  call void @nuis_debug_print_i64(i64 %trips{index})\n"));
+            llvm.push_str(&format!("  store i64 {}, ptr %work, align 8\n  store i64 {}, ptr %entries, align 8\n  store volatile i64 0, ptr @probe_iterations, align 8\n  %skip{index} = icmp ne i64 %v{index}_3, 0\n  %result{index} = call i64 @nuis_fn_walk(i64 %v{index}_0, i64 %v{index}_1, i64 %v{index}_2, i1 %skip{index}, ptr %work, ptr %entries)\n  call void @nuis_debug_print_i64(i64 %result{index})\n  %trips{index} = load volatile i64, ptr @probe_iterations, align 8\n  call void @nuis_debug_print_i64(i64 %trips{index})\n", bridge.loop_work_limit, bridge.helper_entry_limit));
         } else {
             let symbol = &bridge.callbacks[0].symbol;
             llvm.push_str(&format!("  %status{index} = call i32 @{symbol}(ptr %args, i64 4, ptr %out, i64 1)\n  %status_wide{index} = zext i32 %status{index} to i64\n  call void @nuis_debug_print_i64(i64 %status_wide{index})\n"));

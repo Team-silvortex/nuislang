@@ -4,7 +4,9 @@ pub(super) fn render_scalar_task_invoker(
     function_name: &str,
     signature: &CpuHelperSignature,
 ) -> Option<String> {
-    if !is_normalized_task_scalar(signature.ret)
+    // A caller-owned synchronous context must not escape into a task thunk.
+    if !signature.implicit_parameters.is_empty()
+        || !is_normalized_task_scalar(signature.ret)
         || signature
             .params
             .iter()

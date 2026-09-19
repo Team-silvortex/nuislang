@@ -2,7 +2,7 @@ use std::{
     fs,
     path::PathBuf,
     process::Command,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 struct TempProject(PathBuf);
@@ -50,9 +50,41 @@ fn compile_and_run(project_name: &str, source: &str) -> std::process::ExitStatus
         String::from_utf8_lossy(&compile.stderr)
     );
 
-    Command::new(output_dir.join(project_name))
-        .status()
-        .expect("run native binary")
+    let mut child = Command::new(output_dir.join(project_name))
+        .spawn()
+        .expect("run native binary");
+    let started = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait().expect("poll native binary") {
+            return status;
+        }
+        if started.elapsed() > Duration::from_secs(10) {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("{project_name}: native binary exceeded its test deadline");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn invariant_add_and_multiply_carries_run_as_a_native_binary() {
+    let status = compile_and_run(
+        "invariant_carries",
+        "mod cpu Main {
+      @noinline fn walk(limit: i64) -> i64 {
+        let index: i64 = 0; let total: i64 = 2; let product: i64 = 2;
+        while index < limit {
+          let index: i64 = index + 1;
+          let total: i64 = total + 7;
+          let product: i64 = product * 2;
+        }
+        return total + product;
+      }
+      fn main() -> i64 { return walk(3) + walk(0); }
+    }",
+    );
+    assert_eq!(status.code(), Some(43));
 }
 
 #[test]
@@ -672,4 +704,252 @@ fn inline_bool_match_temporary_preserves_native_entry_result() {
         "#,
     );
     assert_eq!(status.code(), Some(12));
+}
+
+#[test]
+fn checked_iteration_division_and_remainder_run_through_default_native_entry() {
+    let status = compile_and_run(
+        "checked_iteration_entry",
+        r#"mod cpu Main {
+          @noinline fn calculate(limit: i64, divisor: i64) -> i64 {
+            let index: i64 = 0;
+            let total: i64 = 0;
+            while index < limit {
+              let index: i64 = index + 1;
+              let valid = divisor != 0 && index / divisor >= 0;
+              if valid {
+                let quotient = index / divisor;
+                let saved: i64 = quotient;
+                let quotient: i64 = quotient + 1;
+                let remainder = index % divisor;
+                let total: i64 = total + saved * divisor + remainder;
+              } else { let total: i64 = total + 1; }
+            }
+            return total;
+          }
+          fn main() -> i64 { return calculate(4, 2) + calculate(4, 0) + calculate(0, 0); }
+        }"#,
+    );
+    assert_eq!(status.code(), Some(14));
+}
+
+#[test]
+fn unused_checked_iteration_still_traps_without_any_carried_result() {
+    for op in ["/", "%"] {
+        let source = format!(
+            "mod cpu Main {{
+          @noinline fn calculate(limit: i64, divisor: i64) -> i64 {{
+            let index: i64 = 0;
+            while index < limit {{
+              let index: i64 = index + 1;
+              let unused = index {op} divisor;
+            }}
+            return index;
+          }}
+          fn main() -> i64 {{ return calculate(2, 0); }}
+        }}"
+        );
+        let status = compile_and_run("unused_checked_iteration", &source);
+        assert!(!status.success());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+        }
+    }
+}
+
+#[test]
+fn iteration_helper_calls_keep_boolean_arguments_lazy_in_native_entry() {
+    let status = compile_and_run(
+        "iteration_calls_entry",
+        r#"mod cpu Main {
+      @noinline fn quotient(value: i64, divisor: i64) -> i64 { return value / divisor; }
+      @noinline fn flag(value: bool) -> bool { return value; }
+      @noinline fn add(left: i64, right: i64) -> i64 { return left + right; }
+      @noinline fn choose(enabled: bool, yes: i64, no: i64) -> i64 { if enabled { return yes; } return no; }
+      @noinline fn calculate(limit: i64, divisor: i64) -> i64 {
+        let index: i64 = 0;
+        let total: i64 = 0;
+        while index < limit {
+          let index: i64 = index + 1;
+          let ready = flag(divisor != 0);
+          let weight = choose(ready && quotient(index, divisor) > 0, index, 1);
+          let selected = flag(ready) == true;
+          if selected || divisor == 0 { let total: i64 = add(total, weight); }
+        }
+        return total;
+      }
+      fn main() -> i64 { return calculate(4, 2) + calculate(4, 0) + calculate(0, 0); }
+    }"#,
+    );
+    assert_eq!(status.code(), Some(14));
+}
+
+#[test]
+fn ignored_iteration_call_arguments_are_evaluated_before_the_call() {
+    for op in ["/", "%"] {
+        let source = format!(
+            "mod cpu Main {{
+          @noinline fn checked(value: i64, divisor: i64) -> i64 {{ return value {op} divisor; }}
+          @noinline fn ignore(value: i64) -> i64 {{ return 0; }}
+          @noinline fn calculate(limit: i64, divisor: i64) -> i64 {{
+            let index: i64 = 0;
+            while index < limit {{
+              let index: i64 = index + 1;
+              let unused = ignore(checked(index, divisor));
+            }}
+            return index;
+          }}
+          fn main() -> i64 {{ return calculate(2, 0); }}
+        }}"
+        );
+        let status = compile_and_run("ignored_iteration_argument", &source);
+        assert!(!status.success());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+        }
+    }
+}
+
+#[test]
+fn deep_source_calls_report_a_parser_error_instead_of_aborting_the_compiler() {
+    let project = temp_dir("deep_source_calls");
+    fs::write(project.0.join("nuis.toml"), "name = \"deep_source_calls\"\nversion = \"0.1.0\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\n").unwrap();
+    fs::write(project.0.join("main.ns"), format!("mod cpu Main {{ fn identity(value: i64) -> i64 {{ return value; }} fn main() -> i64 {{ return {}1{}; }} }}", "identity(".repeat(4096), ")".repeat(4096))).unwrap();
+    let compile = Command::new(env!("CARGO_BIN_EXE_nuisc"))
+        .arg("compile")
+        .arg(&project.0)
+        .arg(project.0.join("out"))
+        .output()
+        .unwrap();
+    assert!(!compile.status.success());
+    assert!(compile.status.code().is_some(), "{:?}", compile.status);
+    assert!(
+        String::from_utf8_lossy(&compile.stderr)
+            .contains("source expression nesting exceeds parser limit"),
+        "{}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+}
+
+#[test]
+fn flat_iteration_values_compose_with_default_native_entry() {
+    let status = compile_and_run(
+        "flat_iteration_values",
+        r#"mod cpu Main {
+      struct Parts { quotient: i64, remainder: i64 }
+      @noinline fn split(value: i64, divisor: i64) -> Parts {
+        return Parts { remainder: value % divisor, quotient: value / divisor };
+      }
+      @noinline fn restore(parts: Parts, divisor: i64) -> i64 {
+        return parts.quotient * divisor + parts.remainder;
+      }
+      @noinline fn calculate(limit: i64, divisor: i64) -> i64 {
+        let index: i64 = 0;
+        let total: i64 = 0;
+        while index < limit {
+          let index: i64 = index + 1;
+          let valid = divisor != 0 && split(index, divisor).quotient >= 0;
+          if valid {
+            let parts = split(index, divisor);
+            let snapshot: Parts = parts;
+            let total: i64 = total + restore(snapshot, divisor);
+          } else { let total: i64 = total + 1; }
+        }
+        return total;
+      }
+      fn main() -> i64 { return calculate(4, 2) + calculate(4, 0) + calculate(0, 0); }
+    }"#,
+    );
+    assert_eq!(status.code(), Some(14));
+}
+
+#[test]
+fn discarded_flat_iteration_result_keeps_native_arithmetic_failure() {
+    for op in ["/", "%"] {
+        let source = format!(
+            "mod cpu Main {{
+          struct Packet {{ value: i64 }}
+          @noinline fn packet(value: i64, divisor: i64) -> Packet {{
+            return Packet {{ value: value {op} divisor }};
+          }}
+          @noinline fn calculate(limit: i64, divisor: i64) -> i64 {{
+            let index: i64 = 0;
+            while index < limit {{
+              let index: i64 = index + 1;
+              let unused = packet(index, divisor);
+            }}
+            return index;
+          }}
+          fn main() -> i64 {{ return calculate(2, 0); }}
+        }}"
+        );
+        let status = compile_and_run("discarded_flat_iteration", &source);
+        assert!(!status.success());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+        }
+    }
+}
+
+const LOOP_CALL_SOURCE: &str = r#"mod cpu Main {
+  struct Packet { value: i64 }
+  @noinline fn packet(value: i64, stride: i64) -> Packet {
+    let index: i64 = 0;
+    let total: i64 = value;
+    while index < 2 {
+      let index: i64 = index + stride;
+      let total: i64 = total + index;
+    }
+    return Packet { value: total };
+  }
+  @noinline fn calculate(limit: i64, stride: i64, enabled: bool) -> i64 {
+    let index: i64 = 0;
+    let total: i64 = 0;
+    while index < limit {
+      let index: i64 = index + 1;
+      if enabled {
+        let value = packet(index, stride);
+        let saved: Packet = value;
+        let total: i64 = total + saved.value;
+      } else { let total: i64 = total + 1; }
+    }
+    return total;
+  }
+  fn main() -> i64 {
+    return calculate(4, 1, true) + calculate(2, 0, false) + calculate(0, 0, true);
+  }
+}"#;
+
+#[test]
+fn loop_bearing_iteration_helpers_run_through_default_native_entry() {
+    let status = compile_and_run("loop_bearing_iteration_helpers", LOOP_CALL_SOURCE);
+    assert_eq!(status.code(), Some(24));
+}
+
+#[test]
+fn discarded_loop_helper_keeps_its_checked_body_failure() {
+    // Ordinary native entry allows general loops; bounded induction preflight
+    // is the native-session profile's contract, not the CLI's loop semantics.
+    let source = LOOP_CALL_SOURCE
+        .replace(
+            "let total: i64 = total + index;",
+            "let total: i64 = total + index / (2 - index);",
+        )
+        .replace(
+            "let total: i64 = total + saved.value;",
+            "let total: i64 = total + 1;",
+        );
+    let status = compile_and_run("discarded_loop_helper", &source);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
 }

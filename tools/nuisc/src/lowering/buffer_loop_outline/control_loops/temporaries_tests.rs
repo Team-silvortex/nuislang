@@ -76,8 +76,6 @@ fn temporary_scope_and_definite_initialization_are_fail_closed() {
         "let temp: i64 = true; let total: i64 = total + index;",
         "let temp: i64 = index; let temp: bool = true; let total: i64 = total + index;",
         "let flag: bool = true; let flag: bool = false; let total: i64 = total + index;",
-        "let temp: i64 = index / index; let total: i64 = total + temp;",
-        "let temp: i64 = index % index; let total: i64 = total + temp;",
         "let temp: i64 = index; let limit: i64 = limit + 1;",
         "let temp: i64 = index; let stride: i64 = stride + 1;",
         "let temp: i64 = index; let index: i64 = index + 1;",

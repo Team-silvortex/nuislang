@@ -1,0 +1,28 @@
+mod cpu Main {
+  struct State { value: i64 }
+  struct Packet { value: i64, marker: i64 }
+
+  @noinline fn argument(value: i64) -> i64 { return value; }
+  @noinline fn leaf(value: i64) -> Packet {
+    return Packet { value: value + 1, marker: value };
+  }
+  @noinline fn pair(value: i64) -> i64 {
+    let left = leaf(argument(value));
+    let right = leaf(argument(left.value));
+    return right.value;
+  }
+  @noinline fn selected(value: i64, skip: bool) -> i64 {
+    if skip { return value; }
+    return pair(value);
+  }
+  fn start(value: i64, skip: bool) -> State {
+    return State { value: selected(value, skip) };
+  }
+  fn step(state: State, value: i64, skip: bool) -> State {
+    return State { value: state.value + selected(value, skip) };
+  }
+  fn stop(state: State, value: i64, skip: bool) -> State {
+    return State { value: state.value + selected(value, skip) };
+  }
+  fn main() -> i64 { return 0; }
+}

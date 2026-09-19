@@ -10,8 +10,12 @@ use yir_runtime_host::ApplicationSession;
 
 #[path = "native_application_bridge/aggregate_admission.rs"]
 mod aggregate_admission;
+#[path = "native_application_bridge/aggregate_calls.rs"]
+mod aggregate_calls;
 #[path = "native_application_bridge/aggregate_carried.rs"]
 mod aggregate_carried;
+#[path = "native_application_bridge/aggregate_checked.rs"]
+mod aggregate_checked;
 #[path = "native_application_bridge/aggregate_compound.rs"]
 mod aggregate_compound;
 #[path = "native_application_bridge/aggregate_conditional.rs"]
@@ -24,6 +28,10 @@ mod aggregate_division;
 mod aggregate_execution;
 #[path = "native_application_bridge/aggregate_guards.rs"]
 mod aggregate_guards;
+#[path = "native_application_bridge/aggregate_local_values.rs"]
+mod aggregate_local_values;
+#[path = "native_application_bridge/aggregate_loop_calls.rs"]
+mod aggregate_loop_calls;
 #[path = "native_application_bridge/aggregate_loop_probe.rs"]
 mod aggregate_loop_probe;
 #[path = "native_application_bridge/aggregate_nested.rs"]
@@ -60,6 +68,10 @@ mod dynamic_loop_guard;
 mod dynamic_loops;
 #[path = "native_application_bridge/helpers.rs"]
 mod helpers;
+#[path = "native_application_bridge/loop_work.rs"]
+mod loop_work;
+#[path = "native_application_bridge/helper_entries.rs"]
+mod helper_entries;
 #[path = "native_application_bridge/loops.rs"]
 mod loops;
 #[path = "native_application_bridge/multi_admission.rs"]

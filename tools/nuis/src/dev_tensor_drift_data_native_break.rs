@@ -236,7 +236,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "control_loops::contains_loop(&function.body)",
             "helper.may_loop |= helper",
             ".any(|name| admitted[name].may_loop)",
-            "control_loops::validate(condition, body, locals, loop_bindings)?",
+            "control_loops::validate(",
+            "NirStmt::While { condition, body } if allow_loops",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -662,6 +663,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "locals.scope.contains_key(name)",
             "locals.writable.contains(name)",
             "bool_atom",
+            "NirBinaryOp::Div",
+            "NirBinaryOp::Rem",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -707,5 +710,65 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "native_iteration_temporaries_build_cache_and_standalone_relocation",
             "check_workflow(AGGREGATE_TEMPORARIES_SOURCE)",
         ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-routing",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested.rs",
+        required_patterns: &[
+            "speculation::block_has_checked_arithmetic",
+            "captured metadata operand",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-admission",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/checked_tests.rs",
+        required_patterns: &[
+            "checked_iteration_expressions_use_scoped_helpers_with_or_without_temporaries",
+            "checked_arithmetic_does_not_weaken_header_scope_type_or_effect_admission",
+            "checked_scope_rejects_forged_operand_kinds_even_in_an_unreached_arm",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-execution",
+        path: "tools/nuisc/tests/native_application_bridge/aggregate_checked.rs",
+        required_patterns: &[
+            "checked_iteration_arithmetic_matches_independent_oracle_across_call_shapes",
+            "checked_iteration_short_circuit_skips_zero_and_signed_overflow",
+            "checked_iteration_unselected_arms_and_zero_trips_do_not_evaluate_arithmetic",
+            "checked_iteration_faults_trap_at_the_reached_iteration_even_when_unused",
+            "checked_iteration_preflight_rejects_whole_bound_before_any_division",
+            "checked_iteration_call_guards_preserve_prefix_and_suffix_order",
+            "reference_checked_iteration_failure_preserves_accepted_state_and_close",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-frontdoor",
+        path: "tools/nuis/tests/native_session_workflow.rs",
+        required_patterns: &[
+            "aggregate_checked_loops.ns",
+            "native_checked_iterations_build_cache_and_standalone_relocation",
+            "check_workflow(AGGREGATE_CHECKED_SOURCE)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-native-entry",
+        path: "tools/nuisc/tests/control_flow_syntax_native.rs",
+        required_patterns: &[
+            "checked_iteration_division_and_remainder_run_through_default_native_entry",
+            "unused_checked_iteration_still_traps_without_any_carried_result",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-test-registration",
+        path: "tools/nuisc/tests/native_application_bridge.rs",
+        required_patterns: &[
+            "mod aggregate_checked;",
+            "native_application_bridge/aggregate_checked.rs",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-session-checked-iteration-admission-registration",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops.rs",
+        required_patterns: &["mod checked_tests;", "control_loops/checked_tests.rs"],
     },
 ];

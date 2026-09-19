@@ -32,6 +32,8 @@ pub(super) fn validate(
     body: &[NirStmt],
     scope: &Scope,
     loop_bindings: &BTreeSet<String>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
 ) -> Option<()> {
     let (first, effects) = body.split_first()?;
     // Reuse the strict single-step admission, including exact i64 and local
@@ -60,13 +62,19 @@ pub(super) fn validate(
     }
     let mut mutable = updates;
     mutable.insert(prepared.binding_name.clone());
-    if has_temporaries {
+    if has_temporaries
+        || speculation::block_has_checked_arithmetic(effects, &BTreeSet::new())
+        || scalar_helpers::contains_calls(effects)
+        || control_values::has_aggregate_expressions(effects)
+    {
         return temporaries::validate(
             effects,
             scope,
             loop_bindings,
             &mutable,
             &prepared.binding_name,
+            catalog,
+            layouts,
         );
     }
     validate_block(

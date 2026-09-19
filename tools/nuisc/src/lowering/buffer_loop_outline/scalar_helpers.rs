@@ -25,6 +25,11 @@ fn collect_profile(
     layouts: &control_values::FlatLayouts,
     allow_loops: bool,
 ) -> ScalarHelpers {
+    let functions = module
+        .functions
+        .iter()
+        .map(|f| (f.name.as_str(), f))
+        .collect::<BTreeMap<_, _>>();
     let mut candidates = module
         .functions
         .iter()
@@ -42,6 +47,8 @@ fn collect_profile(
                     .is_some_and(|ty| control_values::supported_type(ty, layouts))
         })
         .map(|function| {
+            let mut dependencies = BTreeSet::new();
+            collect_calls(&function.body, &mut dependencies);
             (
                 function.name.clone(),
                 ScalarHelper {
@@ -51,34 +58,16 @@ fn collect_profile(
                         .map(|param| param.ty.clone())
                         .collect(),
                     result: function.return_type.clone().expect("scalar return"),
-                    dependencies: BTreeSet::new(),
+                    dependencies,
                     may_loop: control_loops::contains_loop(&function.body),
                 },
             )
         })
         .collect::<ScalarHelpers>();
-    let valid = module
-        .functions
-        .iter()
-        .filter(|function| candidates.contains_key(&function.name))
-        .filter(|function| validate_body(function, &candidates, layouts, allow_loops).is_some())
-        .map(|function| {
-            let mut dependencies = BTreeSet::new();
-            collect_calls(&function.body, &mut dependencies);
-            (function.name.clone(), dependencies)
-        })
-        .collect::<BTreeMap<_, _>>();
-    candidates.retain(|name, helper| {
-        if let Some(dependencies) = valid.get(name) {
-            helper.dependencies.clone_from(dependencies);
-            true
-        } else {
-            false
-        }
-    });
-
-    // Admit leaves before callers. Missing callees and cycles never become ready;
-    // discovery does not recurse down an arbitrarily deep source call graph.
+    // Validate leaves before callers, including calls inside iterations. Only
+    // admitted dependencies can release a caller; invalid leaves, missing names
+    // and cycles never grant provisional authority. No recursive graph walk or
+    // depth-sized sequence of whole-module validation passes is needed.
     let mut remaining = BTreeMap::new();
     let mut callers = BTreeMap::<String, Vec<String>>::new();
     let mut ready = BTreeSet::new();
@@ -96,6 +85,9 @@ fn collect_profile(
     }
     let mut admitted = ScalarHelpers::new();
     while let Some(name) = ready.pop_first() {
+        if validate_body(functions[name.as_str()], &admitted, layouts, allow_loops).is_none() {
+            continue;
+        }
         let mut helper = candidates.remove(&name).expect("ready helper");
         helper.may_loop |= helper
             .dependencies
@@ -196,7 +188,7 @@ fn validate_block(
                 returned = then_returns && else_returns;
             }
             NirStmt::While { condition, body } if allow_loops => {
-                control_loops::validate(condition, body, locals, loop_bindings)?;
+                control_loops::validate(condition, body, locals, loop_bindings, catalog, layouts)?;
             }
             NirStmt::Return(Some(value)) => {
                 if &control_values::value_type(value, locals, catalog, layouts)? != result {
@@ -208,6 +200,21 @@ fn validate_block(
         }
     }
     Some(returned)
+}
+
+pub(super) fn typed_call_type(
+    callee: &str,
+    args: &[NirTypeRef],
+    catalog: &ScalarHelpers,
+) -> Option<NirTypeRef> {
+    let helper = catalog.get(callee)?;
+    (args == helper.params).then(|| helper.result.clone())
+}
+
+pub(super) fn contains_calls(body: &[NirStmt]) -> bool {
+    let mut calls = BTreeSet::new();
+    collect_calls(body, &mut calls);
+    !calls.is_empty()
 }
 
 pub(super) fn call_type(
@@ -266,54 +273,53 @@ pub(super) fn retain_reachable(
 }
 
 fn collect_calls(body: &[NirStmt], calls: &mut BTreeSet<String>) {
-    for stmt in body {
-        match stmt {
-            NirStmt::Let { value, .. }
-            | NirStmt::Const { value, .. }
-            | NirStmt::Expr(value)
-            | NirStmt::Return(Some(value)) => collect_expr_calls(value, calls),
-            NirStmt::If {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                collect_expr_calls(condition, calls);
-                collect_calls(then_body, calls);
-                collect_calls(else_body, calls);
+    let mut pending = vec![body];
+    while let Some(body) = pending.pop() {
+        for stmt in body {
+            match stmt {
+                NirStmt::Let { value, .. }
+                | NirStmt::Const { value, .. }
+                | NirStmt::Expr(value)
+                | NirStmt::Return(Some(value)) => collect_expr_calls(value, calls),
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    collect_expr_calls(condition, calls);
+                    pending.extend([then_body.as_slice(), else_body.as_slice()]);
+                }
+                NirStmt::While { condition, body } => {
+                    collect_expr_calls(condition, calls);
+                    pending.push(body);
+                }
+                _ => {}
             }
-            NirStmt::While { condition, body } => {
-                collect_expr_calls(condition, calls);
-                collect_calls(body, calls);
-            }
-            _ => {}
         }
     }
 }
 
 fn collect_expr_calls(expr: &NirExpr, calls: &mut BTreeSet<String>) {
-    match expr {
-        NirExpr::Call { callee, args } => {
-            calls.insert(callee.clone());
-            for arg in args {
-                collect_expr_calls(arg, calls);
+    // Dependency collection now precedes body admission. Walk unvalidated
+    // structure without borrowing the compiler's call stack for source depth.
+    let mut pending = vec![expr];
+    while let Some(expr) = pending.pop() {
+        match expr {
+            NirExpr::Call { callee, args } => {
+                calls.insert(callee.clone());
+                pending.extend(args);
             }
-        }
-        NirExpr::Binary { lhs, rhs, .. } => {
-            collect_expr_calls(lhs, calls);
-            collect_expr_calls(rhs, calls);
-        }
-        NirExpr::StructLiteral { fields, .. } => {
-            for (_, value) in fields {
-                collect_expr_calls(value, calls);
+            NirExpr::Binary { lhs, rhs, .. } => pending.extend([lhs.as_ref(), rhs.as_ref()]),
+            NirExpr::StructLiteral { fields, .. } => {
+                pending.extend(fields.iter().map(|(_, value)| value))
             }
+            NirExpr::FieldAccess { base, .. } => pending.push(base),
+            NirExpr::LoadAt { index, .. } => pending.push(index),
+            NirExpr::StoreAt { index, value, .. } => {
+                pending.extend([index.as_ref(), value.as_ref()])
+            }
+            _ => {}
         }
-        NirExpr::FieldAccess { base, .. } => collect_expr_calls(base, calls),
-        NirExpr::LoadAt { index, .. } => collect_expr_calls(index, calls),
-        NirExpr::StoreAt { index, value, .. } => {
-            collect_expr_calls(index, calls);
-            collect_expr_calls(value, calls);
-        }
-        _ => {}
     }
 }
 
@@ -321,6 +327,55 @@ fn collect_expr_calls(expr: &NirExpr, calls: &mut BTreeSet<String>) {
 mod tests {
     use super::*;
     use crate::frontend::parse_nuis_module;
+
+    #[test]
+    fn dependency_collection_handles_deep_unvalidated_structure_iteratively() {
+        let mut value = NirExpr::Int(0);
+        for _ in 0..16384 {
+            value = NirExpr::Call {
+                callee: "leaf".into(),
+                args: vec![value],
+            };
+        }
+        let mut body = vec![NirStmt::Return(Some(value))];
+        for _ in 0..4096 {
+            body = vec![NirStmt::If {
+                condition: NirExpr::Call {
+                    callee: "guard".into(),
+                    args: vec![],
+                },
+                then_body: body,
+                else_body: vec![],
+            }];
+        }
+        let mut calls = BTreeSet::new();
+        collect_calls(&body, &mut calls);
+        assert_eq!(calls, BTreeSet::from(["guard".into(), "leaf".into()]));
+
+        // This is discovery evidence, not admission of arbitrary source depth.
+        // Tear down the deliberately deep owned fixture without recursive Drop.
+        let mut expressions = Vec::new();
+        while let Some(stmt) = body.pop() {
+            match stmt {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    expressions.push(condition);
+                    body.extend(then_body);
+                    body.extend(else_body);
+                }
+                NirStmt::Return(Some(value)) => expressions.push(value),
+                _ => unreachable!(),
+            }
+        }
+        while let Some(value) = expressions.pop() {
+            if let NirExpr::Call { args, .. } = value {
+                expressions.extend(args);
+            }
+        }
+    }
 
     #[test]
     fn scalar_helper_admission_checks_transitive_bodies_and_cycles() {

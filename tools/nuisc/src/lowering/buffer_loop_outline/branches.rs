@@ -6,7 +6,7 @@ pub(super) fn outline_effects(
     names: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
-    catalog: &ScalarHelpers,
+    types: validation::EffectTypes<'_>,
     mutations: &MutationScope,
     structs: &mut Vec<NirStructDef>,
     break_controls: &mut BTreeMap<String, String>,
@@ -27,7 +27,7 @@ pub(super) fn outline_effects(
                         arm,
                         &mut scope.clone(),
                         &mut BTreeSet::new(),
-                        catalog,
+                        types,
                         mutations,
                         &mut carries,
                     )
@@ -55,7 +55,7 @@ pub(super) fn outline_effects(
                         &arm,
                         &mut scope.clone(),
                         &mut inputs,
-                        catalog,
+                        types,
                         mutations,
                         &mut Vec::new(),
                     )
@@ -77,7 +77,7 @@ pub(super) fn outline_effects(
                         names,
                         helpers,
                         guarded,
-                        catalog,
+                        types,
                         mutations,
                         structs,
                         break_controls,
@@ -115,6 +115,9 @@ pub(super) fn outline_effects(
                 condition,
                 mut body,
             } => {
+                let validation::EffectTypes::Buffer(catalog) = types else {
+                    unreachable!("nested loops are not admitted in pure iteration values");
+                };
                 let plan =
                     buffer_loop_params(&condition, &body, scope, catalog, &mutations.protected)
                         .expect("validated nested loop");
@@ -138,7 +141,9 @@ pub(super) fn outline_effects(
             } => {
                 scope.insert(
                     name.clone(),
-                    infer_local(value, scope, catalog).expect("validated local"),
+                    types
+                        .expression(value, scope, &mut BTreeSet::new())
+                        .expect("validated local"),
                 );
                 outlined.push(stmt);
             }

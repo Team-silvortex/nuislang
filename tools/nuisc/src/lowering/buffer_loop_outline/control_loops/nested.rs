@@ -4,6 +4,14 @@ use super::*;
 mod conditions;
 
 pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
+    // Fallible arithmetic must execute in the selected iteration, never as a
+    // captured metadata operand. Reuse the shared non-speculation analysis.
+    if speculation::block_has_checked_arithmetic(body, &BTreeSet::new())
+        || scalar_helpers::contains_calls(body)
+        || control_values::has_aggregate_expressions(body)
+    {
+        return true;
+    }
     let mut seen = BTreeSet::new();
     body.iter().any(|stmt| match stmt {
         NirStmt::Let { name, .. } => !scope.contains_key(name) || !seen.insert(name.as_str()),
@@ -37,7 +45,6 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
     names: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
-    scalar_catalog: &ScalarHelpers,
     control_catalog: &ScalarHelpers,
     layouts: &control_values::FlatLayouts,
 ) {
@@ -54,7 +61,6 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
             names,
             helpers,
             guarded,
-            scalar_catalog,
             control_catalog,
             layouts,
             structs: &mut module.structs,
@@ -67,7 +73,6 @@ struct Builder<'a> {
     names: &'a mut BTreeSet<String>,
     helpers: &'a mut Vec<NirFunction>,
     guarded: &'a mut BTreeSet<String>,
-    scalar_catalog: &'a ScalarHelpers,
     control_catalog: &'a ScalarHelpers,
     layouts: &'a control_values::FlatLayouts,
     structs: &'a mut Vec<NirStructDef>,
@@ -128,11 +133,12 @@ impl Builder<'_> {
         mutations.writable.insert(induction.clone());
         let mut inputs = BTreeSet::new();
         let mut discovered = Vec::new();
+        let types = validation::EffectTypes::Values(self.control_catalog, self.layouts);
         validate_effects(
             std::slice::from_ref(&step),
             &mut scope.clone(),
             &mut inputs,
-            self.scalar_catalog,
+            types,
             &mutations,
             &mut discovered,
         )
@@ -141,7 +147,7 @@ impl Builder<'_> {
             &effects,
             &mut scope.clone(),
             &mut inputs,
-            self.scalar_catalog,
+            types,
             &mutations,
             &mut discovered,
         )
@@ -163,7 +169,7 @@ impl Builder<'_> {
             self.names,
             self.helpers,
             self.guarded,
-            self.scalar_catalog,
+            types,
             &mutations,
             self.structs,
             &mut BTreeMap::new(),
@@ -200,7 +206,14 @@ impl Builder<'_> {
         let mut branches = self.helpers.split_off(first_branch);
         branches.push(function);
         for mut function in branches {
-            conditions::outline(&mut function, self.names, self.helpers, self.guarded);
+            conditions::outline(
+                &mut function,
+                self.names,
+                self.helpers,
+                self.guarded,
+                self.control_catalog,
+                self.layouts,
+            );
             self.helpers.push(function);
         }
     }

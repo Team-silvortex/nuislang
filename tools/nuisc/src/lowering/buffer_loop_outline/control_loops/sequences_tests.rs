@@ -64,8 +64,8 @@ fn statement_sequences_outline_once_and_return_unique_carries() {
 fn statement_sequences_check_unselected_arms_and_keep_header_immutable() {
     for invalid in [
         "let total: i64 = total + checksum;", // Still a forward sibling read.
-        "let total: i64 = total / index;",
-        "let total: i64 = total % index;",
+        "let total: i64 = total / checksum;",
+        "let total: i64 = total % checksum;",
         "let total: i64 = wrap(index, limit, stride);",
         "let index: i64 = index + 1;",
         "let limit: i64 = limit + 1;",
@@ -86,7 +86,10 @@ fn statement_sequences_check_unselected_arms_and_keep_header_immutable() {
     for from_to in [
         ("let total: i64 = initial;", "const total: i64 = initial;"),
         ("total < bound", "total < checksum"),
-        ("checksum < bound", "checksum < (bound / initial)"),
+        (
+            "checksum < bound",
+            "checksum < (bound / wrap(initial, bound, stride))",
+        ),
     ] {
         let module = parse_nuis_module(&source(BODY).replace(from_to.0, from_to.1)).unwrap();
         assert!(

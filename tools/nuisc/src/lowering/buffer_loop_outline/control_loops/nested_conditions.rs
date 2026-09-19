@@ -8,6 +8,8 @@ pub(super) fn outline(
     names: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
 ) {
     let mut scope = function
         .params
@@ -20,12 +22,11 @@ pub(super) fn outline(
             // explicit bool bindings and generated branch predicates.
             let inferred = ty
                 .clone()
-                .or_else(|| infer_local(value, &scope, &ScalarHelpers::new()));
+                .or_else(|| control_values::value_type(value, &scope, catalog, layouts));
             if let Some(inferred) = inferred {
-                if inferred == scalar_type("bool") {
-                    *value = predicate(value.clone(), &scope, names, helpers, guarded);
-                    *ty = Some(inferred.clone());
-                }
+                // Logical edges can also occur inside an i64 call's arguments.
+                *value = predicate(value.clone(), &scope, names, helpers, guarded);
+                *ty = Some(inferred.clone());
                 scope.insert(name.clone(), inferred);
             }
         }
@@ -45,11 +46,41 @@ fn predicate(
         rhs,
     } = expr
     else {
-        return expr;
+        return match expr {
+            NirExpr::Call { callee, args } => NirExpr::Call {
+                callee,
+                args: args
+                    .into_iter()
+                    .map(|arg| predicate(arg, scope, names, helpers, guarded))
+                    .collect(),
+            },
+            NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
+                op,
+                lhs: Box::new(predicate(*lhs, scope, names, helpers, guarded)),
+                rhs: Box::new(predicate(*rhs, scope, names, helpers, guarded)),
+            },
+            NirExpr::StructLiteral {
+                type_name,
+                type_args,
+                fields,
+            } => NirExpr::StructLiteral {
+                type_name,
+                type_args,
+                fields: fields
+                    .into_iter()
+                    .map(|(name, value)| (name, predicate(value, scope, names, helpers, guarded)))
+                    .collect(),
+            },
+            NirExpr::FieldAccess { base, field } => NirExpr::FieldAccess {
+                base: Box::new(predicate(*base, scope, names, helpers, guarded)),
+                field,
+            },
+            _ => expr,
+        };
     };
     let disjunction = op == NirBinaryOp::Or;
     let mut inputs = BTreeSet::new();
-    collect_inputs(&rhs, &mut inputs);
+    control_values::collect_inputs(&rhs, &mut inputs);
     let mut params = captured_params(inputs, scope);
     let mut bindings = scope.keys().cloned().collect();
     let gate = branches::fresh_name("__nuis_predicate_gate", &mut bindings);
@@ -91,20 +122,6 @@ fn predicate(
         negate(call)
     } else {
         call
-    }
-}
-
-fn collect_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
-    match expr {
-        NirExpr::Var(name) => {
-            inputs.insert(name.clone());
-        }
-        NirExpr::Binary { lhs, rhs, .. } => {
-            collect_inputs(lhs, inputs);
-            collect_inputs(rhs, inputs);
-        }
-        NirExpr::Int(_) | NirExpr::Bool(_) => {}
-        _ => unreachable!("admitted comparison atoms"),
     }
 }
 

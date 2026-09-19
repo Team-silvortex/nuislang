@@ -84,6 +84,13 @@ pub(super) fn emit_cpu_function(
         last_cpu_value: None,
         ends_with_terminal_return: false,
     };
+    if require_scalar_values {
+        native_session::helper_entries::enter(
+            &mut state.body,
+            &mut state.next_reg,
+            &mut state.next_block,
+        );
+    }
     state.buffer_lengths.extend(param_buffer_lengths.clone());
     let mut required_values = Vec::new();
 

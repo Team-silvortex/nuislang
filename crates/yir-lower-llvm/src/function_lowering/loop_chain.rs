@@ -203,7 +203,12 @@ macro_rules! lower_loop_chain {
                 for (index, ((carry_kind, raw_payloads), (_, payloads))) in
                     carry_specs_raw.iter().zip(carry_specs.iter()).enumerate()
                 {
-                    let (source, op) = if carry_kind == "add_current" {
+                    let (source, op) = if matches!(carry_kind.as_str(), "add_invariant" | "mul_invariant") {
+                        let value = payloads.first().ok_or_else(|| {
+                            format!("cpu.{loop_instruction} `{}` carry kind `{carry_kind}` is missing its invariant payload during LLVM lowering", node.name)
+                        })?;
+                        (value.clone(), if carry_kind == "add_invariant" { "add" } else { "mul" })
+                    } else if carry_kind == "add_current" {
                         (next_current.clone(), "add")
                     } else if carry_kind == "add_prev_current" {
                         (current.clone(), "add")

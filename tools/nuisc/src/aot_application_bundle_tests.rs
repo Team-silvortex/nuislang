@@ -92,11 +92,34 @@ fn native_inputs_reject_rehashed_llvm_bundle_and_profile_drift() {
     let source = fs::read_to_string(&path).unwrap();
     let rows = parse_artifact_hash_blocks(&source, &path).unwrap();
     verify_sources(&source, &path, &rows).unwrap();
+    let llvm = fs::read_to_string(fixture.0.join("demo.ll")).unwrap();
+    let budget_init = "store i64 1048576, ptr %nuis_loop_work";
+    assert_eq!(llvm.matches(budget_init).count(), 3);
+    let entry_init = "store i64 1048576, ptr %nuis_helper_entries";
+    assert_eq!(llvm.matches(entry_init).count(), 3);
     for (kind, key, replacement, expected) in [
         (
             "llvm_ir",
             "native_session_llvm_hex",
             "invalid LLVM".to_owned(),
+            "LLVM checkpoint",
+        ),
+        (
+            "llvm_ir",
+            "native_session_llvm_hex",
+            llvm.replace(
+                budget_init,
+                "store i64 18446744073709551615, ptr %nuis_loop_work",
+            ),
+            "LLVM checkpoint",
+        ),
+        (
+            "llvm_ir",
+            "native_session_llvm_hex",
+            llvm.replace(
+                entry_init,
+                "store i64 18446744073709551615, ptr %nuis_helper_entries",
+            ),
             "LLVM checkpoint",
         ),
         (

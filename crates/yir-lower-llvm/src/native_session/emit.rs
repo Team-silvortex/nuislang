@@ -1,6 +1,11 @@
 use super::{CallbackExport, ScalarKind};
 
-pub(super) fn callback(export: &CallbackExport, slots: usize) -> String {
+pub(super) fn callback(
+    export: &CallbackExport,
+    slots: usize,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) -> String {
     let count = export.arguments.len();
     let mut lines = vec![
         format!(
@@ -85,6 +90,14 @@ pub(super) fn callback(export: &CallbackExport, slots: usize) -> String {
         };
         parameters.push(format!("{ty} {value}"));
     }
+    lines.extend([
+        "  %nuis_loop_work = alloca i64, align 8".to_owned(),
+        format!("  store i64 {loop_work_limit}, ptr %nuis_loop_work, align 8"),
+        "  %nuis_helper_entries = alloca i64, align 8".to_owned(),
+        format!("  store i64 {helper_entry_limit}, ptr %nuis_helper_entries, align 8"),
+    ]);
+    parameters.push(super::COUNTER_PARAMETER.to_owned());
+    parameters.push(super::HELPER_ENTRY_PARAMETER.to_owned());
     lines.push(format!(
         "  %returned = call i64 @nuis_fn_{}({})",
         export.function,

@@ -2,7 +2,15 @@ use super::*;
 
 impl Parser {
     pub(super) fn parse_expr(&mut self) -> Result<AstExpr, String> {
-        self.parse_or()
+        // Each nested argument/group re-enters the full precedence ladder.
+        // Reject before exhausting the parser stack, independently of NIR limits.
+        if self.expression_depth >= 32 {
+            return Err("source expression nesting exceeds parser limit of 32".to_owned());
+        }
+        self.expression_depth += 1;
+        let result = self.parse_or();
+        self.expression_depth -= 1;
+        result
     }
 
     fn parse_or(&mut self) -> Result<AstExpr, String> {

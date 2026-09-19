@@ -180,9 +180,18 @@ pub(crate) enum CpuLoopScalarKind {
 }
 pub(crate) struct CpuHelperSignature {
     pub(crate) params: Vec<CpuCallScalarKind>,
+    /// Lowering-private parameters forwarded by synchronous calls, not YIR slots.
+    pub(crate) implicit_parameters: Vec<String>,
     pub(crate) mutex_permit_params: Vec<Option<MutexScalarKind>>,
     pub(crate) ret: CpuCallScalarKind,
     pub(crate) owned_struct_return: bool,
     pub(crate) owned_struct_layout: Option<yir_core::OwnedStructLayout>,
     pub(crate) owned_external_buffer_return: Option<CpuOwnedExternalBufferAbi>,
+}
+
+impl CpuHelperSignature {
+    pub(crate) fn call_arguments(&self, mut explicit: Vec<String>) -> String {
+        explicit.extend(self.implicit_parameters.iter().cloned());
+        explicit.join(", ")
+    }
 }

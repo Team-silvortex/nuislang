@@ -308,7 +308,49 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("extend checked iteration-local division/remainder inside guarded loops"));
+        .starts_with("extend iteration-local bool rebinding"));
+    assert!(session
+        .evidence
+        .contains("Shared callback helper-entry accounting"));
+    assert!(session.evidence.contains("loop-free fanout fixture"));
+    assert!(session.evidence.contains("neutral guards still cost one"));
+    assert!(session.next_step.contains("shared helper-entry accounting"));
+    assert!(session
+        .evidence
+        .contains("Shared callback loop-work reservations"));
+    assert!(session.evidence.contains("1,048,576"));
+    assert!(session.evidence.contains("early exits do not refund"));
+    assert!(session
+        .evidence
+        .contains("Dependency-ordered iteration calls"));
+    assert!(session.evidence.contains("aggregate-loop-calls fixture"));
+    assert!(session.evidence.contains("2048 acyclic loop-helper levels"));
+    assert!(session
+        .evidence
+        .contains("Loop reservations are not a total node/time/memory budget"));
+    assert!(session
+        .evidence
+        .contains("Iteration-local flat-i64 helper results"));
+    assert!(session.evidence.contains("aggregate-local-values fixture"));
+    assert!(session.blocker.contains("mutable bool/aggregate rebinding"));
+    assert!(session
+        .evidence
+        .contains("completed pure acyclic helper closure"));
+    assert!(session.evidence.contains("aggregate-calls fixture"));
+    assert!(!session
+        .blocker
+        .contains("loop-free helper fanout remains unaccounted"));
+    assert!(!session
+        .blocker
+        .contains("shared whole-callback loop-work accounting remains open"));
+    assert!(!session
+        .blocker
+        .contains("loop-bearing helper calls, nested loop bodies"));
+    assert!(session
+        .evidence
+        .contains("Checked iteration-local i64 division/remainder"));
+    assert!(session.evidence.contains("aggregate-checked fixture"));
+    assert!(!session.blocker.contains("fallible local expressions"));
     assert!(session
         .evidence
         .contains("private scoped iteration helpers and guarded bool predicates"));

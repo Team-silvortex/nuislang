@@ -1,4 +1,5 @@
-use super::{constant_inputs, MAX_ITERATIONS};
+use super::{bounded_iterations, constant_inputs, MAX_ITERATIONS};
+use crate::native_session::loop_work;
 use crate::{fresh_block, fresh_reg, LlvmValueRef};
 use std::collections::BTreeMap;
 use yir_core::Node;
@@ -25,7 +26,12 @@ pub(crate) fn emit_guard(
         return Ok(());
     }
     super::validate(node, nodes)?;
-    if constant_inputs(node, nodes).is_some() {
+    if let Some([initial, limit, step]) = constant_inputs(node, nodes) {
+        let trips = bounded_iterations(initial, limit, step, &node.op.args[3], &node.op.args[4])
+            .expect("validated constant induction");
+        if trips != 0 {
+            loop_work::reserve(&trips.to_string(), body, next_reg, next_block);
+        }
         return Ok(());
     }
     let value = |index: usize| match registers.get(&node.op.args[index]) {
@@ -51,6 +57,7 @@ pub(crate) fn emit_guard(
     let check = fresh_block(next_block, "native_loop_preflight");
     let ready = fresh_block(next_block, "native_loop_admitted");
     let trap = fresh_block(next_block, "native_loop_rejected");
+    let reserve = fresh_block(next_block, "native_loop_work_reserve");
     let mut ir = GuardEmitter { body, next_reg };
     let active = ir.emit(format!("icmp {pred} i64 {initial}, {limit}"));
     ir.body
@@ -127,11 +134,16 @@ pub(crate) fn emit_guard(
     let range = ir.emit(format!("and i1 {lower}, {upper}"));
     let finite_bound = ir.emit(format!("and i1 {finite}, {bounded}"));
     let admitted = ir.emit(format!("and i1 {finite_bound}, {range}"));
-    ir.body
-        .push(format!("  br i1 {admitted}, label %{ready}, label %{trap}"));
+    ir.body.push(format!(
+        "  br i1 {admitted}, label %{reserve}, label %{trap}"
+    ));
     ir.body.push(format!("{trap}:"));
     ir.body.push("  call void @llvm.trap()".to_owned());
     ir.body.push("  unreachable".to_owned());
+    ir.body.push(format!("{reserve}:"));
+    let trips = ir.emit(format!("trunc i128 {trips} to i64"));
+    loop_work::reserve(&trips, ir.body, ir.next_reg, next_block);
+    ir.body.push(format!("  br label %{ready}"));
     ir.body.push(format!("{ready}:"));
     Ok(())
 }

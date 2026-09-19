@@ -82,8 +82,8 @@ fn carries_reject_seed_order_effect_and_header_mutation_drift() {
         ("let total: i64 = initial;", "const total: i64 = initial;"),
         ("let total: i64 = initial;", "let total: i64 = initial / 1;"),
         ("total + index", "total + checksum"),
-        ("total + index", "total + (index / stride)"),
-        ("total + index", "total + (index % stride)"),
+        ("total + index", "total + (checksum / stride)"),
+        ("total + index", "total + (checksum % stride)"),
         ("total + index", "total + wrap(index, limit, stride)"),
         ("let checksum: i64 = checksum * total;", "print(total);"),
         (
@@ -111,8 +111,8 @@ fn carries_reject_seed_order_effect_and_header_mutation_drift() {
             "let checksum: i64 = checksum + index; let index: i64 = index + stride;",
         ),
     ] {
-        // A fallible seed remains valid: unlike body updates, it executes once
-        // in source order and is protected by ordinary checked arithmetic.
+        // A fallible seed executes once in source order, independently of the
+        // iteration-local availability checks for carry updates.
         let source = SOURCE.replace(from, to);
         let module = parse_nuis_module(&source).unwrap();
         let catalog =

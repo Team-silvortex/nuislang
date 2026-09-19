@@ -168,18 +168,19 @@ pub(crate) fn begin_loop_effect_action(
                 .into_iter()
                 .flatten()
                 .collect::<Vec<_>>();
+            let arguments = signature.call_arguments(lowered);
             if returns_owned_bytes {
                 let result = fresh_reg(next_reg);
                 body.push(format!(
                     "  {result} = call ptr @nuis_fn_{callee}({})",
-                    lowered.join(", ")
+                    arguments
                 ));
                 Ok(LoopEffectCleanup::OwnedResult(result))
             } else if returns_owned_struct {
                 let result = fresh_reg(next_reg);
                 body.push(format!(
                     "  {result} = call i64 @nuis_fn_{callee}({})",
-                    lowered.join(", ")
+                    arguments
                 ));
                 Ok(LoopEffectCleanup::OwnedStructResult(result))
             } else {
@@ -187,7 +188,7 @@ pub(crate) fn begin_loop_effect_action(
                 body.push(format!(
                     "  {ignored_result} = call {} @nuis_fn_{callee}({})",
                     cpu_scalar_kind_llvm_type(signature.ret),
-                    lowered.join(", ")
+                    arguments
                 ));
                 Ok(if scalar_carry.is_some() {
                     LoopEffectCleanup::ScalarResult(ignored_result)

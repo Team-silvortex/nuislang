@@ -1,0 +1,40 @@
+mod cpu Main {
+  struct State { value: i64 }
+  struct Packet { value: i64, marker: i64 }
+
+  @noinline fn argument(trips: i64) -> i64 { return trips; }
+  @noinline fn leaf(trips: i64, stride: i64, early: bool) -> Packet {
+    let index: i64 = 0;
+    while index < trips {
+      let index: i64 = index + stride;
+    }
+    return Packet { value: index, marker: index };
+  }
+  @noinline fn relay(trips: i64, stride: i64, early: bool) -> i64 {
+    let packet = leaf(trips, stride, early);
+    return packet.value;
+  }
+  @noinline fn nested(rounds: i64, trips: i64, stride: i64, early: bool) -> i64 {
+    let index: i64 = 0;
+    let value: i64 = 0;
+    while index < rounds {
+      let index: i64 = index + 1;
+      let value: i64 = value + relay(argument(trips), stride, early);
+    }
+    return value;
+  }
+  @noinline fn selected(rounds: i64, trips: i64, stride: i64, early: bool, skip: bool) -> i64 {
+    if skip { return 0; }
+    return nested(rounds, trips, stride, early);
+  }
+  fn start(rounds: i64, trips: i64, stride: i64, early: bool, skip: bool) -> State {
+    return State { value: selected(rounds, trips, stride, early, skip) };
+  }
+  fn step(state: State, rounds: i64, trips: i64, stride: i64, early: bool, skip: bool) -> State {
+    return State { value: state.value + selected(rounds, trips, stride, early, skip) };
+  }
+  fn stop(state: State, rounds: i64, trips: i64, stride: i64, early: bool, skip: bool) -> State {
+    return State { value: state.value + selected(rounds, trips, stride, early, skip) };
+  }
+  fn main() -> i64 { return 0; }
+}

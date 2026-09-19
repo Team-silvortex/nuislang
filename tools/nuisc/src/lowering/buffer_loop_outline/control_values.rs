@@ -103,6 +103,55 @@ pub(super) fn zero_value(ty: &NirTypeRef, layouts: &FlatLayouts) -> NirExpr {
     }
 }
 
+pub(super) fn collect_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
+    match expr {
+        NirExpr::Var(name) => {
+            inputs.insert(name.clone());
+        }
+        NirExpr::Binary { lhs, rhs, .. } => {
+            collect_inputs(lhs, inputs);
+            collect_inputs(rhs, inputs);
+        }
+        NirExpr::Call { args, .. } => {
+            for arg in args {
+                collect_inputs(arg, inputs);
+            }
+        }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                collect_inputs(value, inputs);
+            }
+        }
+        NirExpr::FieldAccess { base, .. } => collect_inputs(base, inputs),
+        NirExpr::Int(_) | NirExpr::Bool(_) => {}
+        _ => unreachable!("admitted pure value expression"),
+    }
+}
+
+pub(super) fn has_aggregate_expressions(body: &[NirStmt]) -> bool {
+    fn expression(expr: &NirExpr) -> bool {
+        match expr {
+            NirExpr::StructLiteral { .. } | NirExpr::FieldAccess { .. } => true,
+            NirExpr::Binary { lhs, rhs, .. } => expression(lhs) || expression(rhs),
+            NirExpr::Call { args, .. } => args.iter().any(expression),
+            _ => false,
+        }
+    }
+    body.iter().any(|stmt| match stmt {
+        NirStmt::Let { value, .. } => expression(value),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expression(condition)
+                || has_aggregate_expressions(then_body)
+                || has_aggregate_expressions(else_body)
+        }
+        _ => false,
+    })
+}
+
 pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> Option<NirTypeRef> {
     if lhs != rhs {
         return None;

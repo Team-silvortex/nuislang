@@ -1,5 +1,6 @@
 use super::*;
 use branches::{collect_bindings, fresh_name};
+use control_values::collect_inputs as collect_expr_inputs;
 
 pub(super) fn outline(
     module: &mut NirModule,
@@ -194,30 +195,5 @@ fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {
             }
             _ => unreachable!("normalized scalar body"),
         }
-    }
-}
-
-fn collect_expr_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
-    match expr {
-        NirExpr::Var(name) => {
-            inputs.insert(name.clone());
-        }
-        NirExpr::Binary { lhs, rhs, .. } => {
-            collect_expr_inputs(lhs, inputs);
-            collect_expr_inputs(rhs, inputs);
-        }
-        NirExpr::Call { args, .. } => {
-            for arg in args {
-                collect_expr_inputs(arg, inputs);
-            }
-        }
-        NirExpr::StructLiteral { fields, .. } => {
-            for (_, value) in fields {
-                collect_expr_inputs(value, inputs);
-            }
-        }
-        NirExpr::FieldAccess { base, .. } => collect_expr_inputs(base, inputs),
-        NirExpr::Int(_) | NirExpr::Bool(_) => {}
-        _ => unreachable!("normalized scalar expression"),
     }
 }

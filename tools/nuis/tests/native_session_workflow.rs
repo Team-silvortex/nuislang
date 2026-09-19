@@ -5,6 +5,11 @@ use std::{
     process::{Command, Output},
 };
 
+#[path = "native_session_workflow/loop_work.rs"]
+mod loop_work;
+#[path = "native_session_workflow/helper_entries.rs"]
+mod helper_entries;
+
 const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/multi_loops.ns");
 const BREAK_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/break_loops.ns");
@@ -30,6 +35,14 @@ const AGGREGATE_SEQUENCES_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_sequences_loops.ns");
 const AGGREGATE_TEMPORARIES_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_temporaries_loops.ns");
+const AGGREGATE_CHECKED_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_checked_loops.ns");
+const AGGREGATE_CALLS_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_calls_loops.ns");
+const AGGREGATE_LOCAL_VALUES_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_local_values_loops.ns");
+const AGGREGATE_LOOP_CALLS_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_loop_calls_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -188,6 +201,26 @@ fn native_iteration_temporaries_build_cache_and_standalone_relocation() {
     check_workflow(AGGREGATE_TEMPORARIES_SOURCE);
 }
 
+#[test]
+fn native_checked_iterations_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_CHECKED_SOURCE);
+}
+
+#[test]
+fn native_iteration_calls_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_CALLS_SOURCE);
+}
+
+#[test]
+fn native_iteration_flat_values_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_LOCAL_VALUES_SOURCE);
+}
+
+#[test]
+fn native_iteration_loop_calls_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_LOOP_CALLS_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -232,6 +265,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
         AGGREGATE_TEMPORARIES_SOURCE,
+        AGGREGATE_CHECKED_SOURCE,
+        AGGREGATE_CALLS_SOURCE,
+        AGGREGATE_LOCAL_VALUES_SOURCE,
+        AGGREGATE_LOOP_CALLS_SOURCE,
     ]
     .contains(&source)
     {
@@ -249,6 +286,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
         AGGREGATE_TEMPORARIES_SOURCE,
+        AGGREGATE_CHECKED_SOURCE,
+        AGGREGATE_CALLS_SOURCE,
+        AGGREGATE_LOCAL_VALUES_SOURCE,
+        AGGREGATE_LOOP_CALLS_SOURCE,
     ]
     .contains(&source)
     {
@@ -264,6 +305,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
         AGGREGATE_TEMPORARIES_SOURCE,
+        AGGREGATE_CHECKED_SOURCE,
+        AGGREGATE_CALLS_SOURCE,
+        AGGREGATE_LOCAL_VALUES_SOURCE,
+        AGGREGATE_LOOP_CALLS_SOURCE,
     ]
     .contains(&source)
     {
@@ -290,6 +335,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_NESTED_SOURCE,
         AGGREGATE_SEQUENCES_SOURCE,
         AGGREGATE_TEMPORARIES_SOURCE,
+        AGGREGATE_CHECKED_SOURCE,
+        AGGREGATE_CALLS_SOURCE,
+        AGGREGATE_LOCAL_VALUES_SOURCE,
+        AGGREGATE_LOOP_CALLS_SOURCE,
     ]
     .contains(&source)
     {

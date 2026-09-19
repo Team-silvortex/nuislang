@@ -15,19 +15,23 @@ pub(super) fn validate(
     writable: &BTreeSet<String>,
     updates: &BTreeSet<String>,
     induction: &str,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
 ) -> Option<()> {
     let mut locals = Locals {
         scope: scope.clone(),
         writable: writable.clone(),
         available: BTreeSet::from([induction.to_owned()]),
     };
-    block(body, &mut locals, updates, 0)
+    block(body, &mut locals, updates, catalog, layouts, 0)
 }
 
 fn block(
     body: &[NirStmt],
     locals: &mut Locals,
     updates: &BTreeSet<String>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
     depth: usize,
 ) -> Option<()> {
     for stmt in body {
@@ -35,13 +39,13 @@ fn block(
             NirStmt::Let { name, ty, value } => {
                 let existing = locals.scope.get(name);
                 let own = existing.map(|_| name.as_str());
-                let inferred = expression(value, locals, updates, own, 0)?;
+                let inferred = expression(value, locals, updates, own, catalog, layouts, 0)?;
                 if ty.as_ref().is_some_and(|ty| ty != &inferred) {
                     return None;
                 }
                 if let Some(existing) = existing {
                     // Parameters/constants never gain write authority. Local
-                    // bools are snapshots, not a new cross-branch carry ABI.
+                    // bools/aggregates are snapshots, not a new carry ABI.
                     if !locals.writable.contains(name)
                         || existing != &scalar_type("i64")
                         || inferred != *existing
@@ -62,14 +66,29 @@ fn block(
                 else_body,
             } if depth < 32 => {
                 if (then_body.is_empty() && else_body.is_empty())
-                    || expression(condition, locals, updates, None, 0)? != scalar_type("bool")
+                    || expression(condition, locals, updates, None, catalog, layouts, 0)?
+                        != scalar_type("bool")
                 {
                     return None;
                 }
                 let mut then_locals = locals.clone();
                 let mut else_locals = locals.clone();
-                block(then_body, &mut then_locals, updates, depth + 1)?;
-                block(else_body, &mut else_locals, updates, depth + 1)?;
+                block(
+                    then_body,
+                    &mut then_locals,
+                    updates,
+                    catalog,
+                    layouts,
+                    depth + 1,
+                )?;
+                block(
+                    else_body,
+                    &mut else_locals,
+                    updates,
+                    catalog,
+                    layouts,
+                    depth + 1,
+                )?;
                 // Only bindings that exist before the branch survive its join.
                 // Even matching names declared in both arms remain arm-local.
                 locals.available.extend(
@@ -91,6 +110,8 @@ fn expression(
     locals: &Locals,
     updates: &BTreeSet<String>,
     own: Option<&str>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
     depth: usize,
 ) -> Option<NirTypeRef> {
     if depth > 64 {
@@ -106,17 +127,56 @@ fn expression(
             locals
                 .scope
                 .get(name)
-                .filter(|ty| **ty == scalar_type("i64") || **ty == scalar_type("bool"))
+                .filter(|ty| control_values::supported_type(ty, layouts))
                 .cloned()
         }
+        NirExpr::Call { callee, args } => {
+            let types = args
+                .iter()
+                .map(|arg| expression(arg, locals, updates, own, catalog, layouts, depth + 1))
+                .collect::<Option<Vec<_>>>()?;
+            scalar_helpers::typed_call_type(callee, &types, catalog)
+        }
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => {
+            let layout = layouts.get(type_name)?;
+            if !type_args.is_empty() || fields.len() != layout.len() {
+                return None;
+            }
+            let mut seen = BTreeSet::new();
+            for (name, value) in fields {
+                if !layout.contains(name)
+                    || !seen.insert(name)
+                    || expression(value, locals, updates, own, catalog, layouts, depth + 1)?
+                        != scalar_type("i64")
+                {
+                    return None;
+                }
+            }
+            Some(scalar_type(type_name))
+        }
+        NirExpr::FieldAccess { base, field } => {
+            let base = expression(base, locals, updates, own, catalog, layouts, depth + 1)?;
+            layouts
+                .get(&base.name)?
+                .contains(field)
+                .then(|| scalar_type("i64"))
+        }
         NirExpr::Binary { op, lhs, rhs } => {
-            let left = expression(lhs, locals, updates, own, depth + 1)?;
-            let right = expression(rhs, locals, updates, own, depth + 1)?;
+            let left = expression(lhs, locals, updates, own, catalog, layouts, depth + 1)?;
+            let right = expression(rhs, locals, updates, own, catalog, layouts, depth + 1)?;
             if left != right {
                 return None;
             }
             match op {
-                NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
+                NirBinaryOp::Add
+                | NirBinaryOp::Sub
+                | NirBinaryOp::Mul
+                | NirBinaryOp::Div
+                | NirBinaryOp::Rem
                     if left == scalar_type("i64") =>
                 {
                     Some(left)
@@ -132,8 +192,8 @@ fn expression(
                     Some(scalar_type("bool"))
                 }
                 NirBinaryOp::And | NirBinaryOp::Or if left == scalar_type("bool") => Some(left),
-                // Compound bools are outlined only at logical edges. Do not
-                // hide eager logical evaluation under an equality operation.
+                // Keep comparisons on boolean values; call arguments have
+                // their logical edges normalized inside the iteration.
                 NirBinaryOp::Eq | NirBinaryOp::Ne
                     if left == scalar_type("bool") && bool_atom(lhs) && bool_atom(rhs) =>
                 {
@@ -147,5 +207,8 @@ fn expression(
 }
 
 fn bool_atom(value: &NirExpr) -> bool {
-    matches!(value, NirExpr::Bool(_) | NirExpr::Var(_))
+    matches!(
+        value,
+        NirExpr::Bool(_) | NirExpr::Var(_) | NirExpr::Call { .. }
+    )
 }

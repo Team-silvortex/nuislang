@@ -20,8 +20,27 @@ pub(super) fn execute_with_predicates(
     checked: bool,
     predicate_counts: Option<&[i64]>,
 ) {
+    execute_probed(source, cases, loop_label, checked, predicate_counts, None);
+}
+
+pub(super) struct CallProbe<'a> {
+    pub callee: &'a str,
+    pub traces: &'a [Vec<[i64; 3]>],
+}
+
+pub(super) fn execute_probed(
+    source: &str,
+    cases: &[Invocation],
+    loop_label: &str,
+    checked: bool,
+    predicate_counts: Option<&[i64]>,
+    calls: Option<CallProbe<'_>>,
+) {
     if let Some(counts) = predicate_counts {
         assert_eq!(counts.len(), cases.len());
+    }
+    if let Some(calls) = &calls {
+        assert_eq!(calls.traces.len(), cases.len());
     }
     assert!(!cases.is_empty());
     let trap = cases.last().unwrap().state.is_none();
@@ -69,6 +88,13 @@ pub(super) fn execute_with_predicates(
     let leaf = llvm.find("define i64 @nuis_fn_leaf(").unwrap();
     let insertion = leaf + llvm[leaf..].find("{\n").unwrap() + 2;
     llvm.insert_str(insertion, "  call void @nuis_debug_print_i64(i64 93)\n  call void @nuis_debug_print_i64(i64 %arg0)\n  call void @nuis_debug_print_i64(i64 %arg1)\n  %probe_trips = load volatile i64, ptr @probe_iterations\n  call void @nuis_debug_print_i64(i64 %probe_trips)\n  %flushed = call i32 @fflush(ptr null)\n");
+    if let Some(calls) = &calls {
+        let definition = llvm
+            .find(&format!("define i64 @nuis_fn_{}(", calls.callee))
+            .unwrap();
+        let insertion = definition + llvm[definition..].find("{\n").unwrap() + 2;
+        llvm.insert_str(insertion, "  call void @nuis_debug_print_i64(i64 97)\n  call void @nuis_debug_print_i64(i64 %arg0)\n  call void @nuis_debug_print_i64(i64 %arg1)\n  %probe_call_trip = load volatile i64, ptr @probe_iterations\n  call void @nuis_debug_print_i64(i64 %probe_call_trip)\n  %probe_call_flush = call i32 @fflush(ptr null)\n");
+    }
     llvm = llvm.replace(
         "  call void @llvm.trap()",
         "  call void @probe_trap_evidence()\n  call void @llvm.trap()",
@@ -105,8 +131,13 @@ pub(super) fn execute_with_predicates(
             assert!(error.contains(expected_error), "{error}");
         } else {
             // Reference fuel is not evidence for native induction preflight.
+            // A callee's preflight can fail after earlier caller iterations.
             assert!(case.leaf.is_none());
-            assert_eq!(case.iterations, 0);
+        }
+        if let Some(calls) = &calls {
+            for [left, right, trip] in &calls.traces[case_index] {
+                oracle.extend([97, *left, *right, *trip]);
+            }
         }
         if let Some([value, divisor]) = case.leaf {
             oracle.extend([93, value, divisor, case.iterations]);
