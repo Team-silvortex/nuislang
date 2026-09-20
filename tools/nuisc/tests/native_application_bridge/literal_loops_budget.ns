@@ -1,0 +1,23 @@
+mod cpu Main {
+  struct State { value: i64 }
+  @noinline fn identity(value: i64) -> i64 { return value; }
+  @noinline fn selected(rounds: i64, width: i64) -> i64 {
+    let index: i64 = 0;
+    let total: i64 = 0;
+    while index < rounds {
+      let index = index + 1;
+      let child: i64 = 0;
+      while child < width {
+        let child = child + 1;
+        let total = total + identity(child);
+      }
+    }
+    return total;
+  }
+  fn start(rounds: i64, width: i64) -> State {
+    return State { value: selected(rounds, width) };
+  }
+  fn step(state: State) -> State { return state; }
+  fn stop(state: State) -> State { return state; }
+  fn main() -> i64 { return 0; }
+}

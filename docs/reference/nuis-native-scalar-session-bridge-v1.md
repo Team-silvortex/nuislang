@@ -229,9 +229,8 @@ in one arm cannot initialize another arm or the continuation; even two arms usin
 the same spelling do not export that name. A variable initialized before a branch
 may be updated there when it is an iteration-local i64, bool or exact flat-i64 record.
 Rebinding never recomputes an earlier snapshot. New const declarations are not part
-of this slice; outer flat-i64 carries follow the separate seeded rules below.
-Parameters/constants and outer bool bindings never gain
-write authority.
+of this slice; outer flat-i64 and bool carries follow the separate seeded rules
+below. Parameters/constants never gain write authority.
 
 Only pre-existing mutable carries are captured and returned to the outer driver;
 iteration locals are never seeded from a preceding iteration. An iteration with
@@ -265,8 +264,8 @@ two-sided and nested branches. A branch snapshots its condition before any write
 changing that binding in the selected arm cannot activate the other arm. Copies
 retain their initialized values. Branch-local bindings do not escape even when both
 arms use the same spelling, and every iteration initializes its own locals anew.
-Outer bool carries and parameter/constant mutation remain closed. Outer flat-i64
-records use the separate carry rules below, not bool word coercion.
+Outer bool carries and flat-i64 records use the separate seeded carry rules below.
+Parameter/constant mutation remains closed.
 
 The shared outliner retains exact source types. Only private branch return slots
 encode bool values as canonical i64 0/1 words through existing YIR conversion
@@ -379,8 +378,8 @@ The shared effect validator/outliner now takes an explicit Buffer or pure-value 
 mode. Capture discovery is shared with ordinary value control flow, while Buffer's
 scalar-only helper catalog and effect authority remain unchanged. Local discovery
 does not itself authorize outer aggregate writes; the carry rules below do.
-Resource or mixed/nested records, or literal nested
-loop bodies remain outside this profile. Native layout/slot and closure limits remain independent of
+Resource or mixed/nested records remain outside this profile. Literal counted
+nesting follows the scoped rules below. Native layout/slot and closure limits remain independent of
 source layout discovery, including source-only tests with 65-field records.
 
 [Flat-local native regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_local_values.rs)
@@ -406,7 +405,8 @@ may project an already-captured flat parameter, but cannot evaluate arbitrary ca
 nested/resource fields or arithmetic as a pass-through default.
 
 Outer aggregate carries follow the separate seeded rules below. Parameter/constant
-mutation, literal nested loops and resource or mixed/nested payloads remain separate. Buffer retains its scalar-only
+mutation and resource or mixed/nested payloads remain separate. Literal counted
+nesting follows the scoped rules below. Buffer retains its scalar-only
 write authority. The public callback ABI, native flat-i64 slot limits, complete
 induction preflight and both shared execution budgets are unchanged. Reached results
 execute even when overwritten; successful paths release all temporary aggregates.
@@ -430,8 +430,9 @@ cover executable entry and build/cache/source-free standalone restoration respec
 A nonempty, nongeneric record with only exact i64 fields may now cross the loop
 backedge when initialized by a mutable local declaration before the loop. Parameters
 and constants remain read-only; copying them to a mutable local grants authority to
-that local only. Outer bool bindings, mixed/nested/resource records and literal nested
-loop bodies remain outside this slice. Buffer admission is unchanged.
+that local only. Outer bool bindings use the typed word rules below; mixed/nested/resource
+records remain outside this slice. Literal counted nesting follows the scoped
+rules below. Buffer admission is unchanged.
 
 The iteration normalizer reuses the private flat-i64 transport plan. One-field
 records, multiple records and scalar companions use layout-derived slot ranges,
@@ -466,6 +467,95 @@ combines zero-trip and repeated record carries with typed lifecycle callbacks,
 checked arithmetic and existing multi-state break/continue. It passes build/cache
 and source-free standalone restoration. This is bounded CPU value-state evidence,
 not resource-state execution, native GPU dispatch or an allocation-free loop claim.
+
+### Outer Bool Carries
+
+A bool initialized by a mutable local declaration before a counted loop can now
+cross its backedge. A single bool, multiple bools, i64 companions and flat-i64 record
+companions share the existing private transport. This does not admit mixed-field
+records, parameter/constant mutation, Buffer writes or resource state.
+
+The iteration normalizer encodes each bool seed with `CastBoolToI64`, receives an
+exact i64 private parameter and decodes it to a fresh bool binding inside the same
+helper. Returns encode bools as canonical 0/1 words by construction. Even a singleton
+bool uses a one-slot flat return; output projections explicitly decode that slot.
+There is no new loop opcode, callback ABI, extra helper-entry boundary or backend
+special case. Generated parameter names avoid user and iteration-local bindings.
+
+Seed/projection admission requires the exact conversion around a named bool seed
+and its matching result slot, not a raw bool operand, constant or arbitrary call.
+Zero trips retain the initialized value; loop exit creates fresh value nodes so
+pre-loop snapshots remain unchanged. Slot order follows first writes independently
+of capture order. The existing own-old-value and no-forward-sibling-read rules still
+apply. Enclosing branch capture traverses the inserted conversions without granting
+source-level casts new catalog authority.
+
+[Source admission](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/bool_carries_tests.rs)
+checks mutable seeds, name collisions, constants/parameters, type changes and
+forward sibling reads. [Projection tests](../../tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries_tests.rs)
+reject missing, duplicate, raw or mistyped seeds and malformed decodes.
+[Native probes](../../tools/nuisc/tests/native_application_bridge/bool_carries.rs)
+compare independent value/snapshot oracles against reference and real native
+execution after reversing YIR declarations. They cover 1/3/7 bool carries mixed
+with scalar/record state, callee/inline/prefix/suffix placement, both loop directions,
+zero trips, lazy checked operands, overwritten-result traps, full preflight and
+successful-path allocation/drop balance. A separate singleton bool test retains
+the typed callback state. Forged raw-bool seeds, layouts and cast metadata reject.
+
+[Budget probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
+retain exact 18-entry/eight-trip composition and independently insufficient entry
+and loop budgets, without refunds, resets or callback output publication.
+[Ordinary native-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/bool_carries.rs)
+cover singleton and mixed-value loops without importing native-session budgets.
+The [bool-carries fixture](../../tools/nuisc/tests/native_application_bridge/bool_carries_loops.ns)
+combines typed lifecycle, record state, checked arithmetic and existing break/continue
+helpers through build/cache/source-free standalone restoration. These are CPU
+value-state checks, not new GPU/resource execution or allocation-free-loop evidence.
+
+### Literal Nested Counted Loops
+
+Literal `while` bodies can now contain counted child loops using the same scoped
+function and private value-transport contracts as loop-bearing helper calls. Each
+loop retains a single leading i64 induction step and invariant atom bound/stride.
+Child bounds may use an already-available parent index or iteration-local value,
+including triangular loops. Child indices may be initialized per parent trip or
+persist as seeded outer mutable locals. Counter-only children retain the existing
+metadata loop; children with effects use scoped helpers even for a single bool guard.
+There is no new loop opcode, public callback ABI or backend-specific normalization.
+
+Write discovery includes descendants, so changing an ancestor induction, bound or
+stride is rejected even under an untaken branch. Child admission preserves the
+parent's unavailable siblings and resets child-written availability for each child
+backedge. Own-old-value and source-ordered writes remain valid; an inner loop cannot
+launder a future sibling read. Parameters and constants remain read-only, and child
+declarations never escape. Branches and child loops share a source nesting cap of
+32, independently of expression and native call-graph limits.
+
+Every selected invocation performs its own complete induction preflight before its
+body, including invocations reached after earlier parent iterations. Zero trips and
+unselected children do no body work. Both work counters remain callback-owned:
+each selected loop reserves its full trip count, while helpers debit actual entries.
+Neither counter resets at nesting boundaries; insufficient budgets trap without
+publishing callback output. Ordinary native entry does not inherit session budgets.
+
+[Source checks](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/literal_loops_tests.rs)
+cover lexical scope, descendant writes, forward reads, exact types and mixed
+branch/loop depth. [Native oracles](../../tools/nuisc/tests/native_application_bridge/literal_loops.rs)
+compare real execution and reference results after reversing YIR declarations,
+covering two-to-four total loop levels, both directions, rectangular/triangular
+bounds, bool/flat-record snapshots, wrapping values, selected/overwritten arithmetic
+traps, skipped invalid children and late child preflight failure. Volatile probes
+observe actual iterations and checked-call operands; successful paths balance
+aggregate allocation/drop. [Budget tests](../../tools/nuisc/tests/native_application_bridge/literal_loops_budget.rs)
+cover exact eight-trip/16-entry composition, independent exhaustion, counter-only
+children, persistent child indices and single-bool guards. [Ordinary entry](../../tools/nuisc/tests/control_flow_syntax_native/literal_loops.rs)
+retains local and persistent child indices. The [literal-loops fixture](../../tools/nuisc/tests/native_application_bridge/literal_loops.ns)
+composes typed lifecycle, checked arithmetic and existing exit-bearing helpers through
+build/cache/source-free standalone restoration.
+
+This is not arbitrary nesting with exits: `break`/`continue` inside these pure-value
+counted bodies remains excluded. Resource and mixed/nested payloads, Buffer authority,
+allocation elimination, native preemption and device execution are not widened.
 
 ### Loop-Bearing Iteration Calls
 
@@ -1287,15 +1377,46 @@ calls, bool/flat rebinding, outer flat carries and both work budgets) passed bui
 cache and source-free standalone restoration. This was not a full rerun of all
 twenty-two frontdoor cases or the workspace. The fresh tensor CLI reported 1263
 drift checks with zero failures and clean coverage, hierarchy and lineage.
-The broad session coordinate remains active at 86; outer bool carries are next.
+At that checkpoint the broad session coordinate remained active at 86, with outer
+bool carries next.
 These are CPU correctness and successful-path cleanup checks, not performance
 measurements, formal memory-safety proofs or new Linux/GPU certification.
 
+Outer bool carry integration was checked on 2026-09-20 on macOS aarch64:
+all 174 native bridge cases, 35 ordinary native-entry cases, 89 Buffer-loop cases,
+four compound-loop cases and one owned-cleanup case passed. The final compiler
+revision passed 84 targeted unit tests, 141 LLVM unit tests and 26 tensor tests;
+seven affected bool/budget cases were rerun after test-helper cleanup and passed.
+Nine selected frontdoor cases (basic scalar, flat-local values, loop-bearing calls,
+bool/flat rebinding, outer bool/flat carries and both work budgets) passed build,
+cache, tamper rejection and source-free standalone restoration. This was not a full
+rerun of all twenty-three frontdoor cases or the workspace. The freshly built tensor
+reported 1275 drift checks, zero failures and clean coverage, hierarchy and lineage.
+At that checkpoint the broad session coordinate remained active at 86, with literal
+nested counted loops next. These CPU correctness and successful-path cleanup checks do not certify
+performance, formal memory safety or new Linux/GPU execution.
+
+Literal nested counted-loop integration was checked on 2026-09-20 on macOS aarch64:
+all 180 native bridge cases, 37 ordinary native-entry cases, 89 Buffer-loop cases,
+four compound-loop cases and one owned-cleanup case passed. The compiler passed
+87 targeted unit tests and the tensor passed 26 unit tests. Three affected budget
+cases were rerun after adding the persistent-child-index check and passed.
+Seven selected frontdoor cases (basic scalar, loop-bearing calls, outer bool/flat
+carries, literal nesting and both work budgets) passed build, cache, tamper rejection
+and source-free standalone restoration. This was not a full rerun of all twenty-four
+frontdoor cases or the workspace. The fresh tensor CLI reported 1287 drift checks,
+zero failures and clean coverage, hierarchy and lineage. The broad session coordinate
+remains active at 86, with guarded exits in literal nested value loops next. These
+checks do not establish performance, formal memory safety or new Linux/GPU execution.
+
 ## Next Boundary
 
-Extend outer bool loop carries through build/run-artifact with initialized canonical
-seeds and explicit typed backedge conversion. Keep resource and mixed/nested payloads
-separate. Retain outer flat-i64 carries, zero-trip seeds, exact nominal reconstruction,
+Extend guarded exits in literal nested counted value loops through the same scoped
+helper contracts, without changing the separate Buffer exit profile. Preserve each
+selected inner invocation's preflight and both shared work counters. Keep resource
+and mixed/nested payloads separate. Retain outer bool
+carry seeds and explicit typed backedge conversion, outer flat-i64 carries,
+zero-trip seeds, exact nominal reconstruction,
 source-ordered backedge projections and local aggregate and bool rebinding,
 shared helper-entry accounting, loop-work reservations
 and independent per-invocation induction preflight; do not mistake these policies

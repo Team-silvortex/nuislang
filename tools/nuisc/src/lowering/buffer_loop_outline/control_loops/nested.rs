@@ -7,6 +7,7 @@ pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
     // Fallible arithmetic must execute in the selected iteration, never as a
     // captured metadata operand. Reuse the shared non-speculation analysis.
     if speculation::block_has_checked_arithmetic(body, &BTreeSet::new())
+        || contains_loop(body)
         || scalar_helpers::contains_calls(body)
         || control_values::has_aggregate_expressions(body)
         || sequences::carry_names(body)
@@ -41,6 +42,32 @@ pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
         }
         _ => false,
     })
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn outline_iteration(
+    body: &mut Vec<NirStmt>,
+    scope: &Scope,
+    names: &mut BTreeSet<String>,
+    helpers: &mut Vec<NirFunction>,
+    guarded: &mut BTreeSet<String>,
+    control_catalog: &ScalarHelpers,
+    layouts: &control_values::FlatLayouts,
+    structs: &mut Vec<NirStructDef>,
+) {
+    // Child effects were checked as scoped expressions, not metadata predicates.
+    // Keep that execution mode even for a single conditional scalar update.
+    // A counter-only child needs neither a helper nor another entry debit.
+    if body.len() > 1 || present(body, scope) {
+        Builder {
+            names,
+            helpers,
+            guarded,
+            control_catalog,
+            layouts,
+            structs,
+        }
+        .iteration(body, scope);
+    }
 }
 
 pub(in crate::lowering::buffer_loop_outline) fn outline(
@@ -156,11 +183,13 @@ impl Builder<'_> {
         )
         .expect("admitted nested decisions");
         inputs.extend(carries.iter().cloned());
-        let params = captured_params(inputs, scope);
+        let mut params = captured_params(inputs, scope);
         let transport = scalar_carries::Plan::new(&carries, scope, Some(self.layouts));
-        let aggregate = transport
-            .needs_struct()
-            .then(|| scalar_carries::state_type(&transport, self.names, self.structs));
+        let aggregate = (transport.needs_struct()
+            || carries
+                .iter()
+                .any(|name| scope[name] == scalar_type("bool")))
+        .then(|| scalar_carries::state_type(&transport, self.names, self.structs));
         let returned = scalar_carries::value(&transport, aggregate.as_ref());
         let name = branches::fresh_name("__nuis_scalar_iteration", self.names);
         // The driver still owns induction and preflights its complete bound. The
@@ -180,12 +209,35 @@ impl Builder<'_> {
             &mut BTreeMap::new(),
         ));
         helper_body.push(NirStmt::Return(Some(returned)));
+        // Backedge slots remain i64 even for bool source bindings. Decode in the
+        // same iteration helper, rather than adding a second call/budget boundary.
+        let mut bindings = scope.keys().cloned().collect();
+        branches::collect_bindings(&helper_body, &mut bindings);
+        let mut seeds = Vec::new();
+        let args = params
+            .iter_mut()
+            .map(|param| {
+                let input = NirExpr::Var(param.name.clone());
+                if param.ty == scalar_type("bool") && carries.contains(&param.name) {
+                    let word = branches::fresh_name("__nuis_bool_seed", &mut bindings);
+                    seeds.push(scalar_carries::binding(
+                        &param.name,
+                        scope,
+                        NirExpr::Var(word.clone()),
+                    ));
+                    param.name = word;
+                    param.ty = scalar_type("i64");
+                    NirExpr::CastBoolToI64(Box::new(input))
+                } else {
+                    input
+                }
+            })
+            .collect();
+        seeds.extend(helper_body);
+        let helper_body = seeds;
         let call = NirExpr::Call {
             callee: name.clone(),
-            args: params
-                .iter()
-                .map(|p| NirExpr::Var(p.name.clone()))
-                .collect(),
+            args,
         };
         let mut function = helper(name, params, helper_body);
         if let Some(ty) = aggregate {

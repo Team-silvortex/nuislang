@@ -957,5 +957,9 @@ fn discarded_loop_helper_keeps_its_checked_body_failure() {
 mod aggregate_carries;
 #[path = "control_flow_syntax_native/aggregate_rebinding.rs"]
 mod aggregate_rebinding;
+#[path = "control_flow_syntax_native/bool_carries.rs"]
+mod bool_carries;
 #[path = "control_flow_syntax_native/bool_rebinding.rs"]
 mod bool_rebinding;
+#[path = "control_flow_syntax_native/literal_loops.rs"]
+mod literal_loops;

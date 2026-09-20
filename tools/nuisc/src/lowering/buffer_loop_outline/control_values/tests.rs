@@ -2,6 +2,29 @@ use super::*;
 use crate::frontend::parse_nuis_module;
 
 #[test]
+fn private_bool_transport_capture_does_not_widen_source_admission() {
+    let scope = Scope::from([
+        ("flag".into(), scalar_type("bool")),
+        ("word".into(), scalar_type("i64")),
+    ]);
+    for (expr, name) in [
+        (
+            NirExpr::CastBoolToI64(Box::new(NirExpr::Var("flag".into()))),
+            "flag",
+        ),
+        (
+            NirExpr::CastI64ToBool(Box::new(NirExpr::Var("word".into()))),
+            "word",
+        ),
+    ] {
+        let mut inputs = BTreeSet::new();
+        collect_inputs(&expr, &mut inputs);
+        assert_eq!(inputs, BTreeSet::from([name.to_owned()]));
+        assert!(value_type(&expr, &scope, &ScalarHelpers::new(), &FlatLayouts::new()).is_none());
+    }
+}
+
+#[test]
 fn value_catalog_keeps_transitive_types_effects_cycles_and_buffer_admission_separate() {
     let module = parse_nuis_module(
         "mod cpu Main {

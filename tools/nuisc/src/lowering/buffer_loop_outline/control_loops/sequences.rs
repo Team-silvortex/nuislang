@@ -21,6 +21,7 @@ pub(super) fn carry_names(body: &[NirStmt]) -> Vec<String> {
                 pending.extend(else_body.iter().rev());
                 pending.extend(then_body.iter().rev());
             }
+            NirStmt::While { body, .. } => pending.extend(body.iter().rev()),
             _ => {}
         }
     }
@@ -65,6 +66,7 @@ pub(super) fn validate(
     mutable.insert(prepared.binding_name.clone());
     if has_temporaries
         || has_flat_carries
+        || contains_loop(effects)
         || speculation::block_has_checked_arithmetic(effects, &BTreeSet::new())
         || scalar_helpers::contains_calls(effects)
         || control_values::has_aggregate_expressions(effects)

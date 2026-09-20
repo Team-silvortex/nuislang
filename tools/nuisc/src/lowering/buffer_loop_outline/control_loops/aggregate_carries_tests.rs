@@ -70,8 +70,6 @@ fn outer_flat_carries_reject_nominal_mutability_scope_and_order_drift() {
         source("let packet = packet; print(packet.first);"),
         source("let saved = saved;")
             .replace("let saved = packet;", "const saved: Packet = packet;"),
-        source("let gate = false;")
-            .replace("let packet = seed;", "let packet = seed; let gate = true;"),
     ] {
         let admitted = parse_nuis_module(&text).is_ok_and(|module| {
             scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module))

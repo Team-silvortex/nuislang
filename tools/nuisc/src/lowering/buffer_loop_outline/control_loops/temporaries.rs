@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "literal_loops.rs"]
+mod literal_loops;
+
 // This source profile uses scoped functions, not captured loop-metadata RHSs.
 // Keep definite initialization separate from the set of returned loop carries.
 #[derive(Clone)]
@@ -23,9 +26,9 @@ pub(super) fn validate(
         writable: writable
             .iter()
             .filter(|name| {
-                scope.get(*name).is_some_and(|ty| {
-                    ty != &scalar_type("bool") && control_values::supported_type(ty, layouts)
-                })
+                scope
+                    .get(*name)
+                    .is_some_and(|ty| control_values::supported_type(ty, layouts))
             })
             .cloned()
             .collect(),
@@ -52,8 +55,8 @@ fn block(
                     return None;
                 }
                 if let Some(existing) = existing {
-                    // Seeded mutable flat values may cross the backedge. Only
-                    // iteration-local declarations gain bool write authority.
+                    // Only seeded mutable locals may cross the backedge; parameters and
+                    // constants never gain write authority through private word transport.
                     if !locals.writable.contains(name)
                         || !control_values::supported_type(existing, layouts)
                         || inferred != *existing
@@ -106,6 +109,9 @@ fn block(
                         .chain(else_locals.available)
                         .filter(|name| locals.scope.contains_key(name)),
                 );
+            }
+            NirStmt::While { condition, body } if depth < 32 => {
+                literal_loops::validate(condition, body, locals, updates, catalog, layouts, depth)?;
             }
             _ => return None,
         }

@@ -5,7 +5,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-outer-flat-source-authority",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries.rs",
         required_patterns: &[
-            "ty != &scalar_type(\"bool\") && control_values::supported_type(ty, layouts)",
+            "control_values::supported_type(ty, layouts)",
             "!locals.writable.contains(name)",
             "inferred != *existing",
             "own != Some(name)",
@@ -113,7 +113,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "### Outer Flat-I64 Carries",
             "zero-trip seeds",
             "not a finite arity table",
-            "Extend outer bool loop carries",
+            "### Literal Nested Counted Loops",
             "no new loop opcode",
         ],
     },

@@ -110,7 +110,6 @@ fn loop_call_catalog_blocks_invalid_dependencies_and_recursive_components() {
         "let total: i64 = wrap(index, bound, stride);",
         "let local: i64 = record(index, index, stride);",
         "let local = fold(checksum, index, stride); let checksum: i64 = checksum + 1; let total: i64 = total + local;",
-        "let child: i64 = 0; while child < bound { let child: i64 = child + 1; } let total: i64 = total + child;",
     ] {
         if let Ok(module) = parse_nuis_module(&source(body)) {
             assert!(!scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module)).contains_key("walk"), "{body}");

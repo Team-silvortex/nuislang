@@ -2,6 +2,9 @@ use super::*;
 use std::path::Path;
 use yir_lower_llvm::native_session::emit_registered_with_work_limits;
 
+#[path = "literal_loops_budget.rs"]
+mod literal_loops_budget;
+
 const SOURCE: &str = include_str!("helper_entries.ns");
 const SENTINEL: i64 = -700;
 const PAIR: &[&str] = &[
@@ -327,6 +330,29 @@ fn bool_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
         let gate: bool = gate == false;
         let value: i64 = value + relay(argument(trips), stride, gate);",
     );
+    check_bool_budgets(&source);
+}
+
+#[test]
+fn outer_bool_carries_share_both_budgets_without_refunds_or_resets() {
+    let source = include_str!("loop_work.ns")
+        .replace(
+            "let value: i64 = 0;",
+            "let value: i64 = 0; let gate = early;",
+        )
+        .replace(
+            "let value: i64 = value + relay(argument(trips), stride, early);",
+            "let value: i64 = value;
+            let gate = gate;
+            if gate { let gate = false; let value: i64 = value + 1; }
+            else { let gate = true; let value: i64 = value + 1; }
+            let gate = gate == false;
+            let value: i64 = value + relay(argument(trips), stride, gate);",
+        );
+    check_bool_budgets(&source);
+}
+
+fn check_bool_budgets(source: &str) {
     let calls = [
         "start",
         "selected",
@@ -348,7 +374,7 @@ fn bool_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
         "leaf",
     ];
     execute(
-        &source,
+        source,
         8,
         18,
         &[
@@ -358,10 +384,10 @@ fn bool_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
     );
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
     rejected.remaining_loop = 3;
-    execute(&source, 8, 17, &[rejected]);
+    execute(source, 8, 17, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(&source, 7, 18, &[rejected]);
+    execute(source, 7, 18, &[rejected]);
 }
 
 #[test]

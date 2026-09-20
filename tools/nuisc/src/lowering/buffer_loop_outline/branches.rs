@@ -113,23 +113,34 @@ pub(super) fn outline_effects(
                 condition,
                 mut body,
             } => {
-                let validation::EffectTypes::Buffer(catalog) = types else {
-                    unreachable!("nested loops are not admitted in pure iteration values");
-                };
-                let plan =
-                    buffer_loop_params(&condition, &body, scope, catalog, &mutations.protected)
+                match types {
+                    validation::EffectTypes::Buffer(catalog) => {
+                        let plan = buffer_loop_params(
+                            &condition,
+                            &body,
+                            scope,
+                            catalog,
+                            &mutations.protected,
+                        )
                         .expect("validated nested loop");
-                outline_loop(
-                    &mut body,
-                    scope,
-                    names,
-                    helpers,
-                    guarded,
-                    catalog,
-                    structs,
-                    plan,
-                    break_controls,
-                );
+                        outline_loop(
+                            &mut body,
+                            scope,
+                            names,
+                            helpers,
+                            guarded,
+                            catalog,
+                            structs,
+                            plan,
+                            break_controls,
+                        );
+                    }
+                    validation::EffectTypes::Values(catalog, layouts) => {
+                        control_loops::outline_iteration(
+                            &mut body, scope, names, helpers, guarded, catalog, layouts, structs,
+                        );
+                    }
+                }
                 outlined.push(NirStmt::While { condition, body });
             }
             NirStmt::Let {

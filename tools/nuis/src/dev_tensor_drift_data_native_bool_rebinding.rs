@@ -5,7 +5,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-bool-rebinding-local-authority",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries.rs",
         required_patterns: &[
-            "iteration-local declarations gain bool write authority",
+            "Only seeded mutable locals may cross the backedge",
             "inferred != *existing",
             "Only bindings that exist before the branch survive its join",
         ],
@@ -43,7 +43,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries_tests.rs",
         required_patterns: &[
             "temporary_scope_and_definite_initialization_are_fail_closed",
-            "bool_write_authority_does_not_escape_the_iteration_or_widen_buffer_effects",
+            "bool_write_authority_requires_mutable_seeds_and_does_not_widen_buffer_effects",
             "bool_branch_transport_uses_canonical_words_without_new_loop_state",
         ],
     },
@@ -62,8 +62,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/native_application_bridge/helper_entries.rs",
         required_patterns: &[
             "bool_rebinding_guards_share_both_budgets_without_refunds_or_resets",
-            "execute(&source, 8, 17, &[rejected])",
-            "execute(&source, 7, 18, &[rejected])",
+            "execute(source, 8, 17, &[rejected])",
+            "execute(source, 7, 18, &[rejected])",
         ],
     },
     DevTensorDriftCheckSpec {

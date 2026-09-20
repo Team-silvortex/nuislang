@@ -49,6 +49,10 @@ const AGGREGATE_REBINDING_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_rebinding_loops.ns");
 const AGGREGATE_CARRIES_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_carries_loops.ns");
+const BOOL_CARRIES_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/bool_carries_loops.ns");
+const LITERAL_LOOPS_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/literal_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -242,6 +246,16 @@ fn native_outer_flat_carries_build_cache_and_standalone_relocation() {
     check_workflow(AGGREGATE_CARRIES_SOURCE);
 }
 
+#[test]
+fn native_outer_bool_carries_build_cache_and_standalone_relocation() {
+    check_workflow(BOOL_CARRIES_SOURCE);
+}
+
+#[test]
+fn native_literal_nested_loops_build_cache_and_standalone_relocation() {
+    check_workflow(LITERAL_LOOPS_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -293,6 +307,8 @@ fn check_workflow(source: &str) {
         BOOL_REBINDING_SOURCE,
         AGGREGATE_REBINDING_SOURCE,
         AGGREGATE_CARRIES_SOURCE,
+        BOOL_CARRIES_SOURCE,
+        LITERAL_LOOPS_SOURCE,
     ]
     .contains(&source)
     {
@@ -317,6 +333,8 @@ fn check_workflow(source: &str) {
         BOOL_REBINDING_SOURCE,
         AGGREGATE_REBINDING_SOURCE,
         AGGREGATE_CARRIES_SOURCE,
+        BOOL_CARRIES_SOURCE,
+        LITERAL_LOOPS_SOURCE,
     ]
     .contains(&source)
     {
@@ -339,6 +357,8 @@ fn check_workflow(source: &str) {
         BOOL_REBINDING_SOURCE,
         AGGREGATE_REBINDING_SOURCE,
         AGGREGATE_CARRIES_SOURCE,
+        BOOL_CARRIES_SOURCE,
+        LITERAL_LOOPS_SOURCE,
     ]
     .contains(&source)
     {
@@ -372,6 +392,8 @@ fn check_workflow(source: &str) {
         BOOL_REBINDING_SOURCE,
         AGGREGATE_REBINDING_SOURCE,
         AGGREGATE_CARRIES_SOURCE,
+        BOOL_CARRIES_SOURCE,
+        LITERAL_LOOPS_SOURCE,
     ]
     .contains(&source)
     {
@@ -382,6 +404,8 @@ fn check_workflow(source: &str) {
         BOOL_REBINDING_SOURCE,
         AGGREGATE_REBINDING_SOURCE,
         AGGREGATE_CARRIES_SOURCE,
+        BOOL_CARRIES_SOURCE,
+        LITERAL_LOOPS_SOURCE,
     ]
     .contains(&source)
     {

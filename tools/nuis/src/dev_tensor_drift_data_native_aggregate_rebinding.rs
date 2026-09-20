@@ -5,7 +5,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-flat-rebinding-source-authority",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries.rs",
         required_patterns: &[
-            "ty != &scalar_type(\"bool\") && control_values::supported_type(ty, layouts)",
+            "control_values::supported_type(ty, layouts)",
             "!locals.writable.contains(name)",
             "!control_values::supported_type(existing, layouts)",
             "inferred != *existing",

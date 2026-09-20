@@ -50,6 +50,8 @@ mod aggregate_rebinding;
 mod aggregate_sequences;
 #[path = "native_application_bridge/aggregate_temporaries.rs"]
 mod aggregate_temporaries;
+#[path = "native_application_bridge/bool_carries.rs"]
+mod bool_carries;
 #[path = "native_application_bridge/bool_rebinding.rs"]
 mod bool_rebinding;
 #[path = "native_application_bridge/bounds.rs"]
@@ -76,6 +78,8 @@ mod dynamic_loops;
 mod helper_entries;
 #[path = "native_application_bridge/helpers.rs"]
 mod helpers;
+#[path = "native_application_bridge/literal_loops.rs"]
+mod literal_loops;
 #[path = "native_application_bridge/loop_work.rs"]
 mod loop_work;
 #[path = "native_application_bridge/loops.rs"]

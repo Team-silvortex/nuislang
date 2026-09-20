@@ -110,7 +110,7 @@ fn temporary_scope_and_definite_initialization_are_fail_closed() {
 }
 
 #[test]
-fn bool_write_authority_does_not_escape_the_iteration_or_widen_buffer_effects() {
+fn bool_write_authority_requires_mutable_seeds_and_does_not_widen_buffer_effects() {
     for declaration in ["let", "const"] {
         let text =
             source("let local = true; let outer: bool = local; let total: i64 = total + index;")
@@ -120,9 +120,10 @@ fn bool_write_authority_does_not_escape_the_iteration_or_widen_buffer_effects() 
                 );
         assert!(text.contains(&format!("{declaration} outer:")));
         let module = parse_nuis_module(&text).unwrap();
-        assert!(
-            !scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module))
-                .contains_key("walk")
+        assert_eq!(
+            scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module))
+                .contains_key("walk"),
+            declaration == "let"
         );
     }
     let scope = Scope::from([("flag".to_owned(), scalar_type("bool"))]);

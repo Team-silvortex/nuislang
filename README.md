@@ -254,8 +254,7 @@ including roots and outlined guards, closing loop-free call-tree expansion as we
 Conditional calls in the admitted scalar catalog retain guards rather than executing
 both branches before a select. Exhaustion traps without publishing callback output;
 cache and standalone restoration retain both policies. These are not elapsed-time,
-memory or device-work bounds. Literal nested loop bodies, mixed/nested/resource
-aggregates and outer bool carries remain separate.
+memory or device-work bounds. Mixed/nested/resource aggregates remain separate.
 Iteration-local bool rebinding now crosses nested, one-sided and mixed scalar
 branch joins using canonical 0/1 private transport, without adding outer loop state
 or changing the public ABI. Native execution and build/cache/standalone restoration
@@ -269,6 +268,18 @@ carries and other records. Zero trips retain their seeds; declared-order slots
 reconstruct exact nominal values without overwriting pre-loop snapshots. The
 aggregate-carries fixture passes build/cache/source-free restoration using the
 existing loop contract and both budgets; Buffer and resource authority stay unchanged.
+Seeded outer bool locals now use explicit canonical word conversion at iteration
+entry, return and loop exit, including singleton and mixed-value carries. Zero-trip
+seeds, pre-loop snapshots and lazy checked calls survive native execution and
+build/cache/source-free restoration without changing the callback ABI.
+Literal nested counted loops now reuse the same scoped helpers and value transport.
+Each selected child invocation retains its own complete induction preflight and
+shares both callback work counters. Native/reference checks cover rectangular and
+triangular bounds, ascending/descending induction, local and persistent child indices,
+bool/record snapshots, skipped paths and late failures; the literal-loops fixture
+also crosses build/cache/source-free standalone restoration. Child declarations
+remain local, and nested header/ancestor-induction mutation is rejected. Guarded
+break/continue in these pure-value nested bodies remains the next boundary.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this

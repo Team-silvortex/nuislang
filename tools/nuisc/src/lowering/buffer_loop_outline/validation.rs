@@ -211,6 +211,26 @@ pub(super) fn validate_effects(
                 }
             }
             NirStmt::While { condition, body } => {
+                if let EffectTypes::Values(..) = types {
+                    if types.expression(condition, locals, inputs)? != scalar_type("bool") {
+                        return None;
+                    }
+                    let mut child_carries = Vec::new();
+                    validate_effects(
+                        body,
+                        &mut locals.clone(),
+                        inputs,
+                        types,
+                        mutations,
+                        &mut child_carries,
+                    )?;
+                    for name in child_carries {
+                        if locals.contains_key(&name) && !carries.contains(&name) {
+                            carries.push(name);
+                        }
+                    }
+                    continue;
+                }
                 let EffectTypes::Buffer(catalog) = types else {
                     return None;
                 };

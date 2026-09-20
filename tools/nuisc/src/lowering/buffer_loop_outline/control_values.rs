@@ -122,7 +122,11 @@ pub(super) fn collect_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
                 collect_inputs(value, inputs);
             }
         }
-        NirExpr::FieldAccess { base, .. } => collect_inputs(base, inputs),
+        // Enclosing branch capture runs after loop normalization, which inserts
+        // these private conversions. Source admission still uses value_type.
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::CastBoolToI64(base)
+        | NirExpr::CastI64ToBool(base) => collect_inputs(base, inputs),
         NirExpr::Int(_) | NirExpr::Bool(_) => {}
         _ => unreachable!("admitted pure value expression"),
     }

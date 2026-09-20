@@ -85,7 +85,7 @@ impl Builder<'_> {
                     return output;
                 }
                 // Preserve the loop as a control boundary. Its admitted update
-                // changes existing i64 bindings, not the lexical type scope.
+                // changes existing value bindings, not the lexical type scope.
                 NirStmt::While { .. } => output.push(stmt),
                 NirStmt::If {
                     condition,

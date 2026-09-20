@@ -2,13 +2,17 @@ use super::*;
 
 #[path = "control_loops/nested.rs"]
 mod nested;
-pub(super) use nested::outline;
+pub(super) use nested::{outline, outline_iteration};
 
 #[path = "control_loops/sequences.rs"]
 mod sequences;
 
 #[path = "control_loops/temporaries.rs"]
 mod temporaries;
+
+#[cfg(test)]
+#[path = "control_loops/literal_loops_tests.rs"]
+mod literal_loops_tests;
 
 pub(super) fn contains_loop(body: &[NirStmt]) -> bool {
     body.iter().any(|stmt| match stmt {
@@ -371,3 +375,7 @@ mod loop_calls_tests;
 #[cfg(test)]
 #[path = "control_loops/temporaries_tests.rs"]
 mod temporaries_tests;
+
+#[cfg(test)]
+#[path = "control_loops/bool_carries_tests.rs"]
+mod bool_carries_tests;

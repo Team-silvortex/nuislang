@@ -225,3 +225,70 @@ fn flat_projection_requires_exact_nominal_single_seed_and_never_a_break_record()
     assert!(validate_seeds(&projections, false, function, &args, "action").is_err());
     assert!(validate_seeds(&projections, true, function, &args, "action").is_err());
 }
+
+#[test]
+fn bool_projection_requires_explicit_typed_seed_and_decode() {
+    let module = parse_nuis_module(SOURCE).unwrap();
+    let definitions = module
+        .structs
+        .iter()
+        .map(|d| (d.name.as_str(), d))
+        .collect();
+    let body = vec![NirStmt::Let {
+        name: "flag".into(),
+        ty: Some(ty("bool")),
+        value: NirExpr::CastI64ToBool(Box::new(word(0))),
+    }];
+    let projections = projected_bindings("result", &ty("Tiny"), &body, &definitions).unwrap();
+    let mut function = module.functions[0].clone();
+    function.params = vec![NirParam {
+        name: "private_word".into(),
+        ty: ty("i64"),
+    }];
+    let args = vec![NirExpr::CastBoolToI64(Box::new(NirExpr::Var(
+        "flag".into(),
+    )))];
+    validate_seeds(&projections, false, &function, &args, "action").unwrap();
+    assert!(validate_seeds(&projections, true, &function, &args, "action").is_err());
+    for change in ["missing", "raw", "expression", "type", "duplicate"] {
+        let mut function = function.clone();
+        let mut args = args.clone();
+        match change {
+            "missing" => args[0] = NirExpr::CastBoolToI64(Box::new(NirExpr::Var("saved".into()))),
+            "raw" => args[0] = NirExpr::Var("flag".into()),
+            "expression" => args[0] = NirExpr::CastBoolToI64(Box::new(NirExpr::Bool(true))),
+            "type" => function.params[0].ty = ty("bool"),
+            "duplicate" => {
+                function.params.push(function.params[0].clone());
+                args.push(args[0].clone());
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            validate_seeds(&projections, false, &function, &args, "action").is_err(),
+            "{change}"
+        );
+    }
+    for value in [
+        word(0),
+        NirExpr::CastI64ToBool(Box::new(word(1))),
+        NirExpr::CastBoolToI64(Box::new(word(0))),
+        NirExpr::CastI64ToBool(Box::new(NirExpr::Int(1))),
+    ] {
+        let mut invalid = body.clone();
+        let NirStmt::Let { value: slot, .. } = &mut invalid[0] else {
+            unreachable!()
+        };
+        *slot = value;
+        assert!(projected_bindings("result", &ty("Tiny"), &invalid, &definitions).is_none());
+    }
+    let result = ScopedLoopResult::Scalars {
+        bindings: projections,
+        layout: String::new(),
+        breaking: false,
+    };
+    assert_eq!(
+        argument_index(&result, &function.params[0], &args[0]),
+        Some((0, 1))
+    );
+}

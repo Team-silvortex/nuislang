@@ -308,7 +308,13 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("extend outer bool loop carries"));
+        .starts_with("extend guarded exits in literal nested counted value loops"));
+    assert!(session
+        .evidence
+        .contains("Literal nested counted loops now reuse"));
+    assert!(session.evidence.contains("literal-loops fixture"));
+    assert!(session.evidence.contains("Outer bool carries now"));
+    assert!(session.evidence.contains("bool-carries fixture"));
     assert!(session
         .evidence
         .contains("Outer flat-i64 aggregate carries now"));
@@ -344,7 +350,15 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("Iteration-local flat-i64 helper results"));
     assert!(session.evidence.contains("aggregate-local-values fixture"));
-    assert!(session.blocker.contains("outer bool carries"));
+    assert!(session
+        .blocker
+        .contains("Outer bool carries now have typed private seeds/backedges"));
+    assert!(session
+        .blocker
+        .contains("Literal nested counted bodies now have"));
+    assert!(session
+        .blocker
+        .contains("Guarded exits in these pure-value nested bodies"));
     assert!(!session
         .blocker
         .contains("outer flat-i64 aggregate carries still need"));

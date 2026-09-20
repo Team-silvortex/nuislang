@@ -46,6 +46,12 @@ pub(super) fn projected_bindings<'a>(
                 return None;
             }
             Vec::new()
+        } else if is_bool(ty) {
+            if !matches!(value, NirExpr::CastI64ToBool(word) if projected_word(word, result, slot))
+            {
+                return None;
+            }
+            Vec::new()
         } else {
             let fields = flat_fields(ty, definitions)?;
             let NirExpr::StructLiteral {
@@ -75,12 +81,26 @@ pub(super) fn projected_bindings<'a>(
     }
     if slot != words.len()
         || (bindings.len() == 1
-            && bindings[0].fields.is_empty()
+            && is_scalar_i64(bindings[0].ty)
             && !break_guard(tail.get(1), bindings[0].name))
     {
         return None;
     }
     Some(bindings)
+}
+
+fn is_bool(ty: &NirTypeRef) -> bool {
+    ty.name == "bool" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
+}
+
+fn matches_seed(binding: &Projection<'_>, param: &NirParam, arg: &NirExpr) -> bool {
+    if is_bool(binding.ty) {
+        is_scalar_i64(&param.ty)
+            && matches!(arg, NirExpr::CastBoolToI64(value)
+                if matches!(value.as_ref(), NirExpr::Var(name) if name == binding.name))
+    } else {
+        &param.ty == binding.ty && matches!(arg, NirExpr::Var(name) if name == binding.name)
+    }
 }
 
 fn projected_word(value: &NirExpr, result: &str, slot: usize) -> bool {
@@ -155,6 +175,9 @@ pub(super) fn admissible(
                 arg == &NirExpr::Int(0)
             } else {
                 matches!(arg, NirExpr::Var(_))
+                    || carries
+                        .iter()
+                        .any(|binding| matches_seed(binding, param, arg))
             }
         })
         && function
@@ -180,17 +203,18 @@ pub(super) fn validate_seeds(
             .iter()
             .zip(args)
             .filter(|(param, arg)| {
-                &param.ty == binding.ty
-                    && if control {
-                        param.name == binding.name && *arg == &NirExpr::Int(0)
-                    } else {
-                        matches!(arg, NirExpr::Var(name) if name == binding.name)
-                    }
+                if control {
+                    &param.ty == binding.ty
+                        && param.name == binding.name
+                        && *arg == &NirExpr::Int(0)
+                } else {
+                    matches_seed(binding, param, arg)
+                }
             })
             .count();
         if seeds != 1 {
             return Err(format!(
-                "scoped carry `{}` from `{callee}` requires exactly one same-typed {}seed",
+                "scoped carry `{}` from `{callee}` requires exactly one same-typed {}seed (bool uses an explicit i64 word)",
                 binding.name,
                 if control { "zero " } else { "" }
             ));
@@ -216,12 +240,9 @@ pub(super) fn argument_index(
     {
         return Some((bindings.iter().map(Projection::width).sum::<usize>() - 1, 1));
     }
-    let NirExpr::Var(name) = arg else {
-        return None;
-    };
     let mut offset = 0;
     for binding in bindings {
-        if binding.name == name && binding.ty == &param.ty {
+        if matches_seed(binding, param, arg) {
             return Some((offset, binding.width()));
         }
         offset += binding.width();
@@ -260,7 +281,20 @@ pub(super) fn bind_result(
                 value
             })
             .collect::<Vec<_>>();
-        let value = if binding.fields.is_empty() {
+        let value = if is_bool(binding.ty) {
+            let name = next_name(state, "loop_bool_result");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "cast_i64_to_bool".to_owned(),
+                    args: vec![words[0].clone()],
+                },
+            });
+            push_dep_edges(state, &words[0], &name);
+            name
+        } else if binding.fields.is_empty() {
             words[0].clone()
         } else {
             // New value nodes preserve pre-loop snapshots, including on zero trips.

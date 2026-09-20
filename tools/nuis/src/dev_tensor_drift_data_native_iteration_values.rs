@@ -10,7 +10,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "NirExpr::FieldAccess",
             "seen.insert(name)",
             "depth > 64",
-            "ty != &scalar_type(\"bool\") && control_values::supported_type(ty, layouts)",
+            "Only seeded mutable locals may cross the backedge",
             "!control_values::supported_type(existing, layouts)",
         ],
     },
@@ -31,7 +31,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "pub(super) fn collect_inputs",
             "pub(super) fn has_aggregate_expressions",
-            "NirExpr::FieldAccess { base, .. } => collect_inputs(base, inputs)",
+            "NirExpr::FieldAccess { base, .. }",
+            "NirExpr::CastI64ToBool(base) => collect_inputs(base, inputs)",
         ],
     },
     DevTensorDriftCheckSpec {

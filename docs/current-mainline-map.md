@@ -277,9 +277,17 @@ old snapshots, nested/mixed joins, checked failures and shared budgets are retai
 Outer flat-i64 mutable records now cross loop backedges through the same private
 word transport, preserving zero-trip seeds, nominal layouts, old snapshots and
 source-ordered updates. Record slots are independent of helper capture order, including
-single-field records and multiple records mixed with scalar carries. Literal nested
-loop bodies, effects, mixed/nested/resource aggregates and outer bool carries
-remain separate; per-return allocation is still an
+single-field records and multiple records mixed with scalar carries. Outer bool
+locals now retain typed seeds and snapshots through explicit canonical word
+conversion at the private iteration boundary, including singleton bool carries.
+The bool-carries fixture crosses build/cache/source-free standalone restoration.
+Literal nested counted bodies now compose through the same scoped helpers, with
+independent selected-invocation preflight and shared loop/entry budgets. Rectangular
+and triangular loops retain typed bool/record carries and lexical child scope;
+late failures and skipped invalid children have native probes. The literal-loops
+fixture adds build/cache/source-free standalone restoration. Guarded exits in these
+pure-value nested bodies, effects and mixed/nested/resource aggregates remain
+separate; per-return allocation is still an
 optimization target.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and
@@ -287,9 +295,10 @@ native call-graph admission.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
 aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested,
 aggregate-sequences, aggregate-temporaries, aggregate-checked, aggregate-calls and
-aggregate-local-values, aggregate-loop-calls, bool-rebinding, aggregate-rebinding and aggregate-carries
+aggregate-local-values, aggregate-loop-calls, bool-rebinding, aggregate-rebinding,
+aggregate-carries, bool-carries and literal-loops
 fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
-suite now contains twenty-two regressions,
+suite now contains twenty-four regressions,
 including loop-work/helper-entry exhaustion and lifecycle reset, cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.
