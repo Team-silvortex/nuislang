@@ -567,7 +567,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/scoped_loop_lowering.rs",
         required_patterns: &[
             "ScopedLoopResult::Scalar", "scoped_call_i64_carry", "is_scalar_i64",
-            "expr_references_names", "const_bindings.remove(binding)", "carry{index}",
+            "expr_references_names", "const_bindings.remove(*binding)", "scalar_carries::bind_result",
         ],
     },
     DevTensorDriftCheckSpec {

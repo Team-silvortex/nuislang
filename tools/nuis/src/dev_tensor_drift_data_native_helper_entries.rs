@@ -100,7 +100,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Every **actual admitted YIR function entry** consumes one unit",
             "emit_registered_with_work_limits",
             "outlined guard that immediately",
-            "Extend iteration-local bool rebinding through build/run-artifact",
+            "### Iteration-Local Bool Rebinding",
         ],
     },
 ];

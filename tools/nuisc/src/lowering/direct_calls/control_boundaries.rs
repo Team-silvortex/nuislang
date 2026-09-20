@@ -49,16 +49,22 @@ fn is_pass_through_guard_seed(
     value: &NirExpr,
     state: &LoweringState<'_>,
 ) -> bool {
-    let i64_parameter = |value: &NirExpr| {
+    let parameter = |value: &NirExpr, kind| {
         matches!(value, NirExpr::Var(name)
         if function.params.iter().any(|param| &param.name == name
-            && direct_call_scalar_kind(&param.ty) == Some(DirectCallScalarKind::I64)))
+            && direct_call_scalar_kind(&param.ty) == Some(kind)))
+    };
+    let word_seed = |value: &NirExpr| {
+        parameter(value, DirectCallScalarKind::I64)
+            || matches!(value, NirExpr::CastBoolToI64(inner)
+                if parameter(inner, DirectCallScalarKind::Bool))
+            || is_flat_parameter_field(function, value, state)
     };
     let Some(ty) = &function.return_type else {
         return false;
     };
     if direct_call_scalar_kind(ty) == Some(DirectCallScalarKind::I64) {
-        return i64_parameter(value);
+        return word_seed(value);
     }
     let NirExpr::StructLiteral {
         type_name,
@@ -85,8 +91,39 @@ fn is_pass_through_guard_seed(
             .all(|((name, value), field)| {
                 name == &field.name
                     && direct_call_scalar_kind(&field.ty) == Some(DirectCallScalarKind::I64)
-                    && (i64_parameter(value) || value == &NirExpr::Int(0))
+                    && (word_seed(value) || value == &NirExpr::Int(0))
             })
+}
+
+fn is_flat_parameter_field(
+    function: &NirFunction,
+    value: &NirExpr,
+    state: &LoweringState<'_>,
+) -> bool {
+    let NirExpr::FieldAccess { base, field } = value else {
+        return false;
+    };
+    let NirExpr::Var(name) = base.as_ref() else {
+        return false;
+    };
+    let Some(param) = function.params.iter().find(|param| &param.name == name) else {
+        return false;
+    };
+    let Some(definition) = state.struct_defs.get(param.ty.name.as_str()) else {
+        return false;
+    };
+    // A captured flat-value projection is total. Calls, nested records and
+    // resource-bearing fields must never become speculative guard defaults.
+    !param.ty.is_ref
+        && !param.ty.is_optional
+        && param.ty.generic_args.is_empty()
+        && definition.generic_params.is_empty()
+        && definition.where_bounds.is_empty()
+        && definition.fields.iter().any(|entry| &entry.name == field)
+        && definition
+            .fields
+            .iter()
+            .all(|entry| direct_call_scalar_kind(&entry.ty) == Some(DirectCallScalarKind::I64))
 }
 
 pub(in crate::lowering) fn collect_guarded_loop_direct_call_functions(

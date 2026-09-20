@@ -10,7 +10,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "NirExpr::FieldAccess",
             "seen.insert(name)",
             "depth > 64",
-            "existing != &scalar_type(\"i64\")",
+            "ty != &scalar_type(\"bool\") && control_values::supported_type(ty, layouts)",
+            "!control_values::supported_type(existing, layouts)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -47,7 +48,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/aggregate_calls_tests.rs",
         required_patterns: &[
             "iteration_flat_values_keep_nominal_layouts_and_local_capture_scope",
-            "iteration_flat_values_reject_effects_cycles_rebinding_and_layout_drift",
+            "iteration_flat_values_reject_effects_cycles_and_nominal_rebinding_drift",
             "iteration_flat_value_layout_width_is_not_a_native_slot_table",
             "Buffer catalog widened",
         ],

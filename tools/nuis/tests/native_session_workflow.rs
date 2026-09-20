@@ -5,10 +5,10 @@ use std::{
     process::{Command, Output},
 };
 
-#[path = "native_session_workflow/loop_work.rs"]
-mod loop_work;
 #[path = "native_session_workflow/helper_entries.rs"]
 mod helper_entries;
+#[path = "native_session_workflow/loop_work.rs"]
+mod loop_work;
 
 const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/multi_loops.ns");
 const BREAK_SOURCE: &str =
@@ -43,6 +43,12 @@ const AGGREGATE_LOCAL_VALUES_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_local_values_loops.ns");
 const AGGREGATE_LOOP_CALLS_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/aggregate_loop_calls_loops.ns");
+const BOOL_REBINDING_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/bool_rebinding_loops.ns");
+const AGGREGATE_REBINDING_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_rebinding_loops.ns");
+const AGGREGATE_CARRIES_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/aggregate_carries_loops.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -221,6 +227,21 @@ fn native_iteration_loop_calls_build_cache_and_standalone_relocation() {
     check_workflow(AGGREGATE_LOOP_CALLS_SOURCE);
 }
 
+#[test]
+fn native_iteration_bool_rebindings_build_cache_and_standalone_relocation() {
+    check_workflow(BOOL_REBINDING_SOURCE);
+}
+
+#[test]
+fn native_iteration_flat_rebindings_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_REBINDING_SOURCE);
+}
+
+#[test]
+fn native_outer_flat_carries_build_cache_and_standalone_relocation() {
+    check_workflow(AGGREGATE_CARRIES_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -269,6 +290,9 @@ fn check_workflow(source: &str) {
         AGGREGATE_CALLS_SOURCE,
         AGGREGATE_LOCAL_VALUES_SOURCE,
         AGGREGATE_LOOP_CALLS_SOURCE,
+        BOOL_REBINDING_SOURCE,
+        AGGREGATE_REBINDING_SOURCE,
+        AGGREGATE_CARRIES_SOURCE,
     ]
     .contains(&source)
     {
@@ -290,6 +314,9 @@ fn check_workflow(source: &str) {
         AGGREGATE_CALLS_SOURCE,
         AGGREGATE_LOCAL_VALUES_SOURCE,
         AGGREGATE_LOOP_CALLS_SOURCE,
+        BOOL_REBINDING_SOURCE,
+        AGGREGATE_REBINDING_SOURCE,
+        AGGREGATE_CARRIES_SOURCE,
     ]
     .contains(&source)
     {
@@ -309,6 +336,9 @@ fn check_workflow(source: &str) {
         AGGREGATE_CALLS_SOURCE,
         AGGREGATE_LOCAL_VALUES_SOURCE,
         AGGREGATE_LOOP_CALLS_SOURCE,
+        BOOL_REBINDING_SOURCE,
+        AGGREGATE_REBINDING_SOURCE,
+        AGGREGATE_CARRIES_SOURCE,
     ]
     .contains(&source)
     {
@@ -339,11 +369,27 @@ fn check_workflow(source: &str) {
         AGGREGATE_CALLS_SOURCE,
         AGGREGATE_LOCAL_VALUES_SOURCE,
         AGGREGATE_LOOP_CALLS_SOURCE,
+        BOOL_REBINDING_SOURCE,
+        AGGREGATE_REBINDING_SOURCE,
+        AGGREGATE_CARRIES_SOURCE,
     ]
     .contains(&source)
     {
         assert!(llvm.contains("@nuis_fn___nuis_scalar_iteration_"));
         assert!(llvm.contains("@nuis_fn___nuis_buffer_branch_"));
+    }
+    if [
+        BOOL_REBINDING_SOURCE,
+        AGGREGATE_REBINDING_SOURCE,
+        AGGREGATE_CARRIES_SOURCE,
+    ]
+    .contains(&source)
+    {
+        let yir = fs::read_to_string(output.join(format!("{stem}.yir"))).unwrap();
+        assert!(yir.contains("cpu.cast_bool_to_i64"));
+        assert!(yir.contains("cpu.cast_i64_to_bool"));
+        assert!(llvm.contains("store i64 1048576, ptr %nuis_loop_work"));
+        assert!(llvm.contains("store i64 1048576, ptr %nuis_helper_entries"));
     }
     let run = success(project.command("run-artifact", &output, SCRIPT));
     assert!(run.stdout.is_empty(), "unrelated main must not execute");
@@ -433,6 +479,8 @@ fn check_workflow(source: &str) {
     let artifact = standalone.join("nuis.compiled.artifact");
     fs::copy(output.join("nuis.compiled.artifact"), &artifact).unwrap();
     fs::remove_dir_all(&output).unwrap();
+    fs::remove_file(project.0.join("main.ns")).unwrap();
+    fs::remove_file(project.0.join("nuis.toml")).unwrap();
     success(project.command("verify-artifact", &artifact, &[]));
     let relocated = project.0.join("relocated");
     success(project.command(

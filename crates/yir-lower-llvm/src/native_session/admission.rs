@@ -163,6 +163,8 @@ pub(super) fn admitted(instruction: &str) -> bool {
             | "const_i64"
             | "const_f32"
             | "const_f64"
+            | "cast_bool_to_i64"
+            | "cast_i64_to_bool"
             | "struct"
             | "field"
             | "select"

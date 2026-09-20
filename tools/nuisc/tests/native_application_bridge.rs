@@ -14,6 +14,8 @@ mod aggregate_admission;
 mod aggregate_calls;
 #[path = "native_application_bridge/aggregate_carried.rs"]
 mod aggregate_carried;
+#[path = "native_application_bridge/aggregate_carries.rs"]
+mod aggregate_carries;
 #[path = "native_application_bridge/aggregate_checked.rs"]
 mod aggregate_checked;
 #[path = "native_application_bridge/aggregate_compound.rs"]
@@ -42,10 +44,14 @@ mod aggregate_nested_oracle;
 mod aggregate_nested_tree;
 #[path = "native_application_bridge/aggregate_one_sided.rs"]
 mod aggregate_one_sided;
+#[path = "native_application_bridge/aggregate_rebinding.rs"]
+mod aggregate_rebinding;
 #[path = "native_application_bridge/aggregate_sequences.rs"]
 mod aggregate_sequences;
 #[path = "native_application_bridge/aggregate_temporaries.rs"]
 mod aggregate_temporaries;
+#[path = "native_application_bridge/bool_rebinding.rs"]
+mod bool_rebinding;
 #[path = "native_application_bridge/bounds.rs"]
 mod bounds;
 #[path = "native_application_bridge/branch_loops.rs"]
@@ -66,12 +72,12 @@ mod driver;
 mod dynamic_loop_guard;
 #[path = "native_application_bridge/dynamic_loops.rs"]
 mod dynamic_loops;
+#[path = "native_application_bridge/helper_entries.rs"]
+mod helper_entries;
 #[path = "native_application_bridge/helpers.rs"]
 mod helpers;
 #[path = "native_application_bridge/loop_work.rs"]
 mod loop_work;
-#[path = "native_application_bridge/helper_entries.rs"]
-mod helper_entries;
 #[path = "native_application_bridge/loops.rs"]
 mod loops;
 #[path = "native_application_bridge/multi_admission.rs"]

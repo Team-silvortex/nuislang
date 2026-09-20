@@ -268,8 +268,18 @@ Conditional calls in the admitted scalar catalog stay behind guards even without
 loops or checked arithmetic. Loop-free binary call-tree expansion now has real
 native rejection evidence. Both policies survive cache reuse and standalone
 restoration; neither promises wall-time, peak-memory or device-work bounds.
-Literal nested loop bodies, effects, nested/resource aggregates and
-mutable bool/aggregate locals remain separate; per-return allocation is still an
+Iteration-local bool rebinding now preserves lexical initialization, old snapshots,
+one-sided/nested joins and lazy calls. Private branch returns encode bools as 0/1
+in existing i64 slots and restore their source types, without changing outer loop
+state, the public ABI or Buffer admission. Iteration-local flat-i64 record rebinding
+now uses declared-order private word transport and reconstructs exact nominal types;
+old snapshots, nested/mixed joins, checked failures and shared budgets are retained.
+Outer flat-i64 mutable records now cross loop backedges through the same private
+word transport, preserving zero-trip seeds, nominal layouts, old snapshots and
+source-ordered updates. Record slots are independent of helper capture order, including
+single-field records and multiple records mixed with scalar carries. Literal nested
+loop bodies, effects, mixed/nested/resource aggregates and outer bool carries
+remain separate; per-return allocation is still an
 optimization target.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and
@@ -277,8 +287,9 @@ native call-graph admission.
 The division, aggregate-division, aggregate-counted, aggregate-carried,
 aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested,
 aggregate-sequences, aggregate-temporaries, aggregate-checked, aggregate-calls and
-aggregate-local-values and aggregate-loop-calls fixtures compose with typed lifecycle
-and multi-state break/continue. The frontdoor suite now contains nineteen regressions,
+aggregate-local-values, aggregate-loop-calls, bool-rebinding, aggregate-rebinding and aggregate-carries
+fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
+suite now contains twenty-two regressions,
 including loop-work/helper-entry exhaustion and lifecycle reset, cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.

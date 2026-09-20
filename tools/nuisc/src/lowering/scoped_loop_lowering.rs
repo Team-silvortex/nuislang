@@ -7,7 +7,7 @@ enum ScopedLoopResult<'a> {
     None,
     Scalar(&'a str),
     Scalars {
-        bindings: Vec<&'a str>,
+        bindings: Vec<scalar_carries::Projection<'a>>,
         layout: String,
         breaking: bool,
     },
@@ -103,10 +103,13 @@ pub(super) fn lower_scoped_call_while(
         return Ok(false);
     }
     let projections = result_binding.and_then(|(binding, ty)| {
-        scalar_carries::projected_bindings(binding, ty, counted_body, state)
+        scalar_carries::projected_bindings(binding, ty, counted_body, &state.struct_defs)
     });
     let breaking = projections.as_ref().is_some_and(|carries| {
-        scalar_carries::break_guard(counted_body.get(carries.len()), carries[carries.len() - 1])
+        scalar_carries::break_guard(
+            counted_body.get(carries.len()),
+            carries[carries.len() - 1].name,
+        )
     });
     // Only the normalizer proves that this i64 projection is a canonical 0/1 signal.
     // A user struct with the same shape may legitimately contain other integers.
@@ -114,7 +117,7 @@ pub(super) fn lower_scoped_call_while(
         && state.scoped_break_controls.get(callee).map(String::as_str)
             != projections
                 .as_ref()
-                .and_then(|carries| carries.last().copied())
+                .and_then(|carries| carries.last().map(|binding| binding.name))
     {
         return Ok(false);
     }
@@ -171,8 +174,9 @@ pub(super) fn lower_scoped_call_while(
                     .is_some_and(|returned| returned == ty) =>
         {
             let carries = projections.expect("matched scalar projections");
-            if !scalar_carries::admissible(&carries, &prepared, function, args, bindings, breaking)
-            {
+            if !scalar_carries::admissible(
+                &carries, &prepared, function, args, bindings, breaking, state,
+            ) {
                 return Ok(false);
             }
             ScopedLoopResult::Scalars {
@@ -190,19 +194,10 @@ pub(super) fn lower_scoped_call_while(
                 || loop_purity::expr_references_names(&prepared.limit, &changed)
                 || loop_purity::expr_references_names(&prepared.step, &changed)
                 || !args.iter().all(|arg| matches!(arg, NirExpr::Var(_)))
-                || function.params.iter().any(|param| {
-                    !((!param.ty.is_ref
-                        && !param.ty.is_optional
-                        && matches!(
-                            param.ty.name.as_str(),
-                            "bool" | "i32" | "i64" | "f32" | "f64"
-                        )
-                        && param.ty.generic_args.is_empty())
-                        || (param.ty.is_ref
-                            && !param.ty.is_optional
-                            && param.ty.name == "Buffer"
-                            && param.ty.generic_args.is_empty()))
-                })
+                || function
+                    .params
+                    .iter()
+                    .any(|param| !scalar_carries::supported_parameter(&param.ty, state))
             {
                 return Ok(false);
             }
@@ -287,9 +282,15 @@ pub(super) fn lower_scoped_call_while(
         } else if matches!((&result, arg), (ScopedLoopResult::Scalar(binding), NirExpr::Var(name)) if name == binding)
         {
             action_args.push("$carry".to_owned());
-        } else if let Some(index) = scalar_carries::argument_index(&result, param, arg) {
+        } else if let Some((index, width)) = scalar_carries::argument_index(&result, param, arg) {
             let lowered = lower_expr(arg, state, bindings)?;
-            action_args.push(yir_core::encode_loop_owned_struct_carry(index, &lowered));
+            let flattened = direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?;
+            if flattened.len() != width {
+                return Err(format!("scoped carry width mismatch for `{}`", param.name));
+            }
+            action_args.extend(flattened.iter().enumerate().map(|(offset, input)| {
+                yir_core::encode_loop_owned_struct_carry(index + offset, input)
+            }));
         } else if state.struct_defs.contains_key(param.ty.name.as_str()) {
             let lowered = lower_expr(arg, state, bindings)?;
             let flattened = direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?;
@@ -400,33 +401,25 @@ pub(super) fn lower_scoped_call_while(
         }
     }
     body_lowering::chain_statement_effect(state, &name);
-    let scalar_bindings = match &result {
-        ScopedLoopResult::Scalar(binding) => Some(vec![*binding]),
-        ScopedLoopResult::Scalars { bindings, .. } => Some(bindings.clone()),
-        _ => None,
-    };
-    if let Some(scalar_bindings) = scalar_bindings {
-        for (binding, field) in
-            std::iter::once((prepared.binding_name.as_str(), "current".to_owned())).chain(
-                scalar_bindings
-                    .iter()
-                    .enumerate()
-                    .map(|(index, binding)| (*binding, format!("carry{index}"))),
-            )
-        {
-            let result_name = next_name(state, "loop_scalar_result");
-            state.yir.nodes.push(Node {
-                name: result_name.clone(),
-                resource: "cpu0".to_owned(),
-                op: Operation {
-                    module: "cpu".to_owned(),
-                    instruction: "field".to_owned(),
-                    args: vec![name.clone(), field],
-                },
-            });
-            push_dep_edges(state, &name, &result_name);
-            bindings.insert(binding.to_owned(), result_name);
-            const_bindings.remove(binding);
+    if matches!(
+        &result,
+        ScopedLoopResult::Scalar(_) | ScopedLoopResult::Scalars { .. }
+    ) {
+        let current = scalar_carries::field(&name, "current".to_owned(), state);
+        const_bindings.remove(&prepared.binding_name);
+        bindings.insert(prepared.binding_name, current);
+        match &result {
+            ScopedLoopResult::Scalar(binding) => {
+                let value = scalar_carries::field(&name, "carry0".to_owned(), state);
+                bindings.insert((*binding).to_owned(), value);
+                const_bindings.remove(*binding);
+            }
+            ScopedLoopResult::Scalars {
+                bindings: carries, ..
+            } => {
+                scalar_carries::bind_result(&name, carries, state, bindings, const_bindings);
+            }
+            _ => unreachable!(),
         }
         return Ok(true);
     }
@@ -477,36 +470,7 @@ fn validate_loop_result_rebinding(
             bindings: carries,
             breaking,
             ..
-        } => {
-            for binding in carries {
-                if *breaking && Some(binding) == carries.last() {
-                    let seeds = function
-                        .params
-                        .iter()
-                        .zip(args)
-                        .filter(|(param, arg)| {
-                            is_scalar_i64(&param.ty)
-                                && param.name == *binding
-                                && *arg == &NirExpr::Int(0)
-                        })
-                        .count();
-                    if seeds != 1 {
-                        return Err(format!(
-                            "scoped break flag `{binding}` requires exactly one i64 zero seed"
-                        ));
-                    }
-                    continue;
-                }
-                validate_loop_result_rebinding(
-                    &ScopedLoopResult::Scalar(binding),
-                    function,
-                    args,
-                    bindings,
-                    callee,
-                )?;
-            }
-            Ok(())
-        }
+        } => scalar_carries::validate_seeds(carries, *breaking, function, args, callee),
         ScopedLoopResult::Scalar(binding) => {
             let count = function
                 .params

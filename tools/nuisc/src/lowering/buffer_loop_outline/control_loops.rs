@@ -357,6 +357,9 @@ mod sequences_tests;
 #[path = "control_loops/aggregate_calls_tests.rs"]
 mod aggregate_calls_tests;
 #[cfg(test)]
+#[path = "control_loops/aggregate_carries_tests.rs"]
+mod aggregate_carries_tests;
+#[cfg(test)]
 #[path = "control_loops/calls_tests.rs"]
 mod calls_tests;
 #[cfg(test)]

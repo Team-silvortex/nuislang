@@ -227,14 +227,16 @@ logical expression hidden beneath bool equality is not admitted by this profile.
 Fresh bindings are initialized before entering their lexical scope. A declaration
 in one arm cannot initialize another arm or the continuation; even two arms using
 the same spelling do not export that name. A variable initialized before a branch
-may be updated there when it is mutable i64. Bool temporaries are read-only
-snapshots; bool rebinding, new const declarations and richer local types are not
-part of this slice. Parameters/constants never gain write authority.
+may be updated there when it is an iteration-local i64, bool or exact flat-i64 record.
+Rebinding never recomputes an earlier snapshot. New const declarations are not part
+of this slice; outer flat-i64 carries follow the separate seeded rules below.
+Parameters/constants and outer bool bindings never gain
+write authority.
 
 Only pre-existing mutable carries are captured and returned to the outer driver;
 iteration locals are never seeded from a preceding iteration. An iteration with
 local work but no carried output discards its scalar helper result. Inner branch
-helpers may return updated i64 temporaries to their enclosing iteration without
+helpers may return updated i64/bool/flat-record temporaries to their enclosing iteration without
 turning them into driver state. Protected induction, bound and stride still cannot
 be changed by the body. The existing no-forward-sibling-read rule also applies to
 initializer reads; creating a temporary cannot hide an unavailable carry read.
@@ -255,6 +257,43 @@ allocation/drop counts. The [temporary lifecycle fixture](../../tools/nuisc/test
 also crosses ordinary build, registration-specific cache reuse, tamper rejection
 and standalone restoration. Test definitions alone do not certify a platform;
 Linux results must not be relabeled as Windows, macOS or GPU validation.
+
+### Iteration-Local Bool Rebinding
+
+Typed and inferred bool locals can be reassigned directly or through one-sided,
+two-sided and nested branches. A branch snapshots its condition before any writes;
+changing that binding in the selected arm cannot activate the other arm. Copies
+retain their initialized values. Branch-local bindings do not escape even when both
+arms use the same spelling, and every iteration initializes its own locals anew.
+Outer bool carries and parameter/constant mutation remain closed. Outer flat-i64
+records use the separate carry rules below, not bool word coercion.
+
+The shared outliner retains exact source types. Only private branch return slots
+encode bool values as canonical i64 0/1 words through existing YIR conversion
+instructions; projected results are restored to bool before the next statement.
+Single-value and mixed i64/bool joins use the existing scalar/flat-i64 return
+contracts, not a new mixed aggregate ABI. Guard fallback seeds may only encode an
+already-available bool parameter, not arbitrary expressions or calls. Buffer's
+effect profile and the callback's public four-argument ABI are unchanged.
+
+Logical rebinding RHSs remain lazy, including checked helper arguments. Reached
+arithmetic still executes when its result is overwritten or unused. Whole-loop
+preflight runs before body work; branch/iteration helpers consume the same shared
+entry budget and never reset or refund either execution counter. These conversions
+are not a new source-level permission for arbitrary cast expressions in the catalog.
+
+[Native execution regressions](../../tools/nuisc/tests/native_application_bridge/bool_rebinding.rs)
+compare independent states and actual checked-call/iteration traces after reversing
+YIR declaration order, including successful-path allocation/drop balance, both loop
+directions, 1/3/7 carries, skipped invalid arithmetic and selected unused-result traps.
+Forged cast types/dependencies/arity reject. The
+[budget regression](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
+checks an exact 18-entry/8-trip composition and independent exhaustion without
+callback output. [Default native-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/bool_rebinding.rs)
+retain the same value and reached-failure behavior, without importing session budgets.
+The [bool-rebinding lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/bool_rebinding_loops.ns)
+crosses build/run-artifact, registration-specific cache reuse, tamper rejection and
+standalone restoration after removing both the original source and build directory.
 
 ### Checked Iteration Expressions
 
@@ -329,7 +368,7 @@ initializers require each declared field exactly once. Field operands keep sourc
 evaluation order even when their order differs from the declaration. Field accesses
 and aggregate constructors retain the scoped expression-depth/availability checks.
 
-Aggregate locals are immutable snapshots, not extra loop carries. Later scalar
+Aggregate values are immutable snapshots, not extra loop carries. Later scalar
 mutations do not change their contents, and branch-local names never escape. Guarded
 branches and short-circuit predicates capture already-available aggregates; calls and
 field expressions on skipped paths do not run. Reached unused results and ignored
@@ -338,9 +377,10 @@ release aggregate allocations; process traps do not promise recoverable cleanup.
 
 The shared effect validator/outliner now takes an explicit Buffer or pure-value type
 mode. Capture discovery is shared with ordinary value control flow, while Buffer's
-scalar-only helper catalog and effect authority remain unchanged. This does not admit
-mutable aggregate/bool locals, resource or mixed/nested records, or literal nested
-loop bodies. Native layout/slot and closure limits remain independent of
+scalar-only helper catalog and effect authority remain unchanged. Local discovery
+does not itself authorize outer aggregate writes; the carry rules below do.
+Resource or mixed/nested records, or literal nested
+loop bodies remain outside this profile. Native layout/slot and closure limits remain independent of
 source layout discovery, including source-only tests with 65-field records.
 
 [Flat-local native regressions](../../tools/nuisc/tests/native_application_bridge/aggregate_local_values.rs)
@@ -348,6 +388,84 @@ check independent states, real operand/iteration traces, source-order field eval
 snapshots across branch captures, whole-bound preflight and allocation/drop balance.
 The [flat-local lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_local_values_loops.ns)
 also crosses formal build/run-artifact, cache reuse and standalone restoration.
+
+### Iteration-Local Flat Rebinding
+
+Typed and inferred flat-i64 local bindings can now be rebound from literals, existing
+snapshots and admitted helper results, including self-references on the RHS. The old
+binding is read before replacement. One-sided, two-sided and nested branches carry
+only names initialized before that branch; matching arm-local names never escape.
+Exact nominal types must agree even when two records have identical field layouts.
+
+The private transport plan expands each record in declared field order into existing
+i64 return slots. Bool companions keep canonical 0/1 encoding. Each branch call is
+evaluated once; its projections rebuild fresh records with the original nominal type,
+not an in-place update to shared storage. Even a one-field record uses this plan.
+Source literal fields still evaluate in source order before packing. A leading guard
+may project an already-captured flat parameter, but cannot evaluate arbitrary calls,
+nested/resource fields or arithmetic as a pass-through default.
+
+Outer aggregate carries follow the separate seeded rules below. Parameter/constant
+mutation, literal nested loops and resource or mixed/nested payloads remain separate. Buffer retains its scalar-only
+write authority. The public callback ABI, native flat-i64 slot limits, complete
+induction preflight and both shared execution budgets are unchanged. Reached results
+execute even when overwritten; successful paths release all temporary aggregates.
+Process traps still do not promise recoverable cleanup or bounded peak memory.
+
+[Rebinding execution tests](../../tools/nuisc/tests/native_application_bridge/aggregate_rebinding.rs)
+compare independent wrapping-value oracles with reference and real native execution
+after reversing YIR declarations. They cover widths 1/3/7, both induction directions,
+old snapshots, nested/mixed joins, selected field order, skipped invalid arithmetic,
+reached overwritten-result traps, preflight and forged layout/projection rejection.
+[Source admission tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/aggregate_calls_tests.rs)
+also exercise 65-field discovery without widening native limits and reject nominal,
+scope and constant/parameter-write drift. The [budget probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
+check exact 18-entry/eight-trip work, both branch selections and each insufficient budget.
+The [ordinary native entry tests](../../tools/nuisc/tests/control_flow_syntax_native/aggregate_rebinding.rs)
+and [lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_rebinding_loops.ns)
+cover executable entry and build/cache/source-free standalone restoration respectively.
+
+### Outer Flat-I64 Carries
+
+A nonempty, nongeneric record with only exact i64 fields may now cross the loop
+backedge when initialized by a mutable local declaration before the loop. Parameters
+and constants remain read-only; copying them to a mutable local grants authority to
+that local only. Outer bool bindings, mixed/nested/resource records and literal nested
+loop bodies remain outside this slice. Buffer admission is unchanged.
+
+The iteration normalizer reuses the private flat-i64 transport plan. One-field
+records, multiple records and scalar companions use layout-derived slot ranges,
+not a finite arity table. Return slots follow lexical first-write order and each
+record's declared field order; helper parameters may be captured in a different order.
+Each carried argument must supply exactly one same-nominal-type seed. Reconstruction
+accepts only complete ordered projections from that one result, not calls, arithmetic,
+duplicate/missing fields or a same-shaped substitute type. A record is not a break flag.
+
+The existing scoped-i64-carries contract receives flattened seeds and backedge words;
+there is no new loop opcode, provider path or public ABI. Zero-trip loops return the
+initialized seeds. Final projections construct new nominal value nodes, preserving
+pre-loop snapshots. RHS evaluation and branch joins still follow source order, and
+the no-forward-sibling-read rule is retained: an own update can read its old value,
+but a sibling carry read requires the earlier update to be available. Fallible
+record fields stay inside the selected iteration, including overwritten results.
+
+[Source admission](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/aggregate_carries_tests.rs)
+checks widths 1/3/7/65 independently of native slot limits, lexical authority and
+nominal/order drift. [Projection tests](../../tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries_tests.rs)
+reject forged reconstruction and seed layouts. [Native probes](../../tools/nuisc/tests/native_application_bridge/aggregate_carries.rs)
+compare every record field and snapshot with reference and independent wrapping
+oracles, observe checked operands and iteration counts, and check allocation/drop
+balance after successful callbacks. They cover callee/inline/prefix/suffix placement,
+both directions, zero trips, invalid preflight, overwritten traps and metadata drift.
+The shared [field-order probes](../../tools/nuisc/tests/native_application_bridge/aggregate_rebinding.rs)
+also run with records carried across iterations. Ordinary native-entry and both
+independent native-session work budgets retain their existing policies.
+
+The [aggregate-carries fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_carries_loops.ns)
+combines zero-trip and repeated record carries with typed lifecycle callbacks,
+checked arithmetic and existing multi-state break/continue. It passes build/cache
+and source-free standalone restoration. This is bounded CPU value-state evidence,
+not resource-state execution, native GPU dispatch or an allocation-free loop claim.
 
 ### Loop-Bearing Iteration Calls
 
@@ -1087,12 +1205,12 @@ The [frontdoor regression](../../tools/nuis/tests/native_session_workflow.rs) bu
 the five-scalar multi-carry, guarded-break, multi-state branch, checked-division,
 aggregate-division, aggregate-counted, aggregate-carried, aggregate-conditional
 and aggregate-one-sided/aggregate-compound/aggregate-nested/
-aggregate-sequences/aggregate-temporaries/aggregate-checked/aggregate-calls/aggregate-local-values/aggregate-loop-calls
+aggregate-sequences/aggregate-temporaries/aggregate-checked/aggregate-calls/aggregate-local-values/aggregate-loop-calls/bool-rebinding/aggregate-rebinding
 fixtures with two registrations,
 runs typed events and close,
 rejects wrong arguments and changed binary/YIR/LLVM/bundle/metadata before open,
 and switches registrations through a shared cache/output directory. It removes
-the original output, verifies the standalone compiled artifact, materializes it
+the original source/manifest and output, verifies the standalone compiled artifact, materializes it
 elsewhere and runs the restored executable with identical states. Separate
 carrier tests reject rehashed LLVM and bundle drift, schema/profile downgrades,
 duplicate fields and missing hash rows.
@@ -1137,11 +1255,49 @@ The live tensor reported 1232 drift checks, zero failures and clean coverage,
 hierarchy and lineage. No new Linux/GPU certification or whole-workspace test run
 is claimed. The broad session coordinate remains active at 86.
 
+Iteration-local bool rebinding was subsequently checked on macOS aarch64: all
+156 native bridge cases, 29 default native-entry cases, four compound-loop cases,
+89 Buffer-loop cases, one owned-cleanup case, 73 targeted compiler unit tests,
+141 LLVM unit tests and 26 tensor tests passed. Four selected frontdoor cases
+(basic scalar, bool rebinding, loop-work and helper-entry budgets) passed build,
+cache and standalone restoration; this was not a full rerun of all twenty frontdoor
+cases. The live tensor reported 1242 drift checks, zero failures and clean coverage,
+hierarchy and lineage. The old i64 guard-check anchor was updated to the explicit
+typed parameter predicate, not removed. The session coordinate remains active at
+86; these CPU checks do not certify Linux/GPU execution or the whole workspace.
+
+Iteration-local flat rebinding was checked on 2026-09-20 on macOS aarch64: all
+162 native bridge cases, 31 default native-entry cases, 89 Buffer-loop cases,
+one owned-cleanup case, four compound-loop cases, 74 targeted compiler unit tests,
+141 LLVM unit tests and 26 tensor tests passed. Seven selected frontdoor cases
+(basic scalar, flat-local values, loop-bearing calls, bool/flat rebinding and both
+work budgets) passed build/cache/source-free standalone restoration. This was not
+a full rerun of all twenty-one frontdoor cases or the workspace. The live tensor
+reported 1252 drift checks, zero failures and clean coverage, hierarchy and lineage.
+At that local-rebinding checkpoint the broad session coordinate remained active at
+86, with outer aggregate carries next. These CPU correctness/cleanup checks are not performance measurements,
+formal memory-safety proofs or new Linux/GPU certification.
+
+Outer flat-i64 carry integration was checked on 2026-09-20 on macOS aarch64:
+all 168 native bridge cases, 33 ordinary native-entry cases, 89 Buffer-loop cases,
+four compound-loop cases and one owned-cleanup case passed. The final revision
+also passed 80 targeted compiler unit tests, 141 LLVM unit tests and 26 tensor
+tests. Eight selected frontdoor cases (basic scalar, flat-local values, loop-bearing
+calls, bool/flat rebinding, outer flat carries and both work budgets) passed build,
+cache and source-free standalone restoration. This was not a full rerun of all
+twenty-two frontdoor cases or the workspace. The fresh tensor CLI reported 1263
+drift checks with zero failures and clean coverage, hierarchy and lineage.
+The broad session coordinate remains active at 86; outer bool carries are next.
+These are CPU correctness and successful-path cleanup checks, not performance
+measurements, formal memory-safety proofs or new Linux/GPU certification.
+
 ## Next Boundary
 
-Extend iteration-local bool rebinding through build/run-artifact, with lexical
-initialization, branch-local scope and stored predicate snapshots. Keep aggregate
-rebinding separate. Retain shared helper-entry accounting, loop-work reservations
+Extend outer bool loop carries through build/run-artifact with initialized canonical
+seeds and explicit typed backedge conversion. Keep resource and mixed/nested payloads
+separate. Retain outer flat-i64 carries, zero-trip seeds, exact nominal reconstruction,
+source-ordered backedge projections and local aggregate and bool rebinding,
+shared helper-entry accounting, loop-work reservations
 and independent per-invocation induction preflight; do not mistake these policies
 for bounded total node work, memory or scheduling latency. Preserve
 flat-i64 snapshots, exact nominal layouts, field/argument order and allocation cleanup,

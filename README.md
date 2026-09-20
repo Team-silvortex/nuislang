@@ -232,7 +232,7 @@ untaken arms retain incoming values. Later statements observe preceding writes;
 short-circuit guards and source-order sibling restrictions remain enforced.
 Iteration-local i64/bool temporaries now remain inside that helper rather than
 becoming loop state. Typed and inferred bindings preserve initialized snapshots;
-branch-local names never escape their arms, and mutable i64 locals may feed later
+branch-local names never escape their arms, and mutable i64/bool locals may feed later
 statements without adding driver return slots. Checked i64 `/` and `%` now execute
 inside selected iterations, including local initializers, carry updates and lazy
 predicates. Zero-trip/unselected paths do not evaluate them; reached zero divisors
@@ -254,8 +254,21 @@ including roots and outlined guards, closing loop-free call-tree expansion as we
 Conditional calls in the admitted scalar catalog retain guards rather than executing
 both branches before a select. Exhaustion traps without publishing callback output;
 cache and standalone restoration retain both policies. These are not elapsed-time,
-memory or device-work bounds. Literal nested loop
-bodies, nested/resource aggregates and mutable bool/aggregate locals remain separate.
+memory or device-work bounds. Literal nested loop bodies, mixed/nested/resource
+aggregates and outer bool carries remain separate.
+Iteration-local bool rebinding now crosses nested, one-sided and mixed scalar
+branch joins using canonical 0/1 private transport, without adding outer loop state
+or changing the public ABI. Native execution and build/cache/standalone restoration
+retain old snapshots, lazy checked calls and both independent execution budgets.
+Iteration-local flat-i64 records can also be rebound through nested and mixed-value
+joins. Private transport follows declared field order and reconstructs the exact
+nominal record, without mutating old snapshots or widening Buffer/resource authority.
+The aggregate-rebinding fixture retains build/cache/source-free restoration evidence.
+Seeded mutable flat-i64 records now also survive loop backedges, alongside scalar
+carries and other records. Zero trips retain their seeds; declared-order slots
+reconstruct exact nominal values without overwriting pre-loop snapshots. The
+aggregate-carries fixture passes build/cache/source-free restoration using the
+existing loop contract and both budgets; Buffer and resource authority stay unchanged.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this

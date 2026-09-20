@@ -20,7 +20,15 @@ pub(super) fn validate(
 ) -> Option<()> {
     let mut locals = Locals {
         scope: scope.clone(),
-        writable: writable.clone(),
+        writable: writable
+            .iter()
+            .filter(|name| {
+                scope.get(*name).is_some_and(|ty| {
+                    ty != &scalar_type("bool") && control_values::supported_type(ty, layouts)
+                })
+            })
+            .cloned()
+            .collect(),
         available: BTreeSet::from([induction.to_owned()]),
     };
     block(body, &mut locals, updates, catalog, layouts, 0)
@@ -44,16 +52,16 @@ fn block(
                     return None;
                 }
                 if let Some(existing) = existing {
-                    // Parameters/constants never gain write authority. Local
-                    // bools/aggregates are snapshots, not a new carry ABI.
+                    // Seeded mutable flat values may cross the backedge. Only
+                    // iteration-local declarations gain bool write authority.
                     if !locals.writable.contains(name)
-                        || existing != &scalar_type("i64")
+                        || !control_values::supported_type(existing, layouts)
                         || inferred != *existing
                     {
                         return None;
                     }
                 } else {
-                    if inferred == scalar_type("i64") {
+                    if control_values::supported_type(&inferred, layouts) {
                         locals.writable.insert(name.clone());
                     }
                     locals.scope.insert(name.clone(), inferred);

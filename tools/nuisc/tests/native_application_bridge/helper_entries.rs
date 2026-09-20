@@ -315,3 +315,153 @@ fn helper_entries_include_scoped_iterations_without_resetting_loop_reservations(
     invalid.remaining_loop = 8;
     execute(source, 8, 14, &[invalid]);
 }
+
+#[test]
+fn bool_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
+    let source = include_str!("loop_work.ns").replace(
+        "let value: i64 = value + relay(argument(trips), stride, early);",
+        "let value: i64 = value;
+        let gate = early;
+        if gate { let gate = false; let value: i64 = value + 1; }
+        else { let gate = true; let value: i64 = value + 1; }
+        let gate: bool = gate == false;
+        let value: i64 = value + relay(argument(trips), stride, gate);",
+    );
+    let calls = [
+        "start",
+        "selected",
+        "__nuis_scalar_branch_0",
+        "__nuis_scalar_branch_1",
+        "__nuis_scalar_continue_0",
+        "nested",
+        "iteration",
+        "__nuis_buffer_branch_0",
+        "__nuis_buffer_branch_1",
+        "argument",
+        "relay",
+        "leaf",
+        "iteration",
+        "__nuis_buffer_branch_0",
+        "__nuis_buffer_branch_1",
+        "argument",
+        "relay",
+        "leaf",
+    ];
+    execute(
+        &source,
+        8,
+        18,
+        &[
+            open(&[2, 3, 1, 0, 0], Some(8), &calls),
+            open(&[2, 3, 1, 1, 0], Some(8), &calls),
+        ],
+    );
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
+    rejected.remaining_loop = 3;
+    execute(&source, 8, 17, &[rejected]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
+    rejected.remaining_loop = 2;
+    execute(&source, 7, 18, &[rejected]);
+}
+
+#[test]
+fn flat_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
+    let source = include_str!("loop_work.ns").replace(
+        "let value: i64 = value + relay(argument(trips), stride, early);",
+        "let value: i64 = value;
+        let packet = Packet { value: 0, marker: trips };
+        let saved = packet;
+        if early { let packet = Packet { marker: packet.marker, value: packet.value + 1 }; }
+        else { let packet = Packet { value: packet.value + 1, marker: packet.marker }; }
+        let value: i64 = value + packet.value - saved.value
+            + relay(argument(packet.marker), stride, early);",
+    );
+    let calls = [
+        "start",
+        "selected",
+        "__nuis_scalar_branch_0",
+        "__nuis_scalar_branch_1",
+        "__nuis_scalar_continue_0",
+        "nested",
+        "iteration",
+        "__nuis_buffer_branch_0",
+        "__nuis_buffer_branch_1",
+        "argument",
+        "relay",
+        "leaf",
+        "iteration",
+        "__nuis_buffer_branch_0",
+        "__nuis_buffer_branch_1",
+        "argument",
+        "relay",
+        "leaf",
+    ];
+    execute(
+        &source,
+        8,
+        18,
+        &[
+            open(&[2, 3, 1, 0, 0], Some(8), &calls),
+            open(&[2, 3, 1, 1, 0], Some(8), &calls),
+        ],
+    );
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
+    rejected.remaining_loop = 3;
+    execute(&source, 8, 17, &[rejected]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
+    rejected.remaining_loop = 2;
+    execute(&source, 7, 18, &[rejected]);
+}
+
+#[test]
+fn outer_flat_carries_share_both_budgets_without_refunds_or_resets() {
+    let source = include_str!("loop_work.ns")
+        .replace(
+            "let value: i64 = 0;",
+            "let value: i64 = 0; let packet = Packet { value: 0, marker: trips };",
+        )
+        .replace(
+            "let value: i64 = value + relay(argument(trips), stride, early);",
+            "let packet = packet;
+            let saved = packet;
+            if early { let packet = Packet { marker: packet.marker, value: packet.value + 1 }; }
+            else { let packet = Packet { value: packet.value + 1, marker: packet.marker }; }
+            let value: i64 = value + packet.value - saved.value
+                + relay(argument(packet.marker), stride, early);",
+        );
+    let calls = [
+        "start",
+        "selected",
+        "__nuis_scalar_branch_0",
+        "__nuis_scalar_branch_1",
+        "__nuis_scalar_continue_0",
+        "nested",
+        "iteration",
+        "__nuis_buffer_branch_0",
+        "__nuis_buffer_branch_1",
+        "argument",
+        "relay",
+        "leaf",
+        "iteration",
+        "__nuis_buffer_branch_0",
+        "__nuis_buffer_branch_1",
+        "argument",
+        "relay",
+        "leaf",
+    ];
+    execute(
+        &source,
+        8,
+        18,
+        &[
+            open(&[2, 3, 1, 0, 0], Some(8), &calls),
+            open(&[2, 3, 1, 1, 0], Some(8), &calls),
+        ],
+    );
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
+    rejected.remaining_loop = 3;
+    execute(&source, 8, 17, &[rejected]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
+    rejected.remaining_loop = 2;
+    execute(&source, 7, 18, &[rejected]);
+}

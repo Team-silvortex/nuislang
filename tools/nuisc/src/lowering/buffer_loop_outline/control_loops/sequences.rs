@@ -60,9 +60,11 @@ pub(super) fn validate(
             _ => return None,
         }
     }
+    let has_flat_carries = updates.iter().any(|name| scope[name] != scalar_type("i64"));
     let mut mutable = updates;
     mutable.insert(prepared.binding_name.clone());
     if has_temporaries
+        || has_flat_carries
         || speculation::block_has_checked_arithmetic(effects, &BTreeSet::new())
         || scalar_helpers::contains_calls(effects)
         || control_values::has_aggregate_expressions(effects)

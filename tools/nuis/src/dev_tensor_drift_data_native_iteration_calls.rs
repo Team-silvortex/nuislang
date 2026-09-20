@@ -1,13 +1,19 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_aggregate_carries.rs"]
+mod aggregate_carries;
+#[path = "dev_tensor_drift_data_native_aggregate_rebinding.rs"]
+mod aggregate_rebinding;
+#[path = "dev_tensor_drift_data_native_bool_rebinding.rs"]
+mod bool_rebinding;
 #[path = "dev_tensor_drift_data_native_iteration_values.rs"]
 mod flat_values;
+#[path = "dev_tensor_drift_data_native_helper_entries.rs"]
+mod helper_entries;
 #[path = "dev_tensor_drift_data_native_iteration_loops.rs"]
 mod loop_calls;
 #[path = "dev_tensor_drift_data_native_loop_work.rs"]
 mod loop_work;
-#[path = "dev_tensor_drift_data_native_helper_entries.rs"]
-mod helper_entries;
 
 pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
     CHECKS
@@ -16,6 +22,9 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(loop_calls::CHECKS.iter())
         .chain(loop_work::CHECKS.iter())
         .chain(helper_entries::CHECKS.iter())
+        .chain(bool_rebinding::CHECKS.iter())
+        .chain(aggregate_rebinding::CHECKS.iter())
+        .chain(aggregate_carries::CHECKS.iter())
 }
 
 const CHECKS: &[DevTensorDriftCheckSpec] = &[

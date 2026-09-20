@@ -234,9 +234,15 @@ fn outline_loop(
     if let Some(flag) = &plan.break_flag {
         break_controls.insert(name.clone(), flag.clone());
     }
-    let aggregate = (plan.carries.len() > 1 || plan.break_flag.is_some())
-        .then(|| scalar_carries::state_type(&plan.carries, names, structs));
-    let returned = scalar_carries::value(&plan.carries, aggregate.as_ref());
+    let carry_scope = plan
+        .params
+        .iter()
+        .map(|param| (param.name.clone(), param.ty.clone()))
+        .collect();
+    let transport = scalar_carries::Plan::new(&plan.carries, &carry_scope, None);
+    let aggregate = (transport.needs_struct() || plan.break_flag.is_some())
+        .then(|| scalar_carries::state_type(&transport, names, structs));
+    let returned = scalar_carries::value(&transport, aggregate.as_ref());
     let effects = std::mem::take(body);
     let mut helper_body = branches::outline_effects(
         plan.normalized_effects.unwrap_or(effects),
@@ -270,7 +276,7 @@ fn outline_loop(
         let mut used = scope.keys().cloned().collect();
         branches::collect_bindings(&function.body, &mut used);
         let temporary = branches::fresh_name("__nuis_loop_state", &mut used);
-        *body = scalar_carries::projected_call(temporary, &ty, &plan.carries, call);
+        *body = scalar_carries::projected_call(temporary, &ty, &transport, call);
         if let Some(flag) = plan.break_flag {
             body.push(NirStmt::If {
                 condition: NirExpr::Binary {

@@ -50,6 +50,9 @@ fn iteration_flat_values_keep_nominal_layouts_and_local_capture_scope() {
         "let total: i64 = total + Packet { first: index, second: stride }.first;",
         "let unused = relay(index, stride);",
         "let local = loop_wrapper(index); let total: i64 = total + local.first;",
+        "let local = relay(index, stride); let saved = local; let local: Packet = relay(local.second, stride); let total: i64 = total + saved.first + local.first;",
+        "let local = relay(index, stride); if index < bound { let local: Packet = relay(local.first, stride); } let total: i64 = total + read(local);",
+        "let local = relay(index, stride); let flag = false; if index < bound { let local = Packet { second: local.first, first: local.second }; let flag = true; } else { let local = local; } if flag { let nested = local; if index > 0 { let nested = local; } let local = nested; } let total: i64 = total + read(local);",
     ] {
         for reversed in [false, true] {
             let mut module = parse_nuis_module(&source(body)).unwrap();
@@ -69,14 +72,16 @@ fn iteration_flat_values_keep_nominal_layouts_and_local_capture_scope() {
 }
 
 #[test]
-fn iteration_flat_values_reject_effects_cycles_rebinding_and_layout_drift() {
+fn iteration_flat_values_reject_effects_cycles_and_nominal_rebinding_drift() {
     for body in [
         "let local = mixed(index); let total: i64 = total + local.first;",
         "let local = nested(index); let total: i64 = total + local.packet.first;",
         "let local = effect(index); let total: i64 = total + local.first;",
         "let local = effect_wrapper(index); let total: i64 = total + local.first;",
         "let local = cycle(index); let total: i64 = total + local.first;",
-        "let local = relay(index, stride); let local: Packet = relay(index, stride);",
+        "let local = relay(index, stride); let local = Other { first: index, second: stride };",
+        "let local = relay(index, stride); if index < bound { let local: Other = relay(index, stride); }",
+        "if index < bound { let local = relay(index, stride); } else { let local = relay(index, stride); } let local = local;",
         "let local: Other = relay(index, stride);",
         "let local = Other { first: index, second: stride }; let total: i64 = total + read(local);",
         "if index < bound { let local = relay(index, stride); } let total: i64 = total + local.first;",
@@ -105,6 +110,34 @@ fn iteration_flat_values_reject_effects_cycles_rebinding_and_layout_drift() {
 }
 
 #[test]
+fn flat_rebinding_never_grants_constant_or_parameter_write_authority() {
+    let text = source("let local = relay(index, stride); let total: i64 = total + local.first;")
+        .replace(
+        "let index: i64 = initial;",
+        "const local: Packet = Packet { first: initial, second: step }; let index: i64 = initial;",
+    );
+    let module = parse_nuis_module(&text).unwrap();
+    assert!(
+        !scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module))
+            .contains_key("walk")
+    );
+    let text = source("let local = relay(index, stride); let total: i64 = total + local.first;")
+        .replace(
+            "fn walk(initial: i64,",
+            "fn walk(local: Packet, initial: i64,",
+        )
+        .replace(
+            "walk(a, b, step)",
+            "walk(Packet { first: a, second: b }, a, b, step)",
+        );
+    let module = parse_nuis_module(&text).unwrap();
+    assert!(
+        !scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module))
+            .contains_key("walk")
+    );
+}
+
+#[test]
 fn iteration_flat_value_layout_width_is_not_a_native_slot_table() {
     for width in [1, 3, 7, 65] {
         let fields = (0..width)
@@ -116,7 +149,7 @@ fn iteration_flat_value_layout_width_is_not_a_native_slot_table() {
             .map(|n| format!("field{n}: value + {n}"))
             .collect::<Vec<_>>()
             .join(", ");
-        let text = source("let local = wide(index); let total: i64 = total + local.field0;")
+        let text = source("let local = wide(index); if index < bound { let local = wide(local.field0); } let total: i64 = total + local.field0;")
             .replace("fn main()", &format!("struct Wide {{ {fields} }} fn wide(value: i64) -> Wide {{ return Wide {{ {values} }}; }} fn main()"));
         let mut module = parse_nuis_module(&text).unwrap();
         assert!(
@@ -127,5 +160,13 @@ fn iteration_flat_value_layout_width_is_not_a_native_slot_table() {
             .unwrap()
             .functions
             .contains("wide"));
+        assert!(module.structs.iter().any(|definition| definition
+            .name
+            .starts_with("__nuis_scalar_carries_")
+            && definition.fields.len() == width
+            && definition
+                .fields
+                .iter()
+                .all(|field| field.ty == scalar_type("i64"))));
     }
 }

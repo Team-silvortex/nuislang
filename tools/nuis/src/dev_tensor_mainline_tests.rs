@@ -308,7 +308,19 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("extend iteration-local bool rebinding"));
+        .starts_with("extend outer bool loop carries"));
+    assert!(session
+        .evidence
+        .contains("Outer flat-i64 aggregate carries now"));
+    assert!(session.evidence.contains("aggregate-carries fixture"));
+    assert!(session
+        .evidence
+        .contains("Iteration-local flat-i64 aggregate rebinding"));
+    assert!(session.evidence.contains("declared field order"));
+    assert!(session.evidence.contains("aggregate-rebinding fixture"));
+    assert!(session.evidence.contains("Iteration-local bool rebinding"));
+    assert!(session.evidence.contains("canonical 0/1 private transport"));
+    assert!(session.evidence.contains("bool-rebinding fixture"));
     assert!(session
         .evidence
         .contains("Shared callback helper-entry accounting"));
@@ -332,7 +344,12 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("Iteration-local flat-i64 helper results"));
     assert!(session.evidence.contains("aggregate-local-values fixture"));
-    assert!(session.blocker.contains("mutable bool/aggregate rebinding"));
+    assert!(session.blocker.contains("outer bool carries"));
+    assert!(!session
+        .blocker
+        .contains("outer flat-i64 aggregate carries still need"));
+    assert!(!session.blocker.contains("mutable aggregate rebinding"));
+    assert!(!session.blocker.contains("mutable bool/aggregate rebinding"));
     assert!(session
         .evidence
         .contains("completed pure acyclic helper closure"));

@@ -34,9 +34,11 @@ pub(super) fn outline_effects(
                     .expect("validated branch state");
                 }
                 carries.retain(|name| scope.contains_key(name));
-                let aggregate = (carries.len() > 1)
-                    .then(|| scalar_carries::state_type(&carries, names, structs));
-                let returned = scalar_carries::value(&carries, aggregate.as_ref());
+                let transport = scalar_carries::Plan::new(&carries, scope, types.layouts());
+                let aggregate = transport
+                    .needs_struct()
+                    .then(|| scalar_carries::state_type(&transport, names, structs));
+                let returned = scalar_carries::value(&transport, aggregate.as_ref());
                 // Snapshot once: the selected arm may mutate a buffer read by the condition.
                 let predicate = fresh_name("__nuis_buffer_condition", &mut bindings);
                 outlined.push(NirStmt::Let {
@@ -95,15 +97,11 @@ pub(super) fn outline_effects(
                     if let Some(ty) = &aggregate {
                         let temporary = fresh_name("__nuis_branch_state", &mut bindings);
                         outlined.extend(scalar_carries::projected_call(
-                            temporary, ty, &carries, call,
+                            temporary, ty, &transport, call,
                         ));
                         function.return_type = Some(ty.clone());
                     } else if let Some(name) = carries.first() {
-                        outlined.push(NirStmt::Let {
-                            name: name.clone(),
-                            ty: Some(scalar_type("i64")),
-                            value: call,
-                        });
+                        outlined.push(scalar_carries::binding(name, scope, call));
                     } else {
                         outlined.push(NirStmt::Expr(call));
                     }

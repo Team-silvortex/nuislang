@@ -7,7 +7,14 @@ pub(super) enum EffectTypes<'a> {
     Values(&'a ScalarHelpers, &'a control_values::FlatLayouts),
 }
 
-impl EffectTypes<'_> {
+impl<'a> EffectTypes<'a> {
+    pub(super) fn layouts(self) -> Option<&'a control_values::FlatLayouts> {
+        match self {
+            Self::Buffer(_) => None,
+            Self::Values(_, layouts) => Some(layouts),
+        }
+    }
+
     pub(super) fn expression(
         self,
         value: &NirExpr,
@@ -150,8 +157,14 @@ pub(super) fn validate_effects(
                 if ty.as_ref().is_some_and(|ty| ty != &inferred) {
                     return None;
                 }
-                if locals.contains_key(name) {
-                    if !mutations.writable.contains(name) || inferred != scalar_type("i64") {
+                if let Some(existing) = locals.get(name) {
+                    let supported = match types {
+                        EffectTypes::Buffer(_) => inferred == scalar_type("i64"),
+                        EffectTypes::Values(_, layouts) => {
+                            control_values::supported_type(&inferred, layouts)
+                        }
+                    };
+                    if !mutations.writable.contains(name) || !supported || existing != &inferred {
                         return None;
                     }
                     // Replacing and conditional updates still need a seed on zero trips.

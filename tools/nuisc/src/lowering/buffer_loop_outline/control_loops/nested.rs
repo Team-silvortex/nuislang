@@ -9,6 +9,9 @@ pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
     if speculation::block_has_checked_arithmetic(body, &BTreeSet::new())
         || scalar_helpers::contains_calls(body)
         || control_values::has_aggregate_expressions(body)
+        || sequences::carry_names(body)
+            .iter()
+            .any(|name| scope.get(name).is_some_and(|ty| ty != &scalar_type("i64")))
     {
         return true;
     }
@@ -154,9 +157,11 @@ impl Builder<'_> {
         .expect("admitted nested decisions");
         inputs.extend(carries.iter().cloned());
         let params = captured_params(inputs, scope);
-        let aggregate = (carries.len() > 1)
-            .then(|| scalar_carries::state_type(&carries, self.names, self.structs));
-        let returned = scalar_carries::value(&carries, aggregate.as_ref());
+        let transport = scalar_carries::Plan::new(&carries, scope, Some(self.layouts));
+        let aggregate = transport
+            .needs_struct()
+            .then(|| scalar_carries::state_type(&transport, self.names, self.structs));
+        let returned = scalar_carries::value(&transport, aggregate.as_ref());
         let name = branches::fresh_name("__nuis_scalar_iteration", self.names);
         // The driver still owns induction and preflights its complete bound. The
         // helper advances a private parameter copy so decisions observe the
@@ -187,7 +192,7 @@ impl Builder<'_> {
             let mut bindings = scope.keys().cloned().collect();
             branches::collect_bindings(&function.body, &mut bindings);
             let temporary = branches::fresh_name("__nuis_nested_state", &mut bindings);
-            *body = scalar_carries::projected_call(temporary, &ty, &carries, call);
+            *body = scalar_carries::projected_call(temporary, &ty, &transport, call);
             function.return_type = Some(ty);
         } else if let Some(carry) = carries.first() {
             body.push(NirStmt::Let {

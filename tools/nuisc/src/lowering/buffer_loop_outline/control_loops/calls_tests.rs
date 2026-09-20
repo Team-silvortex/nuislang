@@ -41,6 +41,7 @@ fn iteration_calls_use_completed_scalar_closure_and_scoped_arguments() {
         "let total: i64 = total + pick(stride != 0 && relay(index, stride) > bound, index);",
         "let unused = ignore(relay(index, stride));",
         "let local = loop_wrapper(index); let total: i64 = total + local;",
+        "let local = gate(index, true); let local: bool = gate(index, false);",
     ] {
         for reversed in [false, true] {
             let mut module = parse_nuis_module(&source(body)).unwrap();
@@ -90,7 +91,7 @@ fn iteration_calls_reject_transitive_effects_cycles_and_wrong_kinds() {
         "let index: i64 = ignore(index);", "let stride: i64 = ignore(stride);",
         "let bound: i64 = ignore(bound);", "let local: bool = relay(index, stride);",
         "if index < bound { let local = relay(index, stride); } let total: i64 = total + local;",
-        "let local = gate(index, true); let local: bool = gate(index, false);",
+        "let local = gate(index, true); let local: i64 = relay(index, stride);",
     ] {
         if let Ok(module) = parse_nuis_module(&source(body)) {
             assert!(!scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module)).contains_key("walk"), "{body}");
