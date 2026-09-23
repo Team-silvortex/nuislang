@@ -47,9 +47,7 @@ pub(super) fn build(
     );
     llvm.push_str("\n@bridge_entries = internal global i64 0, align 8\n");
     for export in &bridge.callbacks {
-        let start = llvm
-            .find(&format!("define i64 @nuis_fn_{}(", export.function))
-            .unwrap();
+        let start = super::aggregate_values::definition(&llvm, &export.function);
         let insertion = start + llvm[start..].find("{\n").unwrap() + 2;
         llvm.insert_str(insertion, "  %bridge_entry_count = load i64, ptr @bridge_entries, align 8\n  %bridge_entry_next = add i64 %bridge_entry_count, 1\n  store i64 %bridge_entry_next, ptr @bridge_entries, align 8\n");
     }

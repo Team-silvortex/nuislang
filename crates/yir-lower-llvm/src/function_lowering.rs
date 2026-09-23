@@ -40,6 +40,7 @@ pub(super) fn emit_cpu_function(
     branch_effect_emitters: &BranchEffectLlvmEmitterRegistry,
     function_return_kind: CpuCallScalarKind,
     function_return_layout: Option<&yir_core::OwnedStructLayout>,
+    native_value_return: Option<&native_session::aggregate_values::NativeValueReturn>,
     declared_result: Option<&str>,
     require_scalar_values: bool,
     global_counter: &mut usize,
@@ -330,6 +331,17 @@ pub(super) fn emit_cpu_function(
                     node.op.full_name(),
                     node.name
                 ));
+            }
+        }
+        if let Some(returns) = native_value_return {
+            if let Some(terminal) =
+                returns.lower(node, registers, body, &mut next_reg, &mut next_block)?
+            {
+                if terminal {
+                    state.ends_with_terminal_return = true;
+                    break;
+                }
+                continue;
             }
         }
         match lower_cpu_return_node(node, body, registers, &mut next_reg, last_cpu_value)? {

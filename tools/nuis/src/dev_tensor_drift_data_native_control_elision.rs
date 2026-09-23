@@ -85,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "reduce per-return flat-i64 aggregate allocation in native scalar helpers",
+            "extend typed nested value returns to native scalar helpers",
         ],
     },
 ];

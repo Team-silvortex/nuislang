@@ -4,6 +4,8 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 mod aggregate_carries;
 #[path = "dev_tensor_drift_data_native_aggregate_rebinding.rs"]
 mod aggregate_rebinding;
+#[path = "dev_tensor_drift_data_native_aggregate_values.rs"]
+mod aggregate_values;
 #[path = "dev_tensor_drift_data_native_bool_carries.rs"]
 mod bool_carries;
 #[path = "dev_tensor_drift_data_native_bool_rebinding.rs"]
@@ -38,6 +40,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(helper_entries::CHECKS.iter())
         .chain(bool_rebinding::CHECKS.iter())
         .chain(aggregate_rebinding::CHECKS.iter())
+        .chain(aggregate_values::CHECKS.iter())
         .chain(aggregate_carries::CHECKS.iter())
         .chain(bool_carries::CHECKS.iter())
         .chain(literal_loops::CHECKS.iter())

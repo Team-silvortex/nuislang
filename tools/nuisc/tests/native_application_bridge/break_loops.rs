@@ -14,9 +14,14 @@ fn guarded_break_scoped_calls_preserve_native_reference_and_typed_session_parity
     assert_eq!(loops.len(), 2);
     let bridge = emit_registered(&module, "counter").unwrap();
     for node in loops {
-        assert!(bridge
-            .llvm_ir
-            .contains(&format!(" = call i64 @nuis_fn_{}(", node.op.args[8])));
+        let carries = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)
+            .unwrap()
+            .unwrap();
+        assert!(bridge.llvm_ir.contains(&format!(
+            " = call [{} x i64] @nuis_fn_{}(",
+            carries.layout.fields.len(),
+            node.op.args[8]
+        )));
     }
     assert!(bridge.llvm_ir.contains("loop_break_control_invalid"));
     assert_native_parity(BREAKS, true);
@@ -63,7 +68,7 @@ fn scalar_break_source_preserves_provenance_and_rejects_unmodeled_updates() {
     for bad in [
         "let index: i64 = index + 1; break;",
         "break; let total: i64 = 99;",
-        "return total;",
+        "return true;",
     ] {
         let source = BREAKS.replace(
             "if index == stop { break; }",
@@ -82,4 +87,17 @@ fn scalar_break_source_preserves_provenance_and_rejects_unmodeled_updates() {
     );
     let project = Project::with_source(&source);
     assert!(nuisc::pipeline::compile_project(&project.0).is_err());
+}
+
+#[test]
+fn scalar_counted_return_exits_are_supported_without_rejecting_valid_source() {
+    // Returning total after two trips gives value + 2*delta + 1, not the
+    // break path's total + checksum + index. Keep independent lifecycle totals.
+    let source = BREAKS
+        .replace(
+            "if index == stop { break; }",
+            "if index == stop { return total; }",
+        )
+        .replace("result - value * 2 - delta * 5 - 3", "result - delta - 1");
+    assert_native_parity(&source, true);
 }

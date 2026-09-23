@@ -24,9 +24,14 @@ fn multi_carry_scoped_calls_preserve_native_reference_and_typed_session_parity()
     );
     let bridge = emit_registered(&module, "counter").unwrap();
     for node in loops {
-        assert!(bridge
-            .llvm_ir
-            .contains(&format!(" = call i64 @nuis_fn_{}(", node.op.args[8])));
+        let carries = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)
+            .unwrap()
+            .unwrap();
+        assert!(bridge.llvm_ir.contains(&format!(
+            " = call [{} x i64] @nuis_fn_{}(",
+            carries.layout.fields.len(),
+            node.op.args[8]
+        )));
     }
     assert_native_parity(MULTI, true);
 }

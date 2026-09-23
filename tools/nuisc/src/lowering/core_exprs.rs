@@ -415,8 +415,25 @@ fn lower_struct_literal(
     let mut args_out = vec![type_name.to_owned()];
     let name = next_name(state, "struct");
     let mut lowered_fields = Vec::new();
+    let mut previous = state.last_effect_anchor.clone();
     for (field_name, field_expr) in fields {
+        let node_start = state.yir.nodes.len();
+        let edge_start = state.yir.edges.len();
+        let effect_before = state.last_effect_anchor.clone();
         let lowered = lower_expr(field_expr, state, bindings)?;
+        if let Some(previous) = &previous {
+            super::edge_helpers::order_emitted_roots_after(state, node_start, edge_start, previous);
+        }
+        super::body_lowering::chain_nonpure_expr_stmt(field_expr, &lowered, state);
+        // An inlined initializer can finish with cleanup after producing its value.
+        if state.last_effect_anchor != effect_before {
+            previous = state.last_effect_anchor.clone();
+        } else if state.yir.nodes[node_start..]
+            .iter()
+            .any(|node| node.name == lowered)
+        {
+            previous = Some(lowered.clone());
+        }
         lowered_fields.push(lowered.clone());
         args_out.push(format!("{field_name}={lowered}"));
     }
@@ -431,6 +448,9 @@ fn lower_struct_literal(
     });
     for lowered in lowered_fields {
         push_dep_edges(state, &lowered, &name);
+    }
+    if let Some(previous) = previous {
+        super::edge_helpers::push_effect_edge(state, &previous, &name);
     }
     Ok(name)
 }

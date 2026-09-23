@@ -168,7 +168,7 @@ pub(super) fn execute_source(op: &str, shape: Shape, cases: &[Case], trap: bool,
                 if entered {
                     oracle.extend([0, 93, case.left, case.right]);
                 }
-                oracle.extend([0, value, 41, 0, 1]);
+                oracle.extend([0, value, 41, 0, 0]);
             }
             Err(wanted) => {
                 assert!(trap);

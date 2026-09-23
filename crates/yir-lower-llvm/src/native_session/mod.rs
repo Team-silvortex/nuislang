@@ -7,6 +7,7 @@ pub use yir_core::native_scalar_session::{
 use yir_core::YirModule;
 
 mod admission;
+pub(crate) mod aggregate_values;
 pub(crate) mod aggregates;
 mod calls;
 mod emit;
@@ -81,7 +82,11 @@ pub fn emit_registered_with_work_limits(
 ) -> Result<NativeSessionBridge, String> {
     let (selected, callbacks, state_layout) = admission::select(module, id)?;
     let state_fields = state_layout.fields().to_vec();
-    let mut llvm_ir = crate::emit_native_scalar_module(&selected)?;
+    let roots = callbacks
+        .iter()
+        .map(|callback| callback.function.as_str())
+        .collect::<Vec<_>>();
+    let mut llvm_ir = crate::emit_native_scalar_module(&selected, &roots)?;
     for callback in &callbacks {
         llvm_ir.push_str(&emit::callback(
             callback,

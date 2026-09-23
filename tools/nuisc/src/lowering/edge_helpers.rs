@@ -81,6 +81,32 @@ pub(super) fn push_effect_edge(state: &mut LoweringState<'_>, from: &str, to: &s
     push_unique_edge(state, EdgeKind::Effect, from, to);
 }
 
+pub(super) fn order_emitted_roots_after(
+    state: &mut LoweringState<'_>,
+    node_start: usize,
+    edge_start: usize,
+    previous: &str,
+) {
+    let emitted = state.yir.nodes[node_start..]
+        .iter()
+        .map(|node| node.name.as_str())
+        .collect::<HashSet<_>>();
+    let dependent = state.yir.edges[edge_start..]
+        .iter()
+        .filter(|edge| emitted.contains(edge.from.as_str()))
+        .map(|edge| edge.to.as_str())
+        .collect::<HashSet<_>>();
+    let roots = state.yir.nodes[node_start..]
+        .iter()
+        .filter(|node| !dependent.contains(node.name.as_str()))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    // Gating only the final value leaves nested argument effects free to run early.
+    for root in roots {
+        push_effect_edge(state, previous, &root);
+    }
+}
+
 pub(super) fn invalidate_graph_indexes(state: &mut LoweringState<'_>) {
     state.node_resources.clear();
     state.indexed_node_count = 0;

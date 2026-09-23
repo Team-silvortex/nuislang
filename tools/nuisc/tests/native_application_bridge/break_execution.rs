@@ -53,7 +53,6 @@ fn guarded_break_native_calls_commit_carries_and_release_aggregates_before_exit(
         ] {
             let mut cases = Vec::new();
             let mut expected = Vec::new();
-            let mut allocations = 0_u64;
             for (gain, scale) in [
                 (1.5_f32.to_bits(), (-2.25_f64).to_bits()),
                 (0x8000_0000, 0x8000_0000_0000_0000),
@@ -95,16 +94,14 @@ fn guarded_break_native_calls_commit_carries_and_release_aggregates_before_exit(
                                 }
                                 carry[slots - 1] = i64::from(index == 2);
                             }
-                            allocations += 1;
                             if carry[slots - 1] == 1 {
                                 break;
                             }
                             index += stride;
                         }
-                        allocations += 1; // Callback State is unpacked and released as well.
                         expected.push(0); // Native callback status.
                         expected.extend(carry.iter().map(|v| *v as u64));
-                        expected.extend([allocations, allocations]);
+                        expected.extend([0, 0]);
                     }
                 }
             }
@@ -180,21 +177,17 @@ fn guarded_break_rejects_invalid_returned_controls_without_exporting_state() {
         enable_break(&mut module);
         let llvm = emit_registered(&module, "counter").unwrap().llvm_ir;
         let caller = &module.application_sessions[0].open;
-        let start = llvm
-            .find(&format!("define i64 @nuis_fn_{caller}("))
-            .unwrap();
+        let start = aggregate_values::definition(&llvm, caller);
         let end = start + llvm[start..].find("\n}").unwrap();
         let llvm = &llvm[start..end];
-        let drop = llvm
-            .find("call void @nuis_scheduler_owned_aggregate_drop_v1(")
-            .unwrap();
-        let control_check = drop + llvm[drop..].find(" = icmp ule i64 ").unwrap();
+        let unpack = llvm.find(" = extractvalue [2 x i64] ").unwrap();
+        let control_check = unpack + llvm[unpack..].find(" = icmp ule i64 ").unwrap();
         let accepted = control_check
             + llvm[control_check..]
                 .find("loop_break_control_valid")
                 .unwrap();
         assert!(
-            !llvm[drop..accepted].contains("store i64"),
+            !llvm[unpack..accepted].contains("store i64"),
             "validate before committing any carry"
         );
     }

@@ -43,7 +43,6 @@ fn ordinary_flat_returns_preserve_exact_captures_order_and_nested_drop_balance()
             let source = source(slots, comparison);
             let mut cases = Vec::new();
             let mut expected = Vec::new();
-            let mut allocations = 0_u64;
             for (gain, scale) in [
                 (1.5_f32.to_bits(), (-2.25_f64).to_bits()),
                 (0x8000_0000, 0x8000_0000_0000_0000),
@@ -75,15 +74,13 @@ fn ordinary_flat_returns_preserve_exact_captures_order_and_nested_drop_balance()
                                         delta = *value;
                                     }
                                 }
-                                allocations += 1;
                             }
-                            allocations += 1; // Scoped iteration return.
+                            // Native flat helper/iteration returns are values, not owners.
                             index += stride;
                         }
-                        allocations += 1; // Callback State.
                         expected.push(0);
                         expected.extend(carry.iter().map(|v| *v as u64));
-                        expected.extend([allocations, allocations]);
+                        expected.extend([0, 0]);
                     }
                 }
             }

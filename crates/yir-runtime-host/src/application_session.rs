@@ -4,6 +4,7 @@ use yir_exec::{ExecutionTrace, FunctionSession};
 
 mod boundary;
 mod execution;
+mod state_shape;
 use boundary::SessionBoundary;
 use execution::SessionExecution;
 
@@ -50,12 +51,12 @@ impl<'a> ApplicationSession<'a> {
         FunctionSession::validate_arguments(&boundary.open.parameters, &arguments)?;
         let mut execution = SessionExecution::Native(binding);
         let opened = execution.invoke(&boundary.open.name, arguments, None)?;
-        boundary.state_arguments(&opened.value)?;
+        let state = boundary.normalize_state(opened.value)?;
         Ok((
             Self {
                 execution,
                 boundary,
-                state: opened.value,
+                state,
                 phase: ApplicationSessionPhase::Open,
                 close_error: None,
                 event_error: None,
@@ -168,14 +169,14 @@ impl<'a> ApplicationSession<'a> {
             None => execution.invoke(&boundary.open.name, arguments),
         }
         .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
-        boundary
-            .state_arguments(&opened.value)
+        let state = boundary
+            .normalize_state(opened.value)
             .inspect_err(|_| failures.record(ApplicationFailureKind::Callback))?;
         Ok((
             Self {
                 execution: SessionExecution::Reference(execution),
                 boundary,
-                state: opened.value,
+                state,
                 phase: ApplicationSessionPhase::Open,
                 close_error: None,
                 event_error: None,
@@ -270,8 +271,8 @@ impl<'a> ApplicationSession<'a> {
         let result = self
             .execution
             .invoke(&self.boundary.event.name, arguments, max_steps);
-        match result.and_then(|invocation| {
-            self.boundary.state_arguments(&invocation.value)?;
+        match result.and_then(|mut invocation| {
+            invocation.value = self.boundary.normalize_state(invocation.value)?;
             Ok(invocation)
         }) {
             Ok(invocation) => {
@@ -320,8 +321,8 @@ impl<'a> ApplicationSession<'a> {
         let result = self
             .execution
             .invoke(&self.boundary.close.name, arguments, max_steps);
-        match result.and_then(|invocation| {
-            self.boundary.state_arguments(&invocation.value)?;
+        match result.and_then(|mut invocation| {
+            invocation.value = self.boundary.normalize_state(invocation.value)?;
             Ok(invocation)
         }) {
             Ok(invocation) => {

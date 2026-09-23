@@ -305,12 +305,18 @@ fn check_workflow(source: &str) {
     let llvm = fs::read_to_string(output.join(format!("{stem}.ll"))).unwrap();
     assert!(llvm.contains("nuis_native_session_636f756e746572_open_v1"));
     assert!(!llvm.contains("define i64 @main"));
+    assert_eq!(llvm.matches("%returned = call [6 x i64]").count(), 3);
+    assert!(!llvm.lines().any(|line| {
+        line.contains("call ") && line.contains("@nuis_scheduler_owned_aggregate_")
+    }));
     if source == CONTROL_COMPOSITION_SOURCE {
         let functions = llvm
             .lines()
             .filter(|line| line.starts_with("define ") && line.contains(" @nuis_fn_"))
             .count();
         assert!(functions <= 51, "{functions} reachable native functions");
+        assert!(llvm.contains(" = call ["));
+        assert!(llvm.contains(" = extractvalue ["));
     }
     for ty in ["i1", "i32", "i64", "float", "double"] {
         assert!(llvm.contains(&format!(" = call {ty} @nuis_fn_")));
@@ -318,7 +324,7 @@ fn check_workflow(source: &str) {
     assert!(llvm.contains("loop_while_i64_cond"));
     assert!(llvm.contains("loop_while_i64_body"));
     if source == SOURCE {
-        assert!(llvm.contains(" = call i64 @nuis_fn_advance("));
+        assert!(llvm.contains(" = call [2 x i64] @nuis_fn_advance("));
     } else {
         assert!(llvm.contains(" = call i64 @nuis_fn_counted("));
         assert!(llvm.contains("loop_break_control_invalid"));

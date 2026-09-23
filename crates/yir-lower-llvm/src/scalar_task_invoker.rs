@@ -4,8 +4,9 @@ pub(super) fn render_scalar_task_invoker(
     function_name: &str,
     signature: &CpuHelperSignature,
 ) -> Option<String> {
-    // A caller-owned synchronous context must not escape into a task thunk.
+    // Synchronous contexts and lowering-private value returns must not escape into task thunks.
     if !signature.implicit_parameters.is_empty()
+        || signature.native_value_return.is_some()
         || !is_normalized_task_scalar(signature.ret)
         || signature
             .params

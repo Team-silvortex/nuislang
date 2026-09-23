@@ -17,9 +17,12 @@ fn guarded_multi_state_exits_preserve_native_reference_and_typed_session_parity(
     );
     let bridge = emit_registered(&module, "counter").unwrap();
     for node in calls {
-        assert!(bridge
-            .llvm_ir
-            .contains(&format!(" = call i64 @nuis_fn_{}(", node.op.args[0])));
+        let layout = yir_core::parse_owned_struct_layout(&node.op.args[1]).unwrap();
+        assert!(bridge.llvm_ir.contains(&format!(
+            " = call [{} x i64] @nuis_fn_{}(",
+            layout.fields.len(),
+            node.op.args[0]
+        )));
     }
     assert!(module
         .nodes

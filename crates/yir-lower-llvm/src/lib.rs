@@ -139,15 +139,19 @@ pub fn emit_module_with_registries(
     yir_registry: &ModRegistry,
     emitter_registry: &BranchEffectLlvmEmitterRegistry,
 ) -> Result<String, String> {
-    emit_module_with_checks(module, yir_registry, emitter_registry, false)
+    emit_module_with_checks(module, yir_registry, emitter_registry, false, &[])
 }
 
-pub(crate) fn emit_native_scalar_module(module: &YirModule) -> Result<String, String> {
+pub(crate) fn emit_native_scalar_module(
+    module: &YirModule,
+    roots: &[&str],
+) -> Result<String, String> {
     emit_module_with_checks(
         module,
         &default_registry(),
         &default_branch_effect_llvm_emitters(),
         true,
+        roots,
     )
 }
 
@@ -156,6 +160,7 @@ fn emit_module_with_checks(
     yir_registry: &ModRegistry,
     emitter_registry: &BranchEffectLlvmEmitterRegistry,
     require_scalar_values: bool,
+    native_roots: &[&str],
 ) -> Result<String, String> {
     verify_module_with_registry(module, yir_registry)?;
 
@@ -283,6 +288,32 @@ fn emit_module_with_checks(
         } else {
             None
         };
+        let owned_struct_layout = if return_node.op.instruction == "return_owned_struct" {
+            return_node
+                .op
+                .args
+                .get(1)
+                .map(|layout| yir_core::parse_owned_struct_layout(layout))
+                .transpose()?
+        } else {
+            None
+        };
+        let native_value_return = if require_scalar_values {
+            owned_struct_layout
+                .as_ref()
+                .map(|layout| {
+                    if native_roots.contains(&function_name.as_str()) {
+                        native_session::aggregate_values::NativeValueReturn::callback(
+                            &return_node.op.args[1],
+                        )
+                    } else {
+                        native_session::aggregate_values::NativeValueReturn::flat_i64(layout)
+                    }
+                })
+                .transpose()?
+        } else {
+            None
+        };
         helper_signatures.insert(
             function_name,
             CpuHelperSignature {
@@ -307,16 +338,8 @@ fn emit_module_with_checks(
                     .collect(),
                 ret,
                 owned_struct_return: return_node.op.instruction == "return_owned_struct",
-                owned_struct_layout: if return_node.op.instruction == "return_owned_struct" {
-                    return_node
-                        .op
-                        .args
-                        .get(1)
-                        .map(|layout| yir_core::parse_owned_struct_layout(layout))
-                        .transpose()?
-                } else {
-                    None
-                },
+                owned_struct_layout,
+                native_value_return,
                 owned_external_buffer_return,
             },
         );
@@ -394,6 +417,7 @@ fn emit_module_with_checks(
             helper_signatures
                 .get(function_name)
                 .and_then(|signature| signature.owned_struct_layout.as_ref()),
+            helper_signature.native_value_return.as_ref(),
             functions_by_name
                 .get(function_name)
                 .and_then(|function| function.result.as_ref())
@@ -414,12 +438,7 @@ fn emit_module_with_checks(
                 })
                 .collect::<Vec<_>>(),
         );
-        let ret_sig = cpu_scalar_kind_llvm_type(
-            helper_signatures
-                .get(function_name)
-                .expect("helper signature should exist")
-                .ret,
-        );
+        let ret_sig = helper_signature.llvm_return_type();
         helper_defs.push(format!(
             "define {ret_sig} @nuis_fn_{function_name}({args_sig}) {{\n{}\n}}\n",
             emitted.body
@@ -454,6 +473,7 @@ fn emit_module_with_checks(
         &provider_completion_sources,
         emitter_registry,
         CpuCallScalarKind::I64,
+        None,
         None,
         module
             .functions

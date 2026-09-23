@@ -135,15 +135,16 @@ scoped-call and flat-i64 return contracts. It advances a private index copy befo
 the branch tree, then returns the carries. The outer driver advances its own index
 exactly once, preserving the source's step-first semantics and the original finite,
 non-wrapping induction preflight. Multi-carry projection retains source order and
-existing aggregate allocation/drop ownership. No new loop opcode or ABI is added.
+the YIR ownership contract. Native flat helper transport is described below;
+ordinary LLVM retains aggregate allocation/drop. No new loop opcode is added.
 
 The effect outliner snapshots branch decisions and calls guarded helpers; a skipped
 branch returns before its own decisions or updates execute. Boolean `&&`/`||` inside
 these new helpers use guarded scalar calls, not eager boolean arithmetic. Both use
 the existing neutral-false guard contract (`a || b = !(!a && !b)`), without duplicating
 arm bodies or relaxing native guard admission. One helper per logical edge keeps
-this part of normalization linear. An unselected branch can still allocate its
-neutral aggregate return; balanced release does not imply allocation-free execution.
+this part of normalization linear. Native flat neutral returns now use values rather
+than heap owners. Ordinary LLVM retains its aggregate allocation/drop path.
 
 ### Ordered Multi-Statement Carry Bodies
 
@@ -580,7 +581,8 @@ backend rule or Buffer exit behavior is introduced.
 Ordinary `main` loops still use the allocation-free flow path when the existing
 shared flow parser admits them; `main` is not a registered native-session callback.
 Callable value loops use the scoped contract, and complex ordinary-entry loops can
-use that same fallback. This does not remove per-return allocation from scoped loops.
+use that same fallback. Only the admitted native-session helper path now removes
+per-return allocation; the ordinary LLVM fallback remains separate.
 
 Generated suffix guards also count toward the value-profile depth limit of 32.
 Source write checks retain readonly parameters, constants, protected headers and
@@ -628,8 +630,8 @@ and flow fast paths, including prefixed step temporaries; callable value functio
 use scoped helpers without new opcodes, target-specific rules or callback ABI.
 Full induction preflight and reservation still apply to immediate exits. Break
 does not refund unentered iterations, including when a following loop requests work;
-continue does not invent another iteration or helper debit. Per-return allocation
-remains a separate optimization boundary.
+continue does not invent another iteration or helper debit. Native flat helper
+returns and typed callback State now use value transport without aggregate heap storage.
 
 [Source tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/trailing_tests.rs)
 cover pre-step effects, exact continue steps, flag-only break, header authority,
@@ -710,7 +712,7 @@ Calls, arithmetic, projections and record constructors are not ready atoms. They
 stay behind their original guards. Multi-use nontrivial suffixes remain shared, preserving
 linear helper growth instead of duplicating source computation. Unused source
 calls and fallible predicates still execute. Ready-record selection reuses values;
-this does not remove allocations from ordinary aggregate-returning calls.
+helper allocation removal is handled by the separate native value transport below.
 
 The [full control-composition fixture](../../tools/nuisc/tests/native_application_bridge/control_composition.ns)
 combines counted returns with the original nested, branched, typed-carry workload.
@@ -817,8 +819,89 @@ The full composition now includes a record prefix named like its subsequent scal
 binding. Its 51-function bound, typed lifecycle totals, cache validation and exact
 source-free LLVM restoration remain required. Shared multi-use bodies, admission
 limits, callback ABI, lazy failure and source evaluation order are unchanged.
-The next boundary is per-return flat-i64 aggregate allocation, not a claim that
-ordinary aggregate calls have become allocation-free or gained measured speed.
+The subsequent per-return flat-i64 aggregate allocation change is confined to the
+native helper transport below; it does not imply measured runtime speed.
+
+### Native Flat Value Transport
+
+The [private return plan](../../crates/yir-lower-llvm/src/native_session/aggregate_values.rs)
+lowers admitted non-root flat-i64 helper returns to LLVM `[N x i64]` values, for
+1..64 uniquely named fields. Calls, terminal returns, guarded early returns and
+scoped iteration results share the same plan. Each field is inserted in declared
+layout order and extracted into an independent scalar value, preserving earlier
+snapshots across later calls and loop iterations. LLVM handles target lowering;
+there is no hand-written stack pointer return, shared scratch arena or per-trip
+heap allocation. Every return slot is initialized before publication.
+
+Selection happens after native admission, with separate helper and callback checks.
+The YIR nominal type, field order, ownership and exact scalar contracts are not
+weakened. General LLVM emission, resource/nested/mixed helper returns, external
+FFI and task thunks do not acquire this private ABI. Native source-order checks,
+checked arithmetic, guard laziness, graph bounds and both work counters remain.
+The public callback ABI is unchanged; its final State now uses the typed value path below.
+
+[Value-return probes](../../tools/nuisc/tests/native_application_bridge/aggregate_values.rs)
+execute 1/2/7/64-field layouts, reversed constructor fields, early returns and
+multiple live result snapshots. Existing nested, multi-carry and guarded-break
+probes count real allocator/drop calls. The earlier helper-only change reduced
+the four-trip nested case from 13 allocations to 1; typed callback value transport
+now removes that final allocation too. This proves fewer aggregate allocator calls,
+not zero stack traffic, faster wall time or whole-program memory safety.
+
+### Native Callback Value Transport
+
+Registered callback roots now return `[N x i64]` slot values rather than pointer
+bits to a heap-owned State. Unlike flat-i64 helper admission, the callback plan
+uses the shared `ScalarStateLayout` contract for nonempty nested nominal records
+with 1..64 bool/i32/i64/f32/f64 leaves. Resource fields remain rejected; mixed or
+nested ordinary helper calls are not newly admitted. A flat callback called as a
+helper uses the same private return signature at both call sites. Ordinary LLVM,
+external returns and task thunks retain their existing ABI and ownership boundaries.
+
+Each terminal/guarded return first matches exact nominal names, fields and kinds,
+then packs leaves in declaration order. Scalar bit packing is shared with the
+existing owned-payload lowering: bool zero-extends, i32 sign-extends, f32 retains
+its raw low 32 bits and f64 retains all 64 bits. There are no shared scratch globals
+or returned stack pointers. Target lowering may still use registers, stack slots
+or an implicit result address; this is not a no-stack-traffic guarantee.
+
+The wrapper validates shape/canonicality and loads every input before invoking
+the root, extracts all returned words, then writes output using alignment 1.
+In-place and forward/backward partial overlap therefore preserve the input snapshot.
+Status 1/2 failures do not enter the callback or change output. Checked arithmetic,
+induction and work-budget traps still terminate the process without publishing a
+result; they do not become catchable status returns or transactional rollback.
+
+[Callback probes](../../tools/nuisc/tests/native_application_bridge/callback_values.rs)
+exercise 1/6/64 nested slots, all three lifecycle roots, both guarded paths,
+finite/negative-zero/NaN bits, unaligned full/partial overlap, disjoint buffers,
+whole-region sentinels and unchanged entry/allocation counters on malformed input.
+The existing flat-return, nested-loop and break probes now require zero aggregate
+allocations/drops on successful callbacks. Reversed-constructor results now have
+reference open/event/close parity as well as an independent native slot oracle.
+
+### Reference State Normalization
+
+The host binds a recursive shape from registered field paths and scalar kinds,
+then validates all declared callback layouts when present, including nested nominal
+identity. Once a callback completes, named fields are matched and reordered into
+the registered layout before state publication. Duplicate/missing/extra fields,
+wrong scalar kinds, wrong nesting and known nominal mismatches remain errors.
+Invalid results retain the last accepted state; event failure permits one cleanup,
+and close failure remains terminal. Normalization never retries callback effects.
+NaN payloads and signed-zero bits are preserved without numeric conversion.
+
+Metadata-free hand-authored YIR keeps its signature-only nested type boundary;
+no missing nominal identity is invented. Reference states retain support beyond
+the native 64-slot limit, while field-path nesting is bounded to 64 levels.
+This is host-side value normalization, not allocation-free reference execution.
+Constructor lowering also chains effectful field expressions in source order,
+independently of declared storage order. It gates each emitted field subgraph's
+roots, including nested call arguments, after the previous field completes.
+Inline and outlined helper regressions check nested reverse constructors under
+reordered YIR nodes/functions/bodies.
+[Lifecycle regressions](../../tools/nuisc/tests/native_application_bridge/reference_state.rs)
+cover nominal drift, rejected returned state, close-once and fuel exhaustion.
 
 ### Loop-Bearing Iteration Calls
 
@@ -1007,9 +1090,9 @@ remain checked, and induction still requires finite, non-wrapping progress.
 This is not full aggregate
 control flow, a whole-language effect proof or a new runtime loop dispatcher.
 
-An unselected private helper can still allocate its neutral aggregate return.
-Immediate unpack/drop retains lifecycle balance, not zero-cost branching or
-allocation freedom. Trap cleanup remains unpromised.
+Native flat neutral returns use the same value transport as selected returns.
+The helper entry is still charged; this is not zero-cost branching. Ordinary LLVM
+retains owned storage; native callback State uses typed values. Trap cleanup remains unpromised.
 
 Native failure terminates the process, not a catchable callback result or fuel
 error. It cannot promise cleanup, rollback or a returned state. The reference
@@ -1089,12 +1172,11 @@ Operand order need not equal field order. Scalar i32/float captures are also
 supported by the source multi-carry path, without widening carried state kinds.
 
 The helper sees the previous iteration's carries and pre-step counter. Its own
-ordered updates produce one returned aggregate; all leaves are extracted and
-the temporary aggregate is dropped before stepping or invoking it again.
-Zero-trip loops preserve every seed. Unlike a plain scalar chain or single-i64
-call, this route currently allocates one aggregate per iteration. Release
-balance is tested; eliminating that allocation remains an optimization, not a
-claim of allocation-free execution or whole-program memory safety.
+ordered updates produce one returned aggregate; native flat leaves are extracted
+from an LLVM value before stepping or invoking it again, with no per-iteration
+heap owner. Ordinary LLVM still unpacks/drops owned storage. Zero-trip loops
+preserve every seed. Typed callback State now also avoids aggregate heap storage;
+this is not a claim of whole-program allocation freedom or memory safety.
 
 The explicit source shape is a scoped helper call, ordered scalar projections
 and a counted induction step. Source guarded breaks can instead use the private
@@ -1109,7 +1191,8 @@ must be zero even on zero trips, and each returned value must be 0 (advance) or 
 (break). A control-only layout is valid and the control slot counts toward the
 64-slot/parameter bounds. It is not an arbitrary user-data or boolean carry.
 
-The returned aggregate is unpacked and released, then the control value is checked
+The returned aggregate is unpacked (and owned storage released on ordinary LLVM),
+then the control value is checked
 before committing any returned carries. A valid return commits every carry; 1 exits
 with the current pre-step counter, while 0 reaches the ordinary induction step.
 An invalid seed/return traps the process and never publishes callback output.
@@ -1149,15 +1232,16 @@ This is a structural contract, not an allowlist of generated helper names or
 precombined arities. Ordinary and mixed scoped edges share the existing acyclic
 closure and size/depth limits, including discarded and guard-bypassed calls.
 Unknown targets, foreign-lane values, hidden effects and signature drift reject.
-The generic LLVM call lowering unpacks and drops each temporary return immediately;
-no interpreter, host dispatcher, new opcode or new aggregate ABI is introduced.
+Native lowering extracts a flat LLVM value; generic LLVM still unpacks and drops
+each temporary owned return immediately. No interpreter, host dispatcher or new
+YIR opcode is introduced; only the native lowering-private return ABI changes.
 
 Multi-state guarded break and explicit-step continue now preserve source-ordered
 updates, selected-path suffix evaluation and child-loop exit scope. A guarded
 return bypasses later dynamic induction preflight; reaching an excessive bound
 still traps the process. These checks do not add callback fuel/preemption or
-resource-bearing returns. Every reached aggregate return still allocates, even
-when nested inside one loop iteration; release balance is not allocation freedom.
+resource-bearing returns. Native flat helpers and callback State no longer allocate
+on each return; general owned-return paths still allocate.
 
 ## Call ABI
 
@@ -1184,8 +1268,9 @@ input pointer. Output must be nonnull because empty state is not admitted.
 Status 0 means success, 1 means invalid counts/pointers, and 2 means noncanonical
 input encoding. Counts, null pointers and all scalar encodings are checked before
 entering the callback or writing output. All input slots are loaded before output
-publication, so in-place state updates are supported. The bridge reads the returned
-aggregate, drops its temporary storage, and only then publishes scalar slots.
+publication, so in-place and partial-overlap state updates are supported. The bridge
+extracts the returned LLVM slot value before publishing; there is no temporary
+aggregate heap owner to require, read or drop on this native-only path.
 
 This is a trusted, statically linked internal host boundary, not a new Nuis cffi
 authorization or pointer sandbox. Nonnull pointers must actually reference the
@@ -1369,8 +1454,8 @@ run 144 callback cases and 288 actual helper invocations across six native
 executables with 2/3/7 carries, reversed operand order, source-ordered updates,
 wrapping carried arithmetic, zero/one trips and all five scalar capture kinds.
 Test-only wrappers delegate to the real aggregate allocator/drop functions,
-checking release before the next helper and equal allocation/drop counts after
-each export. Three additional binaries retain real preflight traps.
+checking no live heap owner before the next helper and exactly one allocation/drop
+per successful export. Three additional binaries retain real preflight traps.
 [Multi-carry admission tests](../../tools/nuisc/tests/native_application_bridge/multi_admission.rs)
 reject layout/ownership/seed/parameter drift, recursive zero-trip edges, hidden
 effects, foreign lanes and attempts to enable general aggregate calls. They also
@@ -1382,8 +1467,8 @@ retain typed state and reversed-declaration parity. The
 [break execution tests](../../tools/nuisc/tests/native_application_bridge/break_execution.rs)
 exercise 180 callback cases in six native binaries with 2/3/7 slots, early/middle/
 last/no break, zero trips, both directions, reversed operands/declarations, wrapping
-user carries and exact five-scalar captures. Real allocation/drop counters include
-the exiting iteration and callback State. Eleven unmodified process-trap runs
+user carries and exact five-scalar captures. Real allocation/drop counters now
+observe only callback State, not the exiting iteration. Eleven process-trap runs
 cover nonzero seeds (including zero trips), invalid returned control and invalid
 induction even when the helper would immediately break. Helper-entry probes flush
 their output before execution so a trap cannot hide buffered evidence.
@@ -1401,8 +1486,8 @@ adds six typed native/reference lifecycle runs with guarded updates and mixed
 break/continue. [Nested aggregate execution](../../tools/nuisc/tests/native_application_bridge/aggregate_execution.rs)
 uses six native binaries for 144 callback cases and 576 inner helper calls, with
 2/3/7 slots, reversed capture/declaration order, wrapping updates, signed-zero/NaN
-bits and real allocator/drop balance, including early returns. Entry probes verify
-that the previous temporary has already been released before the next inner call.
+bits and one real allocation/drop per callback, including early returns. Entry
+probes verify that no heap temporary remains live before the next inner call.
 [Aggregate admission](../../tools/nuisc/tests/native_application_bridge/aggregate_admission.rs)
 rejects malformed layouts, result/parameter/return-field drift, hidden effects,
 foreign captures and recursive calls, while shared unit tests exercise slot bounds.
@@ -1793,17 +1878,88 @@ flat-i64 aggregate allocation next. This was not a full rerun of all 209 bridge
 cases, all 28 frontdoor cases or the workspace, and adds no Linux/GPU, Windows,
 formal safety, peak-memory or runtime-performance certification.
 
+Native flat value transport was checked on 2026-09-23 on macOS aarch64.
+All 145 LLVM unit tests, 89 Buffer-loop cases, 46 ordinary control-flow cases,
+four compound-loop cases, one owned-cleanup case and 26 tensor tests passed.
+The full 210-case native-bridge scan passed 209 and exposed one outdated rejection
+of an i64 return inside a counted loop. That test now rejects a wrong return kind;
+a new positive case checks independent lifecycle totals instead. The six-case
+value-return/break rerun passed, including the repaired rejection and new case;
+the bridge suite now contains 211 cases. It was not rerun in full a second time.
+
+Six selected frontdoor cases cover multi-carry, fallible aggregates, counted
+returns, full control composition and both shared work budgets. Five passed in
+the combined run; the multi-carry case passed after updating its old pointer-word
+call assertion to require the new two-field value return. Build/cache, tamper
+rejection, project/source deletion and standalone materialization/execution remain
+covered. The full composition retains its 51-function ceiling and byte-identical
+restored LLVM, with explicit value-call/extraction assertions.
+
+At that checkpoint the fresh tensor reported 1358 drift checks, zero failures and
+clean coverage, hierarchy and lineage. The session coordinate remained active at
+86, with final callback-state allocation next. The probes counted one real State
+allocation/drop per successful callback in those fixtures, rather than one per
+helper/iteration return. This is not a whole-workspace or all-28-frontdoor run,
+nor fresh Linux/GPU, Windows, formal-safety, peak-memory or runtime-speed evidence.
+
+Native callback value transport was checked on 2026-09-23 on macOS aarch64.
+All 147 LLVM unit tests, the complete 212-case native-bridge suite, 89 Buffer-loop
+tests, 46 ordinary control-flow tests, four compound-loop tests, one owned-cleanup
+test and 26 tensor tests passed. The zero-allocation regression was first observed
+failing on the old final-State path, then passed after the private return change.
+The new 1/6/64-slot matrix executes 216 successful and 228 rejected callbacks,
+checking complete backing buffers, boundary bytes, exact float bits and entry
+counters. Separate 1/2/7/64-field probes also call a registered flat callback as a
+helper and retain independent snapshots without aggregate allocation/drop.
+
+Six selected frontdoor cases (multi-carry, fallible aggregates, counted returns,
+full composition and both work budgets) passed build/cache, tamper rejection and
+source-free standalone restoration. The full composition retains its 51-function
+ceiling and byte-identical restored LLVM; compiled wrappers now require typed
+value returns and no aggregate runtime calls. At that checkpoint the tensor reported
+1363 drift checks, zero failures and clean coverage/hierarchy/lineage. The session
+coordinate remained active at 86, with the reproduced reference constructor-order
+gap next. That historical rejection is superseded by Reference State Normalization
+above. This was not a full workspace/all-28-frontdoor
+run and adds no Linux/GPU, Windows, formal-safety, peak-memory or speed certification.
+
+Reference state normalization was checked on 2026-09-23 on macOS aarch64.
+The prior inverse-constructor rejection was reproduced before the fix. Afterward,
+84 runtime-host unit tests, 11 application-session and 52 provider-session tests,
+546 lowering unit tests, 140 ordinary Buffer/control/cleanup regressions and 20
+selected native-bridge tests passed. The latter include six reference lifecycle
+regressions and the 1/6/64-slot native probe with reference open/event/close parity.
+Nested argument effects were separately observed running early, then fixed by
+ordering emitted field roots; inline and outlined source-order tests now pass.
+Two selected CLI workflows (multi-carry and full composition) passed cache,
+tamper and source-free artifact restoration checks. All 28 tensor-related tests
+passed; the fresh CLI reports 1368 drift checks, zero failures and clean coverage,
+hierarchy and lineage. The session coordinate remains active at 86.
+The expanded image-session target has one passing and three failing tests at the
+existing `window_event` guarded-fallible-return boundary. Its image-state test also
+fails with the constructor-order change removed; this application path is not
+claimed fixed. This was not a full workspace or complete native-bridge/frontdoor
+run, and adds no Linux/GPU, Windows, formal-safety or speed certification.
+
 ## Next Boundary
 
-Reduce per-return flat-i64 aggregate allocation in native scalar helpers
-while preserving native graph bounds, selected-path evaluation and shared entry
-accounting. Retain the 51-function full-composition regression, single-use terminal
+Repair guarded fallible returns in the ns-nova image session first. The expanded
+image-session tests stop at `window_event` with `conditional fallible return
+requires guarded helper lowering`, also reproduced without the constructor-order
+change. Do not relax speculative-failure checks to make this application compile.
+Then extend typed nested value returns to native scalar helpers with separate
+helper admission and call-site evidence; callback-root admission alone is insufficient.
+Retain reference named-field normalization, nominal/kind/malformed-state rejection,
+source effect order and inverse-constructor native/reference parity. Retain typed
+slot publication, input/output overlap, failure sentinels and allocation-free callback
+and flat-i64 helper return transport, native graph bounds, selected-path evaluation and
+shared entry accounting. Retain the 51-function full-composition regression, single-use terminal
 and statement evaluation, scope-aware local hygiene, unused calls, shared multi-use
 suffixes, and the counted-return
 source timing and propagation proof without changing the separate Buffer exit profile.
 Retain leading/trailing step timing, leading-step break recovery, loop-local continue, each selected inner
 invocation's preflight and both shared work counters. Keep resource
-and mixed/nested payloads separate. Retain outer bool
+and mixed/nested helper payloads separate. Retain outer bool
 carry seeds and explicit typed backedge conversion, outer flat-i64 carries,
 zero-trip seeds, exact nominal reconstruction,
 source-ordered backedge projections and local aggregate and bool rebinding,
@@ -1815,8 +1971,8 @@ temporary initialization, lexical visibility and stored snapshots.
 Retain induction preflight, invariant header
 inputs, exact layouts, source order and selected-path failure semantics. Keep
 checked iteration expressions, flat-local and loop-call values, flat-helper, counted/carried/conditional/one-sided/compound/nested/sequence/temporary-aggregate
-and scoped-break frontdoor/relocation regressions. Per-return aggregate allocation
-is a separate optimization boundary.
+and scoped-break frontdoor/relocation regressions. Ordinary and resource-bearing
+aggregate allocation remain separate optimization boundaries.
 Whole-callback native scheduling limits, general loops, Buffer callbacks, resource
 state, provider dispatch and ordinary image-host selection still need separate
 implementation and evidence. The bridge alone does not impose call order; the

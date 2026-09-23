@@ -179,7 +179,8 @@ pub(crate) fn begin_loop_effect_action(
             } else if returns_owned_struct {
                 let result = fresh_reg(next_reg);
                 body.push(format!(
-                    "  {result} = call i64 @nuis_fn_{callee}({})",
+                    "  {result} = call {} @nuis_fn_{callee}({})",
+                    signature.llvm_return_type(),
                     arguments
                 ));
                 Ok(LoopEffectCleanup::OwnedStructResult(result))

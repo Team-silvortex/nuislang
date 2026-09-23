@@ -1,6 +1,7 @@
 use yir_core::{Value, YirFunction, YirFunctionParameter, YirModule};
 use yir_exec::FunctionSession;
 
+use super::state_shape::StateShape;
 use super::ApplicationSessionEntries;
 
 pub(super) struct SessionBoundary<'a> {
@@ -10,6 +11,7 @@ pub(super) struct SessionBoundary<'a> {
     state_parameters: &'a [YirFunctionParameter],
     state_prefix: String,
     state_type: &'a str,
+    state_shape: StateShape,
 }
 
 impl<'a> SessionBoundary<'a> {
@@ -25,6 +27,17 @@ impl<'a> SessionBoundary<'a> {
             state_prefix,
             state_type,
         } = yir_core::ApplicationSessionSignature::bind(module, entries)?;
+        let mut state_shape = StateShape::bind(state_type, &state_prefix, state_parameters)?;
+        for function in [open, event, close] {
+            let result = function.result.as_ref().unwrap();
+            if let Some(node) = module.nodes.iter().find(|node| node.name == result.node) {
+                if node.op.instruction == "return_owned_struct" {
+                    if let Some(encoded) = node.op.args.get(1) {
+                        state_shape.bind_layout(&yir_core::parse_owned_struct_layout(encoded)?)?;
+                    }
+                }
+            }
+        }
         Ok(Self {
             open,
             event,
@@ -32,7 +45,12 @@ impl<'a> SessionBoundary<'a> {
             state_parameters,
             state_prefix,
             state_type,
+            state_shape,
         })
+    }
+
+    pub fn normalize_state(&self, value: Value) -> Result<Value, String> {
+        self.state_shape.normalize(value)
     }
 
     pub fn state_arguments(&self, state: &Value) -> Result<Vec<Value>, String> {

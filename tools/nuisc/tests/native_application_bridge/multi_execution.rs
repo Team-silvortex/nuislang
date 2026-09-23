@@ -152,9 +152,7 @@ pub(super) fn execute_observed(
             "call void @probe_drop(",
         );
     let callee = observed.unwrap_or(&node.op.args[8]);
-    let start = llvm
-        .find(&format!("define i64 @nuis_fn_{callee}("))
-        .unwrap();
+    let start = aggregate_values::definition(&llvm, callee);
     let insert = start + llvm[start..].find("{\n").unwrap() + 2;
     let mut probe = String::from("  %probe_a = load i64, ptr @probe_allocs\n  %probe_d = load i64, ptr @probe_drops\n  %probe_live = sub i64 %probe_a, %probe_d\n  call void @nuis_debug_print_i64(i64 %probe_live)\n");
     for index in 0..=slots {
@@ -210,7 +208,6 @@ fn multi_carry_native_calls_preserve_sequential_values_exact_captures_and_drop_b
         ] {
             let mut cases = Vec::new();
             let mut expected = Vec::new();
-            let mut allocations = 0_u64;
             for (gain, scale) in [
                 (1.5_f32.to_bits(), (-2.25_f64).to_bits()),
                 (0x8000_0000, 0x8000_0000_0000_0000),
@@ -244,12 +241,10 @@ fn multi_carry_native_calls_preserve_sequential_values_exact_captures_and_drop_b
                                 }
                             }
                             index += stride;
-                            allocations += 1;
                         }
-                        allocations += 1; // The callback's final State is also unpacked and dropped.
                         expected.push(0);
                         expected.extend(carry.iter().map(|v| *v as u64));
-                        expected.extend([allocations, allocations]);
+                        expected.extend([0, 0]);
                     }
                 }
             }

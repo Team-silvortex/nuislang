@@ -273,6 +273,7 @@ fn synchronous_context_is_forwarded_but_never_captured_by_a_task_invoker() {
         ret: CpuCallScalarKind::I64,
         owned_struct_return: false,
         owned_struct_layout: None,
+        native_value_return: None,
         owned_external_buffer_return: None,
     };
     assert_eq!(
@@ -286,6 +287,14 @@ fn synchronous_context_is_forwarded_but_never_captured_by_a_task_invoker() {
         "i64 %arg0"
     );
     assert!(render_scalar_task_invoker("identity", &signature).is_some());
+    let layout = yir_core::parse_owned_struct_layout("Value{value:i64}").unwrap();
+    signature.native_value_return = Some(
+        crate::native_session::aggregate_values::NativeValueReturn::flat_i64(&layout).unwrap(),
+    );
+    signature.owned_struct_layout = Some(layout);
+    signature.owned_struct_return = true;
+    assert_eq!(signature.llvm_return_type(), "[1 x i64]");
+    assert!(render_scalar_task_invoker("identity", &signature).is_none());
 }
 
 #[test]
@@ -301,6 +310,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
             ret: CpuCallScalarKind::F32,
             owned_struct_return: false,
             owned_struct_layout: None,
+            native_value_return: None,
             owned_external_buffer_return: None,
         },
     )
@@ -319,6 +329,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
             ret: CpuCallScalarKind::F64,
             owned_struct_return: false,
             owned_struct_layout: None,
+            native_value_return: None,
             owned_external_buffer_return: None,
         },
     )
@@ -736,6 +747,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         &BTreeMap::new(),
         &branch_effect_emitters,
         CpuCallScalarKind::I32,
+        None,
         None,
         None,
         false,

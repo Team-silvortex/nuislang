@@ -21,6 +21,7 @@ pub(crate) struct OwnedStructLoopCarry {
     template: StructLlvmValueRef,
     slots: Vec<OwnedStructLoopSlot>,
     break_on_return: bool,
+    native_value_return: Option<crate::native_session::aggregate_values::NativeValueReturn>,
 }
 
 pub(crate) fn prepare_owned_struct_loop_carry(
@@ -164,6 +165,7 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         template,
         slots,
         break_on_return,
+        native_value_return: signature.native_value_return.clone(),
     }))
 }
 
@@ -181,12 +183,16 @@ impl OwnedStructLoopCarry {
 
     pub(crate) fn store_return(
         &self,
-        pointer_bits: &str,
+        result: &str,
         body: &mut Vec<String>,
         next_reg: &mut usize,
         next_block: &mut usize,
     ) -> Result<Option<String>, String> {
-        let returned = unpack_immediate_owned_struct(pointer_bits, &self.template, body, next_reg);
+        let returned = if let Some(returns) = &self.native_value_return {
+            returns.unpack(result, body, next_reg)
+        } else {
+            unpack_immediate_owned_struct(result, &self.template, body, next_reg)
+        };
         let mut values = Vec::new();
         flatten_scalar_values(&returned, &mut values)?;
         if values.len() != self.slots.len() {

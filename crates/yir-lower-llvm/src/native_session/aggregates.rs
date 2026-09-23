@@ -62,7 +62,7 @@ pub(super) fn result_layout(
     Ok(layout)
 }
 
-fn flat_i64_values(layout: &OwnedStructLayout) -> bool {
+pub(super) fn flat_i64_values(layout: &OwnedStructLayout) -> bool {
     let mut names = std::collections::BTreeSet::new();
     !layout.fields.is_empty()
         && layout.fields.len() <= super::MAX_SCALAR_SLOTS

@@ -99,16 +99,15 @@ pub(super) fn callback(
     parameters.push(super::COUNTER_PARAMETER.to_owned());
     parameters.push(super::HELPER_ENTRY_PARAMETER.to_owned());
     lines.push(format!(
-        "  %returned = call i64 @nuis_fn_{}({})",
+        "  %returned = call [{slots} x i64] @nuis_fn_{}({})",
         export.function,
         parameters.join(", ")
     ));
-    lines.push("  %aggregate = inttoptr i64 %returned to ptr".to_owned());
-    lines.push("  call void @nuis_scheduler_owned_aggregate_require_v1(ptr %aggregate)".to_owned());
     for index in 0..slots {
-        lines.push(format!("  %result{index} = call i64 @nuis_scheduler_owned_aggregate_get_v1(ptr %aggregate, i64 {index})"));
+        lines.push(format!(
+            "  %result{index} = extractvalue [{slots} x i64] %returned, {index}"
+        ));
     }
-    lines.push("  call void @nuis_scheduler_owned_aggregate_drop_v1(ptr %aggregate)".to_owned());
     for index in 0..slots {
         lines.push(format!(
             "  %output_ptr{index} = getelementptr i64, ptr %out, i64 {index}"

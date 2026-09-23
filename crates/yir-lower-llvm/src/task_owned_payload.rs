@@ -364,7 +364,7 @@ fn pack_value(
             *leaf_index += 1;
             return Some(());
         }
-        let packed = pack_scalar(value, state)?;
+        let packed = pack_scalar(value, &mut state.body, &mut state.next_reg)?;
         if matches!(value, LlvmValueRef::TextHandle { .. }) {
             let blob = fresh_reg(&mut state.next_reg);
             let glm_token = glm_token_base.wrapping_add(*leaf_index as u64).max(1);
@@ -422,7 +422,7 @@ fn unpack_value(
             "  {packed} = call i64 @nuis_scheduler_owned_aggregate_get_v1(ptr {data}, i64 {leaf_index})"
         ));
         *leaf_index += 1;
-        return unpack_scalar(&packed, template, state);
+        return unpack_scalar(&packed, template, &mut state.body, &mut state.next_reg);
     }
     let LlvmValueRef::Struct(template) = template else {
         return None;
@@ -459,92 +459,77 @@ fn is_scalar(value: &LlvmValueRef) -> bool {
     )
 }
 
-fn pack_scalar(value: &LlvmValueRef, state: &mut LlvmLoweringState) -> Option<String> {
+pub(crate) fn pack_scalar(
+    value: &LlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<String> {
     let (instruction, source) = match value {
         LlvmValueRef::Bool { i1, .. } => ("zext i1", i1.as_str()),
         LlvmValueRef::I32(value) => ("sext i32", value.as_str()),
         LlvmValueRef::I64(value) => return Some(value.clone()),
         LlvmValueRef::F32(value) => {
-            let bits = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {bits} = bitcast float {value} to i32"));
-            let packed = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {packed} = zext i32 {bits} to i64"));
+            let bits = fresh_reg(next_reg);
+            body.push(format!("  {bits} = bitcast float {value} to i32"));
+            let packed = fresh_reg(next_reg);
+            body.push(format!("  {packed} = zext i32 {bits} to i64"));
             return Some(packed);
         }
         LlvmValueRef::F64(value) => {
-            let packed = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {packed} = bitcast double {value} to i64"));
+            let packed = fresh_reg(next_reg);
+            body.push(format!("  {packed} = bitcast double {value} to i64"));
             return Some(packed);
         }
         LlvmValueRef::TextHandle { handle, .. } => return Some(handle.clone()),
         _ => return None,
     };
-    let packed = fresh_reg(&mut state.next_reg);
-    state
-        .body
-        .push(format!("  {packed} = {instruction} {source} to i64"));
+    let packed = fresh_reg(next_reg);
+    body.push(format!("  {packed} = {instruction} {source} to i64"));
     Some(packed)
 }
 
-fn unpack_scalar(
+pub(crate) fn unpack_scalar(
     packed: &str,
     template: &LlvmValueRef,
-    state: &mut LlvmLoweringState,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
 ) -> Option<LlvmValueRef> {
     match template {
         LlvmValueRef::Bool { .. } => {
-            let i1 = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {i1} = trunc i64 {packed} to i1"));
+            let i1 = fresh_reg(next_reg);
+            body.push(format!("  {i1} = trunc i64 {packed} to i1"));
             Some(LlvmValueRef::Bool {
                 i1,
                 i64: packed.to_owned(),
             })
         }
         LlvmValueRef::I32(_) => {
-            let value = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {value} = trunc i64 {packed} to i32"));
+            let value = fresh_reg(next_reg);
+            body.push(format!("  {value} = trunc i64 {packed} to i32"));
             Some(LlvmValueRef::I32(value))
         }
         LlvmValueRef::I64(_) => Some(LlvmValueRef::I64(packed.to_owned())),
         LlvmValueRef::F32(_) => {
-            let bits = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {bits} = trunc i64 {packed} to i32"));
-            let value = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {value} = bitcast i32 {bits} to float"));
+            let bits = fresh_reg(next_reg);
+            body.push(format!("  {bits} = trunc i64 {packed} to i32"));
+            let value = fresh_reg(next_reg);
+            body.push(format!("  {value} = bitcast i32 {bits} to float"));
             Some(LlvmValueRef::F32(value))
         }
         LlvmValueRef::F64(_) => {
-            let value = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {value} = bitcast i64 {packed} to double"));
+            let value = fresh_reg(next_reg);
+            body.push(format!("  {value} = bitcast i64 {packed} to double"));
             Some(LlvmValueRef::F64(value))
         }
         LlvmValueRef::TextHandle { .. } => {
-            let blob = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {blob} = inttoptr i64 {packed} to ptr"));
-            let handle = fresh_reg(&mut state.next_reg);
-            state.body.push(format!(
+            let blob = fresh_reg(next_reg);
+            body.push(format!("  {blob} = inttoptr i64 {packed} to ptr"));
+            let handle = fresh_reg(next_reg);
+            body.push(format!(
                 "  {handle} = call i64 @nuis_scheduler_owned_blob_text_lift_v1(ptr {blob})"
             ));
-            let ptr = fresh_reg(&mut state.next_reg);
-            state.body.push(format!(
+            let ptr = fresh_reg(next_reg);
+            body.push(format!(
                 "  {ptr} = call ptr @nuis_host_text_ptr(i64 {handle})"
             ));
             Some(LlvmValueRef::TextHandle { ptr, handle })

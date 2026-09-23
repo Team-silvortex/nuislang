@@ -186,10 +186,19 @@ pub(crate) struct CpuHelperSignature {
     pub(crate) ret: CpuCallScalarKind,
     pub(crate) owned_struct_return: bool,
     pub(crate) owned_struct_layout: Option<yir_core::OwnedStructLayout>,
+    pub(crate) native_value_return:
+        Option<crate::native_session::aggregate_values::NativeValueReturn>,
     pub(crate) owned_external_buffer_return: Option<CpuOwnedExternalBufferAbi>,
 }
 
 impl CpuHelperSignature {
+    pub(crate) fn llvm_return_type(&self) -> String {
+        self.native_value_return.as_ref().map_or_else(
+            || crate::call_return::cpu_scalar_kind_llvm_type(self.ret).to_owned(),
+            |value| value.llvm_type(),
+        )
+    }
+
     pub(crate) fn call_arguments(&self, mut explicit: Vec<String>) -> String {
         explicit.extend(self.implicit_parameters.iter().cloned());
         explicit.join(", ")

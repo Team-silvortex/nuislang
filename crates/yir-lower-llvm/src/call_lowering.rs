@@ -401,14 +401,18 @@ pub(crate) fn lower_cpu_call_node(
     let symbol = format!("nuis_fn_{callee}");
     let call = format!(
         "call {} @{symbol}({})",
-        cpu_scalar_kind_llvm_type(signature.ret),
+        signature.llvm_return_type(),
         signature.call_arguments(lowered_args)
     );
     body.push(format!("  {reg} = {call}"));
 
     if node.op.instruction == "call_owned_struct" {
         let template = parse_owned_struct_layout(&node.op.args[1])?;
-        let value = unpack_immediate_owned_struct(&reg, &template, body, next_reg);
+        let value = if let Some(returns) = &signature.native_value_return {
+            returns.unpack(&reg, body, next_reg)
+        } else {
+            unpack_immediate_owned_struct(&reg, &template, body, next_reg)
+        };
         let value =
             decode_owned_variant_storage(value.clone()).unwrap_or(LlvmValueRef::Struct(value));
         registers.insert(node.name.clone(), value);

@@ -399,7 +399,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-lower-llvm/src/native_session/mod.rs",
         required_patterns: &[
             "pub fn emit_registered(",
-            "crate::emit_native_scalar_module(&selected)",
+            "crate::emit_native_scalar_module(&selected, &roots)",
             "yir_core::native_scalar_session",
             "pub state_layout: ScalarStateLayout",
         ],
@@ -629,8 +629,8 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "%counts_ok = and i1 %argc_ok, %outc_ok",
             "label %bad_scalar",
-            "nuis_scheduler_owned_aggregate_get_v1",
-            "nuis_scheduler_owned_aggregate_drop_v1",
+            "%returned = call [{slots} x i64] @nuis_fn_{}",
+            "extractvalue [{slots} x i64] %returned, {index}",
             "store i64 %result",
         ],
     },
@@ -704,7 +704,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "rejected_before_open",
             "native_loop_preflight",
             "multi_loops.ns",
-            " = call i64 @nuis_fn_advance(",
+            " = call [2 x i64] @nuis_fn_advance(",
         ],
     },
     DevTensorDriftCheckSpec {

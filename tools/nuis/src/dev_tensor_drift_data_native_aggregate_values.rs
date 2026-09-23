@@ -1,0 +1,195 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-flat-value-private-return-plan",
+        path: "crates/yir-lower-llvm/src/native_session/aggregate_values.rs",
+        required_patterns: &[
+            "super::aggregates::flat_i64_values(layout)",
+            "format!(\"[{} x i64]\", self.slots)",
+            "extractvalue {ty} {returned}, {slot}",
+            "insertvalue {ty} {aggregate}, i64 {field}, {index}",
+            "materialize_owned_value",
+            "guard_return_struct_cont",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-value-root-helper-admission-separation",
+        path: "crates/yir-lower-llvm/src/lib.rs",
+        required_patterns: &[
+            "let native_value_return = if require_scalar_values",
+            "if native_roots.contains(&function_name.as_str())",
+            "native_session::aggregate_values::NativeValueReturn::callback",
+            "native_session::aggregate_values::NativeValueReturn::flat_i64",
+            "helper_signature.native_value_return.as_ref()",
+            "helper_signature.llvm_return_type()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-flat-value-loop-snapshots",
+        path: "crates/yir-lower-llvm/src/loop_owned_struct_lowering.rs",
+        required_patterns: &[
+            "native_value_return: signature.native_value_return.clone()",
+            "returns.unpack(result, body, next_reg)",
+            "unpack_immediate_owned_struct(result, &self.template, body, next_reg)",
+            "Check the private control slot before committing any of the returned carries",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-flat-value-layout-unit-evidence",
+        path: "crates/yir-lower-llvm/src/native_session/aggregate_values/tests.rs",
+        required_patterns: &[
+            "value_return_requires_unique_bounded_flat_i64_fields",
+            "value_returns_keep_declared_field_order_and_guarded_packing",
+            "value_returns_reject_nominal_kind_field_and_local_layout_drift",
+            "unpack_materializes_independent_named_scalar_values",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-flat-value-execution-evidence",
+        path: "tools/nuisc/tests/native_application_bridge/aggregate_values.rs",
+        required_patterns: &[
+            "native_returns_are_values_while_ordinary_abi_stays_owned",
+            "for slots in [1, 2, 7, 64]",
+            "multi_execution::ALLOCATION_PROBE",
+            "expected.extend([0, value, 0, 0])",
+            "call [1 x i64] @nuis_fn_stop(",
+            "ApplicationSession::open_registered",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-flat-value-documentation",
+        path: "docs/reference/nuis-native-scalar-session-bridge-v1.md",
+        required_patterns: &[
+            "Native Flat Value Transport",
+            "from 13 allocations to 1",
+            "Selection happens after native admission, with separate helper and callback checks",
+            "Native Callback Value Transport",
+            "Reference State Normalization",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-flat-value-tensor-evidence",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Native callback roots now use allocation-free LLVM value returns",
+            "zero aggregate allocations/drops",
+            "Reference callback state binding now follows registered field paths",
+            "extend typed nested value returns to native scalar helpers",
+            "repair guarded fallible returns in the ns-nova image session",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-callback-value-shared-layout-and-bit-packing",
+        path: "crates/yir-lower-llvm/src/native_session/aggregate_values.rs",
+        required_patterns: &[
+            "super::ScalarStateLayout::parse(encoded)?",
+            "slots: state.fields().len()",
+            "crate::task_owned_payload::pack_scalar(value, body, next_reg)",
+            "crate::task_owned_payload::unpack_scalar(&word, template, body, next_reg)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-callback-value-wrapper-publication",
+        path: "crates/yir-lower-llvm/src/native_session/emit.rs",
+        required_patterns: &[
+            "%returned = call [{slots} x i64] @nuis_fn_{}",
+            "%result{index} = extractvalue [{slots} x i64] %returned, {index}",
+            "store i64 %result{index}, ptr %output_ptr{index}, align 1",
+            "load i64, ptr %input_ptr{index}, align 1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-callback-value-unit-evidence",
+        path: "crates/yir-lower-llvm/src/native_session/aggregate_values/tests/callback.rs",
+        required_patterns: &[
+            "callback_value_plan_uses_shared_scalar_bounds_without_widening_helpers",
+            "callback_value_plan_preserves_typed_nested_snapshots_and_guarded_bits",
+            "for count in [0, 1, 64, 65]",
+            "NativeValueReturn::flat_i64(&layout).is_err()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-callback-value-overlap-and-reference-parity-evidence",
+        path: "tools/nuisc/tests/native_application_bridge/callback_values.rs",
+        required_patterns: &[
+            "callback_values_preserve_nested_bits_overlap_and_failure_sentinels_without_allocating",
+            "for slots in [1, 6, 64]",
+            "[(1, 1), (1, 2), (2, 1), (1, slots + 2)]",
+            "Check the entire backing region",
+            "state_words(reference.state()), advanced",
+            "reference.event(vec![]).unwrap()",
+            "reference.close(vec![]).unwrap().unwrap()",
+            "ApplicationSession::open_registered",
+            "(\"probe_allocs\", 0)",
+            "(\"probe_drops\", 0)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-callback-value-frontdoor-evidence",
+        path: "tools/nuis/tests/native_session_workflow.rs",
+        required_patterns: &[
+            "llvm.matches(\"%returned = call [6 x i64]\").count(), 3",
+            "line.contains(\"call \") && line.contains(\"@nuis_scheduler_owned_aggregate_\")",
+            "functions <= 51",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "reference-state-named-field-normalization",
+        path: "crates/yir-runtime-host/src/application_session/state_shape.rs",
+        required_patterns: &[
+            "const MAX_STATE_DEPTH: usize = 64;",
+            "fn bind_layout",
+            "supplied.insert(name, field).is_some()",
+            "supplied.remove(name).ok_or_else(mismatch)?",
+            "child.normalize(value)?",
+            "kind.pack(&value)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "reference-state-publication-boundary",
+        path: "crates/yir-runtime-host/src/application_session.rs",
+        required_patterns: &[
+            "let state = boundary.normalize_state(opened.value)?;",
+            "invocation.value = self.boundary.normalize_state(invocation.value)?;",
+            "self.state = invocation.value;",
+            "self.failures.record(ApplicationFailureKind::Callback);",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "reference-state-shape-validation-evidence",
+        path: "crates/yir-runtime-host/src/application_session/state_shape/tests.rs",
+        required_patterns: &[
+            "reorders_named_fields_at_every_depth_and_is_idempotent",
+            "preserves_exact_scalar_bits_without_coercion",
+            "rejects_missing_extra_duplicate_and_spoofed_fields",
+            "rejects_wrong_nominal_types_and_resource_or_scalar_kind_substitution",
+            "metadata_must_agree_across_callbacks_including_nested_nominal_identity",
+            "metadata_free_yir_keeps_its_signature_only_nested_boundary",
+            "reference_states_are_not_limited_to_native_slot_capacity",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "reference-state-lifecycle-and-source-order-evidence",
+        path: "tools/nuisc/tests/native_application_bridge/reference_state.rs",
+        required_patterns: &[
+            "reference_state_normalization_preserves_source_effect_order_for_every_callback",
+            "field_effect_order_includes_nested_call_arguments",
+            "SOURCE.replace(\"@noinline \", \"\")",
+            "malformed_event_state_keeps_last_accepted_state_and_allows_one_cleanup",
+            "malformed_close_state_is_terminal_and_does_not_publish_partial_state",
+            "state_normalization_does_not_retry_fuel_exhaustion",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "named-constructor-field-effects-ordered",
+        path: "tools/nuisc/src/lowering/core_exprs.rs",
+        required_patterns: &[
+            "for (field_name, field_expr) in fields",
+            "let lowered = lower_expr(field_expr, state, bindings)?;",
+            "super::body_lowering::chain_nonpure_expr_stmt(field_expr, &lowered, state);",
+            "super::edge_helpers::order_emitted_roots_after(",
+            "args_out.push(format!(\"{field_name}={lowered}\"));",
+        ],
+    },
+];

@@ -308,8 +308,27 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("reduce per-return flat-i64 aggregate allocation"));
+        .starts_with("repair guarded fallible returns in the ns-nova image session"));
     assert!(session.next_step.contains("native scalar helpers"));
+    assert!(session
+        .evidence
+        .contains("allocation-free LLVM value returns"));
+    assert!(session.evidence.contains("from 13 allocations to 1"));
+    assert!(session
+        .evidence
+        .contains("zero aggregate allocations/drops"));
+    assert!(session
+        .blocker
+        .contains("Mixed/nested scalar helper returns remain outside native admission"));
+    assert!(session
+        .blocker
+        .contains("window_event conditional-fallible-return lowering rejection"));
+    assert!(session
+        .evidence
+        .contains("Reference callback state binding now follows registered field paths"));
+    assert!(session
+        .evidence
+        .contains("chains effectful field expressions in source order"));
     assert!(session.evidence.contains("Scope-aware local hygiene"));
     assert!(session
         .evidence

@@ -24,6 +24,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "guarded_break_keeps_shared_layout_kinds_closure_and_general_call_rejections",
             "guarded_break_reference_fuel_failure_keeps_accepted_state",
             "scalar_break_source_preserves_provenance_and_rejects_unmodeled_updates",
+            "scalar_counted_return_exits_are_supported_without_rejecting_valid_source",
+            "\"return true;\"",
             "assert_native_parity(BREAKS, true)",
         ],
     },

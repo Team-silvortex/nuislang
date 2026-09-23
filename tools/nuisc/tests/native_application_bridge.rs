@@ -50,6 +50,8 @@ mod aggregate_rebinding;
 mod aggregate_sequences;
 #[path = "native_application_bridge/aggregate_temporaries.rs"]
 mod aggregate_temporaries;
+#[path = "native_application_bridge/aggregate_values.rs"]
+mod aggregate_values;
 #[path = "native_application_bridge/bool_carries.rs"]
 mod bool_carries;
 #[path = "native_application_bridge/bool_rebinding.rs"]
@@ -64,6 +66,8 @@ mod break_execution;
 mod break_loops;
 #[path = "native_application_bridge/break_source.rs"]
 mod break_source;
+#[path = "native_application_bridge/callback_values.rs"]
+mod callback_values;
 #[path = "native_application_bridge/control_composition.rs"]
 mod control_composition;
 #[path = "native_application_bridge/division_admission.rs"]
@@ -94,6 +98,8 @@ mod multi_execution;
 mod multi_loops;
 #[path = "native_application_bridge/predicate_probe.rs"]
 mod predicate_probe;
+#[path = "native_application_bridge/reference_state.rs"]
+mod reference_state;
 #[path = "native_application_bridge/scoped_admission.rs"]
 mod scoped_admission;
 #[path = "native_application_bridge/scoped_execution.rs"]
