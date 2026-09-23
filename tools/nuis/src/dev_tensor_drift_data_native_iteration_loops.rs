@@ -6,10 +6,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
             "while let Some(name) = ready.pop_first()",
-            "validate_body(functions[name.as_str()], &admitted, layouts, allow_loops)",
+            "validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts)",
             "candidates.remove(&name)",
             "if *count == 0",
-            "collect_profile(module, &control_values::FlatLayouts::new(), false)",
+            "&control_values::FlatLayouts::new(),",
             "dependency_collection_handles_deep_unvalidated_structure_iteratively",
             "let mut pending = vec![body]",
             "let mut pending = vec![expr]",

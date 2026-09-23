@@ -148,7 +148,7 @@ pub(super) fn select(
 // Calls are admitted only through the bounded, acyclic helper closure.
 // Counted loops need a termination proof; scoped actions require a checked helper
 // in that same closure, not arbitrary effects hidden inside loop metadata.
-// Flat i64 carry returns use checked scoped/ordinary edges, not general owned inputs.
+// Scalar record calls use exact typed layouts; scoped carries retain their own schema.
 pub(super) fn admitted(instruction: &str) -> bool {
     matches!(
         instruction,

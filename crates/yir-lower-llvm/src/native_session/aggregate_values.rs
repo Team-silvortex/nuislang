@@ -15,14 +15,9 @@ pub(crate) struct NativeValueReturn {
 }
 
 impl NativeValueReturn {
-    pub(crate) fn flat_i64(layout: &OwnedStructLayout) -> Result<Self, String> {
-        if !super::aggregates::flat_i64_values(layout) {
-            return Err("native value return requires a bounded flat i64 layout".to_owned());
-        }
-        Ok(Self {
-            layout: layout.clone(),
-            slots: layout.fields.len(),
-        })
+    pub(crate) fn helper(encoded: &str) -> Result<Self, String> {
+        let (layout, slots) = super::aggregates::scalar_value_layout(encoded)?;
+        Ok(Self { layout, slots })
     }
 
     pub(crate) fn callback(encoded: &str) -> Result<Self, String> {

@@ -21,8 +21,8 @@ The first admitted profile is deliberately small:
 - Nested nonempty scalar state made of `bool`, `i32`, `i64`, `f32` and `f64`.
 - Acyclic helper calls with scalar parameters and one declared scalar return,
   including nested calls, zero-argument helpers and guarded scalar returns.
-- Checked flat-i64 aggregate helper returns through ordinary or scoped calls,
-  including multi-state guarded branches and matching explicit-step continue.
+- Checked mixed/nested scalar aggregate helper returns through ordinary calls.
+  Scoped calls retain flat-i64 carries, guarded branches and explicit-step continue.
 - Checked i64 division/remainder, with exact operands and reached-path failure.
 - Counted i64 loops with constant or runtime-checked induction inputs and ordered
   scalar add/multiply carries, with at most 64 carries and 65536 iterations per loop.
@@ -824,61 +824,31 @@ native helper transport below; it does not imply measured runtime speed.
 
 ### Native Flat Value Transport
 
-The [private return plan](../../crates/yir-lower-llvm/src/native_session/aggregate_values.rs)
-lowers admitted non-root flat-i64 helper returns to LLVM `[N x i64]` values, for
-1..64 uniquely named fields. Calls, terminal returns, guarded early returns and
-scoped iteration results share the same plan. Each field is inserted in declared
-layout order and extracted into an independent scalar value, preserving earlier
-snapshots across later calls and loop iterations. LLVM handles target lowering;
-there is no hand-written stack pointer return, shared scratch arena or per-trip
-heap allocation. Every return slot is initialized before publication.
-
+Admitted flat-i64 helper returns use private LLVM `[N x i64]` values for 1..64
+fields, including scoped iteration results. The earlier nested-loop probe fell
+from 13 allocations to 1; typed callback transport removed the last allocation.
 Selection happens after native admission, with separate helper and callback checks.
-The YIR nominal type, field order, ownership and exact scalar contracts are not
-weakened. General LLVM emission, resource/nested/mixed helper returns, external
-FFI and task thunks do not acquire this private ABI. Native source-order checks,
-checked arithmetic, guard laziness, graph bounds and both work counters remain.
-The public callback ABI is unchanged; its final State now uses the typed value path below.
-
-[Value-return probes](../../tools/nuisc/tests/native_application_bridge/aggregate_values.rs)
-execute 1/2/7/64-field layouts, reversed constructor fields, early returns and
-multiple live result snapshots. Existing nested, multi-carry and guarded-break
-probes count real allocator/drop calls. The earlier helper-only change reduced
-the four-trip nested case from 13 allocations to 1; typed callback value transport
-now removes that final allocation too. This proves fewer aggregate allocator calls,
-not zero stack traffic, faster wall time or whole-program memory safety.
+The [value-return contract](nuis-native-scalar-value-returns-v1.md) records layout,
+snapshot and ordinary-ABI boundaries. This is not measured runtime speed.
 
 ### Native Callback Value Transport
 
-Registered callback roots now return `[N x i64]` slot values rather than pointer
-bits to a heap-owned State. Unlike flat-i64 helper admission, the callback plan
-uses the shared `ScalarStateLayout` contract for nonempty nested nominal records
-with 1..64 bool/i32/i64/f32/f64 leaves. Resource fields remain rejected; mixed or
-nested ordinary helper calls are not newly admitted. A flat callback called as a
-helper uses the same private return signature at both call sites. Ordinary LLVM,
-external returns and task thunks retain their existing ABI and ownership boundaries.
+Registered roots use the shared bounded scalar schema and publish all result slots
+only after the callback returns. Exact nominal/kind checks, bit-preserving packing,
+unaligned overlap, invalid-input sentinels and zero aggregate allocation remain
+covered by the [callback probes](../../tools/nuisc/tests/native_application_bridge/callback_values.rs).
+See the [value-return contract](nuis-native-scalar-value-returns-v1.md) for details.
 
-Each terminal/guarded return first matches exact nominal names, fields and kinds,
-then packs leaves in declaration order. Scalar bit packing is shared with the
-existing owned-payload lowering: bool zero-extends, i32 sign-extends, f32 retains
-its raw low 32 bits and f64 retains all 64 bits. There are no shared scratch globals
-or returned stack pointers. Target lowering may still use registers, stack slots
-or an implicit result address; this is not a no-stack-traffic guarantee.
+### Native Typed Helper Returns
 
-The wrapper validates shape/canonicality and loads every input before invoking
-the root, extracts all returned words, then writes output using alignment 1.
-In-place and forward/backward partial overlap therefore preserve the input snapshot.
-Status 1/2 failures do not enter the callback or change output. Checked arithmetic,
-induction and work-budget traps still terminate the process without publishing a
-result; they do not become catchable status returns or transactional rollback.
-
-[Callback probes](../../tools/nuisc/tests/native_application_bridge/callback_values.rs)
-exercise 1/6/64 nested slots, all three lifecycle roots, both guarded paths,
-finite/negative-zero/NaN bits, unaligned full/partial overlap, disjoint buffers,
-whole-region sentinels and unchanged entry/allocation counters on malformed input.
-The existing flat-return, nested-loop and break probes now require zero aggregate
-allocations/drops on successful callbacks. Reversed-constructor results now have
-reference open/event/close parity as well as an independent native slot oracle.
+Ordinary native helpers now separately admit nonempty mixed/nested scalar records,
+with exact call/result layouts and 1..64 scalar leaves. Source-flattened arguments,
+helper graph admission and scoped flat-i64 carry schemas remain separate checks.
+The [typed helper probes](../../tools/nuisc/tests/native_application_bridge/typed_helper_values.rs)
+cover nested relay calls, callback-as-helper calls and independent snapshots;
+[guard probes](../../tools/nuisc/tests/native_application_bridge/typed_helper_guards.rs)
+cover lazy division, shared entry exhaustion and unchanged output sentinels.
+This does not widen guarded local rebinding, resource values or provider callbacks.
 
 ### Reference State Normalization
 
@@ -902,6 +872,19 @@ Inline and outlined helper regressions check nested reverse constructors under
 reordered YIR nodes/functions/bodies.
 [Lifecycle regressions](../../tools/nuisc/tests/native_application_bridge/reference_state.rs)
 cover nominal drift, rejected returned state, close-once and fuel exhaustion.
+
+### Guarded Local Values
+
+Effectful parents can now contain matching local i64/bool/flat-i64 selections,
+including nested choices. The compiler extracts only admitted pure value arms
+into private typed helpers, then applies the existing guarded scalar normalizer.
+The outer predicate executes once; only ready captured values cross the boundary.
+Unselected division, remainder and calls do not execute. Reached unused arithmetic
+still fails, and same-name rebinding reads the previous value before replacement.
+Single-sided choices keep an outer seed or discard a branch-local result after dead-arm pruning.
+Effectful arms and resource-bearing values remain outside this extraction; the
+speculative-failure rejection is unchanged. This repairs the image showcase's
+`window_event` local selection without changing its Nuis source or provider ABI.
 
 ### Loop-Bearing Iteration Calls
 
@@ -1933,33 +1916,63 @@ Nested argument effects were separately observed running early, then fixed by
 ordering emitted field roots; inline and outlined source-order tests now pass.
 Two selected CLI workflows (multi-carry and full composition) passed cache,
 tamper and source-free artifact restoration checks. All 28 tensor-related tests
-passed; the fresh CLI reports 1368 drift checks, zero failures and clean coverage,
+passed; that checkpoint reported 1368 drift checks, zero failures and clean coverage,
 hierarchy and lineage. The session coordinate remains active at 86.
-The expanded image-session target has one passing and three failing tests at the
-existing `window_event` guarded-fallible-return boundary. Its image-state test also
-fails with the constructor-order change removed; this application path is not
-claimed fixed. This was not a full workspace or complete native-bridge/frontdoor
-run, and adds no Linux/GPU, Windows, formal-safety or speed certification.
+At that checkpoint the expanded image-session target had one passing and three
+failing tests at `window_event`, also reproduced without the constructor-order
+change. Guarded Local Values above now repairs that separate lowering gap.
+Neither checkpoint certifies fresh Linux/GPU, Windows, formal safety or speed.
+
+Guarded local values were checked on 2026-09-23 on macOS aarch64.
+All 555 selected compiler-unit cases, 143 ordinary Buffer/control/cleanup cases,
+five image-session cases and 20 selected native-bridge cases passed.
+Two native CLI workflows retained cache, tamper and source-free restoration proof.
+A separate headless build/run-artifact rerun verified two exact 76800-byte Metal
+frames, live/replay equality, write/break counts and binary/YIR tamper rejection.
+The 28 tensor tests passed; 1373 drift checks report zero failures with clean
+coverage, hierarchy and lineage. Progress remains active at 86. This is not a full
+workspace/native-bridge run or fresh Linux/CUDA, Windows or performance evidence.
+
+Typed mixed/nested helper returns were checked on 2026-09-23 on macOS aarch64.
+All 236 YIR-core/LLVM-lowering unit tests and 116 selected native-bridge regressions
+passed, alongside three guarded-local-value native and five reference image/window
+session cases. Three CLI workflows passed, including mixed/nested State-returning helpers,
+cache reuse, tamper checks and byte-identical source-free LLVM restoration.
+The 28 tensor tests passed; 1381 drift checks report zero failures with clean
+coverage, hierarchy and lineage. The session coordinate remains active at 86.
+At that checkpoint, the mixed/nested fallible-local-rebinding rejection was
+reproduced separately. Guarded typed local values below now repair that boundary.
+Neither checkpoint is a full workspace, fresh GPU/provider, cross-target or performance run.
+
+Guarded mixed/nested local values were checked on 2026-09-23 on macOS aarch64.
+All 125 selected compiler-unit tests, 42 selected native-bridge cases, four ordinary
+native control cases and five reference image/window sessions passed. The 1/6/63-slot
+probes retain exact bits, snapshots and zero aggregate allocations/drops; selected
+unused traps, five-entry budgets and unchanged output sentinels are covered too.
+Three CLI workflows passed build/cache/tamper/source-free restoration, including the
+new guarded typed-local fixture. The full 64-leaf capture plus predicate remains an
+explicit 65-argument rejection, not a widened native bound. Nested neutral expansion
+is bounded before materialization. Progress remains active at 86.
+The 28 tensor tests passed; 1386 drift checks report zero failures with clean
+coverage, hierarchy and lineage. The guarded CLI also skips its zero-divisor arm.
+Ten typed native cases were rerun successfully after the final expansion-bound change.
 
 ## Next Boundary
 
-Repair guarded fallible returns in the ns-nova image session first. The expanded
-image-session tests stop at `window_event` with `conditional fallible return
-requires guarded helper lowering`, also reproduced without the constructor-order
-change. Do not relax speculative-failure checks to make this application compile.
-Then extend typed nested value returns to native scalar helpers with separate
-helper admission and call-site evidence; callback-root admission alone is insufficient.
+Reduce guarded local helper capture pressure at the 64-argument boundary.
+Keep mixed/nested local values separate from the flat scoped-loop carry profile.
+Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,
 source effect order and inverse-constructor native/reference parity. Retain typed
 slot publication, input/output overlap, failure sentinels and allocation-free callback
-and flat-i64 helper return transport, native graph bounds, selected-path evaluation and
+and typed scalar helper return transport, native graph bounds, selected-path evaluation and
 shared entry accounting. Retain the 51-function full-composition regression, single-use terminal
 and statement evaluation, scope-aware local hygiene, unused calls, shared multi-use
 suffixes, and the counted-return
 source timing and propagation proof without changing the separate Buffer exit profile.
 Retain leading/trailing step timing, leading-step break recovery, loop-local continue, each selected inner
 invocation's preflight and both shared work counters. Keep resource
-and mixed/nested helper payloads separate. Retain outer bool
+payloads and mixed/nested loop carries separate. Retain outer bool
 carry seeds and explicit typed backedge conversion, outer flat-i64 carries,
 zero-trip seeds, exact nominal reconstruction,
 source-ordered backedge projections and local aggregate and bool rebinding,

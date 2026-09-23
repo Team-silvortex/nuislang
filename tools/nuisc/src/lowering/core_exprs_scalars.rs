@@ -75,6 +75,21 @@ pub(super) fn lower_cast_i64_to_i32(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
+    if let NirExpr::Int(value) = value {
+        // Literal narrowing has the same wrapping semantics as the runtime
+        // cast, and needs no conversion opcode (including private guard zeros).
+        let name = next_name(state, "i32");
+        state.yir.nodes.push(Node {
+            name: name.clone(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "const_i32".to_owned(),
+                args: vec![(*value as i32).to_string()],
+            },
+        });
+        return Ok(name);
+    }
     lower_cast_expr(value, state, bindings, "cast_i32", "cast_i64_to_i32")
 }
 

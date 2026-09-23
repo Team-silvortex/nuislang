@@ -289,7 +289,8 @@ fn synchronous_context_is_forwarded_but_never_captured_by_a_task_invoker() {
     assert!(render_scalar_task_invoker("identity", &signature).is_some());
     let layout = yir_core::parse_owned_struct_layout("Value{value:i64}").unwrap();
     signature.native_value_return = Some(
-        crate::native_session::aggregate_values::NativeValueReturn::flat_i64(&layout).unwrap(),
+        crate::native_session::aggregate_values::NativeValueReturn::helper("Value{value:i64}")
+            .unwrap(),
     );
     signature.owned_struct_layout = Some(layout);
     signature.owned_struct_return = true;

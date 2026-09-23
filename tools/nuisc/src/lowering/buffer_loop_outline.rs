@@ -5,6 +5,8 @@ type Scope = BTreeMap<String, NirTypeRef>;
 
 #[path = "buffer_loop_outline/branches.rs"]
 mod branches;
+#[path = "buffer_loop_outline/conditional_values.rs"]
+mod conditional_values;
 #[path = "buffer_loop_outline/control_flow.rs"]
 mod control_flow;
 #[path = "buffer_loop_outline/control_loops.rs"]
@@ -49,20 +51,12 @@ pub(super) struct BufferLoopOutlines {
 // Keep iteration effects inside a private helper; the existing scoped-call contract
 // supplies induction/carry values, validated break control and borrowed-buffer lifetimes.
 pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopOutlines, String> {
-    let catalog = scalar_helpers::collect(module);
+    let mut catalog = scalar_helpers::collect(module);
     let layouts = control_values::layouts(module);
-    let control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
-    for function in &mut module.functions {
-        if control_catalog.contains_key(&function.name) {
-            if let Some(body) = control_loops::returns::normalize(function, &layouts)
-                .expect("admitted counted return flow")
-            {
-                function.body = body;
-            }
-        }
-    }
-    let preserve_entry_flow =
-        control_catalog.contains_key("main") && control_loops::preserve_entry_flow(module);
+    let mut control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+    let value_layouts = control_values::TypedLayouts::collect(module);
+    let mut value_catalog =
+        scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
     let mut names = module
         .functions
         .iter()
@@ -81,6 +75,25 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
                 .map(|definition| definition.name.clone()),
         )
         .collect::<BTreeSet<_>>();
+    let selections =
+        conditional_values::outline(module, &value_catalog, &value_layouts, &mut names);
+    if !selections.is_empty() {
+        catalog = scalar_helpers::collect(module);
+        control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+        value_catalog =
+            scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
+    }
+    for function in &mut module.functions {
+        if control_catalog.contains_key(&function.name) {
+            if let Some(body) = control_loops::returns::normalize(function, &layouts)
+                .expect("admitted counted return flow")
+            {
+                function.body = body;
+            }
+        }
+    }
+    let preserve_entry_flow =
+        control_catalog.contains_key("main") && control_loops::preserve_entry_flow(module);
     let mut helpers = Vec::new();
     let mut outlined = BufferLoopOutlines::default();
     let checked_arithmetic = speculation::collect_checked_arithmetic(module);
@@ -88,20 +101,24 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         if preserve_entry_flow && function.name == "main" {
             continue;
         }
-        if control_catalog.get(&function.name).is_some_and(|helper| {
-            // Pure calls can still expand into substantial work. Keep
-            // conditional calls behind guards, not an eager value select.
-            let conditional_calls = function
-                .body
-                .iter()
-                .any(|stmt| matches!(stmt, NirStmt::If { .. }))
-                && scalar_helpers::contains_calls(&function.body);
-            helper.may_loop || checked_arithmetic.contains(&function.name) || conditional_calls
-        }) {
+        // Typed admission serves the extracted selections and their dependencies;
+        // existing direct typed returns do not need additional branch helpers.
+        if (control_catalog.contains_key(&function.name) || selections.contains(&function.name))
+            && value_catalog.get(&function.name).is_some_and(|helper| {
+                // Pure calls can still expand into substantial work. Keep
+                // conditional calls behind guards, not an eager value select.
+                let conditional_calls = function
+                    .body
+                    .iter()
+                    .any(|stmt| matches!(stmt, NirStmt::If { .. }))
+                    && scalar_helpers::contains_calls(&function.body);
+                helper.may_loop || checked_arithmetic.contains(&function.name) || conditional_calls
+            })
+        {
             outlined.functions.insert(function.name.clone());
             scalar_helpers::retain_reachable(
                 &function.body,
-                &control_catalog,
+                &value_catalog,
                 &mut outlined.functions,
             );
         }
@@ -148,8 +165,8 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut names,
         &mut helpers,
         &mut outlined.guarded_functions,
-        &control_catalog,
-        &layouts,
+        &value_catalog,
+        &value_layouts,
     );
     if !helpers.is_empty() {
         outlined

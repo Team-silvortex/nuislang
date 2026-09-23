@@ -171,7 +171,11 @@ fn flatten(
     if layout.fields.is_empty() {
         return Err("native scalar bridge does not admit empty state structs".to_owned());
     }
+    let mut names = std::collections::BTreeSet::new();
     for (name, field) in &layout.fields {
+        if !names.insert(name) {
+            return Err("native scalar bridge state contains duplicate field names".to_owned());
+        }
         let path = if prefix.is_empty() {
             name.clone()
         } else {
@@ -224,6 +228,8 @@ mod tests {
             "S{child:Empty{}}",
             "S{data:Bytes}",
             "S{x:i64;x:bool}",
+            "S{x:A{a:i64};x:B{b:bool}}",
+            "S{nested:N{x:A{a:i64};x:B{b:bool}}}",
         ] {
             assert!(ScalarStateLayout::parse(invalid).is_err());
         }

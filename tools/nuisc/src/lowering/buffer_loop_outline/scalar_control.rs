@@ -16,7 +16,7 @@ pub(super) fn outline(
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &impl control_values::ValueLayouts,
 ) {
     for function in &mut module.functions {
         if !retained.contains(&function.name)
@@ -51,17 +51,17 @@ pub(super) fn outline(
     }
 }
 
-struct Builder<'a> {
+struct Builder<'a, L> {
     names: &'a mut BTreeSet<String>,
     helpers: &'a mut Vec<NirFunction>,
     guarded: &'a mut BTreeSet<String>,
     catalog: &'a ScalarHelpers,
-    layouts: &'a control_values::FlatLayouts,
+    layouts: &'a L,
     bindings: BTreeSet<String>,
     result: NirTypeRef,
 }
 
-impl Builder<'_> {
+impl<L: control_values::ValueLayouts> Builder<'_, L> {
     fn block(
         &mut self,
         body: Vec<NirStmt>,

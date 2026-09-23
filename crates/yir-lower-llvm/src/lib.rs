@@ -301,13 +301,15 @@ fn emit_module_with_checks(
         let native_value_return = if require_scalar_values {
             owned_struct_layout
                 .as_ref()
-                .map(|layout| {
+                .map(|_| {
                     if native_roots.contains(&function_name.as_str()) {
                         native_session::aggregate_values::NativeValueReturn::callback(
                             &return_node.op.args[1],
                         )
                     } else {
-                        native_session::aggregate_values::NativeValueReturn::flat_i64(layout)
+                        native_session::aggregate_values::NativeValueReturn::helper(
+                            &return_node.op.args[1],
+                        )
                     }
                 })
                 .transpose()?

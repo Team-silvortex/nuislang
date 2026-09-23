@@ -308,7 +308,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("repair guarded fallible returns in the ns-nova image session"));
+        .starts_with("reduce guarded local helper capture pressure at the 64-argument boundary"));
     assert!(session.next_step.contains("native scalar helpers"));
     assert!(session
         .evidence
@@ -319,10 +319,22 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("zero aggregate allocations/drops"));
     assert!(session
         .blocker
-        .contains("Mixed/nested scalar helper returns remain outside native admission"));
+        .contains("a full 64-leaf record capture plus its predicate needs 65 helper arguments"));
     assert!(session
+        .evidence
+        .contains("Real 1/6/63-slot guarded local probes"));
+    assert!(!session
         .blocker
-        .contains("window_event conditional-fallible-return lowering rejection"));
+        .contains("guarded mixed/nested local rebinding remains outside"));
+    assert!(session
+        .evidence
+        .contains("Native scalar helpers now admit bounded mixed/nested scalar return layouts"));
+    assert!(session.blocker.contains(
+        "conditional-value lowering rejection is repaired through typed guarded helpers"
+    ));
+    assert!(session.evidence.contains(
+        "Guarded local value selections now close the ns-nova image-session lowering gap"
+    ));
     assert!(session
         .evidence
         .contains("Reference callback state binding now follows registered field paths"));
@@ -678,7 +690,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("Missing declared native entry results"));
     assert!(session
         .blocker
-        .contains("per-iteration aggregate allocation"));
+        .contains("ordinary/resource aggregate allocation remains separate"));
     assert!(session
         .evidence
         .contains("One explicit i64 scalar loop carry"));

@@ -25,11 +25,10 @@ pub(super) fn lower_guarded_body(
             function.name
         ));
     };
-    let neutral = match function.return_type.as_ref().map(|ty| ty.name.as_str()) {
-        Some("bool") => default == &NirExpr::Bool(false),
-        Some("i64") => default == &NirExpr::Int(0),
-        _ => false,
-    };
+    let neutral = function
+        .return_type
+        .as_ref()
+        .is_some_and(|ty| is_neutral_guard_seed(ty, default, &state.struct_defs));
     if !else_body.is_empty() || (!neutral && !is_pass_through_guard_seed(function, default, state))
     {
         return Err(format!(
@@ -42,6 +41,147 @@ pub(super) fn lower_guarded_body(
     let returned = lower_expr(default, state, bindings)?;
     lower_guard_return(condition, returned, state);
     crate::lowering::body_lowering::lower_inline_stmts(tail, state, bindings, &mut BTreeMap::new())
+}
+
+// Only typed literal zeros may be prepared before the guard. This is a
+// separate check from source admission; no call, projection or resource is total
+// merely because an outliner emitted it as a default.
+fn is_neutral_guard_seed(
+    ty: &NirTypeRef,
+    value: &NirExpr,
+    structs: &BTreeMap<&str, &NirStructDef>,
+) -> bool {
+    let mut pending = vec![(ty, value)];
+    while let Some((ty, value)) = pending.pop() {
+        if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
+            return false;
+        }
+        let scalar_zero = match (ty.name.as_str(), value) {
+            ("bool", NirExpr::Bool(false)) | ("i64", NirExpr::Int(0)) => true,
+            ("i32", NirExpr::CastI64ToI32(inner)) => **inner == NirExpr::Int(0),
+            ("f32", NirExpr::F32(text)) | ("f64", NirExpr::F64(text)) => text == "0.0",
+            _ => false,
+        };
+        if scalar_zero {
+            continue;
+        }
+        let NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } = value
+        else {
+            return false;
+        };
+        let Some(definition) = structs.get(type_name.as_str()) else {
+            return false;
+        };
+        let mut seen = BTreeSet::new();
+        if type_name != &ty.name
+            || !type_args.is_empty()
+            || !definition.generic_params.is_empty()
+            || !definition.where_bounds.is_empty()
+            || fields.is_empty()
+            || fields.len() != definition.fields.len()
+        {
+            return false;
+        }
+        for ((name, value), field) in fields.iter().zip(&definition.fields) {
+            if name != &field.name || !seen.insert(name) {
+                return false;
+            }
+            pending.push((&field.ty, value));
+        }
+    }
+    true
+}
+
+#[cfg(test)]
+mod guard_seed_tests {
+    use super::*;
+
+    #[test]
+    fn nested_guard_zeros_require_exact_types_and_never_evaluate_work() {
+        let module = crate::frontend::parse_nuis_module(
+            "mod cpu Main {
+            struct Leaf { flag: bool, tag: i32, gain: f32, scale: f64 }
+            struct Packet { payload: Leaf }
+            fn main() -> i64 { return 0; }
+        }",
+        )
+        .unwrap();
+        let structs = module
+            .structs
+            .iter()
+            .map(|d| (d.name.as_str(), d))
+            .collect();
+        let scalar = |name: &str| NirTypeRef {
+            name: name.into(),
+            generic_args: vec![],
+            is_ref: false,
+            is_optional: false,
+        };
+        let leaf = NirExpr::StructLiteral {
+            type_name: "Leaf".into(),
+            type_args: vec![],
+            fields: vec![
+                ("flag".into(), NirExpr::Bool(false)),
+                (
+                    "tag".into(),
+                    NirExpr::CastI64ToI32(Box::new(NirExpr::Int(0))),
+                ),
+                ("gain".into(), NirExpr::F32("0.0".into())),
+                ("scale".into(), NirExpr::F64("0.0".into())),
+            ],
+        };
+        for mutation in [
+            "valid",
+            "kind",
+            "nonzero",
+            "call",
+            "field",
+            "duplicate",
+            "nominal",
+        ] {
+            let mut value = leaf.clone();
+            let NirExpr::StructLiteral {
+                type_name, fields, ..
+            } = &mut value
+            else {
+                unreachable!()
+            };
+            match mutation {
+                "valid" => {}
+                "kind" => fields[1].1 = NirExpr::Int(0),
+                "nonzero" => fields[0].1 = NirExpr::Bool(true),
+                "call" => {
+                    fields[0].1 = NirExpr::Call {
+                        callee: "effect".into(),
+                        args: vec![],
+                    }
+                }
+                "field" => {
+                    fields[0].1 = NirExpr::FieldAccess {
+                        base: Box::new(NirExpr::Var("input".into())),
+                        field: "flag".into(),
+                    }
+                }
+                "duplicate" => fields[1].0 = fields[0].0.clone(),
+                "nominal" => *type_name = "Other".into(),
+                _ => unreachable!(),
+            }
+            let packet = NirExpr::StructLiteral {
+                type_name: "Packet".into(),
+                type_args: vec![],
+                fields: vec![("payload".into(), value)],
+            };
+            assert_eq!(
+                is_neutral_guard_seed(&scalar("Packet"), &packet, &structs),
+                mutation == "valid",
+                "{mutation}"
+            );
+        }
+    }
 }
 
 fn is_pass_through_guard_seed(

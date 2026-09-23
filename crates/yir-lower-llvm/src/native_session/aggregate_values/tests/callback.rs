@@ -3,9 +3,11 @@ use super::*;
 const LAYOUT: &str = "State{child:Values{flag:bool;tag:i32;count:i64;gain:f32;scale:f64}}";
 
 #[test]
-fn callback_value_plan_uses_shared_scalar_bounds_without_widening_helpers() {
-    let layout = yir_core::parse_owned_struct_layout(LAYOUT).unwrap();
-    assert!(NativeValueReturn::flat_i64(&layout).is_err());
+fn callback_and_helper_value_plans_share_bounded_scalar_layouts() {
+    assert_eq!(
+        NativeValueReturn::helper(LAYOUT).unwrap().llvm_type(),
+        "[5 x i64]"
+    );
     assert_eq!(
         NativeValueReturn::callback(LAYOUT).unwrap().llvm_type(),
         "[5 x i64]"
@@ -17,6 +19,11 @@ fn callback_value_plan_uses_shared_scalar_bounds_without_widening_helpers() {
             .join(";");
         assert_eq!(
             NativeValueReturn::callback(&format!("S{{nested:N{{{fields}}}}}")).is_ok(),
+            (1..=64).contains(&count)
+        );
+        let layout = format!("S{{nested:N{{{fields}}}}}");
+        assert_eq!(
+            NativeValueReturn::helper(&layout).is_ok(),
             (1..=64).contains(&count)
         );
     }

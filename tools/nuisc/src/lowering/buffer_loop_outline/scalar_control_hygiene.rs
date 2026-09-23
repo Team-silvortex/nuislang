@@ -91,9 +91,11 @@ fn rename_expr(expr: &mut NirExpr, visible: &BTreeMap<String, String>) {
                 pending.extend(fields.iter_mut().map(|(_, value)| value));
             }
             NirExpr::FieldAccess { base, .. }
+            | NirExpr::CastI64ToI32(base)
+            | NirExpr::CastI32ToI64(base)
             | NirExpr::CastBoolToI64(base)
             | NirExpr::CastI64ToBool(base) => pending.push(base),
-            NirExpr::Int(_) | NirExpr::Bool(_) => {}
+            NirExpr::Int(_) | NirExpr::Bool(_) | NirExpr::F32(_) | NirExpr::F64(_) => {}
             _ => unreachable!("admitted normalized scalar expression"),
         }
     }

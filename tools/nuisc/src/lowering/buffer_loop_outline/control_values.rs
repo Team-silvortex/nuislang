@@ -3,6 +3,13 @@ use super::*;
 #[cfg(test)]
 #[path = "control_values/tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "control_values/typed_tests.rs"]
+mod typed_tests;
+
+#[path = "control_values/layouts.rs"]
+mod value_layouts;
+pub(super) use value_layouts::{TypedLayouts, ValueLayouts};
 
 pub(super) type FlatLayouts = BTreeMap<String, Vec<String>>;
 
@@ -27,21 +34,29 @@ pub(super) fn layouts(module: &NirModule) -> FlatLayouts {
         .collect()
 }
 
-pub(super) fn supported_type(ty: &NirTypeRef, layouts: &FlatLayouts) -> bool {
-    ty == &scalar_type("i64")
-        || ty == &scalar_type("bool")
-        || (layouts.contains_key(&ty.name) && ty == &scalar_type(&ty.name))
+pub(super) fn supported_type(ty: &NirTypeRef, layouts: &impl ValueLayouts) -> bool {
+    ty == &scalar_type(&ty.name) && (layouts.scalar(&ty.name) || layouts.fields(&ty.name).is_some())
 }
 
 pub(super) fn value_type(
     expr: &NirExpr,
     scope: &Scope,
     catalog: &ScalarHelpers,
-    layouts: &FlatLayouts,
+    layouts: &impl ValueLayouts,
 ) -> Option<NirTypeRef> {
     match expr {
         NirExpr::Int(_) => Some(scalar_type("i64")),
         NirExpr::Bool(_) => Some(scalar_type("bool")),
+        NirExpr::F32(_) if layouts.scalar("f32") => Some(scalar_type("f32")),
+        NirExpr::F64(_) if layouts.scalar("f64") => Some(scalar_type("f64")),
+        NirExpr::CastI64ToI32(value) if layouts.scalar("i32") => {
+            (value_type(value, scope, catalog, layouts)? == scalar_type("i64"))
+                .then(|| scalar_type("i32"))
+        }
+        NirExpr::CastI32ToI64(value) if layouts.scalar("i32") => {
+            (value_type(value, scope, catalog, layouts)? == scalar_type("i32"))
+                .then(|| scalar_type("i64"))
+        }
         NirExpr::Var(name) => scope
             .get(name)
             .filter(|ty| supported_type(ty, layouts))
@@ -59,16 +74,17 @@ pub(super) fn value_type(
             type_args,
             fields,
         } => {
-            let layout = layouts.get(type_name)?;
+            let layout = layouts.fields(type_name)?;
             if !type_args.is_empty() || fields.len() != layout.len() {
                 return None;
             }
             let mut seen = BTreeSet::new();
             for (name, value) in fields {
-                if !layout.contains(name)
-                    || !seen.insert(name)
-                    || value_type(value, scope, catalog, layouts)? != scalar_type("i64")
-                {
+                let expected = layouts
+                    .fields(type_name)?
+                    .find(|(field, _)| *field == name)?
+                    .1;
+                if !seen.insert(name) || value_type(value, scope, catalog, layouts)? != expected {
                     return None;
                 }
             }
@@ -76,30 +92,35 @@ pub(super) fn value_type(
         }
         NirExpr::FieldAccess { base, field } => {
             let base = value_type(base, scope, catalog, layouts)?;
-            layouts
-                .get(&base.name)?
-                .contains(field)
-                .then(|| scalar_type("i64"))
+            let ty = layouts
+                .fields(&base.name)?
+                .find(|(name, _)| *name == field)
+                .map(|(_, ty)| ty);
+            ty
         }
         _ => None,
     }
 }
 
-pub(super) fn zero_value(ty: &NirTypeRef, layouts: &FlatLayouts) -> NirExpr {
-    if let Some(fields) = layouts.get(&ty.name) {
+pub(super) fn zero_value(ty: &NirTypeRef, layouts: &impl ValueLayouts) -> NirExpr {
+    if let Some(fields) = layouts.fields(&ty.name) {
         NirExpr::StructLiteral {
             type_name: ty.name.clone(),
             type_args: vec![],
             fields: fields
-                .iter()
-                .map(|name| (name.clone(), NirExpr::Int(0)))
+                .map(|(name, ty)| (name.to_owned(), zero_value(&ty, layouts)))
                 .collect(),
         }
-    } else if ty == &scalar_type("bool") {
-        NirExpr::Bool(false)
     } else {
-        assert_eq!(ty, &scalar_type("i64"));
-        NirExpr::Int(0)
+        assert!(supported_type(ty, layouts));
+        match ty.name.as_str() {
+            "bool" => NirExpr::Bool(false),
+            "i32" => NirExpr::CastI64ToI32(Box::new(NirExpr::Int(0))),
+            "i64" => NirExpr::Int(0),
+            "f32" => NirExpr::F32("0.0".into()),
+            "f64" => NirExpr::F64("0.0".into()),
+            _ => unreachable!("admitted scalar kind"),
+        }
     }
 }
 
@@ -125,9 +146,11 @@ pub(super) fn collect_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
         // Enclosing branch capture runs after loop normalization, which inserts
         // these private conversions. Source admission still uses value_type.
         NirExpr::FieldAccess { base, .. }
+        | NirExpr::CastI64ToI32(base)
+        | NirExpr::CastI32ToI64(base)
         | NirExpr::CastBoolToI64(base)
         | NirExpr::CastI64ToBool(base) => collect_inputs(base, inputs),
-        NirExpr::Int(_) | NirExpr::Bool(_) => {}
+        NirExpr::Int(_) | NirExpr::Bool(_) | NirExpr::F32(_) | NirExpr::F64(_) => {}
         _ => unreachable!("admitted pure value expression"),
     }
 }

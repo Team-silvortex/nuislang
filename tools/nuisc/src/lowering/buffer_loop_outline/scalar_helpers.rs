@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Clone)]
 pub(super) struct ScalarHelper {
     params: Vec<NirTypeRef>,
     result: NirTypeRef,
@@ -10,20 +11,35 @@ pub(super) struct ScalarHelper {
 pub(super) type ScalarHelpers = BTreeMap<String, ScalarHelper>;
 
 pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
-    collect_profile(module, &control_values::FlatLayouts::new(), false)
+    collect_profile(
+        module,
+        &control_values::FlatLayouts::new(),
+        None,
+        &ScalarHelpers::new(),
+    )
 }
 
 pub(super) fn collect_with_layouts(
     module: &NirModule,
     layouts: &control_values::FlatLayouts,
 ) -> ScalarHelpers {
-    collect_profile(module, layouts, true)
+    collect_profile(module, layouts, Some(layouts), &ScalarHelpers::new())
+}
+
+pub(super) fn collect_typed_values(
+    module: &NirModule,
+    layouts: &control_values::TypedLayouts,
+    loop_catalog: &ScalarHelpers,
+) -> ScalarHelpers {
+    // Reuse proven flat helpers as dependencies, but admit no new loop bodies.
+    collect_profile(module, layouts, None, loop_catalog)
 }
 
 fn collect_profile(
     module: &NirModule,
-    layouts: &control_values::FlatLayouts,
-    allow_loops: bool,
+    layouts: &impl control_values::ValueLayouts,
+    loop_layouts: Option<&control_values::FlatLayouts>,
+    seeded: &ScalarHelpers,
 ) -> ScalarHelpers {
     let functions = module
         .functions
@@ -34,7 +50,8 @@ fn collect_profile(
         .functions
         .iter()
         .filter(|function| {
-            !function.is_async
+            !seeded.contains_key(&function.name)
+                && !function.is_async
                 && function.generic_params.is_empty()
                 && function.where_bounds.is_empty()
                 && function
@@ -72,20 +89,29 @@ fn collect_profile(
     let mut callers = BTreeMap::<String, Vec<String>>::new();
     let mut ready = BTreeSet::new();
     for (name, helper) in &candidates {
-        remaining.insert(name.clone(), helper.dependencies.len());
-        if helper.dependencies.is_empty() {
+        let unresolved = helper
+            .dependencies
+            .iter()
+            .filter(|name| !seeded.contains_key(*name))
+            .count();
+        remaining.insert(name.clone(), unresolved);
+        if unresolved == 0 {
             ready.insert(name.clone());
         }
-        for callee in &helper.dependencies {
+        for callee in helper
+            .dependencies
+            .iter()
+            .filter(|name| !seeded.contains_key(*name))
+        {
             callers
                 .entry(callee.clone())
                 .or_default()
                 .push(name.clone());
         }
     }
-    let mut admitted = ScalarHelpers::new();
+    let mut admitted = seeded.clone();
     while let Some(name) = ready.pop_first() {
-        if validate_body(functions[name.as_str()], &admitted, layouts, allow_loops).is_none() {
+        if validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts).is_none() {
             continue;
         }
         let mut helper = candidates.remove(&name).expect("ready helper");
@@ -108,11 +134,11 @@ fn collect_profile(
 fn validate_body(
     function: &NirFunction,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
-    allow_loops: bool,
+    layouts: &impl control_values::ValueLayouts,
+    loop_layouts: Option<&control_values::FlatLayouts>,
 ) -> Option<()> {
-    let normalized = if allow_loops {
-        control_loops::returns::normalize(function, layouts)?
+    let normalized = if let Some(loop_layouts) = loop_layouts {
+        control_loops::returns::normalize(function, loop_layouts)?
     } else {
         None
     };
@@ -128,7 +154,7 @@ fn validate_body(
         function.return_type.as_ref()?,
         catalog,
         layouts,
-        allow_loops,
+        loop_layouts,
     )?
     .then_some(())
 }
@@ -140,8 +166,8 @@ fn validate_block(
     loop_bindings: &mut BTreeSet<String>,
     result: &NirTypeRef,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
-    allow_loops: bool,
+    layouts: &impl control_values::ValueLayouts,
+    loop_layouts: Option<&control_values::FlatLayouts>,
 ) -> Option<bool> {
     let mut returned = false;
     for stmt in body {
@@ -185,15 +211,22 @@ fn validate_block(
                         result,
                         catalog,
                         layouts,
-                        allow_loops,
+                        loop_layouts,
                     )
                 };
                 let then_returns = validate_arm(then_body)?;
                 let else_returns = validate_arm(else_body)?;
                 returned = then_returns && else_returns;
             }
-            NirStmt::While { condition, body } if allow_loops => {
-                control_loops::validate(condition, body, locals, loop_bindings, catalog, layouts)?;
+            NirStmt::While { condition, body } => {
+                control_loops::validate(
+                    condition,
+                    body,
+                    locals,
+                    loop_bindings,
+                    catalog,
+                    loop_layouts?,
+                )?;
             }
             NirStmt::Return(Some(value)) => {
                 if &control_values::value_type(value, locals, catalog, layouts)? != result {
@@ -247,10 +280,11 @@ pub(super) fn value_call_type(
     args: &[NirExpr],
     scope: &Scope,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &impl control_values::ValueLayouts,
 ) -> Option<NirTypeRef> {
     let helper = catalog.get(callee)?;
-    if args.len() != helper.params.len() {
+    if args.len() != helper.params.len() || !control_values::supported_type(&helper.result, layouts)
+    {
         return None;
     }
     for (arg, expected) in args.iter().zip(&helper.params) {
@@ -318,7 +352,9 @@ fn collect_expr_calls(expr: &NirExpr, calls: &mut BTreeSet<String>) {
             NirExpr::StructLiteral { fields, .. } => {
                 pending.extend(fields.iter().map(|(_, value)| value))
             }
-            NirExpr::FieldAccess { base, .. } => pending.push(base),
+            NirExpr::FieldAccess { base, .. }
+            | NirExpr::CastI64ToI32(base)
+            | NirExpr::CastI32ToI64(base) => pending.push(base),
             NirExpr::LoadAt { index, .. } => pending.push(index),
             NirExpr::StoreAt { index, value, .. } => {
                 pending.extend([index.as_ref(), value.as_ref()])

@@ -67,12 +67,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-lower-llvm/src/native_session/aggregates.rs",
         required_patterns: &[
             "pub(super) fn result_layout",
-            "layout.fields.len() <= super::MAX_SCALAR_SLOTS",
+            "scalar_value_layout(&node.op.args[1])",
             "result.ownership != YirValueOwnership::Owned",
             "flat_return_layout_has_a_slot_bound_not_precombined_arities",
-            "flat_return_call_rejects_missing_layout_and_other_payload_families",
+            "scalar_return_call_rejects_missing_layout_and_resource_payloads",
             "ordinary_flat_returns_preserve_declared_names_without_a_loop_carry_schema",
-            "names.insert(name)",
+            "super::ScalarStateLayout::parse(encoded)?",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -234,12 +234,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-session-counted-value-transitive-boundaries",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
-            "collect_profile(module, &control_values::FlatLayouts::new(), false)",
+            "&control_values::FlatLayouts::new(),",
             "control_loops::contains_loop(&function.body)",
             "helper.may_loop |= helper",
             ".any(|name| admitted[name].may_loop)",
             "control_loops::validate(",
-            "NirStmt::While { condition, body } if allow_loops",
+            "loop_layouts?,",
         ],
     },
     DevTensorDriftCheckSpec {

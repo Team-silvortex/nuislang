@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
-use yir_core::{
-    Node, OwnedStructFieldLayout, OwnedStructLayout, OwnedStructScalarLayout, YirFunction,
-    YirValueOwnership,
-};
+use yir_core::{Node, OwnedStructLayout, YirFunction, YirValueOwnership};
 
 pub(crate) struct AggregateCall<'a> {
     pub callee: &'a str,
@@ -21,13 +18,8 @@ pub(crate) fn parse(node: &Node) -> Result<Option<AggregateCall<'_>>, String> {
             node.name
         ));
     };
-    let layout = yir_core::parse_owned_struct_layout(encoded)?;
-    if !flat_i64_values(&layout) {
-        return Err(format!(
-            "native aggregate call `{}` requires a flat i64 value layout",
-            node.name
-        ));
-    }
+    let (layout, _) = scalar_value_layout(encoded)
+        .map_err(|error| format!("native aggregate call `{}`: {error}", node.name))?;
     Ok(Some(AggregateCall {
         callee,
         layout,
@@ -55,21 +47,22 @@ pub(super) fn result_layout(
     {
         return Err(fail());
     }
-    let layout = yir_core::parse_owned_struct_layout(&node.op.args[1])?;
-    if layout.type_name != result.ty || !flat_i64_values(&layout) {
+    let (layout, _) =
+        scalar_value_layout(&node.op.args[1]).map_err(|error| format!("{}: {error}", fail()))?;
+    if layout.type_name != result.ty {
         return Err(fail());
     }
     Ok(layout)
 }
 
-pub(super) fn flat_i64_values(layout: &OwnedStructLayout) -> bool {
-    let mut names = std::collections::BTreeSet::new();
-    !layout.fields.is_empty()
-        && layout.fields.len() <= super::MAX_SCALAR_SLOTS
-        && layout.fields.iter().all(|(name, kind)| {
-            names.insert(name)
-                && kind == &OwnedStructFieldLayout::Scalar(OwnedStructScalarLayout::I64)
-        })
+pub(super) fn scalar_value_layout(encoded: &str) -> Result<(OwnedStructLayout, usize), String> {
+    // Share only the bounded value schema. Helper graph/call admission and scoped
+    // iteration carry validation remain independent of callback registration.
+    let value = super::ScalarStateLayout::parse(encoded)?;
+    Ok((
+        yir_core::parse_owned_struct_layout(encoded)?,
+        value.fields().len(),
+    ))
 }
 
 #[cfg(test)]
@@ -97,19 +90,17 @@ mod tests {
     }
 
     #[test]
-    fn flat_return_call_rejects_missing_layout_and_other_payload_families() {
+    fn scalar_return_call_rejects_missing_layout_and_resource_payloads() {
         for args in [vec![], vec!["branch".to_owned()]] {
             assert!(parse(&call(args)).is_err());
         }
         for layout in [
             "Values{carry0:i64;carry0:i64}",
-            "Values{carry0:bool}",
-            "Values{carry0:i32}",
-            "Values{carry0:f32}",
-            "Values{carry0:f64}",
             "Values{carry0:Bytes}",
             "Values{carry0:String}",
-            "Values{carry0:Nested{x:i64}}",
+            "Values{carry0:Nested{x:Bytes}}",
+            "Values{carry0:Nested{}}",
+            "Values{carry0:A{x:i64};carry0:B{y:i64}}",
         ] {
             assert!(
                 parse(&call(vec!["branch".to_owned(), layout.to_owned()])).is_err(),
@@ -127,5 +118,17 @@ mod tests {
                 yir_core::parse_owned_struct_layout(layout).unwrap()
             );
         }
+    }
+
+    #[test]
+    fn ordinary_nested_returns_admit_scalar_kinds_without_a_loop_carry_schema() {
+        let encoded = "Values{child:Nested{flag:bool;tag:i32;count:i64;gain:f32;scale:f64}}";
+        let node = call(vec!["branch".to_owned(), encoded.to_owned()]);
+        let layout = parse(&node).unwrap().unwrap().layout;
+        assert_eq!(
+            layout,
+            yir_core::parse_owned_struct_layout(encoded).unwrap()
+        );
+        assert_eq!(scalar_value_layout(encoded).unwrap().1, 5);
     }
 }

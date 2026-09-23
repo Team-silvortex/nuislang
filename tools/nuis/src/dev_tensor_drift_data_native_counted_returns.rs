@@ -19,7 +19,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-counted-return-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
-            "control_loops::returns::normalize(function, layouts)?",
+            "control_loops::returns::normalize(function, loop_layouts)?",
             "normalized.as_deref().unwrap_or(&function.body)",
             "if returned",
         ],

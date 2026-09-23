@@ -160,6 +160,39 @@ fn native_build_run_artifact_cache_and_standalone_relocation() {
 }
 
 #[test]
+fn native_typed_helper_values_build_cache_and_standalone_relocation() {
+    let source = SOURCE.replace(
+        "fn stop(state: State, reason: i64) -> State {",
+        "@noinline fn relay_state(value: State) -> State { return value; }
+        fn stop(state: State, reason: i64) -> State {
+            return relay_state(finish(state, reason));
+        }
+        @noinline fn finish(state: State, reason: i64) -> State {",
+    );
+    check_workflow(&source);
+}
+
+#[test]
+fn native_typed_local_rebinding_build_cache_and_standalone_relocation() {
+    let source = SOURCE.replace(
+        "fn stop(state: State, reason: i64) -> State {",
+        "@noinline fn relay_state(value: State) -> State { return value; }
+        fn stop(state: State, reason: i64) -> State {
+            let next = state;
+            if reason == 0 { let next = relay_state(state); }
+            else { let next = State { frame: state.frame, metrics: Metrics {
+                total: state.metrics.total + reason / reason - 1,
+                tag: state.metrics.tag, active: state.metrics.active,
+                gain: state.metrics.gain, scale: state.metrics.scale
+            } }; }
+            return relay_state(finish(next, reason));
+        }
+        @noinline fn finish(state: State, reason: i64) -> State {",
+    );
+    check_workflow(&source);
+}
+
+#[test]
 fn native_guarded_break_build_cache_and_standalone_relocation() {
     check_workflow(BREAK_SOURCE);
 }
@@ -309,6 +342,23 @@ fn check_workflow(source: &str) {
     assert!(!llvm.lines().any(|line| {
         line.contains("call ") && line.contains("@nuis_scheduler_owned_aggregate_")
     }));
+    let typed_helper_values = source.contains("fn relay_state(");
+    if source.contains("let next = state;") {
+        assert!(
+            llvm.contains("call [6 x i64] @nuis_fn___nuis_conditional_value"),
+            "{}",
+            llvm.lines()
+                .filter(|line| line.starts_with("define "))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+    if typed_helper_values {
+        for helper in ["relay_state", "finish"] {
+            assert!(llvm.contains(&format!("define [6 x i64] @nuis_fn_{helper}(")));
+            assert!(llvm.contains(&format!("call [6 x i64] @nuis_fn_{helper}(")));
+        }
+    }
     if source == CONTROL_COMPOSITION_SOURCE {
         let functions = llvm
             .lines()
@@ -323,7 +373,7 @@ fn check_workflow(source: &str) {
     }
     assert!(llvm.contains("loop_while_i64_cond"));
     assert!(llvm.contains("loop_while_i64_body"));
-    if source == SOURCE {
+    if source == SOURCE || typed_helper_values {
         assert!(llvm.contains(" = call [2 x i64] @nuis_fn_advance("));
     } else {
         assert!(llvm.contains(" = call i64 @nuis_fn_counted("));
@@ -491,6 +541,16 @@ fn check_workflow(source: &str) {
         }
     }
     assert!(expected[4].contains("total: 16"), "{expected:?}");
+    if source.contains("let next = state;") {
+        let mut skipped = SCRIPT.to_vec();
+        *skipped.last_mut().unwrap() = "0";
+        let skipped = success(project.command("run-artifact", &output, &skipped));
+        let skipped = states(&skipped);
+        assert_eq!(skipped.len(), 5);
+        assert_eq!(&skipped[..4], &expected[..4]);
+        assert!(skipped[4].contains("total: 11"), "{skipped:?}");
+        assert!(skipped[4].contains("active: false"), "{skipped:?}");
+    }
     assert!(String::from_utf8_lossy(&run.stderr).contains("native_session_completed=1"));
     let files = fs::read_dir(&output)
         .unwrap()
@@ -574,7 +634,7 @@ fn check_workflow(source: &str) {
         &[relocated.to_str().unwrap()],
     ));
     assert!(relocated.join(format!("{stem}.ll")).is_file());
-    if source == CONTROL_COMPOSITION_SOURCE {
+    if source == CONTROL_COMPOSITION_SOURCE || typed_helper_values {
         assert_eq!(
             fs::read_to_string(relocated.join(format!("{stem}.ll"))).unwrap(),
             llvm

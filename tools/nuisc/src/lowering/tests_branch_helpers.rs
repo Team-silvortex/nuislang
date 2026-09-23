@@ -22,6 +22,8 @@ fn path_exists(yir: &yir_core::YirModule, from: &str, to: &str) -> bool {
 
 #[path = "tests_branch_helpers/cancel_suffix.rs"]
 mod cancel_suffix;
+#[path = "tests_branch_helpers/conditional_values.rs"]
+mod conditional_values;
 #[path = "tests_branch_helpers/dynamic_cancel.rs"]
 mod dynamic_cancel;
 #[path = "tests_branch_helpers/dynamic_join.rs"]

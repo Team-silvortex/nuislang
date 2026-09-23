@@ -56,9 +56,9 @@ const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-iteration-call-completed-closure",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
-            "collect_profile(module, layouts, true)",
+            "collect_profile(module, layouts, Some(layouts), &ScalarHelpers::new())",
             "typed_call_type",
-            "validate_body(functions[name.as_str()], &admitted, layouts, allow_loops)",
+            "validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts)",
             "contains_calls",
         ],
     },

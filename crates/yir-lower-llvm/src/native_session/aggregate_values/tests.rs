@@ -3,29 +3,28 @@ use super::*;
 mod callback;
 
 #[test]
-fn value_return_requires_unique_bounded_flat_i64_fields() {
+fn value_return_requires_unique_bounded_scalar_fields() {
     for count in [0, 1, 2, 7, 64, 65] {
         let fields = (0..count)
             .map(|i| format!("f{i}:i64"))
             .collect::<Vec<_>>()
             .join(";");
-        let layout = yir_core::parse_owned_struct_layout(&format!("Packet{{{fields}}}")).unwrap();
+        let layout = format!("Packet{{{fields}}}");
         assert_eq!(
-            NativeValueReturn::flat_i64(&layout).is_ok(),
+            NativeValueReturn::helper(&layout).is_ok(),
             (1..=64).contains(&count)
         );
     }
     for fields in [
         "x:i64;x:i64",
-        "x:bool",
-        "x:i32",
-        "x:f32",
-        "x:f64",
         "x:Bytes",
-        "x:Nested{n:i64}",
+        "x:String",
+        "x:Nested{n:Bytes}",
+        "x:Nested{}",
+        "x:A{a:i64};x:B{b:bool}",
     ] {
-        let layout = yir_core::parse_owned_struct_layout(&format!("Packet{{{fields}}}")).unwrap();
-        assert!(NativeValueReturn::flat_i64(&layout).is_err(), "{fields}");
+        let layout = format!("Packet{{{fields}}}");
+        assert!(NativeValueReturn::helper(&layout).is_err(), "{fields}");
     }
 }
 
@@ -40,10 +39,7 @@ fn returned() -> StructLlvmValueRef {
 }
 
 fn lower(value: StructLlvmValueRef, layout: &str, guarded: bool) -> Result<String, String> {
-    let transport = NativeValueReturn::flat_i64(&yir_core::parse_owned_struct_layout(
-        "Packet{second:i64;first:i64}",
-    )?)
-    .unwrap();
+    let transport = NativeValueReturn::helper("Packet{second:i64;first:i64}").unwrap();
     let args = if guarded {
         vec!["condition", "value", layout]
     } else {
@@ -124,10 +120,7 @@ fn value_returns_reject_nominal_kind_field_and_local_layout_drift() {
 
 #[test]
 fn unpack_materializes_independent_named_scalar_values() {
-    let transport = NativeValueReturn::flat_i64(
-        &yir_core::parse_owned_struct_layout("Packet{second:i64;first:i64}").unwrap(),
-    )
-    .unwrap();
+    let transport = NativeValueReturn::helper("Packet{second:i64;first:i64}").unwrap();
     let mut body = Vec::new();
     let mut register = 0;
     let first = transport.unpack("%a", &mut body, &mut register);

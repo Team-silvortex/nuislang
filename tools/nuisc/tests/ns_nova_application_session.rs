@@ -107,6 +107,99 @@ fn compiled_nuis_image_state_survives_independent_events_without_main_replay() {
 }
 
 #[test]
+fn compiled_window_selection_skips_ignored_events_and_matches_image_inputs() {
+    let registry = yir_verify::default_registry();
+    let (mut image, _) = ApplicationSession::open_registered(
+        image_module(),
+        &registry,
+        "image",
+        vec![
+            Value::Int(640),
+            Value::Int(400),
+            Value::Int(60),
+            Value::Int(0),
+        ],
+    )
+    .unwrap();
+    let expected = [0, 2].map(|input| {
+        image
+            .event(vec![Value::Int(input)])
+            .unwrap()
+            .presented_frames
+            .remove(0)
+    });
+    assert_ne!(
+        expected[0], expected[1],
+        "the reference inputs must produce distinguishable frames"
+    );
+    image.close(vec![Value::Int(1000)]).unwrap().unwrap();
+
+    for reversed in [false, true] {
+        let mut module = image_module().clone();
+        if reversed {
+            module.nodes.reverse();
+            for function in &mut module.functions {
+                function.body_nodes.reverse();
+            }
+        }
+        let render_nodes = module
+            .nodes
+            .iter()
+            .filter(|node| {
+                matches!(node.op.module.as_str(), "shader" | "data")
+                    || matches!(node.op.instruction.as_str(), "alloc_buffer" | "store_at")
+            })
+            .map(|node| node.name.as_str())
+            .collect::<BTreeSet<_>>();
+        let (mut window, opened) = ApplicationSession::open_registered(
+            &module,
+            &registry,
+            "window",
+            vec![Value::Int(640), Value::Int(400)],
+        )
+        .unwrap();
+        let mut witnesses = opened.provider_completion_witnesses;
+        for (ordinal, kind, code) in [(0, 0, 99), (1, 1, 32)] {
+            for ignored in [(2, 0), (1, 31), (-1, 32)] {
+                let before = window.state().clone();
+                let trace = window
+                    .event(vec![Value::Int(ignored.0), Value::Int(ignored.1)])
+                    .unwrap();
+                assert_eq!(window.state(), &before);
+                assert!(trace.presented_frames.is_empty());
+                // Completion witnesses are cumulative; ignored events add no work.
+                assert_eq!(trace.provider_completion_witnesses, witnesses);
+                for step in trace.lane_steps.values().flatten() {
+                    assert!(!render_nodes.contains(step.rsplit_once(" -> ").unwrap().1));
+                }
+            }
+            let trace = window
+                .event(vec![Value::Int(kind), Value::Int(code)])
+                .unwrap();
+            assert_eq!(trace.presented_frames.len(), 1);
+            assert_eq!(trace.presented_frames[0], expected[ordinal]);
+            witnesses = trace.provider_completion_witnesses;
+            assert_eq!(field(window.state(), "frame_index"), ordinal as i64 + 1);
+            assert_eq!(
+                field(window.state(), "presented_frames"),
+                ordinal as i64 + 1
+            );
+            assert_eq!(field(window.state(), "dropped_frames"), 0);
+        }
+        let closed = window
+            .close(vec![Value::Int(0), Value::Int(0)])
+            .unwrap()
+            .unwrap();
+        assert!(closed.presented_frames.is_empty());
+        assert_eq!(field(window.state(), "status"), 2);
+        assert!(window
+            .close(vec![Value::Int(0), Value::Int(0)])
+            .unwrap()
+            .is_none());
+    }
+}
+
+#[test]
 fn compiled_registration_roundtrips_and_rejects_signature_drift() {
     let module = image_module();
     let source = nuisc::render::render_yir(module);

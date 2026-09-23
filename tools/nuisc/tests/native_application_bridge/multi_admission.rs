@@ -138,7 +138,7 @@ pub(super) fn check_layout_drift(breaking: bool) {
         }
         rejected(
             &drift,
-            if mutation == "arity" {
+            if matches!(mutation, "arity" | "layout") {
                 "signature drift"
             } else {
                 "return layout drift"
@@ -372,7 +372,7 @@ pub(super) fn check_general_calls(breaking: bool) {
     direct.nodes[index].op.instruction = "call_owned_struct".to_owned();
     direct.nodes[index].op.args = direct_args;
     direct.nodes[index].op.args[1] = "Carries{carry0:i64;carry1:Nested{x:i64}}".to_owned();
-    rejected(&direct, "requires a flat i64 value layout");
+    rejected(&direct, "signature drift");
 }
 
 #[test]
