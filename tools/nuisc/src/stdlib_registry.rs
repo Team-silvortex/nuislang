@@ -268,6 +268,8 @@ mod tests {
                 "surface.pixelmagic.shader.contracts.v1".to_owned(),
                 "surface.pixelmagic.shader.packet-bridge.v1".to_owned(),
                 "surface.pixelmagic.shader.render.v1".to_owned(),
+                "contract.pixelmagic.packed-rgba8-generation.v1".to_owned(),
+                "surface.pixelmagic.shader.image-storage.v1".to_owned(),
                 "surface.pixelmagic.shader.texture.v1".to_owned(),
                 "surface.pixelmagic.shader.pipeline.v1".to_owned(),
             ]
@@ -276,6 +278,8 @@ mod tests {
             manifest.library_modules,
             vec![
                 "lib/image_contracts.ns".to_owned(),
+                "lib/pixels.ns".to_owned(),
+                "lib/image_surface.ns".to_owned(),
                 "lib/shader_contracts.ns".to_owned(),
                 "lib/packet_bridge_surface.ns".to_owned(),
                 "lib/render_surface.ns".to_owned(),

@@ -68,7 +68,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "54 reachable native functions",
             "Generated-use counting is iterative",
-            "reduce guarded local helper capture pressure at the 64-argument boundary",
+            "propagate field demand through immutable private capture aliases",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -130,7 +130,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "51 reachable native functions",
             "disjoint lexical bindings",
             "63 to 32 private helpers",
-            "reduce guarded local helper capture pressure at the 64-argument boundary",
+            "propagate field demand through immutable private capture aliases",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -203,7 +203,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Scope-aware local hygiene",
             "Private names reserve future source bindings",
             "five actual entries instead of six",
-            "reduce guarded local helper capture pressure at the 64-argument boundary",
+            "propagate field demand through immutable private capture aliases",
         ],
     },
 ];

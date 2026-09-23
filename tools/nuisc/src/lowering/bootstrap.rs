@@ -287,6 +287,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
             .map(|definition| (definition.name.as_str(), definition))
             .collect(),
         direct_call_functions: direct_call_functions.clone(),
+        capture_plans: outlined.capture_plans.clone(),
         scoped_break_controls: outlined.break_controls.clone(),
         async_helper_functions: all_async_helper_functions.clone(),
         pure_helpers: collect_pure_helper_functions(module),

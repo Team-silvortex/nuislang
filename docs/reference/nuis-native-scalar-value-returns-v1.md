@@ -19,7 +19,7 @@ Callback and helper admission remain distinct:
 - Callback layouts bind to the registered session's flattened state signature.
 - Each ordinary aggregate call requires exact agreement with its callee's declared
   nominal layout, nested names, field order, kinds and result ownership.
-- Source aggregate parameters are flattened to exact scalar parameters. General
+- User aggregate parameters are flattened to exact scalar parameters. General
   owned/resource inputs do not acquire scalar admission or implicit conversions.
 - Every reachable function still passes CPU instruction, lane, dependency, parameter,
   graph, node and depth checks. Recursive calls and hidden effects remain rejected.
@@ -81,7 +81,8 @@ expansion is bounded to 64 record levels and 4096 nodes; flat source admission i
 unchanged. This source normalization bound is separate from native slot admission.
 
 The predicate is evaluated once. Only already-bound captures enter the extracted
-helper; calls, projections and checked arithmetic remain behind their branch guard.
+helper; calls and checked arithmetic remain behind their branch guard. Total field
+projections of ready pure records may be moved into private capture transport.
 One-sided rebindings preserve the old value, and discarded selected arithmetic is
 not erased. Guard defaults independently require exact typed literal zeros, with
 no calls or projections. Literal i64-to-i32 narrowing emits a wrapped i32 constant;
@@ -93,12 +94,82 @@ merely because the new profile can describe them. Resource/effectful arms remain
 outside this pure-value extraction; i32/floating arithmetic is not newly generalized.
 
 [Local-value probes](../../tools/nuisc/tests/native_application_bridge/typed_local_values.rs)
-cover 1/6/63-slot records, matching and one-sided choices, reversed constructors and
+cover 1/6/63/64-slot records, matching and one-sided choices, reversed constructors and
 YIR storage order, independent snapshots, raw floating bits, in-place publication and zero
 aggregate allocations/drops, compared with reference open/event/close execution.
-The full 64-leaf capture plus a separate predicate needs 65 helper arguments and
-is explicitly rejected by the unchanged 64-argument native bound. Reducing capture
-pressure is the next boundary, not a reason to silently raise that bound.
+The former 64-leaf mixed capture plus predicate now fits through private boolean
+capture transport. A helper that actually consumes a whole record with 64 independent
+i64 leaves plus its predicate still needs 65 arguments and is rejected by the unchanged bound.
+
+## Private Capture Transport
+
+Only helpers identified by the outliner, not source names or annotations, acquire
+the [capture plan](../../tools/nuisc/src/lowering/direct_calls/capture_params.rs).
+User functions, callback roots, FFI and scoped iteration signatures stay unchanged.
+Generated helpers used as scoped actions are also excluded, using the same target
+discovery as scoped-call lowering; their per-trip induction/carry metadata is not packed.
+The same plan lowers both the call arguments and the callee's parameters, using
+declaration-order scalar leaves and exact nominal reconstruction. The normal owned
+return ABI is unchanged; the native value-return path remains heap-free.
+
+Two or more boolean captures share nonnegative i64 words of at most 63 bits.
+Singleton tails keep their boolean type, while i32/i64/f32/f64 leaves keep their
+original scalar kinds and bits. The first replaced leaf supplies a unique physical
+parameter name. Packing uses canonical bool-to-word conversions and bounded
+multiply/add; decoding uses positive constant division/remainder and word-to-bool.
+The top bit is 62, so an all-true word is exactly i64::MAX, never signed overflow.
+These existing YIR operations do not widen the native instruction whitelist.
+
+Arguments are evaluated before packing, including the one-time predicate; no fallible
+or effectful branch work is duplicated or hoisted. Decoding is total and precedes the helper guard.
+Helper identities, entry charges, loop preflights and failure publication are unchanged.
+Physical parameters still undergo the independent native 64-slot check; packing is
+not a general large-argument ABI, a new mixed loop carry, or a claim of faster execution.
+
+[Word probes](../../tools/nuisc/tests/native_application_bridge/typed_capture_words.rs)
+cover independent boolean patterns, the highest nonnegative bit and a second word,
+reversed storage order, in-place lifecycle publication and zero allocation/drop counters.
+The [64-slot CLI workflow](../../tools/nuis/tests/native_session_workflow/capture_words.rs)
+uses an independent predicate and a mixed record at exactly 64 physical arguments,
+with build/run-artifact, malformed input, tamper, cache and source-free restoration checks.
+## Field-Selective Captures
+
+The [projection pass](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs)
+runs before private boolean packing. It processes generated callees before their
+callers, so a chain of private helpers does not keep forwarding an entire record
+when its terminal users need only a few fields. Function storage order is irrelevant.
+Only an actual reduction in scalar leaves changes the signature.
+
+Each selected path becomes a hygienic private parameter. Repeated paths are shared;
+using an entire nested subrecord subsumes its child paths and preserves its exact
+nominal type. No missing fields are filled with synthetic zeros or partial records.
+Definition, every call site and NIR verification move together before YIR lowering.
+Unchanged user signatures still flatten in declaration order; projected parameters
+use deterministic path order, and each retained subrecord keeps declaration order.
+
+Only ready variable/field paths can be duplicated or discarded at a call boundary.
+Computed record arguments veto projection rather than losing effects or failures.
+Scalar arguments, including unused checked arithmetic and predicates, are not removed.
+Whole-record aliases, returns, forwarding and same-name rebinding conservatively keep
+the original capture. Unsupported callers, scoped targets, cycles and their dependent
+helpers are not rewritten. The shared read-only expression walk is exhaustive,
+including conversions, FFI operands and shader/kernel children.
+
+[Sparse native probes](../../tools/nuisc/tests/native_application_bridge/typed_sparse_captures.rs)
+execute a nested 64-i64 state with only four private selection arguments: one predicate
+and three fields. The public helper still has 64 parameters. All lifecycle states
+match independent expectations and reference execution with reversed YIR storage,
+in-place event/close publication, whole-region sentinels and zero allocation/drop counters.
+The [sparse CLI workflow](../../tools/nuis/tests/native_session_workflow/capture_fields.rs)
+checks the same fixture through build, cache reuse, input/tamper rejection and
+source-free materialization with byte-identical LLVM and unchanged lifecycle states.
+Mixed sparse guard probes retain raw float bits, skipped division, selected zero/overflow
+traps and unchanged output sentinels. Both guarded arms still cost entries: the fixture
+needs exactly six, rejects five/zero, and rejects malformed input before helper entry.
+
+The next boundary is propagating field demand through immutable private aliases,
+with explicit scope and snapshot rules. This is not unrestricted scalar replacement,
+a wider native argument limit, mixed loop carry admission or a measured speedup.
 
 ## Evidence And Limits
 
@@ -142,3 +213,10 @@ four/zero-entry failure, unused selected results and malformed-input rejection,
 with unchanged output sentinels and zero aggregate allocations/drops.
 General mixed loop carries, resource state, provider dispatch, native image-host
 selection, cross-target execution and performance still need separate evidence.
+
+The 2026-09-23 macOS aarch64 capture checkpoint passed 207 compiler/registry-unit,
+45 native-bridge, eight ordinary native and five reference image/window cases.
+Five CLI workflows passed; exact-64-slot and sparse captures retain cache reuse,
+input/tamper rejection and source-free restoration with identical LLVM and states.
+All 28 tensor tests passed; 1400 drift checks were clean. No fresh GPU/Linux,
+full-workspace, formal safety or performance result is inferred from this checkpoint.

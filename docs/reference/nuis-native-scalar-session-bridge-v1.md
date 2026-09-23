@@ -1944,22 +1944,27 @@ At that checkpoint, the mixed/nested fallible-local-rebinding rejection was
 reproduced separately. Guarded typed local values below now repair that boundary.
 Neither checkpoint is a full workspace, fresh GPU/provider, cross-target or performance run.
 
-Guarded mixed/nested local values were checked on 2026-09-23 on macOS aarch64.
-All 125 selected compiler-unit tests, 42 selected native-bridge cases, four ordinary
-native control cases and five reference image/window sessions passed. The 1/6/63-slot
-probes retain exact bits, snapshots and zero aggregate allocations/drops; selected
-unused traps, five-entry budgets and unchanged output sentinels are covered too.
-Three CLI workflows passed build/cache/tamper/source-free restoration, including the
-new guarded typed-local fixture. The full 64-leaf capture plus predicate remains an
-explicit 65-argument rejection, not a widened native bound. Nested neutral expansion
-is bounded before materialization. Progress remains active at 86.
-The 28 tensor tests passed; 1386 drift checks report zero failures with clean
-coverage, hierarchy and lineage. The guarded CLI also skips its zero-divisor arm.
-Ten typed native cases were rerun successfully after the final expansion-bound change.
+The preceding guarded-local checkpoint on 2026-09-23 passed 125 compiler-unit,
+42 native-bridge, four ordinary native, five image/window and three CLI regressions.
+Its 1/6/63-slot probes covered snapshots, exact bits, zero allocations/drops,
+unused traps, five-entry budgets and unchanged output sentinels. The CLI skipped
+its zero-divisor arm; ten typed cases were rerun after bounding neutral expansion.
+All 28 tensor tests and 1386 drift checks passed. That checkpoint exposed the
+64-leaf mixed capture plus predicate boundary now repaired by private capture transport.
+
+Private capture projection was checked on 2026-09-23 on macOS aarch64: 207 compiler/registry-unit,
+45 native-bridge, eight ordinary native and five reference image/window cases passed.
+Five CLI workflows passed, including exact-64-slot and sparse build/cache/tamper/source-free restoration.
+All 28 tensor tests passed; 1400 drift checks report zero failures with clean coverage,
+hierarchy and lineage. Sparse 64-i64 state now uses four private selection arguments.
+Progress remains active at 86; the native 64-argument check is unchanged. This is not
+fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Reduce guarded local helper capture pressure at the 64-argument boundary.
+Propagate field demand through immutable private capture aliases, preserving snapshots.
+Sparse captures now project fields bottom-up before private boolean packing; user signatures
+and scoped-action metadata stay unchanged. Whole 64-i64 records plus a predicate still exceed the bound.
 Keep mixed/nested local values separate from the flat scoped-loop carry profile.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,

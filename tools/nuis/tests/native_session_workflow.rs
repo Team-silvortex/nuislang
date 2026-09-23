@@ -5,6 +5,10 @@ use std::{
     process::{Command, Output},
 };
 
+#[path = "native_session_workflow/capture_fields.rs"]
+mod capture_fields;
+#[path = "native_session_workflow/capture_words.rs"]
+mod capture_words;
 #[path = "native_session_workflow/helper_entries.rs"]
 mod helper_entries;
 #[path = "native_session_workflow/loop_work.rs"]

@@ -106,6 +106,8 @@ mod scoped_admission;
 mod scoped_execution;
 #[path = "native_application_bridge/scoped_loops.rs"]
 mod scoped_loops;
+#[path = "native_application_bridge/typed_capture_words.rs"]
+mod typed_capture_words;
 #[path = "native_application_bridge/typed_helper_admission.rs"]
 mod typed_helper_admission;
 #[path = "native_application_bridge/typed_helper_guards.rs"]
@@ -114,6 +116,8 @@ mod typed_helper_guards;
 mod typed_helper_values;
 #[path = "native_application_bridge/typed_local_values.rs"]
 mod typed_local_values;
+#[path = "native_application_bridge/typed_sparse_captures.rs"]
+mod typed_sparse_captures;
 #[path = "native_application_bridge/value_loop_exits.rs"]
 mod value_loop_exits;
 

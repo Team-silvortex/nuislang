@@ -5,6 +5,10 @@ type Scope = BTreeMap<String, NirTypeRef>;
 
 #[path = "buffer_loop_outline/branches.rs"]
 mod branches;
+#[path = "buffer_loop_outline/capture_layouts.rs"]
+mod capture_layouts;
+#[path = "buffer_loop_outline/capture_projection.rs"]
+mod capture_projection;
 #[path = "buffer_loop_outline/conditional_values.rs"]
 mod conditional_values;
 #[path = "buffer_loop_outline/control_flow.rs"]
@@ -46,6 +50,7 @@ pub(super) struct BufferLoopOutlines {
     pub functions: BTreeSet<String>,
     pub guarded_functions: BTreeSet<String>,
     pub break_controls: BTreeMap<String, String>,
+    pub capture_plans: BTreeMap<String, direct_calls::CapturePlan>,
 }
 
 // Keep iteration effects inside a private helper; the existing scoped-call contract
@@ -159,6 +164,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut outlined.break_controls,
         preserve_entry_flow,
     );
+    let scalar_helper_start = helpers.len();
     scalar_control::outline(
         module,
         &outlined.functions,
@@ -168,6 +174,14 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &value_catalog,
         &value_layouts,
     );
+    let capture_functions = selections
+        .into_iter()
+        .chain(
+            helpers[scalar_helper_start..]
+                .iter()
+                .map(|f| f.name.clone()),
+        )
+        .collect();
     if !helpers.is_empty() {
         outlined
             .functions
@@ -175,6 +189,10 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         module.functions.extend(helpers);
         crate::nir_verify::verify_nir_module(module)?;
     }
+    if capture_projection::project(module, &capture_functions, &value_layouts) {
+        crate::nir_verify::verify_nir_module(module)?;
+    }
+    outlined.capture_plans = capture_layouts::collect(module, &capture_functions, &value_layouts);
     Ok(outlined)
 }
 

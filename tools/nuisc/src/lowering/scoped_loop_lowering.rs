@@ -34,9 +34,16 @@ pub(super) fn collect_scoped_loop_helper_functions(
         })
         .map(|function| function.name.as_str())
         .collect::<BTreeSet<_>>();
+    collect_scoped_call_targets(module, &eligible)
+}
+
+pub(super) fn collect_scoped_call_targets(
+    module: &NirModule,
+    eligible: &BTreeSet<&str>,
+) -> BTreeSet<String> {
     let mut helpers = BTreeSet::new();
     for function in &module.functions {
-        collect_from_stmts(&function.body, &eligible, &mut helpers);
+        collect_from_stmts(&function.body, eligible, &mut helpers);
     }
     helpers
 }

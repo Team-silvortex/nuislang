@@ -308,7 +308,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("reduce guarded local helper capture pressure at the 64-argument boundary"));
+        .starts_with("propagate field demand through immutable private capture aliases"));
     assert!(session.next_step.contains("native scalar helpers"));
     assert!(session
         .evidence
@@ -319,10 +319,16 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("zero aggregate allocations/drops"));
     assert!(session
         .blocker
-        .contains("a full 64-leaf record capture plus its predicate needs 65 helper arguments"));
+        .contains("Immutable aliases and rebound records remain whole captures"));
     assert!(session
         .evidence
-        .contains("Real 1/6/63-slot guarded local probes"));
+        .contains("Sparse 64-i64 captures now use four private arguments"));
+    assert!(session
+        .evidence
+        .contains("Real 1/6/63/64-slot guarded local probes"));
+    assert!(session
+        .evidence
+        .contains("Private boolean captures use nonnegative 63-bit words"));
     assert!(!session
         .blocker
         .contains("guarded mixed/nested local rebinding remains outside"));

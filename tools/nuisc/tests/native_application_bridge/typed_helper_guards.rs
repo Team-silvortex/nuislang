@@ -40,6 +40,33 @@ fn typed_local_rebinding_guards_preserve_lazy_traps_shared_entries_and_output_se
     check_guards(&unused, 5, true);
 }
 
+#[test]
+fn typed_sparse_capture_guards_preserve_selected_failures_bits_and_entry_budgets() {
+    let padding = (0..58)
+        .map(|i| format!("p{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = (0..58)
+        .map(|i| format!("p{i}: {i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut source = SOURCE.replace(
+        "    struct Packet",
+        &format!(
+            "    struct Wide {{ payload: Payload, divisor: i64, {padding} }}\n    struct Packet"
+        ),
+    );
+    let start = source.find("        if skip").unwrap();
+    let end = source[start..].find("\n    }").unwrap() + start;
+    source.replace_range(start..end, &format!("let wide = Wide {{ payload: Payload {{ flag: skip, tag: tag, value: a, gain: gain, scale: scale }}, divisor: b, {values} }};
+        let result: Payload = if skip {{ wide.payload }} else {{
+            Payload {{ flag: wide.payload.flag, tag: wide.payload.tag, value: wide.payload.value / wide.divisor, gain: wide.payload.gain, scale: wide.payload.scale }}
+        }};
+        return Packet {{ payload: result }};"));
+    // This fixture keeps both guarded arms: root, packet, selection, two arms, relay.
+    check_guards(&source, 6, false);
+}
+
 fn check_guards(source: &str, required: u64, unused: bool) {
     let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
@@ -131,8 +158,18 @@ fn check_guards(source: &str, required: u64, unused: bool) {
         assert_eq!(
             run.status.success(),
             !trap,
-            "skip={skip} a={a} b={b} budget={budget}: {}",
-            String::from_utf8_lossy(&run.stderr)
+            "skip={skip} a={a} b={b} budget={budget}: {}\nstdout: {}\nhelper graph:\n{}",
+            String::from_utf8_lossy(&run.stderr),
+            String::from_utf8_lossy(&run.stdout),
+            bridge
+                .llvm_ir
+                .lines()
+                .filter(|line| {
+                    (line.starts_with("define ") || line.contains("call "))
+                        && line.contains("@nuis_fn_")
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
         );
         #[cfg(unix)]
         if trap {

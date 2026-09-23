@@ -85,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "reduce guarded local helper capture pressure at the 64-argument boundary",
+            "propagate field demand through immutable private capture aliases",
         ],
     },
 ];

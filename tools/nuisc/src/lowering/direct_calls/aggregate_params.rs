@@ -86,6 +86,9 @@ pub(super) fn lower_direct_call_parameters(
     bindings: &mut BTreeMap<String, String>,
     function_parameters: &mut Vec<YirFunctionParameter>,
 ) -> Result<(), String> {
+    if let Some(plan) = state.capture_plans.get(&function.name).cloned() {
+        return plan.lower_parameters(function, state, bindings, function_parameters);
+    }
     let mut physical_index = 0usize;
     for param in &function.params {
         if direct_call_scalar_kind(&param.ty).is_some() {
@@ -130,7 +133,10 @@ pub(super) fn flatten_direct_call_arguments(
     for (param, arg) in function.params.iter().zip(args) {
         flattened.extend(flatten_direct_call_argument(&param.ty, arg, state)?);
     }
-    Ok(flattened)
+    match state.capture_plans.get(&function.name).cloned() {
+        Some(plan) => plan.lower_arguments(&flattened, state),
+        None => Ok(flattened),
+    }
 }
 
 pub(in crate::lowering) fn flatten_direct_call_argument(
@@ -183,7 +189,7 @@ fn is_value_struct_leaf(kind: DirectCallScalarKind) -> bool {
     )
 }
 
-fn materialize_scalar_parameter(
+pub(super) fn materialize_scalar_parameter(
     function_name: &str,
     parameter_name: &str,
     ty: &NirTypeRef,
@@ -296,7 +302,7 @@ fn flatten_struct_argument(
     Ok(())
 }
 
-fn struct_fields(
+pub(super) fn struct_fields(
     ty: &NirTypeRef,
     state: &LoweringState<'_>,
 ) -> Result<Vec<(String, NirTypeRef)>, String> {

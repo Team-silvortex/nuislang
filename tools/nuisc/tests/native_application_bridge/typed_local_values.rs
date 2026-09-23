@@ -32,17 +32,39 @@ fn source(slots: usize) -> String {
 
 #[test]
 fn typed_local_choices_and_one_sided_rebindings_preserve_nested_snapshots_and_bits() {
-    for slots in [1, 6, 63] {
+    for slots in [1, 6, 63, 64] {
         let source = source(slots);
         typed_helper_values::check_values(slots, &source, 64);
     }
 }
 
 #[test]
-fn typed_local_full_record_capture_keeps_native_argument_bounds_explicit() {
-    let project = Project::with_source(&source(64));
+fn typed_local_incompressible_capture_keeps_native_argument_bounds_explicit() {
+    let fields = (0..64)
+        .map(|i| format!("f{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = (0..64)
+        .map(|i| format!("f{i}: {i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        "mod cpu Main {{
+        struct State {{ {fields} }}
+        @noinline fn relay(value: State) -> State {{ return value; }}
+        fn start() -> State {{ return State {{ {values} }}; }}
+        fn step(state: State) -> State {{
+            let next = state;
+            if state.f0 > 0 {{ let next = relay(state); }}
+            return next;
+        }}
+        fn stop(state: State) -> State {{ return state; }}
+        fn main() -> i64 {{ return 0; }}
+    }}"
+    );
+    let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     let error = emit_registered(&compiled.yir, "counter").unwrap_err();
-    // A full 64-leaf capture plus its separate predicate requires 65 arguments.
+    // Sixty-four independent i64 values cannot share a word with the predicate.
     assert!(error.contains("function/argument bounds"), "{error}");
 }

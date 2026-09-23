@@ -1,5 +1,18 @@
 use super::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum DirectCallScalarKind {
+    Bool,
+    I32,
+    I64,
+    F32,
+    F64,
+    BorrowedBuffer,
+    TraversalPointer,
+    OwnedBytes,
+    OwnedExternalBuffer,
+}
+
 pub(super) fn direct_call_scalar_kind(ty: &NirTypeRef) -> Option<DirectCallScalarKind> {
     if ty.is_mutex_permit_family() && ty.generic_args.len() == 1 && !ty.is_optional {
         return Some(DirectCallScalarKind::I64);

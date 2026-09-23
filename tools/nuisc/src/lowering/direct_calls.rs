@@ -1,20 +1,10 @@
 use super::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum DirectCallScalarKind {
-    Bool,
-    I32,
-    I64,
-    F32,
-    F64,
-    BorrowedBuffer,
-    TraversalPointer,
-    OwnedBytes,
-    OwnedExternalBuffer,
-}
-
 #[path = "direct_calls/aggregate_params.rs"]
 mod aggregate_params;
+#[path = "direct_calls/capture_params.rs"]
+mod capture_params;
+pub(super) use capture_params::CapturePlan;
 #[path = "direct_calls/control_boundaries.rs"]
 mod control_boundaries;
 #[path = "direct_calls/kinds.rs"]
@@ -30,6 +20,7 @@ pub(super) use kinds::{
 use kinds::{
     direct_call_return_kind, direct_call_scalar_kind, is_scheduler_scalar_kind,
     owned_external_buffer_metadata_for_helper, owned_external_buffer_metadata_for_node,
+    DirectCallScalarKind,
 };
 
 pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
