@@ -62,8 +62,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/native_application_bridge/helper_entries.rs",
         required_patterns: &[
             "bool_rebinding_guards_share_both_budgets_without_refunds_or_resets",
-            "execute(source, 8, 17, &[rejected])",
-            "execute(source, 7, 18, &[rejected])",
+            "execute(source, 8, 16, &[rejected])",
+            "execute(source, 7, 17, &[rejected])",
         ],
     },
     DevTensorDriftCheckSpec {

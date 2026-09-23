@@ -174,7 +174,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "value_catalog_keeps_transitive_types_effects_cycles_and_buffer_admission_separate",
             "aggregate_control_outlining_shares_suffixes_and_captures_existing_records",
-            "assert_eq!(helpers.len(), 32 * 3)",
+            "assert_eq!(helpers.len(), 32 * 3 - 2)",
             "scalar_helpers::collect_with_layouts",
         ],
     },
@@ -206,7 +206,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-session-counted-value-source-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops.rs",
         required_patterns: &[
-            "prepare_counted_while(",
+            "induction::parse(condition, body)?",
             "locals.contains(binding)",
             "!updates.contains(input) && scope.get(input)? == &scalar_type(\"i64\")",
             "!updates.insert(name.to_owned())",

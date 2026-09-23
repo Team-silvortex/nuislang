@@ -111,13 +111,18 @@ fn validate_body(
     layouts: &control_values::FlatLayouts,
     allow_loops: bool,
 ) -> Option<()> {
+    let normalized = if allow_loops {
+        control_loops::returns::normalize(function, layouts)?
+    } else {
+        None
+    };
     let mut locals = function
         .params
         .iter()
         .map(|p| (p.name.clone(), p.ty.clone()))
         .collect::<Scope>();
     validate_block(
-        &function.body,
+        normalized.as_deref().unwrap_or(&function.body),
         &mut locals,
         &mut BTreeSet::new(),
         function.return_type.as_ref()?,
@@ -595,8 +600,9 @@ mod tests {
             &catalog,
             &control_values::FlatLayouts::new(),
         );
-        assert_eq!(helpers.len(), 64 * 3);
-        assert_eq!(guarded.len(), 64 * 2);
+        // The final ready return needs neither a continuation nor an empty-arm guard.
+        assert_eq!(helpers.len(), 64 * 3 - 2);
+        assert_eq!(guarded.len(), 64 * 2 - 1);
         assert!(helpers.iter().all(|f| f.params.len() <= 2));
         assert!(helpers.iter().map(|f| f.body.len()).sum::<usize>() < 64 * 12);
         module.functions.extend(helpers);

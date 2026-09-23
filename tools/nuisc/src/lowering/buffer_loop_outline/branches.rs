@@ -136,9 +136,22 @@ pub(super) fn outline_effects(
                         );
                     }
                     validation::EffectTypes::Values(catalog, layouts) => {
-                        control_loops::outline_iteration(
-                            &mut body, scope, names, helpers, guarded, catalog, layouts, structs,
+                        let boundary = control_loops::outline_iteration(
+                            &condition,
+                            &mut body,
+                            scope,
+                            names,
+                            helpers,
+                            guarded,
+                            catalog,
+                            layouts,
+                            structs,
+                            break_controls,
                         );
+                        outlined.extend(boundary.before);
+                        outlined.push(NirStmt::While { condition, body });
+                        outlined.extend(boundary.after);
+                        continue;
                     }
                 }
                 outlined.push(NirStmt::While { condition, body });

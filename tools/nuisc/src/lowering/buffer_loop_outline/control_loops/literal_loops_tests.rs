@@ -51,8 +51,6 @@ fn literal_loops_cannot_launder_headers_write_authority_or_future_siblings() {
         "let saved = checksum; let total = total + saved;",
         "let total = true;",
         "print(child);",
-        "break;",
-        "continue;",
     ] {
         let text = source(&format!(
             "let child: i64 = 0; let inner_limit = index; let inner_step: i64 = 1;

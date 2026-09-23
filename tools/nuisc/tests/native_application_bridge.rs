@@ -64,6 +64,8 @@ mod break_execution;
 mod break_loops;
 #[path = "native_application_bridge/break_source.rs"]
 mod break_source;
+#[path = "native_application_bridge/control_composition.rs"]
+mod control_composition;
 #[path = "native_application_bridge/division_admission.rs"]
 mod division_admission;
 #[path = "native_application_bridge/division_execution.rs"]
@@ -98,6 +100,8 @@ mod scoped_admission;
 mod scoped_execution;
 #[path = "native_application_bridge/scoped_loops.rs"]
 mod scoped_loops;
+#[path = "native_application_bridge/value_loop_exits.rs"]
+mod value_loop_exits;
 
 const SOURCE: &str = include_str!("native_application_bridge/main.ns");
 struct Project(PathBuf);

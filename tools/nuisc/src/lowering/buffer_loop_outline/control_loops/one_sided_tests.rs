@@ -105,7 +105,6 @@ fn empty_or_malformed_carry_arms_cannot_create_or_erase_state() {
         "if index > total { let total: i64 = total + index; }",
         "if checksum > initial { let total: i64 = total + index; }",
         "if index > initial && index < (checksum / initial) { let total: i64 = total + index; }",
-        "if index > initial { break; }",
         "if index > initial { let index: i64 = index + stride; }",
     ] {
         let module = parse_nuis_module(&source(arm)).unwrap();

@@ -279,13 +279,33 @@ triangular bounds, ascending/descending induction, local and persistent child in
 bool/record snapshots, skipped paths and late failures; the literal-loops fixture
 also crosses build/cache/source-free standalone restoration. Child declarations
 remain local, and nested header/ancestor-induction mutation is rejected. Guarded
-break/continue in these pure-value nested bodies remains the next boundary.
+`break`/`continue` now also work in these leading-step pure-value bodies: each exit
+belongs to its own loop, keeps earlier updates and skips only its remaining suffix.
+Private recovery preserves the already-advanced index on break and the seed on zero
+trips, reusing the existing scoped-break contract. Full preflight and reservations
+still apply even to immediate exits; the value-loop-exits fixture passes build,
+cache and source-free standalone restoration. Trailing-step pure-value loops now
+use that same contract: effects observe the pre-step index, break suppresses the
+step, and continue requires an identical explicit step immediately before it.
+Leading/trailing child loops may mix without sharing exit scope. Pure-value and
+Buffer rewriting are mutually exclusive for admitted value functions. The
+trailing-value-loops fixture exercises build/cache/source-free restoration.
+Counted value bodies now also return i64, bool or exact flat-i64 records from
+inside loops. The selected payload is evaluated before a private pending flag
+unwinds child and parent loops; neither skipped suffixes nor trailing steps run.
+The counted-returns fixture crosses the same source-free workflow. Ready-value
+returns now avoid private branch/continuation helpers: integer/bool literals and
+existing scalar/flat-record values need no speculative work. Conditions still run
+once, and calls, projections and constructors stay guarded. The full previously
+over-budget control-composition fixture now fits in 57 reachable native functions,
+without raising the 64-function bound or changing either work-budget policy.
+Nontrivial terminal continuations remain the next helper-expansion target.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this
 profile; the default image host is unchanged.
-Step-before-break, unstepped `continue`, arbitrary
-carry types and fully native CPU callbacks remain separate work.
+The separate Buffer profile still excludes step-before-break and unstepped
+`continue`; arbitrary carry types and fully native CPU callbacks remain separate work.
 Portable protocol tests do not certify Linux GPU execution or Windows transport.
 Resource-capability state, recovery, richer image bindings,
 long-duration measurements and native CPU frame dispatch remain separate work.

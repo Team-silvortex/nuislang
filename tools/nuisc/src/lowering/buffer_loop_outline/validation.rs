@@ -216,12 +216,30 @@ pub(super) fn validate_effects(
                         return None;
                     }
                     let mut child_carries = Vec::new();
+                    let iteration = control_loops::induction::parse(condition, body)?;
+                    let normalized = iteration.normalize(locals)?;
+                    let mut child_mutations = mutations.clone();
+                    if let Some(flow) = &normalized {
+                        child_mutations.writable.insert(flow.running.clone());
+                        child_mutations
+                            .writable
+                            .extend(flow.breaking.iter().cloned());
+                    }
+                    let mut child_body = normalized
+                        .as_ref()
+                        .map_or(iteration.effects, |flow| &flow.effects)
+                        .to_vec();
+                    if iteration.leading {
+                        child_body.insert(0, iteration.step.clone());
+                    } else {
+                        child_body.push(iteration.step.clone());
+                    }
                     validate_effects(
-                        body,
+                        &child_body,
                         &mut locals.clone(),
                         inputs,
                         types,
-                        mutations,
+                        &child_mutations,
                         &mut child_carries,
                     )?;
                     for name in child_carries {

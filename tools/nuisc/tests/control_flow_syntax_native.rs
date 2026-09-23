@@ -963,3 +963,11 @@ mod bool_carries;
 mod bool_rebinding;
 #[path = "control_flow_syntax_native/literal_loops.rs"]
 mod literal_loops;
+#[path = "control_flow_syntax_native/value_loop_exits.rs"]
+mod value_loop_exits;
+
+#[path = "control_flow_syntax_native/trailing_value_loops.rs"]
+mod trailing_value_loops;
+
+#[path = "control_flow_syntax_native/counted_returns.rs"]
+mod counted_returns;

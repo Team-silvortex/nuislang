@@ -145,8 +145,9 @@ fn aggregate_control_outlining_shares_suffixes_and_captures_existing_records() {
         &catalog,
         &layouts,
     );
-    assert_eq!(helpers.len(), 32 * 3);
-    assert_eq!(guarded.len(), 32 * 2);
+    // Existing flat values share the same ready-return elision as scalar values.
+    assert_eq!(helpers.len(), 32 * 3 - 2);
+    assert_eq!(guarded.len(), 32 * 2 - 1);
     assert!(helpers.iter().all(|f| f.params.len() <= 3));
     assert!(helpers.iter().map(|f| f.body.len()).sum::<usize>() < 32 * 12);
     module.functions.extend(helpers);

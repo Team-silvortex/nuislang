@@ -2,8 +2,16 @@ use super::*;
 use std::path::Path;
 use yir_lower_llvm::native_session::emit_registered_with_work_limits;
 
+#[path = "control_elision_budgets.rs"]
+mod control_elision_budgets;
+#[path = "counted_return_budgets.rs"]
+mod counted_return_budgets;
 #[path = "literal_loops_budget.rs"]
 mod literal_loops_budget;
+#[path = "trailing_value_loop_budgets.rs"]
+mod trailing_value_loop_budgets;
+#[path = "value_loop_exit_budgets.rs"]
+mod value_loop_exit_budgets;
 
 const SOURCE: &str = include_str!("helper_entries.ns");
 const SENTINEL: i64 = -700;
@@ -11,7 +19,6 @@ const PAIR: &[&str] = &[
     "start",
     "selected",
     "__nuis_scalar_branch_0",
-    "__nuis_scalar_branch_1",
     "__nuis_scalar_continue_0",
     "pair",
     "argument",
@@ -238,12 +245,12 @@ fn helper_entries_share_exact_budget_and_reset_at_lifecycle_roots() {
         cases.push(case);
     }
     cases.push(open(&[10, 0], Some(12), PAIR));
-    execute(SOURCE, 0, 10, &cases);
+    execute(SOURCE, 0, 9, &cases);
 }
 
 #[test]
 fn helper_entries_reject_before_body_but_after_argument_evaluation() {
-    execute(SOURCE, 0, 9, &[open(&[10, 0], None, &PAIR[..9])]);
+    execute(SOURCE, 0, 8, &[open(&[10, 0], None, &PAIR[..8])]);
     execute(SOURCE, 0, 0, &[open(&[10, 0], None, &[])]);
 }
 
@@ -252,10 +259,10 @@ fn helper_entries_skip_unselected_paths_and_validate_transport_first() {
     execute(
         SOURCE,
         0,
-        4,
+        3,
         &[
-            open(&[10, 1], Some(10), &PAIR[..4]),
-            open(&[10, 0], None, &PAIR[..4]),
+            open(&[10, 1], Some(10), &PAIR[..3]),
+            open(&[10, 0], None, &PAIR[..3]),
         ],
     );
     let mut wrong_shape = open(&[10], Some(SENTINEL), &[]);
@@ -283,8 +290,8 @@ fn helper_entries_count_loop_free_roots_and_unused_results() {
         "return pair(value);",
         "let unused = pair(value); return value;",
     );
-    execute(&unused, 0, 10, &[open(&[10, 0], Some(10), PAIR)]);
-    execute(&unused, 0, 9, &[open(&[10, 0], None, &PAIR[..9])]);
+    execute(&unused, 0, 9, &[open(&[10, 0], Some(10), PAIR)]);
+    execute(&unused, 0, 8, &[open(&[10, 0], None, &PAIR[..8])]);
 }
 
 #[test]
@@ -294,7 +301,6 @@ fn helper_entries_include_scoped_iterations_without_resetting_loop_reservations(
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_branch_1",
         "__nuis_scalar_continue_0",
         "nested",
         "iteration",
@@ -306,17 +312,17 @@ fn helper_entries_include_scoped_iterations_without_resetting_loop_reservations(
         "relay",
         "leaf",
     ];
-    execute(source, 8, 14, &[open(&[2, 3, 1, 0, 0], Some(6), &calls)]);
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..13]);
+    execute(source, 8, 13, &[open(&[2, 3, 1, 0, 0], Some(6), &calls)]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..12]);
     rejected.remaining_loop = 3;
-    execute(source, 8, 13, &[rejected]);
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..10]);
+    execute(source, 8, 12, &[rejected]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..9]);
     rejected.remaining_loop = 3;
-    execute(source, 8, 10, &[rejected]);
+    execute(source, 8, 9, &[rejected]);
     // Per-loop admission still traps after the containing function entry, before debit.
-    let mut invalid = open(&[65537, 3, 1, 0, 0], None, &calls[..6]);
+    let mut invalid = open(&[65537, 3, 1, 0, 0], None, &calls[..5]);
     invalid.remaining_loop = 8;
-    execute(source, 8, 14, &[invalid]);
+    execute(source, 8, 13, &[invalid]);
 }
 
 #[test]
@@ -357,7 +363,6 @@ fn check_bool_budgets(source: &str) {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_branch_1",
         "__nuis_scalar_continue_0",
         "nested",
         "iteration",
@@ -376,18 +381,18 @@ fn check_bool_budgets(source: &str) {
     execute(
         source,
         8,
-        18,
+        17,
         &[
             open(&[2, 3, 1, 0, 0], Some(8), &calls),
             open(&[2, 3, 1, 1, 0], Some(8), &calls),
         ],
     );
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..16]);
     rejected.remaining_loop = 3;
-    execute(source, 8, 17, &[rejected]);
+    execute(source, 8, 16, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(source, 7, 18, &[rejected]);
+    execute(source, 7, 17, &[rejected]);
 }
 
 #[test]
@@ -406,7 +411,6 @@ fn flat_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_branch_1",
         "__nuis_scalar_continue_0",
         "nested",
         "iteration",
@@ -425,18 +429,18 @@ fn flat_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
     execute(
         &source,
         8,
-        18,
+        17,
         &[
             open(&[2, 3, 1, 0, 0], Some(8), &calls),
             open(&[2, 3, 1, 1, 0], Some(8), &calls),
         ],
     );
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..16]);
     rejected.remaining_loop = 3;
-    execute(&source, 8, 17, &[rejected]);
+    execute(&source, 8, 16, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(&source, 7, 18, &[rejected]);
+    execute(&source, 7, 17, &[rejected]);
 }
 
 #[test]
@@ -459,7 +463,6 @@ fn outer_flat_carries_share_both_budgets_without_refunds_or_resets() {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_branch_1",
         "__nuis_scalar_continue_0",
         "nested",
         "iteration",
@@ -478,16 +481,16 @@ fn outer_flat_carries_share_both_budgets_without_refunds_or_resets() {
     execute(
         &source,
         8,
-        18,
+        17,
         &[
             open(&[2, 3, 1, 0, 0], Some(8), &calls),
             open(&[2, 3, 1, 1, 0], Some(8), &calls),
         ],
     );
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..17]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..16]);
     rejected.remaining_loop = 3;
-    execute(&source, 8, 17, &[rejected]);
+    execute(&source, 8, 16, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(&source, 7, 18, &[rejected]);
+    execute(&source, 7, 17, &[rejected]);
 }

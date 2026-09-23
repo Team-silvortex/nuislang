@@ -235,7 +235,20 @@ fn scoped_captures_require_exact_types_and_the_callers_own_lane() {
         .iter()
         .position(|n| n.op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carry"))
         .unwrap();
-    let boolean = module.nodes[index].op.args.last().unwrap().clone();
+    let args = &module.nodes[index].op.args;
+    let function = module.functions.iter().find(|f| f.name == args[8]).unwrap();
+    assert_eq!(function.parameters.len(), args.len() - 10);
+    // Private iteration helpers may reorder captures; corrupt a real bool seed,
+    // not a positional $carry marker, so this still tests exact-kind admission.
+    let boolean = function
+        .parameters
+        .iter()
+        .zip(&args[10..])
+        .find(|(param, _)| param.ty == "bool")
+        .unwrap()
+        .1
+        .clone();
+    assert!(!boolean.starts_with('$'));
     module.nodes[index].op.args[9] = boolean;
     rejected(&module, "declared scalar kind");
 }

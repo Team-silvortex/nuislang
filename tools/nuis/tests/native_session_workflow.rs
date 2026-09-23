@@ -53,6 +53,14 @@ const BOOL_CARRIES_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/bool_carries_loops.ns");
 const LITERAL_LOOPS_SOURCE: &str =
     include_str!("../../nuisc/tests/native_application_bridge/literal_loops.ns");
+const VALUE_LOOP_EXITS_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/value_loop_exits.ns");
+const TRAILING_VALUE_LOOPS_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/trailing_value_loops.ns");
+const COUNTED_RETURNS_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/counted_returns.ns");
+const CONTROL_COMPOSITION_SOURCE: &str =
+    include_str!("../../nuisc/tests/native_application_bridge/control_composition.ns");
 const SCRIPT: &[&str] = &[
     "--native-session",
     "counter",
@@ -256,6 +264,26 @@ fn native_literal_nested_loops_build_cache_and_standalone_relocation() {
     check_workflow(LITERAL_LOOPS_SOURCE);
 }
 
+#[test]
+fn native_trailing_value_loops_build_cache_and_standalone_relocation() {
+    check_workflow(TRAILING_VALUE_LOOPS_SOURCE);
+}
+
+#[test]
+fn native_value_loop_exits_build_cache_and_standalone_relocation() {
+    check_workflow(VALUE_LOOP_EXITS_SOURCE);
+}
+
+#[test]
+fn native_counted_returns_build_cache_and_standalone_relocation() {
+    check_workflow(COUNTED_RETURNS_SOURCE);
+}
+
+#[test]
+fn native_control_composition_build_cache_and_standalone_relocation() {
+    check_workflow(CONTROL_COMPOSITION_SOURCE);
+}
+
 fn check_workflow(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -309,6 +337,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_CARRIES_SOURCE,
         BOOL_CARRIES_SOURCE,
         LITERAL_LOOPS_SOURCE,
+        VALUE_LOOP_EXITS_SOURCE,
+        TRAILING_VALUE_LOOPS_SOURCE,
+        COUNTED_RETURNS_SOURCE,
+        CONTROL_COMPOSITION_SOURCE,
     ]
     .contains(&source)
     {
@@ -335,6 +367,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_CARRIES_SOURCE,
         BOOL_CARRIES_SOURCE,
         LITERAL_LOOPS_SOURCE,
+        VALUE_LOOP_EXITS_SOURCE,
+        TRAILING_VALUE_LOOPS_SOURCE,
+        COUNTED_RETURNS_SOURCE,
+        CONTROL_COMPOSITION_SOURCE,
     ]
     .contains(&source)
     {
@@ -359,6 +395,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_CARRIES_SOURCE,
         BOOL_CARRIES_SOURCE,
         LITERAL_LOOPS_SOURCE,
+        VALUE_LOOP_EXITS_SOURCE,
+        TRAILING_VALUE_LOOPS_SOURCE,
+        COUNTED_RETURNS_SOURCE,
+        CONTROL_COMPOSITION_SOURCE,
     ]
     .contains(&source)
     {
@@ -394,6 +434,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_CARRIES_SOURCE,
         BOOL_CARRIES_SOURCE,
         LITERAL_LOOPS_SOURCE,
+        VALUE_LOOP_EXITS_SOURCE,
+        TRAILING_VALUE_LOOPS_SOURCE,
+        COUNTED_RETURNS_SOURCE,
+        CONTROL_COMPOSITION_SOURCE,
     ]
     .contains(&source)
     {
@@ -406,6 +450,10 @@ fn check_workflow(source: &str) {
         AGGREGATE_CARRIES_SOURCE,
         BOOL_CARRIES_SOURCE,
         LITERAL_LOOPS_SOURCE,
+        VALUE_LOOP_EXITS_SOURCE,
+        TRAILING_VALUE_LOOPS_SOURCE,
+        COUNTED_RETURNS_SOURCE,
+        CONTROL_COMPOSITION_SOURCE,
     ]
     .contains(&source)
     {

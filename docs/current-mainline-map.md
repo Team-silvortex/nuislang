@@ -285,10 +285,32 @@ Literal nested counted bodies now compose through the same scoped helpers, with
 independent selected-invocation preflight and shared loop/entry budgets. Rectangular
 and triangular loops retain typed bool/record carries and lexical child scope;
 late failures and skipped invalid children have native probes. The literal-loops
-fixture adds build/cache/source-free standalone restoration. Guarded exits in these
-pure-value nested bodies, effects and mixed/nested/resource aggregates remain
-separate; per-return allocation is still an
-optimization target.
+fixture adds build/cache/source-free standalone restoration. Leading-step pure-value
+loops now also admit guarded `break`/`continue` with loop-local control and ordered
+prefix effects. Private carry recovery preserves the already-advanced induction
+without a new opcode or callback ABI. Full preflight and work reservations are not
+shortened by early exits; actual helper entries remain independently charged.
+The value-loop-exits fixture crosses the same source-free frontdoor. Trailing-step
+pure-value loops now retain pre-step effects, break indices and matching explicit-step
+continue through the same contract, including mixed leading/trailing child loops.
+Admitted value functions bypass Buffer rewriting, avoiding a double-normalization
+crash. Existing ordinary-entry counted/flow fast paths stay intact. The
+trailing-value-loops fixture follows the same source-free workflow. Counted-loop
+returns now transport i64, bool and exact flat-i64 records through seeded private
+values and loop-local break, propagating child returns out of the whole function.
+Return expressions run at their source position before the pending flag is set;
+skipped suffixes do not run, entered loops retain full reservations and failed
+callbacks do not publish partial output. The counted-returns fixture passes the
+same source-free workflow. Ready-value branch/continuation elision now restores
+the full control-composition fixture that exceeded the unchanged 64-function bound:
+it emits 57 reachable native functions and retains native/reference parity.
+Only integer/bool literals and already-initialized scalar/flat-record values bypass
+private helpers. Conditions still execute once; calls, field projections and record
+construction remain guarded, with nontrivial suffixes shared rather than copied.
+Actual helper entries decrease, but loop reservations and both budget policies stay
+unchanged. Nontrivial terminal continuations remain the next expansion target.
+Effects and mixed/nested/resource aggregates remain separate; per-return allocation
+is still an optimization target.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and
 native call-graph admission.
@@ -296,9 +318,10 @@ The division, aggregate-division, aggregate-counted, aggregate-carried,
 aggregate-conditional, aggregate-one-sided, aggregate-compound, aggregate-nested,
 aggregate-sequences, aggregate-temporaries, aggregate-checked, aggregate-calls and
 aggregate-local-values, aggregate-loop-calls, bool-rebinding, aggregate-rebinding,
-aggregate-carries, bool-carries and literal-loops
+aggregate-carries, bool-carries, literal-loops, value-loop-exits, trailing-value-loops,
+counted-returns and control-composition
 fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
-suite now contains twenty-four regressions,
+suite now contains twenty-eight regressions,
 including loop-work/helper-entry exhaustion and lifecycle reset, cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.

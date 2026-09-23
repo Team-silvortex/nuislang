@@ -9,19 +9,15 @@ pub(super) fn validate(
     layouts: &control_values::FlatLayouts,
     depth: usize,
 ) -> Option<()> {
-    let (first @ NirStmt::Let { .. }, effects) = body.split_first()? else {
-        return None;
-    };
-    let prepared = prepare_counted_while(
-        condition,
-        std::slice::from_ref(first),
-        &BTreeSet::new(),
-        &BTreeMap::new(),
-        &BTreeMap::new(),
-    )?;
-    if update_name(first, &locals.scope, &locals.writable)? != prepared.binding_name {
+    let iteration = induction::parse(condition, body)?;
+    let prepared = &iteration.prepared;
+    if update_name(iteration.step, &locals.scope, &locals.writable)? != prepared.binding_name {
         return None;
     }
+    let normalized = iteration.normalize(&locals.scope)?;
+    let effects = normalized
+        .as_ref()
+        .map_or(iteration.effects, |flow| &flow.effects);
     let mut changed = sequences::carry_names(effects)
         .into_iter()
         .filter(|name| locals.scope.contains_key(name))
@@ -43,7 +39,7 @@ pub(super) fn validate(
     // then starts a fresh source-ordered write set, without gaining authority.
     let mut child = locals.clone();
     child.available.retain(|name| !changed.contains(name));
-    child.available.insert(prepared.binding_name);
+    child.available.insert(prepared.binding_name.clone());
     let mut child_updates = updates.clone();
     child_updates.extend(changed.iter().cloned());
     block(

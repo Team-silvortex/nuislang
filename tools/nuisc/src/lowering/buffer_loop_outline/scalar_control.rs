@@ -2,6 +2,10 @@ use super::*;
 use branches::{collect_bindings, fresh_name};
 use control_values::collect_inputs as collect_expr_inputs;
 
+#[cfg(test)]
+#[path = "scalar_control_tests.rs"]
+mod tests;
+
 pub(super) fn outline(
     module: &mut NirModule,
     retained: &BTreeSet<String>,
@@ -95,11 +99,13 @@ impl Builder<'_> {
                     let tail = stmts.collect::<Vec<_>>();
                     // Share the suffix instead of copying it into both arms. Nested
                     // fallthroughs therefore generate a linear-size function DAG.
-                    let next = if tail.is_empty() {
-                        continuation
-                    } else {
-                        let body = self.block(tail, scope.clone(), continuation);
-                        Some(self.function("__nuis_scalar_continue", body, &scope, false))
+                    let next = match tail.as_slice() {
+                        [] => continuation,
+                        [NirStmt::Return(Some(value))] if is_atom(value) => Some(value.clone()),
+                        _ => {
+                            let body = self.block(tail, scope.clone(), continuation);
+                            Some(self.function("__nuis_scalar_continue", body, &scope, false))
+                        }
                     };
                     let predicate = fresh_name("__nuis_scalar_condition", &mut self.bindings);
                     output.push(NirStmt::Let {
@@ -110,6 +116,17 @@ impl Builder<'_> {
                     scope.insert(predicate.clone(), scalar_type("bool"));
                     let mut values = Vec::new();
                     for (selected, arm) in [(true, then_body), (false, else_body)] {
+                        // Existing values need no speculative work or allocation. Keep
+                        // calls, projections and constructors behind their original guard.
+                        let atom = match arm.as_slice() {
+                            [NirStmt::Return(Some(value))] if is_atom(value) => Some(value),
+                            [] => next.as_ref().filter(|value| is_atom(value)),
+                            _ => None,
+                        };
+                        if let Some(value) = atom {
+                            values.push(value.clone());
+                            continue;
+                        }
                         let default = control_values::zero_value(&self.result, self.layouts);
                         let mut body = vec![NirStmt::If {
                             condition: NirExpr::Binary {
@@ -130,9 +147,8 @@ impl Builder<'_> {
                         });
                         values.push(NirExpr::Var(name));
                     }
-                    // Both calls receive only captured values. The unselected arm
-                    // returns before its arguments, arithmetic or nested callees run.
-                    // This final select only chooses already-guarded results.
+                    // Remaining calls receive only captured values and return before
+                    // unselected work. The select chooses ready atoms or guarded results.
                     output.push(NirStmt::If {
                         condition: NirExpr::Var(predicate),
                         then_body: vec![NirStmt::Return(Some(values.remove(0)))],
@@ -172,6 +188,10 @@ impl Builder<'_> {
         self.helpers.push(function);
         NirExpr::Call { callee: name, args }
     }
+}
+
+fn is_atom(value: &NirExpr) -> bool {
+    matches!(value, NirExpr::Int(_) | NirExpr::Bool(_) | NirExpr::Var(_))
 }
 
 fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {

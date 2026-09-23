@@ -37,12 +37,25 @@ fn extra_carries_cannot_disappear_behind_a_single_scoped_call() {
         "let returned: Carries = advance(total, index, checksum, enabled);\n      let total: i64 = returned.carry0;\n      let checksum: i64 = returned.carry1;",
         "let total: i64 = accumulate(total, index, enabled);\n      let checksum: i64 = sum(checksum, total);",
     );
-    let project = Project::with_source(&source);
+    // The value outliner now admits both writes. Losing checksum would corrupt
+    // the independent lifecycle totals even if reference/native made the same bug.
+    assert_native_parity(&source, true);
+    // An effectful callee remains outside that catalog. The fallback must reject
+    // this body instead of silently dropping its extra outer-state update.
+    let effectful = source.replace(
+        "let checksum: i64 = sum(checksum, total);",
+        "let checksum: i64 = audit(checksum, total);",
+    ).replace(
+        "mod cpu Main {",
+        "mod cpu Main { @noinline fn audit(left: i64, right: i64) -> i64 { print(left); return left + right; }",
+    );
+    let project = Project::with_source(&effectful);
     let error = nuisc::pipeline::compile_project(&project.0)
         .err()
         .expect("must retain every carried update or reject");
     assert!(
-        error.contains("cannot discard an unsupported outer-state update"),
+        error.contains("structured `while` lowering recognized loop state `index`")
+            && error.contains("first body binding `total` is not a supported temp/step prefix"),
         "{error}"
     );
 }

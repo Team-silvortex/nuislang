@@ -14,7 +14,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-literal-loop-source-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/literal_loops.rs",
         required_patterns: &[
-            "update_name(first, &locals.scope, &locals.writable)",
+            "update_name(iteration.step, &locals.scope, &locals.writable)",
             "changed.insert(prepared.binding_name.clone())",
             "expression(input, locals, updates, None, catalog, layouts, 0)",
             "child.available.retain(|name| !changed.contains(name))",
@@ -111,7 +111,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "### Literal Nested Counted Loops",
             "Every selected invocation performs its own complete induction preflight",
             "Neither counter resets at nesting boundaries",
-            "Extend guarded exits in literal nested counted value loops",
+            "Guarded exits in these leading-step bodies now use the contract below",
         ],
     },
 ];

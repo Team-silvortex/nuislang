@@ -22,6 +22,7 @@ use scalar_helpers::ScalarHelpers;
 mod validation;
 use validation::{buffer_loop_params, captured_params, validate_effects};
 
+#[derive(Clone)]
 struct MutationScope {
     writable: BTreeSet<String>,
     protected: BTreeSet<String>,
@@ -51,6 +52,17 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let catalog = scalar_helpers::collect(module);
     let layouts = control_values::layouts(module);
     let control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+    for function in &mut module.functions {
+        if control_catalog.contains_key(&function.name) {
+            if let Some(body) = control_loops::returns::normalize(function, &layouts)
+                .expect("admitted counted return flow")
+            {
+                function.body = body;
+            }
+        }
+    }
+    let preserve_entry_flow =
+        control_catalog.contains_key("main") && control_loops::preserve_entry_flow(module);
     let mut names = module
         .functions
         .iter()
@@ -73,6 +85,9 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let mut outlined = BufferLoopOutlines::default();
     let checked_arithmetic = speculation::collect_checked_arithmetic(module);
     for function in &module.functions {
+        if preserve_entry_flow && function.name == "main" {
+            continue;
+        }
         if control_catalog.get(&function.name).is_some_and(|helper| {
             // Pure calls can still expand into substantial work. Keep
             // conditional calls behind guards, not an eager value select.
@@ -92,6 +107,14 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         }
     }
     for function in &mut module.functions {
+        // Value admission excludes Buffer effects. A tail-step break may match
+        // both shape parsers, but only one outliner may rewrite its source body.
+        if control_catalog
+            .get(&function.name)
+            .is_some_and(|helper| helper.may_loop)
+        {
+            continue;
+        }
         let mut scope = function
             .params
             .iter()
@@ -116,6 +139,8 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut outlined.guarded_functions,
         &control_catalog,
         &layouts,
+        &mut outlined.break_controls,
+        preserve_entry_flow,
     );
     scalar_control::outline(
         module,

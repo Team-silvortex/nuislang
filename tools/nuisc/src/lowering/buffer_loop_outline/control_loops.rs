@@ -7,8 +7,33 @@ pub(super) use nested::{outline, outline_iteration};
 #[path = "control_loops/sequences.rs"]
 mod sequences;
 
+#[path = "control_loops/induction.rs"]
+pub(super) mod induction;
+
 #[path = "control_loops/temporaries.rs"]
 mod temporaries;
+
+#[path = "control_loops/exits.rs"]
+mod exits;
+
+#[path = "control_loops/returns.rs"]
+pub(super) mod returns;
+
+#[path = "control_loops/entry_flow.rs"]
+mod entry_flow;
+pub(super) use entry_flow::preserve as preserve_entry_flow;
+
+#[cfg(test)]
+#[path = "control_loops/exits_tests.rs"]
+mod exits_tests;
+
+#[cfg(test)]
+#[path = "control_loops/trailing_tests.rs"]
+mod trailing_tests;
+
+#[cfg(test)]
+#[path = "control_loops/returns_tests.rs"]
+mod returns_tests;
 
 #[cfg(test)]
 #[path = "control_loops/literal_loops_tests.rs"]
@@ -36,22 +61,12 @@ pub(super) fn validate(
     catalog: &ScalarHelpers,
     layouts: &control_values::FlatLayouts,
 ) -> Option<()> {
-    let (first @ NirStmt::Let { name, .. }, tail) = body.split_first()? else {
-        return None;
-    };
-    let prepared = prepare_counted_while(
-        condition,
-        std::slice::from_ref(first),
-        &BTreeSet::new(),
-        &BTreeMap::new(),
-        &BTreeMap::new(),
-    )?;
-    if name != &prepared.binding_name {
-        return None;
+    let iteration = induction::parse(condition, body)?;
+    if !iteration.leading || nested::present(body, scope) {
+        return sequences::validate(&iteration, scope, loop_bindings, catalog, layouts);
     }
-    if nested::present(body, scope) {
-        return sequences::validate(&prepared, body, scope, loop_bindings, catalog, layouts);
-    }
+    let prepared = &iteration.prepared;
+    let tail = iteration.effects;
     let mut updates = BTreeSet::new();
     let mut ordered = Vec::new();
     for stmt in body {
@@ -322,10 +337,6 @@ mod tests {
                 "let index: i64 = wrap(index, limit, stride);",
             ),
             ("return index;", "let index: i64 = initial; return index;"),
-            (
-                "let index: i64 = index + stride;",
-                "if index > 0 { break; } let index: i64 = index + stride;",
-            ),
         ] {
             let module = parse_nuis_module(&SOURCE.replace(from, to)).unwrap();
             let catalog =

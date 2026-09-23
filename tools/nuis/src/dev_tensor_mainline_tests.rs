@@ -308,7 +308,30 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("extend guarded exits in literal nested counted value loops"));
+        .starts_with("reduce private control-helper expansion"));
+    assert!(session
+        .next_step
+        .contains("nontrivial terminal continuations"));
+    assert!(session.evidence.contains("57 reachable native functions"));
+    assert!(session
+        .evidence
+        .contains("full control-composition fixture"));
+    assert!(session.evidence.contains("predicates still run once"));
+    assert!(session.evidence.contains("Counted value-loop returns now"));
+    assert!(session.evidence.contains("counted-returns fixture"));
+    assert!(session.evidence.contains("unchanged 64-function bound"));
+    assert!(session
+        .evidence
+        .contains("Trailing-step pure-value counted loops now share"));
+    assert!(session
+        .evidence
+        .contains("Value-admitted functions bypass Buffer rewriting"));
+    assert!(session.evidence.contains("trailing-value-loops fixture"));
+    assert!(session
+        .evidence
+        .contains("Guarded break/continue now compose"));
+    assert!(session.evidence.contains("private advanced-index recovery"));
+    assert!(session.evidence.contains("value-loop-exits fixture"));
     assert!(session
         .evidence
         .contains("Literal nested counted loops now reuse"));
@@ -358,7 +381,14 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("Literal nested counted bodies now have"));
     assert!(session
         .blocker
-        .contains("Guarded exits in these pure-value nested bodies"));
+        .contains("Leading-step guarded exits now have private advanced-index recovery"));
+    assert!(session
+        .blocker
+        .contains("Trailing-step pure-value loops now have pre-step effects"));
+    assert!(session
+        .blocker
+        .contains("Counted-loop i64/bool/flat-i64 returns now"));
+    assert!(session.blocker.contains("Private control-helper expansion"));
     assert!(!session
         .blocker
         .contains("outer flat-i64 aggregate carries still need"));

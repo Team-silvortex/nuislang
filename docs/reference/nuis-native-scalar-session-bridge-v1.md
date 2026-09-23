@@ -287,7 +287,7 @@ YIR declaration order, including successful-path allocation/drop balance, both l
 directions, 1/3/7 carries, skipped invalid arithmetic and selected unused-result traps.
 Forged cast types/dependencies/arity reject. The
 [budget regression](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
-checks an exact 18-entry/8-trip composition and independent exhaustion without
+checks an exact 17-entry/8-trip composition and independent exhaustion without
 callback output. [Default native-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/bool_rebinding.rs)
 retain the same value and reached-failure behavior, without importing session budgets.
 The [bool-rebinding lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/bool_rebinding_loops.ns)
@@ -420,7 +420,7 @@ reached overwritten-result traps, preflight and forged layout/projection rejecti
 [Source admission tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/aggregate_calls_tests.rs)
 also exercise 65-field discovery without widening native limits and reject nominal,
 scope and constant/parameter-write drift. The [budget probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
-check exact 18-entry/eight-trip work, both branch selections and each insufficient budget.
+check exact 17-entry/eight-trip work, both branch selections and each insufficient budget.
 The [ordinary native entry tests](../../tools/nuisc/tests/control_flow_syntax_native/aggregate_rebinding.rs)
 and [lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_rebinding_loops.ns)
 cover executable entry and build/cache/source-free standalone restoration respectively.
@@ -503,7 +503,7 @@ successful-path allocation/drop balance. A separate singleton bool test retains
 the typed callback state. Forged raw-bool seeds, layouts and cast metadata reject.
 
 [Budget probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
-retain exact 18-entry/eight-trip composition and independently insufficient entry
+retain exact 17-entry/eight-trip composition and independently insufficient entry
 and loop budgets, without refunds, resets or callback output publication.
 [Ordinary native-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/bool_carries.rs)
 cover singleton and mixed-value loops without importing native-session budgets.
@@ -516,7 +516,8 @@ value-state checks, not new GPU/resource execution or allocation-free-loop evide
 
 Literal `while` bodies can now contain counted child loops using the same scoped
 function and private value-transport contracts as loop-bearing helper calls. Each
-loop retains a single leading i64 induction step and invariant atom bound/stride.
+loop retains a single i64 induction step and invariant atom bound/stride. Leading
+and trailing placements use the distinct source-timing rules below.
 Child bounds may use an already-available parent index or iteration-local value,
 including triangular loops. Child indices may be initialized per parent trip or
 persist as seeded outer mutable locals. Counter-only children retain the existing
@@ -553,9 +554,179 @@ retains local and persistent child indices. The [literal-loops fixture](../../to
 composes typed lifecycle, checked arithmetic and existing exit-bearing helpers through
 build/cache/source-free standalone restoration.
 
-This is not arbitrary nesting with exits: `break`/`continue` inside these pure-value
-counted bodies remains excluded. Resource and mixed/nested payloads, Buffer authority,
-allocation elimination, native preemption and device execution are not widened.
+Guarded exits in these leading-step bodies now use the contract below. Resource and
+mixed/nested payloads, Buffer authority, allocation elimination, native preemption
+and device execution are not widened.
+
+### Leading-Step Value Loop Exits
+
+Pure-value counted loops now admit direct and guarded `break`/`continue`, including
+literal child loops. Each loop owns its exit scope: a child exit cannot terminate
+its parent or suppress the parent's suffix. Prefix writes remain source ordered;
+the selected exit skips the rest of its own iteration without evaluating skipped
+arguments or checked arithmetic. The strict single leading i64 step remains required;
+an extra induction write or a statement after a direct exit in the same arm rejects.
+
+The [normalizer](../../tools/nuisc/src/lowering/buffer_loop_outline/control_flow.rs)
+reuses existing flag guards, with a separate leading-step mode. It does not require
+another step before `continue`. On `break`, the shared driver's tail step is suppressed,
+but the source step has already run. A [private recovery carry](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/exits.rs)
+holds that advanced value and restores the visible induction after the driver exits.
+Its entry seed preserves zero-trip identity; fresh names reserve future source
+bindings as well. The canonical break flag stays last and is seeded with zero,
+using existing `scoped_call_i64_carries_break` admission. No new opcode, public ABI,
+backend rule or Buffer exit behavior is introduced.
+
+Ordinary `main` loops still use the allocation-free flow path when the existing
+shared flow parser admits them; `main` is not a registered native-session callback.
+Callable value loops use the scoped contract, and complex ordinary-entry loops can
+use that same fallback. This does not remove per-return allocation from scoped loops.
+
+Generated suffix guards also count toward the value-profile depth limit of 32.
+Source write checks retain readonly parameters, constants, protected headers and
+forward-sibling rejection; normalization does not grant write authority. Full nonwrapping
+induction preflight remains mandatory even for immediate break. Each selected loop
+reserves its full bound without refund, while the separate helper counter charges
+only actual entries. Neither failure publishes callback output.
+
+[Source checks](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/exits_tests.rs)
+cover local control, canonical transport, name collisions and rejected writes/depth.
+[Native/reference oracles](../../tools/nuisc/tests/native_application_bridge/value_loop_exits.rs)
+check both directions, zero trips, bool/record snapshots, parent/child exits, skipped
+and overwritten arithmetic failures, late preflight failures, volatile operand and
+iteration traces, and successful-path allocation/drop balance.
+[Exact budget probes](../../tools/nuisc/tests/native_application_bridge/value_loop_exit_budgets.rs)
+check full reservations, actual entry debits and independent exhaustion without refund.
+[Ordinary entry](../../tools/nuisc/tests/control_flow_syntax_native/value_loop_exits.rs)
+retains advanced indices without acquiring native-session budgets. The
+[value-loop-exits fixture](../../tools/nuisc/tests/native_application_bridge/value_loop_exits.ns)
+combines these controls with typed lifecycle state through build/cache/tamper rejection
+and standalone restoration after source deletion.
+
+### Trailing-Step Value Loops
+
+Pure-value loops also admit a single trailing i64 induction step. The shared
+[induction parser](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/induction.rs)
+identifies the source placement before validation and outlining. The iteration
+helper observes the pre-step index; only a successful driver backedge advances it.
+`break` therefore retains the pre-step index and needs no advanced-index recovery.
+Even a break-only body uses the existing canonical projected flag transport.
+Leading and trailing child loops can mix; each child's exit and recovery remain local.
+
+A trailing `continue` must be immediately preceded by the identical explicit
+induction step in its own arm. Normalization removes only that duplicate, allowing
+the driver to execute the one source-equivalent step. An unstepped continue, a
+different step, a second induction mutation or effects between step and continue
+remain rejected by this bounded value profile. This is not a language-wide ban on
+continue: the profile cannot certify those bodies with its counted preflight.
+Generated suffix guards retain the 32-level bound. Header/write authority and
+source-order checks still apply to untaken branches and descendant loops.
+
+Value-admitted functions bypass the separate Buffer outliner, preventing duplicate
+rewriting of tail-step break bodies. The ordinary entry retains existing counted
+and flow fast paths, including prefixed step temporaries; callable value functions
+use scoped helpers without new opcodes, target-specific rules or callback ABI.
+Full induction preflight and reservation still apply to immediate exits. Break
+does not refund unentered iterations, including when a following loop requests work;
+continue does not invent another iteration or helper debit. Per-return allocation
+remains a separate optimization boundary.
+
+[Source tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/trailing_tests.rs)
+cover pre-step effects, exact continue steps, flag-only break, header authority,
+forward reads, mixed exits and generated guard depth.
+[Native/reference probes](../../tools/nuisc/tests/native_application_bridge/trailing_value_loops.rs)
+check both directions, nonunit strides, mixed child placements, bool/record snapshots,
+checked operand order, skipped/overwritten failures and full/late preflight.
+Successful executions balance aggregate allocation/drop.
+[Budget probes](../../tools/nuisc/tests/native_application_bridge/trailing_value_loop_budgets.rs)
+check independent exhaustion, repeated invocation, flag-only control and no refunds.
+[Ordinary-entry regressions](../../tools/nuisc/tests/control_flow_syntax_native/trailing_value_loops.rs)
+check break indices and mixed scopes. The
+[trailing-value-loops fixture](../../tools/nuisc/tests/native_application_bridge/trailing_value_loops.ns)
+adds build/cache/tamper rejection and source-free standalone restoration.
+
+### Returns From Counted Value Loops
+
+Counted pure-value helpers now admit `return` inside leading- or trailing-step
+loops, including child loops and conditional arms. Return types remain exact i64,
+bool or nonempty nominal flat-i64 records. This is not admission for resource
+returns, mixed/nested records, arbitrary loops or the separate Buffer profile.
+
+[Return normalization](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/returns.rs)
+seeds a private typed payload and canonical pending word before the source body.
+The return expression executes at its source location before publishing that word.
+Each containing loop then exits through its existing scoped-break contract; an
+outer function guard returns the saved payload. A child return exits the entire
+function, unlike an ordinary child break. Skipped suffixes, later child preflights
+and trailing steps are not evaluated. Leading-step indices are already advanced;
+zero trips leave the pending bit clear and retain the original fallback return.
+
+Admission validates the same normalized body that outlining consumes, preserving
+initialized-local write authority, exact nominal types and source-ordered reads.
+Generated names reserve parameters, future bindings and references. The frontend
+rejects unknown source names; normalization must not repair malformed NIR by
+accidentally binding one to a generated slot. Source nesting and
+generated suffix guards remain bounded; a direct return must terminate its source
+arm (apart from the canonical trailing induction step). Wrong/void return values,
+effects, writes to readonly/header state and hidden extra induction writes fail
+closed. No new native opcode, callback ABI, resource authority or global state is
+introduced.
+
+Entered loops still preflight their complete bound and reserve all trips. Returns
+do not refund work, and all entered helpers, including unselected guard helpers,
+consume the same callback-owned entry budget. A failing return expression or
+budget exhaustion leaves callback output unpublished; this is a process trap,
+not a recoverable callback error or a whole-program memory-safety claim.
+
+[Source admission tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/returns_tests.rs),
+[native/reference oracles](../../tools/nuisc/tests/native_application_bridge/counted_returns.rs)
+and [ordinary-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/counted_returns.rs)
+cover exact types, parent/child propagation, both directions and step placements,
+snapshots, zero trips, lazy failure and full induction preflight. Successful native
+paths balance aggregate allocations/drops.
+[Budget probes](../../tools/nuisc/tests/native_application_bridge/counted_return_budgets.rs)
+check repeated callbacks, shared reservations, helper exhaustion and unchanged
+output sentinels for division by zero and signed overflow. The
+[counted-returns fixture](../../tools/nuisc/tests/native_application_bridge/counted_returns.ns)
+adds build/cache, tamper rejection and source-free standalone restoration.
+
+Private continuation/guard expansion still consumes the unchanged 64-function
+native graph budget. An initial fixture combining the previous deeply branched
+body with the new returns exceeded that limit. The dedicated counted-returns
+fixture removed redundant control rather than raising it; the full composition
+is now restored by the ready-value optimization below.
+
+### Ready-Value Control Elision
+
+The [scalar-control outliner](../../tools/nuisc/src/lowering/buffer_loop_outline/scalar_control.rs)
+omits private helpers for integer/bool literals and already-initialized variables
+of the admitted scalar or flat-i64 record type. A terminal ready-value return needs
+no continuation; a branch returning such a value, or an empty arm forwarding it,
+needs no guard helper. The condition is still evaluated exactly once, including
+when both arms return the same value. Admission still rejects unknown variables,
+type/layout drift and unsupported effects before this transformation.
+
+Calls, arithmetic, projections and record constructors are not ready atoms. They
+stay behind their original guards. Nontrivial suffixes remain shared, preserving
+linear helper growth instead of duplicating source computation. Unused source
+calls and fallible predicates still execute. Ready-record selection reuses values;
+this does not remove allocations from ordinary aggregate-returning calls.
+
+The [full control-composition fixture](../../tools/nuisc/tests/native_application_bridge/control_composition.ns)
+combines counted returns with the original nested, branched, typed-carry workload.
+It previously failed the 64-function limit and now emits 57 reachable native
+functions. [The regression](../../tools/nuisc/tests/native_application_bridge/control_composition.rs)
+requires at most 57 and compares native execution with reference lifecycle states;
+the frontdoor suite also exercises build/cache/tamper rejection and source-free
+standalone restoration for this unshortened source.
+
+[Exact entry probes](../../tools/nuisc/tests/native_application_bridge/control_elision_budgets.rs)
+check one-time/fallible predicates, equal arms, argument-before-callee ordering,
+typed bool/record snapshots and untouched callback output on exhaustion. Eliminated
+synthetic functions no longer consume entries; every remaining actual entry still
+does. The loop reservation policy, both default budgets, graph/node/depth limits,
+public ABI and native opcodes are unchanged. This is a size/correctness improvement,
+not a measured runtime-speed or peak-memory result.
 
 ### Loop-Bearing Iteration Calls
 
@@ -1405,15 +1576,85 @@ Seven selected frontdoor cases (basic scalar, loop-bearing calls, outer bool/fla
 carries, literal nesting and both work budgets) passed build, cache, tamper rejection
 and source-free standalone restoration. This was not a full rerun of all twenty-four
 frontdoor cases or the workspace. The fresh tensor CLI reported 1287 drift checks,
-zero failures and clean coverage, hierarchy and lineage. The broad session coordinate
-remains active at 86, with guarded exits in literal nested value loops next. These
+zero failures and clean coverage, hierarchy and lineage. At that checkpoint the broad
+session coordinate remained active at 86, with guarded exits in literal nested value loops next. These
 checks do not establish performance, formal memory safety or new Linux/GPU execution.
+
+Leading-step value-loop exit integration was checked on 2026-09-20 on macOS aarch64:
+528 lowering unit tests, all 186 native bridge cases, 39 ordinary native-entry cases,
+89 Buffer-loop cases, four compound-flow cases and one owned-cleanup case passed.
+Six affected exit cases were rerun after strengthening early-parent child-preflight
+skipping and following-loop no-refund checks, and passed. Existing ordinary-entry
+flow instruction assertions remain intact. All 26 tensor unit tests passed.
+Six selected frontdoor cases (basic scalar, outer bool carries, literal nesting,
+value-loop exits and both work budgets) passed build, cache isolation, tamper rejection
+and source-free standalone restoration. This was not a full rerun of all twenty-five
+frontdoor cases or the workspace. The fresh tensor CLI reported 1300 drift checks,
+zero failures and clean coverage, hierarchy and lineage. The broad session coordinate
+remained active at 86, with trailing-step counted value loops next. These are CPU
+correctness and successful-path cleanup checks, not performance measurements, formal
+memory-safety proofs or new Linux/GPU certification.
+
+Trailing-step value-loop integration was checked on 2026-09-20 on macOS aarch64:
+531 lowering unit tests, 41 ordinary native-entry cases, 89 Buffer-loop cases,
+four compound-flow cases and one owned-cleanup case passed. All 191 native bridge
+cases were exercised. The full sweep passed 189; two old source/positional assertions
+were updated and passed focused reruns: extra pure carries now require independent
+native/reference lifecycle totals, effectful unsupported bodies still reject, and
+kind corruption now locates its bool capture by declared parameter type rather than
+assuming it is the last operand. The 18 affected cases passed across focused reruns,
+including stronger nonunit continue and early-parent child-preflight skipping probes.
+All 26 tensor unit tests passed. Nine selected frontdoor cases (basic scalar,
+guarded break, compound carries, outer bool carries, literal nesting, leading/trailing
+value exits and both work counters) passed build, cache isolation, tamper rejection
+and standalone restoration after source deletion. This was not a full rerun of all
+twenty-six frontdoor cases or the workspace. The freshly built tensor reported 1312
+drift checks, zero failures and clean coverage, hierarchy and lineage. The broad
+session coordinate stays active at 86, with early-returning counted value helpers
+next. These are CPU correctness and successful-path cleanup checks, not new
+performance measurements, formal memory-safety proofs or device certification.
+
+Counted-return integration was completed on 2026-09-23 on macOS aarch64. This
+change passed 535 lowering unit tests, 23 selected native-bridge regressions,
+89 Buffer-loop tests, 43 ordinary control-flow tests, four compound-loop tests,
+one owned-cleanup return test and 26 tensor unit tests. After the final private-name
+hardening, all 535 lowering tests, the five new native-bridge tests and two new
+ordinary-entry tests were rerun successfully. Three selected frontdoor cases
+(counted returns, trailing-step loops and leading-step value exits) passed
+build/cache, tamper rejection and source-free standalone restoration. The earlier
+interrupted frontdoor run was not counted as completion; these three cases were
+rerun together to obtain a complete result. This was not a full rerun of the
+196-case bridge suite, all 27 frontdoor cases or the workspace. The live tensor
+reported 1322 drift checks with zero failures, clean coverage/hierarchy/lineage,
+and the session coordinate remains active at 86. Private control-helper expansion
+is next; no graph limit, public ABI or opcode was widened. These are CPU-path
+proofs, not new Linux GPU, Windows, peak-memory or performance certification.
+
+Ready-value control elision was checked on 2026-09-23 on macOS aarch64.
+All 538 lowering unit tests, 141 LLVM unit tests, 43 ordinary control-flow tests,
+89 Buffer-loop tests, four compound-loop tests, one owned-cleanup test and 26 tensor
+tests passed. Across focused runs, 42 native-bridge cases passed, including exact
+entry accounting, ready bool/record snapshots, fallible aggregate cleanup, counted
+returns and unchanged graph/depth/node rejection. Old helper-count expectations
+were recalibrated to actual emitted entries; insufficient-budget rejection remains
+required. The restored full composition emits 57 reachable native functions.
+Five frontdoor cases (basic scalar, counted returns, full control composition,
+loop-work reservations and helper-entry fanout) passed build/cache, tamper rejection
+and source-free standalone restoration. This was not a full rerun of the 200-case
+bridge suite, all 28 frontdoor cases or the workspace. The fresh tensor reported
+1331 drift checks with zero failures and clean coverage/hierarchy/lineage. The
+session coordinate remains active at 86, with nontrivial terminal continuations
+next. These are CPU correctness and artifact-closure checks, not new Linux/GPU,
+Windows, peak-memory, formal safety or runtime-performance certification.
 
 ## Next Boundary
 
-Extend guarded exits in literal nested counted value loops through the same scoped
-helper contracts, without changing the separate Buffer exit profile. Preserve each
-selected inner invocation's preflight and both shared work counters. Keep resource
+Reduce private control-helper expansion for nontrivial terminal continuations
+while preserving native graph bounds, selected-path evaluation and shared entry
+accounting. Retain the 57-function full-composition regression and the counted-return
+source timing and propagation proof without changing the separate Buffer exit profile.
+Retain leading/trailing step timing, leading-step break recovery, loop-local continue, each selected inner
+invocation's preflight and both shared work counters. Keep resource
 and mixed/nested payloads separate. Retain outer bool
 carry seeds and explicit typed backedge conversion, outer flat-i64 carries,
 zero-trip seeds, exact nominal reconstruction,

@@ -8,6 +8,10 @@ mod aggregate_rebinding;
 mod bool_carries;
 #[path = "dev_tensor_drift_data_native_bool_rebinding.rs"]
 mod bool_rebinding;
+#[path = "dev_tensor_drift_data_native_control_elision.rs"]
+mod control_elision;
+#[path = "dev_tensor_drift_data_native_counted_returns.rs"]
+mod counted_returns;
 #[path = "dev_tensor_drift_data_native_iteration_values.rs"]
 mod flat_values;
 #[path = "dev_tensor_drift_data_native_helper_entries.rs"]
@@ -18,6 +22,10 @@ mod literal_loops;
 mod loop_calls;
 #[path = "dev_tensor_drift_data_native_loop_work.rs"]
 mod loop_work;
+#[path = "dev_tensor_drift_data_native_trailing_value_loops.rs"]
+mod trailing_value_loops;
+#[path = "dev_tensor_drift_data_native_value_loop_exits.rs"]
+mod value_loop_exits;
 
 pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
     CHECKS
@@ -31,6 +39,10 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(aggregate_carries::CHECKS.iter())
         .chain(bool_carries::CHECKS.iter())
         .chain(literal_loops::CHECKS.iter())
+        .chain(value_loop_exits::CHECKS.iter())
+        .chain(trailing_value_loops::CHECKS.iter())
+        .chain(counted_returns::CHECKS.iter())
+        .chain(control_elision::CHECKS.iter())
 }
 
 const CHECKS: &[DevTensorDriftCheckSpec] = &[

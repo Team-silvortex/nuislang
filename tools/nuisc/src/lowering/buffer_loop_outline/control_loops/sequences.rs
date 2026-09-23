@@ -29,26 +29,34 @@ pub(super) fn carry_names(body: &[NirStmt]) -> Vec<String> {
 }
 
 pub(super) fn validate(
-    prepared: &PreparedCountedWhile,
-    body: &[NirStmt],
+    iteration: &induction::Iteration<'_>,
     scope: &Scope,
     loop_bindings: &BTreeSet<String>,
     catalog: &ScalarHelpers,
     layouts: &control_values::FlatLayouts,
 ) -> Option<()> {
-    let (first, effects) = body.split_first()?;
+    let prepared = &iteration.prepared;
     // Reuse the strict single-step admission, including exact i64 and local
     // mutability. No branch can advance the outer induction a second time.
-    if update_name(first, scope, loop_bindings)? != prepared.binding_name {
+    if update_name(iteration.step, scope, loop_bindings)? != prepared.binding_name {
         return None;
     }
+    // A trailing continue may remove only its identical, immediately preceding
+    // step. All other induction/header writes remain visible to admission.
+    let normalized = iteration.normalize(scope)?;
+    let effects = normalized
+        .as_ref()
+        .map_or(iteration.effects, |flow| &flow.effects);
     let writes = carry_names(effects);
     let has_temporaries = writes.iter().any(|name| !scope.contains_key(name));
     let updates = writes
         .into_iter()
         .filter(|name| scope.contains_key(name))
         .collect::<BTreeSet<_>>();
-    if (!has_temporaries && updates.is_empty()) || updates.contains(&prepared.binding_name) {
+    let has_exits = control_flow::contains_exit(iteration.effects, false);
+    if (!has_temporaries && updates.is_empty() && !has_exits)
+        || updates.contains(&prepared.binding_name)
+    {
         return None;
     }
     for input in [&prepared.limit, &prepared.step] {
@@ -64,8 +72,10 @@ pub(super) fn validate(
     let has_flat_carries = updates.iter().any(|name| scope[name] != scalar_type("i64"));
     let mut mutable = updates;
     mutable.insert(prepared.binding_name.clone());
-    if has_temporaries
+    if !iteration.leading
+        || has_temporaries
         || has_flat_carries
+        || has_exits
         || contains_loop(effects)
         || speculation::block_has_checked_arithmetic(effects, &BTreeSet::new())
         || scalar_helpers::contains_calls(effects)

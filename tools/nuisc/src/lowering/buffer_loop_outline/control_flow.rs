@@ -13,6 +13,29 @@ pub(super) fn normalize(
     scope: &Scope,
     step: &NirStmt,
 ) -> Option<Option<Normalized>> {
+    normalize_with_step(effects, scope, Some(step), false)
+}
+
+// The pure-value profile has already advanced its induction before these effects.
+// Continue only skips the suffix; break's advanced index is transported separately.
+pub(super) fn normalize_leading(effects: &[NirStmt], scope: &Scope) -> Option<Option<Normalized>> {
+    normalize_with_step(effects, scope, None, true)
+}
+
+pub(super) fn normalize_trailing(
+    effects: &[NirStmt],
+    scope: &Scope,
+    step: &NirStmt,
+) -> Option<Option<Normalized>> {
+    normalize_with_step(effects, scope, Some(step), true)
+}
+
+fn normalize_with_step(
+    effects: &[NirStmt],
+    scope: &Scope,
+    step: Option<&NirStmt>,
+    bounded: bool,
+) -> Option<Option<Normalized>> {
     if !contains_exit(effects, false) {
         return Some(None);
     }
@@ -29,7 +52,15 @@ pub(super) fn normalize(
         branches::fresh_name("__nuis_buffer_continue", &mut names)
     };
     let running_value = i64::from(!break_only);
-    let (mut body, _) = rewrite(effects, step, &flag, breaking.as_deref(), running_value)?;
+    let (mut body, _) = rewrite(
+        effects,
+        step,
+        &flag,
+        breaking.as_deref(),
+        running_value,
+        0,
+        bounded,
+    )?;
     body.insert(0, set_flag(&flag, running_value));
     if let Some(breaking) = breaking.as_ref().filter(|name| *name != &flag) {
         body.insert(0, set_flag(breaking, 0));
@@ -42,37 +73,41 @@ pub(super) fn normalize(
 }
 
 fn contains_continue(body: &[NirStmt]) -> bool {
-    body.iter().any(|stmt| match stmt {
-        NirStmt::Continue => true,
-        NirStmt::If {
-            then_body,
-            else_body,
-            ..
-        } => contains_continue(then_body) || contains_continue(else_body),
-        _ => false,
-    })
+    any_exit(body, false, true)
 }
 
-fn contains_exit(body: &[NirStmt], break_only: bool) -> bool {
-    body.iter().any(|stmt| match stmt {
-        NirStmt::Break => true,
-        NirStmt::Continue => !break_only,
-        NirStmt::If {
-            then_body,
-            else_body,
-            ..
-        } => contains_exit(then_body, break_only) || contains_exit(else_body, break_only),
-        // A child loop owns its control scope and is normalized independently.
-        _ => false,
-    })
+pub(super) fn contains_exit(body: &[NirStmt], break_only: bool) -> bool {
+    any_exit(body, true, !break_only)
+}
+
+fn any_exit(body: &[NirStmt], breaks: bool, continues: bool) -> bool {
+    let mut pending = body.iter().collect::<Vec<_>>();
+    while let Some(stmt) = pending.pop() {
+        match stmt {
+            NirStmt::Break if breaks => return true,
+            NirStmt::Continue if continues => return true,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                pending.extend(then_body.iter().chain(else_body));
+            }
+            // A child loop owns its control scope and is normalized independently.
+            _ => {}
+        }
+    }
+    false
 }
 
 fn rewrite(
     body: &[NirStmt],
-    step: &NirStmt,
+    step: Option<&NirStmt>,
     flag: &str,
     breaking: Option<&str>,
     running_value: i64,
+    depth: usize,
+    bounded: bool,
 ) -> Option<(Vec<NirStmt>, bool)> {
     let mut rewritten = Vec::with_capacity(body.len());
     for (index, stmt) in body.iter().enumerate() {
@@ -88,10 +123,15 @@ fn rewrite(
                 return Some((rewritten, true));
             }
             NirStmt::Continue => {
-                if index + 1 != body.len() || !same_step(rewritten.last()?, step) {
+                if index + 1 != body.len() {
                     return None;
                 }
-                rewritten.pop();
+                if let Some(step) = step {
+                    if !same_step(rewritten.last()?, step) {
+                        return None;
+                    }
+                    rewritten.pop();
+                }
                 rewritten.push(set_flag(flag, 0));
                 return Some((rewritten, true));
             }
@@ -100,10 +140,27 @@ fn rewrite(
                 then_body,
                 else_body,
             } => {
-                let (then_body, then_continues) =
-                    rewrite(then_body, step, flag, breaking, running_value)?;
-                let (else_body, else_continues) =
-                    rewrite(else_body, step, flag, breaking, running_value)?;
+                if bounded && depth >= 32 {
+                    return None;
+                }
+                let (then_body, then_continues) = rewrite(
+                    then_body,
+                    step,
+                    flag,
+                    breaking,
+                    running_value,
+                    depth + 1,
+                    bounded,
+                )?;
+                let (else_body, else_continues) = rewrite(
+                    else_body,
+                    step,
+                    flag,
+                    breaking,
+                    running_value,
+                    depth + 1,
+                    bounded,
+                )?;
                 rewritten.push(NirStmt::If {
                     condition: condition.clone(),
                     then_body,
@@ -111,8 +168,18 @@ fn rewrite(
                 });
                 if then_continues || else_continues {
                     // Outline the suffix once. A skipped suffix never evaluates its inputs.
-                    let (tail, _) =
-                        rewrite(&body[index + 1..], step, flag, breaking, running_value)?;
+                    // Pure-value admission also bounds the generated suffix guards,
+                    // including a long sequence of otherwise shallow source exits.
+                    let tail_depth = depth + usize::from(bounded);
+                    let (tail, _) = rewrite(
+                        &body[index + 1..],
+                        step,
+                        flag,
+                        breaking,
+                        running_value,
+                        tail_depth,
+                        bounded,
+                    )?;
                     if !tail.is_empty() {
                         rewritten.push(NirStmt::If {
                             condition: NirExpr::Binary {
