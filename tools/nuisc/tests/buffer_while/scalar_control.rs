@@ -54,7 +54,9 @@ fn scalar_control_nested_early_returns_stay_inside_callees() {
             .iter()
             .any(|node| node.op.instruction == instruction));
     }
-    assert!(compiled
+    // Every suffix here has one generated use and disjoint bindings. Keep the
+    // real guards above, but do not require an eliminated forwarding layer.
+    assert!(!compiled
         .yir
         .functions
         .iter()

@@ -13,7 +13,8 @@ fn composed_counted_returns_fit_native_graph_without_relaxing_limits() {
         .filter(|line| line.starts_with("define ") && line.contains(" @nuis_fn_"))
         .count();
     // This source exceeded the unchanged 64-function admission limit before
-    // ready-value return elision. Leave headroom without accepting regression.
-    assert!(functions <= 57, "{functions} functions");
+    // ready-value elision reached 57, terminal folding 54 and statement folding 51.
+    // The added same-name record/scalar scope keeps that bound through hygiene.
+    assert!(functions <= 51, "{functions} functions");
     assert_native_parity(COMPOSED, true);
 }

@@ -2,6 +2,9 @@ use super::*;
 use branches::{collect_bindings, fresh_name};
 use control_values::collect_inputs as collect_expr_inputs;
 
+#[path = "scalar_control_hygiene.rs"]
+mod hygiene;
+
 #[cfg(test)]
 #[path = "scalar_control_tests.rs"]
 mod tests;
@@ -93,15 +96,28 @@ impl Builder<'_> {
                 NirStmt::While { .. } => output.push(stmt),
                 NirStmt::If {
                     condition,
-                    then_body,
-                    else_body,
+                    mut then_body,
+                    mut else_body,
                 } => {
                     let tail = stmts.collect::<Vec<_>>();
-                    // Share the suffix instead of copying it into both arms. Nested
-                    // fallthroughs therefore generate a linear-size function DAG.
+                    let single_use = has_single_continuation_use(&then_body, &else_body);
+                    // Move a suffix only into its sole generated use after making
+                    // arm-local bindings hygienic. Multi-use work stays shared.
                     let next = match tail.as_slice() {
                         [] => continuation,
                         [NirStmt::Return(Some(value))] if is_atom(value) => Some(value.clone()),
+                        [NirStmt::Return(Some(value))] if single_use => Some(value.clone()),
+                        _ if single_use => {
+                            hygiene::prepare_arms(
+                                &mut then_body,
+                                &mut else_body,
+                                &tail,
+                                &scope,
+                                &mut self.bindings,
+                            );
+                            append_single_use_tail(&mut then_body, &mut else_body, tail);
+                            continuation
+                        }
                         _ => {
                             let body = self.block(tail, scope.clone(), continuation);
                             Some(self.function("__nuis_scalar_continue", body, &scope, false))
@@ -192,6 +208,79 @@ impl Builder<'_> {
 
 fn is_atom(value: &NirExpr) -> bool {
     matches!(value, NirExpr::Int(_) | NirExpr::Bool(_) | NirExpr::Var(_))
+}
+
+fn has_single_continuation_use(then_body: &[NirStmt], else_body: &[NirStmt]) -> bool {
+    // Count generated uses in block(), not runtime paths. A nonempty suffix
+    // is moved once or shared once; terminal fallthroughs can duplicate a value.
+    let mut pending = vec![then_body, else_body];
+    let mut uses = 0;
+    while let Some(body) = pending.pop() {
+        let boundary = body
+            .iter()
+            .enumerate()
+            .find(|(_, stmt)| matches!(stmt, NirStmt::If { .. } | NirStmt::Return(_)));
+        match boundary {
+            Some((
+                index,
+                NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                },
+            )) => {
+                let tail = &body[index + 1..];
+                if tail.is_empty() {
+                    pending.extend([then_body.as_slice(), else_body.as_slice()]);
+                } else {
+                    pending.push(tail);
+                }
+            }
+            Some((_, NirStmt::Return(_))) => {}
+            None => {
+                uses += 1;
+                if uses > 1 {
+                    return false;
+                }
+            }
+            _ => unreachable!("only branch/return boundaries are selected"),
+        }
+    }
+    uses == 1
+}
+
+fn append_single_use_tail(
+    then_body: &mut Vec<NirStmt>,
+    else_body: &mut Vec<NirStmt>,
+    tail: Vec<NirStmt>,
+) {
+    // Follow the same sharing boundaries as has_single_continuation_use. Moving
+    // the owned tail avoids cloning it into returning or mutually exclusive arms.
+    let mut pending = vec![(then_body, 0), (else_body, 0)];
+    while let Some((body, start)) = pending.pop() {
+        let boundary = (start..body.len())
+            .find(|&index| matches!(body[index], NirStmt::If { .. } | NirStmt::Return(_)));
+        match boundary {
+            None => {
+                body.extend(tail);
+                return;
+            }
+            Some(index) if matches!(body[index], NirStmt::Return(_)) => {}
+            Some(index) if index + 1 < body.len() => pending.push((body, index + 1)),
+            Some(index) => {
+                let NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                } = &mut body[index]
+                else {
+                    unreachable!("only branch/return boundaries are selected")
+                };
+                pending.extend([(then_body, 0), (else_body, 0)]);
+            }
+        }
+    }
+    unreachable!("validated single continuation use")
 }
 
 fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {

@@ -297,9 +297,15 @@ The counted-returns fixture crosses the same source-free workflow. Ready-value
 returns now avoid private branch/continuation helpers: integer/bool literals and
 existing scalar/flat-record values need no speculative work. Conditions still run
 once, and calls, projections and constructors stay guarded. The full previously
-over-budget control-composition fixture now fits in 57 reachable native functions,
+over-budget control-composition fixture now fits in 51 reachable native functions,
 without raising the 64-function bound or changing either work-budget policy.
-Nontrivial terminal continuations remain the next helper-expansion target.
+Single-use terminal computations also lose their forwarding helper but remain
+inside the selected guard; multiple uses still share one body. Single-use
+multi-statement suffixes also fold without dropping unused calls or changing their
+order. Scope-aware private names now separate colliding locals while preserving
+outer loop updates, fields and function symbols. The expanded composition includes
+a same-name record/scalar prefix and retains the 51-function bound. Per-return
+flat-i64 aggregate allocation is the next optimization target.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this

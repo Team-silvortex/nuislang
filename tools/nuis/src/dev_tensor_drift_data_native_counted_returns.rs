@@ -101,7 +101,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Returns From Counted Value Loops",
             "The return expression executes at its source location",
             "unchanged 64-function",
-            "Reduce private control-helper expansion",
+            "Hygienic Continuation Bindings",
         ],
     },
 ];

@@ -47,18 +47,21 @@ fn scalar_elision_keeps_nontrivial_fallback_arguments_inside_the_guard() {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_continue_0",
         "checked",
         "checked",
     ];
     execute(
         &source,
         0,
-        6,
-        &[open(&[0], Some(41), &skipped), open(&[2], Some(8), &taken)],
+        5,
+        &[
+            open(&[0], Some(41), &skipped),
+            open(&[2], Some(8), &taken),
+            open(&[4], None, &taken),
+        ],
     );
     // Argument evaluation enters the inner call before the outer call's debit.
-    execute(&source, 0, 5, &[open(&[2], None, &taken[..5])]);
+    execute(&source, 0, 4, &[open(&[2], None, &taken[..4])]);
 }
 
 #[test]

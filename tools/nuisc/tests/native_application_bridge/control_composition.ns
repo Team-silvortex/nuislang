@@ -100,7 +100,11 @@ mod cpu Main {
   }
   @noinline
   fn adjust(value: i64, delta: i64) -> i64 {
-    if delta == 0 { return value; }
+    if delta == 0 { return value; } else {
+      // This local record and the following scalar have distinct source bindings.
+      let result = Parts { quotient: quotient(value, 1), remainder: 0 };
+      let unused = result.quotient + result.remainder;
+    }
     let result: i64 = counted(value, delta, delta + 4, delta + 1);
     let corrected: i64 = result - value * 4 - delta * 8 - 32;
     let parts: Parts = decompose(corrected, 3);

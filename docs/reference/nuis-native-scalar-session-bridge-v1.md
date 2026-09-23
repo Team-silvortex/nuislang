@@ -287,7 +287,7 @@ YIR declaration order, including successful-path allocation/drop balance, both l
 directions, 1/3/7 carries, skipped invalid arithmetic and selected unused-result traps.
 Forged cast types/dependencies/arity reject. The
 [budget regression](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
-checks an exact 17-entry/8-trip composition and independent exhaustion without
+checks an exact 16-entry/8-trip composition and independent exhaustion without
 callback output. [Default native-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/bool_rebinding.rs)
 retain the same value and reached-failure behavior, without importing session budgets.
 The [bool-rebinding lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/bool_rebinding_loops.ns)
@@ -420,7 +420,7 @@ reached overwritten-result traps, preflight and forged layout/projection rejecti
 [Source admission tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/aggregate_calls_tests.rs)
 also exercise 65-field discovery without widening native limits and reject nominal,
 scope and constant/parameter-write drift. The [budget probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
-check exact 17-entry/eight-trip work, both branch selections and each insufficient budget.
+check exact 16-entry/eight-trip work, both branch selections and each insufficient budget.
 The [ordinary native entry tests](../../tools/nuisc/tests/control_flow_syntax_native/aggregate_rebinding.rs)
 and [lifecycle fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_rebinding_loops.ns)
 cover executable entry and build/cache/source-free standalone restoration respectively.
@@ -503,7 +503,7 @@ successful-path allocation/drop balance. A separate singleton bool test retains
 the typed callback state. Forged raw-bool seeds, layouts and cast metadata reject.
 
 [Budget probes](../../tools/nuisc/tests/native_application_bridge/helper_entries.rs)
-retain exact 17-entry/eight-trip composition and independently insufficient entry
+retain exact 16-entry/eight-trip composition and independently insufficient entry
 and loop budgets, without refunds, resets or callback output publication.
 [Ordinary native-entry tests](../../tools/nuisc/tests/control_flow_syntax_native/bool_carries.rs)
 cover singleton and mixed-value loops without importing native-session budgets.
@@ -707,16 +707,18 @@ when both arms return the same value. Admission still rejects unknown variables,
 type/layout drift and unsupported effects before this transformation.
 
 Calls, arithmetic, projections and record constructors are not ready atoms. They
-stay behind their original guards. Nontrivial suffixes remain shared, preserving
+stay behind their original guards. Multi-use nontrivial suffixes remain shared, preserving
 linear helper growth instead of duplicating source computation. Unused source
 calls and fallible predicates still execute. Ready-record selection reuses values;
 this does not remove allocations from ordinary aggregate-returning calls.
 
 The [full control-composition fixture](../../tools/nuisc/tests/native_application_bridge/control_composition.ns)
 combines counted returns with the original nested, branched, typed-carry workload.
-It previously failed the 64-function limit and now emits 57 reachable native
-functions. [The regression](../../tools/nuisc/tests/native_application_bridge/control_composition.rs)
-requires at most 57 and compares native execution with reference lifecycle states;
+It previously failed the 64-function limit; ready-value elision first reduced it
+to 57 reachable native functions, terminal elision reduced it to 54, and statement
+suffix folding below now reduces it to 51.
+[The regression](../../tools/nuisc/tests/native_application_bridge/control_composition.rs)
+requires at most 51 and compares native execution with reference lifecycle states;
 the frontdoor suite also exercises build/cache/tamper rejection and source-free
 standalone restoration for this unshortened source.
 
@@ -727,6 +729,96 @@ synthetic functions no longer consume entries; every remaining actual entry stil
 does. The loop reservation policy, both default budgets, graph/node/depth limits,
 public ABI and native opcodes are unchanged. This is a size/correctness improvement,
 not a measured runtime-speed or peak-memory result.
+
+### Single-Use Terminal Continuations
+
+A suffix consisting of one `return expression` can now lose its private forwarding
+function when exactly one generated continuation use reaches it. Calls, arithmetic,
+projections and flat-record constructors still execute behind the selected branch's
+leading guard, not before the condition or as speculative `select` operands.
+Argument and field evaluation order, old snapshots and reached unused calls remain
+unchanged. No source call is removed by this transformation.
+
+The outliner counts uses iteratively, saturating after the second use. An explicit
+return consumes no inherited continuation. Terminal branch fallthroughs contribute
+separate uses, but a nonempty suffix is emitted once regardless of how many runtime
+paths reach it. This models generated code rather than runtime path counts. Two or
+more uses still share a continuation; nontrivial expressions are not duplicated and
+the existing linear helper-growth property is retained. Multi-statement suffixes
+use the additional scope-preserving rule below.
+
+[Unit regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/scalar_control_tests.rs)
+cover typed terminals, nested fallthroughs, shared suffixes and a 32-return chain
+with only one copy of the final calculation.
+[Native budget probes](../../tools/nuisc/tests/native_application_bridge/terminal_continuation_budgets.rs)
+check bool/record results, source-ordered fields, lazy failure, unused prefixes,
+shared suffixes and unchanged output sentinels on exhaustion. The
+[ordinary CLI regression](../../tools/nuisc/tests/control_flow_syntax_native/terminal_continuations.rs)
+covers typed results and selected arithmetic traps without callback counters.
+Terminal folding alone reached 54 reachable native functions instead of 57. Remaining
+entries, including neutral guards, still cost one; loop reservations are unchanged.
+There is no graph-limit, public ABI, opcode or aggregate-allocation policy change.
+
+### Single-Use Statement Continuations
+
+A multi-statement suffix with one generated continuation use can now move into
+that use with disjoint bindings or the scope-aware local hygiene below. The outliner moves
+the owned statement sequence rather than copying it across runtime paths. It uses
+the same iterative boundary walk as terminal-use counting: an existing nonempty
+inner suffix is emitted once, while terminal fallthroughs contribute separate uses.
+Shared inner suffixes remain shared, and all moved work stays after the selected
+guard. Reached unused calls, arguments, predicates and source ordering are retained.
+
+Branch-local declarations do not escape in source. The initial optimization kept a
+separate function when an arm binding collided with a suffix binding.
+Scope-colliding single-use continuations now use explicit lexical renaming, rather than merging
+unrelated bindings. Multiple uses still retain one shared body.
+
+The unit return-chain regression drops from 63 to 32 private helpers while retaining
+one copy of the final calculation. The full control-composition fixture
+now emits 51 reachable native functions, down from 54; its native and frontdoor
+regressions require at most 51, including byte-identical restored LLVM. Exact entry
+probes check typed bool/record snapshots, unused fallible calls, shared inner work,
+argument-before-callee entry and unchanged output sentinels. The unused-result
+fixture now needs eight entries rather than nine, and still fails with seven.
+Ordinary CLI tests cover the same scope, typed-value and lazy-failure boundaries.
+
+The optimization removes forwarding functions only. Remaining real entries still
+cost one; selected loops keep full reservations. Native graph/node/depth bounds,
+public ABI, aggregate allocation and process-trap semantics are unchanged. These
+are code-size and correctness results, not a runtime-speed or peak-memory claim.
+
+### Hygienic Continuation Bindings
+
+The [local-hygiene pass](../../tools/nuisc/src/lowering/buffer_loop_outline/scalar_control_hygiene.rs)
+renames only arm-local declarations that collide with the moved suffix. Each
+binding receives a fresh private identity reserved against all source parameters
+and declarations, including future locals. Statement and expression walks are
+iterative; each branch and loop inherits its own scope snapshot. Binding
+initializers retain their original scope before a new identity is introduced.
+Only already-admitted scalar bodies reach this pass; it does not grant general
+source shadowing or make out-of-scope references valid.
+
+Existing bindings are updates, not new declarations: loop writes keep the same
+identity as their seed, and outer bindings are never renamed merely because both
+the branch and suffix update them. Normalized bool-word conversions and flat-record
+projections follow variable references; field labels, nominal types, function
+symbols and statement order do not change. Private scoped iteration functions
+retain their own parameter names and receive the renamed caller values normally.
+
+The same-name record/scalar probe now needs five entries instead of six, with an
+untouched output sentinel when four entries are insufficient. Native probes also
+cover renamed local i64/bool/record loop carries, unrenamed outer carries, zero-trip
+skipping, entry exhaustion and independent full-loop reservations. Unit and ordinary
+CLI tests preserve sibling constants of different types, early returns, unused
+fallible work, matching variable/field/function names and future private-like names.
+
+The full composition now includes a record prefix named like its subsequent scalar
+binding. Its 51-function bound, typed lifecycle totals, cache validation and exact
+source-free LLVM restoration remain required. Shared multi-use bodies, admission
+limits, callback ABI, lazy failure and source evaluation order are unchanged.
+The next boundary is per-return flat-i64 aggregate allocation, not a claim that
+ordinary aggregate calls have become allocation-free or gained measured speed.
 
 ### Loop-Bearing Iteration Calls
 
@@ -1647,11 +1739,67 @@ session coordinate remains active at 86, with nontrivial terminal continuations
 next. These are CPU correctness and artifact-closure checks, not new Linux/GPU,
 Windows, peak-memory, formal safety or runtime-performance certification.
 
+Single-use terminal continuation folding was checked on 2026-09-23 on macOS
+aarch64. All 541 lowering unit tests, 45 selected native-bridge cases, 44 ordinary
+control-flow tests, 89 Buffer-loop tests, four compound-loop tests, one owned-cleanup
+test, 141 LLVM unit tests and 26 tensor tests passed. The focused bridge run includes
+typed terminals, field/argument ordering, shared suffixes, unused calls, exact work
+debits and unchanged graph/depth/node rejection. Five frontdoor cases (basic scalar,
+counted returns, full composition and both work budgets) passed build/cache, tamper
+rejection and source-free standalone restoration. The full-composition frontdoor
+also requires at most 54 native functions and byte-identical LLVM after restoration.
+The live tensor reported 1338 drift checks, zero failures and clean coverage,
+hierarchy and lineage; the session coordinate remains active at 86. Single-use
+multi-statement continuations are next. This was not a full rerun of all 203 bridge
+cases, all 28 frontdoor cases or the workspace, and does not add Linux/GPU, Windows,
+formal safety, peak-memory or runtime-performance certification.
+
+Single-use multi-statement continuation folding was checked on 2026-09-23 on
+macOS aarch64. All 544 lowering unit tests, 49 selected native-bridge cases,
+89 Buffer-loop cases, 45 ordinary control-flow cases, four compound-loop cases,
+one owned-cleanup case, 141 LLVM unit tests and 26 tensor tests passed. The Buffer
+sweep exposed an old assertion requiring an eliminated continuation; it now requires
+no such forwarder while retaining guards, independent results and reversed-node
+execution. The complete 89-case suite passed again after that assertion update.
+The focused bridge run checks multi-statement typed results, unused fallible calls,
+argument ordering, same-name record/scalar scope isolation, shared inner suffixes,
+exact entry exhaustion and unchanged loop reservations and graph/depth/node bounds.
+Five frontdoor cases (basic scalar, counted returns, full composition and both work
+budgets) passed build/cache, tamper rejection and source-free standalone restoration.
+The full composition emits 51 reachable native functions, and both its native and
+frontdoor regressions require at most 51; restored LLVM remains byte-identical.
+The fresh tensor reported 1344 drift checks, zero failures and clean coverage,
+hierarchy and lineage. The session coordinate remains active at 86, with
+scope-colliding single-use continuations next. This was not a full rerun of all
+207 bridge cases, all 28 frontdoor cases or the workspace, and does not add
+Linux/GPU, Windows, formal safety, peak-memory or runtime-performance certification.
+
+Scope-aware continuation hygiene was checked on 2026-09-23 on macOS aarch64.
+All 546 lowering unit tests, 51 selected native-bridge cases, 89 Buffer-loop cases,
+46 ordinary control-flow cases, four compound-loop cases, one owned-cleanup case,
+141 LLVM unit tests and 26 tensor tests passed. The two new loop-budget cases
+passed again after strengthening zero-trip bool/record seed checks. Native traces
+cover same-name record/scalar bindings, renamed local and unrenamed outer loop
+updates, private bool conversions, exact entry exhaustion and independent loop
+reservations. Unit and CLI tests preserve sibling constants, future private-like
+names, field/function symbols, early returns and reached unused fallible calls.
+Five frontdoor cases (basic scalar, counted returns, expanded full composition and
+both work budgets) passed build/cache, tamper rejection and source-free standalone
+restoration. The full composition now includes a same-name record/scalar prefix;
+its 51-function ceiling and byte-identical restored LLVM remain verified.
+The fresh tensor reported 1351 drift checks, zero failures and clean coverage,
+hierarchy and lineage. The session coordinate remains active at 86, with per-return
+flat-i64 aggregate allocation next. This was not a full rerun of all 209 bridge
+cases, all 28 frontdoor cases or the workspace, and adds no Linux/GPU, Windows,
+formal safety, peak-memory or runtime-performance certification.
+
 ## Next Boundary
 
-Reduce private control-helper expansion for nontrivial terminal continuations
+Reduce per-return flat-i64 aggregate allocation in native scalar helpers
 while preserving native graph bounds, selected-path evaluation and shared entry
-accounting. Retain the 57-function full-composition regression and the counted-return
+accounting. Retain the 51-function full-composition regression, single-use terminal
+and statement evaluation, scope-aware local hygiene, unused calls, shared multi-use
+suffixes, and the counted-return
 source timing and propagation proof without changing the separate Buffer exit profile.
 Retain leading/trailing step timing, leading-step break recovery, loop-local continue, each selected inner
 invocation's preflight and both shared work counters. Keep resource

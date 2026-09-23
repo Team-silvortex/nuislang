@@ -305,6 +305,13 @@ fn check_workflow(source: &str) {
     let llvm = fs::read_to_string(output.join(format!("{stem}.ll"))).unwrap();
     assert!(llvm.contains("nuis_native_session_636f756e746572_open_v1"));
     assert!(!llvm.contains("define i64 @main"));
+    if source == CONTROL_COMPOSITION_SOURCE {
+        let functions = llvm
+            .lines()
+            .filter(|line| line.starts_with("define ") && line.contains(" @nuis_fn_"))
+            .count();
+        assert!(functions <= 51, "{functions} reachable native functions");
+    }
     for ty in ["i1", "i32", "i64", "float", "double"] {
         assert!(llvm.contains(&format!(" = call {ty} @nuis_fn_")));
     }
@@ -561,6 +568,12 @@ fn check_workflow(source: &str) {
         &[relocated.to_str().unwrap()],
     ));
     assert!(relocated.join(format!("{stem}.ll")).is_file());
+    if source == CONTROL_COMPOSITION_SOURCE {
+        assert_eq!(
+            fs::read_to_string(relocated.join(format!("{stem}.ll"))).unwrap(),
+            llvm
+        );
+    }
     assert_eq!(
         states(&success(project.command(
             "run-artifact",

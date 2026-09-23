@@ -301,16 +301,21 @@ values and loop-local break, propagating child returns out of the whole function
 Return expressions run at their source position before the pending flag is set;
 skipped suffixes do not run, entered loops retain full reservations and failed
 callbacks do not publish partial output. The counted-returns fixture passes the
-same source-free workflow. Ready-value branch/continuation elision now restores
+same source-free workflow. Ready-value, terminal and statement-suffix elision restore
 the full control-composition fixture that exceeded the unchanged 64-function bound:
-it emits 57 reachable native functions and retains native/reference parity.
+it emits 51 reachable native functions, down from 54, and retains native/reference parity.
 Only integer/bool literals and already-initialized scalar/flat-record values bypass
 private helpers. Conditions still execute once; calls, field projections and record
-construction remain guarded, with nontrivial suffixes shared rather than copied.
+construction remain guarded. A terminal expression with one generated use no longer
+needs a forwarding function; multiple uses still share their suffix instead of copying it.
 Actual helper entries decrease, but loop reservations and both budget policies stay
-unchanged. Nontrivial terminal continuations remain the next expansion target.
-Effects and mixed/nested/resource aggregates remain separate; per-return allocation
-is still an optimization target.
+unchanged. Multi-statement suffixes with a single generated use also fold, retaining
+unused calls and shared inner suffixes. Scope-aware private naming now separates
+colliding locals without renaming function symbols, fields or outer loop bindings;
+bool/record backedges retain their original binding identities. The full composition
+now includes a same-name record/scalar prefix within the same 51-function bound.
+Effects and mixed/nested/resource aggregates remain separate; per-return flat-i64
+aggregate allocation is the next optimization target.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and
 native call-graph admission.

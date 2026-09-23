@@ -971,3 +971,6 @@ mod trailing_value_loops;
 
 #[path = "control_flow_syntax_native/counted_returns.rs"]
 mod counted_returns;
+
+#[path = "control_flow_syntax_native/terminal_continuations.rs"]
+mod terminal_continuations;

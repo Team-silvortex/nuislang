@@ -26,7 +26,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/tests/native_application_bridge/control_composition.rs",
         required_patterns: &[
             "composed_counted_returns_fit_native_graph_without_relaxing_limits",
-            "assert!(functions <= 57",
+            "assert!(functions <= 51",
             "assert_native_parity(COMPOSED, true)",
         ],
     },
@@ -57,6 +57,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "native_control_composition_build_cache_and_standalone_relocation",
             "check_workflow(CONTROL_COMPOSITION_SOURCE)",
             "control_composition.ns",
+            "assert!(functions <= 51",
+            "fs::read_to_string(relocated.join",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -72,9 +74,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "docs/reference/nuis-native-scalar-session-bridge-v1.md",
         required_patterns: &[
             "Ready-Value Control Elision",
-            "It previously failed the 64-function limit and now emits 57 reachable native",
+            "It previously failed the 64-function limit; ready-value elision first reduced it",
             "including\nwhen both arms return the same value",
-            "nontrivial terminal continuations",
+            "Single-Use Terminal Continuations",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -83,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "reduce private control-helper expansion for nontrivial terminal continuations",
+            "reduce per-return flat-i64 aggregate allocation in native scalar helpers",
         ],
     },
 ];

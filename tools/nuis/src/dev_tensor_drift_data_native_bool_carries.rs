@@ -87,8 +87,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "outer_bool_carries_share_both_budgets_without_refunds_or_resets",
             "check_bool_budgets(&source)",
-            "execute(source, 8, 16, &[rejected])",
-            "execute(source, 7, 17, &[rejected])",
+            "execute(source, 8, 15, &[rejected])",
+            "execute(source, 7, 16, &[rejected])",
         ],
     },
     DevTensorDriftCheckSpec {

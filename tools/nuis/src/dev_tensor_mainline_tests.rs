@@ -308,10 +308,19 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("reduce private control-helper expansion"));
+        .starts_with("reduce per-return flat-i64 aggregate allocation"));
+    assert!(session.next_step.contains("native scalar helpers"));
+    assert!(session.evidence.contains("Scope-aware local hygiene"));
     assert!(session
-        .next_step
-        .contains("nontrivial terminal continuations"));
+        .evidence
+        .contains("five actual entries instead of six"));
+    assert!(session.evidence.contains("51 reachable native functions"));
+    assert!(session.evidence.contains("disjoint lexical bindings"));
+    assert!(session.evidence.contains("63 to 32 private helpers"));
+    assert!(session.evidence.contains("54 reachable native functions"));
+    assert!(session
+        .evidence
+        .contains("Generated-use counting is iterative"));
     assert!(session.evidence.contains("57 reachable native functions"));
     assert!(session
         .evidence

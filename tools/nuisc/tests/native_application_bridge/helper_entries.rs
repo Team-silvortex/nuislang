@@ -8,6 +8,8 @@ mod control_elision_budgets;
 mod counted_return_budgets;
 #[path = "literal_loops_budget.rs"]
 mod literal_loops_budget;
+#[path = "terminal_continuation_budgets.rs"]
+mod terminal_continuation_budgets;
 #[path = "trailing_value_loop_budgets.rs"]
 mod trailing_value_loop_budgets;
 #[path = "value_loop_exit_budgets.rs"]
@@ -19,7 +21,6 @@ const PAIR: &[&str] = &[
     "start",
     "selected",
     "__nuis_scalar_branch_0",
-    "__nuis_scalar_continue_0",
     "pair",
     "argument",
     "leaf",
@@ -245,12 +246,12 @@ fn helper_entries_share_exact_budget_and_reset_at_lifecycle_roots() {
         cases.push(case);
     }
     cases.push(open(&[10, 0], Some(12), PAIR));
-    execute(SOURCE, 0, 9, &cases);
+    execute(SOURCE, 0, 8, &cases);
 }
 
 #[test]
 fn helper_entries_reject_before_body_but_after_argument_evaluation() {
-    execute(SOURCE, 0, 8, &[open(&[10, 0], None, &PAIR[..8])]);
+    execute(SOURCE, 0, 7, &[open(&[10, 0], None, &PAIR[..7])]);
     execute(SOURCE, 0, 0, &[open(&[10, 0], None, &[])]);
 }
 
@@ -290,8 +291,9 @@ fn helper_entries_count_loop_free_roots_and_unused_results() {
         "return pair(value);",
         "let unused = pair(value); return value;",
     );
-    execute(&unused, 0, 9, &[open(&[10, 0], Some(10), PAIR)]);
-    execute(&unused, 0, 8, &[open(&[10, 0], None, &PAIR[..8])]);
+    // The single-use suffix loses only its forwarder, not the unused source call.
+    execute(&unused, 0, 8, &[open(&[10, 0], Some(10), PAIR)]);
+    execute(&unused, 0, 7, &[open(&[10, 0], None, &PAIR[..7])]);
 }
 
 #[test]
@@ -301,7 +303,6 @@ fn helper_entries_include_scoped_iterations_without_resetting_loop_reservations(
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_continue_0",
         "nested",
         "iteration",
         "argument",
@@ -312,17 +313,17 @@ fn helper_entries_include_scoped_iterations_without_resetting_loop_reservations(
         "relay",
         "leaf",
     ];
-    execute(source, 8, 13, &[open(&[2, 3, 1, 0, 0], Some(6), &calls)]);
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..12]);
+    execute(source, 8, 12, &[open(&[2, 3, 1, 0, 0], Some(6), &calls)]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..11]);
     rejected.remaining_loop = 3;
-    execute(source, 8, 12, &[rejected]);
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..9]);
+    execute(source, 8, 11, &[rejected]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..8]);
     rejected.remaining_loop = 3;
-    execute(source, 8, 9, &[rejected]);
+    execute(source, 8, 8, &[rejected]);
     // Per-loop admission still traps after the containing function entry, before debit.
-    let mut invalid = open(&[65537, 3, 1, 0, 0], None, &calls[..5]);
+    let mut invalid = open(&[65537, 3, 1, 0, 0], None, &calls[..4]);
     invalid.remaining_loop = 8;
-    execute(source, 8, 13, &[invalid]);
+    execute(source, 8, 12, &[invalid]);
 }
 
 #[test]
@@ -363,7 +364,6 @@ fn check_bool_budgets(source: &str) {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_continue_0",
         "nested",
         "iteration",
         "__nuis_buffer_branch_0",
@@ -381,18 +381,18 @@ fn check_bool_budgets(source: &str) {
     execute(
         source,
         8,
-        17,
+        16,
         &[
             open(&[2, 3, 1, 0, 0], Some(8), &calls),
             open(&[2, 3, 1, 1, 0], Some(8), &calls),
         ],
     );
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..16]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..15]);
     rejected.remaining_loop = 3;
-    execute(source, 8, 16, &[rejected]);
+    execute(source, 8, 15, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(source, 7, 17, &[rejected]);
+    execute(source, 7, 16, &[rejected]);
 }
 
 #[test]
@@ -411,7 +411,6 @@ fn flat_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_continue_0",
         "nested",
         "iteration",
         "__nuis_buffer_branch_0",
@@ -429,18 +428,18 @@ fn flat_rebinding_guards_share_both_budgets_without_refunds_or_resets() {
     execute(
         &source,
         8,
-        17,
+        16,
         &[
             open(&[2, 3, 1, 0, 0], Some(8), &calls),
             open(&[2, 3, 1, 1, 0], Some(8), &calls),
         ],
     );
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..16]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..15]);
     rejected.remaining_loop = 3;
-    execute(&source, 8, 16, &[rejected]);
+    execute(&source, 8, 15, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(&source, 7, 17, &[rejected]);
+    execute(&source, 7, 16, &[rejected]);
 }
 
 #[test]
@@ -463,7 +462,6 @@ fn outer_flat_carries_share_both_budgets_without_refunds_or_resets() {
         "start",
         "selected",
         "__nuis_scalar_branch_0",
-        "__nuis_scalar_continue_0",
         "nested",
         "iteration",
         "__nuis_buffer_branch_0",
@@ -481,16 +479,16 @@ fn outer_flat_carries_share_both_budgets_without_refunds_or_resets() {
     execute(
         &source,
         8,
-        17,
+        16,
         &[
             open(&[2, 3, 1, 0, 0], Some(8), &calls),
             open(&[2, 3, 1, 1, 0], Some(8), &calls),
         ],
     );
-    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..16]);
+    let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls[..15]);
     rejected.remaining_loop = 3;
-    execute(&source, 8, 16, &[rejected]);
+    execute(&source, 8, 15, &[rejected]);
     let mut rejected = open(&[2, 3, 1, 0, 0], None, &calls);
     rejected.remaining_loop = 2;
-    execute(&source, 7, 17, &[rejected]);
+    execute(&source, 7, 16, &[rejected]);
 }

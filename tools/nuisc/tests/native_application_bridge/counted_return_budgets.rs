@@ -42,15 +42,9 @@ fn counted_returns_keep_shared_reservations_entries_and_atomic_callback_output()
     execute(SOURCE, 8, 9, &[open(&[8, 3], None, &trace[..6])]);
     // Even the unselected private guard is an actual call, but not its suffix.
     execute(SOURCE, 9, 8, &[open(&[8, 3], None, &trace[..8])]);
-    let mut zero = vec![
-        "start",
-        "selected",
-        "__nuis_scalar_branch_0",
-        "__nuis_scalar_continue_0",
-        "identity",
-    ];
+    let mut zero = vec!["start", "selected", "__nuis_scalar_branch_0", "identity"];
     zero.extend(CALL);
-    execute(SOURCE, 1, 9, &[open(&[0, 3], Some(8), &zero)]);
+    execute(SOURCE, 1, 8, &[open(&[0, 3], Some(8), &zero)]);
     let mut preflight = open(&[65537, 3], None, &["start", "selected"]);
     preflight.remaining_loop = 9;
     execute(SOURCE, 9, 9, &[preflight]);
