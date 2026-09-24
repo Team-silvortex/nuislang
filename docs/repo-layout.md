@@ -18,7 +18,7 @@ quickly.
   ABI targets and lane defaults
 * [examples](../examples)
   canonical source examples, invalid/verifier examples, historical bridge
-  examples, and current checked-in build bundles
+  examples, and a source-first bundle rebuild guide
 * [stdlib](../stdlib)
   standard-library layout plus staged `.ns` source assets, especially the
   `std`, `PixelMagic`, `WitSage`, and `ns-nova` official library/galaxy
@@ -70,8 +70,8 @@ to trust first when implementation and future direction are both present.
   local build outputs and scratch artifacts; not part of the curated source
   layout and absent from a clean checkout
 * [examples/bins](../examples/bins)
-  explicitly retained generated example bundles; new scratch builds should use
-  a local output directory unless the bundle is intentionally curated
+  rebuild guide only; generated example bundles belong in ignored
+  `target/example-builds/`, not in the source checkout
 * [.github](../.github)
   repository automation/workflow metadata
 

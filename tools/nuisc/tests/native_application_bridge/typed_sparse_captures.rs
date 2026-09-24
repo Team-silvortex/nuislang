@@ -1,31 +1,64 @@
 use super::*;
 
 const SOURCE: &str = include_str!("typed_sparse_captures.ns");
+#[path = "typed_alias_capture_fixture.rs"]
+mod aliases;
 
 #[test]
 fn typed_sparse_captures_execute_64_integer_state_with_four_private_arguments() {
-    let project = Project::with_source(SOURCE);
+    check_sparse_captures(SOURCE, false, 0);
+}
+
+#[test]
+fn typed_sparse_captures_follow_aliases_inside_guarded_private_helpers() {
+    check_sparse_captures(&aliases::source(), true, 0);
+}
+
+#[test]
+fn typed_sparse_captures_preserve_old_and_rebound_record_versions() {
+    check_sparse_captures(&aliases::rebound_source(), true, 30);
+}
+
+fn check_sparse_captures(source: &str, alias: bool, offset: i64) {
+    let project = Project::with_source(source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     compiled.yir.nodes.reverse();
     compiled.yir.functions.reverse();
     for function in &mut compiled.yir.functions {
         function.body_nodes.reverse();
     }
-    let selection = compiled
-        .yir
-        .functions
-        .iter()
-        .find(|f| f.name.starts_with("__nuis_conditional_value"))
-        .unwrap();
-    assert_eq!(selection.parameters.len(), 4);
-    assert_eq!(
-        selection
-            .parameters
+    if alias {
+        let mut sizes = compiled
+            .yir
+            .functions
             .iter()
-            .map(|p| p.ty.as_str())
-            .collect::<Vec<_>>(),
-        ["bool", "i64", "i64", "i64"]
-    );
+            .filter(|f| f.name.starts_with("__nuis_scalar_branch"))
+            .map(|f| f.parameters.len())
+            .collect::<Vec<_>>();
+        sizes.sort();
+        assert_eq!(
+            sizes,
+            [2, 3],
+            "{}",
+            nuisc::render::render_yir(&compiled.yir)
+        );
+    } else {
+        let selection = compiled
+            .yir
+            .functions
+            .iter()
+            .find(|f| f.name.starts_with("__nuis_conditional_value"))
+            .unwrap();
+        assert_eq!(selection.parameters.len(), 4);
+        assert_eq!(
+            selection
+                .parameters
+                .iter()
+                .map(|p| p.ty.as_str())
+                .collect::<Vec<_>>(),
+            ["bool", "i64", "i64", "i64"]
+        );
+    }
     let choose = compiled
         .yir
         .functions
@@ -82,7 +115,7 @@ fn typed_sparse_captures_execute_64_integer_state_with_four_private_arguments() 
                     input[0]
                 } else {
                     input[3] / input[1]
-                };
+                } + offset;
             } else if role == 2 {
                 reference.close(vec![]).unwrap();
                 reference.completion_status().unwrap();
@@ -112,7 +145,7 @@ fn typed_sparse_captures_execute_64_integer_state_with_four_private_arguments() 
     let artifact = nuisc::aot::write_and_link_with_source(
         &project.0.join("main.ns"),
         &project.0.join("out"),
-        SOURCE,
+        source,
         nuisc::aot::AotCompileProgram {
             ast: &compiled.ast,
             nir: &compiled.nir,

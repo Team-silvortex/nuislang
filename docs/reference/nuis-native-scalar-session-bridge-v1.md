@@ -1952,19 +1952,20 @@ its zero-divisor arm; ten typed cases were rerun after bounding neutral expansio
 All 28 tensor tests and 1386 drift checks passed. That checkpoint exposed the
 64-leaf mixed capture plus predicate boundary now repaired by private capture transport.
 
-Private capture projection was checked on 2026-09-23 on macOS aarch64: 207 compiler/registry-unit,
-45 native-bridge, eight ordinary native and five reference image/window cases passed.
-Five CLI workflows passed, including exact-64-slot and sparse build/cache/tamper/source-free restoration.
-All 28 tensor tests passed; 1400 drift checks report zero failures with clean coverage,
-hierarchy and lineage. Sparse 64-i64 state now uses four private selection arguments.
+Private capture aliases and snapshots were checked on 2026-09-23/24 on macOS aarch64: 699 compiler/registry-unit,
+47 native-bridge, ten ordinary native, five reference image/window cases and the host-path policy check passed.
+Seven CLI workflows passed, including alias/snapshot/sparse build/cache/tamper/source-free restoration and selected traps.
+All 28 tensor tests passed (797 selected tests total); 1409 drift checks report zero failures with clean coverage,
+hierarchy and lineage. Sparse captures use four selection arguments; private alias/snapshot branches use two/three.
 Progress remains active at 86; the native 64-argument check is unchanged. This is not
 fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Propagate field demand through immutable private capture aliases, preserving snapshots.
-Sparse captures now project fields bottom-up before private boolean packing; user signatures
-and scoped-action metadata stay unchanged. Whole 64-i64 records plus a predicate still exceed the bound.
+Propagate field demand through same-name branch-local capture aliases, preserving lexical identity.
+Stable aliases and straight-line record snapshots now project fields before private boolean packing; user signatures
+and scoped-action metadata stay unchanged. Alias branches use two/three private arguments; whole 64-i64 uses still exceed the bound with a predicate.
+Forward substitution preserves old snapshots; versioning retains initializer work and rejects nested control-flow writes.
 Keep mixed/nested local values separate from the flat scoped-loop carry profile.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,

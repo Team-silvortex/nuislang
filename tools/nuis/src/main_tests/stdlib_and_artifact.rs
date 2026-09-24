@@ -157,7 +157,15 @@ fn single_source_workflow_helpers_emit_artifact_follow_up_commands() {
 fn resolve_run_artifact_binary_path_accepts_output_dir() {
     let project_root = checked_in_path("../../examples/projects/tooling/cli_runtime_demo");
     let output_dir = temp_dir("resolve_run_artifact_binary_path_output_dir");
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir).expect("resolve output-dir");
     assert_eq!(binary, output_dir.join("cli_runtime_demo"));
 }
@@ -225,7 +233,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("build_command_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
 
     for path in [
         output_dir.join("build_command_smoke.ast.txt"),
@@ -270,7 +286,7 @@ mod cpu Main {
     crate::galaxy::lock_project_deps(&project_root).expect("write release Galaxy lock");
     crate::galaxy::sync_project_deps(&project_root).expect("sync release Galaxy cache");
 
-    handle_release_check(project_root, output_dir.clone(), None, None, false)
+    handle_release_check(project_root.clone(), output_dir.clone(), None, None, false)
         .expect("release-check passes");
 
     let manifest_path = output_dir.join("nuis.build.manifest.toml");
@@ -296,7 +312,7 @@ fn release_check_rejects_project_without_committed_galaxy_lock() {
         "mod cpu Main {\n  fn main() -> i64 {\n    return 0;\n  }\n}\n",
     );
     let output_dir = temp_dir("release_check_missing_galaxy_lock_outputs");
-    let error = handle_release_check(project_root, output_dir.clone(), None, None, false)
+    let error = handle_release_check(project_root.clone(), output_dir.clone(), None, None, false)
         .expect_err("release-check must reject an unlocked project");
 
     assert!(error.contains("committed and synchronized Galaxy resolution"));
@@ -313,7 +329,7 @@ fn release_check_rejects_locked_project_without_synchronized_galaxy_cache() {
     );
     crate::galaxy::lock_project_deps(&project_root).expect("write release Galaxy lock");
     let output_dir = temp_dir("release_check_missing_galaxy_cache_outputs");
-    let error = handle_release_check(project_root, output_dir.clone(), None, None, false)
+    let error = handle_release_check(project_root.clone(), output_dir.clone(), None, None, false)
         .expect_err("release-check must reject an unsynchronized lock");
 
     assert!(error.contains("committed and synchronized Galaxy resolution"));
@@ -354,7 +370,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     handle_run_artifact(output_dir.join("nuis.build.manifest.toml"), false)
         .expect("run-artifact passes");
 }
@@ -470,7 +494,15 @@ fn cli_pgm_info_binary_accepts_real_pgm_input_file() {
     let input_path = output_dir.join("probe.pgm");
     fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
         .expect("resolve built binary");
     let status = Command::new(&binary)
@@ -488,7 +520,15 @@ fn cli_pgm_invert_binary_writes_inverted_pgm_output_file() {
     let output_path = output_dir.join("probe_out.pgm");
     fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
         .expect("resolve built binary");
     let status = Command::new(&binary)
@@ -510,7 +550,15 @@ fn cli_pgm_threshold_binary_writes_mask_pgm_output_file() {
     let output_path = output_dir.join("probe_out.pgm");
     fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
         .expect("resolve built binary");
     let status = Command::new(&binary)
@@ -554,7 +602,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("artifact_doctor_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let json = render_artifact_doctor_json(&output_dir);
 
     assert!(json.contains("\"kind\":\"artifact_doctor\""));

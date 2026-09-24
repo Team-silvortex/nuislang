@@ -975,5 +975,7 @@ mod counted_returns;
 #[path = "control_flow_syntax_native/terminal_continuations.rs"]
 mod terminal_continuations;
 
+#[path = "control_flow_syntax_native/alias_snapshots.rs"]
+mod alias_snapshots;
 #[path = "control_flow_syntax_native/conditional_values.rs"]
 mod conditional_values;

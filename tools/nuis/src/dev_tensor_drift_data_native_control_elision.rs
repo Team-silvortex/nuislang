@@ -85,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "propagate field demand through immutable private capture aliases",
+            "propagate field demand through same-name branch-local capture aliases",
         ],
     },
 ];

@@ -1,3 +1,0 @@
-main.ns	mod cpu Main
-kernel_unit.ns	mod kernel KernelUnit
-fabric_plane.ns	mod data FabricPlane

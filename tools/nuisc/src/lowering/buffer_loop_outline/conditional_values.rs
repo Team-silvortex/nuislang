@@ -5,13 +5,16 @@ use super::*;
 pub(super) fn outline(
     module: &mut NirModule,
     catalog: &ScalarHelpers,
+    control_catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
     names: &mut BTreeSet<String>,
 ) -> BTreeSet<String> {
     let checked = speculation::collect_checked_arithmetic(module);
     let mut helpers = Vec::new();
     for function in &mut module.functions {
-        if catalog.contains_key(&function.name) {
+        // Typed value admission alone does not provide full control lowering.
+        // Keep local selection extraction unless that route is already admitted.
+        if control_catalog.contains_key(&function.name) {
             continue;
         }
         let mut scope = function

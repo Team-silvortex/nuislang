@@ -1,25 +1,26 @@
-# Built Example Bundles
+# Rebuilding Example Bundles
 
-This folder contains generated example outputs, not handwritten source examples.
+This directory no longer ships generated binaries, host shims, manifests or IR
+dumps. The old window/kernel bundles were retired during the beta-0.14 cleanup;
+their source projects and regression coverage remain.
 
-Current kept bundles:
+Use the current compiler and an ignored output directory:
 
-Canonical current build:
+```bash
+cargo run -p nuis -- build examples/projects/kernel_tensor_demo target/example-builds/kernel_tensor_demo
+cargo run -p nuis -- build examples/projects/tooling/native_artifact_closure_demo target/example-builds/native_artifact_closure_demo
+```
 
-* [window_controls_demo_project](window_controls_demo_project/window_controls_demo)
-  single-binary bundle built from multi-file project [window_controls_demo](../../examples/projects/window_controls_demo)
-* [kernel_tensor_demo_project](kernel_tensor_demo_project/kernel_tensor_demo)
-  native bundle built from multi-file project [kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
+These commands run from the repository root and regenerate manifests alongside
+their artifacts. Follow the [native artifact workflow](../../docs/reference/nuis-native-artifact-workflow.md)
+for verification, Nsld handoff and execution rather than trusting a stale host
+binary. Build success alone is not device-execution evidence.
 
-Notes:
+For the current application route, start with
+[ns_nova_image_showcase](../projects/domains/ns_nova_image_showcase).
+The older [window_controls_demo](../projects/window_controls_demo) source is a
+repair/probe route, not a prebuilt application guarantee.
 
-* These folders may contain generated `.ast.txt`, `.nir.txt`, `.yir`, `.ll`, host stub, and bundle metadata files.
-* Project-route bundles are the primary ones to keep aligned with the current `nuis.toml` workflow.
-* Handwritten `YIR` and single-file `.ns` demo bundles should be rebuilt into a local output directory when needed, instead of being kept in-repo as compatibility artifacts.
-* Real-time window/runtime output is now the preferred bundle mode; prerendered `ppm` assets are treated as fallback/reference artifacts when they still exist.
-* Asset files inside a bundle should use the bundle name where possible; older anonymous leftovers such as `main.ppm` are treated as stale and can be cleaned.
-* All `nuis build` outputs now emit `nuis.build.manifest.toml` with toolchain/profile info, loaded nustar list, effective project ABI mode, per-artifact FNV-1a hashes, and CPU target details such as ABI, machine, object format, calling ABI, clang triple, and cross-build flag.
-* Project builds now also emit `nuis.project.host_ffi.txt` that records the host FFI contract surface used by the project entry.
-* Project builds now also emit `nuis.project.abi.txt` for the resolved ABI entries and record the compact `abi_graph` summary in both `nuis.project.plan.txt` and `nuis.build.manifest.toml`.
-* Current `project-status` and `build` output also surface the same ABI graph/target view, including per-domain backend family and whether a selected ABI is host-adaptive.
-* Per-project `.nuis/` compile caches are generated locally and should not be checked into the repository.
+Only this guide is versioned here. Local outputs are ignored; never force-add
+generated bundles. Intentional binary compatibility fixtures belong beside the
+tests that consume them. See the [cleanup policy](../../docs/repo-cleanup-candidates.md).

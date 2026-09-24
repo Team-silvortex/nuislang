@@ -34,7 +34,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::Once,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 fn enable_test_quiet_success_logs() {
@@ -212,6 +211,8 @@ fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
 mod abi_surface;
 #[path = "main_tests/artifact_runtime.rs"]
 mod artifact_runtime;
+#[path = "main_tests/artifact_runtime_providers.rs"]
+mod artifact_runtime_providers;
 #[path = "main_tests/artifact_runtime_release_check.rs"]
 mod artifact_runtime_release_check;
 #[path = "main_tests/artifact_runtime_run_artifact.rs"]
@@ -222,18 +223,19 @@ mod language_runner;
 mod project_health;
 #[path = "main_tests/project_imports_and_scheduler.rs"]
 mod project_imports_and_scheduler;
-fn temp_dir(label: &str) -> PathBuf {
+#[path = "main_tests/test_dirs.rs"]
+mod test_dirs;
+
+fn temp_dir(label: &str) -> test_dirs::TestDir {
     enable_test_quiet_success_logs();
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time")
-        .as_nanos();
-    let dir = env::temp_dir().join(format!("nuis_{label}_{}_{}", std::process::id(), nanos));
-    fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+    test_dirs::TestDir::new(label)
 }
 
-fn write_temp_project_fixture(name: &str, manifest: &str, entry_source: &str) -> PathBuf {
+fn write_temp_project_fixture(
+    name: &str,
+    manifest: &str,
+    entry_source: &str,
+) -> test_dirs::TestDir {
     let root = temp_dir(name);
     fs::write(root.join("nuis.toml"), manifest).expect("write manifest");
     fs::write(root.join("main.ns"), entry_source).expect("write entry");

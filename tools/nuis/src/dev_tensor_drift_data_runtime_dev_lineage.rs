@@ -2,6 +2,63 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "cli-fixture-scope-bound-output-cleanup",
+        path: "tools/nuis/src/main_tests/test_dirs.rs",
+        required_patterns: &[
+            "impl Drop for TestDir",
+            "default_build_output_dir(&root)",
+            "default_release_check_output_dir(&root)",
+            "temporary_project_and_derived_outputs_are_removed_on_drop",
+            "temporary_fixture_cleanup_runs_during_unwind",
+            "fixture_cleanup_keeps_other_live_fixtures",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "repository-cleanup-workspace-boundary",
+        path: "scripts/disk-clean-safe.sh",
+        required_patterns: &[
+            "APPLY=0",
+            "--build-binaries",
+            "git -C \"$ROOT_DIR\" ls-files -- \"$relative\"",
+            "refusing tracked cleanup path",
+            "refusing symlinked cleanup path",
+            "refusing non-ignored cleanup path",
+            "check_candidate \"$path\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "repository-cleanup-safety-regressions",
+        path: "scripts/tests/test_disk_cleanup.py",
+        required_patterns: &[
+            "test_default_is_read_only_and_resolves_workspace_from_script",
+            "test_apply_preserves_source_project_state_and_external_resources",
+            "test_workspace_removal_is_explicit",
+            "test_tracked_candidate_vetoes_every_deletion",
+            "test_non_ignored_candidate_is_not_assumed_disposable",
+            "test_symlinked_candidate_and_parent_veto_every_deletion",
+            "test_removed_global_options_fail_without_cleanup",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "repository-generated-output-source-guard",
+        path: "scripts/tests/test_repository_hygiene.py",
+        required_patterns: &[
+            "test_source_checkout_does_not_ship_generated_outputs",
+            "generated outputs belong in ignored local build directories",
+            "examples/bins/README.md",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "repository-regeneratable-output-policy",
+        path: "docs/repo-cleanup-candidates.md",
+        required_patterns: &[
+            "Keep source, intentional fixtures, package manifests/locks",
+            "Do not remove tests just because their original bug is old",
+            "target/example-builds/",
+            "Tracked paths, non-ignored paths and paths through symlinks fail closed",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "ci-cold-checkout-workflow",
         path: ".github/workflows/build.yml",
         required_patterns: &[

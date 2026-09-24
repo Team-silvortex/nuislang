@@ -32,3 +32,9 @@ __pycache__/
 
 # Generated per-project nuis workspace state
 **/.nuis/
+
+# Example bundles and optional host preview outputs are rebuilt from source.
+/examples/bins/*
+!/examples/bins/README.md
+/tools/yir-preview-macos/build/
+/.codex-write-probe/

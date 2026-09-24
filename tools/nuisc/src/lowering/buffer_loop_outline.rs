@@ -80,8 +80,13 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
                 .map(|definition| definition.name.clone()),
         )
         .collect::<BTreeSet<_>>();
-    let selections =
-        conditional_values::outline(module, &value_catalog, &value_layouts, &mut names);
+    let selections = conditional_values::outline(
+        module,
+        &value_catalog,
+        &control_catalog,
+        &value_layouts,
+        &mut names,
+    );
     if !selections.is_empty() {
         catalog = scalar_helpers::collect(module);
         control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);

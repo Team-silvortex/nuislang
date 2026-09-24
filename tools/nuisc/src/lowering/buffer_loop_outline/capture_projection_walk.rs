@@ -61,7 +61,7 @@ pub(super) fn supported(body: &[NirStmt]) -> bool {
     valid
 }
 
-pub(super) fn rewrite(body: &mut [NirStmt], mut visitor: impl FnMut(&mut NirExpr)) {
+pub(super) fn rewrite(body: &mut [NirStmt], visitor: impl FnMut(&mut NirExpr)) {
     let mut blocks = vec![body];
     let mut expressions = Vec::new();
     while let Some(body) = blocks.pop() {
@@ -89,6 +89,14 @@ pub(super) fn rewrite(body: &mut [NirStmt], mut visitor: impl FnMut(&mut NirExpr
             }
         }
     }
+    rewrite_expressions(expressions, visitor);
+}
+
+pub(super) fn rewrite_expr(expr: &mut NirExpr, visitor: impl FnMut(&mut NirExpr)) {
+    rewrite_expressions(vec![expr], visitor);
+}
+
+fn rewrite_expressions(mut expressions: Vec<&mut NirExpr>, mut visitor: impl FnMut(&mut NirExpr)) {
     while let Some(expr) = expressions.pop() {
         visitor(expr);
         match expr {

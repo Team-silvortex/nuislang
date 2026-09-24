@@ -448,7 +448,12 @@ separates existing CI coverage from focused native, migration and provider check
 The [beta-0.12 checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
 remains historical evidence, not a current acceptance result.
 For disk cleanup, inspect `scripts/disk-clean-safe.sh` output before choosing
-`--apply`; do not remove source or unrelated project data.
+`--apply`. Add `--build-binaries` to retire hashed test/build executables while
+keeping root CLI binaries and libraries; `--workspace` explicitly drops the
+whole root build tree. Cleanup is workspace-only and refuses tracked or symlinked
+paths. See the [cleanup policy](docs/repo-cleanup-candidates.md); do not remove
+source, live regressions or unrelated project data. Generated example bundles
+are rebuilt from source, not shipped in the checkout.
 
 Use repository-relative paths and registered target/provider identities, not
 personal directories, private host addresses or a fixed macOS version. Prefer

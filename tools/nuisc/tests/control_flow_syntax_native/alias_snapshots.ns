@@ -1,0 +1,55 @@
+mod cpu Main {
+    struct State { left: i64, right: i64, unused: i64 }
+    fn relay(value: i64) -> i64 { return value; }
+    @noinline fn choose(state: State, flag: bool) -> i64 {
+        if flag {
+            let saved = state;
+            let state = State { left: 30, right: 0, unused: 0 };
+            return relay(saved.left) + state.left;
+        }
+        let snapshot = state;
+        return relay(snapshot.left);
+    }
+    @noinline fn rebound_alias(state: State, flag: bool) -> i64 {
+        if flag {
+            let saved = state;
+            let saved = State { left: saved.left + 1, right: 0, unused: 0 };
+            return saved.left;
+        }
+        return state.left;
+    }
+    @noinline fn guard(state: State, flag: bool) -> i64 {
+        if flag { return state.left; }
+        let saved = state;
+        let state = State { left: 30, right: 0, unused: 0 };
+        return saved.left + state.left;
+    }
+    @noinline fn binding(state: State, flag: bool) -> i64 {
+        let result = state.left;
+        if flag {
+            let saved = state;
+            let state = State { left: 30, right: 0, unused: 0 };
+            let result = saved.left + state.left;
+        } else { let result = state.left; }
+        return result;
+    }
+    @noinline fn checked_snapshot(state: State, divisor: i64, flag: bool) -> i64 {
+        if flag {
+            let old = state;
+            let state = State { left: 30, right: 0, unused: 7 / divisor };
+            return old.left;
+        }
+        return state.left;
+    }
+    fn main() -> i64 {
+        let state = State { left: 12, right: 7, unused: 0 };
+        print(choose(state, true)); print(choose(state, false));
+        print(rebound_alias(state, true)); print(rebound_alias(state, false));
+        print(guard(state, false)); print(guard(state, true));
+        print(binding(state, true)); print(binding(state, false));
+        return choose(state, true) + choose(state, false)
+            + rebound_alias(state, true) + rebound_alias(state, false)
+            + guard(state, false) + guard(state, true)
+            + binding(state, true) + binding(state, false);
+    }
+}

@@ -181,12 +181,20 @@ fn validate_block(
                     NirStmt::Const { ty, .. } => Some(ty),
                     _ => unreachable!(),
                 };
-                if locals.contains_key(name) {
-                    return None;
-                }
                 let inferred = control_values::value_type(value, locals, catalog, layouts)?;
                 if declared.is_some_and(|ty| ty != &inferred) {
                     return None;
+                }
+                // Record writes retain their exact nominal value type. Guarded
+                // helpers preserve evaluation order; capture snapshot identity
+                // is normalized separately, without changing scalar/loop rules.
+                if let Some(previous) = locals.get(name) {
+                    if !matches!(stmt, NirStmt::Let { .. })
+                        || previous != &inferred
+                        || layouts.scalar(&inferred.name)
+                    {
+                        return None;
+                    }
                 }
                 locals.insert(name.clone(), inferred);
                 if matches!(stmt, NirStmt::Let { .. }) {

@@ -18,22 +18,22 @@ Use this command chain:
 ```bash
 cargo run -p nuis -- build \
   examples/projects/tooling/native_artifact_closure_demo \
-  examples/bins/native_artifact_closure_demo_project
+  target/example-builds/native_artifact_closure_demo
 
 cargo run -p nuis -- inspect-artifact \
-  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
+  target/example-builds/native_artifact_closure_demo/nuis.build.manifest.toml
 
 cargo run -p nuis -- verify-artifact \
-  examples/bins/native_artifact_closure_demo_project/nuis.compiled.artifact
+  target/example-builds/native_artifact_closure_demo/nuis.compiled.artifact
 
 cargo run -p nuis -- artifact-doctor \
-  examples/bins/native_artifact_closure_demo_project
+  target/example-builds/native_artifact_closure_demo
 
 cargo run -p nuis -- verify-build-manifest \
-  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
+  target/example-builds/native_artifact_closure_demo/nuis.build.manifest.toml
 
 cargo run -p nuis -- run-artifact \
-  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
+  target/example-builds/native_artifact_closure_demo/nuis.build.manifest.toml
 ```
 
 To select the pure Nsld self-contained image route at the `nuis` frontdoor,
@@ -43,7 +43,7 @@ pass `--packaging-mode nuis-self-contained-image` during build:
 cargo run -p nuis -- build \
   --packaging-mode nuis-self-contained-image \
   examples/projects/tooling/native_artifact_closure_demo \
-  examples/bins/native_artifact_closure_demo_project
+  target/example-builds/native_artifact_closure_demo
 ```
 
 That produces a build manifest whose link plan selects
@@ -57,10 +57,10 @@ To hand the emitted manifest to the current linker frontdoor, use:
 
 ```bash
 cargo run -p nsld -- check-next-action \
-  examples/bins/native_artifact_closure_demo_project
+  target/example-builds/native_artifact_closure_demo
 
 cargo run -p nsld -- drive \
-  examples/bins/native_artifact_closure_demo_project \
+  target/example-builds/native_artifact_closure_demo \
   --apply --until-clean --json
 ```
 

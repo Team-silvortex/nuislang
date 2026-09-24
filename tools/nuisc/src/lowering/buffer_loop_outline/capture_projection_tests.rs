@@ -74,10 +74,8 @@ fn projection_retains_exact_nominal_subrecords_and_deduplicates_prefix_uses() {
 }
 
 #[test]
-fn projection_keeps_whole_aliases_returns_and_rebound_parameters() {
+fn projection_keeps_whole_uses_and_control_flow_rebound_parameters() {
     for body in [
-        "let alias = state; return alias.a.x;",
-        "let state = State { a: state.b, b: state.a, unused: 0 }; return state.a.x;",
         "if flag { let state = State { a: state.b, b: state.a, unused: 0 }; } return state.a.x;",
         "return consume(state);",
     ] {

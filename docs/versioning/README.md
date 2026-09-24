@@ -3,6 +3,11 @@
 This directory is the lightweight anchor set for minor-line snapshots,
 workflow/history checkpoints, and policy notes.
 
+Historical command blocks are records of their original checkout, not current
+entrypoints. The pre-alpha `check-0.17-*`, `check-0.18-*` and `check-0.19-*`
+scripts were retired in the 2026-09-24 cleanup. Use the current-line checklist
+below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead.
+
 ## Read This First
 
 ### Current Line

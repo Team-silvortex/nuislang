@@ -1,6 +1,10 @@
 use super::*;
 use control_values::ValueLayouts;
 
+#[path = "capture_aliases.rs"]
+mod aliases;
+#[path = "capture_snapshots.rs"]
+mod snapshots;
 #[cfg(test)]
 #[path = "capture_projection_tests.rs"]
 mod tests;
@@ -58,7 +62,12 @@ pub(super) fn project(
             .iter()
             .position(|f| f.name == name)
             .unwrap();
-        let Some(plan) = plan(&module.functions[index], layouts) else {
+        // Normalize only a candidate copy. A whole use or an unrewritable caller
+        // must keep both the original signature and its original body.
+        let mut candidate = module.functions[index].clone();
+        snapshots::normalize(&mut candidate, layouts);
+        aliases::normalize(&mut candidate, layouts);
+        let Some(plan) = plan(&candidate, layouts) else {
             continue;
         };
         let callers = call_graph
@@ -73,7 +82,7 @@ pub(super) fn project(
         {
             continue;
         }
-        let function = &mut module.functions[index];
+        let function = &mut candidate;
         walk::rewrite(&mut function.body, |expr| {
             if let Some(replacement) = access(expr).and_then(|path| plan.replacements.get(&path)) {
                 *expr = NirExpr::Var(replacement.clone());
@@ -87,6 +96,7 @@ pub(super) fn project(
                 Input::Fields(fields) => fields.iter().map(|field| field.param.clone()).collect(),
             })
             .collect();
+        module.functions[index] = candidate;
         for index in callers {
             walk::rewrite(&mut module.functions[index].body, |expr| {
                 let NirExpr::Call { callee, args } = expr else {

@@ -21,7 +21,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_json_ready_nsld_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
 
@@ -191,7 +199,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_pending_hetero_closure_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
     fs::write(
@@ -263,7 +279,7 @@ mod cpu Main {
     let output_dir = temp_dir("run_artifact_self_contained_without_handoff_outputs");
 
     handle_build(
-        project_root,
+        project_root.clone(),
         output_dir.clone(),
         false,
         None,
@@ -308,7 +324,15 @@ mod cpu Main {
     let output_dir = temp_dir("run_artifact_nsld_entrypoint_without_legacy_binary_outputs");
     let manifest_path = output_dir.join("nuis.build.manifest.toml");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let legacy_binary =
         resolve_run_artifact_binary_path(&manifest_path).expect("legacy binary path resolves");
     fs::remove_file(&legacy_binary).expect("remove legacy binary");
@@ -341,7 +365,7 @@ mod cpu Main {
     let manifest_path = output_dir.join("nuis.build.manifest.toml");
 
     handle_build(
-        project_root,
+        project_root.clone(),
         output_dir.clone(),
         false,
         None,
@@ -382,7 +406,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_json_missing_entrypoint_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
     fs::remove_file(output_dir.join("nuis.host-entrypoint.sh")).expect("remove entrypoint stub");
@@ -430,7 +462,15 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_json_bad_entrypoint_protocol_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
     fs::write(
@@ -463,7 +503,15 @@ fn build_report_json_exposes_shader_result_enum_bundle_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_result_enum_demo");
     let output_dir = temp_dir("build_report_shader_result_enum_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"ready_to_run\":true"));
@@ -506,7 +554,15 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
     let output_dir = temp_dir("run_artifact_shader_packet_bridge_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
 
     assert!(json.contains("\"binary_resolved\":true"));
@@ -756,7 +812,15 @@ fn unpack_artifact_support_materializes_embedded_sidecars_for_bridge_project() {
     let output_dir = temp_dir("unpack_artifact_support_bridge_build_outputs");
     let unpack_dir = temp_dir("unpack_artifact_support_bridge_unpack_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     handle_unpack_artifact_support(
         output_dir.join("nuis.compiled.artifact"),
         unpack_dir.clone(),
@@ -791,7 +855,7 @@ fn materialize_artifact_rebuilds_frontdoor_bundle_and_support_sidecars() {
     let materialize_dir = temp_dir("materialize_artifact_bridge_bundle_outputs");
 
     handle_build(
-        project_root,
+        project_root.clone(),
         build_output_dir.clone(),
         false,
         None,

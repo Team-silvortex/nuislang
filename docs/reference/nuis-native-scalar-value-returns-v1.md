@@ -150,8 +150,8 @@ use deterministic path order, and each retained subrecord keeps declaration orde
 Only ready variable/field paths can be duplicated or discarded at a call boundary.
 Computed record arguments veto projection rather than losing effects or failures.
 Scalar arguments, including unused checked arithmetic and predicates, are not removed.
-Whole-record aliases, returns, forwarding and same-name rebinding conservatively keep
-the original capture. Unsupported callers, scoped targets, cycles and their dependent
+Whole-record returns/forwarding and control-flow-dependent rebinding conservatively keep
+the required capture. Unsupported callers, scoped targets, cycles and their dependent
 helpers are not rewritten. The shared read-only expression walk is exhaustive,
 including conversions, FFI operands and shader/kernel children.
 
@@ -167,9 +167,57 @@ Mixed sparse guard probes retain raw float bits, skipped division, selected zero
 traps and unchanged output sentinels. Both guarded arms still cost entries: the fixture
 needs exactly six, rejects five/zero, and rejects malformed input before helper entry.
 
-The next boundary is propagating field demand through immutable private aliases,
-with explicit scope and snapshot rules. This is not unrestricted scalar replacement,
-a wider native argument limit, mixed loop carry admission or a measured speedup.
+The [alias normalizer](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_aliases.rs)
+now resolves immutable Let/Const record chains rooted in stable helper parameters.
+Nested field origins retain exact nominal and scalar types, including mixed records.
+Distinct branch-local aliases have independent environments and do not escape.
+Control-flow writes and iteration-local aliases remain conservative;
+a stable outer alias can still be read inside a loop. Repeated same-name
+branch aliases may capture exact subrecords, but are not reduced to individual leaves.
+
+Alias normalization is transactional: it runs on a candidate copy and commits only
+with actual leaf reduction and successful call-site preflight. Whole-record demand,
+computed caller arguments, annotations that disagree with origins, resources and
+reference types cannot silently change the original helper's contract.
+The shared [alias fixture](../../tools/nuisc/tests/native_application_bridge/typed_alias_capture_fixture.rs)
+uses chains inside the generated branches of a 64-i64 helper. Those private branches
+now take two and three physical arguments instead of 65, while the public helper
+retains 64. Native/reference results, in-place publication and zero allocation/drop
+counters agree. CLI cache reuse and source-free restoration retain identical LLVM
+and states; selected zero-divisor and signed-overflow failures still trap, without
+fallback, event publication or completion.
+
+Forward branch substitution now materializes a binding before continuing when it
+or any of its inputs is rebound later. Previously, substituting an old alias with
+a live variable name could silently read the later value. The shared
+[Nuis snapshot regression](../../tools/nuisc/tests/control_flow_syntax_native/alias_snapshots.ns)
+covers origin/alias rebinding, guarded returns and branch binding chains in both
+reference and ordinary native execution.
+
+The [snapshot normalizer](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_snapshots.rs)
+now gives straight-line record writes separate private identities before alias
+discovery. It versions both rebound parameters and repeated local aliases, with
+each initializer reading the preceding version, including self-rebinding.
+Names reserve all existing bindings and reads before allocation. Every version
+must retain the same canonical record type; untyped, reference and type-changing
+versions are not rewritten. Any nested branch/loop write vetoes all versions of
+that name, while nested reads can use an invariant version safely.
+
+Pure-helper admission now accepts same-nominal-type record Let rebindings, retaining
+dependency validation, checked arithmetic and existing scalar/loop restrictions.
+Typed admission alone does not bypass local selection extraction; only the existing
+full-control catalog authorizes that path, preserving mixed-value helper transport.
+Actual signature projection remains private, transactional and reduction-only.
+The 64-i64 rebound fixture keeps old snapshots and new records in the same expression,
+with two/three private arguments, unchanged public inputs, reference/native parity,
+in-place lifecycle publication and zero allocation/drop counters. Constructors and
+calls are not expanded into aliases or erased when their result is unused: the
+discarded-record regression retains selected division failure while skipping it on
+the unselected path in reference and ordinary native execution.
+
+The next boundary is field demand through same-name branch-local capture aliases.
+This is not unrestricted scalar replacement, a wider native argument limit,
+mixed loop carry admission or a measured speedup.
 
 ## Evidence And Limits
 
@@ -214,9 +262,9 @@ with unchanged output sentinels and zero aggregate allocations/drops.
 General mixed loop carries, resource state, provider dispatch, native image-host
 selection, cross-target execution and performance still need separate evidence.
 
-The 2026-09-23 macOS aarch64 capture checkpoint passed 207 compiler/registry-unit,
-45 native-bridge, eight ordinary native and five reference image/window cases.
-Five CLI workflows passed; exact-64-slot and sparse captures retain cache reuse,
-input/tamper rejection and source-free restoration with identical LLVM and states.
-All 28 tensor tests passed; 1400 drift checks were clean. No fresh GPU/Linux,
+The 2026-09-23/24 macOS aarch64 alias/snapshot checkpoint passed 699 compiler/registry-unit,
+47 native-bridge, ten ordinary native, five reference image/window cases and the host-path policy check.
+Seven CLI workflows passed; exact-64-slot, sparse, alias and snapshot captures retain cache reuse,
+input/tamper rejection, selected traps and source-free restoration with identical LLVM and states.
+All 28 tensor tests passed; 1409 drift checks were clean (797 selected tests in total). No fresh GPU/Linux,
 full-workspace, formal safety or performance result is inferred from this checkpoint.

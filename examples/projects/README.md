@@ -229,15 +229,11 @@ Practical consequence:
 
 ## Artifact Bundles
 
-Checked-in canonical build outputs still live under:
+Rebuild examples with the current toolchain into ignored `target/example-builds/`.
+The two old checked-in window/kernel bundles have been retired; use the guide:
 
 * [examples/bins](../../examples/bins)
 
-The two retained checked-in reference bundles remain:
-
-* [window_controls_demo_project](../../examples/bins/window_controls_demo_project/window_controls_demo)
-* [kernel_tensor_demo_project](../../examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)
-
-Use `kernel_tensor_demo` for the copy-first source workflow. The retained
-window bundle remains useful as artifact/reference evidence while its source
-project is a repair/probe route.
+Use [kernel_tensor_demo](kernel_tensor_demo) for the copy-first source workflow.
+The [window_controls_demo](window_controls_demo) source remains a repair/probe
+route; a stale generated binary is not current execution evidence.

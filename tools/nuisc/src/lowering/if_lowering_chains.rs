@@ -25,7 +25,9 @@ pub(super) fn lower_return_if_chain(
             let Some((name, value)) = extract_pure_branch_binding(binding, &pure_helpers) else {
                 return Ok(None);
             };
-            if !branch_binding_contains_function_call(&value) {
+            if !branch_binding_contains_function_call(&value)
+                && !binding_rebound_in_tail(&name, &value, tail)
+            {
                 let substituted = tail
                     .iter()
                     .map(|stmt| {
@@ -169,7 +171,7 @@ fn lower_guard_return_chain_with_prefix_effects(
             if contains_effect {
                 return Ok(None);
             }
-            if !contains_call && !contains_effect {
+            if !contains_call && !binding_rebound_in_tail(&name, &value, tail) {
                 let substituted = tail
                     .iter()
                     .map(|stmt| {
@@ -270,6 +272,12 @@ pub(super) fn lower_binding_if_chain(
             let Some((name, value)) = extract_pure_branch_binding(binding, pure_helpers) else {
                 return Ok(None);
             };
+            if binding_rebound_in_tail(&name, &value, tail) {
+                let lowered = lower_expr(&value, state, bindings)?;
+                let mut local_bindings = bindings.clone();
+                local_bindings.insert(name, lowered);
+                return lower_binding_if_chain(tail, state, &local_bindings, pure_helpers);
+            }
             let substituted: Vec<NirStmt> = tail
                 .iter()
                 .map(|stmt| {
@@ -307,6 +315,42 @@ pub(super) fn lower_binding_if_chain(
         }
         _ => Ok(None),
     }
+}
+
+fn binding_rebound_in_tail(name: &str, value: &NirExpr, tail: &[NirStmt]) -> bool {
+    // Forward textual substitution cannot preserve a snapshot when either the
+    // binding or one of its inputs is rebound. Keep its already-evaluated YIR
+    // value instead; nested scopes conservatively count as conflicts too.
+    let mut dependencies = BTreeSet::from([name]);
+    let mut expressions = vec![value];
+    while let Some(expr) = expressions.pop() {
+        if let NirExpr::Var(name) = expr {
+            dependencies.insert(name.as_str());
+        }
+        crate::nir_walk::walk_child_exprs(expr, &mut |child| expressions.push(child));
+    }
+    let mut bodies = vec![tail];
+    while let Some(body) = bodies.pop() {
+        for stmt in body {
+            match stmt {
+                NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => {
+                    if dependencies.contains(name.as_str()) {
+                        return true;
+                    }
+                }
+                NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                } => {
+                    bodies.extend([then_body.as_slice(), else_body.as_slice()]);
+                }
+                NirStmt::While { body, .. } => bodies.push(body),
+                _ => {}
+            }
+        }
+    }
+    false
 }
 
 pub(super) fn lower_binding_if_chain_with_shared_context(

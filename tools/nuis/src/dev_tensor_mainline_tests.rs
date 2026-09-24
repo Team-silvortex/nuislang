@@ -308,7 +308,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("two exact 76800-byte Metal frames"));
     assert!(session
         .next_step
-        .starts_with("propagate field demand through immutable private capture aliases"));
+        .starts_with("propagate field demand through same-name branch-local capture aliases"));
     assert!(session.next_step.contains("native scalar helpers"));
     assert!(session
         .evidence
@@ -319,7 +319,22 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("zero aggregate allocations/drops"));
     assert!(session
         .blocker
-        .contains("Immutable aliases and rebound records remain whole captures"));
+        .contains("Control-flow writes and iteration-local aliases still retain whole captures"));
+    assert!(session
+        .evidence
+        .contains("Straight-line record snapshots now have hygienic version identities"));
+    assert!(session
+        .evidence
+        .contains("Discarded rebound constructors still evaluate checked work"));
+    assert!(session
+        .evidence
+        .contains("Immutable private alias chains now expose exact field demand"));
+    assert!(session
+        .evidence
+        .contains("Private alias branches use two and three physical arguments"));
+    assert!(session
+        .evidence
+        .contains("Forward branch substitution now materializes snapshots"));
     assert!(session
         .evidence
         .contains("Sparse 64-i64 captures now use four private arguments"));

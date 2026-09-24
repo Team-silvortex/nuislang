@@ -1,305 +1,107 @@
-# Repo Cleanup Candidates
-
-This file is the first-pass cleanup inventory for reducing repository noise
-without accidentally deleting still-useful coverage.
-
-The current goal is:
-
-* keep the active `nuis -> NIR -> YIR -> LLVM/AOT` spine obvious
-* reduce duplicated doc entrypoints
-* separate narrow canonical examples from wider exploratory examples
-* avoid deleting files that still carry regression, bridge, or packaging value
-
-## Current Audit Snapshot
-
-Latest audit result:
-
-* `alpha-0.6.*` cleanup pass removed local generated `.nuis/cache` state from
-  `examples/projects/**`, reducing that subtree from roughly `85M` to `4.3M`
-* repository text now has no checked-in developer-home absolute paths, file URI
-  references, or macOS private temp path references outside ignored build outputs
-* Markdown links resolve as repo-relative links, with no remaining absolute
-  workspace links
-* the largest remaining cleanup pressure is structural, not stale generated
-  files:
-  - `tools/nuis/src/main.rs` is still close to `10k` lines
-  - `tools/nsld/src/main.rs` is down to roughly `3.2k` lines after CLI,
-    display, JSON, container, TOML, reports, and link-unit extraction
-  - several `crates/yir-*` libraries are well over the local file-size policy
-    and should be split by domain/lowering responsibility before beta
-* `examples/projects/state/` currently has no orphaned project companion
-  directories with zero doc/test/source references
-* `examples/projects/task/` currently has no orphaned project companion
-  directories with zero doc/test/source references
-* current cleanup pressure is therefore no longer “delete obviously unused
-  project demos”
-* current cleanup pressure is now mostly:
-  - duplicate README entrypoints
-  - outdated semantic wording after async/GLM rule tightening
-  - overlong local inventory READMEs that repeat routes already covered by
-    `current-mainline-map.md`
-
-Practical reading:
-
-* if a demo still appears in a local README, `current-mainline-map.md`,
-  reference docs, or focused tests, treat it as live until a narrower
-  replacement path is chosen
-* prefer deleting duplicate routes before deleting the underlying probe/demo
-  itself
-
-## Cleanup Rule
-
-Use three buckets:
-
-* `keep`
-  still active in the current mainline map or still carrying narrow regression
-  value
-* `archive next`
-  still useful historically, but now clearly overshadowed by narrower canonical
-  chains
-* `decision needed`
-  plausible cleanup targets, but deleting them changes workflow expectations,
-  generated-artifact policy, or reference commands
-
-## Keep
-
-These should stay in the mainline for now.
-
-### Core current examples
-
-* `examples/projects/`
-  recipe-companion project demos for task, host I/O, persistence, path, and
-  filesystem surfaces
-* `examples/ns/ffi/`
-  narrow facade mirrors aligned with current `std/*_recipe.ns`
-* `examples/ns/memory/`
-  current task/GLM and payload-boundary examples
-* `examples/yir/`
-  current handwritten `YIR` probes and domain anchors
-
-### Current `std` shape
-
-* `stdlib/std/*_recipe.ns`
-  these are now the real canonical `std` growth path
-* narrow runtime helpers still used as raw facade surfaces:
-  - `argv_runtime.ns`
-  - `env_runtime.ns`
-  - `process_runtime.ns`
-  - `stdin_runtime.ns`
-  - `tty_runtime.ns`
-  - `cwd_runtime.ns`
-  - `temp_runtime.ns`
-  - `home_runtime.ns`
-  - `config_runtime.ns`
-  - `kv_runtime.ns`
-  - `cache_runtime.ns`
-
-### Explicit archive areas that already exist
-
-* `docs/historical/`
-* `examples/legacy/`
-
-## Removed In Current Cleanup
-
-These were previously secondary wider native examples. They have now been
-removed from the repository after being demoted out of the mainline docs.
-
-* `examples/ns/ffi/hello_native_input_tool.ns`
-* `examples/ns/ffi/hello_native_cli_pipeline.ns`
-* `examples/ns/ffi/hello_native_tool_runner.ns`
-* `examples/ns/ffi/hello_native_cli_runtime.ns`
-* `examples/projects/native_cli_pipeline_demo/`
-* `examples/projects/native_tool_runner_demo/`
-* `examples/projects/native_branch_cli_demo/`
-
-## Archive Next
-
-These are the strongest candidates to move out of the shortest-path docs and,
-if desired, relocate under a more explicit archive bucket after references are
-updated.
-
-### Wider native CLI / workflow examples
-
-These are not necessarily bad examples, but they are now overshadowed by
-narrower `recipe -> facade -> project` chains.
-
-Previous targets that motivated this cleanup:
-
-* `examples/ns/ffi/hello_native_input_tool.ns`
-* `examples/ns/ffi/hello_native_cli_pipeline.ns`
-* `examples/ns/ffi/hello_native_tool_runner.ns`
-* `examples/ns/ffi/hello_native_cli_runtime.ns`
-* `examples/projects/native_cli_pipeline_demo/`
-* `examples/projects/native_tool_runner_demo/`
-* `examples/projects/native_branch_cli_demo/`
-
-Cleanup just completed:
-
-* they were first removed from recommended routes
-* then isolated as secondary examples
-* finally deleted once references were quiet
-
-### Long local README inventories
-
-These are not deletion targets yet, but they are the clearest next
-documentation-trim targets whenever a folder README still repeats a large local
-index that is already covered by:
-
-* [docs/current-mainline-map.md](current-mainline-map.md)
-* [stdlib/std/README.md](../stdlib/std/README.md)
-* local subdirectory READMEs
-
-Strong current candidates:
-
-* `examples/ns/memory/README.md`
-  still mixes a useful small anchor set with a longer command-and-companion
-  inventory that can likely be shortened into a tighter `first anchors + local
-  detail lives here` structure
-* `examples/invalid/README.md`
-  small already, but still a plausible candidate to become even more of a pure
-  router into `invalid/ns/*` and `invalid/yir/*` without maintaining its own
-  recommended-check list
-
-Cleanup now completed:
-
-* `examples/ns/memory/README.md`
-  has been reduced to a short router centered on ownership/task anchors plus
-  direct links to `nir-memory-model`, `cpu-task-memory-contract`,
-  `cpu-task-glm-contract`, and `cpu-task-payload-matrix`
-* `examples/invalid/README.md`
-  has been reduced to a pure invalid-example router with local subdirectory
-  links and direct links back to the task payload matrix and cleanup policy
-
-## Policy Chosen
-
-### Checked-in generated bundles
-
-Keep exactly two canonical checked-in bundles for now:
-
-* `examples/bins/window_controls_demo_project/`
-* `examples/bins/kernel_tensor_demo_project/`
-
-Reason:
-
-* they still anchor the current documented `nuis.toml` project workflow
-* they give the repo one stable place to inspect emitted
-  `nuis.build.manifest.toml`, `nuis.project.host_ffi.txt`,
-  `nuis.project.abi.txt`, the manifest-level `abi_graph` summary, and related
-  build artifacts
-* current top-level docs and project docs still intentionally use them as
-  concrete build targets rather than purely ephemeral host-temp outputs
-
-Practical rule:
-
-* keep only these two checked-in bundles
-* do not re-introduce checked-in bundles for single-file `.ns` or handwritten
-  `YIR` demos
-* continue treating per-project `.nuis/` caches as local-only generated state
-* if a local run recreates `examples/**/.nuis/cache`, it is safe to delete and
-  should remain ignored rather than staged
-* repeated smoke/compile tests should prefer table-driven case lists; the first
-  pass consolidated FFI, project-workflow, memory, network, state, task, and
-  tooling checks while keeping their build/lowering coverage intact
-
-## Decision Needed
-
-These can be cleaned, but only with an explicit repository-policy decision.
-
-### Physical directory reshaping
-
-These are no longer documentation-only questions. Changing them would affect
-path stability, commands, or the mental model of the repository tree.
-
-Current high-signal candidates:
-
-* `examples/projects/`
-  first-phase reshaping is now complete:
-  - true end-to-end showcase projects such as `window_controls_demo` and
-    `kernel_tensor_demo` remain at the root
-  - narrow one-file companions now live under
-    `examples/projects/task/`,
-    `examples/projects/tooling/`,
-    `examples/projects/state/`, and
-    `examples/projects/filesystem/`
-  Remaining future question:
-  - whether the top-level directory name should stay `projects/`
-    now that it also contains grouped companion subtrees
-  Why this still needs a decision:
-  - the first semantic split is done
-  - but a later rename such as `project-companions/` would still be path churn
-    with little immediate value unless the current grouped layout proves
-    insufficient
-
-* `examples/bins/`
-  the current policy is now clear, but the directory name still reads like a
-  generic dump of binaries rather than “checked-in canonical project bundles”.
-  Future direction worth considering:
-  - keep the current contents
-  - but later rename or alias the area to something closer to
-    `examples/project_builds/` or `examples/canonical-bundles/`
-  Why this needs a decision:
-  - many current build commands and docs point here directly
-  - the current name is familiar but semantically weak
-
-* `docs/fabric-spec/`, `docs/glm-spec/`, `docs/yir-spec/`, `docs/versioning/`
-  these are design/spec directories, while `docs/reference/` is current truth.
-  Future direction worth considering:
-  - keep them separate
-  - but possibly regroup them under a clearer second-level bucket such as
-    `docs/design/` if we later want the top-level docs tree to read more
-    cleanly
-  Why this needs a decision:
-  - large path churn
-  - risk of breaking stable historical/spec references
-
-### Future re-evaluation of generated bundle outputs
-
-* `examples/bins/window_controls_demo_project/`
-* `examples/bins/kernel_tensor_demo_project/`
-
-Why this needs a decision:
-
-* they are generated outputs, not handwritten source
-* but current top-level docs and commands still point at them
-* they are also serving as checked-in example build artifacts and manifest
-  snapshots
-
-Current status:
-
-* policy 1 is now the active repository policy
-* revisit only if we later want to make host-temp rebuilds the only supported
-  artifact inspection route
-
-### Raw runtime helper modules
-
-Files like `stdin_runtime.ns` and `tty_runtime.ns` are still useful as thin raw
-facade surfaces, but the repository now increasingly teaches the recipe layer
-first.
-
-Possible future direction:
-
-* keep raw runtime helpers, but stop surfacing most of them in first-read docs
-* or move them under a more explicit “raw host facades” section inside
-  `stdlib/std/README.md`
-
-## Suggested Next Cleanup Pass
-
-If we want a low-risk second pass, do it in this order:
-
-1. keep shrinking front-door and local READMEs that still duplicate long
-   companion inventories
-2. observe whether the new grouped `examples/projects/{task,tooling,state,filesystem}`
-   layout is already enough before considering any further rename
-3. only revisit `examples/bins/` if we want to change the documented workflow
-4. only then move or delete more source/example files
-
-## Current Recommendation
-
-Right now the safest immediate next deletion-like action is not source deletion.
-It is:
-
-* keep shrinking front-door docs
-* keep converting long local README inventories into short routers
-* make a conscious policy decision for checked-in generated bundles
-* avoid more physical directory churn unless the new grouped
-  `examples/projects/` layout still proves too noisy
+# Repository Hygiene
+
+This is the current cleanup policy and audit record, not an alpha-era deletion
+wishlist. Current compiler, Nustar and application behavior remains governed by
+the [mainline map](current-mainline-map.md) and the development tensor.
+
+## 2026-09-24 Audit
+
+The pre-cleanup workspace occupied about 7.9 GiB. Root Cargo output accounted
+for 7.2 GiB; generated outputs below tools and example projects added several
+hundred MiB. Source deletion is not the main disk-saving mechanism.
+
+Retired after checking workspace, source, test and documentation references:
+
+* the unused `strategy-ai` workspace crate, whose only compiled API returned a
+  placeholder string and had no consumers
+* five pre-alpha `check-0.17-*`, `check-0.18-*` and `check-0.19-*` scripts;
+  current CI and the [beta checklist](versioning/nuis-beta-0.14.0-release-checklist.md)
+  replace their historical gate role
+* generated window/kernel bundles under `examples/bins/`, including host
+  shims, LLVM/IR dumps, stale manifests and host executables
+* the checked-in executable under `tools/yir-preview-macos/build/`;
+  its optional preview source and build scripts remain available
+
+The example sources remain. Generated artifacts are not ABI compatibility
+fixtures unless an explicit test identifies them as such. Current snapshot,
+native-session, Nsld and provider regressions remain intact.
+
+CLI unit-test fixtures now own their temporary project and derived default
+build/release outputs. Scope exit and panic unwinding reclaim those paths;
+independent fixtures remain isolated. Artifact protocol and provider-runtime
+tests are separated without removing cases.
+
+The Rust module audit checked Cargo targets, ordinary modules, path attributes,
+inline test scopes and macro-declared Nsld test modules. A missing ordinary
+`mod` line alone is not evidence that a file is unused.
+
+After cleanup, a cold build of all 29 workspace packages and focused regressions
+left the workspace at about 1.93 GiB, including 1.81 GiB of fresh build output.
+The net reduction was about 6 GiB; available volume space rose from about
+11 GiB to 17 GiB. These are measured local results, not a fixed cache budget.
+
+## Storage Boundary
+
+Keep source, intentional fixtures, package manifests/locks, current regression
+tests, minor-version history and the separately owned `vulpoya`/`yalivia`
+subprojects. Do not remove tests just because their original bug is old.
+Git history is retained; this cleanup does not rewrite repository history.
+
+Rebuild generated example bundles into `target/example-builds/`, rather than
+shipping host-specific binaries beside source. The
+[artifact workflow](reference/nuis-native-artifact-workflow.md) uses that route.
+The former `examples/bins/` area now contains only a rebuild guide.
+
+Default cleanup removes example `.nuis/cache`, tool/crate-local `target`
+directories, incremental state, optional preview output and maintenance Python
+cache. It preserves other `.nuis` state, the root CLI binaries, libraries,
+package downloads and all subprojects.
+
+## Cleanup Commands
+
+Stop builds and tests first. From any working directory, the scripts resolve
+their own Git workspace; they do not search siblings, home caches, shared
+temporary directories or Docker state.
+
+```bash
+bash scripts/disk-audit.sh
+bash scripts/disk-clean-safe.sh --build-binaries --verbose
+bash scripts/disk-clean-safe.sh --build-binaries --apply
+```
+
+`--build-binaries` also removes hashed debug/release build/test executables.
+Root CLI binaries and dependency libraries remain; Cargo regenerates removed
+executables when needed. Reported candidate sizes may share hardlinked storage.
+
+For a deliberately cold rebuild, inspect `--workspace --verbose`, then apply
+`--workspace --apply`. That also removes the complete root `target/`.
+No option cleans other projects, shared Cargo downloads or Docker.
+
+The cleaner defaults to dry-run and preflights every candidate before deletion.
+Tracked paths, non-ignored paths and paths through symlinks fail closed. Do not
+run it concurrently with builds or other writers.
+
+## Validation
+
+CI discovers the maintenance regressions under
+[scripts/tests](../scripts/tests). They cover dry-run behavior, explicit full
+cleanup, preservation of source/project state/external resources, tracked and
+symlinked-path refusal, and source-only checkouts with no generated outputs.
+
+This audit passed 72 focused CLI/tensor/workflow tests, six source-example
+compilation tests and 20 maintenance tests. The rebuilt CLI reported 1,414
+passing drift checks with clean coverage and hierarchy validation. This is a
+focused cleanup regression result, not a claim that the entire test suite or
+every hardware backend was executed.
+
+Run the same checks locally:
+
+```bash
+python3 -m unittest discover -s scripts/tests -v
+python3 scripts/check-text-encoding.py
+bash scripts/check-doc-links.sh
+cargo metadata --locked --no-deps --format-version 1
+```
+
+The [development tensor](reference/nuis-development-tensor.md) keeps the current
+application mainline and its evidence boundaries unchanged by repository cleanup.
