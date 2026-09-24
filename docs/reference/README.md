@@ -11,12 +11,13 @@ task/pointer rules?", read:
 
 * [../glm-spec/glm-heterogeneous-flow-graph-positioning.md](../../docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
 
-For the current `beta-0.14.*` application-led line, start with:
+For the current `beta-0.15.*` application-led line, start with:
 
 * [Mainline map](../current-mainline-map.md)
-* [Beta-0.14 checkpoint](../versioning/nuis-beta-0.14.0-snapshot.md)
-* [Beta-0.14 validation checklist](../versioning/nuis-beta-0.14.0-release-checklist.md)
+* [Beta-0.15 checkpoint](../versioning/nuis-beta-0.15.0-snapshot.md)
+* [Beta-0.15 validation checklist](../versioning/nuis-beta-0.15.0-release-checklist.md)
 * [Native scalar session bridge](nuis-native-scalar-session-bridge-v1.md)
+* [Native value returns and private captures](nuis-native-scalar-value-returns-v1.md)
 * [Window contract](nuis-yir-window-session-v3.md)
 * [Cancellation and host retirement](nuis-yir-application-cancellation-v1.md)
 * [Provider-owned session drain](nuis-yir-provider-session-drain-v1.md)
@@ -150,7 +151,7 @@ container and a runnable Nuis-owned heterogeneous executable?”, start with
 
 If your question is specifically “what is the current beta checkpoint and
 what wording is safe?”, start with
-[the beta-0.14 snapshot](../versioning/nuis-beta-0.14.0-snapshot.md).
+[the beta-0.15 snapshot](../versioning/nuis-beta-0.15.0-snapshot.md).
 The [beta-0.6 entry](../versioning/nuis-beta-0.6.0-mainline-entry.md) remains
 historical foundation context.
 

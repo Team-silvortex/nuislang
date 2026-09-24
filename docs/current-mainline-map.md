@@ -6,10 +6,10 @@ before changing a capability claim.
 
 ## Fast Reading Order
 
-The current `beta-0.14.*` priority is the ns-nova application-led dependency
+The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The [beta-0.14 snapshot](versioning/nuis-beta-0.14.0-snapshot.md) records
-`1fcfd65` (`beta-0.14.1`, 2026-09-13); Git remains authoritative for later patches.
+The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
+`05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative for later patches.
 
 1. [Repository overview](../README.md)
 2. [Mainline selection and acceptance coordinates](reference/nuis-development-tensor-mainline.md)
@@ -18,9 +18,10 @@ The [beta-0.14 snapshot](versioning/nuis-beta-0.14.0-snapshot.md) records
 5. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
 6. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
 7. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
-8. [Focused validation checklist](versioning/nuis-beta-0.14.0-release-checklist.md)
+8. [Focused validation checklist](versioning/nuis-beta-0.15.0-release-checklist.md)
 
 Use the [versioning index](versioning/README.md) for the historical
+[beta-0.14 snapshot](versioning/nuis-beta-0.14.0-snapshot.md),
 [beta-0.12 snapshot](versioning/nuis-beta-0.12.0-snapshot.md) and
 [checklist](versioning/nuis-beta-0.12.0-release-checklist.md), earlier
 [beta-0.10 migration entry](versioning/nuis-beta-0.10.0-self-hosting-entry.md),
@@ -40,6 +41,10 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
+At `05951bef`, this prerequisite remains `active/86`. The next selected task is
+field demand through same-name branch-local capture aliases, preserving lexical
+identity, guarded evaluation and the existing native-session boundaries. Version
+documentation and repository cleanup do not change capability scores.
 
 Current session evidence:
 
@@ -102,8 +107,9 @@ Multiple source-ordered i64 accumulators now cross Buffer-writing iterations thr
 shared scoped-call contract and ordinary LoopState field projections. Updates keep
 source order; zero-trip loops preserve all seeds and only fully validated helper
 returns update the private state. PixelMagic exposes fill-and-statistics with exact
-native/reference pixel, red-count and pixel-sum tests. Native aggregate returns still
-allocate and release storage per iteration and multi-state branch return; this is not performance-parity evidence.
+native/reference pixel, red-count and pixel-sum tests. Ordinary LLVM aggregate returns
+still allocate and release storage; the explicit native-session value profile below
+is separate. Neither route establishes performance parity.
 The carried generator also passes ordinary M2 build/run-artifact with two exact
 Metal frames, direct-session byte parity and unchanged failure admission.
 Branch-local and repeated scalar updates now compose with those writes. Guarded
@@ -314,8 +320,20 @@ unused calls and shared inner suffixes. Scope-aware private naming now separates
 colliding locals without renaming function symbols, fields or outer loop bindings;
 bool/record backedges retain their original binding identities. The full composition
 now includes a same-name record/scalar prefix within the same 51-function bound.
-Effects and mixed/nested/resource aggregates remain separate; per-return flat-i64
-aggregate allocation is the next optimization target.
+The selected [native value-return profile](reference/nuis-native-scalar-value-returns-v1.md)
+now removes aggregate heap allocation from admitted nested scalar helper and callback
+returns. It preserves exact layouts, raw scalar bits, independent snapshots, overlap
+and failure publication. Ordinary owned/resource aggregates retain their separate ABI.
+Generated capture transport packs boolean leaves and projects only demanded fields,
+without changing user signatures or the independent native argument bound. A sparse
+64-i64 state needs four private selection arguments; stable aliases and straight-line
+rebound snapshots use two/three in their fixtures while public inputs remain unchanged.
+Forward substitution materializes old snapshots before later writes; record versioning
+retains initializer work and selected arithmetic failure. The sparse, alias and snapshot
+frontdoor cases retain cache reuse, tamper rejection and source-free restoration.
+Same-name branch-local aliases, control-flow writes and iteration-local aliases remain
+conservative boundaries. These are bounded CPU correctness/transport results, not
+native resource/provider dispatch or measured runtime speedups.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and
 native call-graph admission.
@@ -326,8 +344,8 @@ aggregate-local-values, aggregate-loop-calls, bool-rebinding, aggregate-rebindin
 aggregate-carries, bool-carries, literal-loops, value-loop-exits, trailing-value-loops,
 counted-returns and control-composition
 fixtures compose with typed lifecycle and multi-state break/continue. The frontdoor
-suite now contains twenty-eight regressions,
-including loop-work/helper-entry exhaustion and lifecycle reset, cache isolation, tamper rejection and
+suite also covers typed value returns, capture words, sparse fields, aliases and
+snapshots, alongside loop-work/helper-entry exhaustion and lifecycle reset, cache isolation, tamper rejection and
 standalone restoration. Use the execution logs for the tested revision/platform,
 not the test count alone, as acceptance evidence.
 The passing default image host still executes embedded YIR.

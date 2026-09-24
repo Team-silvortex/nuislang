@@ -1,8 +1,8 @@
 # Rebuilding Example Bundles
 
 This directory no longer ships generated binaries, host shims, manifests or IR
-dumps. The old window/kernel bundles were retired during the beta-0.14 cleanup;
-their source projects and regression coverage remain.
+dumps. The old window/kernel bundles were retired in the 2026-09-24 cleanup,
+recorded in `beta-0.15.0`; their source projects and regression coverage remain.
 
 Use the current compiler and an ignored output directory:
 

@@ -6,17 +6,17 @@ tests, the development tensor, and `docs/reference/` in that order.
 
 ## Read This First
 
-Use this short route for the current `beta-0.14.*` repository, recorded at
-`1fcfd65` (`beta-0.14.1`):
+Use this short route for the current `beta-0.15.*` repository, recorded at
+`05951bef` (`beta-0.15.0`, 2026-09-24):
 
 1. [Current mainline map](current-mainline-map.md)
-2. [Beta-0.14 checkpoint](versioning/nuis-beta-0.14.0-snapshot.md)
+2. [Beta-0.15 checkpoint](versioning/nuis-beta-0.15.0-snapshot.md)
 3. [Mainline dependency selection](reference/nuis-development-tensor-mainline.md)
 4. [Native scalar session bridge](reference/nuis-native-scalar-session-bridge-v1.md)
 5. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
 6. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
 7. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
-8. [Focused validation checklist](versioning/nuis-beta-0.14.0-release-checklist.md)
+8. [Focused validation checklist](versioning/nuis-beta-0.15.0-release-checklist.md)
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

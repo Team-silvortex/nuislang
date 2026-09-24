@@ -6,6 +6,10 @@ the [mainline map](current-mainline-map.md) and the development tensor.
 
 ## 2026-09-24 Audit
 
+The cleanup is recorded in `05951bef` (`beta-0.15.0`). The
+[minor snapshot](versioning/nuis-beta-0.15.0-snapshot.md) separates this repository
+maintenance result from native application and provider-execution evidence.
+
 The pre-cleanup workspace occupied about 7.9 GiB. Root Cargo output accounted
 for 7.2 GiB; generated outputs below tools and example projects added several
 hundred MiB. Source deletion is not the main disk-saving mechanism.
@@ -15,7 +19,7 @@ Retired after checking workspace, source, test and documentation references:
 * the unused `strategy-ai` workspace crate, whose only compiled API returned a
   placeholder string and had no consumers
 * five pre-alpha `check-0.17-*`, `check-0.18-*` and `check-0.19-*` scripts;
-  current CI and the [beta checklist](versioning/nuis-beta-0.14.0-release-checklist.md)
+  current CI and the [beta checklist](versioning/nuis-beta-0.15.0-release-checklist.md)
   replace their historical gate role
 * generated window/kernel bundles under `examples/bins/`, including host
   shims, LLVM/IR dumps, stale manifests and host executables

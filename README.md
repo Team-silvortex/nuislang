@@ -16,13 +16,14 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.14.*`. The recorded source checkpoint is
-`1fcfd65` (`beta-0.14.1`, 2026-09-13). Git history is authoritative for later
+The repository is on `beta-0.15.*`. The recorded source checkpoint is
+`05951bef` (`beta-0.15.0`, 2026-09-24). Git history is authoritative for later
 patches; Cargo package versions are independent of the project release.
-The [beta-0.14 snapshot](docs/versioning/nuis-beta-0.14.0-snapshot.md) records
-this checkpoint, not a new release or compatibility freeze. The
-[beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) remains the
-historical record of `505c820c` (`beta-0.12.2`).
+The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
+this existing commit, not another release or compatibility freeze. The
+[beta-0.14 snapshot](docs/versioning/nuis-beta-0.14.0-snapshot.md) and
+[beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) remain
+historical checkpoints, not current acceptance results.
 
 The mainline is **ns-nova application-led development**: grow one Nuis-owned
 interactive image application, fix the foundation gaps it exposes, measure
@@ -148,8 +149,9 @@ uses them for fill-and-statistics, with exact native/reference red-count and pix
 checks and compatible red-count/boolean APIs. State updates also compose inside
 nested `if`/`else` arms: untaken arms preserve their incoming values, conditions
 are snapshotted once, and repeated updates retain source order. PixelMagic counts
-red pixels inside the selected write branch. Native multi-carry loops still
-allocate aggregate return storage, including multi-state branch returns.
+red pixels inside the selected write branch. Ordinary LLVM multi-carry loops
+retain aggregate return storage; the explicit native-session value profile below
+has a separate allocation-free aggregate return path.
 Nested bounded loops now compose through those same function contracts, including
 branch-local child loops, reset/persistent counters and shared callback fuel.
 PixelMagic uses real row/pixel loops with clamped partial rows; native/reference
@@ -304,8 +306,21 @@ inside the selected guard; multiple uses still share one body. Single-use
 multi-statement suffixes also fold without dropping unused calls or changing their
 order. Scope-aware private names now separate colliding locals while preserving
 outer loop updates, fields and function symbols. The expanded composition includes
-a same-name record/scalar prefix and retains the 51-function bound. Per-return
-flat-i64 aggregate allocation is the next optimization target.
+a same-name record/scalar prefix and retains the 51-function bound.
+The selected [native value-return profile](docs/reference/nuis-native-scalar-value-returns-v1.md)
+now returns admitted nested scalar records as LLVM slot values, with zero aggregate
+heap allocations in the tested helper and callback paths. This does not change
+the ordinary owned-aggregate ABI or promise faster wall time. Typed publication
+retains raw scalar bits, independent snapshots, overlapping input/output buffers
+and failure sentinels. Private boolean packing and field-selective capture transport
+reduce generated helper arguments without widening public signatures or native limits.
+Stable record aliases and straight-line rebound snapshots now retain lexical identity
+and source evaluation order through projection; selected failures still trap.
+The sparse, alias and snapshot workflows cover build/cache/tamper rejection and
+source-free restoration. The next boundary is field demand through same-name
+branch-local capture aliases; control-flow writes and iteration-local aliases
+still retain conservative whole captures. Neither this work nor the repository
+cleanup raises the persistent-session coordinate above its bounded `active/86`.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this
@@ -443,7 +458,7 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-The [beta-0.14 validation checklist](docs/versioning/nuis-beta-0.14.0-release-checklist.md)
+The [beta-0.15 validation checklist](docs/versioning/nuis-beta-0.15.0-release-checklist.md)
 separates existing CI coverage from focused native, migration and provider checks.
 The [beta-0.12 checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
 remains historical evidence, not a current acceptance result.

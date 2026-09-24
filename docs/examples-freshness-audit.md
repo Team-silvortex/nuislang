@@ -6,7 +6,7 @@ wishlists remain in Git history, not as a second source of current truth.
 ## Current Routes
 
 Follow the [mainline map](current-mainline-map.md) and the
-[beta-0.14 checkpoint](versioning/nuis-beta-0.14.0-snapshot.md). A route's age or
+[beta-0.15 checkpoint](versioning/nuis-beta-0.15.0-snapshot.md). A route's age or
 name does not prove native execution, device completion or cross-platform support.
 
 | Role | Source Route | Evidence Boundary |

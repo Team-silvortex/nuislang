@@ -12,17 +12,24 @@ below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead
 
 ### Current Line
 
-For the current `beta-0.14.*` line instead of historical backfill, start with:
+For the current `beta-0.15.*` line instead of historical backfill, start with:
+
+* [nuis-beta-0.15.0-snapshot.md](nuis-beta-0.15.0-snapshot.md)
+* [nuis-beta-0.15.0-release-checklist.md](nuis-beta-0.15.0-release-checklist.md)
+
+These record the existing commit `05951bef` (`beta-0.15.0`, 2026-09-24).
+Git remains authoritative for later source checkpoints. This documentation
+update does not create another release or certify every suite listed in the
+checklist. Cargo package versions and protocol versions remain independent.
+
+The previous native-session checkpoint remains historical:
 
 * [nuis-beta-0.14.0-snapshot.md](nuis-beta-0.14.0-snapshot.md)
 * [nuis-beta-0.14.0-release-checklist.md](nuis-beta-0.14.0-release-checklist.md)
 
-These record `1fcfd65` (`beta-0.14.1`, 2026-09-13); the `.0` filenames identify
-the minor series rather than retroactively assigning every feature to its first
-patch. Git remains authoritative for later source checkpoints. This documentation
-update does not create a release or certify every suite listed in the checklist.
-
-The previous application-session checkpoint remains historical:
+Those files still record `1fcfd65` (`beta-0.14.1`, 2026-09-13); their `.0`
+filenames identify the minor series, not the exact source patch.
+The earlier application-session checkpoint also remains historical:
 
 * [nuis-beta-0.12.0-snapshot.md](nuis-beta-0.12.0-snapshot.md)
 * [nuis-beta-0.12.0-release-checklist.md](nuis-beta-0.12.0-release-checklist.md)
@@ -67,6 +74,8 @@ Earlier alpha anchors are:
 
 Use this section when the question is:
 
+* what beta-0.15 records for native value returns, private capture aliases and
+  snapshots, source-free artifact restoration, and bounded repository cleanup
 * what beta-0.14 records for bounded native scalar sessions, conditional loop
   carries, artifact restoration, and the distinction between build and execution evidence
 * what beta-0.12 established for persistent windows, independent cancellation
@@ -208,7 +217,8 @@ Read:
 
 Practical rule:
 
-* start at the current `beta-0.14.*` native-session checkpoint and validation checklist
+* start at the current `beta-0.15.*` native-value/session checkpoint and validation checklist
+* use `beta-0.14.*` for the previous native-session checkpoint
 * use `beta-0.12.*` for the previous application-session snapshot
 * use `beta-0.11.*` for the governing application-led direction
 * use `beta-0.10.*` for the historical staged-migration entry
