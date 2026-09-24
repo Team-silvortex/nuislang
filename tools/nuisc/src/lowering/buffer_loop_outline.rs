@@ -186,6 +186,14 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
                 .iter()
                 .map(|f| f.name.clone()),
         )
+        .collect::<BTreeSet<_>>();
+    let generated_helpers = helpers
+        .iter()
+        .map(|f| f.name.clone())
+        .collect::<BTreeSet<_>>();
+    let projection_functions = capture_functions
+        .union(&generated_helpers)
+        .cloned()
         .collect();
     if !helpers.is_empty() {
         outlined
@@ -194,7 +202,12 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         module.functions.extend(helpers);
         crate::nir_verify::verify_nir_module(module)?;
     }
-    if capture_projection::project(module, &capture_functions, &value_layouts) {
+    if capture_projection::project(
+        module,
+        &projection_functions,
+        &generated_helpers,
+        &value_layouts,
+    ) {
         crate::nir_verify::verify_nir_module(module)?;
     }
     outlined.capture_plans = capture_layouts::collect(module, &capture_functions, &value_layouts);

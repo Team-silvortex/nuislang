@@ -24,8 +24,12 @@ mod literal_loops;
 mod loop_calls;
 #[path = "dev_tensor_drift_data_native_loop_work.rs"]
 mod loop_work;
+#[path = "dev_tensor_drift_data_native_scoped_captures.rs"]
+mod scoped_captures;
 #[path = "dev_tensor_drift_data_native_terminal_continuations.rs"]
 mod terminal_continuations;
+#[path = "dev_tensor_drift_data_native_terminal_snapshots.rs"]
+mod terminal_snapshots;
 #[path = "dev_tensor_drift_data_native_trailing_value_loops.rs"]
 mod trailing_value_loops;
 #[path = "dev_tensor_drift_data_native_value_loop_exits.rs"]
@@ -41,6 +45,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(bool_rebinding::CHECKS.iter())
         .chain(aggregate_rebinding::CHECKS.iter())
         .chain(aggregate_values::CHECKS.iter())
+        .chain(scoped_captures::CHECKS.iter())
         .chain(aggregate_carries::CHECKS.iter())
         .chain(bool_carries::CHECKS.iter())
         .chain(literal_loops::CHECKS.iter())
@@ -49,6 +54,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(counted_returns::CHECKS.iter())
         .chain(control_elision::CHECKS.iter())
         .chain(terminal_continuations::CHECKS.iter())
+        .chain(terminal_snapshots::CHECKS.iter())
 }
 
 const CHECKS: &[DevTensorDriftCheckSpec] = &[

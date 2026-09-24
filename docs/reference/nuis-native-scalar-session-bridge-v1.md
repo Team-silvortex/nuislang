@@ -1962,10 +1962,10 @@ fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Propagate field demand through same-name branch-local capture aliases, preserving lexical identity.
-Stable aliases and straight-line record snapshots now project fields before private boolean packing; user signatures
-and scoped-action metadata stay unchanged. Alias branches use two/three private arguments; whole 64-i64 uses still exceed the bound with a predicate.
-Forward substitution preserves old snapshots; versioning retains initializer work and rejects nested control-flow writes.
+Project field demand through fallthrough record joins while preserving branch-selected values and loop backedges.
+Independent same-name branch aliases now project fields; existing outer writes, user signatures and scoped-action
+metadata stay unchanged. Scoped alias branches use 2/2/2/3 arguments; whole 64-i64 uses still exceed the bound with a predicate.
+Scoped iterations project invariant fields; returning child writes now have snapshots, while live joins remain conservative.
 Keep mixed/nested local values separate from the flat scoped-loop carry profile.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,

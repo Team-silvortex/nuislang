@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "scoped_loop_lowering/arguments.rs"]
+mod arguments;
 #[path = "scoped_loop_lowering/scalar_carries.rs"]
 mod scalar_carries;
 
@@ -171,6 +173,7 @@ pub(super) fn lower_scoped_call_while(
             .as_ref()
             .is_some_and(|ty| state.struct_defs.contains_key(ty.name.as_str()))
     });
+    let invariant_inputs = arguments::invariant_bindings(body, bindings);
     let result = match (result_binding, returns_owned_bytes, owned_struct_layout) {
         (None, false, None) => ScopedLoopResult::None,
         (Some((_, ty)), false, Some(layout))
@@ -182,7 +185,14 @@ pub(super) fn lower_scoped_call_while(
         {
             let carries = projections.expect("matched scalar projections");
             if !scalar_carries::admissible(
-                &carries, &prepared, function, args, bindings, breaking, state,
+                &carries,
+                &prepared,
+                function,
+                args,
+                bindings,
+                breaking,
+                &invariant_inputs,
+                state,
             ) {
                 return Ok(false);
             }
@@ -200,7 +210,9 @@ pub(super) fn lower_scoped_call_while(
                 || !bindings.contains_key(binding)
                 || loop_purity::expr_references_names(&prepared.limit, &changed)
                 || loop_purity::expr_references_names(&prepared.step, &changed)
-                || !args.iter().all(|arg| matches!(arg, NirExpr::Var(_)))
+                || !args
+                    .iter()
+                    .all(|arg| arguments::ready(arg, &invariant_inputs))
                 || function
                     .params
                     .iter()

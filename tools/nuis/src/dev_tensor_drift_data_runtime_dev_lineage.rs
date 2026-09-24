@@ -157,7 +157,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
             "nuis-beta-0.15.0-snapshot.md",
             "nuis-beta-0.15.0-release-checklist.md",
             "05951bef",
-            "field demand through same-name branch-local capture aliases",
+            "project field demand through fallthrough record joins",
             "nuis-beta-0.11-application-led-mainline.md",
             "nuis-beta-0.10.0-self-hosting-entry.md",
             "nuis-beta-0.6.0-mainline-entry.md",

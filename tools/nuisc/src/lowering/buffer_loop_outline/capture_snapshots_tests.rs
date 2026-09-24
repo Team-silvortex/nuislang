@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "capture_terminal_snapshots_tests.rs"]
+mod terminal_tests;
+
 fn module(body: &str) -> NirModule {
     crate::frontend::parse_nuis_module(&format!(
         "mod cpu Main {{
@@ -20,10 +23,54 @@ fn project(module: &mut NirModule, names: &[&str]) -> bool {
     let changed = super::super::project(
         module,
         &names.iter().map(|name| (*name).to_owned()).collect(),
+        &BTreeSet::new(),
         &layouts,
     );
     crate::nir_verify::verify_nir_module(module).unwrap();
     changed
+}
+
+#[test]
+fn branch_local_rebindings_project_old_alias_fields() {
+    let mut module = module(
+        "fn helper(state: State, flag: bool) -> i64 {
+        if flag {
+            let current = state; let old = current;
+            let current = State { a: Pair { x: 30, y: 0 }, b: Pair { x: 0, y: 7 }, unused: 0 };
+            return old.a.x + current.b.y;
+        } else {
+            let current = state; let old = current;
+            let current = State { a: Pair { x: 20, y: 0 }, b: Pair { x: 0, y: 9 }, unused: 0 };
+            return old.b.y + current.a.x;
+        }
+    } fn entry(state: State, flag: bool) -> i64 { return helper(state, flag); }",
+    );
+    assert!(project(&mut module, &["helper"]));
+    let helper = function(&module, "helper");
+    assert_eq!(
+        helper
+            .params
+            .iter()
+            .map(|p| p.ty.name.as_str())
+            .collect::<Vec<_>>(),
+        ["i64", "i64", "bool"]
+    );
+    let NirStmt::If {
+        then_body,
+        else_body,
+        ..
+    } = &helper.body[0]
+    else {
+        panic!()
+    };
+    for body in [then_body, else_body] {
+        assert_eq!(body.len(), 2);
+        assert!(
+            matches!(&body[0], NirStmt::Let { name, .. } if name.starts_with("__nuis_capture_snapshot_"))
+        );
+    }
+    assert_eq!(function(&module, "entry").params[0].ty.name, "State");
+    assert!(!project(&mut module, &["helper"]));
 }
 
 #[test]
@@ -311,4 +358,183 @@ fn record_rebinding_admission_preserves_type_and_scalar_boundaries() {
     ty.as_mut().unwrap().name = "Pair".into();
     let rejected = scalar_helpers::collect_typed_values(&module, &layouts, &BTreeMap::new());
     assert!(!rejected.contains_key("helper") && !rejected.contains_key("entry"));
+}
+
+#[test]
+fn scoped_snapshot_versions_preserve_nested_reads_siblings_and_suffixes() {
+    let mut module = crate::frontend::parse_nuis_module(
+        "mod cpu Main {
+        struct State { left: i64, right: i64, unused: i64 }
+        @noinline fn relay(value: i64) -> i64 { return value; }
+        @noinline fn helper(state: State, flag: bool, other: bool) -> i64 {
+        if flag {
+            let current = state; let old = current;
+            let current = State { left: current.right, right: current.left, unused: 0 };
+            let current = State { left: current.right, right: current.left, unused: 0 };
+            if other { return relay(old.left) + current.right; }
+            return relay(old.right) + current.left;
+        } else {
+            if other {
+                let current = state; let old = current;
+                let current = State { left: 20, right: 9, unused: 0 };
+                return relay(old.left) + current.right;
+            }
+        }
+        let current = state; let old = current;
+        let current = State { left: 30, right: 7, unused: 0 };
+        return relay(old.right) + current.left;
+    }
+    fn main() -> i64 {
+        let state = State { left: 12, right: 33, unused: 99 };
+        print(helper(state, true, true)); print(helper(state, true, false));
+        print(helper(state, false, true)); print(helper(state, false, false));
+        return 0;
+    }}",
+    )
+    .unwrap();
+    for projected in [false, true] {
+        if projected {
+            assert!(project(&mut module, &["helper"]));
+            assert!(!project(&mut module, &["helper"]));
+        }
+        let yir = crate::lowering::lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let trace = yir_runtime_host::execute_module_source_with_registry(
+            &crate::render::render_yir(&yir),
+            &yir_verify::default_registry(),
+        )
+        .unwrap();
+        let prints = trace
+            .events
+            .iter()
+            .filter(|e| e.contains("cpu.print"))
+            .collect::<Vec<_>>();
+        assert_eq!(prints.len(), 4);
+        for (line, expected) in prints.iter().zip([45, 45, 21, 63]) {
+            assert!(line.ends_with(&format!(": {expected}")), "{prints:?}");
+        }
+        yir_lower_llvm::emit_module(&yir).unwrap();
+    }
+}
+
+#[test]
+fn scoped_snapshot_writes_across_branches_and_loop_iterations_stay_unchanged() {
+    let rebind = "let current = State { a: current.b, b: current.a, unused: 0 };";
+    for body in [
+        format!("if flag {{ let current = state; {rebind} if other {{ {rebind} }} return current.a.x; }} return 0;"),
+        format!("if flag {{ let current = state; {rebind} while other {{ {rebind} break; }} return current.a.x; }} return 0;"),
+        format!("while flag {{ let current = state; {rebind} return current.a.x; }} return 0;"),
+        format!("while flag {{ if other {{ let current = state; {rebind} return current.a.x; }} break; }} return 0;"),
+        format!("let current = state; if flag {{ {rebind} {rebind} }} return current.a.x;"),
+    ] {
+        let mut module = module(&format!("fn helper(state: State, flag: bool, other: bool) -> i64 {{ {body} }}"));
+        let layouts = control_values::TypedLayouts::collect(&module);
+        let helper = &mut module.functions[0];
+        super::super::bindings::normalize(helper);
+        let before = helper.clone();
+        normalize(helper, &layouts);
+        assert_eq!(*helper, before);
+    }
+}
+
+#[test]
+fn scoped_snapshot_projection_is_transactional_for_whole_records_and_computed_callers() {
+    for whole in [false, true] {
+        let returned = if whole { "State" } else { "Pair" };
+        let selected = if whole { "old" } else { "old.a" };
+        let call = if whole {
+            "helper(state, flag)"
+        } else {
+            "helper(relay(state), flag)"
+        };
+        let mut module = module(&format!(
+            "fn relay(state: State) -> State {{ return state; }}
+            fn helper(state: State, flag: bool) -> {returned} {{
+                if flag {{
+                    let current = state; let old = current;
+                    let current = State {{ a: Pair {{ x: 30, y: 0 }}, b: Pair {{ x: 0, y: 7 }}, unused: 0 }};
+                    return {selected};
+                }} else {{ let old = state; return {selected}; }}
+            }}
+            fn entry(state: State, flag: bool) -> {returned} {{ return {call}; }}"
+        ));
+        let before = module.clone();
+        assert!(!project(&mut module, &["helper"]));
+        assert_eq!(module, before);
+    }
+}
+
+#[test]
+fn scoped_snapshots_reject_untyped_reference_and_mismatched_versions() {
+    for case in 0..3 {
+        let mut module = module(
+            "fn helper(state: State, flag: bool) -> i64 {
+                if flag {
+                    let current = state;
+                    let current = State { a: current.b, b: current.a, unused: 0 };
+                    return current.a.x;
+                } return 0;
+            }",
+        );
+        let layouts = control_values::TypedLayouts::collect(&module);
+        let helper = &mut module.functions[0];
+        let NirStmt::If { then_body, .. } = &mut helper.body[0] else {
+            panic!()
+        };
+        for stmt in then_body {
+            if let NirStmt::Let { ty, .. } = stmt {
+                match case {
+                    0 => *ty = None,
+                    1 => ty.as_mut().unwrap().is_ref = true,
+                    _ => {
+                        ty.as_mut().unwrap().name = "Pair".into();
+                        break;
+                    }
+                }
+            }
+        }
+        let before = helper.clone();
+        normalize(helper, &layouts);
+        assert_eq!(*helper, before);
+    }
+}
+
+#[test]
+fn discarded_scoped_rebound_constructor_keeps_selected_checked_work() {
+    for (divisor, flag) in [(0, false), (2, true), (0, true)] {
+        let mut module = crate::frontend::parse_nuis_module(&format!(
+            "mod cpu Main {{
+            struct State {{ left: i64, right: i64, unused: i64 }}
+            @noinline fn helper(state: State, divisor: i64, flag: bool) -> i64 {{
+                if flag {{
+                    let current = state; let old = current;
+                    let current = State {{ left: 30 / divisor, right: 7, unused: 0 }};
+                    return old.left;
+                }} return state.left;
+            }}
+            fn main() -> i64 {{
+                let state = State {{ left: 12, right: 33, unused: 99 }};
+                print(helper(state, {divisor}, {flag})); return 0;
+            }} }}"
+        ))
+        .unwrap();
+        assert!(project(&mut module, &["helper"]));
+        let yir = crate::lowering::lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        yir_lower_llvm::emit_module(&yir).unwrap();
+        let trace = yir_runtime_host::execute_module_source_with_registry(
+            &crate::render::render_yir(&yir),
+            &yir_verify::default_registry(),
+        );
+        if divisor == 0 && flag {
+            assert!(trace.is_err(), "discarded constructor must still execute");
+        } else {
+            let trace = trace.unwrap();
+            let prints = trace
+                .events
+                .iter()
+                .filter(|e| e.contains("cpu.print"))
+                .collect::<Vec<_>>();
+            assert_eq!(prints.len(), 1);
+            assert!(prints[0].ends_with(": 12"), "{prints:?}");
+        }
+    }
 }

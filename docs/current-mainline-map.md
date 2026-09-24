@@ -8,8 +8,10 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
+The current patch is [`beta-0.15.1`](versioning/nuis-beta-0.15.1-patch.md)
+(2026-09-24), covering private capture identity, snapshots and invariant loop inputs.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
-`05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative for later patches.
+the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
 1. [Repository overview](../README.md)
 2. [Mainline selection and acceptance coordinates](reference/nuis-development-tensor-mainline.md)
@@ -41,9 +43,9 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
-At `05951bef`, this prerequisite remains `active/86`. The next selected task is
-field demand through same-name branch-local capture aliases, preserving lexical
-identity, guarded evaluation and the existing native-session boundaries. Version
+The `05951bef` checkpoint and `beta-0.15.1` retain `active/86`. The next task is to
+project field demand through fallthrough record joins, preserving branch-selected
+values, loop backedges and the existing native-session boundaries. Version
 documentation and repository cleanup do not change capability scores.
 
 Current session evidence:
@@ -331,9 +333,21 @@ rebound snapshots use two/three in their fixtures while public inputs remain unc
 Forward substitution materializes old snapshots before later writes; record versioning
 retains initializer work and selected arithmetic failure. The sparse, alias and snapshot
 frontdoor cases retain cache reuse, tamper rejection and source-free restoration.
-Same-name branch-local aliases, control-flow writes and iteration-local aliases remain
-conservative boundaries. These are bounded CPU correctness/transport results, not
-native resource/provider dispatch or measured runtime speedups.
+Same-name branch-local aliases now acquire independent identities on the candidate
+copy before projection; writes to an existing outer/parameter binding retain its
+identity. Nested and suffix declarations remain isolated, and unsafe callers veto
+the whole candidate. Scoped-alias native and frontdoor regressions retain exact state,
+selected traps, cache identity and source-free restoration. Straight-line branch-local
+record rebindings now use separate snapshot versions when all writes remain in one
+non-loop scope with an exact type. Nested reads inherit the version at entry;
+siblings and suffixes do not inherit branch-local versions. Returning non-loop branches
+now receive separate versions for writes to ancestor records; fallthrough joins and
+rebound iteration-local records remain conservative boundaries. Single-definition
+loop aliases now project field demand from unwritten pure-value parameter origins;
+generated scoped iteration targets now project invariant fields and retain their
+independent argument maps. The 64-field source loop uses four rather than 66 iteration
+arguments; loop-written inputs and nested break identities stay intact. These are bounded CPU
+correctness/transport results, not native resource/provider dispatch or measured runtime speedups.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and
 native call-graph admission.

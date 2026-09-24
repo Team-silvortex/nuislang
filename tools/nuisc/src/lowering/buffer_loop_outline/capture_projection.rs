@@ -3,6 +3,10 @@ use control_values::ValueLayouts;
 
 #[path = "capture_aliases.rs"]
 mod aliases;
+#[path = "capture_bindings.rs"]
+mod bindings;
+#[path = "capture_scoped.rs"]
+mod scoped_inputs;
 #[path = "capture_snapshots.rs"]
 mod snapshots;
 #[cfg(test)]
@@ -29,6 +33,7 @@ struct Plan {
 pub(super) fn project(
     module: &mut NirModule,
     generated: &BTreeSet<String>,
+    scoped_generated: &BTreeSet<String>,
     layouts: &impl ValueLayouts,
 ) -> bool {
     if generated.is_empty() {
@@ -36,6 +41,7 @@ pub(super) fn project(
     }
     let eligible = generated.iter().map(String::as_str).collect();
     let scoped = scoped_loop_lowering::collect_scoped_call_targets(module, &eligible);
+    let protected = scoped_inputs::protected_inputs(module, &scoped);
     let call_graph = module
         .functions
         .iter()
@@ -45,7 +51,10 @@ pub(super) fn project(
         .functions
         .iter()
         .zip(&call_graph)
-        .filter(|(f, _)| generated.contains(&f.name) && !scoped.contains(&f.name))
+        .filter(|(f, _)| {
+            generated.contains(&f.name)
+                && (!scoped.contains(&f.name) || scoped_generated.contains(&f.name))
+        })
         .map(|(f, calls)| (f.name.clone(), calls.clone()))
         .collect::<BTreeMap<_, _>>();
     let mut changed = false;
@@ -65,9 +74,14 @@ pub(super) fn project(
         // Normalize only a candidate copy. A whole use or an unrewritable caller
         // must keep both the original signature and its original body.
         let mut candidate = module.functions[index].clone();
-        snapshots::normalize(&mut candidate, layouts);
+        if !scoped.contains(&name) {
+            bindings::normalize(&mut candidate);
+            snapshots::normalize(&mut candidate, layouts);
+        }
+        // Scoped helpers retain the outliner's control identities, including
+        // nested break flags. Only unwritten parameter aliases may disappear.
         aliases::normalize(&mut candidate, layouts);
-        let Some(plan) = plan(&candidate, layouts) else {
+        let Some(plan) = plan(&candidate, protected.get(&name), layouts) else {
             continue;
         };
         let callers = call_graph
@@ -166,7 +180,11 @@ fn valid_caller(body: &[NirStmt], name: &str, plan: &Plan) -> bool {
     valid
 }
 
-fn plan(function: &NirFunction, layouts: &impl ValueLayouts) -> Option<Plan> {
+fn plan(
+    function: &NirFunction,
+    protected: Option<&BTreeSet<usize>>,
+    layouts: &impl ValueLayouts,
+) -> Option<Plan> {
     if !walk::supported(&function.body) {
         return None;
     }
@@ -175,12 +193,14 @@ fn plan(function: &NirFunction, layouts: &impl ValueLayouts) -> Option<Plan> {
     let candidates = function
         .params
         .iter()
-        .filter(|p| {
-            !written.contains(&p.name)
+        .enumerate()
+        .filter(|(index, p)| {
+            !protected.is_some_and(|inputs| inputs.contains(index))
+                && !written.contains(&p.name)
                 && !layouts.scalar(&p.ty.name)
                 && control_values::supported_type(&p.ty, layouts)
         })
-        .map(|p| p.name.clone())
+        .map(|(_, p)| p.name.clone())
         .collect::<BTreeSet<_>>();
     let mut demand = BTreeMap::<String, BTreeSet<Vec<String>>>::new();
     walk::visit(&function.body, |expr| {

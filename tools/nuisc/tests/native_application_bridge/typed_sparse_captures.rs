@@ -6,20 +6,54 @@ mod aliases;
 
 #[test]
 fn typed_sparse_captures_execute_64_integer_state_with_four_private_arguments() {
-    check_sparse_captures(SOURCE, false, 0);
+    check_sparse_captures(SOURCE, None, 0);
 }
 
 #[test]
 fn typed_sparse_captures_follow_aliases_inside_guarded_private_helpers() {
-    check_sparse_captures(&aliases::source(), true, 0);
+    check_sparse_captures(&aliases::source(), Some(&[2, 3]), 0);
 }
 
 #[test]
 fn typed_sparse_captures_preserve_old_and_rebound_record_versions() {
-    check_sparse_captures(&aliases::rebound_source(), true, 30);
+    check_sparse_captures(&aliases::rebound_source(), Some(&[2, 3]), 30);
 }
 
-fn check_sparse_captures(source: &str, alias: bool, offset: i64) {
+#[test]
+fn typed_sparse_captures_keep_same_name_branch_aliases_and_suffixes_independent() {
+    check_sparse_captures(&aliases::scoped_source(), Some(&[2, 2, 2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_captures_preserve_branch_local_rebound_snapshots() {
+    check_sparse_captures(&aliases::scoped_rebound_source(), Some(&[2, 2, 2, 3]), 30);
+}
+
+#[test]
+fn typed_sparse_captures_compose_with_invariant_iteration_aliases() {
+    check_sparse_captures(&aliases::loop_source(), Some(&[2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_captures_project_wide_invariant_iteration_inputs() {
+    let source = aliases::wide_loop_source();
+    let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    let iteration = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name.starts_with("__nuis_scalar_iteration_"))
+        .unwrap();
+    assert_eq!(iteration.parameters.len(), 4);
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_captures_preserve_cross_scope_terminal_snapshots() {
+    check_sparse_captures(&aliases::terminal_snapshot_source(), Some(&[2, 3]), 30);
+}
+
+fn check_sparse_captures(source: &str, branch_sizes: Option<&[usize]>, offset: i64) {
     let project = Project::with_source(source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     compiled.yir.nodes.reverse();
@@ -27,7 +61,7 @@ fn check_sparse_captures(source: &str, alias: bool, offset: i64) {
     for function in &mut compiled.yir.functions {
         function.body_nodes.reverse();
     }
-    if alias {
+    if let Some(branch_sizes) = branch_sizes {
         let mut sizes = compiled
             .yir
             .functions
@@ -38,7 +72,7 @@ fn check_sparse_captures(source: &str, alias: bool, offset: i64) {
         sizes.sort();
         assert_eq!(
             sizes,
-            [2, 3],
+            branch_sizes,
             "{}",
             nuisc::render::render_yir(&compiled.yir)
         );
@@ -82,9 +116,14 @@ fn check_sparse_captures(source: &str, alias: bool, offset: i64) {
     llvm.push_str("\ndefine i64 @nuis_yir_entry() {\n  %args = alloca [4 x i64], align 8\n  %words = alloca [66 x i64], align 8\n  %state = getelementptr i64, ptr %words, i64 1\n");
     let mut expected = Vec::new();
     let registry = yir_verify::default_registry();
-    for (case, input) in [[12, 0, 1, 99], [12, 3, 0, 99], [-15, -3, 0, 99]]
-        .into_iter()
-        .enumerate()
+    for (case, input) in [
+        [12, 0, 1, 99],
+        [-12, 0, 1, 99],
+        [12, 3, 0, 99],
+        [-15, -3, 0, 99],
+    ]
+    .into_iter()
+    .enumerate()
     {
         let (mut reference, _) = ApplicationSession::open_registered(
             &compiled.yir,

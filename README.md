@@ -16,11 +16,12 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.15.*`. The recorded source checkpoint is
-`05951bef` (`beta-0.15.0`, 2026-09-24). Git history is authoritative for later
-patches; Cargo package versions are independent of the project release.
+The repository is on `beta-0.15.*`; the current source patch is
+[`beta-0.15.1`](docs/versioning/nuis-beta-0.15.1-patch.md) (2026-09-24).
+Git history is authoritative; Cargo package versions are independent of the
+project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
-this existing commit, not another release or compatibility freeze. The
+that baseline, not a compatibility freeze or acceptance of later changes. The
 [beta-0.14 snapshot](docs/versioning/nuis-beta-0.14.0-snapshot.md) and
 [beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) remain
 historical checkpoints, not current acceptance results.
@@ -317,10 +318,21 @@ reduce generated helper arguments without widening public signatures or native l
 Stable record aliases and straight-line rebound snapshots now retain lexical identity
 and source evaluation order through projection; selected failures still trap.
 The sparse, alias and snapshot workflows cover build/cache/tamper rejection and
-source-free restoration. The next boundary is field demand through same-name
-branch-local capture aliases; control-flow writes and iteration-local aliases
-still retain conservative whole captures. Neither this work nor the repository
-cleanup raises the persistent-session coordinate above its bounded `active/86`.
+source-free restoration. Same-name branch-local aliases now receive separate lexical
+identities before field projection, while existing outer writes keep their identity.
+Nested scopes and later same-name declarations stay separate; computed callers still
+veto the candidate transaction. The scoped-alias workflow retains guarded native
+results and source-free restoration. Straight-line branch-local record rebindings
+now have scope-confined snapshot identities; old aliases and self-rebinding reads
+retain their previous values without erasing constructor work. Cross-scope writes
+in non-loop branches proven to return now receive separate snapshot versions too;
+the suffix retains its preceding value. Fallthrough joins and rebound iteration-local
+records still retain conservative whole captures.
+Single-definition loop aliases now expose fields when their pure-value origin is
+an unwritten parameter. Generated scoped iterations now project invariant fields while
+preserving induction/carry maps and nested break identities: the 64-field loop fixture
+uses four arguments instead of 66. Fallthrough record joins remain next. Neither this work nor
+the repository cleanup raises the persistent-session coordinate above its bounded `active/86`.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
 Unrestricted aggregate calls, resources and provider effects remain outside this

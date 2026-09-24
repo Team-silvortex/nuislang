@@ -151,8 +151,8 @@ Only ready variable/field paths can be duplicated or discarded at a call boundar
 Computed record arguments veto projection rather than losing effects or failures.
 Scalar arguments, including unused checked arithmetic and predicates, are not removed.
 Whole-record returns/forwarding and control-flow-dependent rebinding conservatively keep
-the required capture. Unsupported callers, scoped targets, cycles and their dependent
-helpers are not rewritten. The shared read-only expression walk is exhaustive,
+the required capture. Unsupported callers, scoped targets without the opt-in proof
+below, cycles and their dependent helpers are not rewritten. The shared read-only expression walk is exhaustive,
 including conversions, FFI operands and shader/kernel children.
 
 [Sparse native probes](../../tools/nuisc/tests/native_application_bridge/typed_sparse_captures.rs)
@@ -171,9 +171,10 @@ The [alias normalizer](../../tools/nuisc/src/lowering/buffer_loop_outline/captur
 now resolves immutable Let/Const record chains rooted in stable helper parameters.
 Nested field origins retain exact nominal and scalar types, including mixed records.
 Distinct branch-local aliases have independent environments and do not escape.
-Control-flow writes and iteration-local aliases remain conservative;
-a stable outer alias can still be read inside a loop. Repeated same-name
-branch aliases may capture exact subrecords, but are not reduced to individual leaves.
+Fallthrough cross-scope writes and rebound iteration-local records remain conservative;
+a stable outer alias can still be read inside a loop. Same-name aliases in
+independent branches now reduce to individual demanded fields through the lexical
+identity pass below.
 
 Alias normalization is transactional: it runs on a candidate copy and commits only
 with actual leaf reduction and successful call-site preflight. Whole-record demand,
@@ -200,8 +201,8 @@ discovery. It versions both rebound parameters and repeated local aliases, with
 each initializer reading the preceding version, including self-rebinding.
 Names reserve all existing bindings and reads before allocation. Every version
 must retain the same canonical record type; untyped, reference and type-changing
-versions are not rewritten. Any nested branch/loop write vetoes all versions of
-that name, while nested reads can use an invariant version safely.
+versions are not rewritten. Any loop-local write or write in a non-returning child
+scope vetoes all versions of the name, while nested reads can use an invariant version safely.
 
 Pure-helper admission now accepts same-nominal-type record Let rebindings, retaining
 dependency validation, checked arithmetic and existing scalar/loop restrictions.
@@ -215,9 +216,155 @@ calls are not expanded into aliases or erased when their result is unused: the
 discarded-record regression retains selected division failure while skipping it on
 the unselected path in reference and ordinary native execution.
 
-The next boundary is field demand through same-name branch-local capture aliases.
+## Branch-Local Capture Identities
+
+The [binding normalizer](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_bindings.rs)
+runs on the private candidate before snapshot versioning and alias discovery.
+Fresh declarations below a branch/loop boundary receive independent identities;
+parameters and already-visible bindings retain their identity on writes. Initializers
+read the preceding scope. Siblings, nested scopes and later suffix declarations
+do not share an identity just because their source spelling matches.
+
+All bindings and variable reads reserve names before rewriting. Only variable uses
+change; function symbols, field labels and nominal types remain untouched. Unsupported
+expressions veto normalization, and the existing signature/call-site transaction
+still commits only after a real leaf reduction. A computed caller or whole-record
+demand therefore preserves the original body as well as its signature.
+
+Same-name branch aliases that previously retained two complete Pair captures now
+retain two demanded i64 fields. Tests cover nested aliases of different record types,
+outer and parameter updates, loop writes, private-name collisions and before/after
+reference execution. The shared scoped-alias source adds nested branches and a later
+same-name declaration to the 64-i64 lifecycle fixture. Native and CLI regressions
+retain four bounded private branches with 2/2/2/3 physical arguments, unchanged
+64-parameter public inputs, exact state, zero aggregate allocations, skipped/reached
+division failures, cache reuse and source-free restoration.
+
+### Branch-Local Snapshot Versions
+
+Straight-line rebindings of a branch-local record now receive private snapshot
+identities before alias discovery. One iterative analysis tracks each hygienic
+binding's write scope, exact type and loop ancestry. Writes in the owning non-loop
+scope remain admissible; child writes now require the return proof below. Writes
+with fallthrough joins and all iteration-local writes remain unchanged.
+
+Each initializer sees its preceding version, including self-rebinding. Nested reads
+inherit the version visible at entry; siblings and suffix declarations never inherit
+another branch's versions. Constructor/call evaluation is not erased even when the
+record is discarded. Unsupported types and computed callers retain the existing
+conservative, transactional behavior. The direct nested-record regression reduces
+one whole State capture to its two demanded i64 leaves, retaining the bool predicate.
+Flat-record before/after execution covers nested branches, two self-rebindings,
+sibling and suffix snapshots; selected checked constructor work still fails.
+
+The shared scoped-rebound 64-i64 fixture combines old aliases with new values in
+both nested arms and the suffix. Its native/CLI checks retain four private branches
+with 2/2/2/3 physical arguments, the unchanged 64-argument public helper, zero aggregate
+allocations/drops, exact lifecycle state, selected traps and source-free restoration.
+This source route complements the direct NIR reduction proof; it is not a claim that
+the whole frontend route was previously unbuildable.
+
+Snapshot versioning adds no join/backedge rewrite or iteration-local write
+versioning, and does not widen source control admission. Stable loop aliases use
+the separate invariant-origin proof below.
 This is not unrestricted scalar replacement, a wider native argument limit,
 mixed loop carry admission or a measured speedup.
+
+### Returning Child Snapshots
+
+Cross-scope record writes can now receive separate versions when their immediate
+non-loop scope is proven to return rather than rejoin its parent. This includes
+parameter updates and ancestor-local updates, with preceding versions available to
+initializers and old aliases. The enclosing continuation keeps its prior version;
+sibling arms never inherit another arm's writes.
+
+The [scope analysis](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_snapshot_scopes.rs)
+assigns lexical scope IDs iteratively and computes normal fallthrough and escaping
+control bottom-up. Both returning arms can close a scope; a returning child loop
+cannot because it may execute zero times. Break/continue do not count as function
+returns, and loop ancestry is still an unconditional veto for snapshot candidates.
+All writes must retain the exact declared pure-value type. A non-returning cross-scope
+write vetoes every version of that binding rather than inventing a merge value.
+
+[Direct projection regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_terminal_snapshots_tests.rs)
+reduce a nested State capture to two demanded i64 fields plus its predicate. They
+cover parameter/local writes, nested returning arms, top-level preceding versions,
+unchanged fallthrough values, exact types, live joins, backedges and computed-caller
+transactions. Before/after reference execution and LLVM emission retain selected
+checked constructor work even when the constructed record is discarded.
+
+The shared 64-field source combines an outer record/old alias, a returning child
+update and a suffix update. Native/CLI execution retains two/three private branch
+arguments, the unchanged 64-argument public helper, complete state, zero aggregate
+allocations/drops, selected traps, cache reuse and source-free restoration. This
+proves composition through the source pipeline, not that the fixture previously
+failed to compile. General fallthrough joins, loop-written versions and resources
+remain separate work; no native bound or source control admission is widened.
+
+## Invariant Loop Aliases
+
+Single-definition aliases inside loops can now expose demanded fields when their
+canonical origin is a ready pure-value path rooted in an unwritten parameter.
+The proof is checked explicitly before replacing an alias. Local computations,
+constructors, calls, references, type mismatches and roots written anywhere in the
+function cannot acquire invariant-origin authority. Rebound loop-local records
+retain their per-trip snapshots; parameter and outer carry writes remain unchanged.
+
+Child scopes inherit the preceding alias environment without exporting new locals.
+The same rule handles chains and nested loops, with lexical identities separating
+sibling declarations. Candidate transactions, whole-record demand, computed-caller
+vetoes remain unchanged; scoped targets require the separate opt-in proof below. The
+[loop-alias regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_loop_aliases_tests.rs)
+project nested records to demanded scalar fields; flat-record before/after reference
+execution and LLVM emission retain zero trips, selected division/overflow failures and calls.
+
+The shared loop source adds a real repeated checked-division helper to the 64-i64
+lifecycle fixture. It uses a separate two-field input record, not a wide iteration
+capture. Native/CLI checks retain the unchanged public inputs, 2/3-argument private
+branches, exact lifecycle state, zero aggregate allocations, selected traps, cache
+reuse and source-free restoration. This is execution-composition evidence, not a
+claim that every loop alias survives outlining or that wide scoped captures now fit.
+
+That narrower fixture preceded the scoped iteration projection described below.
+Fallthrough cross-scope writes and rebound iteration-local records remain conservative;
+the native argument bound, backedge layouts, source loop admission and callback
+budgets are not widened by alias discovery.
+
+## Scoped Invariant Captures
+
+Compiler-generated scoped helpers now opt into field projection separately from
+ordinary generated helpers. Before rewriting signatures, the
+[scoped input pass](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_scoped.rs) examines every
+scoped caller and unions protected argument positions: any computed argument or
+path rooted in a loop-written binding stays whole. Induction, record/scalar carry
+seeds and break-control values therefore retain their original identities. User
+functions do not gain this private-signature permission.
+
+Callees are still processed before callers. Signature and call-site changes commit
+only together after real leaf reduction; whole uses, unsafe callers and cycles
+remain conservative. Scoped candidates skip general local renaming and snapshot
+versioning so nested break-control identities survive. Stable alias discovery can
+still expose demanded fields without renaming any control binding.
+
+[Scoped argument admission](../../tools/nuisc/src/lowering/scoped_loop_lowering/arguments.rs)
+accepts field paths only from existing bindings unwritten anywhere
+in that loop, including nested scopes. It materializes those ready inputs before
+the loop and derives induction/carry argument positions from the rewritten calls.
+Computed expressions and fields of carried records cannot use this invariant path.
+Carry reconstruction, bool seed conversion, break slots and preflight are unchanged;
+private boolean packing still excludes scoped targets.
+
+The shared wide-loop source uses the original 64-field Payload inside the loop,
+not a two-field wrapper. Its iteration signature drops from 66 physical parameters
+to four, while the public helper retains 64. Native execution compares complete
+lifecycle state against the reference, including reversed YIR storage, in-place
+publication and zero aggregate allocations/drops. The CLI fixture covers cache,
+tamper rejection, selected traps and byte-identical source-free restoration.
+Focused NIR/reference/LLVM checks cover zero trips, leading/trailing steps,
+multiple callers, record/bool carries and nested breaks. An initial nested-break
+regression exposed the control-identity renaming problem and now guards its repair.
+This is bounded correctness/transport evidence, not measured speedup or support
+for unrestricted cross-scope record updates and mixed loop carries.
 
 ## Evidence And Limits
 
@@ -268,3 +415,56 @@ Seven CLI workflows passed; exact-64-slot, sparse, alias and snapshot captures r
 input/tamper rejection, selected traps and source-free restoration with identical LLVM and states.
 All 28 tensor tests passed; 1409 drift checks were clean (797 selected tests in total). No fresh GPU/Linux,
 full-workspace, formal safety or performance result is inferred from this checkpoint.
+
+The 2026-09-24 lexical-identity worktree follow-up to `9ec40a40` passed 601
+lowering-unit tests, 36 selected native-bridge tests, two ordinary native snapshot
+tests, four sparse-capture CLI workflows, 28 tensor tests and the host-path policy
+case: 672 selected tests without counting overlapping reruns twice. The fresh CLI
+reported 1416 clean drift checks; coverage, hierarchy and lineage remained clean,
+with the session coordinate still `active/86`. This is not a full-workspace,
+fresh GPU/Linux or performance result. Historical checkpoints above remain separate.
+
+The later 2026-09-24 scope-confined snapshot follow-up passed 607 selected lowering
+tests, 37 selected native-bridge tests, two ordinary native snapshot tests, five
+sparse-capture CLI workflows, 26 tensor tests and the host-path policy case: 678
+selected tests, excluding overlapping reruns. The new branch-local projection
+regression failed before the implementation and passed afterward. The fresh CLI
+reported 1418 clean drift checks, clean coverage/hierarchy/lineage and `active/86`.
+All five workflows retained cache reuse, tamper rejection, selected traps and
+source-free restoration. No full-workspace, fresh GPU/Linux or speedup is claimed.
+
+The 2026-09-24 invariant-loop-alias follow-up passed 614 selected lowering tests,
+38 selected native-bridge tests, two ordinary native snapshot tests, six
+sparse-capture CLI workflows, 26 tensor tests and the host-path policy case: 687
+selected tests, excluding overlapping reruns. The loop-local alias projection
+regression failed before the implementation and passed afterward. The fresh CLI
+reported 1420 clean drift checks, clean coverage/hierarchy/lineage and `active/86`.
+All six workflows retained cache reuse, tamper rejection, selected traps and
+source-free restoration. Direct NIR projection and narrow-loop execution evidence
+do not imply field-selective scoped iteration inputs, a full-workspace result,
+fresh GPU/Linux validation or a measured speedup.
+
+The subsequent 2026-09-24 scoped-invariant-capture follow-up passed 622 selected
+lowering tests, 134 selected native-bridge tests, two ordinary native snapshot
+tests, seven sparse-capture CLI workflows, 26 tensor tests and the host-path policy
+case: 792 selected tests without double-counting overlapping reruns. The new
+64-field source regression failed with 66 iteration parameters before the change
+and passes with four afterward, including a linked native executable. A separate
+nested-break regression caught generic local renaming of control identities and
+passes after preserving those identities. All seven CLI workflows retain cache,
+tamper rejection, selected traps and byte-identical source-free restoration.
+The fresh CLI reports 1426 clean drift checks, clean coverage/hierarchy/lineage
+and `active/86`. This is not a full-workspace, fresh GPU/Linux or performance result.
+
+The 2026-09-24 returning-child-snapshot follow-up passed 629 selected lowering
+tests, 40 selected native-bridge tests, two ordinary native snapshot tests, eight
+sparse-capture CLI workflows, 26 tensor tests and the host-path policy case: 706
+selected tests, excluding overlapping reruns. The direct NIR projection regression
+failed before the change and passes afterward; the shared 64-field source is
+composition evidence, not a claim that the source pipeline previously rejected it.
+All eight CLI workflows retain cache reuse, tamper rejection, selected traps and
+byte-identical source-free restoration. The fresh CLI reports 1429 clean drift
+checks, clean coverage/hierarchy/lineage and `active/86`. Returning child scopes
+preserve old aliases and parent/suffix values without exporting branch versions.
+Fallthrough joins and loop-written snapshots remain separate work. No full-workspace,
+fresh GPU/Linux, formal safety or measured performance result is claimed.

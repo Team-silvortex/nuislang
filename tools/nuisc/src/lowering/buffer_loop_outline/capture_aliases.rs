@@ -41,15 +41,15 @@ pub(super) fn normalize(function: &mut NirFunction, layouts: &impl ValueLayouts)
         parameters: &parameters,
         layouts,
     };
-    let mut pending = vec![(&mut function.body, origins, false)];
-    while let Some((body, mut scope, in_loop)) = pending.pop() {
+    let mut pending = vec![(&mut function.body, origins)];
+    while let Some((body, mut scope)) = pending.pop() {
         let mut nested_scopes = Vec::new();
         body.retain_mut(|stmt| match stmt {
             NirStmt::Let { name, ty, value } => {
-                context.keep_binding(name, ty.as_ref(), value, &mut scope, in_loop)
+                context.keep_binding(name, ty.as_ref(), value, &mut scope)
             }
             NirStmt::Const { name, ty, value } => {
-                context.keep_binding(name, Some(ty), value, &mut scope, in_loop)
+                context.keep_binding(name, Some(ty), value, &mut scope)
             }
             NirStmt::If { condition, .. } | NirStmt::While { condition, .. } => {
                 rewrite(condition, &scope);
@@ -65,8 +65,8 @@ pub(super) fn normalize(function: &mut NirFunction, layouts: &impl ValueLayouts)
             }
             NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => true,
         });
-        // Snapshot lexical environments before descending. Branch-local aliases
-        // never escape; iteration-local bindings keep their per-trip snapshots.
+        // Each child inherits the preceding lexical environment. Invariant
+        // origins have the same value on every trip; no local alias escapes.
         let mut scopes = nested_scopes.into_iter();
         for stmt in body {
             match stmt {
@@ -76,11 +76,11 @@ pub(super) fn normalize(function: &mut NirFunction, layouts: &impl ValueLayouts)
                     ..
                 } => {
                     let scope = scopes.next().expect("recorded branch scope");
-                    pending.push((then_body, scope.clone(), in_loop));
-                    pending.push((else_body, scope, in_loop));
+                    pending.push((then_body, scope.clone()));
+                    pending.push((else_body, scope));
                 }
                 NirStmt::While { body, .. } => {
-                    pending.push((body, scopes.next().expect("recorded loop scope"), true));
+                    pending.push((body, scopes.next().expect("recorded loop scope")));
                 }
                 _ => {}
             }
@@ -101,7 +101,6 @@ impl<L: ValueLayouts> Context<'_, L> {
         declared: Option<&NirTypeRef>,
         value: &mut NirExpr,
         scope: &mut Origins,
-        in_loop: bool,
     ) -> bool {
         rewrite(value, scope);
         let origin = access(value).and_then(|path| {
@@ -114,9 +113,11 @@ impl<L: ValueLayouts> Context<'_, L> {
                 ty,
             })
         });
-        if !in_loop && self.writes.get(name) == Some(&1) && !self.parameters.contains(name) {
+        if self.writes.get(name) == Some(&1) && !self.parameters.contains(name) {
             if let Some(origin) = origin.filter(|origin| {
-                is_record(&origin.ty, self.layouts) && declared.is_none_or(|ty| ty == &origin.ty)
+                self.invariant_origin(origin)
+                    && is_record(&origin.ty, self.layouts)
+                    && declared.is_none_or(|ty| ty == &origin.ty)
             }) {
                 scope.insert(name.to_owned(), origin);
                 return false;
@@ -124,6 +125,15 @@ impl<L: ValueLayouts> Context<'_, L> {
         }
         scope.remove(name);
         true
+    }
+
+    fn invariant_origin(&self, origin: &Origin) -> bool {
+        // Only ready value paths from unwritten parameters may replace per-trip
+        // snapshots. A computed local or carried record cannot grant this proof.
+        origin
+            .path
+            .first()
+            .is_some_and(|root| self.parameters.contains(root) && !self.writes.contains_key(root))
     }
 }
 

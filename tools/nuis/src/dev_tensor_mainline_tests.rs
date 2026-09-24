@@ -306,9 +306,39 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
+    assert!(session.next_step.starts_with(
+        "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges"
+    ));
     assert!(session
-        .next_step
-        .starts_with("propagate field demand through same-name branch-local capture aliases"));
+        .evidence
+        .contains("Branch-local record snapshots now use scope-confined versions"));
+    assert!(session
+        .evidence
+        .contains("Returning non-loop child scopes now admit separate snapshot versions"));
+    assert!(session
+        .blocker
+        .contains("do not synthesize live join values"));
+    assert!(session.blocker.contains(
+        "fallthrough cross-scope writes and rebound iteration-local records still retain whole captures"
+    ));
+    assert!(session
+        .evidence
+        .contains("Loop-local invariant record aliases now expose field demand"));
+    assert!(session
+        .evidence
+        .contains("Generated scoped iteration helpers now opt into invariant field projection"));
+    assert!(session
+        .evidence
+        .contains("four physical iteration arguments instead of 66"));
+    assert!(session
+        .blocker
+        .contains("loop-written seeds and nested break identities stay whole"));
+    assert!(session
+        .evidence
+        .contains("Same-name branch-local aliases now have independent lexical identities"));
+    assert!(session
+        .evidence
+        .contains("existing outer/parameter writes keep their original identity"));
     assert!(session.next_step.contains("native scalar helpers"));
     assert!(session
         .evidence
@@ -319,7 +349,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("zero aggregate allocations/drops"));
     assert!(session
         .blocker
-        .contains("Control-flow writes and iteration-local aliases still retain whole captures"));
+        .contains("Scoped iteration targets retain their independent argument maps"));
     assert!(session
         .evidence
         .contains("Straight-line record snapshots now have hygienic version identities"));

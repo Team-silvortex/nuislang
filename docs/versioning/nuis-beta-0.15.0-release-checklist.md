@@ -3,6 +3,8 @@
 This is the operational companion to the
 [beta-0.15 snapshot](nuis-beta-0.15.0-snapshot.md), anchored to
 `05951befc70d6a145e4978a3ff8909737e5c4fbb` (`beta-0.15.0`, 2026-09-24).
+The [beta-0.15.1 patch](nuis-beta-0.15.1-patch.md) records the subsequent private
+capture and snapshot changes and their selected validation results.
 Commands below are validation instructions, not blanket claims that every suite
 was rerun during documentation synchronization. Record the actual revision and
 worktree changes, platform, prerequisites, command, exit status and skip counts.
@@ -94,11 +96,14 @@ exact nested layouts, raw scalar bits, independent snapshots, overlapping buffer
 malformed-input sentinels, selected traps and zero aggregate allocation counters
 for the admitted value path. Ordinary/resource ABI behavior remains separate.
 
-Private capture tests must retain unchanged public/scoped/FFI signatures,
-field/argument order, guarded effects, work budgets and conservative rejection.
-Aliases and snapshots must not observe later writes or discard selected initializer
-work. Build/cache/tamper and source-free restoration must keep exact artifact
-identity without interpreter fallback for a selected native failure.
+Private capture tests must retain unchanged public/FFI signatures, field/argument
+order, guarded effects, work budgets and conservative rejection. Generated scoped
+helpers may project only proven invariant inputs; carry and break-control identities
+must survive unchanged. Aliases and snapshots must not observe later writes or
+discard selected initializer work. Returning-child versions must not leak into
+parent continuations; fallthrough writes and loop-written snapshots remain
+conservative. Build/cache/tamper and source-free restoration must keep exact
+artifact identity without interpreter fallback for a selected native failure.
 
 ## Provider And Migration Boundaries
 
@@ -115,6 +120,7 @@ For compiler migration, use each gate's `validation_command` in
 gates are not completed compiler responsibility transfer. Nuis-rc policy tests and
 safe cleanup do not establish shared CAS, compiler leases or a resident collector.
 
-This document follows the existing beta-0.15.0 commit. Updating it does not create
-a release/tag, advance the patch, alter runtime behavior or certify unexecuted
+This checklist follows the beta-0.15 minor line; the linked patch notes distinguish
+later evidence from the original baseline. Updating documentation alone does not
+create a release/tag, alter runtime behavior or certify unexecuted
 hardware, performance, packaging or self-hosting work.

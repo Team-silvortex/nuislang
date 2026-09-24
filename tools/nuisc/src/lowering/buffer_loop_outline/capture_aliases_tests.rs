@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "capture_loop_aliases_tests.rs"]
+mod loop_tests;
+
 fn module(body: &str) -> NirModule {
     crate::frontend::parse_nuis_module(&format!(
         "mod cpu Main {{
@@ -20,6 +23,7 @@ fn project(module: &mut NirModule, names: &[&str]) -> bool {
     let changed = super::super::project(
         module,
         &names.iter().map(|name| (*name).to_owned()).collect(),
+        &BTreeSet::new(),
         &layouts,
     );
     crate::nir_verify::verify_nir_module(module).unwrap();
@@ -144,7 +148,7 @@ fn control_flow_rebindings_keep_snapshot_captures_whole() {
 }
 
 #[test]
-fn repeated_branch_alias_names_keep_exact_subrecords() {
+fn repeated_branch_alias_names_project_independent_fields() {
     let mut module = module(
         "fn helper(state: State, flag: bool) -> i64 {
             if flag { let saved = state.a; return saved.x; }
@@ -160,7 +164,7 @@ fn repeated_branch_alias_names_keep_exact_subrecords() {
             .iter()
             .map(|p| p.ty.name.as_str())
             .collect::<Vec<_>>(),
-        ["Pair", "Pair", "bool"]
+        ["i64", "i64", "bool"]
     );
     let NirStmt::If {
         then_body,
@@ -171,13 +175,107 @@ fn repeated_branch_alias_names_keep_exact_subrecords() {
         panic!()
     };
     for body in [then_body, else_body] {
-        assert_eq!(body.len(), 2);
-        assert!(matches!(&body[0], NirStmt::Let { name, .. } if name == "saved"));
+        assert_eq!(body.len(), 1);
+        assert!(matches!(&body[0], NirStmt::Return(Some(NirExpr::Var(_)))));
     }
 }
 
 #[test]
-fn iteration_local_aliases_stay_whole_but_invariant_outer_alias_reads_project() {
+fn nested_same_name_aliases_keep_distinct_types_and_origins() {
+    let mut module = module(
+        "fn helper(state: State, flag: bool, other: bool) -> i64 {
+            if flag {
+                if other { let saved: Pair = state.a; return saved.x; }
+                else { const saved: Pair = state.b; return saved.y; }
+            } else { let saved: State = state; return saved.unused; }
+        }
+        fn entry(state: State, flag: bool, other: bool) -> i64 {
+            return helper(state, flag, other);
+        }",
+    );
+    assert!(project(&mut module, &["helper"]));
+    assert_eq!(
+        function(&module, "helper")
+            .params
+            .iter()
+            .map(|p| p.ty.name.as_str())
+            .collect::<Vec<_>>(),
+        ["i64", "i64", "i64", "bool", "bool"]
+    );
+    assert!(!project(&mut module, &["helper"]));
+}
+
+#[test]
+fn branch_alias_names_do_not_hide_outer_writes_or_parameter_rebindings() {
+    for prefix in ["", "let saved = state;"] {
+        let updated = if prefix.is_empty() { "state" } else { "saved" };
+        let mut module = module(&format!(
+            "fn helper(state: State, flag: bool) -> i64 {{
+                {prefix}
+                if flag {{ let {updated} = State {{ a: state.b, b: state.a, unused: 0 }}; }}
+                return {updated}.a.x;
+            }}
+            fn entry(state: State, flag: bool) -> i64 {{ return helper(state, flag); }}"
+        ));
+        let before = function(&module, "helper").body.clone();
+        assert!(!project(&mut module, &["helper"]));
+        assert_eq!(function(&module, "helper").body, before);
+    }
+}
+
+#[test]
+fn branch_alias_normalization_remains_transactional_on_computed_callers() {
+    let mut module = module(
+        "fn relay(state: State) -> State { return state; }
+        fn helper(state: State, flag: bool) -> i64 {
+            if flag { let saved = state.a; return saved.x; }
+            else { let saved = state.b; return saved.y; }
+        }
+        fn entry(state: State, flag: bool) -> i64 { return helper(relay(state), flag); }",
+    );
+    let before = function(&module, "helper").body.clone();
+    assert!(!project(&mut module, &["helper"]));
+    assert_eq!(function(&module, "helper").body, before);
+}
+
+#[test]
+fn projected_same_name_aliases_preserve_reference_execution() {
+    let mut module = module(
+        "@noinline fn helper(state: State, flag: bool) -> i64 {
+            if flag { let saved = state.a; return saved.x; }
+            else { const saved: Pair = state.b; return saved.y; }
+        }
+        fn main() -> i64 {
+            let state = State { a: Pair { x: 12, y: 21 }, b: Pair { x: 23, y: 33 }, unused: 99 };
+            print(helper(state, true)); print(helper(state, false));
+            return 0;
+        }",
+    );
+    for projected in [false, true] {
+        if projected {
+            assert!(project(&mut module, &["helper"]));
+            assert_eq!(function(&module, "helper").params.len(), 3);
+        }
+        let yir = crate::lowering::lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let trace = yir_runtime_host::execute_module_source_with_registry(
+            &crate::render::render_yir(&yir),
+            &yir_verify::default_registry(),
+        )
+        .unwrap();
+        let prints = trace
+            .events
+            .iter()
+            .filter(|event| event.contains("cpu.print"))
+            .collect::<Vec<_>>();
+        assert_eq!(prints.len(), 2);
+        assert!(prints[0].ends_with(": 12"), "{prints:?}");
+        assert!(prints[1].ends_with(": 33"), "{prints:?}");
+        yir_lower_llvm::emit_module(&yir).unwrap();
+    }
+}
+
+#[test]
+fn invariant_outer_and_iteration_local_alias_reads_project() {
     for inside in [false, true] {
         let alias = "let saved = state;";
         let mut module = module(&format!(
@@ -190,11 +288,9 @@ fn iteration_local_aliases_stay_whole_but_invariant_outer_alias_reads_project() 
             if inside { "" } else { alias },
             if inside { alias } else { "" }
         ));
-        assert_eq!(project(&mut module, &["helper"]), !inside);
-        assert_eq!(
-            function(&module, "helper").params[0].ty.name,
-            if inside { "State" } else { "i64" }
-        );
+        assert!(project(&mut module, &["helper"]));
+        assert_eq!(function(&module, "helper").params[0].ty.name, "i64");
+        assert!(!project(&mut module, &["helper"]));
     }
 }
 

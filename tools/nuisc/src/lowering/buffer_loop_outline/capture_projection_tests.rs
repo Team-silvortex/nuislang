@@ -10,7 +10,7 @@ fn module(body: &str) -> NirModule {
 fn run(module: &mut NirModule, generated: &[&str]) -> bool {
     let layouts = control_values::TypedLayouts::collect(module);
     let generated = generated.iter().map(|s| (*s).to_owned()).collect();
-    let changed = project(module, &generated, &layouts);
+    let changed = project(module, &generated, &BTreeSet::new(), &layouts);
     crate::nir_verify::verify_nir_module(module).unwrap();
     changed
 }
@@ -175,6 +175,7 @@ fn projection_vetoes_calls_hidden_in_unsupported_expressions() {
         assert!(!project(
             &mut module,
             &BTreeSet::from(["helper".into()]),
+            &BTreeSet::new(),
             &layouts
         ));
         assert_eq!(function(&module, "helper").params[0].ty.name, "State");

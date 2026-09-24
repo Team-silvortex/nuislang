@@ -9,6 +9,7 @@ fn verify_runs(project: &Project, output: &Path, offset: i64) -> Vec<Vec<String>
     let mut results = Vec::new();
     for (input, left, divisor, flag, right, selected) in [
         ("12,0,1,99", 12, 0, 1, 99, 12),
+        ("-12,0,1,99", -12, 0, 1, 99, -12),
         ("12,3,0,99", 12, 3, 0, 99, 33),
         ("-15,-3,0,99", -15, -3, 0, 99, -33),
     ] {
@@ -95,20 +96,45 @@ fn verify_selected_failures(project: &Project, output: &Path) {
 
 #[test]
 fn native_sparse_captures_build_cache_and_restore_without_sources() {
-    check_sparse_workflow(SOURCE, false, 0);
+    check_sparse_workflow(SOURCE, None, 0);
 }
 
 #[test]
 fn native_sparse_captures_aliases_build_cache_and_restore_without_sources() {
-    check_sparse_workflow(&aliases::source(), true, 0);
+    check_sparse_workflow(&aliases::source(), Some(&[1, 2]), 0);
 }
 
 #[test]
 fn native_sparse_captures_snapshots_build_cache_and_restore_without_sources() {
-    check_sparse_workflow(&aliases::rebound_source(), true, 30);
+    check_sparse_workflow(&aliases::rebound_source(), Some(&[1, 2]), 30);
 }
 
-fn check_sparse_workflow(source: &str, alias: bool, offset: i64) {
+#[test]
+fn native_sparse_captures_scoped_aliases_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::scoped_source(), Some(&[1, 1, 1, 2]), 0);
+}
+
+#[test]
+fn native_sparse_captures_scoped_snapshots_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::scoped_rebound_source(), Some(&[1, 1, 1, 2]), 30);
+}
+
+#[test]
+fn native_sparse_captures_loop_aliases_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::loop_source(), Some(&[1, 2]), 0);
+}
+
+#[test]
+fn native_sparse_captures_wide_iteration_inputs_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::wide_loop_source(), Some(&[1, 2]), 0);
+}
+
+#[test]
+fn native_sparse_captures_terminal_snapshots_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::terminal_snapshot_source(), Some(&[1, 2]), 30);
+}
+
+fn check_sparse_workflow(source: &str, branch_sizes: Option<&[usize]>, offset: i64) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
         target_pointer_width = "64"
@@ -122,7 +148,7 @@ fn check_sparse_workflow(source: &str, alias: bool, offset: i64) {
         nuisc::aot::verify_build_manifest(&output.join("nuis.build.manifest.toml")).unwrap();
     let llvm_name = format!("{}.ll", report.artifact_binary_name);
     let llvm = fs::read_to_string(output.join(&llvm_name)).unwrap();
-    if alias {
+    if let Some(branch_sizes) = branch_sizes {
         let mut sizes = llvm
             .lines()
             .filter(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch"))
@@ -132,7 +158,7 @@ fn check_sparse_workflow(source: &str, alias: bool, offset: i64) {
             })
             .collect::<Vec<_>>();
         sizes.sort();
-        assert_eq!(sizes, [1, 2]);
+        assert_eq!(sizes, branch_sizes);
     } else {
         let selection = llvm
             .lines()

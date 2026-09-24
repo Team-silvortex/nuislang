@@ -68,7 +68,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "54 reachable native functions",
             "Generated-use counting is iterative",
-            "propagate field demand through same-name branch-local capture aliases",
+            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -130,7 +130,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "51 reachable native functions",
             "disjoint lexical bindings",
             "63 to 32 private helpers",
-            "propagate field demand through same-name branch-local capture aliases",
+            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -203,7 +203,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Scope-aware local hygiene",
             "Private names reserve future source bindings",
             "five actual entries instead of six",
-            "propagate field demand through same-name branch-local capture aliases",
+            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
         ],
     },
 ];

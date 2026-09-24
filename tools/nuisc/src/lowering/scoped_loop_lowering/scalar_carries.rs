@@ -160,6 +160,7 @@ pub(super) fn admissible(
     args: &[NirExpr],
     bindings: &BTreeMap<String, String>,
     breaking: bool,
+    invariant_inputs: &BTreeSet<&str>,
     state: &LoweringState<'_>,
 ) -> bool {
     let control = breaking.then(|| carries.last().expect("nonempty projections").name);
@@ -174,7 +175,7 @@ pub(super) fn admissible(
             if control == Some(param.name.as_str()) {
                 arg == &NirExpr::Int(0)
             } else {
-                matches!(arg, NirExpr::Var(_))
+                arguments::ready(arg, invariant_inputs)
                     || carries
                         .iter()
                         .any(|binding| matches_seed(binding, param, arg))
