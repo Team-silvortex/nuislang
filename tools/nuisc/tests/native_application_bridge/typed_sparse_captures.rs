@@ -53,6 +53,118 @@ fn typed_sparse_captures_preserve_cross_scope_terminal_snapshots() {
     check_sparse_captures(&aliases::terminal_snapshot_source(), Some(&[2, 3]), 30);
 }
 
+#[test]
+fn typed_sparse_captures_preserve_fallthrough_record_joins() {
+    check_sparse_captures(&aliases::join_source(), Some(&[3, 4]), 30);
+}
+
+#[test]
+fn typed_sparse_captures_preserve_loop_record_snapshots() {
+    let source = aliases::loop_join_source();
+    let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    let call = compiled
+        .yir
+        .nodes
+        .iter()
+        .find_map(|node| {
+            yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)
+                .ok()
+                .flatten()
+                .filter(|call| call.callee.starts_with("__nuis_scalar_iteration_"))
+        })
+        .unwrap();
+    assert_eq!(call.seeds.len(), 5);
+    assert_eq!(call.operands.len(), 5);
+    let mut slots = call
+        .operands
+        .iter()
+        .filter_map(|arg| {
+            yir_core::parse_loop_owned_struct_carry(arg)
+                .unwrap()
+                .map(|(slot, _)| slot)
+        })
+        .collect::<Vec<_>>();
+    slots.sort();
+    assert_eq!(slots, [0, 1, 2, 4]);
+    assert_eq!(
+        compiled
+            .yir
+            .functions
+            .iter()
+            .find(|f| f.name == call.callee)
+            .unwrap()
+            .parameters
+            .len(),
+        5
+    );
+    check_sparse_captures(&source, Some(&[2, 3]), 30);
+}
+
+#[test]
+fn typed_sparse_captures_map_record_fields_to_scoped_backedges() {
+    let source = aliases::field_seed_source();
+    let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    let driver = compiled
+        .yir
+        .nodes
+        .iter()
+        .find(|n| n.op.args.iter().any(|a| a == "update_fields"))
+        .unwrap();
+    let slots = driver
+        .op
+        .args
+        .iter()
+        .filter_map(|arg| {
+            yir_core::parse_loop_owned_struct_carry(arg)
+                .unwrap()
+                .map(|(slot, _)| slot)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(slots, [2, 4, 0, 3, 1]);
+    check_sparse_captures(&source, Some(&[2, 3]), 30);
+}
+
+#[test]
+fn typed_sparse_captures_separate_initial_state_from_partial_iteration_arguments() {
+    let source = aliases::partial_field_seed_source();
+    let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    let call = compiled
+        .yir
+        .nodes
+        .iter()
+        .find_map(|node| {
+            yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)
+                .ok()
+                .flatten()
+                .filter(|call| call.callee == "update_fields")
+        })
+        .unwrap();
+    assert_eq!(call.seeds.len(), 5);
+    assert_eq!(call.operands.len(), 4);
+    let slots = call
+        .operands
+        .iter()
+        .filter_map(|arg| {
+            yir_core::parse_loop_owned_struct_carry(arg)
+                .unwrap()
+                .map(|(slot, _)| slot)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(slots, [2, 4, 0, 1]);
+    assert_eq!(
+        compiled
+            .yir
+            .functions
+            .iter()
+            .find(|f| f.name == "update_fields")
+            .unwrap()
+            .parameters
+            .len(),
+        4
+    );
+    check_sparse_captures(&source, Some(&[2, 3]), 30);
+}
+
 fn check_sparse_captures(source: &str, branch_sizes: Option<&[usize]>, offset: i64) {
     let project = Project::with_source(source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();

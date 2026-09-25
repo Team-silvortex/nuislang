@@ -134,7 +134,36 @@ fn native_sparse_captures_terminal_snapshots_build_cache_and_restore_without_sou
     check_sparse_workflow(&aliases::terminal_snapshot_source(), Some(&[1, 2]), 30);
 }
 
+#[test]
+fn native_sparse_captures_record_joins_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::join_source(), Some(&[2, 3]), 30);
+}
+
+#[test]
+fn native_sparse_captures_loop_snapshots_build_cache_and_restore_without_sources() {
+    check_sparse_workflow_with_iteration(&aliases::loop_join_source(), Some(&[1, 2]), 30, Some(5));
+}
+
+#[test]
+fn native_sparse_captures_field_seeds_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::field_seed_source(), Some(&[1, 2]), 30);
+}
+
+#[test]
+fn native_sparse_captures_partial_field_seeds_build_cache_and_restore_without_sources() {
+    check_sparse_workflow(&aliases::partial_field_seed_source(), Some(&[1, 2]), 30);
+}
+
 fn check_sparse_workflow(source: &str, branch_sizes: Option<&[usize]>, offset: i64) {
+    check_sparse_workflow_with_iteration(source, branch_sizes, offset, None);
+}
+
+fn check_sparse_workflow_with_iteration(
+    source: &str,
+    branch_sizes: Option<&[usize]>,
+    offset: i64,
+    iteration_arity: Option<usize>,
+) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
         target_pointer_width = "64"
@@ -148,13 +177,25 @@ fn check_sparse_workflow(source: &str, branch_sizes: Option<&[usize]>, offset: i
         nuisc::aot::verify_build_manifest(&output.join("nuis.build.manifest.toml")).unwrap();
     let llvm_name = format!("{}.ll", report.artifact_binary_name);
     let llvm = fs::read_to_string(output.join(&llvm_name)).unwrap();
+    if let Some(arity) = iteration_arity {
+        let iteration = llvm
+            .lines()
+            .find(|line| {
+                line.starts_with("define ") && line.contains(" @nuis_fn___nuis_scalar_iteration_")
+            })
+            .unwrap();
+        assert_eq!(iteration.matches("i64 %").count(), arity, "{iteration}");
+    }
     if let Some(branch_sizes) = branch_sizes {
         let mut sizes = llvm
             .lines()
-            .filter(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch"))
+            .filter(|line| {
+                line.starts_with("define ") && line.contains(" @nuis_fn___nuis_scalar_branch")
+            })
             .map(|line| {
-                assert_eq!(line.matches("i1 %").count(), 1, "{line}");
-                line.matches("i64 %").count()
+                let params = line.split_once('(').unwrap().1;
+                assert_eq!(params.matches("i1 %").count(), 1, "{line}");
+                params.matches("i64 %").count()
             })
             .collect::<Vec<_>>();
         sizes.sort();

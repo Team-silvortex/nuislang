@@ -27,9 +27,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
         required_patterns: &[
             "NirExpr::CastI64ToBool(word) if projected_word(word, result, slot)",
-            "fn matches_seed",
+            "fn seed_range",
             "NirExpr::CastBoolToI64(value)",
-            "seeds != 1",
+            "covered.iter().any(|covered| !covered)",
             "instruction: \"cast_i64_to_bool\"",
             "const_bindings.remove(binding.name)",
         ],

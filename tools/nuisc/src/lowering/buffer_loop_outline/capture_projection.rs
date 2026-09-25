@@ -5,8 +5,12 @@ use control_values::ValueLayouts;
 mod aliases;
 #[path = "capture_bindings.rs"]
 mod bindings;
+#[path = "capture_joins.rs"]
+mod joins;
 #[path = "capture_scoped.rs"]
 mod scoped_inputs;
+#[path = "capture_snapshot_scopes.rs"]
+mod scopes;
 #[path = "capture_snapshots.rs"]
 mod snapshots;
 #[cfg(test)]
@@ -76,10 +80,13 @@ pub(super) fn project(
         let mut candidate = module.functions[index].clone();
         if !scoped.contains(&name) {
             bindings::normalize(&mut candidate);
+            joins::normalize(&mut candidate, layouts);
             snapshots::normalize(&mut candidate, layouts);
+        } else {
+            snapshots::normalize_scoped(&mut candidate, layouts);
         }
         // Scoped helpers retain the outliner's control identities, including
-        // nested break flags. Only unwritten parameter aliases may disappear.
+        // nested break flags. Only immutable input-version aliases may disappear.
         aliases::normalize(&mut candidate, layouts);
         let Some(plan) = plan(&candidate, protected.get(&name), layouts) else {
             continue;
@@ -182,7 +189,7 @@ fn valid_caller(body: &[NirStmt], name: &str, plan: &Plan) -> bool {
 
 fn plan(
     function: &NirFunction,
-    protected: Option<&BTreeSet<usize>>,
+    protected: Option<&scoped_inputs::Inputs>,
     layouts: &impl ValueLayouts,
 ) -> Option<Plan> {
     if !walk::supported(&function.body) {
@@ -195,7 +202,7 @@ fn plan(
         .iter()
         .enumerate()
         .filter(|(index, p)| {
-            !protected.is_some_and(|inputs| inputs.contains(index))
+            !protected.is_some_and(|inputs| inputs.protected.contains(index))
                 && !written.contains(&p.name)
                 && !layouts.scalar(&p.ty.name)
                 && control_values::supported_type(&p.ty, layouts)
@@ -220,7 +227,7 @@ fn plan(
     let mut inputs = Vec::new();
     let mut replacements = BTreeMap::new();
     let mut changed = false;
-    for param in &function.params {
+    for (index, param) in function.params.iter().enumerate() {
         if !candidates.contains(&param.name) {
             inputs.push(Input::Keep(param.clone()));
             continue;
@@ -236,7 +243,9 @@ fn plan(
             .map(|path| field_type(&param.ty, path, layouts))
             .collect::<Option<Vec<_>>>()?;
         let selected = types.iter().map(|ty| leaves(ty, layouts)).sum::<usize>();
-        if selected >= leaves(&param.ty, layouts) {
+        if selected >= leaves(&param.ty, layouts)
+            || (paths.is_empty() && protected.is_some_and(|inputs| inputs.carried.contains(&index)))
+        {
             inputs.push(Input::Keep(param.clone()));
             continue;
         }

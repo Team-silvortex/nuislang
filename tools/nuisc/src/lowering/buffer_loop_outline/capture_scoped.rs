@@ -4,13 +4,33 @@ use super::*;
 #[path = "capture_scoped_tests.rs"]
 mod tests;
 
-// Projection precedes scoped lowering. Keep every loop-written argument whole
-// so the driver can still identify induction, carry and break seeds by identity.
+#[cfg(test)]
+#[path = "capture_scoped_carries_tests.rs"]
+mod carry_tests;
+
+#[derive(Default)]
+pub(super) struct Inputs {
+    pub(super) protected: BTreeSet<usize>,
+    pub(super) carried: BTreeSet<usize>,
+}
+
+// Only an exact flat record reconstruction grants field-mapped backedge inputs.
+// Other loop-written arguments retain induction/carry/break seed identities.
 pub(super) fn protected_inputs(
     module: &NirModule,
     targets: &BTreeSet<String>,
-) -> BTreeMap<String, BTreeSet<usize>> {
-    let mut protected = BTreeMap::<String, BTreeSet<usize>>::new();
+) -> BTreeMap<String, Inputs> {
+    let mut protected = BTreeMap::<String, Inputs>::new();
+    let functions = module
+        .functions
+        .iter()
+        .map(|f| (f.name.as_str(), f))
+        .collect::<BTreeMap<_, _>>();
+    let definitions = module
+        .structs
+        .iter()
+        .map(|d| (d.name.as_str(), d))
+        .collect();
     let mut pending = module
         .functions
         .iter()
@@ -39,11 +59,22 @@ pub(super) fn protected_inputs(
                         let mut written = BTreeSet::new();
                         branches::collect_bindings(body, &mut written);
                         let inputs = protected.entry(callee.clone()).or_default();
+                        let carried = functions
+                            .get(callee.as_str())
+                            .map(|function| {
+                                scoped_loop_lowering::projectable_record_seed_inputs(
+                                    &body[0], &body[1..], function, &definitions,
+                                )
+                            })
+                            .unwrap_or_default();
                         for (index, arg) in args.iter().enumerate() {
-                            if access(arg).is_none_or(|path| written.contains(&path[0])) {
-                                inputs.insert(index);
+                            if access(arg).is_none_or(|path| {
+                                written.contains(&path[0]) && !carried.contains(&index)
+                            }) {
+                                inputs.protected.insert(index);
                             }
                         }
+                        inputs.carried.extend(carried);
                     }
                     pending.push(body);
                 }

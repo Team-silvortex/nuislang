@@ -30,7 +30,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "type_name != &ty.name",
             "projected_word(value, result, slot + offset)",
             "&param.ty == binding.ty",
-            "seeds != 1",
+            "covered.iter().any(|covered| !covered)",
+            "std::mem::replace(slot, true)",
             "control && !is_scalar_i64(binding.ty)",
             "New value nodes preserve pre-loop snapshots",
             "format!(\"carry{slot}\")",
@@ -40,7 +41,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-outer-flat-scoped-integration",
         path: "tools/nuisc/src/lowering/scoped_loop_lowering.rs",
         required_patterns: &[
-            "scalar_carries::validate_seeds",
+            "scalar_carries::needs_separate_seeds",
             "scalar_carries::bind_result",
             "flattened.len() != width",
             "index + offset, input",

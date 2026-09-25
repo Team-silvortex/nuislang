@@ -11,6 +11,10 @@ impl Projection<'_> {
     fn width(&self) -> usize {
         self.fields.len().max(1)
     }
+
+    pub(super) fn whole_record_seed(&self, param: &NirParam, arg: &NirExpr) -> bool {
+        !self.fields.is_empty() && seed_range(self, param, arg) == Some((0, self.width()))
+    }
 }
 
 pub(super) fn projected_bindings<'a>(
@@ -93,14 +97,32 @@ fn is_bool(ty: &NirTypeRef) -> bool {
     ty.name == "bool" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
 }
 
-fn matches_seed(binding: &Projection<'_>, param: &NirParam, arg: &NirExpr) -> bool {
-    if is_bool(binding.ty) {
+fn seed_range(binding: &Projection<'_>, param: &NirParam, arg: &NirExpr) -> Option<(usize, usize)> {
+    let whole = if is_bool(binding.ty) {
         is_scalar_i64(&param.ty)
             && matches!(arg, NirExpr::CastBoolToI64(value)
                 if matches!(value.as_ref(), NirExpr::Var(name) if name == binding.name))
     } else {
         &param.ty == binding.ty && matches!(arg, NirExpr::Var(name) if name == binding.name)
+    };
+    if whole {
+        return Some((0, binding.width()));
     }
+    // Only declared flat-i64 fields can name a carried slot. These are dynamic
+    // backedge operands, never invariant field reads hoisted out of the loop.
+    let NirExpr::FieldAccess { base, field } = arg else {
+        return None;
+    };
+    if !is_scalar_i64(&param.ty)
+        || !matches!(base.as_ref(), NirExpr::Var(name) if name == binding.name)
+    {
+        return None;
+    }
+    binding
+        .fields
+        .iter()
+        .position(|name| name == field)
+        .map(|index| (index, 1))
 }
 
 fn projected_word(value: &NirExpr, result: &str, slot: usize) -> bool {
@@ -178,7 +200,7 @@ pub(super) fn admissible(
                 arguments::ready(arg, invariant_inputs)
                     || carries
                         .iter()
-                        .any(|binding| matches_seed(binding, param, arg))
+                        .any(|binding| seed_range(binding, param, arg).is_some())
             }
         })
         && function
@@ -194,34 +216,110 @@ pub(super) fn validate_seeds(
     args: &[NirExpr],
     callee: &str,
 ) -> Result<(), String> {
+    if function.params.len() != args.len() {
+        return Err(format!("scoped carry seed arity mismatch for `{callee}`"));
+    }
     for (index, binding) in carries.iter().enumerate() {
         let control = breaking && index + 1 == carries.len();
         if control && !is_scalar_i64(binding.ty) {
             return Err(format!("scoped break flag `{}` must be i64", binding.name));
         }
-        let seeds = function
-            .params
-            .iter()
-            .zip(args)
-            .filter(|(param, arg)| {
-                if control {
-                    &param.ty == binding.ty
-                        && param.name == binding.name
-                        && *arg == &NirExpr::Int(0)
-                } else {
-                    matches_seed(binding, param, arg)
-                }
-            })
-            .count();
-        if seeds != 1 {
+        let covered = seed_coverage(binding, control, function, args, callee)?;
+        if covered.iter().any(|covered| !covered) {
             return Err(format!(
-                "scoped carry `{}` from `{callee}` requires exactly one same-typed {}seed (bool uses an explicit i64 word)",
+                "scoped carry `{}` from `{callee}` requires exactly one same-typed {}seed per slot (bool uses an explicit i64 word)",
                 binding.name,
                 if control { "zero " } else { "" }
             ));
         }
     }
     Ok(())
+}
+
+fn seed_coverage(
+    binding: &Projection<'_>,
+    control: bool,
+    function: &NirFunction,
+    args: &[NirExpr],
+    callee: &str,
+) -> Result<Vec<bool>, String> {
+    let mut covered = vec![false; binding.width()];
+    for (param, arg) in function.params.iter().zip(args) {
+        let range = if control {
+            (&param.ty == binding.ty && param.name == binding.name && arg == &NirExpr::Int(0))
+                .then_some((0, 1))
+        } else {
+            seed_range(binding, param, arg)
+        };
+        if let Some((start, width)) = range {
+            for slot in &mut covered[start..start + width] {
+                if std::mem::replace(slot, true) {
+                    return Err(format!(
+                        "scoped carry `{}` from `{callee}` has duplicate seed coverage",
+                        binding.name
+                    ));
+                }
+            }
+        }
+    }
+    Ok(covered)
+}
+
+pub(super) fn needs_separate_seeds(
+    carries: &[Projection<'_>],
+    breaking: bool,
+    function: &NirFunction,
+    args: &[NirExpr],
+    callee: &str,
+) -> Result<bool, String> {
+    let error = match validate_seeds(carries, breaking, function, args, callee) {
+        Ok(()) => return Ok(false),
+        Err(error) => error,
+    };
+    if function.params.len() != args.len() {
+        return Err(error);
+    }
+    for (index, binding) in carries.iter().enumerate() {
+        let control = breaking && index + 1 == carries.len();
+        let covered = seed_coverage(binding, control, function, args, callee)?;
+        if control && !is_scalar_i64(binding.ty) {
+            return Err(error);
+        }
+        if covered.iter().any(|covered| !covered)
+            && (control || binding.fields.is_empty() || !covered.iter().any(|covered| *covered))
+        {
+            return Err(error);
+        }
+    }
+    Ok(true)
+}
+
+pub(super) fn lower_initial_seeds(
+    carries: &[Projection<'_>],
+    breaking: bool,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Vec<String>, String> {
+    let mut seeds = Vec::new();
+    for (index, binding) in carries.iter().enumerate() {
+        if breaking && index + 1 == carries.len() {
+            seeds.push(lower_expr(&NirExpr::Int(0), state, bindings)?);
+        } else if is_bool(binding.ty) {
+            seeds.push(lower_expr(
+                &NirExpr::CastBoolToI64(Box::new(NirExpr::Var(binding.name.to_owned()))),
+                state,
+                bindings,
+            )?);
+        } else {
+            let initial = bindings
+                .get(binding.name)
+                .ok_or_else(|| format!("missing initial carry `{}`", binding.name))?;
+            seeds.extend(direct_calls::flatten_direct_call_argument(
+                binding.ty, initial, state,
+            )?);
+        }
+    }
+    Ok(seeds)
 }
 
 pub(super) fn argument_index(
@@ -243,12 +341,102 @@ pub(super) fn argument_index(
     }
     let mut offset = 0;
     for binding in bindings {
-        if matches_seed(binding, param, arg) {
-            return Some((offset, binding.width()));
+        if let Some((field, width)) = seed_range(binding, param, arg) {
+            return Some((offset + field, width));
         }
         offset += binding.width();
     }
     None
+}
+
+pub(super) fn validate_field_seed_origins(
+    carries: &[Projection<'_>],
+    args: &[NirExpr],
+    bindings: &BTreeMap<String, String>,
+    state: &LoweringState<'_>,
+    require_all: bool,
+) -> Result<(), String> {
+    for binding in carries {
+        let field_mapped = !binding.fields.is_empty()
+            && (require_all
+                || args.iter().any(|arg| {
+                    matches!(arg, NirExpr::FieldAccess { base, .. }
+                    if matches!(base.as_ref(), NirExpr::Var(name) if name == binding.name))
+                }));
+        if !field_mapped {
+            continue;
+        }
+        let actual = bindings
+            .get(binding.name)
+            .and_then(|node| initial_record_type(node, state));
+        if actual.as_deref() != Some(binding.ty.name.as_str()) {
+            return Err(format!(
+                "scoped field seed `{}` requires initial record `{}`, found {}",
+                binding.name,
+                binding.ty.name,
+                actual.as_deref().unwrap_or("an unproven record type")
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn initial_record_type(node: &str, state: &LoweringState<'_>) -> Option<String> {
+    // Field operands erase their source's nominal type. Check that type before
+    // flattening, or even a zero-trip loop could reconstruct a different record.
+    let mut node = node;
+    let mut path = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut ty = loop {
+        if !seen.insert(node) {
+            return None;
+        }
+        let op = &state.yir.nodes.iter().rev().find(|n| n.name == node)?.op;
+        if op.module != "cpu" {
+            return None;
+        }
+        let name = match op.instruction.as_str() {
+            "struct" => op.args.first()?.clone(),
+            "call_owned_struct" => {
+                break state
+                    .function_map
+                    .get(op.args.first()?.as_str())?
+                    .return_type
+                    .clone()?;
+            }
+            "loop_owned_struct_result" => {
+                yir_core::parse_owned_struct_layout(op.args.get(1)?)
+                    .ok()?
+                    .type_name
+            }
+            "field" => {
+                path.push(op.args.get(1)?.as_str());
+                node = op.args.first()?;
+                continue;
+            }
+            _ => return None,
+        };
+        break NirTypeRef {
+            name,
+            generic_args: Vec::new(),
+            is_ref: false,
+            is_optional: false,
+        };
+    };
+    for field in path.into_iter().rev() {
+        if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
+            return None;
+        }
+        ty = state
+            .struct_defs
+            .get(ty.name.as_str())?
+            .fields
+            .iter()
+            .find(|candidate| candidate.name == field)?
+            .ty
+            .clone();
+    }
+    flat_fields(&ty, &state.struct_defs).map(|_| ty.name)
 }
 
 pub(super) fn field(result: &str, field: String, state: &mut LoweringState<'_>) -> String {

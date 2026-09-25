@@ -1,0 +1,22 @@
+mod cpu Main {
+    struct Packet { left: i64, right: i64 }
+    struct Slots { carry0: i64, carry1: i64 }
+
+    @noinline fn advance(right: i64, left: i64, divisor: i64) -> Slots {
+        return Slots { carry0: left + right, carry1: left / divisor };
+    }
+
+    @noinline fn walk(limit: i64, divisor: i64) -> i64 {
+        let packet = Packet { left: 12, right: 33 };
+        let saved = packet;
+        let i = 0;
+        while i < limit {
+            let words = advance(packet.right, packet.left, divisor);
+            let packet = Packet { left: words.carry0, right: words.carry1 };
+            let i = i + 1;
+        }
+        return packet.left + packet.right + saved.left;
+    }
+
+    fn main() -> i64 { return walk(2, 1) + walk(0, 0); }
+}

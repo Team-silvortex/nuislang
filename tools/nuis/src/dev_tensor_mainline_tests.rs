@@ -307,7 +307,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("two exact 76800-byte Metal frames"));
     assert!(session.next_step.starts_with(
-        "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges"
+        "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state"
     ));
     assert!(session
         .evidence
@@ -315,12 +315,24 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("Returning non-loop child scopes now admit separate snapshot versions"));
+    assert!(session.evidence.contains(
+        "Fallthrough record input projection now follows a separate exact-type copy-family proof"
+    ));
     assert!(session
         .blocker
         .contains("do not synthesize live join values"));
     assert!(session.blocker.contains(
-        "fallthrough cross-scope writes and rebound iteration-local records still retain whole captures"
+        "Entirely unread scoped record inputs and full-record escapes still retain whole captures"
     ));
+    assert!(session
+        .evidence
+        .contains("Scoped carry inputs now support complete flat-i64 field seed maps"));
+    assert!(session.evidence.contains(
+        "Generated scoped partial-record captures now separate parameter snapshot versions from output rebindings"
+    ));
+    assert!(session
+        .evidence
+        .contains("Loop-written record families now admit entry-field reconstruction"));
     assert!(session
         .evidence
         .contains("Loop-local invariant record aliases now expose field demand"));
@@ -332,7 +344,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("four physical iteration arguments instead of 66"));
     assert!(session
         .blocker
-        .contains("loop-written seeds and nested break identities stay whole"));
+        .contains("scoped parameter versioning leaves nested break identities unchanged"));
     assert!(session
         .evidence
         .contains("Same-name branch-local aliases now have independent lexical identities"));

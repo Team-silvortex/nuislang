@@ -114,4 +114,39 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn independent_seed_slots_still_obey_native_state_bounds() {
+        for count in [1, 7, 64, 65] {
+            let seeds = (0..count).map(|i| format!("seed{i}")).collect::<Vec<_>>();
+            let fields = (0..count)
+                .map(|i| format!("carry{i}:i64"))
+                .collect::<Vec<_>>()
+                .join(";");
+            let mut args = "begin end step lt add cpu scoped_call_i64_carries 0 advance"
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            args.push(format!("State{{{fields}}}"));
+            args.extend(yir_core::loop_carry_contract::encode_scoped_i64_seeds(
+                &seeds,
+            ));
+            args[7] = (args.len() - 8).to_string();
+            let mut node = Node {
+                name: "loop".into(),
+                resource: "cpu".into(),
+                op: yir_core::Operation::parse("cpu.loop_while_i64_effect", args).unwrap(),
+            };
+            for action in ["scoped_call_i64_carries", "scoped_call_i64_carries_break"] {
+                node.op.args[6] = action.into();
+                if count <= 64 {
+                    let parsed = parse(&node).unwrap().unwrap();
+                    assert!(parsed.operands.is_empty());
+                    assert_eq!(parsed.carries.unwrap().seeds.len(), count);
+                } else {
+                    assert!(parse(&node).is_err());
+                }
+            }
+        }
+    }
 }

@@ -142,8 +142,13 @@ fn control_flow_rebindings_keep_snapshot_captures_whole() {
         let mut module = module(&format!("fn helper(state: State, flag: bool) -> i64 {{ {body} }}
             fn entry(state: State, flag: bool) -> i64 {{ return helper(state, flag); }}"));
         let before = function(&module, "helper").body.clone();
-        assert!(!project(&mut module, &["helper"]));
+        let layouts = control_values::TypedLayouts::collect(&module);
+        normalize(&mut module.functions[0], &layouts);
         assert_eq!(function(&module, "helper").body, before);
+        // Alias discovery cannot authorize a join. The separate copy-family
+        // proof admits entry-field reconstruction without erasing record copies.
+        assert!(project(&mut module, &["helper"]));
+        assert_eq!(function(&module, "helper").params[0].ty.name, "Pair");
     }
 }
 
@@ -218,8 +223,18 @@ fn branch_alias_names_do_not_hide_outer_writes_or_parameter_rebindings() {
             fn entry(state: State, flag: bool) -> i64 {{ return helper(state, flag); }}"
         ));
         let before = function(&module, "helper").body.clone();
-        assert!(!project(&mut module, &["helper"]));
+        let layouts = control_values::TypedLayouts::collect(&module);
+        normalize(&mut module.functions[0], &layouts);
         assert_eq!(function(&module, "helper").body, before);
+        assert!(project(&mut module, &["helper"]));
+        assert_eq!(
+            function(&module, "helper")
+                .params
+                .iter()
+                .map(|p| p.ty.name.as_str())
+                .collect::<Vec<_>>(),
+            ["Pair", "Pair", "bool"]
+        );
     }
 }
 

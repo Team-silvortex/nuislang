@@ -605,7 +605,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-core/src/loop_carry_contract/scoped_scalars.rs",
         required_patterns: &[
             "parse_scoped_i64_carries", "parse_owned_struct_layout", "checked_add(8)",
-            "slot.replace(input).is_some()", "OwnedStructScalarLayout::I64",
+            "std::mem::replace(&mut mapped[index], true)", "OwnedStructScalarLayout::I64",
             "scoped_multi_scalar_layout_and_markers_are_checked_together",
         ],
     },

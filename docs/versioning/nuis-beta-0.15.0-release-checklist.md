@@ -3,8 +3,8 @@
 This is the operational companion to the
 [beta-0.15 snapshot](nuis-beta-0.15.0-snapshot.md), anchored to
 `05951befc70d6a145e4978a3ff8909737e5c4fbb` (`beta-0.15.0`, 2026-09-24).
-The [beta-0.15.1 patch](nuis-beta-0.15.1-patch.md) records the subsequent private
-capture and snapshot changes and their selected validation results.
+The [beta-0.15.2 patch](nuis-beta-0.15.2-patch.md) records subsequent record joins,
+independent seeds, generated scoped input projection and selected validation results.
 Commands below are validation instructions, not blanket claims that every suite
 was rerun during documentation synchronization. Record the actual revision and
 worktree changes, platform, prerequisites, command, exit status and skip counts.
@@ -98,11 +98,28 @@ for the admitted value path. Ordinary/resource ABI behavior remains separate.
 
 Private capture tests must retain unchanged public/FFI signatures, field/argument
 order, guarded effects, work budgets and conservative rejection. Generated scoped
-helpers may project only proven invariant inputs; carry and break-control identities
-must survive unchanged. Aliases and snapshots must not observe later writes or
+helpers may project invariant inputs and proven partial flat-record carry inputs;
+induction and break-control identities must survive unchanged. Aliases and snapshots must not observe later writes or
 discard selected initializer work. Returning-child versions must not leak into
-parent continuations; fallthrough writes and loop-written snapshots remain
-conservative. Build/cache/tamper and source-free restoration must keep exact
+parent continuations. Fallthrough and loop-written input reconstruction require an exact-type,
+field-only copy-family proof and must retain original record assignments and
+complete initializers, per-trip snapshots and backedges. Whole escapes and entirely
+unread carried records remain conservative; zero trips must not execute body work.
+Explicit scoped field seed maps require complete initial state and unique, same-typed
+argument mappings, including partial maps with independent seeds. Prove each initial field-seed record's
+exact nominal identity before flattening; reject mismatched or unknown origins.
+Preserve bool conversion and named break zero seeds; never treat mutable-field
+operands as invariant input snapshots.
+Check legacy and explicit-seed parsing, metadata-free dependency/GLM reads, unused
+seed validation, zero-trip initializer failures and independent state/parameter bounds.
+Generated partial-record projection must prove the original seed/reconstruction map
+at every scoped caller, version only eligible record parameters, keep full output
+state and retain at least one field per record. Reject ambiguous or computed maps,
+unresolved fallthrough joins and nested-loop writes without partially mutating the
+candidate. Check 3/7/64-slot state with three arguments, break/continue/bool identities,
+ordinary native results and initializer/second-trip traps, plus native lifecycle
+arity inspection and byte-identical source-free restoration.
+Build/cache/tamper and source-free restoration must keep exact
 artifact identity without interpreter fallback for a selected native failure.
 
 ## Provider And Migration Boundaries

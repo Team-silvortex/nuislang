@@ -24,6 +24,8 @@ mod literal_loops;
 mod loop_calls;
 #[path = "dev_tensor_drift_data_native_loop_work.rs"]
 mod loop_work;
+#[path = "dev_tensor_drift_data_native_record_joins.rs"]
+mod record_joins;
 #[path = "dev_tensor_drift_data_native_scoped_captures.rs"]
 mod scoped_captures;
 #[path = "dev_tensor_drift_data_native_terminal_continuations.rs"]
@@ -55,6 +57,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(control_elision::CHECKS.iter())
         .chain(terminal_continuations::CHECKS.iter())
         .chain(terminal_snapshots::CHECKS.iter())
+        .chain(record_joins::CHECKS.iter())
 }
 
 const CHECKS: &[DevTensorDriftCheckSpec] = &[

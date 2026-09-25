@@ -39,7 +39,7 @@ fn invariant_loop_alias_chains_keep_nested_scopes_and_exact_field_demand() {
 }
 
 #[test]
-fn loop_aliases_keep_mutating_origins_and_rebound_local_snapshots_whole() {
+fn loop_aliases_keep_mutating_origins_until_copy_family_reconstruction() {
     for body in [
         "let saved = state; let state = State { a: state.b, b: state.a, unused: 0 }; let total = total + saved.a.x;",
         "let saved = state; if flag { let state = State { a: state.b, b: state.a, unused: 0 }; } let total = total + saved.a.x;",
@@ -51,9 +51,13 @@ fn loop_aliases_keep_mutating_origins_and_rebound_local_snapshots_whole() {
                 let i = 0; let total = 0; while i < 2 {{ {body} let i = i + 1; }} return total;
             }} fn entry(state: State, flag: bool) -> i64 {{ return helper(state, flag); }}"
         ));
-        let before = module.clone();
+        let before = function(&module, "helper").body.clone();
+        let layouts = control_values::TypedLayouts::collect(&module);
+        normalize(&mut module.functions[0], &layouts);
+        assert_eq!(function(&module, "helper").body, before);
+        assert!(project(&mut module, &["helper"]));
+        assert_eq!(function(&module, "helper").params[0].ty.name, "Pair");
         assert!(!project(&mut module, &["helper"]));
-        assert_eq!(module, before);
     }
 }
 

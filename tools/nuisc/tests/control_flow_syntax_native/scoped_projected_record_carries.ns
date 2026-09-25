@@ -1,0 +1,26 @@
+mod cpu Main {
+    struct Packet { left: i64, right: i64, unused: i64 }
+
+    @noinline fn relay(value: i64) -> i64 { return value; }
+
+    @noinline fn walk(limit: i64, divisor: i64) -> i64 {
+        let packet = Packet { left: 12, right: 33, unused: 7 };
+        let saved = packet;
+        let i = 0;
+        while i < limit {
+            let i = i + 1;
+            let packet = packet;
+            let before = packet;
+            let packet = Packet {
+                left: relay(before.left) + 1,
+                right: before.left / divisor,
+                unused: 9
+            };
+        }
+        return packet.left + packet.right + packet.unused + saved.right;
+    }
+
+    fn main() -> i64 {
+        return walk(2, 1) + walk(0, 0);
+    }
+}

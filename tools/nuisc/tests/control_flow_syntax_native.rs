@@ -979,3 +979,5 @@ mod terminal_continuations;
 mod alias_snapshots;
 #[path = "control_flow_syntax_native/conditional_values.rs"]
 mod conditional_values;
+#[path = "control_flow_syntax_native/scoped_field_seeds.rs"]
+mod scoped_field_seeds;

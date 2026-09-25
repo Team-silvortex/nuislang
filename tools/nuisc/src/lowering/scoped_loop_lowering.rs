@@ -12,6 +12,7 @@ enum ScopedLoopResult<'a> {
         bindings: Vec<scalar_carries::Projection<'a>>,
         layout: String,
         breaking: bool,
+        separate_seeds: bool,
     },
     OwnedBytes(&'a str),
     OwnedStruct {
@@ -19,6 +20,45 @@ enum ScopedLoopResult<'a> {
         ty: &'a NirTypeRef,
         layout: String,
     },
+}
+
+pub(super) fn projectable_record_seed_inputs(
+    action: &NirStmt,
+    tail: &[NirStmt],
+    function: &NirFunction,
+    definitions: &BTreeMap<&str, &NirStructDef>,
+) -> BTreeSet<usize> {
+    let NirStmt::Let {
+        name,
+        ty: Some(ty),
+        value: NirExpr::Call { callee, args },
+    } = action
+    else {
+        return BTreeSet::new();
+    };
+    if callee != &function.name || function.return_type.as_ref() != Some(ty) {
+        return BTreeSet::new();
+    }
+    let Some(carries) = scalar_carries::projected_bindings(name, ty, tail, definitions) else {
+        return BTreeSet::new();
+    };
+    let breaking =
+        scalar_carries::break_guard(tail.get(carries.len()), carries.last().unwrap().name);
+    if scalar_carries::validate_seeds(&carries, breaking, function, args, callee).is_err() {
+        return BTreeSet::new();
+    }
+    function
+        .params
+        .iter()
+        .zip(args)
+        .enumerate()
+        .filter(|(_, (param, arg))| {
+            carries
+                .iter()
+                .any(|carry| carry.whole_record_seed(param, arg))
+        })
+        .map(|(index, _)| index)
+        .collect()
 }
 
 pub(super) fn collect_scoped_loop_helper_functions(
@@ -197,6 +237,9 @@ pub(super) fn lower_scoped_call_while(
                 return Ok(false);
             }
             ScopedLoopResult::Scalars {
+                separate_seeds: scalar_carries::needs_separate_seeds(
+                    &carries, breaking, function, args, callee,
+                )?,
                 bindings: carries,
                 layout,
                 breaking,
@@ -252,6 +295,20 @@ pub(super) fn lower_scoped_call_while(
         _ => return Ok(false),
     };
     validate_loop_result_rebinding(&result, function, args, bindings, callee)?;
+    if let ScopedLoopResult::Scalars {
+        bindings: carries,
+        separate_seeds,
+        ..
+    } = &result
+    {
+        scalar_carries::validate_field_seed_origins(
+            carries,
+            args,
+            bindings,
+            state,
+            *separate_seeds,
+        )?;
+    }
 
     let Some(initial) = bindings.get(&prepared.binding_name).cloned() else {
         return Err(format!(
@@ -288,6 +345,21 @@ pub(super) fn lower_scoped_call_while(
     if let ScopedLoopResult::Scalars { layout, .. } = &result {
         action_args.push(layout.clone());
     }
+    let initial_seeds = match &result {
+        ScopedLoopResult::Scalars {
+            bindings: carries,
+            breaking,
+            separate_seeds: true,
+            ..
+        } => {
+            let seeds = scalar_carries::lower_initial_seeds(carries, *breaking, state, bindings)?;
+            action_args.extend(yir_core::loop_carry_contract::encode_scoped_i64_seeds(
+                &seeds,
+            ));
+            Some(seeds)
+        }
+        _ => None,
+    };
     if let Some(result) = &owned_result {
         action_args.push(result.clone());
     }
@@ -302,8 +374,12 @@ pub(super) fn lower_scoped_call_while(
         {
             action_args.push("$carry".to_owned());
         } else if let Some((index, width)) = scalar_carries::argument_index(&result, param, arg) {
-            let lowered = lower_expr(arg, state, bindings)?;
-            let flattened = direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?;
+            let flattened = if let Some(seeds) = &initial_seeds {
+                seeds[index..index + width].to_vec()
+            } else {
+                let lowered = lower_expr(arg, state, bindings)?;
+                direct_calls::flatten_direct_call_argument(&param.ty, &lowered, state)?
+            };
             if flattened.len() != width {
                 return Err(format!("scoped carry width mismatch for `{}`", param.name));
             }
@@ -485,11 +561,8 @@ fn validate_loop_result_rebinding(
 ) -> Result<(), String> {
     match result {
         ScopedLoopResult::None => Ok(()),
-        ScopedLoopResult::Scalars {
-            bindings: carries,
-            breaking,
-            ..
-        } => scalar_carries::validate_seeds(carries, *breaking, function, args, callee),
+        // Slot coverage was validated while choosing the scalar seed representation.
+        ScopedLoopResult::Scalars { .. } => Ok(()),
         ScopedLoopResult::Scalar(binding) => {
             let count = function
                 .params

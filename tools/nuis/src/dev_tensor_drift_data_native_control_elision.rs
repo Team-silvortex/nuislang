@@ -85,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
+            "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state",
         ],
     },
 ];

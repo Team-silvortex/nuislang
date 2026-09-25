@@ -133,6 +133,64 @@ fn returned_carries(first: Value, second: Value) -> Value {
 }
 
 #[test]
+fn separate_seeds_keep_unpassed_state_and_break_control() {
+    use yir_core::RegisteredExecutionStep as Step;
+    let mut node = multiple_carry_loop();
+    node.op.args = "initial limit step lt add cpu scoped_call_i64_carries_break 8 update State{carry0:i64;carry1:i64} $carry_seeds 2 seed second $current $owned_struct_carry:0:seed"
+        .split_whitespace().map(str::to_owned).collect();
+    for limit in [0, 3] {
+        let mut state = loop_state(0, limit, 1);
+        state.bind_value("seed", Value::Int(10));
+        state.bind_value("second", Value::Int(0));
+        let dependencies = CpuMod.describe(&node, &resource()).unwrap().dependencies;
+        assert_eq!(dependencies, ["initial", "limit", "step", "seed", "second"]);
+        let mut execution = CpuMod
+            .begin_execution(&node, &resource(), &state)
+            .unwrap()
+            .unwrap();
+        let step = execution.resume(&mut state, None).unwrap();
+        let result = if limit == 0 {
+            step
+        } else {
+            let Step::Call { arguments, .. } = step else {
+                panic!("call")
+            };
+            assert_eq!(arguments, [Value::Int(0), Value::Int(10)]);
+            assert!(execution
+                .resume(
+                    &mut state,
+                    Some(returned_carries(Value::Int(99), Value::Int(2)))
+                )
+                .is_err());
+            execution
+                .resume(
+                    &mut state,
+                    Some(returned_carries(Value::Int(11), Value::Int(1))),
+                )
+                .unwrap()
+        };
+        let Step::Complete(Value::Struct(value)) = result else {
+            panic!("complete")
+        };
+        assert_eq!(value.fields[0].1, Value::Int(0));
+        assert_eq!(
+            value.fields[1].1,
+            Value::Int(if limit == 0 { 10 } else { 11 })
+        );
+        assert_eq!(
+            value.fields[2].1,
+            Value::Int(if limit == 0 { 0 } else { 1 })
+        );
+        state.bind_value("second", Value::Int(1));
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+        state.bind_value("second", Value::I32(0));
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+        state.values.remove("second");
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+    }
+}
+
+#[test]
 fn break_control_exits_before_step_and_rejects_invalid_results_before_commit() {
     use yir_core::RegisteredExecutionStep as Step;
     let mut node = multiple_carry_loop();

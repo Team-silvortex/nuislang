@@ -1146,13 +1146,13 @@ counter. Zero-trip loops preserve the seed and do not invoke the helper. The
 native induction preflight runs before the first invocation; invalid values trap
 the process. Pure scalar carry transport adds no owned aggregate per iteration.
 
-Multi-carry calls use `parse_scoped_i64_carries`, not a new opcode or ABI. Each
-`$owned_struct_carry:N:seed` binds exactly one named i64 seed to the corresponding
-flat `carryN:i64` field. The declared helper result must be owned and match the
-action's nominal type, field order and kinds; parameters remain exact scalar
-values. At most 64 slots are allowed, within the existing 64-parameter bound.
-Operand order need not equal field order. Scalar i32/float captures are also
-supported by the source multi-carry path, without widening carried state kinds.
+Multi-carry calls use `parse_scoped_i64_carries`, not a new opcode or public ABI.
+Legacy `$owned_struct_carry:N:seed` operands also initialize the flat `carryN:i64` slots.
+An optional `$carry_seeds N seed0 ...` prefix after the layout supplies complete initial
+state separately; mapped operands must match those seeds but may omit unread slots.
+The owned helper result still matches the action's nominal type, field order and kinds.
+The 64-state-slot and 64-parameter bounds apply independently; order need not match.
+Scalar i32/float captures remain supported without widening carried state kinds.
 
 The helper sees the previous iteration's carries and pre-step counter. Its own
 ordered updates produce one returned aggregate; native flat leaves are extracted
@@ -1962,11 +1962,11 @@ fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Project field demand through fallthrough record joins while preserving branch-selected values and loop backedges.
+Remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state.
 Independent same-name branch aliases now project fields; existing outer writes, user signatures and scoped-action
 metadata stay unchanged. Scoped alias branches use 2/2/2/3 arguments; whole 64-i64 uses still exceed the bound with a predicate.
-Scoped iterations project invariant fields; returning child writes now have snapshots, while live joins remain conservative.
-Keep mixed/nested local values separate from the flat scoped-loop carry profile.
+Scoped iterations project invariant fields; ordinary private entry reconstruction now also preserves loop-written snapshots.
+Generated scoped partial inputs now share independent seed proofs; empty demand, sparse storage and mixed/nested carries remain separate.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,
 source effect order and inverse-constructor native/reference parity. Retain typed

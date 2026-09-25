@@ -1,6 +1,6 @@
 use super::*;
 
-fn module(body: &str) -> NirModule {
+pub(super) fn module(body: &str) -> NirModule {
     crate::frontend::parse_nuis_module(&format!(
         "mod cpu Main {{
         struct Pair {{ x: i64, y: i64 }}
@@ -10,11 +10,11 @@ fn module(body: &str) -> NirModule {
     .unwrap()
 }
 
-fn function<'a>(module: &'a NirModule, name: &str) -> &'a NirFunction {
+pub(super) fn function<'a>(module: &'a NirModule, name: &str) -> &'a NirFunction {
     module.functions.iter().find(|f| f.name == name).unwrap()
 }
 
-fn project_scoped(module: &mut NirModule, names: &[&str]) -> bool {
+pub(super) fn project_scoped(module: &mut NirModule, names: &[&str]) -> bool {
     let layouts = control_values::TypedLayouts::collect(module);
     let names = names.iter().map(|name| (*name).to_owned()).collect();
     let changed = project(module, &names, &names, &layouts);

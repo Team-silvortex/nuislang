@@ -4,9 +4,6 @@ use super::*;
 #[path = "capture_snapshots_tests.rs"]
 mod tests;
 
-#[path = "capture_snapshot_scopes.rs"]
-mod scopes;
-
 // Binding hygiene runs first. Writes may stay in their non-loop owner or a
 // returning child scope. A fallthrough join/backedge still needs its own contract.
 pub(super) fn normalize(function: &mut NirFunction, layouts: &impl ValueLayouts) {
@@ -14,6 +11,21 @@ pub(super) fn normalize(function: &mut NirFunction, layouts: &impl ValueLayouts)
         return;
     }
     let candidates = snapshot_candidates(function, layouts);
+    normalize_candidates(function, &candidates);
+}
+
+pub(super) fn normalize_scoped(function: &mut NirFunction, layouts: &impl ValueLayouts) {
+    if !walk::supported(&function.body) {
+        return;
+    }
+    // Scoped helpers skip general binding hygiene to preserve control identities.
+    // Parameters already have unique lexical identities; leave local names alone.
+    let mut candidates = snapshot_candidates(function, layouts);
+    candidates.retain(|name| function.params.iter().any(|p| &p.name == name));
+    normalize_candidates(function, &candidates);
+}
+
+fn normalize_candidates(function: &mut NirFunction, candidates: &BTreeSet<String>) {
     if candidates.is_empty() {
         return;
     }

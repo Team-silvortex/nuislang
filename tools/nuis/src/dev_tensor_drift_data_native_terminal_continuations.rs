@@ -68,7 +68,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "54 reachable native functions",
             "Generated-use counting is iterative",
-            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
+            "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -130,7 +130,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "51 reachable native functions",
             "disjoint lexical bindings",
             "63 to 32 private helpers",
-            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
+            "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -203,7 +203,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Scope-aware local hygiene",
             "Private names reserve future source bindings",
             "five actual entries instead of six",
-            "project field demand through fallthrough record joins while preserving branch-selected values and loop backedges",
+            "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state",
         ],
     },
 ];

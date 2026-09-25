@@ -171,7 +171,7 @@ The [alias normalizer](../../tools/nuisc/src/lowering/buffer_loop_outline/captur
 now resolves immutable Let/Const record chains rooted in stable helper parameters.
 Nested field origins retain exact nominal and scalar types, including mixed records.
 Distinct branch-local aliases have independent environments and do not escape.
-Fallthrough cross-scope writes and rebound iteration-local records remain conservative;
+Alias discovery alone stays conservative for cross-scope writes and rebound iteration-local records;
 a stable outer alias can still be read inside a loop. Same-name aliases in
 independent branches now reduce to individual demanded fields through the lexical
 identity pass below.
@@ -298,8 +298,58 @@ update and a suffix update. Native/CLI execution retains two/three private branc
 arguments, the unchanged 64-argument public helper, complete state, zero aggregate
 allocations/drops, selected traps, cache reuse and source-free restoration. This
 proves composition through the source pipeline, not that the fixture previously
-failed to compile. General fallthrough joins, loop-written versions and resources
-remain separate work; no native bound or source control admission is widened.
+failed to compile. Field-only fallthrough inputs use the separate reconstruction
+proof below; no native bound or source control admission is widened.
+
+### Record Input Reconstruction
+
+The [copy-family proof](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_join_plan.rs)
+collects full-record copies iteratively and unions all observed field paths across
+each family, including initializers and old aliases. Every member must retain the
+same declared pure-value type, and at least one must be an input. Whole-record
+escapes and unknown or mismatched types veto the family. Field demand includes
+loop conditions, every constructor RHS and all later copies. Nominal prefixes subsume
+their descendant paths; candidates must reduce the number of input leaves.
+
+The [input reconstruction](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_joins.rs)
+creates a private nominal record from demanded input fields. Omitted fields receive
+typed zero values only after proving they are unobservable throughout the family.
+This is not defaulting an unknown runtime value. The original assignments, copies,
+constructors, calls and branch shapes remain intact; their complete right-hand sides
+still execute before their writes, including unused checked fields. Existing record
+semantics retain old snapshots and branch-selected values. Public signatures,
+backedges, scoped helper control identities and native limits remain unchanged.
+
+[Direct regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_join_tests.rs)
+cover parameter/local joins, nested and one-sided arms, multiple input copies,
+nominal prefixes, mixed kinds, name hygiene, read-only loops and rejected callers.
+Before/after reference execution and LLVM emission check old aliases, self-rebinding
+and selected unused constructor calls. The source/native fixture combines both
+reaching values with a pre-join alias, retaining 64 public inputs and three/four
+private branch arguments. Source composition is separate from the direct reduction
+proof. This does not implement general SSA joins, scoped loop-carried field interfaces,
+resource transport or a measured speedup; ordinary owned-aggregate allocation is
+not promised to improve through this private reconstruction.
+
+The [loop-entry regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_loop_join_tests.rs)
+extend this proof to loop-written families without replacing their original loop
+bodies. Repeated writes within one loop scope qualify; single-definition invariant
+aliases retain their separate path. Reference execution before and after projection,
+plus LLVM emission, check seeded-local zero/multiple trips, per-trip old values,
+nested loops, `continue`/`break`/`return`, and unused constructor work that can fail
+on the second trip. Structural tests cover parameter updates, cyclic copies,
+nominal prefixes, exact-type vetoes and unmodified loop bodies. Executable profiles
+still use the existing seeded-local and ordered-update admission rules; parameter
+loop reduction is not evidence for a wider source control-flow profile.
+
+The shared native/CLI source composes two-trip record snapshots with a zero-trip
+call whose divisor is zero. It retains 64 public inputs and two/three private branch
+inputs, exact native/reference state and zero aggregate allocations/drops. Its CLI
+workflow checks build/cache identity, selected arithmetic failures, tamper rejection
+and byte-identical restoration without source files. This is source-composition
+evidence in addition to direct NIR input reduction, not a claim that the source
+pipeline previously rejected this fixture. Automatic scoped projection still keeps
+loop-carried inputs whole; explicit field seeds use the separate slot-map proof below.
 
 ## Invariant Loop Aliases
 
@@ -326,7 +376,7 @@ reuse and source-free restoration. This is execution-composition evidence, not a
 claim that every loop alias survives outlining or that wide scoped captures now fit.
 
 That narrower fixture preceded the scoped iteration projection described below.
-Fallthrough cross-scope writes and rebound iteration-local records remain conservative;
+The invariant-alias pass leaves cross-scope writes and rebound iteration-local records conservative;
 the native argument bound, backedge layouts, source loop admission and callback
 budgets are not widened by alias discovery.
 
@@ -365,6 +415,96 @@ multiple callers, record/bool carries and nested breaks. An initial nested-break
 regression exposed the control-identity renaming problem and now guards its repair.
 This is bounded correctness/transport evidence, not measured speedup or support
 for unrestricted cross-scope record updates and mixed loop carries.
+
+## Scoped Carry Field Seeds
+
+The [scoped carry mapper](../../tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs)
+now accepts either a same-typed whole-record seed or direct flat-i64 field seeds.
+One binding/type-to-slot range function is shared by admission, coverage validation
+and argument encoding. Offsets follow the result layout, not helper parameter
+order. Mapped fields are dynamic backedge operands, not invariant input snapshots.
+Whole-record and field-mapped inputs can coexist for different carried bindings.
+
+Every output slot still needs exactly one seed, including slots whose per-trip
+values are overwritten without reading their initial values. This preserves the
+zero-trip result. Repeated or overlapping argument coverage is rejected, as are
+wrong scalar types and computed mutable-field arguments. Foreign/nested roots cannot name a carried slot.
+Before flattening field seeds, the producer must also prove that the initial
+record has the exact carried nominal type. Constructors, aliases, declared helper
+returns and nested field origins retain that identity; mismatches or unproven
+origins are rejected rather than changing record type on a zero-trip loop.
+Bool carries retain explicit word conversion; a break flag still requires its
+normalizer-proven identity and named zero seed. Nested and mixed records are not
+admitted by this flat-i64 contract. Complete argument maps retain the legacy wire form.
+
+[Mapping regressions](../../tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carry_seed_maps_tests.rs)
+cover permuted arguments, whole/field combinations, bool/break identities, malformed
+maps, initial nominal drift and reference execution with reversed YIR storage. A shared
+[Nuis source](../../tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.ns)
+checks updated per-trip reads, an independent pre-loop snapshot and a zero-trip
+zero-divisor call in both reference and ordinary native execution; selected division
+failure remains a process failure. Native lifecycle and CLI fixtures use the slot
+order `2,4,0,3,1`, preserve complete state with zero aggregate allocations, and check
+cache identity, tamper rejection and source-free restoration. Input selection is
+separate from the explicit loop driver; conditional helper admission is not widened.
+
+### Independent Initial State
+
+The shared [carry contract](../../crates/yir-core/src/loop_carry_contract/scoped_scalars.rs)
+now optionally accepts `$carry_seeds N seed0 ... seedN-1` immediately after the
+result layout. N equals the full layout width; every seed is a named input in
+declaration order. Subsequent operands alone determine helper arity. A mapped
+`$owned_struct_carry:index:seed` must match that slot's initial input, with no
+duplicate slot mappings. Unknown markers, inconsistent counts, truncated prefixes,
+out-of-range indices and seed drift reject. Legacy complete-map payloads still parse;
+older consumers reject the explicit prefix rather than silently executing it.
+
+Dependency and GLM reads include even the seeds not passed to the helper, never
+the prefix/count metadata. Registered execution and ordinary/native LLVM share
+the parsed state layout. All slots remain initialized, stored after each return
+and reconstructed at exit; only mapped slots are loaded as call arguments. Native
+state-width, helper-arity and execution-budget bounds remain independent and unchanged.
+Break seeds/results are validated even when the control slot is not an operand.
+
+Source admission currently permits partially consumed flat-i64 records, requiring
+at least one mapped field per record and exact initial nominal provenance. Whole-record,
+scalar, bool and break inputs retain their existing admission; entirely unpassed
+source records remain conservative. All initializers still execute, including checked
+work in unpassed fields on zero-trip paths. The explicit lifecycle fixture declares
+four iteration parameters for five state slots, rather than passing an unused field;
+the ordinary source retains two slots while passing only one carried field.
+
+### Generated Scoped Record Inputs
+
+The [capture projection](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs)
+now applies this partial-argument form automatically to compiler-generated scoped
+helpers. Each scoped caller must prove an exact flat-i64 record reconstruction and
+complete original seed map through the same NIR projection rules used by lowering.
+Constraints are unioned across callers; an unproven written input or an unrewritable
+caller vetoes that projection. Source-declared helper signatures are not rewritten.
+
+Before demand analysis, eligible record parameters receive distinct snapshot versions
+for their local updates. Initializers read the preceding value; immutable aliases can
+then expose initial-field demand independently of the returned, fully updated record.
+Only parameter records are versioned in scoped helpers: local control names, scalar
+induction, bool conversions and named break seeds retain their identities. Unresolved
+fallthrough joins and nested-loop writes remain whole. At least one field per carried
+record must remain an argument; entirely unread record inputs are the next boundary.
+
+Caller initializers, complete seed storage, result layouts and record reconstruction
+are unchanged. No seed expression or skipped-path computation is synthesized at a
+call site. An omitted field can still be observed after a zero-trip loop, and checked
+work in initializers or overwritten constructors must still execute when reached.
+This does not implement sparse state storage, mixed/nested carries or a public ABI change.
+
+[Projection regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_scoped_carries_tests.rs)
+exercise reverse function/YIR order, idempotence, aliases, cross-caller vetoes, empty
+demand, ambiguous seed maps, whole uses, break/continue and bool identities. The shared
+[source fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_projected_record_carries.ns)
+retains three state slots with one carried operand and three total iteration arguments;
+generated 7/64-field variants retain the same arity. Native lifecycle probes inspect
+five complete state slots and five arguments instead of six, while still returning
+all state fields and retaining ordinary/native execution's separate allocation behavior.
 
 ## Evidence And Limits
 
@@ -466,5 +606,79 @@ All eight CLI workflows retain cache reuse, tamper rejection, selected traps and
 byte-identical source-free restoration. The fresh CLI reports 1429 clean drift
 checks, clean coverage/hierarchy/lineage and `active/86`. Returning child scopes
 preserve old aliases and parent/suffix values without exporting branch versions.
-Fallthrough joins and loop-written snapshots remain separate work. No full-workspace,
+At that checkpoint, fallthrough joins and loop-written snapshots remained separate. No full-workspace,
 fresh GPU/Linux, formal safety or measured performance result is claimed.
+
+The 2026-09-24 fallthrough-input follow-up to `4257ebb6` passed 637 selected
+lowering tests, 41 selected native-bridge tests, nine sparse-capture CLI workflows,
+two ordinary native snapshot tests, 26 tensor tests and the host-path policy case:
+716 selected tests without double-counting overlapping reruns. The direct NIR
+reduction regression failed before implementation and passes afterward. An initial
+field-assignment expansion failed existing lowering admission; input reconstruction
+instead preserves original control shapes and complete record initializer work.
+All nine CLI workflows retain cache/tamper checks, selected failures and byte-identical
+source-free restoration. The fresh CLI reports 1433 clean drift checks, clean
+coverage/hierarchy/lineage and `active/86`. At that checkpoint loop-written record
+snapshots were next; that checkpoint does not certify fresh GPU/Linux, full-workspace,
+ordinary owned-aggregate performance or formal safety.
+
+The 2026-09-24 loop-written-input follow-up passed 643 selected lowering tests,
+42 selected native-bridge tests, ten sparse-capture CLI workflows, two ordinary
+native snapshot tests, 26 tensor tests and the host-path policy case: 724 selected
+tests without double-counting overlapping reruns. Direct input-reduction regressions
+failed before the change and pass afterward; source/native fixtures provide separate
+composition evidence. Zero trips, per-trip aliases, nested exits and selected
+second-trip constructor failures retain their original behavior. All ten CLI
+workflows retain cache/tamper checks and byte-identical source-free restoration.
+The fresh CLI reports 1437 clean drift checks, clean coverage/hierarchy/lineage and
+`active/86`. The next boundary is field projection through scoped loop-carried
+record interfaces, not another widening of ordinary entry reconstruction.
+This checkpoint does not certify fresh GPU/Linux, full-workspace, formal safety
+or measured performance; source admission and native graph limits remain separate.
+
+The 2026-09-25 complete-field-seed follow-up passed 650 selected lowering tests,
+49 selected native-bridge tests, six ordinary native tests, twelve distinct CLI
+workflows, 26 tensor tests and the host-path policy case: 744 selected tests without
+double-counting overlapping reruns. Field-map regressions failed before the change.
+A further source regression exposed same-shaped nominal drift in initial records;
+the producer now rejects it before flattening, with constructor, alias, helper-return
+and nested-field checks. CLI branch inspection was corrected to include record
+returns rather than assuming every generated branch returns i64. The field-seed and
+legacy whole-record workflows both passed again after origin validation, preserving
+cache identity, tamper rejection, selected traps and source-free restoration.
+The fresh CLI reports 1443 clean drift checks, clean coverage/hierarchy/lineage and
+`active/86`. Automatic carry-field elimination still awaits separate initial seeds
+and demanded iteration operands. This macOS aarch64 checkpoint does not certify
+fresh GPU/Linux, full-workspace, formal safety or measured performance.
+
+The 2026-09-25 independent-initial-state follow-up passed 90 core-contract tests,
+96 registered-CPU tests, 149 LLVM-lowering tests, 654 selected compiler-lowering
+tests, 50 selected native-bridge tests, seven ordinary native tests, thirteen CLI
+workflows, 26 tensor tests and the host-path policy case: 1086 selected tests without
+double-counting overlapping reruns. The new partial-record fixture keeps five state
+slots with four helper arguments; the ordinary native fixture returns 96 while
+preserving zero-trip state and trapping on selected invalid computations. Unpassed
+initializers are still evaluated, including failures before a zero-trip loop.
+Legacy complete maps and the new explicit seed prefix retain cache reuse, tamper
+rejection and byte-identical source-free restoration. The fresh CLI reports 1452
+clean drift checks, clean coverage/hierarchy/lineage and `active/86`. Automatic
+partial-record capture projection for compiler-generated scoped helpers is next;
+partial declared interfaces do not yet imply automatic signature pruning or reduced
+state storage. This macOS aarch64 checkpoint does not certify fresh GPU/Linux,
+full-workspace, formal safety or measured performance.
+
+The 2026-09-25 generated-scoped-record-projection follow-up passed 662 selected
+compiler-lowering tests, 50 selected native-bridge tests, eight ordinary native
+tests, five reference image/window tests, thirteen CLI workflows and 26 tensor
+tests: 764 selected tests without double-counting overlapping reruns. The direct
+NIR input-reduction regression failed before implementation and passes afterward.
+Source/reference regressions retain 3/7/64 state slots with three iteration arguments;
+the native lifecycle fixture retains all five slots while reducing six arguments
+to five. Ordinary native execution returns 154 and preserves selected iteration,
+zero-trip initializer and second-trip constructor failures. All thirteen workflows
+retain cache reuse, tamper rejection and byte-identical source-free restoration;
+the generated loop workflow also inspects its reduced LLVM signature. The fresh
+CLI reports 1459 clean drift checks, clean coverage/hierarchy/lineage and `active/86`.
+Entirely unconsumed generated flat-record inputs are next; this checkpoint does not
+claim sparse state storage, fresh GPU/Linux execution, a full-workspace result,
+formal safety or measured performance.

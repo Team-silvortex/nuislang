@@ -1,6 +1,12 @@
 use super::*;
 use crate::frontend::parse_nuis_module;
 
+#[path = "scalar_carry_seed_maps_tests.rs"]
+mod seed_maps;
+
+#[path = "scalar_carry_seed_storage_tests.rs"]
+mod seed_storage;
+
 const SOURCE: &str = "mod cpu Main {
     struct Slots { carry0: i64, carry1: i64, carry2: i64, carry3: i64 }
     struct Tiny { carry0: i64 }
@@ -81,6 +87,7 @@ fn flat_projection_slots_follow_layouts_not_capture_order() {
         .collect::<Vec<_>>();
     validate_seeds(&projections, false, function, &args, "action").unwrap();
     let result = ScopedLoopResult::Scalars {
+        separate_seeds: false,
         bindings: projections,
         layout: String::new(),
         breaking: false,
@@ -283,6 +290,7 @@ fn bool_projection_requires_explicit_typed_seed_and_decode() {
         assert!(projected_bindings("result", &ty("Tiny"), &invalid, &definitions).is_none());
     }
     let result = ScopedLoopResult::Scalars {
+        separate_seeds: false,
         bindings: projections,
         layout: String::new(),
         breaking: false,

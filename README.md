@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.1`](docs/versioning/nuis-beta-0.15.1-patch.md) (2026-09-24).
+[`beta-0.15.2`](docs/versioning/nuis-beta-0.15.2-patch.md) (2026-09-25).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -326,12 +326,16 @@ results and source-free restoration. Straight-line branch-local record rebinding
 now have scope-confined snapshot identities; old aliases and self-rebinding reads
 retain their previous values without erasing constructor work. Cross-scope writes
 in non-loop branches proven to return now receive separate snapshot versions too;
-the suffix retains its preceding value. Fallthrough joins and rebound iteration-local
-records still retain conservative whole captures.
+the suffix retains its preceding value. Field-only record copy families now admit
+fallthrough and loop-written input projection by rebuilding private inputs while
+keeping assignments, per-trip snapshots and backedges intact. Full-record escapes stay whole.
 Single-definition loop aliases now expose fields when their pure-value origin is
 an unwritten parameter. Generated scoped iterations now project invariant fields while
 preserving induction/carry maps and nested break identities: the 64-field loop fixture
-uses four arguments instead of 66. Fallthrough record joins remain next. Neither this work nor
+uses four arguments instead of 66. Scoped drivers retain complete flat-i64 initial state
+independently of partial field arguments. Generated scoped helpers now project proven
+partial record inputs too, preserving full state and initializer work. Entirely unread
+carried records still keep their arguments; removing those inputs is next. Neither this work nor
 the repository cleanup raises the persistent-session coordinate above its bounded `active/86`.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.

@@ -440,6 +440,16 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
         .take(3)
         .map(|input| value_read(input))
         .collect::<Vec<_>>();
+    if let Ok(Some(carries)) = crate::loop_carry_contract::parse_scoped_i64_carries(&op.args) {
+        if let Ok(inputs) = carries.dependencies() {
+            accesses.extend(inputs.iter().map(|input| value_read(input)));
+            return GlmNodeProfile {
+                result_class: GlmValueClass::Val,
+                accesses,
+                effect: GlmEffect::None,
+            };
+        }
+    }
     let operand_start = match op.args.get(6).map(String::as_str) {
         Some("owned_bytes_copy_drop") => 8,
         Some("scoped_call") => 9,

@@ -3,7 +3,9 @@
 mod scoped_scalar;
 pub use scoped_scalar::{parse_scoped_i64_carry, ScopedI64Carry};
 mod scoped_scalars;
-pub use scoped_scalars::{parse_scoped_i64_carries, ScopedI64Carries};
+pub use scoped_scalars::{
+    encode_scoped_i64_seeds, parse_scoped_i64_carries, ScopedI64Carries, SCOPED_I64_SEEDS_MARKER,
+};
 
 pub fn carry_state_fragment_is_valid(fragment: &str) -> bool {
     match fragment {

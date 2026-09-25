@@ -8,8 +8,8 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.1`](versioning/nuis-beta-0.15.1-patch.md)
-(2026-09-24), covering private capture identity, snapshots and invariant loop inputs.
+The current patch is [`beta-0.15.2`](versioning/nuis-beta-0.15.2-patch.md)
+(2026-09-25), covering record joins, independent seeds and generated scoped record inputs.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -43,9 +43,9 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
-The `05951bef` checkpoint and `beta-0.15.1` retain `active/86`. The next task is to
-project field demand through fallthrough record joins, preserving branch-selected
-values, loop backedges and the existing native-session boundaries. Version
+The `05951bef` checkpoint and `beta-0.15.2` retain `active/86`. The next task is to
+remove entirely unconsumed flat-record inputs from generated scoped helper signatures
+without losing initial state, carry/break identities or native-session boundaries. Version
 documentation and repository cleanup do not change capability scores.
 
 Current session evidence:
@@ -341,12 +341,20 @@ selected traps, cache identity and source-free restoration. Straight-line branch
 record rebindings now use separate snapshot versions when all writes remain in one
 non-loop scope with an exact type. Nested reads inherit the version at entry;
 siblings and suffixes do not inherit branch-local versions. Returning non-loop branches
-now receive separate versions for writes to ancestor records; fallthrough joins and
-rebound iteration-local records remain conservative boundaries. Single-definition
+now receive separate versions for writes to ancestor records. A separate copy-family
+proof now projects field-only fallthrough and loop-written inputs through nominal
+reconstruction without changing assignments, per-trip aliases or backedges. Whole
+escapes and unknown/mismatched types remain conservative. Single-definition
 loop aliases now project field demand from unwritten pure-value parameter origins;
 generated scoped iteration targets now project invariant fields and retain their
 independent argument maps. The 64-field source loop uses four rather than 66 iteration
-arguments; loop-written inputs and nested break identities stay intact. These are bounded CPU
+arguments; nested break identities retain their existing mapping.
+Explicit flat-i64 field arguments can now omit unread slots while independent seeds preserve complete initial state.
+Generated scoped helpers now also project partially read flat-i64 record inputs after
+separating parameter snapshots from updates and proving every scoped caller's exact
+seed/reconstruction map. Source regressions retain 3/7/64 state slots with three
+iteration arguments. Empty demand, full uses, unresolved joins and nested writes
+remain conservative; sparse state storage is not implemented by this projection. These are bounded CPU
 correctness/transport results, not native resource/provider dispatch or measured runtime speedups.
 The parser also rejects excessive call/group expression re-entry before stack
 exhaustion, independently of other frontend recursion, NIR expression-depth and

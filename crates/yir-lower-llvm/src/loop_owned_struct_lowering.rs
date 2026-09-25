@@ -11,7 +11,7 @@ use super::{
 
 struct OwnedStructLoopSlot {
     index: usize,
-    operand: String,
+    operand: Option<String>,
     kind: CpuCallScalarKind,
     slot: String,
 }
@@ -104,7 +104,7 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         ));
     }
 
-    let mut slots = Vec::new();
+    let mut seeds = Vec::new();
     for (operand, kind) in operands.iter().zip(signature.params.iter().copied()) {
         let Some((index, input)) = parse_loop_owned_struct_carry(operand)? else {
             continue;
@@ -114,6 +114,17 @@ pub(crate) fn prepare_owned_struct_loop_carry(
                 "scoped carry `{input}` must bind an i64 helper parameter"
             ));
         }
+        seeds.push((index, input, Some(operand.clone()), kind));
+    }
+    if let Some(multi) = &multi {
+        for (index, input) in multi.seeds.iter().enumerate() {
+            if !seeds.iter().any(|(mapped, ..)| *mapped == index) {
+                seeds.push((index, *input, None, CpuCallScalarKind::I64));
+            }
+        }
+    }
+    let mut slots = Vec::new();
+    for (index, input, operand, kind) in seeds {
         let initial = scalar_value(registers.get(input), kind).ok_or_else(|| {
             format!(
                 "cpu.loop_while_i64_effect `{}` cannot resolve aggregate carry leaf `{input}`",
@@ -134,7 +145,7 @@ pub(crate) fn prepare_owned_struct_loop_carry(
         body.push(format!("  store {llvm_type} {initial}, ptr {slot}"));
         slots.push(OwnedStructLoopSlot {
             index,
-            operand: operand.clone(),
+            operand,
             kind,
             slot,
         });
@@ -177,7 +188,11 @@ impl OwnedStructLoopCarry {
     ) -> BTreeMap<String, LlvmValueRef> {
         self.slots
             .iter()
-            .map(|slot| (slot.operand.clone(), load_slot(slot, body, next_reg)))
+            .filter_map(|slot| {
+                slot.operand
+                    .as_ref()
+                    .map(|operand| (operand.clone(), load_slot(slot, body, next_reg)))
+            })
             .collect()
     }
 

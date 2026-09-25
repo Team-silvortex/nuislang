@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "capture_join_tests.rs"]
+mod join_tests;
+
 const RECORDS: &str = "struct Pair { x: i64, y: i64 }
     struct State { a: Pair, b: Pair, unused: i64 }";
 
@@ -74,9 +77,9 @@ fn projection_retains_exact_nominal_subrecords_and_deduplicates_prefix_uses() {
 }
 
 #[test]
-fn projection_keeps_whole_uses_and_control_flow_rebound_parameters() {
+fn projection_keeps_whole_uses_after_control_flow_rebindings() {
     for body in [
-        "if flag { let state = State { a: state.b, b: state.a, unused: 0 }; } return state.a.x;",
+        "while flag { let state = State { a: state.b, b: state.a, unused: 0 }; break; } return consume(state);",
         "return consume(state);",
     ] {
         let mut module = module(&format!(
