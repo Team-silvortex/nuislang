@@ -2,6 +2,108 @@ use super::*;
 
 const SOURCE: &str = include_str!("scoped_field_seeds.ns");
 
+#[path = "../native_application_bridge/scoped_record_fixture.rs"]
+mod record_fixture;
+
+#[test]
+fn f64_record_carries_preserve_native_values_scalar_slots_and_lazy_traps() {
+    let source = include_str!("scoped_f64_record_carries.ns");
+    assert_eq!(compile_and_run("f64_record_words", source).code(), Some(37));
+    let trapped = source.replace("walk(5, 2)", "walk(5, 0)");
+    let status = compile_and_run("f64_record_words_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
+#[test]
+fn f32_record_carries_preserve_native_values_scalar_slots_and_lazy_traps() {
+    let source = include_str!("scoped_f32_record_carries.ns");
+    assert_eq!(compile_and_run("f32_record_words", source).code(), Some(37));
+    let trapped = source.replace("walk(5, 2)", "walk(5, 0)");
+    let status = compile_and_run("f32_record_words_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
+#[test]
+fn i32_record_carries_preserve_native_signed_wraps_comparisons_and_lazy_traps() {
+    let source = include_str!("scoped_i32_record_carries.ns");
+    assert_eq!(compile_and_run("i32_record_words", source).code(), Some(37));
+    let trapped = source.replace("walk(5, 2)", "walk(5, 0)");
+    let status = compile_and_run("i32_record_words_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
+#[test]
+fn mixed_record_word_carries_preserve_ordinary_native_snapshots_and_lazy_traps() {
+    let source = include_str!("scoped_mixed_record_carries.ns");
+    assert_eq!(
+        compile_and_run("mixed_record_words", source).code(),
+        Some(37)
+    );
+    let trapped = source.replace("walk(5, 2)", "walk(5, 0)");
+    let status = compile_and_run("mixed_record_words_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
+#[test]
+fn generated_branch_record_inputs_preserve_ordinary_native_execution_and_traps() {
+    let source = record_fixture::source(64, true)
+        .replace("if i == 3 { break; }", "")
+        .replace(
+            "fn main() -> i64 { return 0; }",
+            "fn main() -> i64 { let result = step(start(5)); return result.f0 + result.f63; }",
+        );
+    assert_eq!(
+        compile_and_run("branch_record_inputs", &source).code(),
+        Some(93)
+    );
+    assert_eq!(
+        compile_and_run(
+            "branch_record_zero_trip",
+            &source.replace("start(5)", "start(-3)")
+        )
+        .code(),
+        Some(57)
+    );
+    let lazy = source
+        .replace("start(5)", "start(1)")
+        .replace("if i <= 2", "if limit < 3")
+        .replace("carry.f0 + 2", "10 / (carry.f0 - 2)");
+    assert_eq!(
+        compile_and_run("branch_record_lazy", &lazy).code(),
+        Some(69)
+    );
+    let trapped = source
+        .replace("start(5)", "start(2)")
+        .replace("value.f0 + 1", "10 / (value.f0 - 2)");
+    let status = compile_and_run("branch_record_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
 #[test]
 fn scoped_field_seed_backedges_execute_in_the_ordinary_native_entry() {
     let status = compile_and_run("scoped_field_seeds", SOURCE);

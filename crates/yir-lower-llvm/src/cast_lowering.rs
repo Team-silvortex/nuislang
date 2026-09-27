@@ -16,11 +16,59 @@ pub(crate) fn lower_cpu_cast_node(
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
-    if node.op.module != "cpu" || !node.op.instruction.starts_with("cast_") {
+    if node.op.module != "cpu" {
         return Ok(false);
     }
 
     match node.op.instruction.as_str() {
+        "pack_f64_word" => {
+            let input = get_f64(registers, &node.op.args[0])
+                .ok_or_else(|| format!("cpu.pack_f64_word `{}` requires f64 input", node.name))?;
+            let word = fresh_reg(next_reg);
+            body.push(format!("  {word} = bitcast double {input} to i64"));
+            registers.insert(node.name.clone(), LlvmValueRef::I64(word.clone()));
+            *last_cpu_value = Some(word);
+        }
+        "unpack_f64_word" => {
+            let Some(LlvmValueRef::I64(word)) = registers.get(&node.op.args[0]) else {
+                return Err(format!(
+                    "cpu.unpack_f64_word `{}` requires i64 input",
+                    node.name
+                ));
+            };
+            let word = word.clone();
+            let value = fresh_reg(next_reg);
+            body.push(format!("  {value} = bitcast i64 {word} to double"));
+            registers.insert(node.name.clone(), LlvmValueRef::F64(value));
+            *last_cpu_value = Some(word);
+        }
+        "pack_f32_word" => {
+            let input = get_f32(registers, &node.op.args[0])
+                .ok_or_else(|| format!("cpu.pack_f32_word `{}` requires f32 input", node.name))?;
+            let bits = fresh_reg(next_reg);
+            let word = fresh_reg(next_reg);
+            body.push(format!("  {bits} = bitcast float {input} to i32"));
+            body.push(format!("  {word} = zext i32 {bits} to i64"));
+            registers.insert(node.name.clone(), LlvmValueRef::I64(word.clone()));
+            *last_cpu_value = Some(word);
+        }
+        "unpack_f32_word" => {
+            let Some(LlvmValueRef::I64(input)) = registers.get(&node.op.args[0]) else {
+                return Err(format!(
+                    "cpu.unpack_f32_word `{}` requires i64 input",
+                    node.name
+                ));
+            };
+            let bits = fresh_reg(next_reg);
+            let value = fresh_reg(next_reg);
+            body.push(format!("  {bits} = trunc i64 {input} to i32"));
+            body.push(format!("  {value} = bitcast i32 {bits} to float"));
+            registers.insert(node.name.clone(), LlvmValueRef::F32(value));
+            // The legacy terminal word remains a bit pattern too, never fptosi.
+            let word = fresh_reg(next_reg);
+            body.push(format!("  {word} = zext i32 {bits} to i64"));
+            *last_cpu_value = Some(word);
+        }
         "cast_i32_to_i64" => {
             let Some(input) = get_i32(registers, &node.op.args[0]) else {
                 body.push(format!(

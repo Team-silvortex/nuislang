@@ -20,7 +20,8 @@ pub(super) fn describe_cpu_scalar_memory_node(
         }
         "cast_bool_to_i64" | "cast_i32_to_i64" | "cast_i64_to_bool" | "cast_i64_to_i32"
         | "cast_i32_to_f32" | "cast_i32_to_f64" | "cast_f32_to_f64" | "cast_f64_to_f32"
-        | "cast_i64_to_f32" | "cast_f32_to_i64" | "cast_i64_to_f64" | "cast_f64_to_i64" => {
+        | "cast_i64_to_f32" | "cast_f32_to_i64" | "cast_i64_to_f64" | "cast_f64_to_i64"
+        | "pack_f32_word" | "unpack_f32_word" | "pack_f64_word" | "unpack_f64_word" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <input>`",

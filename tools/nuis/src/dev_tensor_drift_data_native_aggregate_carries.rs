@@ -28,7 +28,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "pub(super) struct Projection",
             "slot != words.len()",
             "type_name != &ty.name",
-            "projected_word(value, result, slot + offset)",
+            "mixed_words::projected(value, ty, result, slot + offset)",
             "&param.ty == binding.ty",
             "covered.iter().any(|covered| !covered)",
             "std::mem::replace(slot, true)",

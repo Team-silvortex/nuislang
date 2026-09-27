@@ -71,7 +71,11 @@ fn generated_capture_transport_does_not_rewrite_user_signatures_or_namesakes() {
     let generated = yir
         .functions
         .iter()
-        .find(|f| f.name.starts_with("__nuis_conditional_value_"))
+        .find(|f| {
+            !["__nuis_conditional_value", "choose", "relay", "main"].contains(&f.name.as_str())
+                && f.parameters.len() == 1
+                && f.parameters[0].ty == "i64"
+        })
         .unwrap();
     assert_eq!(generated.parameters.len(), 1);
     assert_eq!(generated.parameters[0].ty, "i64");
@@ -106,7 +110,7 @@ fn scoped_boolean_iteration_parameters_remain_independent_of_value_captures() {
 }
 
 #[test]
-fn generated_value_helpers_used_as_scoped_actions_keep_logical_parameters() {
+fn generated_mixed_value_iterations_keep_word_maps_independent_of_boolean_compaction() {
     let source = "mod cpu Main {
         struct Pair { a: bool, b: bool }
         fn relay(value: Pair) -> Pair { return value; }
@@ -126,7 +130,7 @@ fn generated_value_helpers_used_as_scoped_actions_keep_logical_parameters() {
     let selection = module
         .functions
         .iter()
-        .find(|f| f.name.starts_with("__nuis_conditional_value"))
+        .find(|f| f.name.starts_with("__nuis_scalar_iteration"))
         .unwrap();
     let eligible = BTreeSet::from([selection.name.as_str()]);
     assert!(
@@ -134,6 +138,15 @@ fn generated_value_helpers_used_as_scoped_actions_keep_logical_parameters() {
             .contains(&selection.name)
     );
     assert!(!outlined.capture_plans.contains_key(&selection.name));
+    assert!(selection.params.iter().any(|p| p.ty.name == "bool"));
+    assert!(selection
+        .params
+        .iter()
+        .any(|p| module.structs.iter().any(|definition| {
+            definition.name == p.ty.name
+                && definition.fields.len() == 2
+                && definition.fields.iter().all(|f| f.ty.name == "i64")
+        })));
 }
 
 #[test]

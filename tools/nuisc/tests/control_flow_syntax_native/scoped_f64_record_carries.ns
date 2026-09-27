@@ -1,0 +1,32 @@
+mod cpu Main {
+    struct Packet { value: f64, count: i64, enabled: bool }
+    @noinline fn advance(value: Packet, divisor: i64) -> Packet {
+        return Packet { value: value.value + 0.5,
+            count: value.count + 6 / divisor, enabled: !value.enabled };
+    }
+    @noinline fn walk(limit: i64, divisor: i64) -> Packet {
+        let carry = Packet { value: 1.5, count: 7, enabled: true };
+        let saved = carry;
+        let i = 0;
+        while i < limit {
+            let i = i + 1;
+            let carry = advance(carry, divisor);
+            if i == 3 { break; }
+        }
+        return Packet { value: carry.value, count: carry.count + saved.count, enabled: carry.enabled };
+    }
+    @noinline fn scalar_loop(seed: f64) -> f64 {
+        let value = seed; let i = 0;
+        while i < 3 { let i = i + 1; let value = value + 0.5; }
+        return value;
+    }
+    fn main() -> i64 {
+        let result = walk(5, 2);
+        if result.value != 3.0 { return 200; }
+        let zero = walk(0, 0);
+        if zero.value != 1.5 { return 201; }
+        if scalar_loop(0.25) != 1.75 { return 202; }
+        if zero.enabled { return result.count + zero.count; }
+        return 203;
+    }
+}

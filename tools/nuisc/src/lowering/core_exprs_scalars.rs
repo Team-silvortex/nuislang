@@ -163,7 +163,7 @@ pub(super) fn lower_null(state: &mut LoweringState<'_>) -> String {
     name
 }
 
-fn lower_cast_expr(
+pub(super) fn lower_cast_expr(
     value: &NirExpr,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,

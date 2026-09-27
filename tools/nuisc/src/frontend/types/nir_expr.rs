@@ -291,7 +291,7 @@ pub(crate) fn infer_nir_expr_type(
                 None
             }
         }
-        NirExpr::CastI64ToF32(inner) => {
+        NirExpr::CastI64ToF32(inner) | NirExpr::UnpackF32Word(inner) => {
             let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
             if inner_ty == i64_type() {
                 Some(f32_type())
@@ -299,7 +299,7 @@ pub(crate) fn infer_nir_expr_type(
                 None
             }
         }
-        NirExpr::CastF32ToI64(inner) => {
+        NirExpr::CastF32ToI64(inner) | NirExpr::PackF32Word(inner) => {
             let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
             if inner_ty == f32_type() {
                 Some(i64_type())
@@ -307,7 +307,7 @@ pub(crate) fn infer_nir_expr_type(
                 None
             }
         }
-        NirExpr::CastI64ToF64(inner) => {
+        NirExpr::CastI64ToF64(inner) | NirExpr::UnpackF64Word(inner) => {
             let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
             if inner_ty == i64_type() {
                 Some(f64_type())
@@ -315,7 +315,7 @@ pub(crate) fn infer_nir_expr_type(
                 None
             }
         }
-        NirExpr::CastF64ToI64(inner) => {
+        NirExpr::CastF64ToI64(inner) | NirExpr::PackF64Word(inner) => {
             let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
             if inner_ty == f64_type() {
                 Some(i64_type())

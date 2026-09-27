@@ -170,7 +170,6 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut outlined.break_controls,
         preserve_entry_flow,
     );
-    let scalar_helper_start = helpers.len();
     scalar_control::outline(
         module,
         &outlined.functions,
@@ -180,22 +179,13 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &value_catalog,
         &value_layouts,
     );
-    let mut capture_functions = selections
-        .into_iter()
-        .chain(
-            helpers[scalar_helper_start..]
-                .iter()
-                .map(|f| f.name.clone()),
-        )
-        .collect::<BTreeSet<_>>();
     let generated_helpers = helpers
         .iter()
         .map(|f| f.name.clone())
         .collect::<BTreeSet<_>>();
-    let projection_functions = capture_functions
-        .union(&generated_helpers)
-        .cloned()
-        .collect();
+    // Loop branch helpers have the same private value transport as selections.
+    // Admission still checks pure layouts and every scoped caller's seed map.
+    let capture_functions = selections.union(&generated_helpers).cloned().collect();
     if !helpers.is_empty() {
         outlined
             .functions
@@ -203,9 +193,12 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         module.functions.extend(helpers);
         crate::nir_verify::verify_nir_module(module)?;
     }
+    // Mixed record carries introduce private word layouts during outlining.
+    // Capture planning must see those definitions, not just the source layouts.
+    let value_layouts = control_values::TypedLayouts::collect(module);
     let projected = capture_projection::project(
         module,
-        &projection_functions,
+        &capture_functions,
         &generated_helpers,
         &value_layouts,
     );
@@ -213,10 +206,6 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         crate::nir_verify::verify_nir_module(module)?;
     }
     outlined.elided_record_seeds = projected.elided_records;
-    let eligible = generated_helpers.iter().map(String::as_str).collect();
-    capture_functions.extend(scoped_loop_lowering::collect_scoped_call_targets(
-        module, &eligible,
-    ));
     outlined.capture_plans = capture_layouts::collect(module, &capture_functions, &value_layouts);
     Ok(outlined)
 }

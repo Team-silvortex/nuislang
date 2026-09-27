@@ -126,7 +126,15 @@ pub(super) fn lower_binary_expr_with_async(
             rhs_ty.render()
         ));
     }
-    Ok(NirExpr::Binary {
+    // Generic integer YIR arithmetic produces i64. Preserve wrapping i32
+    // results explicitly, including the type seen by a later record backedge.
+    let narrow_result = lhs_ty == super::i32_type()
+        && matches!(op, AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul);
+    if narrow_result {
+        lowered_lhs = NirExpr::CastI32ToI64(Box::new(lowered_lhs));
+        lowered_rhs = NirExpr::CastI32ToI64(Box::new(lowered_rhs));
+    }
+    let value = NirExpr::Binary {
         op: match op {
             AstBinaryOp::And => NirBinaryOp::And,
             AstBinaryOp::Or => NirBinaryOp::Or,
@@ -144,6 +152,11 @@ pub(super) fn lower_binary_expr_with_async(
         },
         lhs: Box::new(lowered_lhs),
         rhs: Box::new(lowered_rhs),
+    };
+    Ok(if narrow_result {
+        NirExpr::CastI64ToI32(Box::new(value))
+    } else {
+        value
     })
 }
 

@@ -134,6 +134,18 @@ fn expression(
     match value {
         NirExpr::Int(_) => Some(scalar_type("i64")),
         NirExpr::Bool(_) => Some(scalar_type("bool")),
+        NirExpr::F32(_) => Some(scalar_type("f32")),
+        NirExpr::F64(_) => Some(scalar_type("f64")),
+        NirExpr::CastI64ToI32(value) => {
+            (expression(value, locals, updates, own, catalog, layouts, depth + 1)?
+                == scalar_type("i64"))
+            .then(|| scalar_type("i32"))
+        }
+        NirExpr::CastI32ToI64(value) => {
+            (expression(value, locals, updates, own, catalog, layouts, depth + 1)?
+                == scalar_type("i32"))
+            .then(|| scalar_type("i64"))
+        }
         NirExpr::Var(name) => {
             if updates.contains(name) && !locals.available.contains(name) && own != Some(name) {
                 return None;
@@ -162,10 +174,10 @@ fn expression(
             }
             let mut seen = BTreeSet::new();
             for (name, value) in fields {
-                if !layout.contains(name)
-                    || !seen.insert(name)
+                let expected = &layout.iter().find(|(field, _)| field == name)?.1;
+                if !seen.insert(name)
                     || expression(value, locals, updates, own, catalog, layouts, depth + 1)?
-                        != scalar_type("i64")
+                        != *expected
                 {
                     return None;
                 }
@@ -176,8 +188,9 @@ fn expression(
             let base = expression(base, locals, updates, own, catalog, layouts, depth + 1)?;
             layouts
                 .get(&base.name)?
-                .contains(field)
-                .then(|| scalar_type("i64"))
+                .iter()
+                .find(|(name, _)| name == field)
+                .map(|(_, ty)| ty.clone())
         }
         NirExpr::Binary { op, lhs, rhs } => {
             let left = expression(lhs, locals, updates, own, catalog, layouts, depth + 1)?;
@@ -186,6 +199,11 @@ fn expression(
                 return None;
             }
             match op {
+                NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
+                    if left == scalar_type("f32") || left == scalar_type("f64") =>
+                {
+                    Some(left)
+                }
                 NirBinaryOp::Add
                 | NirBinaryOp::Sub
                 | NirBinaryOp::Mul
@@ -201,7 +219,7 @@ fn expression(
                 | NirBinaryOp::Le
                 | NirBinaryOp::Gt
                 | NirBinaryOp::Ge
-                    if left == scalar_type("i64") =>
+                    if left == scalar_type("i64") || left == scalar_type("i32") =>
                 {
                     Some(scalar_type("bool"))
                 }

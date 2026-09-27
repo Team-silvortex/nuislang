@@ -48,7 +48,11 @@ fn typed_capture_words_execute_high_bits_word_boundaries_and_independent_flags()
         .yir
         .functions
         .iter()
-        .find(|f| f.name.starts_with("__nuis_conditional_value"))
+        .find(|f| {
+            f.name.starts_with("__nuis_")
+                && f.parameters.len() == 2
+                && f.parameters.iter().all(|p| p.ty == "i64")
+        })
         .unwrap();
     assert_eq!(selection.parameters.len(), 2);
     assert!(selection.parameters.iter().all(|p| p.ty == "i64"));

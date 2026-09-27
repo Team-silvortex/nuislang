@@ -4,6 +4,8 @@ use crate::frontend::parse_nuis_module;
 #[path = "scalar_carry_seed_maps_tests.rs"]
 mod seed_maps;
 
+#[path = "mixed_record_words_tests.rs"]
+mod mixed_words_tests;
 #[path = "scalar_carry_seed_storage_tests.rs"]
 mod seed_storage;
 
@@ -85,7 +87,7 @@ fn flat_projection_slots_follow_layouts_not_capture_order() {
         .iter()
         .map(|param| NirExpr::Var(param.name.clone()))
         .collect::<Vec<_>>();
-    validate_seeds(&projections, false, function, &args, "action").unwrap();
+    validate_seeds(&projections, false, function, &args, "action", &definitions).unwrap();
     let result = ScopedLoopResult::Scalars {
         separate_seeds: false,
         bindings: projections,
@@ -94,7 +96,7 @@ fn flat_projection_slots_follow_layouts_not_capture_order() {
     };
     for (index, expected) in [(0, (3, 1)), (1, (2, 1)), (2, (0, 2))] {
         assert_eq!(
-            argument_index(&result, &function.params[index], &args[index]),
+            argument_index(&result, &function.params[index], &args[index], &definitions),
             Some(expected)
         );
     }
@@ -216,7 +218,15 @@ fn flat_projection_requires_exact_nominal_single_seed_and_never_a_break_record()
             _ => unreachable!(),
         }
         assert!(
-            validate_seeds(&projections, false, &function, &args, "action").is_err(),
+            validate_seeds(
+                &projections,
+                false,
+                &function,
+                &args,
+                "action",
+                &definitions
+            )
+            .is_err(),
             "{change}"
         );
     }
@@ -229,8 +239,8 @@ fn flat_projection_requires_exact_nominal_single_seed_and_never_a_break_record()
     ];
     assert!(!is_scalar_i64(projections.last().unwrap().ty));
     assert!(!break_guard(None, "marker"));
-    assert!(validate_seeds(&projections, false, function, &args, "action").is_err());
-    assert!(validate_seeds(&projections, true, function, &args, "action").is_err());
+    assert!(validate_seeds(&projections, false, function, &args, "action", &definitions).is_err());
+    assert!(validate_seeds(&projections, true, function, &args, "action", &definitions).is_err());
 }
 
 #[test]
@@ -255,8 +265,16 @@ fn bool_projection_requires_explicit_typed_seed_and_decode() {
     let args = vec![NirExpr::CastBoolToI64(Box::new(NirExpr::Var(
         "flag".into(),
     )))];
-    validate_seeds(&projections, false, &function, &args, "action").unwrap();
-    assert!(validate_seeds(&projections, true, &function, &args, "action").is_err());
+    validate_seeds(
+        &projections,
+        false,
+        &function,
+        &args,
+        "action",
+        &definitions,
+    )
+    .unwrap();
+    assert!(validate_seeds(&projections, true, &function, &args, "action", &definitions).is_err());
     for change in ["missing", "raw", "expression", "type", "duplicate"] {
         let mut function = function.clone();
         let mut args = args.clone();
@@ -272,7 +290,15 @@ fn bool_projection_requires_explicit_typed_seed_and_decode() {
             _ => unreachable!(),
         }
         assert!(
-            validate_seeds(&projections, false, &function, &args, "action").is_err(),
+            validate_seeds(
+                &projections,
+                false,
+                &function,
+                &args,
+                "action",
+                &definitions
+            )
+            .is_err(),
             "{change}"
         );
     }
@@ -296,7 +322,7 @@ fn bool_projection_requires_explicit_typed_seed_and_decode() {
         breaking: false,
     };
     assert_eq!(
-        argument_index(&result, &function.params[0], &args[0]),
+        argument_index(&result, &function.params[0], &args[0], &definitions),
         Some((0, 1))
     );
 }

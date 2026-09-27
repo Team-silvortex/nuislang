@@ -221,7 +221,7 @@ impl Builder<'_> {
             || plan.breaking.is_some()
             || carries
                 .iter()
-                .any(|name| scope[name] == scalar_type("bool")))
+                .any(|name| matches!(scope[name].name.as_str(), "bool" | "i32" | "f32" | "f64")))
         .then(|| scalar_carries::state_type(&transport, self.names, self.structs));
         let returned = scalar_carries::value(&transport, aggregate.as_ref());
         let name = branches::fresh_name("__nuis_scalar_iteration", self.names);
@@ -249,7 +249,7 @@ impl Builder<'_> {
             self.break_controls,
         ));
         helper_body.push(NirStmt::Return(Some(returned)));
-        // Backedge slots remain i64 even for bool source bindings. Decode in the
+        // Backedge slots remain i64 even for other scalar bindings. Decode in the
         // same iteration helper, rather than adding a second call/budget boundary.
         let mut bindings = scope.keys().cloned().collect();
         branches::collect_bindings(&helper_body, &mut bindings);
@@ -260,8 +260,20 @@ impl Builder<'_> {
                 let input = NirExpr::Var(param.name.clone());
                 if plan.breaking.as_ref() == Some(&param.name) {
                     NirExpr::Int(0)
-                } else if param.ty == scalar_type("bool") && carries.contains(&param.name) {
-                    let word = branches::fresh_name("__nuis_bool_seed", &mut bindings);
+                } else if matches!(param.ty.name.as_str(), "bool" | "i32" | "f32" | "f64")
+                    && carries.contains(&param.name)
+                {
+                    let prefix = if param.ty == scalar_type("bool") {
+                        "__nuis_bool_seed"
+                    } else if param.ty == scalar_type("i32") {
+                        "__nuis_i32_seed"
+                    } else if param.ty == scalar_type("f32") {
+                        "__nuis_f32_seed"
+                    } else {
+                        "__nuis_f64_seed"
+                    };
+                    let word = branches::fresh_name(prefix, &mut bindings);
+                    let encoded = scalar_carries::encode(&param.ty, input);
                     seeds.push(scalar_carries::binding(
                         &param.name,
                         scope,
@@ -269,7 +281,18 @@ impl Builder<'_> {
                     ));
                     param.name = word;
                     param.ty = scalar_type("i64");
-                    NirExpr::CastBoolToI64(Box::new(input))
+                    encoded
+                } else if carries.contains(&param.name) {
+                    scalar_carries::record_input(
+                        param,
+                        scope,
+                        self.layouts,
+                        self.names,
+                        self.structs,
+                        &mut bindings,
+                        &mut seeds,
+                    )
+                    .unwrap_or(input)
                 } else {
                     input
                 }

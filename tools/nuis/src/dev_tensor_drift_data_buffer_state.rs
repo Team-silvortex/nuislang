@@ -133,7 +133,7 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/direct_calls/control_boundaries.rs",
         required_patterns: &[
             "is_pass_through_guard_seed",
-            "parameter(value, DirectCallScalarKind::I64)",
+            "scalar_seed(value, DirectCallScalarKind::I64)",
             "fields.len() == definition.fields.len()",
             "type_name == &ty.name",
             "name == &field.name",

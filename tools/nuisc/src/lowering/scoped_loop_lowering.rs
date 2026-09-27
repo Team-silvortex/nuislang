@@ -52,7 +52,9 @@ pub(super) fn projectable_record_seed_inputs(
     };
     let breaking =
         scalar_carries::break_guard(tail.get(carries.len()), carries.last().unwrap().name);
-    if scalar_carries::validate_seeds(&carries, breaking, function, args, callee).is_err() {
+    if scalar_carries::validate_seeds(&carries, breaking, function, args, callee, definitions)
+        .is_err()
+    {
         return BTreeMap::new();
     }
     function
@@ -63,7 +65,7 @@ pub(super) fn projectable_record_seed_inputs(
         .filter_map(|(index, (param, arg))| {
             let mut slot = 0;
             for carry in &carries {
-                if carry.whole_record_seed(param, arg) {
+                if carry.whole_record_seed(param, arg, definitions) {
                     return Some((index, carry.record_seed(slot)));
                 }
                 slot += carry.width();
@@ -260,6 +262,7 @@ pub(super) fn lower_scoped_call_while(
                         .get(callee)
                         .map(Vec::as_slice)
                         .unwrap_or(&[]),
+                    &state.struct_defs,
                 )?,
                 bindings: carries,
                 layout,
@@ -395,7 +398,9 @@ pub(super) fn lower_scoped_call_while(
         } else if matches!((&result, arg), (ScopedLoopResult::Scalar(binding), NirExpr::Var(name)) if name == binding)
         {
             action_args.push("$carry".to_owned());
-        } else if let Some((index, width)) = scalar_carries::argument_index(&result, param, arg) {
+        } else if let Some((index, width)) =
+            scalar_carries::argument_index(&result, param, arg, &state.struct_defs)
+        {
             let flattened = if let Some(seeds) = &initial_seeds {
                 seeds[index..index + width].to_vec()
             } else {

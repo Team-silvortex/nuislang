@@ -1,6 +1,10 @@
 use super::*;
 use control_values::ValueLayouts;
 
+#[cfg(test)]
+#[path = "capture_layouts_tests.rs"]
+mod tests;
+
 pub(super) fn collect(
     module: &NirModule,
     generated: &BTreeSet<String>,

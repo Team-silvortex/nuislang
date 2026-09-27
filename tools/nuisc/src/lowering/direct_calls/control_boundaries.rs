@@ -29,7 +29,8 @@ pub(super) fn lower_guarded_body(
         .return_type
         .as_ref()
         .is_some_and(|ty| is_neutral_guard_seed(ty, default, &state.struct_defs));
-    if !else_body.is_empty() || (!neutral && !is_pass_through_guard_seed(function, default, state))
+    if !else_body.is_empty()
+        || (!neutral && !is_pass_through_guard_seed(function, default, &state.struct_defs))
     {
         return Err(format!(
             "outlined helper `{}` has an invalid leading guard",
@@ -187,18 +188,26 @@ mod guard_seed_tests {
 fn is_pass_through_guard_seed(
     function: &NirFunction,
     value: &NirExpr,
-    state: &LoweringState<'_>,
+    structs: &BTreeMap<&str, &NirStructDef>,
 ) -> bool {
     let parameter = |value: &NirExpr, kind| {
         matches!(value, NirExpr::Var(name)
         if function.params.iter().any(|param| &param.name == name
             && direct_call_scalar_kind(&param.ty) == Some(kind)))
     };
+    let scalar_seed = |value: &NirExpr, kind| {
+        parameter(value, kind) || is_flat_parameter_field(function, value, structs, kind)
+    };
     let word_seed = |value: &NirExpr| {
-        parameter(value, DirectCallScalarKind::I64)
+        scalar_seed(value, DirectCallScalarKind::I64)
             || matches!(value, NirExpr::CastBoolToI64(inner)
-                if parameter(inner, DirectCallScalarKind::Bool))
-            || is_flat_parameter_field(function, value, state)
+                if scalar_seed(inner, DirectCallScalarKind::Bool))
+            || matches!(value, NirExpr::CastI32ToI64(inner)
+                if scalar_seed(inner, DirectCallScalarKind::I32))
+            || matches!(value, NirExpr::PackF32Word(inner)
+                if scalar_seed(inner, DirectCallScalarKind::F32))
+            || matches!(value, NirExpr::PackF64Word(inner)
+                if scalar_seed(inner, DirectCallScalarKind::F64))
     };
     let Some(ty) = &function.return_type else {
         return false;
@@ -214,7 +223,7 @@ fn is_pass_through_guard_seed(
     else {
         return false;
     };
-    let Some(definition) = state.struct_defs.get(type_name.as_str()) else {
+    let Some(definition) = structs.get(type_name.as_str()) else {
         return false;
     };
     !ty.is_ref
@@ -238,7 +247,8 @@ fn is_pass_through_guard_seed(
 fn is_flat_parameter_field(
     function: &NirFunction,
     value: &NirExpr,
-    state: &LoweringState<'_>,
+    structs: &BTreeMap<&str, &NirStructDef>,
+    kind: DirectCallScalarKind,
 ) -> bool {
     let NirExpr::FieldAccess { base, field } = value else {
         return false;
@@ -249,7 +259,7 @@ fn is_flat_parameter_field(
     let Some(param) = function.params.iter().find(|param| &param.name == name) else {
         return false;
     };
-    let Some(definition) = state.struct_defs.get(param.ty.name.as_str()) else {
+    let Some(definition) = structs.get(param.ty.name.as_str()) else {
         return false;
     };
     // A captured flat-value projection is total. Calls, nested records and
@@ -259,12 +269,27 @@ fn is_flat_parameter_field(
         && param.ty.generic_args.is_empty()
         && definition.generic_params.is_empty()
         && definition.where_bounds.is_empty()
-        && definition.fields.iter().any(|entry| &entry.name == field)
         && definition
             .fields
             .iter()
-            .all(|entry| direct_call_scalar_kind(&entry.ty) == Some(DirectCallScalarKind::I64))
+            .any(|entry| &entry.name == field && direct_call_scalar_kind(&entry.ty) == Some(kind))
+        && definition.fields.iter().all(|entry| {
+            matches!(
+                direct_call_scalar_kind(&entry.ty),
+                Some(
+                    DirectCallScalarKind::I64
+                        | DirectCallScalarKind::Bool
+                        | DirectCallScalarKind::I32
+                        | DirectCallScalarKind::F32
+                        | DirectCallScalarKind::F64
+                )
+            )
+        })
 }
+
+#[cfg(test)]
+#[path = "mixed_guard_seed_tests.rs"]
+mod mixed_guard_seed_tests;
 
 pub(in crate::lowering) fn collect_guarded_loop_direct_call_functions(
     module: &NirModule,

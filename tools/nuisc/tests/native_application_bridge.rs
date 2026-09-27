@@ -8,6 +8,14 @@ use yir_core::{Value, YirModule};
 use yir_lower_llvm::native_session::{emit_registered, NativeSessionBridge, ScalarKind};
 use yir_runtime_host::ApplicationSession;
 
+#[path = "native_application_bridge/f32_scoped_record_carries.rs"]
+mod f32_scoped_record_carries;
+#[path = "native_application_bridge/f64_scoped_record_carries.rs"]
+mod f64_scoped_record_carries;
+#[path = "native_application_bridge/i32_scoped_record_carries.rs"]
+mod i32_scoped_record_carries;
+#[path = "native_application_bridge/mixed_scoped_record_carries.rs"]
+mod mixed_scoped_record_carries;
 #[path = "native_application_bridge/typed_scoped_record_inputs.rs"]
 mod typed_scoped_record_inputs;
 

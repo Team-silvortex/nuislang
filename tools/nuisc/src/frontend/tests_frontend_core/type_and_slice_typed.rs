@@ -1,6 +1,37 @@
 use super::*;
 
 #[test]
+fn i32_wrapping_arithmetic_preserves_explicit_result_width_and_single_operands() {
+    for (symbol, expected) in [
+        ("+", NirBinaryOp::Add),
+        ("-", NirBinaryOp::Sub),
+        ("*", NirBinaryOp::Mul),
+    ] {
+        let module = parse_nuis_module(&format!(
+            "mod cpu Main {{
+            fn identity(value: i32) -> i32 {{ return value; }}
+            fn calculate(a: i32, b: i32) -> i32 {{ return identity(a) {symbol} identity(b); }}
+        }}"
+        ))
+        .unwrap();
+        let NirStmt::Return(Some(NirExpr::CastI64ToI32(value))) = &module.functions[1].body[0]
+        else {
+            panic!("i32 result must remain narrow")
+        };
+        let NirExpr::Binary { op, lhs, rhs } = value.as_ref() else {
+            panic!("integer arithmetic")
+        };
+        assert_eq!(*op, expected);
+        for (value, argument) in [(lhs, "a"), (rhs, "b")] {
+            assert!(matches!(value.as_ref(), NirExpr::CastI32ToI64(inner)
+                if matches!(inner.as_ref(), NirExpr::Call { callee, args }
+                    if callee == "identity" && args == &[NirExpr::Var(argument.into())])));
+        }
+        crate::nir_verify::verify_nir_module(&module).unwrap();
+    }
+}
+
+#[test]
 fn lowers_slice_i32_read_and_write_via_slot_casts() {
     let module = parse_nuis_module(
         r#"

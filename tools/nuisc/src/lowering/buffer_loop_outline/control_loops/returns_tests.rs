@@ -185,3 +185,31 @@ fn counted_returns_do_not_bind_unknown_source_or_nir_references() {
         );
     }
 }
+
+#[test]
+fn counted_i32_returns_walk_casts_without_binding_hidden_free_references() {
+    let text = source(
+        "i32",
+        "i32_from_i64(index / stride)",
+        "i32_from_i64(1 / 0)",
+        "",
+    );
+    let mut module = parse_nuis_module(&text).unwrap();
+    let layouts = control_values::layouts(&module);
+    assert!(scalar_helpers::collect_with_layouts(&module, &layouts).contains_key("work"));
+    let function = module
+        .functions
+        .iter_mut()
+        .find(|f| f.name == "work")
+        .unwrap();
+    let NirStmt::While { body, .. } = &mut function.body[1] else {
+        panic!("loop")
+    };
+    let NirStmt::If { then_body, .. } = &mut body[0] else {
+        panic!("return guard")
+    };
+    then_body[0] = NirStmt::Return(Some(NirExpr::CastI64ToI32(Box::new(NirExpr::Var(
+        "__nuis_return_pending_0".into(),
+    )))));
+    assert!(!scalar_helpers::collect_with_layouts(&module, &layouts).contains_key("work"));
+}

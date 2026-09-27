@@ -60,9 +60,12 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::CastI32ToI64(inner)
         | NirExpr::CastI64ToBool(inner)
         | NirExpr::CastBoolToI64(inner) => verify_expr_uses(inner, moved)?,
-        NirExpr::CastI64ToF32(inner) | NirExpr::CastF32ToI64(inner) => {
-            verify_expr_uses(inner, moved)?
-        }
+        NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::PackF64Word(inner)
+        | NirExpr::UnpackF64Word(inner)
+        | NirExpr::PackF32Word(inner)
+        | NirExpr::UnpackF32Word(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::CastI64ToF64(inner) | NirExpr::CastF64ToI64(inner) => {
             verify_expr_uses(inner, moved)?
         }

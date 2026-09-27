@@ -26,7 +26,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "let word_seed =",
             "NirExpr::CastBoolToI64(inner)",
-            "parameter(inner, DirectCallScalarKind::Bool)",
+            "scalar_seed(inner, DirectCallScalarKind::Bool)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -91,7 +91,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "### Iteration-Local Bool Rebinding",
             "canonical i64 0/1 words",
-            "Outer bool carries",
+            "Outer bool/i32/f32/f64 carries",
             "Iteration-Local Flat Rebinding",
         ],
     },

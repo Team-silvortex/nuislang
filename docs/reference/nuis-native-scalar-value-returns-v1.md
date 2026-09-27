@@ -24,7 +24,7 @@ Callback and helper admission remain distinct:
 - Every reachable function still passes CPU instruction, lane, dependency, parameter,
   graph, node and depth checks. Recursive calls and hidden effects remain rejected.
 - Scoped iteration calls retain their separate flat-i64 carry schema; accepting a
-  mixed helper return does not make it a valid mixed loop carry.
+  mixed helper return does not grant carry admission without a typed word map.
 
 The producer validates layouts through
 [aggregate admission](../../crates/yir-lower-llvm/src/native_session/aggregates.rs),
@@ -629,11 +629,180 @@ The [CLI workflow](../../tools/nuis/tests/native_session_workflow/scoped_record_
 checks cache reuse, tamper rejection, source removal, standalone verification and
 materialization with identical LLVM and lifecycle results.
 
-The remaining reproduced boundary is a wide generated branch helper: a 64-field
-record plus a scalar can still become 65 arguments there. This is kept as an explicit
-negative regression, not bypassed by increasing limits. Invariant whole records
-without seed proof, mixed/nested carried records, resources and task transport remain
-separate work. These are CPU-host value-path proofs, not fresh Linux/GPU evidence.
+Invariant whole records without seed proof, wider-scalar/nested carried records, resources
+and task transport remain separate work. These are CPU-host value-path proofs, not
+fresh Linux/GPU evidence. The branch-helper input boundary recorded at the scoped
+checkpoint is addressed by the following generated-branch slice.
+
+## Generated Branch Inputs
+
+The outliner now offers all of its actual generated helpers to the same private
+capture planner, including branches created while outlining loops. Source names
+are never generation authority. Pure-layout admission, field projection, boolean
+compaction and the all-caller seed proof for scoped targets remain independent
+requirements; references, optional values, resources and oversized records do not
+gain admission from being passed to this planner.
+
+The former 65-argument loop branch uses two parameters: its predicate and the
+complete 64-field record. This changes neither the 64-parameter bound nor the
+source/public/FFI or callback ABI. Branch calls still pass existing captured values;
+calls and constructor arithmetic belonging to an arm stay behind that arm's guard.
+Predicates are snapshotted before a selected arm updates a record. No new LLVM or
+runtime transport is needed, and scoped induction/carry/seed maps stay separate.
+
+The [branch regressions](../../tools/nuisc/tests/native_application_bridge/typed_scoped_record_inputs.rs)
+check source/native/reference values, reversed YIR order, in-place callback output
+and zero owned aggregate allocation/drop counters. Unselected helper division and
+unselected record-field division remain lazy; selected failures and both work
+budgets preserve all output sentinels. Planner tests reject source-name authority
+and unsupported parameter layouts. The existing scoped-record CLI workflow also
+exercises wide branches through two events, cache reuse, tamper rejection and
+source-free restoration with identical LLVM and lifecycle states.
+
+The first mixed-scalar carry slice follows below. Native bounds remain unchanged;
+nested/resource carries and provider state remain separate admission work.
+
+## Bool/I64 Record Carries
+
+Generated scoped loops now carry flat records containing `bool` and `i64` fields.
+The compiler creates private i64-word records for mixed input seeds and result
+backedges. Each boolean is explicitly encoded as 0/1 and decoded inside the same
+iteration helper, with no additional helper-entry debit. Pure i64 records retain
+their existing projection/transport route. Layout planning is refreshed after
+outlining so newly generated word-record definitions participate in bounded capture
+planning; generated names are not authorization.
+
+The [seed proof](../../tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words.rs)
+requires exact nominal input layout, declaration order, word width, source binding,
+field kind and conversion. Missing, duplicate, reordered, unconverted, computed or
+wrong-origin inputs fail closed. Initial record identity is checked before field
+flattening, including on zero trips. Output reconstruction creates a new nominal
+record and explicitly decodes boolean fields, preserving earlier snapshots.
+Guard defaults admit only existing typed parameter fields and explicit boolean
+word conversion. Calls, arithmetic, raw boolean words and resource/nested fields
+remain forbidden there, including during counted-return normalization.
+The existing YIR i64 carry contract, CPU executor, LLVM loop implementation,
+source/public/FFI signatures and callback ABI are unchanged.
+
+[Native/reference probes](../../tools/nuisc/tests/native_application_bridge/mixed_scoped_record_carries.rs)
+exercise wide mixed records, multiple flags/records, counted returns, guarded breaks, nested iterations,
+immutable inputs, zero trips, reversed YIR order, overlapping outputs and zero
+owned aggregate allocation/drop counters. Selected arithmetic and work-limit
+failures leave output sentinels intact. Ordinary native entry and source-free CLI
+restoration have separate regressions. Record seed projection remains conservative:
+this slice transports the complete mixed record, not sparse mixed backedge inputs.
+
+The subsequent signed-i32 slice follows below. f32/f64 require bit-preserving
+transport, not numeric conversion; nested and resource records remain separate.
+Existing non-loop mixed/nested values are not narrowed.
+
+## Signed I32 Record Carries
+
+Flat `bool/i32/i64` records and independent `i32` locals now use the same private
+word transport. Each `i32` seed and backedge is sign-extended to i64, then explicitly
+truncated to i32 inside the existing iteration helper and after the loop. Exact
+nominal layouts, field order, scalar kinds, source identity and decode indices
+remain mandatory. No extra helper-entry boundary or wider native slot limit is
+introduced; sparse mixed record projection remains separate.
+
+The native scalar bridge now admits the existing registered `cast_i32_to_i64` and
+`cast_i64_to_i32` instructions. Shared YIR loop/runtime contracts and public/source,
+FFI and callback signatures are unchanged. Guard defaults permit total typed i32
+parameter reads followed by explicit signed encoding, not calls or arithmetic.
+Wrong-kind casts and raw/misindexed reconstruction maps fail closed.
+
+Execution testing also exposed a source arithmetic width bug: generic integer
+operations return i64, so a previously accepted i32 sum could lose its declared
+kind before its next use. Source i32 addition, subtraction and multiplication
+now lower through explicit operand widening and result narrowing, preserving
+wrapping i32 semantics and evaluating each operand once. This does not newly
+admit i32 division/remainder into the scoped value profile.
+Counted-return normalization also walks cast operands when reserving source names,
+without turning hidden free references into generated initialized locals. A fallible
+cast in an unselected return suffix remains lazy, rather than rejecting the loop.
+
+[Signed record probes](../../tools/nuisc/tests/native_application_bridge/i32_scoped_record_carries.rs)
+cover signed limits, out-of-range truncation, zero trips, snapshots, independent
+scalar carries, nested iterations, early returns and 64-field mixed records.
+The [ordinary native fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_i32_record_carries.ns)
+checks break timing, signed comparisons, add/subtract/multiply wrapping and lazy
+traps. CLI build/cache/tamper/source-free restoration has a separate signed-record
+case, without changing the existing callback ABI or allocation-free transport.
+
+The checkpoint's next step was to extend generated scoped record word transport to f32 leaves with bit-preserving seeds and backedges.
+The following f32 and f64 slices implement that bit transport. Nested and resource-bearing
+record carries remain separate, and the session coordinate stays `active/86`.
+
+## Bit-Preserving F32 Carries
+
+Flat `bool/i32/i64/f32` records and independent f32 locals now retain their exact
+seed/backedge bits. Private NIR `PackF32Word` / `UnpackF32Word` expressions lower
+to registered `cpu.pack_f32_word` / `cpu.unpack_f32_word` operations. These are not
+source builtins, public ABI changes or numerical `cast_f32_to_i64` conversions.
+Packing requires f32 and zero-extends its IEEE-754 u32 bits into i64. Unpacking
+requires exactly i64 and reconstructs f32 from the low 32 bits. In particular,
+bool, i32 and f64 operands receive no implicit conversion. External callback
+words still require canonical zero upper bits under the existing scalar ABI.
+
+The reference CPU executor uses `to_bits` / `from_bits`; LLVM uses `bitcast` with
+`zext` / `trunc`, never `fptosi` / `sitofp`. Negative zero, NaN sign/payload,
+infinities and subnormal bits survive transport. Arithmetic itself keeps normal
+f32 semantics; this is not a guarantee of NaN payload stability across arithmetic.
+Source value-loop admission adds f32 add/subtract/multiply, not float division,
+remainder or comparisons. Existing non-loop float support is unchanged.
+
+The exact source-field/slot/nominal proof now requires these explicit pack/unpack
+forms for f32, rejecting numeric casts, missing encodes and misindexed decodes.
+Only total typed parameter reads may be packed as guard defaults. Each iteration
+decodes in the existing helper, so the loop metadata schema, work accounting,
+64-slot bounds, immutable snapshots and source/public/FFI signatures stay unchanged.
+
+[F32 native/reference probes](../../tools/nuisc/tests/native_application_bridge/f32_scoped_record_carries.rs)
+cover zero trips, raw bit patterns, scalar companions, nested loops, early returns,
+finite arithmetic, wide private record inputs and atomic selected failures.
+The [ordinary native fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_f32_record_carries.ns)
+also checks breaks and lazy traps. CLI build/cache/tamper/source-free restoration
+has a dedicated f32 record case. This remains complete flat-record word transport,
+not sparse mixed projection or nested/resource-bearing carry support.
+
+That checkpoint selected: extend generated scoped record word transport to f64 leaves with bit-preserving seeds and backedges.
+
+## Full-Width F64 Carries
+
+Flat `bool/i32/i64/f32/f64` records and independent f64 locals now use the same
+scoped word-map proof. Private NIR `PackF64Word` / `UnpackF64Word` expressions
+lower to registered `cpu.pack_f64_word` / `cpu.unpack_f64_word` operations.
+Packing requires exactly f64; unpacking requires exactly i64. All 64 bits are
+transported, including the sign bit: a negative i64 word is not an invalid input.
+No truncation, extension or numerical float/integer conversion is involved.
+These internal operations are not source builtins or a new public ABI.
+
+The reference executor uses `to_bits` / `from_bits`; LLVM uses `bitcast double`
+and `bitcast i64`. Float-derived integer facts are not inferred. Negative zero,
+quiet/signaling NaNs, infinities, subnormals and adjacent finite values are checked
+as words, not by float equality. This is transport fidelity, not a promise to retain
+NaN payloads across arithmetic. The bounded source value-loop profile adds f64
+add/subtract/multiply, not float division, remainder or comparisons.
+
+Seed/reconstruction checks require exact nominal fields, source bindings, slots
+and f64 codecs. F32 codecs, numeric casts and missing encodes do not substitute for
+f64 maps. Guard defaults still permit only total typed parameter projections.
+The existing helper decodes each trip, without extra helper entries or changes to
+loop metadata, work budgets, 64-slot limits or source/public/FFI/callback signatures.
+
+[F64 native/reference probes](../../tools/nuisc/tests/native_application_bridge/f64_scoped_record_carries.rs)
+cover full-width raw bits, all five scalar kinds in one record, independent f32/f64
+locals, zero trips, snapshots, nested iterations, counted returns, finite arithmetic,
+64-field private inputs and atomic selected failures. The
+[ordinary native fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_f64_record_carries.ns)
+checks break timing and selected versus skipped traps. A dedicated CLI workflow
+covers build/cache identity, tamper rejection and source-free artifact restoration.
+Loop-bound admission is unchanged: these carry probes bind a field-derived bound
+to a local before the loop, rather than claiming arbitrary field-valued conditions.
+Sparse mixed projections, nested record carries and resource-bearing carries remain
+separate admission work; ordinary non-loop nested values keep their existing support.
+
+Next: extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
 
 ## Evidence And Limits
 
@@ -675,7 +844,7 @@ duplicate parents, oversized/deep layouts, spoofed returned values and hidden ef
 The local-rebinding guard probes additionally check exact five-entry success,
 four/zero-entry failure, unused selected results and malformed-input rejection,
 with unchanged output sentinels and zero aggregate allocations/drops.
-General mixed loop carries, resource state, provider dispatch, native image-host
+Wider-scalar/nested loop carries, resource state, provider dispatch, native image-host
 selection, cross-target execution and performance still need separate evidence.
 
 The 2026-09-23/24 macOS aarch64 alias/snapshot checkpoint passed 699 compiler/registry-unit,
@@ -869,3 +1038,112 @@ branch-helper argument overflow, not a request to increase native bounds.
 The rebuilt CLI reports 1492 clean drift checks, clean coverage/hierarchy/lineage
 and unchanged `active/86`. This is macOS aarch64 evidence only; no fresh Linux/GPU,
 full-workspace, formal-safety or measured-performance result is claimed.
+
+The subsequent 2026-09-27 generated-branch checkpoint supersedes that branch-input
+boundary. It passed 676 compiler-lowering tests, 93 selected native/reference bridge
+tests, six ordinary native entry tests, five reference image/window tests, two CLI
+workflows and 26 tensor tests: 808 distinct selected tests, excluding overlapping
+reruns. The new branch regression failed before implementation at 65 rather than
+two arguments, then passed with real native execution. One-time predicates remain
+independent of selected record updates; unselected calls and constructor division
+stay lazy, while selected failures and work-budget exhaustion preserve output
+sentinels. Ordinary native executables retain zero-trip results and selected traps.
+Both scoped-record and branch-record workflows preserve cache/tamper checks and
+source-free restoration with identical LLVM and lifecycle states.
+
+The rebuilt CLI reports 1496 clean drift checks with clean coverage, hierarchy and
+lineage. The host-path policy, documentation links, UTF-8, changed-file formatting
+and line budgets also pass. The coordinate stays `active/86`; mixed-scalar scoped
+record seed/backedge transport is next. These are local macOS aarch64 results, not
+a full-workspace run, fresh Linux/GPU acceptance or measured performance evidence.
+
+The subsequent 2026-09-27 mixed-record checkpoint passed 679 compiler-lowering
+tests, 99 distinct selected native/reference bridge tests, seven ordinary native
+entry tests, five reference image/window tests, three CLI workflows and 26 tensor
+tests: 819 distinct selected tests, excluding overlapping reruns. The mixed-record
+source case failed before implementation. A counted-return regression then exposed
+the guard-default check limited to pure-i64 parameter fields; exact typed field
+reads and explicit bool-to-word conversion now pass without admitting speculative
+arithmetic or calls. Early returns still skip unreachable division, and nested
+iterations, independent records, multiple flags, zero-trip seeds and snapshots
+retain their source values. Selected failures and work-budget exhaustion leave
+output sentinels untouched, with zero owned-aggregate allocation/drop counters in
+the native probes.
+
+All three scoped, branch and mixed-record CLI workflows retain cache reuse, tamper
+rejection and source-free restoration with identical LLVM and lifecycle states.
+The rebuilt CLI reports 1502 clean drift checks and clean coverage, hierarchy and
+lineage. The host-path policy check also passes. The coordinate stays `active/86`;
+exact signed `i32` seed/backedge transport is next. Floating-point, nested and
+resource-bearing scoped record carries remain outside this slice. This is local
+macOS aarch64 evidence, not a full-workspace run, fresh Linux/GPU acceptance,
+formal-safety certification or measured performance evidence.
+
+The subsequent 2026-09-27 signed-i32 checkpoint passed 1582 frontend/lowering
+tests, 106 distinct selected native/reference bridge tests after targeted repair
+reruns, eight ordinary native entry tests, five reference image/window tests,
+four CLI restoration workflows, 37 LLVM native-session/cast tests and 26 tensor
+tests: 1768 distinct selected tests, excluding overlapping reruns and the opt-in
+ignored codec probe. The initial source regression reproduced unsupported loop
+lowering. Follow-up execution caught loss of i32 arithmetic width and counted-return
+cast traversal; both repairs retain dedicated regressions rather than removing
+the failing cases. Signed limits, explicit truncation, wrapping arithmetic, wide
+records, scalar companions and zero-trip snapshots match the reference executor.
+The ordinary native program returns 37 and still traps on selected invalid work.
+
+Scoped, branch, bool/i64 and signed-i32 CLI cases each retain two events, exact typed
+state rendering, cache identity, tamper rejection and source-free restoration with
+byte-identical LLVM. The coordinate stays `active/86`; bit-preserving f32 seed and
+backedge maps are next. This is local macOS aarch64 evidence, not a full-workspace
+run, fresh Linux/GPU acceptance, formal-safety or measured-performance certification.
+
+The rebuilt CLI reports 1511 clean drift checks with clean coverage, hierarchy and
+lineage. The host-path policy check also passes; changed files remain within their
+source/test/document line budgets, with clean formatting, local links and UTF-8.
+
+The subsequent 2026-09-27 f32 checkpoint passed 1586 frontend/lowering/walker
+tests, 64 NIR-verifier tests, 114 selected native/reference bridge tests, 23 ordinary
+native tests, five CLI record restoration workflows, seven CPU scalar tests,
+38 LLVM native-session/cast tests, five reference image/window tests and 26 tensor
+tests: 1868 distinct selected tests, excluding overlapping reruns and one opt-in
+ignored codec probe. The host-path policy check passed separately. The initial
+f32 source case reproduced unsupported loop lowering before implementation.
+Raw signed-zero, quiet/signaling NaN, infinity and subnormal words now survive
+seeds/backedges and native publication; no float equality oracle substitutes for
+bit comparisons. Strict word-kind tests also prevent permissive integer accessors
+from accepting bool/i32 inputs differently in reference and native execution.
+
+All five scoped-record CLI shapes pass build/cache/tamper checks and source-free
+restoration with byte-identical LLVM and matching lifecycle states. The rebuilt
+CLI reports 1521 clean drift checks and clean coverage, hierarchy and lineage;
+the coordinate remains `active/86`, with f64 bit-preserving carries next. Changed
+files respect source/test/document budgets, formatting, local links and UTF-8.
+This is local macOS aarch64 evidence, not a full-workspace run, fresh Linux/GPU
+acceptance, formal-safety certification or measured-performance evidence.
+
+The subsequent 2026-09-27 f64 checkpoint passed 1652 frontend/lowering/NIR tests,
+123 distinct selected native/reference bridge tests after targeted repair reruns,
+24 ordinary native tests, six CLI record restoration workflows, nine CPU scalar
+tests, 39 LLVM native-session/cast tests, five reference image/window tests and
+26 tensor tests: 1884 distinct selected tests. Overlapping reruns and one opt-in
+ignored codec probe are excluded; the host-path policy check passed separately.
+The initial f64 source regression failed before implementation. Expanded tests
+then exposed a probe assuming generated iteration arguments retained source order;
+it now instruments the declared source helper and checks its exact signature.
+LLVM checks allow register-valued operands while still requiring full-width
+bitcasts and rejecting truncation, extension and numeric conversion. The mixed
+five-kind source fixture retains the existing named-local loop-bound restriction.
+
+Full-width signed-zero, quiet/signaling NaN, infinity, subnormal and adjacent-finite
+words survive reference/native seeds, backedges and publication. All five scalar
+kinds coexist in one record with independent f32/f64 locals. Selected failures
+remain atomic, wide private inputs remain bounded and allocation-free, and the
+ordinary native fixture returns 37 while retaining selected traps. All six CLI
+shapes preserve cache reuse, tamper rejection and source-free restoration with
+byte-identical LLVM and matching lifecycle states.
+
+The rebuilt CLI reports 1531 clean drift checks with clean coverage, hierarchy and
+lineage. The coordinate stays `active/86`; exact nested pure-scalar field-path seed
+and backedge maps are next. Formatting, source/test/document budgets, local links
+and UTF-8 pass. This is local macOS aarch64 evidence, not a full-workspace run,
+fresh Linux/GPU acceptance, formal-safety certification or measured performance.

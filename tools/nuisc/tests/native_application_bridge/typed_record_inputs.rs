@@ -50,6 +50,14 @@ fn typed_record_inputs_preserve_mixed_nested_snapshot_bits() {
 }
 
 pub(super) fn check(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>) {
+    check_transport(source, cases, true);
+}
+
+pub(super) fn check_flattened(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>) {
+    check_transport(source, cases, false);
+}
+
+fn check_transport(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>, whole: bool) {
     let width = cases[0].1[0].len();
     let project = Project::with_source(source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
@@ -64,9 +72,10 @@ pub(super) fn check(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>) {
         .iter()
         .filter(|node| node.op.instruction == "param_value_struct")
         .collect::<Vec<_>>();
-    assert!(
+    assert_eq!(
         !record_nodes.is_empty(),
-        "fixture must require whole-record capture transport"
+        whole,
+        "fixture must exercise the expected capture transport"
     );
     for node in &record_nodes {
         let function = compiled
@@ -100,16 +109,19 @@ pub(super) fn check(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>) {
                 .collect::<Vec<_>>()
         )
     });
-    assert!(bridge
-        .llvm_ir
-        .lines()
-        .any(|line| line.starts_with("define ")
-            && line.contains(" @nuis_fn___nuis_")
-            && line
-                .split_once('(')
-                .unwrap()
-                .1
-                .contains(&format!("[{width} x i64] %arg"))));
+    assert_eq!(
+        bridge
+            .llvm_ir
+            .lines()
+            .any(|line| line.starts_with("define ")
+                && line.contains(" @nuis_fn___nuis_")
+                && line
+                    .split_once('(')
+                    .unwrap()
+                    .1
+                    .contains(&format!("[{width} x i64] %arg"))),
+        whole
+    );
     assert!(!bridge
         .llvm_ir
         .contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1("));

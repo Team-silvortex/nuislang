@@ -80,6 +80,10 @@ fn scan(body: &[NirStmt]) -> (bool, BTreeSet<String>) {
                 | NirExpr::CastBoolToI64(base)
                 | NirExpr::CastI64ToF32(base)
                 | NirExpr::CastI64ToF64(base)
+                | NirExpr::PackF64Word(base)
+                | NirExpr::UnpackF64Word(base)
+                | NirExpr::PackF32Word(base)
+                | NirExpr::UnpackF32Word(base)
                 | NirExpr::CastF32ToI64(base)
                 | NirExpr::CastF64ToI64(base),
             ) => pending.push(Item::Expr(base)),

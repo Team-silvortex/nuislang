@@ -412,6 +412,10 @@ pub(in crate::lowering) fn expr_contains_async_loop_primitive(expr: &NirExpr) ->
         | NirExpr::CastI64ToBool(inner)
         | NirExpr::CastBoolToI64(inner)
         | NirExpr::CastI64ToF32(inner)
+        | NirExpr::PackF64Word(inner)
+        | NirExpr::UnpackF64Word(inner)
+        | NirExpr::PackF32Word(inner)
+        | NirExpr::UnpackF32Word(inner)
         | NirExpr::CastF32ToI64(inner)
         | NirExpr::CastI64ToF64(inner)
         | NirExpr::CastF64ToI64(inner) => expr_contains_async_loop_primitive(inner),

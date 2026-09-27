@@ -2,7 +2,7 @@ use super::*;
 use nuis_semantics::model::NirStructField;
 
 pub(super) struct Plan {
-    bindings: Vec<(String, NirTypeRef, Option<Vec<String>>)>,
+    bindings: Vec<(String, NirTypeRef, Option<Vec<(String, NirTypeRef)>>)>,
 }
 
 impl Plan {
@@ -15,7 +15,12 @@ impl Plan {
             .iter()
             .map(|name| {
                 let ty = scope[name].clone();
-                let fields = if ty == scalar_type("i64") || ty == scalar_type("bool") {
+                let fields = if ty == scalar_type("i64")
+                    || ty == scalar_type("bool")
+                    || ty == scalar_type("i32")
+                    || ty == scalar_type("f32")
+                    || ty == scalar_type("f64")
+                {
                     None
                 } else {
                     assert_eq!(ty, scalar_type(&ty.name));
@@ -39,15 +44,18 @@ impl Plan {
                 if let Some(fields) = fields {
                     fields
                         .iter()
-                        .map(|field| NirExpr::FieldAccess {
-                            base: Box::new(base.clone()),
-                            field: field.clone(),
+                        .map(|(field, ty)| {
+                            encode(
+                                ty,
+                                NirExpr::FieldAccess {
+                                    base: Box::new(base.clone()),
+                                    field: field.clone(),
+                                },
+                            )
                         })
                         .collect()
-                } else if ty == &scalar_type("bool") {
-                    vec![NirExpr::CastBoolToI64(Box::new(base))]
                 } else {
-                    vec![base]
+                    vec![encode(ty, base)]
                 }
             })
             .collect()
@@ -109,10 +117,16 @@ pub(super) fn projected_call(
         ty: Some(ty.clone()),
         value: call,
     }];
+    body.extend(projections(&temporary, plan));
+    body
+}
+
+fn projections(temporary: &str, plan: &Plan) -> Vec<NirStmt> {
+    let mut body = Vec::new();
     let mut index = 0;
     let mut word = || {
         let value = NirExpr::FieldAccess {
-            base: Box::new(NirExpr::Var(temporary.clone())),
+            base: Box::new(NirExpr::Var(temporary.to_owned())),
             field: format!("carry{index}"),
         };
         index += 1;
@@ -123,7 +137,10 @@ pub(super) fn projected_call(
             NirExpr::StructLiteral {
                 type_name: ty.name.clone(),
                 type_args: vec![],
-                fields: fields.iter().map(|field| (field.clone(), word())).collect(),
+                fields: fields
+                    .iter()
+                    .map(|(field, ty)| (field.clone(), decode(ty, word())))
+                    .collect(),
             }
         } else {
             decode(ty, word())
@@ -135,6 +152,46 @@ pub(super) fn projected_call(
         });
     }
     body
+}
+
+pub(super) fn record_input(
+    param: &mut NirParam,
+    scope: &Scope,
+    layouts: &control_values::FlatLayouts,
+    names: &mut BTreeSet<String>,
+    structs: &mut Vec<NirStructDef>,
+    bindings: &mut BTreeSet<String>,
+    seeds: &mut Vec<NirStmt>,
+) -> Option<NirExpr> {
+    if !layouts
+        .get(&param.ty.name)?
+        .iter()
+        .any(|(_, ty)| ty != &scalar_type("i64"))
+    {
+        return None;
+    }
+    let plan = Plan::new(std::slice::from_ref(&param.name), scope, Some(layouts));
+    let ty = state_type(&plan, names, structs);
+    let word = branches::fresh_name("__nuis_record_seed", bindings);
+    seeds.extend(projections(&word, &plan));
+    param.name = word;
+    param.ty = ty.clone();
+    Some(value(&plan, Some(&ty)))
+}
+
+pub(super) fn encode(ty: &NirTypeRef, value: NirExpr) -> NirExpr {
+    if ty == &scalar_type("bool") {
+        NirExpr::CastBoolToI64(Box::new(value))
+    } else if ty == &scalar_type("i32") {
+        NirExpr::CastI32ToI64(Box::new(value))
+    } else if ty == &scalar_type("f32") {
+        NirExpr::PackF32Word(Box::new(value))
+    } else if ty == &scalar_type("f64") {
+        NirExpr::PackF64Word(Box::new(value))
+    } else {
+        assert_eq!(ty, &scalar_type("i64"));
+        value
+    }
 }
 
 pub(super) fn binding(name: &str, scope: &Scope, word: NirExpr) -> NirStmt {
@@ -150,6 +207,12 @@ pub(super) fn binding(name: &str, scope: &Scope, word: NirExpr) -> NirStmt {
 fn decode(ty: &NirTypeRef, word: NirExpr) -> NirExpr {
     if ty == &scalar_type("bool") {
         NirExpr::CastI64ToBool(Box::new(word))
+    } else if ty == &scalar_type("i32") {
+        NirExpr::CastI64ToI32(Box::new(word))
+    } else if ty == &scalar_type("f32") {
+        NirExpr::UnpackF32Word(Box::new(word))
+    } else if ty == &scalar_type("f64") {
+        NirExpr::UnpackF64Word(Box::new(word))
     } else {
         assert_eq!(ty, &scalar_type("i64"));
         word

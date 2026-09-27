@@ -11,7 +11,7 @@ mod typed_tests;
 mod value_layouts;
 pub(super) use value_layouts::{TypedLayouts, ValueLayouts};
 
-pub(super) type FlatLayouts = BTreeMap<String, Vec<String>>;
+pub(super) type FlatLayouts = BTreeMap<String, Vec<(String, NirTypeRef)>>;
 
 // This is source-level pure-value normalization. Native slot/layout admission
 // remains a separate backend contract, not a compiler-wide ABI restriction.
@@ -23,12 +23,19 @@ pub(super) fn layouts(module: &NirModule) -> FlatLayouts {
             definition.generic_params.is_empty()
                 && definition.where_bounds.is_empty()
                 && !definition.fields.is_empty()
-                && definition.fields.iter().all(|f| f.ty == scalar_type("i64"))
+                && definition.fields.iter().all(|f| {
+                    matches!(f.ty.name.as_str(), "i64" | "bool" | "i32" | "f32" | "f64")
+                        && f.ty == scalar_type(&f.ty.name)
+                })
         })
         .map(|definition| {
             (
                 definition.name.clone(),
-                definition.fields.iter().map(|f| f.name.clone()).collect(),
+                definition
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.clone(), f.ty.clone()))
+                    .collect(),
             )
         })
         .collect()
@@ -56,6 +63,22 @@ pub(super) fn value_type(
         NirExpr::CastI32ToI64(value) if layouts.scalar("i32") => {
             (value_type(value, scope, catalog, layouts)? == scalar_type("i32"))
                 .then(|| scalar_type("i64"))
+        }
+        NirExpr::PackF32Word(value) if layouts.scalar("f32") => {
+            (value_type(value, scope, catalog, layouts)? == scalar_type("f32"))
+                .then(|| scalar_type("i64"))
+        }
+        NirExpr::UnpackF32Word(value) if layouts.scalar("f32") => {
+            (value_type(value, scope, catalog, layouts)? == scalar_type("i64"))
+                .then(|| scalar_type("f32"))
+        }
+        NirExpr::PackF64Word(value) if layouts.scalar("f64") => {
+            (value_type(value, scope, catalog, layouts)? == scalar_type("f64"))
+                .then(|| scalar_type("i64"))
+        }
+        NirExpr::UnpackF64Word(value) if layouts.scalar("f64") => {
+            (value_type(value, scope, catalog, layouts)? == scalar_type("i64"))
+                .then(|| scalar_type("f64"))
         }
         NirExpr::Var(name) => scope
             .get(name)
@@ -148,6 +171,10 @@ pub(super) fn collect_inputs(expr: &NirExpr, inputs: &mut BTreeSet<String>) {
         NirExpr::FieldAccess { base, .. }
         | NirExpr::CastI64ToI32(base)
         | NirExpr::CastI32ToI64(base)
+        | NirExpr::PackF64Word(base)
+        | NirExpr::UnpackF64Word(base)
+        | NirExpr::PackF32Word(base)
+        | NirExpr::UnpackF32Word(base)
         | NirExpr::CastBoolToI64(base)
         | NirExpr::CastI64ToBool(base) => collect_inputs(base, inputs),
         NirExpr::Int(_) | NirExpr::Bool(_) | NirExpr::F32(_) | NirExpr::F64(_) => {}
@@ -184,6 +211,11 @@ pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> 
         return None;
     }
     match op {
+        NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
+            if lhs == scalar_type("f32") || lhs == scalar_type("f64") =>
+        {
+            Some(lhs)
+        }
         NirBinaryOp::Add
         | NirBinaryOp::Sub
         | NirBinaryOp::Mul
@@ -194,12 +226,14 @@ pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> 
             Some(lhs)
         }
         NirBinaryOp::Lt | NirBinaryOp::Le | NirBinaryOp::Gt | NirBinaryOp::Ge
-            if lhs == scalar_type("i64") =>
+            if lhs == scalar_type("i64") || lhs == scalar_type("i32") =>
         {
             Some(scalar_type("bool"))
         }
         NirBinaryOp::Eq | NirBinaryOp::Ne
-            if lhs == scalar_type("i64") || lhs == scalar_type("bool") =>
+            if lhs == scalar_type("i64")
+                || lhs == scalar_type("i32")
+                || lhs == scalar_type("bool") =>
         {
             Some(scalar_type("bool"))
         }

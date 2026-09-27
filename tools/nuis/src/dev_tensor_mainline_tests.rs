@@ -307,7 +307,40 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("two exact 76800-byte Metal frames"));
     assert!(session.next_step.starts_with(
-        "lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms"
+        "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps"
+    ));
+    assert!(session.evidence.starts_with(
+        "Generated scoped f64 record carries now retain full-width bit-preserving private word maps"
+    ));
+    assert!(session
+        .validation_command
+        .contains("typed_f64_scoped_record_carries"));
+    assert!(session
+        .validation_command
+        .contains("native_f64_record_carries_cache_and_restore_full_width_maps_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("typed_f32_scoped_record_carries"));
+    assert!(session
+        .validation_command
+        .contains("native_f32_record_carries_cache_and_restore_bit_maps_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("typed_mixed_scoped_record_carries"));
+    assert!(session
+        .validation_command
+        .contains("typed_i32_scoped_record_carries"));
+    assert!(session
+        .validation_command
+        .contains("native_i32_record_carries_cache_and_restore_signed_maps_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("native_mixed_record_carries_cache_and_restore_typed_maps_without_sources"));
+    assert!(session
+        .evidence
+        .contains("guard-default check limited to pure-i64 parameter fields"));
+    assert!(session.validation_command.contains(
+        "native_branch_record_inputs_cache_and_restore_guarded_branches_without_sources"
     ));
     assert!(session.evidence.contains("Generated scoped flat-i64 record inputs now use explicit per-trip field mappings and all-caller seed proofs"));
     assert!(session.validation_command.contains(
@@ -323,7 +356,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .validation_command
         .contains("native_record_inputs_build_cache_and_restore_without_sources"));
     assert!(session.blocker.contains(
-        "wide generated branch helpers still flatten records and can exceed 64 arguments"
+        "nested record carries still lack exact field-path scoped seed and backedge maps"
     ));
     assert!(session
         .next_action

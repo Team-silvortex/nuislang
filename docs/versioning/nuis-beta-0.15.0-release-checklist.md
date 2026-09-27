@@ -3,8 +3,8 @@
 This is the operational companion to the
 [beta-0.15 snapshot](nuis-beta-0.15.0-snapshot.md), anchored to
 `05951befc70d6a145e4978a3ff8909737e5c4fbb` (`beta-0.15.0`, 2026-09-24).
-The [beta-0.15.3 patch](nuis-beta-0.15.3-patch.md) records subsequent unread-input
-elision, checked record transport, scoped record parameters and selected validation results.
+The [beta-0.15.4 patch](nuis-beta-0.15.4-patch.md) records subsequent guarded branch
+record inputs, typed scoped carries and selected validation results.
 Commands below are validation instructions, not blanket claims that every suite
 was rerun during documentation synchronization. Record the actual revision and
 worktree changes, platform, prerequisites, command, exit status and skip counts.
@@ -117,6 +117,15 @@ at every scoped caller, version only eligible record parameters, keep full outpu
 state and prove the exact nominal type/width/result-slot range when no record field
 is passed. All scoped callers must agree; vetoed rewrites must publish no elision proof.
 
+Generated bool/i32/i64/f32/f64 record carries must retain explicit word encodes/decodes, exact
+nominal seed origins and per-field mapping proofs. Cover full-width records, nested
+loops, multiple flags, snapshots, breaks, zero trips and ordinary native execution.
+Keep arithmetic/work-limit failures atomic and source-free CLI restoration exact;
+Cover signed i32 limits, wrapping arithmetic, independent scalar slots and wrong-kind
+cast rejection. F32/F64 require raw negative-zero/NaN/subnormal bit parity, exact kinds,
+numeric-cast rejection and source-free restoration; nested records and resources need separate scoped-carry admission.
+F64 must preserve every bit, including the sign bit, and coexist with the other four scalar kinds.
+
 The shared pure-value codec also has an opt-in host-clang argument/return probe:
 
 ```sh
@@ -128,15 +137,16 @@ Verify flat/nested 1..64-leaf records and scalar bit patterns at both `-O0` and
 admission additionally requires the following source/native and restoration gates:
 
 ```sh
-CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --test native_application_bridge -- typed_record_inputs typed_record_guards typed_scoped_record_inputs wide_scoped_record typed_local_declared --test-threads=1
-CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuis --test native_session_workflow -- native_record_inputs_build_cache_and_restore_without_sources native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --test native_application_bridge -- typed_record_inputs typed_record_guards typed_scoped_record_inputs typed_mixed_scoped_record_carries typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries wide_scoped_record typed_local_declared --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuis --test native_session_workflow -- native_record_inputs_build_cache_and_restore_without_sources native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources native_branch_record_inputs_cache_and_restore_guarded_branches_without_sources native_mixed_record_carries_cache_and_restore_typed_maps_without_sources native_i32_record_carries_cache_and_restore_signed_maps_without_sources native_f32_record_carries_cache_and_restore_bit_maps_without_sources native_f64_record_carries_cache_and_restore_full_width_maps_without_sources --test-threads=1
 ```
 
 The generated 64-field-plus-predicate case must run, while a source-declared 65-leaf
 namesake still rejects. Keep bounded nominal layout, exact kind and unique parameter
 binding checks, selected traps and failure sentinels. Scoped flat-i64 record inputs
-require complete seed proofs and exact per-trip maps. Wide generated branch inputs,
-mixed/nested carries, task thunks and resources remain separate; callback/public/FFI ABI is unchanged.
+require complete seed proofs and exact per-trip maps. Wide generated branch inputs
+must retain one-time predicates and skip unselected calls/constructor arithmetic.
+Mixed/nested carries, task thunks and resources remain separate; callback/public/FFI ABI is unchanged.
 Source names cannot grant authority and scalar/bool/break seeds stay required. Reject ambiguous or computed maps,
 unresolved fallthrough joins and nested-loop writes without partially mutating the
 candidate. Check 3/7/64-slot state with two/three arguments, multiple records, break/continue/bool identities,

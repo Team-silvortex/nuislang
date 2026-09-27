@@ -53,14 +53,22 @@ pub(super) fn check_traps(original: String) {
 pub(super) fn check_limits(original: String, cases: &[(i64, u64, u64, bool)]) {
     let source = original.replace("value.f0 + 1", "10 / (value.f0 - 2)");
     assert_ne!(source, original);
-    let project = Project::with_source(&source);
+    let cases = cases
+        .iter()
+        .map(|&(seed, loops, entries, trap)| (seed, loops, entries, seed == 2, trap))
+        .collect::<Vec<_>>();
+    check_prepared(&source, &cases);
+}
+
+pub(super) fn check_prepared(source: &str, cases: &[(i64, u64, u64, bool, bool)]) {
+    let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     assert!(compiled
         .yir
         .nodes
         .iter()
         .any(|node| node.op.instruction == "param_value_struct"));
-    for &(seed, loop_budget, budget, trap) in cases {
+    for &(seed, loop_budget, budget, reference_trap, trap) in cases {
         let registry = yir_verify::default_registry();
         let (mut reference, _) = ApplicationSession::open_registered(
             &compiled.yir,
@@ -70,7 +78,7 @@ pub(super) fn check_limits(original: String, cases: &[(i64, u64, u64, bool)]) {
         )
         .unwrap();
         let initial = state_words(reference.state());
-        if seed == 2 {
+        if reference_trap {
             assert!(reference.event(vec![]).is_err());
             assert_eq!(state_words(reference.state()), initial);
         } else {
@@ -111,7 +119,7 @@ pub(super) fn check_limits(original: String, cases: &[(i64, u64, u64, bool)]) {
         let artifact = nuisc::aot::write_and_link_with_source(
             &project.0.join("main.ns"),
             &project.0.join("out"),
-            &source,
+            source,
             nuisc::aot::AotCompileProgram {
                 ast: &compiled.ast,
                 nir: &compiled.nir,

@@ -20,7 +20,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "fields.is_some()",
             "Private branch transport stays flat-i64",
             "type_name: ty.name.clone()",
-            "fields.iter().map(|field| (field.clone(), word()))",
+            ".map(|(field, ty)| (field.clone(), decode(ty, word())))",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -39,7 +39,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "fn is_flat_parameter_field",
             "let NirExpr::Var(name) = base.as_ref()",
             "definition.where_bounds.is_empty()",
-            "direct_call_scalar_kind(&entry.ty) == Some(DirectCallScalarKind::I64)",
+            "direct_call_scalar_kind(&entry.ty) == Some(kind)",
         ],
     },
     DevTensorDriftCheckSpec {

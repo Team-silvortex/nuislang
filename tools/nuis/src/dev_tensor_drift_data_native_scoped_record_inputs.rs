@@ -2,6 +2,211 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "native-f64-record-word-map-proof",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words.rs",
+        required_patterns: &[
+            "PackF64Word",
+            "UnpackF64Word",
+            "source_word(binding.name, field, ty)",
+            "\"unpack_f64_word\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-record-word-map-negative-regressions",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words_tests.rs",
+        required_patterns: &[
+            "f64_record_word_maps_require_bit_encoding_and_reject_numeric_casts",
+            "NirExpr::CastF64ToI64",
+            "NirExpr::CastI64ToF64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-codec-runtime",
+        path: "crates/yir-domain-cpu/src/tests_scalar_logic.rs",
+        required_patterns: &[
+            "f64_word_codec_preserves_all_bits_without_numeric_conversion",
+            "f64_word_codec_requires_exact_kinds_and_unary_arity",
+            "0x7ff0_0000_0000_0001",
+            "value.to_bits()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-codec-llvm",
+        path: "crates/yir-lower-llvm/src/tests/fact_cast_tests.rs",
+        required_patterns: &[
+            "f64_word_codec_uses_full_width_bitcasts_and_rejects_implicit_word_types",
+            "cpu.unpack_f64_word",
+            "cpu.pack_f64_word",
+            "-9223372036854775808",
+            "bitcast i64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-map-guard-seeds",
+        path: "tools/nuisc/src/lowering/direct_calls/mixed_guard_seed_tests.rs",
+        required_patterns: &[
+            "f64_guard_defaults_require_bit_packing_of_exact_parameter_fields",
+            "NirExpr::PackF64Word",
+            "NirExpr::CastF64ToI64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-map-execution",
+        path: "tools/nuisc/tests/native_application_bridge/f64_scoped_record_carries.rs",
+        required_patterns: &[
+            "typed_f64_scoped_record_carries_preserve_all_seed_and_backedge_bits",
+            "typed_f64_scoped_record_carries_compose_nested_iterations",
+            "typed_f64_scoped_record_carries_keep_counted_returns_lazy",
+            "typed_f64_scoped_record_carries_keep_scalar_slots_and_snapshots",
+            "typed_f64_scoped_record_carries_update_with_float_arithmetic",
+            "typed_f64_scoped_record_carries_reject_wrong_word_kinds",
+            "typed_f64_scoped_record_carries_compose_all_five_scalar_kinds",
+            "typed_f64_scoped_record_carries_transport_wide_private_word_inputs",
+            "typed_f64_scoped_record_carries_keep_traps_and_work_limits_atomic",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-map-ordinary-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "f64_record_carries_preserve_native_values_scalar_slots_and_lazy_traps",
+            "scoped_f64_record_carries.ns",
+            "f64_record_words_trap",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-map-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs",
+        required_patterns: &[
+            "native_f64_record_carries_cache_and_restore_full_width_maps_without_sources",
+            "Shape::Double",
+            "materialize-artifact",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-map-documented-contract",
+        path: "docs/reference/nuis-native-scalar-value-returns-v1.md",
+        required_patterns: &[
+            "## Full-Width F64 Carries",
+            "cpu.pack_f64_word",
+            "unpacking requires exactly i64",
+            "not a promise to retain",
+            "extend generated scoped record word transport to nested pure-scalar records",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f64-word-map-nir-traversal",
+        path: "tools/nuisc/src/nir_walk_tests.rs",
+        required_patterns: &["NirExpr::PackF64Word", "NirExpr::UnpackF64Word"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-record-word-map-proof",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words.rs",
+        required_patterns: &[
+            "PackF32Word",
+            "UnpackF32Word",
+            "source_word(binding.name, field, ty)",
+            "\"unpack_f32_word\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-record-word-map-negative-regressions",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words_tests.rs",
+        required_patterns: &[
+            "f32_record_word_maps_require_bit_encoding_and_reject_numeric_casts",
+            "NirExpr::CastF32ToI64",
+            "NirExpr::CastI64ToF32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-codec-runtime",
+        path: "crates/yir-domain-cpu/src/tests_scalar_logic.rs",
+        required_patterns: &[
+            "f32_word_codec_preserves_bits_without_numeric_conversion",
+            "f32_word_codec_requires_exact_kinds_and_unary_arity",
+            "0x7f80_0001",
+            "value.to_bits()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-codec-llvm",
+        path: "crates/yir-lower-llvm/src/tests/fact_cast_tests.rs",
+        required_patterns: &[
+            "f32_word_codec_uses_bitcasts_and_rejects_implicit_word_types",
+            "cpu.unpack_f32_word",
+            "cpu.pack_f32_word",
+            "!llvm.contains(\"fptosi\")",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-map-guard-seeds",
+        path: "tools/nuisc/src/lowering/direct_calls/mixed_guard_seed_tests.rs",
+        required_patterns: &[
+            "f32_guard_defaults_require_bit_packing_of_exact_parameter_fields",
+            "NirExpr::PackF32Word",
+            "NirExpr::CastF32ToI64",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-map-execution",
+        path: "tools/nuisc/tests/native_application_bridge/f32_scoped_record_carries.rs",
+        required_patterns: &[
+            "typed_f32_scoped_record_carries_preserve_all_seed_and_backedge_bits",
+            "typed_f32_scoped_record_carries_compose_nested_iterations",
+            "typed_f32_scoped_record_carries_keep_counted_returns_lazy",
+            "typed_f32_scoped_record_carries_keep_scalar_slots_and_snapshots",
+            "typed_f32_scoped_record_carries_update_with_float_arithmetic",
+            "typed_f32_scoped_record_carries_reject_wrong_word_kinds",
+            "typed_f32_scoped_record_carries_transport_wide_private_word_inputs",
+            "typed_f32_scoped_record_carries_keep_traps_and_work_limits_atomic",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-map-ordinary-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "f32_record_carries_preserve_native_values_scalar_slots_and_lazy_traps",
+            "scoped_f32_record_carries.ns",
+            "f32_record_words_trap",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-map-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs",
+        required_patterns: &[
+            "native_f32_record_carries_cache_and_restore_bit_maps_without_sources",
+            "Shape::Float",
+            "materialize-artifact",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-map-documented-contract",
+        path: "docs/reference/nuis-native-scalar-value-returns-v1.md",
+        required_patterns: &[
+            "## Bit-Preserving F32 Carries",
+            "cpu.pack_f32_word",
+            "requires exactly i64",
+            "not a guarantee of NaN payload stability across arithmetic",
+            "extend generated scoped record word transport to f64 leaves",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-f32-word-map-nir-traversal",
+        path: "tools/nuisc/src/nir_walk_tests.rs",
+        required_patterns: &["NirExpr::PackF32Word", "NirExpr::UnpackF32Word"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-counted-return-cast-hygiene",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/returns_tests.rs",
+        required_patterns: &[
+            "counted_i32_returns_walk_casts_without_binding_hidden_free_references",
+            "__nuis_return_pending_0",
+            "NirExpr::CastI64ToI32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "native-scoped-record-input-shared-contract",
         path: "crates/yir-core/src/loop_carry_contract/scoped_record.rs",
         required_patterns: &[
@@ -71,7 +276,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "typed_scoped_record_inputs_preserve_independent_boolean_carry_and_break",
             "typed_scoped_record_inputs_keep_iteration_failures_and_entry_limits_atomic",
             "typed_scoped_record_inputs_reject_descriptor_and_parameter_drift",
-            "wide_scoped_record_branch_helpers_keep_the_remaining_argument_boundary_explicit",
+            "typed_scoped_record_branch_helpers_transport_whole_inputs_without_widening_bounds",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -79,6 +284,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs",
         required_patterns: &[
             "native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources",
+            "native_branch_record_inputs_cache_and_restore_guarded_branches_without_sources",
             "compile_cache: hit",
             "verify-artifact",
             "materialize-artifact",
@@ -93,7 +299,197 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "$value_record:<layout>|<leaf0>|...",
             "Only multi-carry scoped actions admit it",
             "complete seed range",
-            "remaining reproduced boundary is a wide generated branch helper",
+            "## Generated Branch Inputs",
+            "Source names",
+            "are never generation authority",
+            "## Bool/I64 Record Carries",
+            "explicitly encoded as 0/1 and decoded inside the same",
+            "## Signed I32 Record Carries",
+            "extend generated scoped record word transport to f32 leaves",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-loop-branch-input-generated-authority",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline.rs",
+        required_patterns: &[
+            "let generated_helpers = helpers",
+            "let capture_functions = selections",
+            ".union(&generated_helpers)",
+            "capture_layouts::collect(module, &capture_functions, &value_layouts)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-loop-branch-input-admission-regressions",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_layouts_tests.rs",
+        required_patterns: &[
+            "loop_branch_capture_authority_comes_from_generation_not_source_names",
+            "branch_capture_plans_keep_pure_layout_and_width_admission",
+            "for count in [63, 64, 65]",
+            "assert!(!outlined.capture_plans.contains_key(&function.name))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-loop-branch-input-selected-execution",
+        path: "tools/nuisc/tests/native_application_bridge/typed_scoped_record_inputs.rs",
+        required_patterns: &[
+            "typed_scoped_record_branch_helpers_transport_whole_inputs_without_widening_bounds",
+            "typed_scoped_record_branch_inputs_snapshot_predicate_before_record_updates",
+            "typed_scoped_record_branch_inputs_keep_unselected_calls_lazy",
+            "typed_scoped_record_branch_inputs_keep_selected_call_failures_atomic",
+            "typed_scoped_record_branch_inputs_keep_constructor_math_behind_its_guard",
+            "assert_eq!(function.parameters.len(), 2)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-loop-branch-input-ordinary-native-entry",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "generated_branch_record_inputs_preserve_ordinary_native_execution_and_traps",
+            "branch_record_zero_trip",
+            "branch_record_lazy",
+            "branch_record_trap",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-mixed-record-word-map-proof",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words.rs",
+        required_patterns: &[
+            "flat_fields(&param.ty, definitions)",
+            "type_name == &param.ty.name",
+            "source_word(binding.name, field, ty)",
+            "CastBoolToI64",
+            "CastI64ToBool",
+            "(\"loop_bool_result\", \"cast_i64_to_bool\")",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-mixed-record-word-map-negative-regressions",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words_tests.rs",
+        required_patterns: &[
+            "mixed_record_word_maps_require_exact_types_slots_and_source_identity",
+            "mixed_record_word_reconstruction_rejects_missing_and_wrong_decodes",
+            "whole_record_seed",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-mixed-record-word-map-native-execution",
+        path: "tools/nuisc/tests/native_application_bridge/mixed_scoped_record_carries.rs",
+        required_patterns: &[
+            "typed_mixed_scoped_record_carries_preserve_boolean_backedges_and_zero_trips",
+            "typed_mixed_scoped_record_carries_preserve_breaks_multiple_flags_and_snapshots",
+            "typed_mixed_scoped_record_carries_compose_nested_iterations_and_immutable_inputs",
+            "typed_mixed_scoped_record_carries_keep_multiple_record_and_scalar_slots_distinct",
+            "typed_mixed_scoped_record_carries_keep_counted_return_source_timing",
+            "typed_mixed_scoped_record_carries_keep_checked_failures_and_work_limits_atomic",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-mixed-record-word-map-ordinary-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "mixed_record_word_carries_preserve_ordinary_native_snapshots_and_lazy_traps",
+            "scoped_mixed_record_carries.ns",
+            "mixed_record_words_trap",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-mixed-record-word-map-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs",
+        required_patterns: &[
+            "native_mixed_record_carries_cache_and_restore_typed_maps_without_sources",
+            "Shape::Mixed",
+            "compile_cache: hit",
+            "materialize-artifact",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-mixed-record-word-map-guard-seeds",
+        path: "tools/nuisc/src/lowering/direct_calls/mixed_guard_seed_tests.rs",
+        required_patterns: &[
+            "mixed_record_guard_defaults_only_read_exact_typed_parameter_fields",
+            "raw_bool",
+            "cast_integer",
+            "computed",
+            "resource",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-proof",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words.rs",
+        required_patterns: &[
+            "CastI32ToI64",
+            "CastI64ToI32",
+            "source_word(binding.name, field, ty)",
+            "(\"loop_i32_result\", \"cast_i64_to_i32\")",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-negative-regressions",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words_tests.rs",
+        required_patterns: &[
+            "i32_record_word_maps_require_signed_encoding_and_exact_decoding",
+            "validate_seeds",
+            "projected_bindings",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-guard-seeds",
+        path: "tools/nuisc/src/lowering/direct_calls/mixed_guard_seed_tests.rs",
+        required_patterns: &[
+            "i32_guard_defaults_require_total_signed_parameter_projection",
+            "CastI32ToI64",
+            "is_pass_through_guard_seed",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-execution",
+        path: "tools/nuisc/tests/native_application_bridge/i32_scoped_record_carries.rs",
+        required_patterns: &[
+            "typed_i32_scoped_record_carries_preserve_signed_words_zero_trips_and_snapshots",
+            "typed_i32_scoped_record_carries_keep_counted_returns_lazy",
+            "typed_i32_scoped_record_carries_compose_nested_iterations",
+            "typed_i32_scoped_record_carries_keep_independent_scalar_slots",
+            "typed_i32_scoped_record_carries_transport_wide_signed_backedges",
+            "typed_i32_scoped_record_carries_keep_traps_and_work_limits_atomic",
+            "typed_i32_scoped_record_carries_reject_wrong_cast_kinds",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs",
+        required_patterns: &[
+            "native_i32_record_carries_cache_and_restore_signed_maps_without_sources",
+            "Shape::Signed",
+            "wrapping_add",
+            "materialize-artifact",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-ordinary-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "i32_record_carries_preserve_native_signed_wraps_comparisons_and_lazy_traps",
+            "scoped_i32_record_carries.ns",
+            "i32_record_words_trap",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-record-word-map-cast-admission",
+        path: "crates/yir-lower-llvm/src/native_session/admission.rs",
+        required_patterns: &[
+            "\"cast_i32_to_i64\"",
+            "\"cast_i64_to_i32\"",
+            "yir_verify::verify_module_with_registry(module, &registry)?",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-i32-arithmetic-width-regression",
+        path: "tools/nuisc/src/frontend/tests_frontend_core/type_and_slice_typed.rs",
+        required_patterns: &[
+            "i32_wrapping_arithmetic_preserves_explicit_result_width_and_single_operands",
+            "NirExpr::CastI64ToI32",
+            "NirExpr::CastI32ToI64",
+            "verify_nir_module",
         ],
     },
 ];

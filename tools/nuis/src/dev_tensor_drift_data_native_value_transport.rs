@@ -65,7 +65,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "A shared bounded pure-value record codec now serves native helper and callback returns",
             "retain the checked non-scoped record parameter contract",
-            "wide generated branch helpers still flatten records and can exceed 64 arguments",
+            "nested record carries still lack exact field-path scoped seed and backedge maps",
         ],
     },
     DevTensorDriftCheckSpec {

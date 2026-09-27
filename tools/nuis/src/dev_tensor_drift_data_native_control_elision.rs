@@ -85,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms",
+            "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps",
         ],
     },
 ];

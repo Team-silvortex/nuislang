@@ -40,13 +40,31 @@ fn partial_record_seed_admission_keeps_bool_and_break_identities() {
         NirExpr::CastBoolToI64(Box::new(NirExpr::Var("flag".into()))),
         NirExpr::Int(0),
     ];
-    assert!(needs_separate_seeds(&projections, true, &function, &args, "action", &[]).unwrap());
+    assert!(needs_separate_seeds(
+        &projections,
+        true,
+        &function,
+        &args,
+        "action",
+        &[],
+        &definitions
+    )
+    .unwrap());
     for missing in 0..3 {
         let mut function = function.clone();
         let mut args = args.clone();
         function.params.remove(missing);
         args.remove(missing);
-        assert!(needs_separate_seeds(&projections, true, &function, &args, "action", &[]).is_err());
+        assert!(needs_separate_seeds(
+            &projections,
+            true,
+            &function,
+            &args,
+            "action",
+            &[],
+            &definitions
+        )
+        .is_err());
         let proof = projections[0].record_seed(0);
         assert_eq!(
             needs_separate_seeds(
@@ -55,7 +73,8 @@ fn partial_record_seed_admission_keeps_bool_and_break_identities() {
                 &function,
                 &args,
                 "action",
-                &[proof.clone()]
+                &[proof.clone()],
+                &definitions
             )
             .is_ok(),
             missing == 0
@@ -81,14 +100,24 @@ fn partial_record_seed_admission_keeps_bool_and_break_identities() {
                     &function,
                     &args,
                     "action",
-                    &[wrong]
+                    &[wrong],
+                    &definitions
                 )
                 .is_err());
             }
         }
     }
     function.params[2].name = "other".into();
-    assert!(needs_separate_seeds(&projections, true, &function, &args, "action", &[]).is_err());
+    assert!(needs_separate_seeds(
+        &projections,
+        true,
+        &function,
+        &args,
+        "action",
+        &[],
+        &definitions
+    )
+    .is_err());
 }
 
 #[test]

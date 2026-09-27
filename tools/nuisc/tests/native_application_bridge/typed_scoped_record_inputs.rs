@@ -104,16 +104,98 @@ fn typed_scoped_record_inputs_reject_descriptor_and_parameter_drift() {
 }
 
 #[test]
-fn wide_scoped_record_branch_helpers_keep_the_remaining_argument_boundary_explicit() {
+fn typed_scoped_record_branch_helpers_transport_whole_inputs_without_widening_bounds() {
     let source = fixture::source(64, true).replace("if i == 3 { break; }", "");
     let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
-    assert!(compiled.yir.functions.iter().any(|function| function
-        .name
-        .starts_with("__nuis_buffer_branch_")
-        && function.parameters.len() > 64));
-    let error = emit_registered(&compiled.yir, "counter").err().unwrap();
-    assert!(error.contains("function/argument bounds"), "{error}");
+    let branches = compiled
+        .yir
+        .functions
+        .iter()
+        .filter(|function| function.name.starts_with("__nuis_buffer_branch_"))
+        .collect::<Vec<_>>();
+    assert!(!branches.is_empty());
+    for function in branches {
+        assert_eq!(function.parameters.len(), 2);
+        assert!(function.parameters.iter().any(|param| param.ty == "State"));
+        assert!(function.parameters.iter().any(|param| param.ty == "bool"));
+    }
+    let cases = [-3_i64, 0, 1, 5]
+        .into_iter()
+        .map(|seed| {
+            let initial = (0..64).map(|i| (seed + i) as u64).collect::<Vec<_>>();
+            let trips = (seed + 1).max(0);
+            let delta = trips.min(2) + 2 * (trips - 2).max(0);
+            let event = initial
+                .iter()
+                .map(|word| (*word as i64 + delta) as u64)
+                .collect::<Vec<_>>();
+            (vec![seed as u64], vec![initial, event.clone(), event])
+        })
+        .collect();
+    typed_record_inputs::check(&source, cases);
+}
+
+#[test]
+fn typed_scoped_record_branch_inputs_snapshot_predicate_before_record_updates() {
+    let source = fixture::source(64, true)
+        .replace("if i == 3 { break; }", "")
+        .replace("if i <= 2", "if carry.f0 <= 2");
+    let cases = [0_i64, 1, 2, 5]
+        .into_iter()
+        .map(|seed| {
+            let initial = (0..64).map(|i| (seed + i) as u64).collect::<Vec<_>>();
+            let mut event = initial.clone();
+            for _ in 0..seed + 1 {
+                let delta = if event[0] <= 2 { 1 } else { 2 };
+                for word in &mut event {
+                    *word += delta;
+                }
+            }
+            (vec![seed as u64], vec![initial, event.clone(), event])
+        })
+        .collect();
+    typed_record_inputs::check(&source, cases);
+}
+
+#[test]
+fn typed_scoped_record_branch_inputs_keep_unselected_calls_lazy() {
+    let source = fixture::source(64, true)
+        .replace("if i == 3 { break; }", "")
+        .replace("if i <= 2", "if limit < 2")
+        .replace("value.f0 + 1", "10 / (value.f0 - 2)");
+    typed_record_guards::check_prepared(
+        &source,
+        &[
+            (-2, 0, 64, false, false),
+            (2, 64, 64, false, false),
+            (0, 64, 64, false, false),
+            (2, 64, 1, false, true),
+            (2, 2, 64, false, true),
+        ],
+    );
+}
+
+#[test]
+fn typed_scoped_record_branch_inputs_keep_selected_call_failures_atomic() {
+    let source = fixture::source(64, true).replace("if i == 3 { break; }", "");
+    typed_record_guards::check_limits(source, &[(2, 64, 64, true), (4, 64, 64, false)]);
+}
+
+#[test]
+fn typed_scoped_record_branch_inputs_keep_constructor_math_behind_its_guard() {
+    let source = fixture::source(64, true)
+        .replace("if i == 3 { break; }", "")
+        .replace("if i <= 2", "if limit < 3")
+        .replace("carry.f0 + 2", "10 / (carry.f0 - 2)");
+    typed_record_guards::check_prepared(
+        &source,
+        &[
+            (1, 64, 64, false, false),
+            (2, 64, 64, true, true),
+            (4, 64, 64, false, false),
+        ],
+    );
 }
 
 fn check(count: usize, breaking: bool) {

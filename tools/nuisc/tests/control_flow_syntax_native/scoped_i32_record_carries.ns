@@ -1,0 +1,37 @@
+mod cpu Main {
+    struct Packet { narrow: i32, count: i64, enabled: bool }
+    @noinline fn advance(value: Packet, divisor: i64) -> Packet {
+        return Packet { narrow: value.narrow + i32_from_i64(1),
+            count: value.count + 6 / divisor, enabled: !value.enabled };
+    }
+    @noinline fn walk(limit: i64, divisor: i64) -> Packet {
+        let carry = Packet { narrow: i32_from_i64(2147483647), count: 7, enabled: true };
+        let saved = carry;
+        let i = 0;
+        while i < limit {
+            let i = i + 1;
+            let carry = advance(carry, divisor);
+            if i == 3 { break; }
+        }
+        if saved.narrow != i32_from_i64(2147483647) { return saved; }
+        return Packet { narrow: carry.narrow, count: carry.count + saved.count, enabled: carry.enabled };
+    }
+    @noinline fn narrow_loop(seed: i32) -> i32 {
+        let value = seed; let i = 0;
+        while i < 3 { let i = i + 1; let value = value + i32_from_i64(1); }
+        return value;
+    }
+    fn main() -> i64 {
+        let result = walk(5, 2);
+        if result.narrow != i32_from_i64(-2147483646) { return 200; }
+        let zero = walk(0, 0);
+        if zero.narrow != i32_from_i64(2147483647) { return 201; }
+        if result.narrow >= i32_from_i64(0) { return 202; }
+        let minimum = i32_from_i64(-2147483648);
+        if minimum - i32_from_i64(1) != i32_from_i64(2147483647) { return 203; }
+        if minimum * i32_from_i64(-1) != minimum { return 204; }
+        if narrow_loop(i32_from_i64(2147483647)) != i32_from_i64(-2147483646) { return 206; }
+        if zero.enabled { return result.count + zero.count; }
+        return 205;
+    }
+}

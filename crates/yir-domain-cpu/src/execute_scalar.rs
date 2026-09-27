@@ -458,6 +458,26 @@ pub(crate) fn execute_cpu_scalar_node(
         "cast_f64_to_f32" => Ok(Value::F32(state.expect_f64(&node.op.args[0])? as f32)),
         "cast_i64_to_f32" => Ok(Value::F32(state.expect_int(&node.op.args[0])? as f32)),
         "cast_f32_to_i64" => Ok(Value::Int(state.expect_f32(&node.op.args[0])? as i64)),
+        "pack_f32_word" => Ok(Value::Int(i64::from(
+            state.expect_f32(&node.op.args[0])?.to_bits(),
+        ))),
+        "unpack_f32_word" => match state.expect_value(&node.op.args[0])? {
+            Value::Int(word) => Ok(Value::F32(f32::from_bits(*word as u32))),
+            _ => Err(format!(
+                "cpu.unpack_f32_word `{}` requires i64 input",
+                node.name
+            )),
+        },
+        "pack_f64_word" => Ok(Value::Int(
+            state.expect_f64(&node.op.args[0])?.to_bits() as i64
+        )),
+        "unpack_f64_word" => match state.expect_value(&node.op.args[0])? {
+            Value::Int(word) => Ok(Value::F64(f64::from_bits(*word as u64))),
+            _ => Err(format!(
+                "cpu.unpack_f64_word `{}` requires i64 input",
+                node.name
+            )),
+        },
         "cast_i64_to_f64" => Ok(Value::F64(state.expect_int(&node.op.args[0])? as f64)),
         "cast_f64_to_i64" => Ok(Value::Int(state.expect_f64(&node.op.args[0])? as i64)),
 

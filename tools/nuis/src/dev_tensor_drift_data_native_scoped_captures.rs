@@ -40,7 +40,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "arguments::invariant_bindings(body, bindings)",
             "arguments::ready(arg, &invariant_inputs)",
-            "scalar_carries::argument_index(&result, param, arg)",
+            "scalar_carries::argument_index(&result, param, arg, &state.struct_defs)",
             "scalar_carries::validate_field_seed_origins(",
             "action_args.push(\"$current\".to_owned())",
             "action_args.push(\"$carry\".to_owned())",
@@ -72,8 +72,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
         required_patterns: &[
             "fn seed_range",
-            "position(|name| name == field)",
-            "seed_range(binding, param, arg).is_some()",
+            "position(|(name, _)| name == field)",
+            "seed_range(binding, param, arg, &state.struct_defs).is_some()",
             "function.params.len() != args.len()",
             "std::mem::replace(slot, true)",
             "covered.iter().any(|covered| !covered)",
@@ -221,8 +221,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "fn projectable_record_seed_inputs(",
             "scalar_carries::projected_bindings(name, ty, tail, definitions)",
-            "scalar_carries::validate_seeds(&carries, breaking, function, args, callee)",
-            "carry.whole_record_seed(param, arg)",
+            "scalar_carries::validate_seeds(&carries, breaking, function, args, callee, definitions)",
+            "carry.whole_record_seed(param, arg, definitions)",
         ],
     },
     DevTensorDriftCheckSpec {

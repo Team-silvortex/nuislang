@@ -51,7 +51,7 @@ fn value_catalog_keeps_transitive_types_effects_cycles_and_buffer_admission_sepa
     let layouts = layouts(&module);
     assert_eq!(
         layouts.keys().map(String::as_str).collect::<Vec<_>>(),
-        ["Pair"]
+        ["Mixed", "Pair"]
     );
     let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
     let keys = |catalog: &ScalarHelpers| catalog.keys().cloned().collect::<Vec<_>>();

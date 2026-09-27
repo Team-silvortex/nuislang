@@ -47,9 +47,19 @@ fn execute(compare: &str, cases: &[Case]) -> std::process::Output {
         "define i64 @unused_native_entry()",
         1,
     );
-    let start = llvm
-        .find(&format!("define i64 @nuis_fn_{}(", node.op.args[8]))
-        .unwrap();
+    // A generated iteration wrapper may reorder private captures. Observe the
+    // source helper's stable signature after those captures have been decoded.
+    let start = llvm.find("define i64 @nuis_fn_advance(").unwrap();
+    let signature = llvm[start..].split_once(')').unwrap().0;
+    for (index, kind) in ["i64", "i64", "i32", "i1", "float", "double"]
+        .iter()
+        .enumerate()
+    {
+        assert!(
+            signature.contains(&format!("{kind} %arg{index}")),
+            "{signature}"
+        );
+    }
     let insert = start + llvm[start..].find("{\n").unwrap() + 2;
     // Observe the actual call operands, not merely captures copied into final state.
     llvm.insert_str(

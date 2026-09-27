@@ -28,6 +28,18 @@ pub(super) fn lower_core_expr(
         NirExpr::CastBoolToI64(value) => Some(lower_cast_bool_to_i64(value, state, bindings)),
         NirExpr::CastI64ToF32(value) => Some(lower_cast_i64_to_f32(value, state, bindings)),
         NirExpr::CastF32ToI64(value) => Some(lower_cast_f32_to_i64(value, state, bindings)),
+        NirExpr::PackF32Word(value) => Some(core_exprs_scalars::lower_cast_expr(
+            value, state, bindings, "f32_word", "pack_f32_word",
+        )),
+        NirExpr::UnpackF32Word(value) => Some(core_exprs_scalars::lower_cast_expr(
+            value, state, bindings, "word_f32", "unpack_f32_word",
+        )),
+        NirExpr::PackF64Word(value) => Some(core_exprs_scalars::lower_cast_expr(
+            value, state, bindings, "f64_word", "pack_f64_word",
+        )),
+        NirExpr::UnpackF64Word(value) => Some(core_exprs_scalars::lower_cast_expr(
+            value, state, bindings, "word_f64", "unpack_f64_word",
+        )),
         NirExpr::CastI64ToF64(value) => Some(lower_cast_i64_to_f64(value, state, bindings)),
         NirExpr::CastF64ToI64(value) => Some(lower_cast_f64_to_i64(value, state, bindings)),
         NirExpr::Var(name) => Some(

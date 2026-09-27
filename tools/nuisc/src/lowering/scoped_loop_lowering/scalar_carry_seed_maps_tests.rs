@@ -37,7 +37,15 @@ fn carried_field_seeds_follow_result_layout_not_parameter_order() {
         field("packet", "left"),
         NirExpr::Var("total".into()),
     ];
-    validate_seeds(&projections, false, &function, &args, "action").unwrap();
+    validate_seeds(
+        &projections,
+        false,
+        &function,
+        &args,
+        "action",
+        &definitions,
+    )
+    .unwrap();
     let result = ScopedLoopResult::Scalars {
         separate_seeds: false,
         bindings: projections,
@@ -45,7 +53,10 @@ fn carried_field_seeds_follow_result_layout_not_parameter_order() {
         breaking: false,
     };
     for ((param, arg), index) in function.params.iter().zip(&args).zip([1, 3, 0, 2]) {
-        assert_eq!(argument_index(&result, param, arg), Some((index, 1)));
+        assert_eq!(
+            argument_index(&result, param, arg, &definitions),
+            Some((index, 1))
+        );
     }
 }
 
@@ -123,7 +134,15 @@ fn carried_field_seeds_require_complete_unique_exact_typed_coverage() {
             _ => unreachable!(),
         }
         assert!(
-            validate_seeds(&projections, false, &function, &args, "action").is_err(),
+            validate_seeds(
+                &projections,
+                false,
+                &function,
+                &args,
+                "action",
+                &definitions
+            )
+            .is_err(),
             "{case}"
         );
     }
@@ -164,7 +183,7 @@ fn carried_field_seeds_preserve_bool_and_break_word_identities() {
         field("packet", "left"),
         NirExpr::Int(0),
     ];
-    validate_seeds(&projections, true, &function, &args, "action").unwrap();
+    validate_seeds(&projections, true, &function, &args, "action", &definitions).unwrap();
     let result = ScopedLoopResult::Scalars {
         separate_seeds: false,
         bindings: projections,
@@ -172,7 +191,10 @@ fn carried_field_seeds_preserve_bool_and_break_word_identities() {
         breaking: true,
     };
     for ((param, arg), index) in function.params.iter().zip(&args).zip([1, 2, 0, 3]) {
-        assert_eq!(argument_index(&result, param, arg), Some((index, 1)));
+        assert_eq!(
+            argument_index(&result, param, arg, &definitions),
+            Some((index, 1))
+        );
     }
     let ScopedLoopResult::Scalars { bindings, .. } = result else {
         panic!()
@@ -185,7 +207,7 @@ fn carried_field_seeds_preserve_bool_and_break_word_identities() {
         } else {
             args[3] = NirExpr::Int(1);
         }
-        assert!(validate_seeds(&bindings, true, &function, &args, "action").is_err());
+        assert!(validate_seeds(&bindings, true, &function, &args, "action", &definitions).is_err());
     }
 }
 
@@ -216,7 +238,15 @@ fn carried_field_seeds_mix_whole_and_field_mapped_records() {
         NirExpr::Var("other".into()),
         field("packet", "left"),
     ];
-    validate_seeds(&projections, false, &function, &args, "action").unwrap();
+    validate_seeds(
+        &projections,
+        false,
+        &function,
+        &args,
+        "action",
+        &definitions,
+    )
+    .unwrap();
     let result = ScopedLoopResult::Scalars {
         separate_seeds: false,
         bindings: projections,
@@ -229,7 +259,10 @@ fn carried_field_seeds_mix_whole_and_field_mapped_records() {
         .zip(&args)
         .zip([(1, 1), (2, 2), (0, 1)])
     {
-        assert_eq!(argument_index(&result, param, arg), Some(range));
+        assert_eq!(
+            argument_index(&result, param, arg, &definitions),
+            Some(range)
+        );
     }
 }
 

@@ -265,7 +265,7 @@ two-sided and nested branches. A branch snapshots its condition before any write
 changing that binding in the selected arm cannot activate the other arm. Copies
 retain their initialized values. Branch-local bindings do not escape even when both
 arms use the same spelling, and every iteration initializes its own locals anew.
-Outer bool carries and flat-i64 records use the separate seeded carry rules below.
+Outer bool/i32/f32/f64 carries and flat bool/i32/i64/f32/f64 records use the separate seeded carry rules below.
 Parameter/constant mutation remains closed.
 
 The shared outliner retains exact source types. Only private branch return slots
@@ -651,8 +651,8 @@ adds build/cache/tamper rejection and source-free standalone restoration.
 
 Counted pure-value helpers now admit `return` inside leading- or trailing-step
 loops, including child loops and conditional arms. Return types remain exact i64,
-bool or nonempty nominal flat-i64 records. This is not admission for resource
-returns, mixed/nested records, arbitrary loops or the separate Buffer profile.
+bool, i32, f32, f64 or nonempty nominal flat bool/i32/i64/f32/f64 records. This is not admission for resource
+returns, nested records, arbitrary loops or the separate Buffer profile.
 
 [Return normalization](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/returns.rs)
 seeds a private typed payload and canonical pending word before the source body.
@@ -1586,7 +1586,7 @@ The exact trip limit and invalid induction still distinguish preflight from
 reference fuel. Nested RHS type drift rejects before execution. A 10000-leaf
 malformed condition is rejected during general verification rather than relying
 on later native admission. Generic backend regressions retain i64/f32/f64 scalar
-selection without admitting float carries into this native profile.
+selection; those tests alone do not establish scoped float carry support.
 The [aggregate-compound fixture](../../tools/nuisc/tests/native_application_bridge/aggregate_compound_loops.ns)
 adds six typed lifecycle runs and reference-budget failure with accepted-state
 retention and cleanup. The tenth frontdoor fixture also passes build/cache
@@ -1962,11 +1962,11 @@ fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms.
+Extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
 Independent same-name branch aliases now project fields; existing outer writes, user signatures and scoped-action
 metadata stay unchanged. Scoped alias branches use 2/2/2/3 arguments; non-scoped 64-i64-plus-predicate inputs now pass by value.
-Scoped iterations project invariant fields; ordinary private entry reconstruction now also preserves loop-written snapshots.
-Generated scoped flat-i64 whole inputs now use checked per-trip maps; unproven records, sparse storage and mixed/nested carries remain separate.
+Scoped iterations preserve invariant fields and loop-written snapshots; loop branch helpers now share guarded record input transport.
+Generated bool/i32/i64/f32/f64 record carries use private word maps and typed reconstruction; f32/f64 bit packing is distinct from numeric casts; nested carries remain separate.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,
 source effect order and inverse-constructor native/reference parity. Retain typed
@@ -1978,7 +1978,7 @@ suffixes, and the counted-return
 source timing and propagation proof without changing the separate Buffer exit profile.
 Retain leading/trailing step timing, leading-step break recovery, loop-local continue, each selected inner
 invocation's preflight and both shared work counters. Keep resource
-payloads and mixed/nested loop carries separate. Retain outer bool
+payloads and wider-scalar/nested loop carries separate. Retain outer bool
 carry seeds and explicit typed backedge conversion, outer flat-i64 carries,
 zero-trip seeds, exact nominal reconstruction,
 source-ordered backedge projections and local aggregate and bool rebinding,

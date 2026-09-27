@@ -561,6 +561,12 @@ pub enum NirExpr {
     CastBoolToI64(Box<NirExpr>),
     CastI64ToF32(Box<NirExpr>),
     CastF32ToI64(Box<NirExpr>),
+    // Private transport: f32 bits zero-extend into a word; decode uses its low 32 bits.
+    PackF32Word(Box<NirExpr>),
+    UnpackF32Word(Box<NirExpr>),
+    // Full-width transport: preserve all 64 bits, including the sign bit.
+    PackF64Word(Box<NirExpr>),
+    UnpackF64Word(Box<NirExpr>),
     CastI64ToF64(Box<NirExpr>),
     CastF64ToI64(Box<NirExpr>),
     Free(Box<NirExpr>),

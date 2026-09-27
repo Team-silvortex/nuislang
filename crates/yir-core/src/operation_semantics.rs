@@ -326,7 +326,8 @@ impl Operation {
             }
             "not" | "and" | "or" | "xor" | "shl" | "shr" => CpuLlvmLoweringClass::Bitwise,
             "cast_i32_to_i64" | "cast_i64_to_i32" | "cast_i32_to_f32" | "cast_i32_to_f64"
-            | "cast_f32_to_f64" | "cast_f64_to_f32" => CpuLlvmLoweringClass::Cast,
+            | "cast_f32_to_f64" | "cast_f64_to_f32" | "pack_f32_word" | "unpack_f32_word"
+            | "pack_f64_word" | "unpack_f64_word" => CpuLlvmLoweringClass::Cast,
             "alloc_node" | "alloc_buffer" | "load_value" | "load_next" | "buffer_len"
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory

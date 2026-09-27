@@ -8,9 +8,9 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.3`](versioning/nuis-beta-0.15.3-patch.md)
-(2026-09-27), covering unread-input elision, checked pure-value transport and
-generated whole-record parameters, including bounded scoped flat-i64 loops.
+The current patch is [`beta-0.15.4`](versioning/nuis-beta-0.15.4-patch.md)
+(2026-09-27), covering guarded whole-record branch inputs and exact flat
+bool/i32/i64/f32/f64 scoped carries, including source-free artifact restoration.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -44,13 +44,16 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
-The `05951bef` checkpoint and `beta-0.15.3` retain `active/86`. Current work removes
-proven entirely unread generated record inputs while preserving full initial seeds.
-The next task is to lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms.
+The `05951bef` checkpoint and `beta-0.15.4` retain `active/86`. Current work adds
+explicit bool/i32/i64/f32/f64 record word maps without changing the shared loop contract.
+The next task is to extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
 Generated scoped flat-i64 inputs now use explicit per-trip record maps after every
 caller agrees on the complete seed range. A 64-field record plus induction and a
-bounded break loop execute natively; separate wide branch helpers still hit the
-64-argument bound. Mixed/nested carries and resource inputs remain outside this slice.
+bounded break loop execute natively. Generated loop branch helpers now retain whole
+records with guarded call/constructor work instead of exceeding the 64-argument bound.
+Generated flat bool/i32/i64/f32/f64 carries now retain typed initial state, per-trip decoding
+and immutable snapshots. F32/F64 use exact bit packing; nested carries and resource inputs remain
+outside this slice; ordinary non-loop typed records keep their existing support.
 Generated non-scoped capture plans now use typed YIR record parameters when scalar
 compaction still exceeds 64 parameters. The incompressible 64-field-plus-predicate
 case now executes with bounded value transport; public/source/FFI and callback ABI
@@ -314,7 +317,7 @@ continue through the same contract, including mixed leading/trailing child loops
 Admitted value functions bypass Buffer rewriting, avoiding a double-normalization
 crash. Existing ordinary-entry counted/flow fast paths stay intact. The
 trailing-value-loops fixture follows the same source-free workflow. Counted-loop
-returns now transport i64, bool and exact flat-i64 records through seeded private
+returns now transport i64, bool, i32, f32, f64 and exact flat bool/i32/i64/f32/f64 records through seeded private
 values and loop-local break, propagating child returns out of the whole function.
 Return expressions run at their source position before the pending flag is set;
 skipped suffixes do not run, entered loops retain full reservations and failed

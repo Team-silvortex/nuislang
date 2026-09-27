@@ -94,8 +94,14 @@ fn reserve_references(body: &[NirStmt], names: &mut BTreeSet<String>) -> Option<
             NirExpr::StructLiteral { fields, .. } => {
                 values.extend(fields.iter().map(|(_, value)| value))
             }
-            NirExpr::FieldAccess { base, .. } => values.push(base),
-            NirExpr::Int(_) | NirExpr::Bool(_) => {}
+            NirExpr::FieldAccess { base, .. }
+            | NirExpr::CastI64ToI32(base)
+            | NirExpr::CastI32ToI64(base)
+            | NirExpr::PackF64Word(base)
+            | NirExpr::UnpackF64Word(base)
+            | NirExpr::PackF32Word(base)
+            | NirExpr::UnpackF32Word(base) => values.push(base),
+            NirExpr::Int(_) | NirExpr::Bool(_) | NirExpr::F32(_) | NirExpr::F64(_) => {}
             _ => return None,
         }
     }

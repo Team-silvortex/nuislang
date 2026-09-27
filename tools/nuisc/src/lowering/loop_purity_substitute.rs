@@ -51,6 +51,22 @@ pub(in crate::lowering) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
+        NirExpr::PackF32Word(inner) => NirExpr::PackF32Word(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::UnpackF32Word(inner) => NirExpr::UnpackF32Word(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::PackF64Word(inner) => NirExpr::PackF64Word(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::UnpackF64Word(inner) => NirExpr::UnpackF64Word(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
         NirExpr::CastF32ToI64(inner) => NirExpr::CastF32ToI64(Box::new(substitute_branch_binding(
             inner,
             binding_name,

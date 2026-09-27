@@ -43,6 +43,10 @@ pub(in crate::lowering) fn is_terminal_branch_pure_expr(
         | NirExpr::CastI64ToBool(inner)
         | NirExpr::CastBoolToI64(inner)
         | NirExpr::CastI64ToF32(inner)
+        | NirExpr::PackF64Word(inner)
+        | NirExpr::UnpackF64Word(inner)
+        | NirExpr::PackF32Word(inner)
+        | NirExpr::UnpackF32Word(inner)
         | NirExpr::CastF32ToI64(inner)
         | NirExpr::CastI64ToF64(inner)
         | NirExpr::CastF64ToI64(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),

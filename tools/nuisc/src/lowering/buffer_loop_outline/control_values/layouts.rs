@@ -1,7 +1,7 @@
 use super::*;
 
 // Value selection and loop carry admission share expression rules, not authority.
-// FlatLayouts remains the independent, i64-word-only scoped loop profile.
+// FlatLayouts remains the independent flat-scalar profile with i64-word backedges.
 pub(crate) trait ValueLayouts {
     fn scalar(&self, name: &str) -> bool;
     fn fields(&self, name: &str) -> Option<impl ExactSizeIterator<Item = (&str, NirTypeRef)>>;
@@ -9,15 +9,12 @@ pub(crate) trait ValueLayouts {
 
 impl ValueLayouts for FlatLayouts {
     fn scalar(&self, name: &str) -> bool {
-        matches!(name, "i64" | "bool")
+        matches!(name, "i64" | "bool" | "i32" | "f32" | "f64")
     }
 
     fn fields(&self, name: &str) -> Option<impl ExactSizeIterator<Item = (&str, NirTypeRef)>> {
-        self.get(name).map(|fields| {
-            fields
-                .iter()
-                .map(|name| (name.as_str(), scalar_type("i64")))
-        })
+        self.get(name)
+            .map(|fields| fields.iter().map(|(name, ty)| (name.as_str(), ty.clone())))
     }
 }
 

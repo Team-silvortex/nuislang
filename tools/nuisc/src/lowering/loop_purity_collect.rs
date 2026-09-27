@@ -204,6 +204,18 @@ pub(in crate::lowering) fn inline_pure_helper_calls(
             NirExpr::CastF32ToI64(inner) => {
                 NirExpr::CastF32ToI64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
             }
+            NirExpr::PackF32Word(inner) => {
+                NirExpr::PackF32Word(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::PackF64Word(inner) => {
+                NirExpr::PackF64Word(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::UnpackF32Word(inner) => {
+                NirExpr::UnpackF32Word(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::UnpackF64Word(inner) => {
+                NirExpr::UnpackF64Word(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
             NirExpr::CastI64ToF64(inner) => {
                 NirExpr::CastI64ToF64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
             }
@@ -346,9 +358,12 @@ fn is_pure_helper_expr(
         | NirExpr::CastI32ToI64(inner)
         | NirExpr::CastI64ToBool(inner)
         | NirExpr::CastBoolToI64(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
-        NirExpr::CastI64ToF32(inner) | NirExpr::CastF32ToI64(inner) => {
-            is_pure_helper_expr(inner, function_map, memo, visiting)
-        }
+        NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::PackF64Word(inner)
+        | NirExpr::UnpackF64Word(inner)
+        | NirExpr::PackF32Word(inner)
+        | NirExpr::UnpackF32Word(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
         NirExpr::CastI64ToF64(inner) | NirExpr::CastF64ToI64(inner) => {
             is_pure_helper_expr(inner, function_map, memo, visiting)
         }

@@ -1,10 +1,13 @@
 use super::*;
 use nuis_semantics::model::NirParam;
 
+#[path = "mixed_record_words.rs"]
+mod mixed_words;
+
 pub(super) struct Projection<'a> {
     pub name: &'a str,
     pub ty: &'a NirTypeRef,
-    fields: Vec<String>,
+    fields: Vec<(String, NirTypeRef)>,
 }
 
 impl Projection<'_> {
@@ -12,8 +15,14 @@ impl Projection<'_> {
         self.fields.len().max(1)
     }
 
-    pub(super) fn whole_record_seed(&self, param: &NirParam, arg: &NirExpr) -> bool {
-        !self.fields.is_empty() && seed_range(self, param, arg) == Some((0, self.width()))
+    pub(super) fn whole_record_seed(
+        &self,
+        param: &NirParam,
+        arg: &NirExpr,
+        definitions: &BTreeMap<&str, &NirStructDef>,
+    ) -> bool {
+        !self.fields.is_empty()
+            && seed_range(self, param, arg, definitions) == Some((0, self.width()))
     }
 
     pub(super) fn record_seed(&self, slot: usize) -> RecordSeed {
@@ -58,14 +67,13 @@ pub(super) fn projected_bindings<'a>(
                 return None;
             }
             Vec::new()
-        } else if is_bool(ty) {
-            if !matches!(value, NirExpr::CastI64ToBool(word) if projected_word(word, result, slot))
-            {
+        } else if is_bool(ty) || is_i32(ty) || is_f32(ty) || is_f64(ty) {
+            if !mixed_words::projected(value, ty, result, slot) {
                 return None;
             }
             Vec::new()
         } else {
-            let fields = flat_fields(ty, definitions)?;
+            let fields = mixed_words::fields(ty, definitions)?;
             let NirExpr::StructLiteral {
                 type_name,
                 type_args,
@@ -78,8 +86,8 @@ pub(super) fn projected_bindings<'a>(
                 || !type_args.is_empty()
                 || values.len() != fields.len()
                 || !values.iter().zip(&fields).enumerate().all(
-                    |(offset, ((name, value), field))| {
-                        name == field && projected_word(value, result, slot + offset)
+                    |(offset, ((name, value), (field, ty)))| {
+                        name == field && mixed_words::projected(value, ty, result, slot + offset)
                     },
                 )
             {
@@ -105,14 +113,38 @@ fn is_bool(ty: &NirTypeRef) -> bool {
     ty.name == "bool" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
 }
 
-fn seed_range(binding: &Projection<'_>, param: &NirParam, arg: &NirExpr) -> Option<(usize, usize)> {
-    let whole = if is_bool(binding.ty) {
-        is_scalar_i64(&param.ty)
-            && matches!(arg, NirExpr::CastBoolToI64(value)
-                if matches!(value.as_ref(), NirExpr::Var(name) if name == binding.name))
-    } else {
-        &param.ty == binding.ty && matches!(arg, NirExpr::Var(name) if name == binding.name)
-    };
+fn is_i32(ty: &NirTypeRef) -> bool {
+    ty.name == "i32" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
+}
+
+fn is_f32(ty: &NirTypeRef) -> bool {
+    ty.name == "f32" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
+}
+
+fn is_f64(ty: &NirTypeRef) -> bool {
+    ty.name == "f64" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
+}
+
+fn has_encoded_fields(binding: &Projection<'_>) -> bool {
+    binding.fields.iter().any(|(_, ty)| !is_scalar_i64(ty))
+}
+
+fn seed_range(
+    binding: &Projection<'_>,
+    param: &NirParam,
+    arg: &NirExpr,
+    definitions: &BTreeMap<&str, &NirStructDef>,
+) -> Option<(usize, usize)> {
+    if has_encoded_fields(binding) {
+        return mixed_words::seed(binding, param, arg, definitions).then_some((0, binding.width()));
+    }
+    let whole =
+        if is_bool(binding.ty) || is_i32(binding.ty) || is_f32(binding.ty) || is_f64(binding.ty) {
+            is_scalar_i64(&param.ty)
+                && arg == &mixed_words::encode(NirExpr::Var(binding.name.to_owned()), binding.ty)
+        } else {
+            &param.ty == binding.ty && matches!(arg, NirExpr::Var(name) if name == binding.name)
+        };
     if whole {
         return Some((0, binding.width()));
     }
@@ -129,7 +161,7 @@ fn seed_range(binding: &Projection<'_>, param: &NirParam, arg: &NirExpr) -> Opti
     binding
         .fields
         .iter()
-        .position(|name| name == field)
+        .position(|(name, _)| name == field)
         .map(|index| (index, 1))
 }
 
@@ -172,7 +204,7 @@ pub(super) fn supported_parameter(ty: &NirTypeRef, state: &LoweringState<'_>) ->
             && ty.generic_args.is_empty()
             && ((!ty.is_ref && matches!(ty.name.as_str(), "bool" | "i32" | "f32" | "f64"))
                 || (ty.is_ref && ty.name == "Buffer")))
-        || flat_fields(ty, &state.struct_defs).is_some()
+        || mixed_words::fields(ty, &state.struct_defs).is_some()
 }
 
 pub(super) fn break_guard(stmt: Option<&NirStmt>, binding: &str) -> bool {
@@ -206,9 +238,9 @@ pub(super) fn admissible(
                 arg == &NirExpr::Int(0)
             } else {
                 arguments::ready(arg, invariant_inputs)
-                    || carries
-                        .iter()
-                        .any(|binding| seed_range(binding, param, arg).is_some())
+                    || carries.iter().any(|binding| {
+                        seed_range(binding, param, arg, &state.struct_defs).is_some()
+                    })
             }
         })
         && function
@@ -223,6 +255,7 @@ pub(super) fn validate_seeds(
     function: &NirFunction,
     args: &[NirExpr],
     callee: &str,
+    definitions: &BTreeMap<&str, &NirStructDef>,
 ) -> Result<(), String> {
     if function.params.len() != args.len() {
         return Err(format!("scoped carry seed arity mismatch for `{callee}`"));
@@ -232,10 +265,10 @@ pub(super) fn validate_seeds(
         if control && !is_scalar_i64(binding.ty) {
             return Err(format!("scoped break flag `{}` must be i64", binding.name));
         }
-        let covered = seed_coverage(binding, control, function, args, callee)?;
+        let covered = seed_coverage(binding, control, function, args, callee, definitions)?;
         if covered.iter().any(|covered| !covered) {
             return Err(format!(
-                "scoped carry `{}` from `{callee}` requires exactly one same-typed {}seed per slot (bool uses an explicit i64 word)",
+                "scoped carry `{}` from `{callee}` requires exactly one same-typed {}seed per slot (bool/i32/f32/f64 use explicit i64 words)",
                 binding.name,
                 if control { "zero " } else { "" }
             ));
@@ -250,6 +283,7 @@ fn seed_coverage(
     function: &NirFunction,
     args: &[NirExpr],
     callee: &str,
+    definitions: &BTreeMap<&str, &NirStructDef>,
 ) -> Result<Vec<bool>, String> {
     let mut covered = vec![false; binding.width()];
     for (param, arg) in function.params.iter().zip(args) {
@@ -257,7 +291,7 @@ fn seed_coverage(
             (&param.ty == binding.ty && param.name == binding.name && arg == &NirExpr::Int(0))
                 .then_some((0, 1))
         } else {
-            seed_range(binding, param, arg)
+            seed_range(binding, param, arg, definitions)
         };
         if let Some((start, width)) = range {
             for slot in &mut covered[start..start + width] {
@@ -280,8 +314,9 @@ pub(super) fn needs_separate_seeds(
     args: &[NirExpr],
     callee: &str,
     elided: &[RecordSeed],
+    definitions: &BTreeMap<&str, &NirStructDef>,
 ) -> Result<bool, String> {
-    let error = match validate_seeds(carries, breaking, function, args, callee) {
+    let error = match validate_seeds(carries, breaking, function, args, callee, definitions) {
         Ok(()) => return Ok(false),
         Err(error) => error,
     };
@@ -291,7 +326,7 @@ pub(super) fn needs_separate_seeds(
     let mut slot = 0;
     for (index, binding) in carries.iter().enumerate() {
         let control = breaking && index + 1 == carries.len();
-        let covered = seed_coverage(binding, control, function, args, callee)?;
+        let covered = seed_coverage(binding, control, function, args, callee, definitions)?;
         if control && !is_scalar_i64(binding.ty) {
             return Err(error);
         }
@@ -318,12 +353,24 @@ pub(super) fn lower_initial_seeds(
     for (index, binding) in carries.iter().enumerate() {
         if breaking && index + 1 == carries.len() {
             seeds.push(lower_expr(&NirExpr::Int(0), state, bindings)?);
-        } else if is_bool(binding.ty) {
+        } else if is_bool(binding.ty)
+            || is_i32(binding.ty)
+            || is_f32(binding.ty)
+            || is_f64(binding.ty)
+        {
             seeds.push(lower_expr(
-                &NirExpr::CastBoolToI64(Box::new(NirExpr::Var(binding.name.to_owned()))),
+                &mixed_words::encode(NirExpr::Var(binding.name.to_owned()), binding.ty),
                 state,
                 bindings,
             )?);
+        } else if has_encoded_fields(binding) {
+            for (field, ty) in &binding.fields {
+                seeds.push(lower_expr(
+                    &mixed_words::source_word(binding.name, field, ty),
+                    state,
+                    bindings,
+                )?);
+            }
         } else {
             let initial = bindings
                 .get(binding.name)
@@ -340,6 +387,7 @@ pub(super) fn argument_index(
     result: &ScopedLoopResult<'_>,
     param: &NirParam,
     arg: &NirExpr,
+    definitions: &BTreeMap<&str, &NirStructDef>,
 ) -> Option<(usize, usize)> {
     let ScopedLoopResult::Scalars {
         bindings, breaking, ..
@@ -355,7 +403,7 @@ pub(super) fn argument_index(
     }
     let mut offset = 0;
     for binding in bindings {
-        if let Some((field, width)) = seed_range(binding, param, arg) {
+        if let Some((field, width)) = seed_range(binding, param, arg, definitions) {
             return Some((offset + field, width));
         }
         offset += binding.width();
@@ -373,6 +421,7 @@ pub(super) fn validate_field_seed_origins(
     for binding in carries {
         let field_mapped = !binding.fields.is_empty()
             && (require_all
+                || has_encoded_fields(binding)
                 || args.iter().any(|arg| {
                     matches!(arg, NirExpr::FieldAccess { base, .. }
                     if matches!(base.as_ref(), NirExpr::Var(name) if name == binding.name))
@@ -450,7 +499,7 @@ fn initial_record_type(node: &str, state: &LoweringState<'_>) -> Option<String> 
             .ty
             .clone();
     }
-    flat_fields(&ty, &state.struct_defs).map(|_| ty.name)
+    mixed_words::fields(&ty, &state.struct_defs).map(|_| ty.name)
 }
 
 pub(super) fn field(result: &str, field: String, state: &mut LoweringState<'_>) -> String {
@@ -477,26 +526,24 @@ pub(super) fn bind_result(
 ) {
     let mut slot = 0;
     for binding in carries {
-        let words = (0..binding.width())
+        let mut words = (0..binding.width())
             .map(|_| {
                 let value = field(result, format!("carry{slot}"), state);
                 slot += 1;
                 value
             })
             .collect::<Vec<_>>();
-        let value = if is_bool(binding.ty) {
-            let name = next_name(state, "loop_bool_result");
-            state.yir.nodes.push(Node {
-                name: name.clone(),
-                resource: "cpu0".to_owned(),
-                op: Operation {
-                    module: "cpu".to_owned(),
-                    instruction: "cast_i64_to_bool".to_owned(),
-                    args: vec![words[0].clone()],
-                },
-            });
-            push_dep_edges(state, &words[0], &name);
-            name
+        for ((_, ty), word) in binding.fields.iter().zip(&mut words) {
+            if is_bool(ty) || is_i32(ty) || is_f32(ty) || is_f64(ty) {
+                *word = mixed_words::decode(word, ty, state);
+            }
+        }
+        let value = if is_bool(binding.ty)
+            || is_i32(binding.ty)
+            || is_f32(binding.ty)
+            || is_f64(binding.ty)
+        {
+            mixed_words::decode(&words[0], binding.ty, state)
         } else if binding.fields.is_empty() {
             words[0].clone()
         } else {
@@ -508,7 +555,7 @@ pub(super) fn bind_result(
                     .fields
                     .iter()
                     .zip(&words)
-                    .map(|(field, word)| format!("{field}={word}")),
+                    .map(|((field, _), word)| format!("{field}={word}")),
             );
             state.yir.nodes.push(Node {
                 name: name.clone(),

@@ -1,5 +1,90 @@
 use super::support::*;
 
+#[test]
+fn f32_word_codec_uses_bitcasts_and_rejects_implicit_word_types() {
+    for (kind, value, valid) in [
+        ("i64", "2147483648", true),
+        ("i32", "0", false),
+        ("bool", "false", false),
+        ("f32", "0.0", false),
+    ] {
+        let mut module = module_with_cpu0();
+        push_cpu_node(
+            &mut module,
+            "word",
+            &format!("cpu.const_{kind}"),
+            vec![value],
+        );
+        push_cpu_node(&mut module, "float", "cpu.unpack_f32_word", vec!["word"]);
+        push_cpu_node(&mut module, "roundtrip", "cpu.pack_f32_word", vec!["float"]);
+        push_deps(&mut module, &[("word", "float"), ("float", "roundtrip")]);
+        let llvm = emit_module(&module);
+        if valid {
+            let llvm = llvm.unwrap();
+            assert!(llvm.contains("bitcast i32"));
+            assert!(llvm.contains("bitcast float"));
+            assert!(llvm.contains("trunc i64"));
+            assert!(llvm.contains("zext i32"));
+            assert!(!llvm.contains("sitofp") && !llvm.contains("fptosi"));
+        } else {
+            assert!(llvm.is_err(), "{kind}");
+        }
+    }
+}
+
+#[test]
+fn f64_word_codec_uses_full_width_bitcasts_and_rejects_implicit_word_types() {
+    for (kind, value, valid) in [
+        ("i64", "-9223372036854775808", true),
+        ("i32", "0", false),
+        ("bool", "false", false),
+        ("f32", "0.0", false),
+        ("f64", "0.0", false),
+    ] {
+        let mut module = module_with_cpu0();
+        push_cpu_node(
+            &mut module,
+            "word",
+            &format!("cpu.const_{kind}"),
+            vec![value],
+        );
+        push_cpu_node(&mut module, "float", "cpu.unpack_f64_word", vec!["word"]);
+        push_cpu_node(&mut module, "roundtrip", "cpu.pack_f64_word", vec!["float"]);
+        push_deps(&mut module, &[("word", "float"), ("float", "roundtrip")]);
+        let llvm = emit_module(&module);
+        if valid {
+            let llvm = llvm.unwrap();
+            assert!(llvm.contains("-9223372036854775808"));
+            assert!(llvm
+                .lines()
+                .any(|line| line.contains("bitcast i64") && line.ends_with("to double")));
+            assert!(llvm.contains("bitcast double"));
+            for forbidden in ["trunc ", "zext ", "sext ", "sitofp ", "fptosi "] {
+                assert!(!llvm.contains(forbidden), "{forbidden}: {llvm}");
+            }
+        } else {
+            assert!(llvm.is_err(), "{kind}");
+        }
+    }
+    for (kind, value) in [
+        ("i64", "0"),
+        ("i32", "0"),
+        ("bool", "false"),
+        ("f32", "0.0"),
+    ] {
+        let mut module = module_with_cpu0();
+        push_cpu_node(
+            &mut module,
+            "value",
+            &format!("cpu.const_{kind}"),
+            vec![value],
+        );
+        push_cpu_node(&mut module, "word", "cpu.pack_f64_word", vec!["value"]);
+        push_dep(&mut module, "value", "word");
+        assert!(emit_module(&module).is_err(), "{kind}");
+    }
+}
+
 fn push_eq_expected_lazy_select_fixture(
     module: &mut YirModule,
     actual: &str,

@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.3`](docs/versioning/nuis-beta-0.15.3-patch.md) (2026-09-27).
+[`beta-0.15.4`](docs/versioning/nuis-beta-0.15.4-patch.md) (2026-09-27).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -293,7 +293,7 @@ step, and continue requires an identical explicit step immediately before it.
 Leading/trailing child loops may mix without sharing exit scope. Pure-value and
 Buffer rewriting are mutually exclusive for admitted value functions. The
 trailing-value-loops fixture exercises build/cache/source-free restoration.
-Counted value bodies now also return i64, bool or exact flat-i64 records from
+Counted value bodies now also return i64, bool, i32, f32, f64 or exact flat bool/i32/i64/f32/f64 records from
 inside loops. The selected payload is evaluated before a private pending flag
 unwinds child and parent loops; neither skipped suffixes nor trailing steps run.
 The counted-returns fixture crosses the same source-free workflow. Ready-value
@@ -340,9 +340,14 @@ and LLVM slot values when scalar capture compaction still exceeds 64 parameters.
 The 64-field-plus-predicate case runs without widening source/public/FFI or callback ABI;
 nominal layouts, scalar bits, independent snapshots and allocation-free publication stay checked.
 Proven generated scoped flat-i64 records now use explicit per-trip field mappings,
-preserving independent induction, carry and complete seed storage. Wide generated
-branch helpers remain a separate input-transport boundary. Direct codec round trips
-also pass with host clang at `-O0` and `-O2`. Neither this work nor
+preserving independent induction, carry and complete seed storage. Generated loop
+branch helpers now share this private record transport while keeping unselected work guarded.
+Generated scoped bool/i32/i64/f32/f64 record carries now use checked private word seeds and
+typed reconstruction, including zero trips, snapshots and loop exits. The YIR loop
+contract and source/public/FFI signatures stay unchanged. Signed i32 fields retain
+sign extension, width-correct arithmetic and exact backedge decoding. F32/F64 fields use
+bit-preserving word packing, not numeric casts; nested carries remain separate. Earlier shared-codec round trips
+also passed with host clang at `-O0` and `-O2`. Neither this work nor
 the repository cleanup raises the persistent-session coordinate above its bounded `active/86`.
 Deep call/group nesting now reports a bounded parser diagnostic;
 other frontend recursion and native call-depth limits remain separate boundaries.
