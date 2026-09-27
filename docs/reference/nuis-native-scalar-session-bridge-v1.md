@@ -80,8 +80,8 @@ callee that ignores the argument. Work before the guard still executes.
 Acyclic helpers with i64/bool and flat-i64 record values now share this outliner.
 It supports early/two-arm/nested returns, aggregate locals and captures, field
 projections, same-callee arguments and shared fallthrough suffixes. Only existing
-values cross a generated branch boundary; captures are flattened through the
-existing scalar-parameter contract. An unselected private helper returns a typed
+values cross a generated branch boundary; scalar compaction precedes bounded non-scoped
+record-input transport under a registered parameter contract. An unselected private helper returns a typed
 zero record before user arithmetic or callees execute. The final select operates
 on already guarded values, never on deferred branch expressions.
 
@@ -1962,11 +1962,11 @@ fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state.
+Lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms.
 Independent same-name branch aliases now project fields; existing outer writes, user signatures and scoped-action
-metadata stay unchanged. Scoped alias branches use 2/2/2/3 arguments; whole 64-i64 uses still exceed the bound with a predicate.
+metadata stay unchanged. Scoped alias branches use 2/2/2/3 arguments; non-scoped 64-i64-plus-predicate inputs now pass by value.
 Scoped iterations project invariant fields; ordinary private entry reconstruction now also preserves loop-written snapshots.
-Generated scoped partial inputs now share independent seed proofs; empty demand, sparse storage and mixed/nested carries remain separate.
+Generated scoped flat-i64 whole inputs now use checked per-trip maps; unproven records, sparse storage and mixed/nested carries remain separate.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,
 source effect order and inverse-constructor native/reference parity. Retain typed

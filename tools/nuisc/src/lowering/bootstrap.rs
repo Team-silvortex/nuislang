@@ -289,6 +289,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         direct_call_functions: direct_call_functions.clone(),
         capture_plans: outlined.capture_plans.clone(),
         scoped_break_controls: outlined.break_controls.clone(),
+        scoped_elided_record_seeds: outlined.elided_record_seeds.clone(),
         async_helper_functions: all_async_helper_functions.clone(),
         pure_helpers: collect_pure_helper_functions(module),
         checked_arithmetic_helpers: speculation::collect_checked_arithmetic(module),

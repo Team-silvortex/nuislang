@@ -5,6 +5,8 @@ use yir_core::{
 
 use crate::loop_metadata::{validate_loop_compare_kind, validate_loop_step_kind};
 
+mod record_inputs;
+
 enum Argument {
     Current,
     Carry,
@@ -12,6 +14,7 @@ enum Argument {
     Capture(Value),
     CopyBuffer(Option<usize>),
     MoveOwned(String),
+    Record(record_inputs::RecordInput),
 }
 
 struct ScopedLoop {
@@ -87,7 +90,12 @@ pub(super) fn begin_execution(
     let arguments = operands
         .iter()
         .map(|input| {
-            if input == "$current" {
+            if let Some(record) = record_inputs::RecordInput::parse(input, state)? {
+                if carries.is_none() {
+                    return Err(invalid());
+                }
+                Ok(Argument::Record(record))
+            } else if input == "$current" {
                 Ok(Argument::Current)
             } else if input == "$carry" && carry.is_some() {
                 Ok(Argument::Carry)
@@ -260,6 +268,7 @@ impl RegisteredExecution for ScopedLoop {
             .arguments
             .iter()
             .map(|arg| match arg {
+                Argument::Record(record) => record.value(self.current, self.carries.as_ref()),
                 Argument::Current => Ok(Value::Int(self.current)),
                 Argument::Carry => Ok(Value::Int(self.carry.expect("validated carry operand"))),
                 Argument::CarryAt(index) => Ok(self

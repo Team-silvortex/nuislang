@@ -50,6 +50,7 @@ pub(super) struct BufferLoopOutlines {
     pub functions: BTreeSet<String>,
     pub guarded_functions: BTreeSet<String>,
     pub break_controls: BTreeMap<String, String>,
+    pub elided_record_seeds: BTreeMap<String, Vec<scoped_loop_lowering::RecordSeed>>,
     pub capture_plans: BTreeMap<String, direct_calls::CapturePlan>,
 }
 
@@ -179,7 +180,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &value_catalog,
         &value_layouts,
     );
-    let capture_functions = selections
+    let mut capture_functions = selections
         .into_iter()
         .chain(
             helpers[scalar_helper_start..]
@@ -202,14 +203,20 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         module.functions.extend(helpers);
         crate::nir_verify::verify_nir_module(module)?;
     }
-    if capture_projection::project(
+    let projected = capture_projection::project(
         module,
         &projection_functions,
         &generated_helpers,
         &value_layouts,
-    ) {
+    );
+    if projected.changed {
         crate::nir_verify::verify_nir_module(module)?;
     }
+    outlined.elided_record_seeds = projected.elided_records;
+    let eligible = generated_helpers.iter().map(String::as_str).collect();
+    capture_functions.extend(scoped_loop_lowering::collect_scoped_call_targets(
+        module, &eligible,
+    ));
     outlined.capture_plans = capture_layouts::collect(module, &capture_functions, &value_layouts);
     Ok(outlined)
 }

@@ -14,5 +14,6 @@ mod helper_guard_tests;
 mod loop_guard_tests;
 mod owned_cleanup_return_tests;
 mod owned_return_contract_tests;
+mod record_parameter_tests;
 mod support;
 mod unbounded_loop_tests;

@@ -6,14 +6,14 @@ pub(super) fn collect(
     generated: &BTreeSet<String>,
     layouts: &impl ValueLayouts,
 ) -> BTreeMap<String, direct_calls::CapturePlan> {
-    // Scoped-call metadata supplies induction/carry arguments on every trip.
-    // Even a generated value helper must retain that independent signature.
+    // Scoped record transport needs a complete, agreed seed map at every caller.
     let eligible = generated.iter().map(String::as_str).collect();
     let scoped = scoped_loop_lowering::collect_scoped_call_targets(module, &eligible);
+    let scoped_inputs = capture_projection::scoped_record_seeds(module, &scoped);
     module
         .functions
         .iter()
-        .filter(|function| generated.contains(&function.name) && !scoped.contains(&function.name))
+        .filter(|function| generated.contains(&function.name))
         .filter_map(|function| {
             let mut pending = function.params.iter().rev().cloned().collect::<Vec<_>>();
             let mut leaves = Vec::new();
@@ -31,7 +31,14 @@ pub(super) fn collect(
                     }));
                 }
             }
-            direct_calls::CapturePlan::new(leaves).map(|plan| (function.name.clone(), plan))
+            direct_calls::CapturePlan::for_generated(leaves, function, module)
+                .filter(|plan| {
+                    !scoped.contains(&function.name)
+                        || scoped_inputs
+                            .get(&function.name)
+                            .is_some_and(|seeds| plan.supports_scoped(function, seeds))
+                })
+                .map(|plan| (function.name.clone(), plan))
         })
         .collect()
 }

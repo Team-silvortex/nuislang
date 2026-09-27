@@ -148,10 +148,21 @@ pub(crate) fn begin_loop_effect_action(
             if scalar_carry.is_some() && signature.ret != CpuCallScalarKind::I64 {
                 return Err(format!("scoped helper `{callee}` must return i64 for a scalar carry"));
             }
+            // Validate every record before emitting any argument packing.
+            let prepared = operands.iter().zip(&signature.params)
+                .map(|(operand, kind)| crate::scoped_record_args::prepare(
+                    operand, kind, current, registers, scalar_overrides,
+                )).collect::<Result<Vec<_>, _>>()?;
             let lowered = operands
                 .iter()
-                .zip(signature.params.iter().copied())
-                .map(|(operand, kind)| {
+                .zip(signature.params.iter())
+                .zip(&prepared)
+                .map(|((operand, kind), prepared)| {
+                    if let Some(prepared) = prepared {
+                        let value = prepared.emit(body, next_reg);
+                        return Ok(vec![format!("{} {value}", kind.llvm_type())]);
+                    }
+                    let kind = kind.scalar().ok_or("scoped helpers do not admit record parameters")?;
                     lower_scoped_operand(
                         operand,
                         kind,

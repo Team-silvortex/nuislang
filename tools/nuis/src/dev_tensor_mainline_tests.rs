@@ -307,8 +307,30 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .evidence
         .contains("two exact 76800-byte Metal frames"));
     assert!(session.next_step.starts_with(
-        "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state"
+        "lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms"
     ));
+    assert!(session.evidence.contains("Generated scoped flat-i64 record inputs now use explicit per-trip field mappings and all-caller seed proofs"));
+    assert!(session.validation_command.contains(
+        "native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources"
+    ));
+    assert!(session.evidence.contains(
+        "A shared bounded pure-value record codec now serves native helper and callback returns"
+    ));
+    assert!(session.evidence.contains(
+        "Generated non-scoped whole-record capture inputs now cross typed YIR parameters"
+    ));
+    assert!(session
+        .validation_command
+        .contains("native_record_inputs_build_cache_and_restore_without_sources"));
+    assert!(session.blocker.contains(
+        "wide generated branch helpers still flatten records and can exceed 64 arguments"
+    ));
+    assert!(session
+        .next_action
+        .contains("retain the checked non-scoped record parameter contract"));
+    assert!(session
+        .validation_command
+        .contains("typed_record_arguments_round_trip_through_host_llvm --ignored"));
     assert!(session
         .evidence
         .contains("Branch-local record snapshots now use scope-confined versions"));
@@ -322,13 +344,19 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .blocker
         .contains("do not synthesize live join values"));
     assert!(session.blocker.contains(
-        "Entirely unread scoped record inputs and full-record escapes still retain whole captures"
+        "Unproven scoped whole uses, unsupported record layouts and wide branch inputs can still exceed that bound"
     ));
+    assert!(session
+        .blocker
+        .contains("Source-declared 65-leaf namesakes still reject"));
     assert!(session
         .evidence
         .contains("Scoped carry inputs now support complete flat-i64 field seed maps"));
     assert!(session.evidence.contains(
         "Generated scoped partial-record captures now separate parameter snapshot versions from output rebindings"
+    ));
+    assert!(session.evidence.contains(
+        "Entirely unread generated flat-record inputs now leave helper signatures through compiler-private nominal-type, width and result-slot proofs"
     ));
     assert!(session
         .evidence

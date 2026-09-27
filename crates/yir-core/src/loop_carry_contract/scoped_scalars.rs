@@ -26,11 +26,18 @@ pub struct ScopedI64Carries<'a> {
 impl ScopedI64Carries<'_> {
     pub fn dependencies(&self) -> Result<Vec<String>, String> {
         let mut inputs = Vec::new();
-        for operand in self.operands {
+        for operand in self
+            .operands
+            .iter()
+            .map(|input| super::scoped_input_leaves(input))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+        {
             if operand != "$current" {
                 inputs.push(
                     parse_loop_owned_struct_carry(operand)?
-                        .map_or(operand.as_str(), |(_, seed)| seed)
+                        .map_or(operand, |(_, seed)| seed)
                         .to_owned(),
                 );
             }
@@ -97,7 +104,13 @@ pub fn parse_scoped_i64_carries(args: &[String]) -> Result<Option<ScopedI64Carri
         operands = &operands[end..];
     }
     let mut mapped = vec![false; seeds.len()];
-    for operand in operands {
+    for operand in operands
+        .iter()
+        .map(|input| super::scoped_input_leaves(input))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+    {
         if let Some((index, input)) = parse_loop_owned_struct_carry(operand)? {
             let slot = seeds.get_mut(index).ok_or_else(invalid)?;
             if !named(input)

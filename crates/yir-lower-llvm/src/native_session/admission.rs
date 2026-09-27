@@ -153,6 +153,7 @@ pub(super) fn admitted(instruction: &str) -> bool {
     matches!(
         instruction,
         "param_bool"
+            | "param_value_struct"
             | "param_i32"
             | "param_i64"
             | "param_f32"

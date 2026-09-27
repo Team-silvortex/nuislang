@@ -48,10 +48,12 @@ pub(crate) fn verify_function_table(
         }
 
         let mut parameter_names = HashSet::with_capacity(function.parameters.len());
+        let mut parameter_nodes = HashSet::with_capacity(function.parameters.len());
         for parameter in &function.parameters {
             if !valid_token(&parameter.name)
                 || parameter.ty.is_empty()
                 || !parameter_names.insert(parameter.name.as_str())
+                || !parameter_nodes.insert(parameter.node.as_str())
                 || !body.contains(parameter.node.as_str())
             {
                 return Err(format!(

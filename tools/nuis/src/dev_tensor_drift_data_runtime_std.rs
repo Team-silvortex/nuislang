@@ -459,7 +459,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         path: "crates/yir-lower-llvm/src/scalar_task_invoker.rs",
         required_patterns: &[
             "render_scalar_task_invoker",
-            "signature.params.iter().copied().enumerate()",
+            "parameters.iter().copied().enumerate()",
+            ".map(|kind| kind.scalar())",
+            ".collect::<Option<Vec<_>>>()?",
             "CpuCallScalarKind::F32",
             "CpuCallScalarKind::F64",
             "bitcast float %task_result to i32",

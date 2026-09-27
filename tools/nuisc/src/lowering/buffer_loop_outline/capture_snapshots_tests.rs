@@ -27,7 +27,7 @@ fn project(module: &mut NirModule, names: &[&str]) -> bool {
         &layouts,
     );
     crate::nir_verify::verify_nir_module(module).unwrap();
-    changed
+    changed.changed
 }
 
 #[test]

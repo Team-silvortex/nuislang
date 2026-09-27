@@ -85,7 +85,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "57 reachable native functions",
             "predicates still run once",
-            "remove entirely unconsumed flat-record inputs from generated scoped helper signatures without losing initial state",
+            "lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms",
         ],
     },
 ];

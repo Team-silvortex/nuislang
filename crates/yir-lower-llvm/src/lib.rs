@@ -14,6 +14,7 @@ mod async_resource_lowering;
 mod bitwise_lowering;
 mod branch_effect_lowering;
 mod call_lowering;
+mod call_parameters;
 mod call_return;
 mod cast_lowering;
 mod data_ingress_lowering;
@@ -52,6 +53,7 @@ mod scalar_equality_lowering;
 mod scalar_lowering;
 mod scalar_order_lowering;
 mod scalar_task_invoker;
+mod scoped_record_args;
 mod select_lowering;
 mod simple_loop_lowering;
 mod static_lowering;
@@ -231,27 +233,7 @@ fn emit_module_with_checks(
         let lane_nodes = helper_lane_nodes
             .get(lane)
             .expect("helper lane index should contain every helper lane");
-        let mut params = lane_nodes
-            .iter()
-            .filter_map(|node| {
-                let kind = cpu_call_scalar_kind_for_instruction(&node.op.instruction)?;
-                node.op
-                    .instruction
-                    .starts_with("param_")
-                    .then_some((node, kind))
-            })
-            .map(|(node, kind)| {
-                let index = node.op.args[0].parse::<usize>().map_err(|_| {
-                    format!(
-                        "invalid {} index `{}`",
-                        node.op.full_name(),
-                        node.op.args[0]
-                    )
-                })?;
-                Ok((index, node.name.clone(), kind))
-            })
-            .collect::<Result<Vec<_>, String>>()?;
-        params.sort_by_key(|(index, _, _)| *index);
+        let params = call_parameters::collect(lane_nodes)?;
         let return_node = lane_nodes
             .iter()
             .find(|node| node.op.instruction.starts_with("return_"))
@@ -319,7 +301,7 @@ fn emit_module_with_checks(
         helper_signatures.insert(
             function_name,
             CpuHelperSignature {
-                params: params.iter().map(|(_, _, kind)| *kind).collect(),
+                params: params.iter().map(|(_, _, kind)| kind.clone()).collect(),
                 implicit_parameters: if require_scalar_values {
                     vec![
                         native_session::COUNTER_PARAMETER.to_owned(),
@@ -354,27 +336,7 @@ fn emit_module_with_checks(
         let source_lane_nodes = helper_lane_nodes
             .get(lane)
             .expect("helper lane index should contain every helper lane");
-        let mut params = source_lane_nodes
-            .iter()
-            .filter_map(|node| {
-                let kind = cpu_call_scalar_kind_for_instruction(&node.op.instruction)?;
-                node.op
-                    .instruction
-                    .starts_with("param_")
-                    .then_some((node, kind))
-            })
-            .map(|(node, kind)| {
-                let index = node.op.args[0].parse::<usize>().map_err(|_| {
-                    format!(
-                        "invalid {} index `{}`",
-                        node.op.full_name(),
-                        node.op.args[0]
-                    )
-                })?;
-                Ok((index, node.name.clone(), kind))
-            })
-            .collect::<Result<Vec<_>, String>>()?;
-        params.sort_by_key(|(index, _, _)| *index);
+        let params = call_parameters::collect(source_lane_nodes)?;
         let function_name = lane.trim_start_matches("fn:");
         let helper_signature = helper_signatures
             .get(function_name)
@@ -382,7 +344,7 @@ fn emit_module_with_checks(
         let param_bindings = params
             .iter()
             .enumerate()
-            .map(|(position, (index, name, kind))| {
+            .filter_map(|(position, (index, name, kind))| {
                 let value = match helper_signature
                     .mutex_permit_params
                     .get(position)
@@ -393,9 +355,9 @@ fn emit_module_with_checks(
                         runtime_token: format!("%arg{index}"),
                         scalar_kind,
                     }),
-                    None => cpu_param_binding(*kind, *index),
+                    None => cpu_param_binding(kind.scalar()?, *index),
                 };
-                (name.clone(), value)
+                Some((name.clone(), value))
             })
             .collect::<BTreeMap<_, _>>();
         let param_buffer_lengths = params
@@ -403,11 +365,21 @@ fn emit_module_with_checks(
             .filter(|(_, _, kind)| *kind == CpuCallScalarKind::BorrowedBuffer)
             .map(|(index, name, _)| (name.clone(), format!("%arg{index}_len")))
             .collect::<BTreeMap<_, _>>();
+        let value_bindings = params
+            .iter()
+            .filter_map(|(index, name, kind)| match kind {
+                call_parameters::CpuCallParameterKind::Record(layout) => {
+                    Some((name.clone(), (*index, layout.clone())))
+                }
+                _ => None,
+            })
+            .collect();
         let emitted = emit_cpu_function(
             &nodes,
             &resources,
             lane_nodes,
             &param_bindings,
+            &value_bindings,
             &param_buffer_lengths,
             &helper_signatures,
             &provider_completion_sources,
@@ -435,7 +407,7 @@ fn emit_module_with_checks(
                     if *kind == CpuCallScalarKind::BorrowedBuffer {
                         format!("ptr %arg{index}, i64 %arg{index}_len")
                     } else {
-                        format!("{} %arg{index}", cpu_scalar_kind_llvm_type(*kind))
+                        format!("{} %arg{index}", kind.llvm_type())
                     }
                 })
                 .collect::<Vec<_>>(),
@@ -469,6 +441,7 @@ fn emit_module_with_checks(
         &nodes,
         &resources,
         &entry_nodes,
+        &BTreeMap::new(),
         &BTreeMap::new(),
         &BTreeMap::new(),
         &helper_signatures,

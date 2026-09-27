@@ -467,9 +467,9 @@ state-width, helper-arity and execution-budget bounds remain independent and unc
 Break seeds/results are validated even when the control slot is not an operand.
 
 Source admission currently permits partially consumed flat-i64 records, requiring
-at least one mapped field per record and exact initial nominal provenance. Whole-record,
-scalar, bool and break inputs retain their existing admission; entirely unpassed
-source records remain conservative. All initializers still execute, including checked
+at least one mapped field per record and exact initial nominal provenance unless the
+compiler carries the generated-helper elision proof described below. Whole-record,
+scalar, bool and break inputs retain their existing admission. All initializers still execute, including checked
 work in unpassed fields on zero-trip paths. The explicit lifecycle fixture declares
 four iteration parameters for five state slots, rather than passing an unused field;
 the ordinary source retains two slots while passing only one carried field.
@@ -477,19 +477,23 @@ the ordinary source retains two slots while passing only one carried field.
 ### Generated Scoped Record Inputs
 
 The [capture projection](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs)
-now applies this partial-argument form automatically to compiler-generated scoped
+now applies partial or entirely unread record-input elision to compiler-generated scoped
 helpers. Each scoped caller must prove an exact flat-i64 record reconstruction and
 complete original seed map through the same NIR projection rules used by lowering.
 Constraints are unioned across callers; an unproven written input or an unrewritable
-caller vetoes that projection. Source-declared helper signatures are not rewritten.
+caller vetoes that projection. Source-declared scoped helper signatures are not rewritten by this pass.
 
 Before demand analysis, eligible record parameters receive distinct snapshot versions
 for their local updates. Initializers read the preceding value; immutable aliases can
 then expose initial-field demand independently of the returned, fully updated record.
 Only parameter records are versioned in scoped helpers: local control names, scalar
 induction, bool conversions and named break seeds retain their identities. Unresolved
-fallthrough joins and nested-loop writes remain whole. At least one field per carried
-record must remain an argument; entirely unread record inputs are the next boundary.
+fallthrough joins and nested-loop writes remain whole. Entirely unread records may
+leave the signature only with an internal proof of their nominal type, complete
+width and starting result slot. Every scoped caller must agree on that proof.
+It is published only when the signature/body/caller rewrite commits, then passed
+from outlining to lowering. Source names cannot grant it; no wire-format change
+or unchecked missing scalar/bool/break seed is admitted.
 
 Caller initializers, complete seed storage, result layouts and record reconstruction
 are unchanged. No seed expression or skipped-path computation is synthesized at a
@@ -505,6 +509,131 @@ retains three state slots with one carried operand and three total iteration arg
 generated 7/64-field variants retain the same arity. Native lifecycle probes inspect
 five complete state slots and five arguments instead of six, while still returning
 all state fields and retaining ordinary/native execution's separate allocation behavior.
+
+[Unread-record regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_scoped_elision_tests.rs)
+add whole-input elision, disjoint record slot ranges, caller disagreement, generated-name
+spoofing and vetoed-proof checks. The [source fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_unread_record_carries.ns)
+keeps three complete seeds and just two iteration arguments, with no record operand;
+7/64-field variants keep that arity. The lifecycle variant keeps five state slots
+with four arguments and maps only the separate scalar carry. Zero-trip initial values,
+initializer/second-trip failures, bool words and break/continue remain covered.
+Scoped whole-record inputs now have the bounded seed/carry mapping described below;
+neither path relaxes native arity bounds or public/source/FFI signatures.
+
+## Shared Pure-Value Codec
+
+The lowering-private [record codec](../../crates/yir-lower-llvm/src/native_session/value_transport.rs)
+now separates bounded nominal layout validation, preparation of an ordered scalar
+snapshot, and LLVM packing/unpacking. Native helper and callback returns both use
+it. Layouts retain the existing total bound of 1..64 scalar leaves across the whole
+nested tree; resources, pointers, empty records and duplicate fields are rejected.
+Preparation checks the complete nominal tree and exact scalar kinds before any
+instruction or label is emitted. Guarded return packing stays inside the selected
+branch, and an invalid value leaves the body and fresh register/block counters intact.
+Pure records do not inherit owned-variant prefix conversion or synthetic zero fields.
+A regression reproduces the previous erroneous acceptance of a variant as a differently
+named record, at both the root and a nested field; the codec now rejects that conversion
+while preserving exact records whose names happen to carry the internal-looking prefix.
+
+The same codec can build and decode an LLVM `[N x i64]` argument without an owned
+runtime pointer. [Direct LLVM probes](../../crates/yir-lower-llvm/src/native_session/value_transport/tests/native.rs)
+exercise two independent record arguments plus a predicate, then verify every returned
+word. Seven flat/nested shapes cover 1/2/5/7/64 leaves, eight input vectors and both
+selected values at `-O0` and `-O2`. The bit oracle includes signed integer extrema,
+boolean values, float negative zero, infinities, subnormals and quiet/signaling NaNs.
+The emitted probe IR contains no loads, stores, pointers or runtime allocations;
+this does not promise that a machine ABI never uses stack storage.
+
+This codec is not signature authority. Source-declared functions still
+flatten whole-record inputs; only proven compiler-generated capture plans opt
+into the bounded parameter contract below. The direct LLVM probe is not evidence
+for a new source ABI, external FFI contract, resource transport, general record-input
+admission or a performance improvement.
+Callback word canonicality and graph/ownership admission remain separate checks.
+
+The host compiler probe is explicitly opt-in so portable emitter tests do not
+require clang. It can use `CLANG` to select an installed host driver:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p yir-lower-llvm --lib -- typed_record_arguments_round_trip_through_host_llvm --ignored --test-threads=1
+```
+
+## Generated Record Inputs
+
+The [capture planner](../../tools/nuisc/src/lowering/direct_calls/capture_params.rs)
+first retains field projection and boolean compaction. Only when the resulting
+signature would still exceed 64 parameters does it replace complete, exact,
+resource-free record groups with private record-value parameters. Each record
+retains the shared 1..64-leaf bound, nominal tree and exact scalar kinds. Source
+function names cannot opt in; source-declared helpers and FFI stay unchanged.
+Scoped targets require the separate all-caller seed proof described below.
+
+`cpu.param_value_struct <index> <layout>` declares a bounded synchronous value
+parameter, not a pointer or an owned handle. The CPU nustar registers its parameter
+contract and runtime argument validator. The common verifier checks index, nominal
+type, value ownership and unique function-table binding through registration hooks,
+without a CPU opcode switch. The reference executor validates evaluated arguments
+before changing a call frame; an unbound parameter cannot synthesize a default value.
+The [CPU validator](../../crates/yir-domain-cpu/src/value_parameters.rs) rejects
+missing/extra/duplicate fields, nominal or scalar-kind drift and owned-variant
+conversion. The host registry wrapper forwards both hooks.
+
+LLVM uses the shared checked snapshot codec for `[N x i64]` argument packing and
+typed callee unpacking. Each record argument is validated before packing; no owned
+aggregate allocation is introduced. Task thunks reject records; scoped calls require
+explicit record maps rather than assuming that a scalar argument map still applies.
+Native callback wrappers keep their original scalar word-buffer ABI and 64-slot
+bound; helper-entry charging and selected-branch publication remain unchanged.
+
+[Source/native probes](../../tools/nuisc/tests/native_application_bridge/typed_record_inputs.rs)
+exercise the former 65-leaf capture failure as flat and nested 64-field records,
+mixed nested snapshots, reverse constructors/YIR ordering, overlapping callback
+input/output and raw negative-zero/NaN bits. A declared helper with a generated-style
+name and 65 scalar leaves still rejects. [Guard probes](../../tools/nuisc/tests/native_application_bridge/typed_record_guards.rs)
+cover nominal/kind drift, selected division traps, shared entry limits and unchanged
+output sentinels. The [CLI workflow](../../tools/nuis/tests/native_session_workflow/record_inputs.rs)
+checks build, cache reuse, input/artifact tamper rejection and source-free restoration
+with identical LLVM and lifecycle states. These are bounded CPU-host proofs, not
+new GPU/provider, resource-state or unrestricted whole-record transport claims.
+
+## Scoped Record Inputs
+
+Generated scoped helpers may compress whole flat-i64 record inputs only when every
+scoped caller proves the same nominal record and complete seed range. The planner
+uses the compiler's generated-function set, never a name prefix. Existing scalar
+projection, unread-input elision and separate full seed storage remain unchanged.
+Independent boolean carries are not bit-packed by this path. Unproven inputs keep
+their previous signature; source-declared helpers and callback/FFI ABI do not change.
+
+The shared [loop contract](../../crates/yir-core/src/loop_carry_contract/scoped_record.rs)
+encodes a single physical argument as
+`$value_record:<layout>|<leaf0>|...`. Layout order maps each field to an exact i64
+source: a named immutable value, `$current`, or `$owned_struct_carry:<slot>:<seed>`.
+Only multi-carry scoped actions admit it. Parsing retains the 1..64-leaf bound and
+rejects resources, mixed kinds, malformed operands and nested transport descriptors.
+The enclosing carry contract validates all expanded mappings together, including
+duplicate slots across record/scalar arguments, out-of-range indices and explicit
+seed mismatches. Dependency/GLM reads are the actual leaves, not metadata strings.
+
+The registered CPU executor reconstructs each record from current iteration state.
+LLVM validates the descriptor against the callee's exact nominal layout and prepares
+all record arguments before packing any of them through the shared value codec.
+Carried fields load from current carry slots, not captured initial values. Zero trips
+still return all initial state; break/control slots keep independent positions.
+
+[Native/reference regressions](../../tools/nuisc/tests/native_application_bridge/typed_scoped_record_inputs.rs)
+cover a 64-field record plus induction, bounded break loops, reverse source/YIR order,
+exact callback state and overlapping input/output buffers. Descriptor/parameter drift,
+selected arithmetic traps and work limits fail without publishing callback state.
+The [CLI workflow](../../tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs)
+checks cache reuse, tamper rejection, source removal, standalone verification and
+materialization with identical LLVM and lifecycle results.
+
+The remaining reproduced boundary is a wide generated branch helper: a 64-field
+record plus a scalar can still become 65 arguments there. This is kept as an explicit
+negative regression, not bypassed by increasing limits. Invariant whole records
+without seed proof, mixed/nested carried records, resources and task transport remain
+separate work. These are CPU-host value-path proofs, not fresh Linux/GPU evidence.
 
 ## Evidence And Limits
 
@@ -682,3 +811,61 @@ CLI reports 1459 clean drift checks, clean coverage/hierarchy/lineage and `activ
 Entirely unconsumed generated flat-record inputs are next; this checkpoint does not
 claim sparse state storage, fresh GPU/Linux execution, a full-workspace result,
 formal safety or measured performance.
+
+The unread-record follow-up completed on 2026-09-27 with 671 selected compiler-lowering
+tests, 51 native-bridge tests, nine ordinary native tests, five reference image/window
+tests, fourteen CLI workflows and 26 tensor tests: 776 distinct selected tests,
+excluding overlapping reruns. The new input-elision regressions failed before the
+implementation. Complete 3/7/64-slot seeds now coexist with two iteration arguments
+and no record operand; two independent records retain disjoint slot ranges.
+The native lifecycle fixture keeps five state slots and four arguments. Ordinary
+native execution returns 132 and still traps for selected iteration, zero-trip
+initializer and second-trip constructor failures. CLI restoration retains the exact
+reduced LLVM signature, cache identity, tamper rejection and source-free execution.
+Twenty maintenance tests and the host-path policy check also passed; documentation
+links and UTF-8 checks are clean. The rebuilt CLI reports 1467 clean drift checks,
+clean coverage/hierarchy/lineage and unchanged `active/86`. Whole-record uses in
+generated private helpers remain the next bounded-transport boundary. This is macOS
+aarch64 evidence, not fresh GPU/Linux, full-workspace, formal-safety or performance certification.
+
+The 2026-09-27 shared-codec follow-up passed 160 LLVM emitter/host-ABI tests,
+the explicit host-clang round-trip probe at both optimization levels, five selected
+native lifecycle/argument-bound tests, one unread-record CLI build/cache/source-free
+restoration workflow and 26 tensor tests: 193 distinct selected tests, excluding
+overlapping reruns. The owned-variant prefix regression failed before the pure-value
+validator was separated and passes afterward; valid nominal records retain their bits.
+The rebuilt CLI reports 1473 clean drift checks, clean coverage/hierarchy/lineage
+and unchanged `active/86`. This checkpoint verifies the shared codec and existing
+return paths, not generated record-input signatures. The incompressible 65-argument
+source fixture still rejects until compiler-private capture and YIR parameter/call
+layouts are connected. No fresh Linux/GPU, full-workspace or performance result is claimed.
+
+The 2026-09-27 generated-record-input integration supersedes that last source-admission
+boundary for non-scoped generated helpers. All 673 compiler-lowering tests and all
+246 native-bridge tests pass on macOS aarch64. The record-input and unread-record
+CLI workflows both pass build/cache/tamper checks and source-free restoration with
+identical LLVM and lifecycle states. Together with 435 core/registered-CPU/YIR/LLVM
+checks (including the explicit host-clang probe) and 26 tensor tests, this is 1382
+distinct selected tests, without counting repeated runs twice. Exact schema/argument rejection, independent
+mixed snapshots, lazy arithmetic traps, shared-entry failures and untouched output
+sentinels remain covered. Public/source/FFI and callback signatures are unchanged;
+scoped whole-record transport and its induction/carry/seed maps were the next boundary
+at that checkpoint; the subsequent scoped-record section above records the new slice.
+The coordinate remains `active/86`. This is not a fresh Linux/GPU, full-workspace,
+formal-safety or measured-performance result. The rebuilt CLI reports 1483 clean
+drift checks and clean coverage, hierarchy and lineage.
+
+The subsequent 2026-09-27 scoped-input checkpoint passes 420 core/CPU/verifier/LLVM
+tests, 674 compiler-lowering tests, 89 distinct selected native/reference regressions
+(including corrected-test reruns), two CLI record build/cache/tamper/source-free
+restoration workflows and 26 tensor tests. These are 1211 selected tests without
+double-counting reruns, not the full workspace or the full native-bridge suite.
+The full 64-field record plus induction, 62-field break record and 61-field record
+with independent bool/break carries match reference execution. Selected division,
+shared-entry and loop-work failures retain every output sentinel, with zero owned
+aggregate allocation/drop counters in the probes. Public/source/FFI and callback
+signatures remain unchanged. The next boundary is the reproduced wide generated
+branch-helper argument overflow, not a request to increase native bounds.
+The rebuilt CLI reports 1492 clean drift checks, clean coverage/hierarchy/lineage
+and unchanged `active/86`. This is macOS aarch64 evidence only; no fresh Linux/GPU,
+full-workspace, formal-safety or measured-performance result is claimed.

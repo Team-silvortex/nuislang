@@ -165,6 +165,46 @@ fn typed_sparse_captures_separate_initial_state_from_partial_iteration_arguments
     check_sparse_captures(&source, Some(&[2, 3]), 30);
 }
 
+#[test]
+fn typed_sparse_captures_elide_unread_record_inputs_with_full_initial_state() {
+    let source = aliases::unread_record_source();
+    let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    let call = compiled
+        .yir
+        .nodes
+        .iter()
+        .find_map(|node| {
+            yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)
+                .ok()
+                .flatten()
+        })
+        .unwrap();
+    assert_eq!(call.seeds.len(), 5);
+    assert_eq!(call.operands.len(), 4);
+    let slots = call
+        .operands
+        .iter()
+        .filter_map(|arg| {
+            yir_core::parse_loop_owned_struct_carry(arg)
+                .unwrap()
+                .map(|(slot, _)| slot)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(slots, [4]);
+    assert_eq!(
+        compiled
+            .yir
+            .functions
+            .iter()
+            .find(|f| f.name == call.callee)
+            .unwrap()
+            .parameters
+            .len(),
+        4
+    );
+    check_sparse_captures(&source, Some(&[2, 3]), 30);
+}
+
 fn check_sparse_captures(source: &str, branch_sizes: Option<&[usize]>, offset: i64) {
     let project = Project::with_source(source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();

@@ -105,7 +105,14 @@ pub(crate) fn prepare_owned_struct_loop_carry(
     }
 
     let mut seeds = Vec::new();
-    for (operand, kind) in operands.iter().zip(signature.params.iter().copied()) {
+    for (operand, kind) in operands
+        .iter()
+        .zip(signature.params.iter())
+        .map(|(operand, kind)| crate::scoped_record_args::leaves(operand, kind))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+    {
         let Some((index, input)) = parse_loop_owned_struct_carry(operand)? else {
             continue;
         };
@@ -114,7 +121,7 @@ pub(crate) fn prepare_owned_struct_loop_carry(
                 "scoped carry `{input}` must bind an i64 helper parameter"
             ));
         }
-        seeds.push((index, input, Some(operand.clone()), kind));
+        seeds.push((index, input, Some(operand.to_owned()), kind));
     }
     if let Some(multi) = &multi {
         for (index, input) in multi.seeds.iter().enumerate() {

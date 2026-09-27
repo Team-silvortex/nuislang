@@ -120,7 +120,7 @@ pub(crate) fn owned_tree_scalar_args_ready(
     registers: &BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &BTreeMap<String, String>,
     args: &[OwnedSelectScalarArg<'_>],
-    kinds: &[CpuCallScalarKind],
+    kinds: &[crate::call_parameters::CpuCallParameterKind],
 ) -> bool {
     let mut body = Vec::new();
     let mut next_reg = 0;
@@ -139,13 +139,14 @@ pub(crate) fn lower_owned_tree_scalar_args(
     registers: &BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &BTreeMap<String, String>,
     args: &[OwnedSelectScalarArg<'_>],
-    kinds: &[CpuCallScalarKind],
+    kinds: &[crate::call_parameters::CpuCallParameterKind],
     body: &mut Vec<String>,
     next_reg: &mut usize,
 ) -> Option<Vec<String>> {
     args.iter()
         .zip(kinds)
         .map(|(arg, kind)| {
+            let kind = &kind.scalar()?;
             if let OwnedSelectScalarArg::OwnedTransfer {
                 address_kind,
                 nullable,

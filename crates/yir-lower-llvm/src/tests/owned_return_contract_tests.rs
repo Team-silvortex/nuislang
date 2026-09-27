@@ -138,6 +138,7 @@ fn unavailable_declared_entry_result_traps_instead_of_using_an_unrelated_scalar(
             &BTreeMap::new(),
             &BTreeMap::new(),
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &crate::default_branch_effect_llvm_emitters(),
             CpuCallScalarKind::I64,
             None,

@@ -14,6 +14,17 @@ pub(crate) fn lower_cpu_param_node(
     if node.op.module != "cpu" {
         return Ok(false);
     }
+    if yir_domain_cpu::value_parameters::parse(node)?.is_some() {
+        let binding = registers.get(&node.name).ok_or_else(|| {
+            format!(
+                "CPU value parameter `{}` has no function binding",
+                node.name
+            )
+        })?;
+        crate::native_session::value_transport::NativeValueLayout::parse(&node.op.args[1])?
+            .prepare(binding)?;
+        return Ok(true);
+    }
     if !matches!(
         node.op.instruction.as_str(),
         "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64"

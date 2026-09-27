@@ -57,6 +57,27 @@ impl RegisteredMod for HostParentMod {
             .describe(node, resource)
     }
 
+    fn function_parameter(
+        &self,
+        node: &Node,
+        resource: &Resource,
+    ) -> Result<Option<yir_core::FunctionParameterContract>, String> {
+        self.base
+            .lookup(self.name)
+            .unwrap()
+            .function_parameter(node, resource)
+    }
+
+    fn validate_function_argument(
+        &self,
+        node: &Node,
+        resource: &Resource,
+        value: &Value,
+    ) -> Result<(), String> {
+        self.admitted()?
+            .validate_function_argument(node, resource, value)
+    }
+
     fn provider_completion_registration(
         &self,
         node: &Node,

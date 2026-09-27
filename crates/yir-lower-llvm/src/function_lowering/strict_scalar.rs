@@ -67,18 +67,26 @@ pub(super) fn validate(
                 require_value(node, initial, CpuCallScalarKind::I64, registers)?;
             }
         }
-        for (operand, kind) in call.operands.iter().zip(&signature.params) {
-            if matches!(operand.as_str(), "$current" | "$carry")
+        for (operand, kind) in call
+            .operands
+            .iter()
+            .zip(&signature.params)
+            .map(|(operand, kind)| crate::scoped_record_args::leaves(operand, kind))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+        {
+            if matches!(operand, "$current" | "$carry")
                 || yir_core::parse_loop_owned_struct_carry(operand)?.is_some()
             {
-                if *kind != CpuCallScalarKind::I64 {
+                if kind != CpuCallScalarKind::I64 {
                     return Err(format!(
                         "native scoped call `{}` requires exact i64 loop-state parameters",
                         node.name
                     ));
                 }
             } else {
-                require_value(node, operand, *kind, registers)?;
+                require_value(node, operand, kind, registers)?;
             }
         }
     }
@@ -121,7 +129,14 @@ pub(super) fn validate(
             ));
         }
         for (name, kind) in operands.iter().zip(&signature.params) {
-            require_value(node, name, *kind, registers)?;
+            match kind.scalar() {
+                Some(kind) => require_value(node, name, kind, registers)?,
+                None => kind.validate(
+                    registers
+                        .get(name)
+                        .ok_or_else(|| format!("missing native record input `{name}`"))?,
+                )?,
+            }
         }
     }
     if !aggregate_return {

@@ -34,14 +34,31 @@ struct Plan {
     replacements: BTreeMap<Vec<String>, String>,
 }
 
+#[derive(Default)]
+pub(super) struct ProjectedCaptures {
+    pub(super) changed: bool,
+    pub(super) elided_records: BTreeMap<String, Vec<scoped_loop_lowering::RecordSeed>>,
+}
+
+pub(super) fn scoped_record_seeds(
+    module: &NirModule,
+    targets: &BTreeSet<String>,
+) -> BTreeMap<String, BTreeMap<usize, scoped_loop_lowering::RecordSeed>> {
+    scoped_inputs::protected_inputs(module, targets)
+        .into_iter()
+        .map(|(name, inputs)| (name, inputs.elidable))
+        .collect()
+}
+
 pub(super) fn project(
     module: &mut NirModule,
     generated: &BTreeSet<String>,
     scoped_generated: &BTreeSet<String>,
     layouts: &impl ValueLayouts,
-) -> bool {
+) -> ProjectedCaptures {
+    let mut projected = ProjectedCaptures::default();
     if generated.is_empty() {
-        return false;
+        return projected;
     }
     let eligible = generated.iter().map(String::as_str).collect();
     let scoped = scoped_loop_lowering::collect_scoped_call_targets(module, &eligible);
@@ -61,7 +78,6 @@ pub(super) fn project(
         })
         .map(|(f, calls)| (f.name.clone(), calls.clone()))
         .collect::<BTreeMap<_, _>>();
-    let mut changed = false;
     // Rewrite callees first: their projected call arguments expose demand to
     // enclosing helpers. Cycles (and their dependants) conservatively stay whole.
     while let Some(name) = pending
@@ -102,6 +118,22 @@ pub(super) fn project(
             .all(|i| valid_caller(&module.functions[*i].body, &name, &plan))
         {
             continue;
+        }
+        if let Some(inputs) = protected.get(&name) {
+            let seeds = plan
+                .inputs
+                .iter()
+                .enumerate()
+                .filter_map(|(index, input)| match input {
+                    Input::Fields(fields) if fields.is_empty() => {
+                        inputs.elidable.get(&index).cloned()
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            if !seeds.is_empty() {
+                projected.elided_records.insert(name.clone(), seeds);
+            }
         }
         let function = &mut candidate;
         walk::rewrite(&mut function.body, |expr| {
@@ -147,9 +179,9 @@ pub(super) fn project(
                     .collect();
             });
         }
-        changed = true;
+        projected.changed = true;
     }
-    changed
+    projected
 }
 
 fn calls(body: &[NirStmt]) -> BTreeSet<String> {
@@ -244,7 +276,10 @@ fn plan(
             .collect::<Option<Vec<_>>>()?;
         let selected = types.iter().map(|ty| leaves(ty, layouts)).sum::<usize>();
         if selected >= leaves(&param.ty, layouts)
-            || (paths.is_empty() && protected.is_some_and(|inputs| inputs.carried.contains(&index)))
+            || (paths.is_empty()
+                && protected.is_some_and(|inputs| {
+                    inputs.carried.contains(&index) && !inputs.elidable.contains_key(&index)
+                }))
         {
             inputs.push(Input::Keep(param.clone()));
             continue;

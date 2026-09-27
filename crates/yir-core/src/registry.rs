@@ -3,12 +3,20 @@ use std::collections::BTreeMap;
 use crate::{
     BranchEffectAction, BranchEffectActionCapability, ExecutionState, Node,
     PlannedBranchEffectAction, PlannedBranchEffectOperand, Resource, Value, YirResultFamily,
+    YirValueOwnership,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstructionSemantics {
     pub dependencies: Vec<String>,
     pub has_effect: bool,
+}
+
+/// Domain-owned parameter declaration, checked against the common function table.
+pub struct FunctionParameterContract {
+    pub index: usize,
+    pub ty: String,
+    pub ownership: YirValueOwnership,
 }
 
 impl InstructionSemantics {
@@ -95,6 +103,24 @@ pub trait RegisteredMod: Send + Sync {
     }
 
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String>;
+
+    fn function_parameter(
+        &self,
+        _node: &Node,
+        _resource: &Resource,
+    ) -> Result<Option<FunctionParameterContract>, String> {
+        Ok(None)
+    }
+
+    /// Validate an already evaluated argument before changing a call frame.
+    fn validate_function_argument(
+        &self,
+        _node: &Node,
+        _resource: &Resource,
+        _value: &Value,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 
     fn begin_execution(
         &self,

@@ -152,6 +152,10 @@ pub(crate) fn execute_cpu_value_node(
         }
         "null" => Ok(Value::Pointer(None)),
         "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
+        "param_value_struct" => Err(format!(
+            "CPU value parameter `{}` requires a function argument binding",
+            node.name
+        )),
         "param_bool" => Ok(Value::Bool(false)),
         "param_i32" => Ok(Value::I32(0)),
         "param_i64" => Ok(Value::Int(0)),

@@ -41,6 +41,7 @@ fn boolean_capture_groups_preserve_scalar_order_and_bound_word_width() {
                     assert!((2..=BOOLS_PER_WORD).contains(&group.len()));
                     group.clone()
                 }
+                Slot::Record { .. } => panic!("boolean-only plan must not introduce records"),
             })
             .collect::<Vec<_>>();
         assert_eq!(flattened, (0..count).collect::<Vec<_>>());
@@ -133,4 +134,141 @@ fn generated_value_helpers_used_as_scoped_actions_keep_logical_parameters() {
             .contains(&selection.name)
     );
     assert!(!outlined.capture_plans.contains_key(&selection.name));
+}
+
+#[test]
+fn generated_record_plan_is_bounded_and_only_needed_after_scalar_compaction() {
+    for (count, kind, records) in [
+        (63, "i64", false),
+        (64, "i64", true),
+        (64, "bool", false),
+        (65, "i64", false),
+    ] {
+        let fields = (0..count)
+            .map(|i| format!("f{i}: {kind}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let source = format!("mod cpu Main {{ struct State {{ {fields} }} fn choose(value: State, flag: bool) -> State {{ return value; }} }}");
+        let module = crate::frontend::parse_nuis_module(&source).unwrap();
+        let function = module
+            .functions
+            .iter()
+            .find(|f| f.name == "choose")
+            .unwrap();
+        let mut flattened = leaves(&vec![kind; count]);
+        for leaf in &mut flattened {
+            leaf.name = format!("value.{}", leaf.name);
+        }
+        flattened.push(function.params[1].clone());
+        let plan = CapturePlan::for_generated(flattened, function, &module);
+        assert_eq!(
+            plan.as_ref().is_some_and(|plan| plan
+                .slots
+                .iter()
+                .any(|slot| matches!(slot, Slot::Record { .. }))),
+            records
+        );
+        if records {
+            assert_eq!(plan.unwrap().slots.len(), 2);
+        }
+    }
+}
+
+#[test]
+fn scoped_record_plan_groups_exact_leaf_ranges_between_scalar_inputs() {
+    let fields = (0..64)
+        .map(|i| format!("f{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let module = crate::frontend::parse_nuis_module(&format!(
+        "mod cpu Main {{ struct State {{ {fields} }} fn helper(index: i64, value: State, limit: i64) -> State {{ return value; }} }}"
+    )).unwrap();
+    let function = &module.functions[0];
+    let mut flattened = vec![function.params[0].clone()];
+    let mut fields = leaves(&["i64"; 64]);
+    for field in &mut fields {
+        field.name = format!("value.{}", field.name);
+    }
+    flattened.extend(fields);
+    flattened.push(function.params[2].clone());
+    let plan = CapturePlan::for_generated(flattened, function, &module).unwrap();
+    let record = (0..64)
+        .map(|i| format!("$owned_struct_carry:{i}:seed{i}"))
+        .collect::<Vec<_>>();
+    let mut input = vec!["$current".into()];
+    input.extend(record.clone());
+    input.push("limit".into());
+    let mapped = plan.lower_scoped_arguments(&input).unwrap();
+    assert_eq!(mapped.len(), 3);
+    assert_eq!(mapped[0], "$current");
+    assert_eq!(mapped[2], "limit");
+    assert_eq!(
+        yir_core::loop_carry_contract::ScopedRecordInput::parse(&mapped[1])
+            .unwrap()
+            .unwrap()
+            .operands,
+        record
+    );
+    assert!(plan.lower_scoped_arguments(&input[..65]).is_err());
+    assert!(!plan.supports_scoped(function, &BTreeMap::new()));
+    assert!(CapturePlan::new(leaves(&["bool", "bool"]))
+        .unwrap()
+        .lower_scoped_arguments(&["first".into(), "second".into()])
+        .is_err());
+}
+
+#[test]
+fn wide_record_scoped_helpers_keep_carry_and_seed_signature_mapping() {
+    let fields = (0..64)
+        .map(|i| format!("f{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = (0..64)
+        .map(|i| format!("f{i}: carry.f{i} + 1"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        "mod cpu Main {{
+        struct State {{ {fields} }}
+        @noinline fn relay(value: State) -> State {{ return value; }}
+        fn walk(value: State, flag: bool) -> State {{
+            let carry = value; let i = 0;
+            while i < 2 {{
+                if flag {{ let carry = relay(carry); }}
+                else {{ let carry = State {{ {values} }}; }}
+                let i = i + 1;
+            }}
+            return carry;
+        }}
+        fn main() -> i64 {{ return 0; }}
+    }}"
+    );
+    let mut module = crate::frontend::parse_nuis_module(&source).unwrap();
+    let outlined = crate::lowering::buffer_loop_outline::outline_buffer_loops(&mut module).unwrap();
+    let eligible = module
+        .functions
+        .iter()
+        .filter(|f| f.name.starts_with("__nuis_"))
+        .map(|f| f.name.as_str())
+        .collect();
+    let scoped = scoped_loop_lowering::collect_scoped_call_targets(&module, &eligible);
+    assert!(
+        scoped.iter().any(|name| {
+            module
+                .functions
+                .iter()
+                .find(|function| function.name == *name)
+                .unwrap()
+                .params
+                .iter()
+                .any(|parameter| parameter.ty.name == "State")
+        }),
+        "fixture must carry a whole record through a scoped signature"
+    );
+    assert!(
+        scoped
+            .iter()
+            .any(|name| outlined.capture_plans.contains_key(name)),
+        "proven wide scoped record must use a mapped record input"
+    );
 }

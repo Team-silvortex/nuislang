@@ -19,7 +19,7 @@ pub(super) fn project_scoped(module: &mut NirModule, names: &[&str]) -> bool {
     let names = names.iter().map(|name| (*name).to_owned()).collect();
     let changed = project(module, &names, &names, &layouts);
     crate::nir_verify::verify_nir_module(module).unwrap();
-    changed
+    changed.changed
 }
 
 #[test]

@@ -5,6 +5,14 @@ mod arguments;
 #[path = "scoped_loop_lowering/scalar_carries.rs"]
 mod scalar_carries;
 
+// Compiler-private proof, not source naming or serialized ABI authority.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct RecordSeed {
+    slot: usize,
+    width: usize,
+    ty: NirTypeRef,
+}
+
 enum ScopedLoopResult<'a> {
     None,
     Scalar(&'a str),
@@ -27,37 +35,41 @@ pub(super) fn projectable_record_seed_inputs(
     tail: &[NirStmt],
     function: &NirFunction,
     definitions: &BTreeMap<&str, &NirStructDef>,
-) -> BTreeSet<usize> {
+) -> BTreeMap<usize, RecordSeed> {
     let NirStmt::Let {
         name,
         ty: Some(ty),
         value: NirExpr::Call { callee, args },
     } = action
     else {
-        return BTreeSet::new();
+        return BTreeMap::new();
     };
     if callee != &function.name || function.return_type.as_ref() != Some(ty) {
-        return BTreeSet::new();
+        return BTreeMap::new();
     }
     let Some(carries) = scalar_carries::projected_bindings(name, ty, tail, definitions) else {
-        return BTreeSet::new();
+        return BTreeMap::new();
     };
     let breaking =
         scalar_carries::break_guard(tail.get(carries.len()), carries.last().unwrap().name);
     if scalar_carries::validate_seeds(&carries, breaking, function, args, callee).is_err() {
-        return BTreeSet::new();
+        return BTreeMap::new();
     }
     function
         .params
         .iter()
         .zip(args)
         .enumerate()
-        .filter(|(_, (param, arg))| {
-            carries
-                .iter()
-                .any(|carry| carry.whole_record_seed(param, arg))
+        .filter_map(|(index, (param, arg))| {
+            let mut slot = 0;
+            for carry in &carries {
+                if carry.whole_record_seed(param, arg) {
+                    return Some((index, carry.record_seed(slot)));
+                }
+                slot += carry.width();
+            }
+            None
         })
-        .map(|(index, _)| index)
         .collect()
 }
 
@@ -238,7 +250,16 @@ pub(super) fn lower_scoped_call_while(
             }
             ScopedLoopResult::Scalars {
                 separate_seeds: scalar_carries::needs_separate_seeds(
-                    &carries, breaking, function, args, callee,
+                    &carries,
+                    breaking,
+                    function,
+                    args,
+                    callee,
+                    state
+                        .scoped_elided_record_seeds
+                        .get(callee)
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]),
                 )?,
                 bindings: carries,
                 layout,
@@ -367,6 +388,7 @@ pub(super) fn lower_scoped_call_while(
         action_args.push(layout.clone());
     }
     let mut carried_struct_leaf = 0usize;
+    let operand_start = action_args.len();
     for (param, arg) in function.params.iter().zip(args) {
         if matches!(arg, NirExpr::Var(name) if name == &prepared.binding_name) {
             action_args.push("$current".to_owned());
@@ -430,6 +452,14 @@ pub(super) fn lower_scoped_call_while(
             action_args.push(lower_expr(arg, state, bindings)?);
         }
     }
+    if let Some(plan) = state.capture_plans.get(callee) {
+        if !matches!(&result, ScopedLoopResult::Scalars { .. }) {
+            return Err("scoped record inputs require proven scalar carry mappings".into());
+        }
+        let operands = plan.lower_scoped_arguments(&action_args[operand_start..])?;
+        action_args.truncate(operand_start);
+        action_args.extend(operands);
+    }
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
@@ -465,7 +495,13 @@ pub(super) fn lower_scoped_call_while(
             args: node_args.clone(),
         },
     });
-    for input in node_args {
+    for input in node_args
+        .iter()
+        .map(|input| yir_core::loop_carry_contract::scoped_input_leaves(input))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+    {
         let dependency = yir_core::parse_loop_owned_struct_carry(&input)?
             .map(|(_, dependency)| dependency)
             .unwrap_or_else(|| {

@@ -210,6 +210,10 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
             yir_core::parse_owned_struct_layout(&node.op.args[1])?;
             Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
         }
+        "param_value_struct" => {
+            crate::value_parameters::parse(node)?;
+            Ok(InstructionSemantics::pure(Vec::new()))
+        }
         "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64"
         | "param_buffer_ref" | "param_node_ref" | "param_owned_bytes" => {
             if node.op.args.len() != 1 {

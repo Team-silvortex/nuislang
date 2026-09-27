@@ -78,3 +78,33 @@ fn generated_record_capture_projection_preserves_real_native_results_and_traps()
         }
     }
 }
+
+#[test]
+fn generated_unread_record_elision_preserves_native_state_and_traps() {
+    let source = include_str!("scoped_unread_record_carries.ns");
+    assert_eq!(
+        compile_and_run("scoped_unread_record_carries", source).code(),
+        Some(132)
+    );
+    for (name, source) in [
+        ("iteration", source.replace("walk(2, 1)", "walk(2, 0)")),
+        (
+            "initializer",
+            source
+                .replace("unused: 7", "unused: 7 / divisor")
+                .replace("walk(2, 1) + walk(0, 0)", "walk(0, 0)"),
+        ),
+        (
+            "second_trip",
+            source.replace("unused: 9", "unused: 9 / (divisor - i + 1)"),
+        ),
+    ] {
+        let status = compile_and_run(&format!("scoped_unread_record_{name}"), &source);
+        assert!(!status.success(), "{status:?}");
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+        }
+    }
+}

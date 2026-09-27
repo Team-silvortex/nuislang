@@ -249,6 +249,17 @@ pub fn field_seed_source() -> String {
     .replace("choose(state)", "choose(state.payload)")
 }
 
+pub fn unread_record_source() -> String {
+    loop_join_source()
+        .replace("before.value", "input.value")
+        .replace("before.divisor", "input.divisor")
+        .replace("before.marker + 10", "i * 10")
+        .replace(
+            "before.marker + current.marker",
+            "(i - 1) * 10 + current.marker",
+        )
+}
+
 pub fn partial_field_seed_source() -> String {
     field_seed_source()
         .replace(

@@ -72,6 +72,7 @@ impl<'a> FunctionAdmission<'a> {
                 ));
             }
             if node.op.instruction.starts_with("param_") {
+                let record = yir_domain_cpu::value_parameters::parse(node)?;
                 let index = node
                     .op
                     .args
@@ -79,16 +80,26 @@ impl<'a> FunctionAdmission<'a> {
                     .and_then(|arg| arg.parse::<usize>().ok());
                 let parameter = index.and_then(|index| function.parameters.get(index));
                 if !parameter.is_some_and(|p| {
-                    p.node == *name && node.op.instruction == format!("param_{}", p.ty)
+                    p.node == *name
+                        && record.as_ref().map_or_else(
+                            || node.op.instruction == format!("param_{}", p.ty),
+                            |record| !callback && p.ty == record.layout.type_name,
+                        )
                 }) {
                     return Err("native scalar bridge parameter node/signature drift".to_owned());
                 }
             }
         }
         for (index, parameter) in function.parameters.iter().enumerate() {
-            ScalarKind::parse(&parameter.ty)?;
             let node = self.nodes[parameter.node.as_str()];
-            if node.op.instruction != format!("param_{}", parameter.ty)
+            let record = yir_domain_cpu::value_parameters::parse(node)?;
+            let kind_matches = if let Some(record) = record {
+                !callback && record.layout.type_name == parameter.ty
+            } else {
+                ScalarKind::parse(&parameter.ty)?;
+                node.op.instruction == format!("param_{}", parameter.ty)
+            };
+            if !kind_matches
                 || node
                     .op
                     .args

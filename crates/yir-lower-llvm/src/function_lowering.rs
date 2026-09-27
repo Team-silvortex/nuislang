@@ -34,6 +34,7 @@ pub(super) fn emit_cpu_function(
     resources: &BTreeMap<String, &Resource>,
     ordered_node_names: &[String],
     param_bindings: &BTreeMap<String, LlvmValueRef>,
+    value_bindings: &BTreeMap<String, (usize, native_session::value_transport::NativeValueLayout)>,
     param_buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     provider_completion_sources: &BTreeMap<String, (YirResultFamily, String)>,
@@ -112,6 +113,17 @@ pub(super) fn emit_cpu_function(
             LlvmValueRef::I64(reg) => state.last_cpu_value = Some(reg.clone()),
             _ => {}
         }
+    }
+
+    for (name, (index, layout)) in value_bindings {
+        let value = layout.unpack(
+            &format!("%arg{index}"),
+            &mut state.body,
+            &mut state.next_reg,
+        );
+        state
+            .registers
+            .insert(name.clone(), LlvmValueRef::Struct(value));
     }
 
     for node_name in ordered_node_names {

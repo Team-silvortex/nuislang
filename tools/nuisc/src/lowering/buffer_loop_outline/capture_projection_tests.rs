@@ -15,7 +15,7 @@ fn run(module: &mut NirModule, generated: &[&str]) -> bool {
     let generated = generated.iter().map(|s| (*s).to_owned()).collect();
     let changed = project(module, &generated, &BTreeSet::new(), &layouts);
     crate::nir_verify::verify_nir_module(module).unwrap();
-    changed
+    changed.changed
 }
 
 fn function<'a>(module: &'a NirModule, name: &str) -> &'a NirFunction {
@@ -175,12 +175,15 @@ fn projection_vetoes_calls_hidden_in_unsupported_expressions() {
         };
         *expr = wrap(Box::new(expr.clone()));
         let layouts = control_values::TypedLayouts::collect(&module);
-        assert!(!project(
-            &mut module,
-            &BTreeSet::from(["helper".into()]),
-            &BTreeSet::new(),
-            &layouts
-        ));
+        assert!(
+            !project(
+                &mut module,
+                &BTreeSet::from(["helper".into()]),
+                &BTreeSet::new(),
+                &layouts
+            )
+            .changed
+        );
         assert_eq!(function(&module, "helper").params[0].ty.name, "State");
     }
 }

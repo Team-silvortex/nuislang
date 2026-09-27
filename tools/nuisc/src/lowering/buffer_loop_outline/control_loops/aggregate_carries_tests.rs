@@ -36,9 +36,12 @@ fn outer_flat_carries_admit_seeded_locals_and_keep_buffer_authority_closed() {
             let catalog = scalar_helpers::collect_with_layouts(&module, &control_values::layouts(&module));
             assert!(catalog["walk"].may_loop, "{body}");
             assert!(!scalar_helpers::collect(&module).contains_key("walk"));
-            assert!(outline_buffer_loops(&mut module).unwrap().functions.contains("walk"));
+            let outlined = outline_buffer_loops(&mut module).unwrap();
+            assert!(outlined.functions.contains("walk"));
             let iteration = module.functions.iter().find(|function| function.name.starts_with("__nuis_scalar_iteration_")).unwrap();
-            assert!(iteration.params.iter().any(|param| param.name == "packet" && param.ty == scalar_type("Packet")));
+            let elided = body == "let packet = saved;";
+            assert_eq!(iteration.params.iter().any(|param| param.name == "packet" && param.ty == scalar_type("Packet")), !elided, "{body}");
+            assert_eq!(outlined.elided_record_seeds.contains_key(&iteration.name), elided);
             let layout = module.structs.iter().find(|layout| Some(scalar_type(&layout.name)) == iteration.return_type).unwrap();
             assert!(layout.fields.iter().all(|field| field.ty == scalar_type("i64")));
         }

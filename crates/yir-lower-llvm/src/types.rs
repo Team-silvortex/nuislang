@@ -179,7 +179,7 @@ pub(crate) enum CpuLoopScalarKind {
     F64,
 }
 pub(crate) struct CpuHelperSignature {
-    pub(crate) params: Vec<CpuCallScalarKind>,
+    pub(crate) params: Vec<crate::call_parameters::CpuCallParameterKind>,
     /// Lowering-private parameters forwarded by synchronous calls, not YIR slots.
     pub(crate) implicit_parameters: Vec<String>,
     pub(crate) mutex_permit_params: Vec<Option<MutexScalarKind>>,

@@ -297,6 +297,14 @@ impl<'a> ExecutionEngine<'a> {
             .get(name)
             .cloned()
             .ok_or_else(|| format!("YIR function `{name}` has no execution order"))?;
+        for (parameter, value) in function.parameters.iter().zip(&arguments) {
+            let node = self.nodes_by_name[parameter.node.as_str()];
+            let domain = self
+                .registry
+                .lookup(&node.op.module)
+                .ok_or_else(|| format!("unregistered parameter domain `{}`", node.op.module))?;
+            domain.validate_function_argument(node, self.resources[&node.resource], value)?;
+        }
         let saved_values = function
             .body_nodes
             .iter()

@@ -54,7 +54,7 @@ const SOURCE: &str =
     include_str!("../../../tests/control_flow_syntax_native/scoped_projected_record_carries.ns");
 
 #[test]
-fn generated_scoped_projection_rejects_unproven_or_empty_carry_maps_transactionally() {
+fn generated_scoped_projection_rejects_unproven_carry_maps_transactionally() {
     let source = "
         struct Words { carry0: i64, carry1: i64 }
         fn helper(old: Pair, index: i64) -> Words {
@@ -71,7 +71,6 @@ fn generated_scoped_projection_rejects_unproven_or_empty_carry_maps_transactiona
             return carry;
         }";
     for source in [
-        source.replace("x: old.x + index", "x: index"),
         source.replace("y: 9", "y: old.y"),
         source.replace("x: words.carry0, y: words.carry1", "x: words.carry1, y: words.carry0"),
         source.replace("helper(carry, i)", "helper(Pair { x: carry.x, y: carry.y }, i)"),
@@ -178,7 +177,7 @@ fn generated_partial_carries_execute_with_complete_seed_storage() {
     assert_eq!(reference(&mut yir).unwrap(), 154);
 }
 
-fn reference(yir: &mut yir_core::YirModule) -> Result<i64, String> {
+pub(super) fn reference(yir: &mut yir_core::YirModule) -> Result<i64, String> {
     yir.nodes.reverse();
     yir.functions.reverse();
     for function in &mut yir.functions {

@@ -8,12 +8,20 @@ pub(super) struct Projection<'a> {
 }
 
 impl Projection<'_> {
-    fn width(&self) -> usize {
+    pub(super) fn width(&self) -> usize {
         self.fields.len().max(1)
     }
 
     pub(super) fn whole_record_seed(&self, param: &NirParam, arg: &NirExpr) -> bool {
         !self.fields.is_empty() && seed_range(self, param, arg) == Some((0, self.width()))
+    }
+
+    pub(super) fn record_seed(&self, slot: usize) -> RecordSeed {
+        RecordSeed {
+            slot,
+            width: self.width(),
+            ty: self.ty.clone(),
+        }
     }
 }
 
@@ -271,6 +279,7 @@ pub(super) fn needs_separate_seeds(
     function: &NirFunction,
     args: &[NirExpr],
     callee: &str,
+    elided: &[RecordSeed],
 ) -> Result<bool, String> {
     let error = match validate_seeds(carries, breaking, function, args, callee) {
         Ok(()) => return Ok(false),
@@ -279,6 +288,7 @@ pub(super) fn needs_separate_seeds(
     if function.params.len() != args.len() {
         return Err(error);
     }
+    let mut slot = 0;
     for (index, binding) in carries.iter().enumerate() {
         let control = breaking && index + 1 == carries.len();
         let covered = seed_coverage(binding, control, function, args, callee)?;
@@ -286,10 +296,14 @@ pub(super) fn needs_separate_seeds(
             return Err(error);
         }
         if covered.iter().any(|covered| !covered)
-            && (control || binding.fields.is_empty() || !covered.iter().any(|covered| *covered))
+            && (control
+                || binding.fields.is_empty()
+                || (!covered.iter().any(|covered| *covered)
+                    && !elided.contains(&binding.record_seed(slot))))
         {
             return Err(error);
         }
+        slot += binding.width();
     }
     Ok(true)
 }

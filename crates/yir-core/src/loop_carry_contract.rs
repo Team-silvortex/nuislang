@@ -2,7 +2,11 @@
 
 mod scoped_scalar;
 pub use scoped_scalar::{parse_scoped_i64_carry, ScopedI64Carry};
+mod scoped_record;
 mod scoped_scalars;
+pub use scoped_record::{scoped_input_leaves, ScopedRecordInput};
+#[cfg(test)]
+mod scoped_record_tests;
 pub use scoped_scalars::{
     encode_scoped_i64_seeds, parse_scoped_i64_carries, ScopedI64Carries, SCOPED_I64_SEEDS_MARKER,
 };

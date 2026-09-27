@@ -14,6 +14,11 @@ const BOOLS_PER_WORD: usize = 63;
 enum Slot {
     Scalar(usize),
     Bools(Vec<usize>),
+    Record {
+        parameter: NirParam,
+        layout: String,
+        leaves: std::ops::Range<usize>,
+    },
 }
 
 #[derive(Clone)]
@@ -23,6 +28,98 @@ pub(in crate::lowering) struct CapturePlan {
 }
 
 impl CapturePlan {
+    pub(in crate::lowering) fn supports_scoped(
+        &self,
+        function: &NirFunction,
+        seeds: &BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
+    ) -> bool {
+        self.slots
+            .iter()
+            .any(|slot| matches!(slot, Slot::Record { .. }))
+            && self.slots.iter().all(|slot| match slot {
+                Slot::Scalar(_) => true,
+                Slot::Bools(_) => false,
+                Slot::Record { parameter, .. } => function
+                    .params
+                    .iter()
+                    .position(|param| param == parameter)
+                    .is_some_and(|index| seeds.contains_key(&index)),
+            })
+    }
+
+    pub(in crate::lowering) fn lower_scoped_arguments(
+        &self,
+        args: &[String],
+    ) -> Result<Vec<String>, String> {
+        if args.len() != self.leaves.len() {
+            return Err("scoped value capture layout/argument mismatch".into());
+        }
+        self.slots
+            .iter()
+            .map(|slot| match slot {
+                Slot::Scalar(index) => Ok(args[*index].clone()),
+                Slot::Bools(_) => {
+                    Err("scoped inputs cannot pack independent boolean carries".into())
+                }
+                Slot::Record { layout, leaves, .. } => {
+                    let inputs = &args[leaves.clone()];
+                    yir_core::loop_carry_contract::ScopedRecordInput::encode(layout, inputs)
+                }
+            })
+            .collect()
+    }
+
+    pub(in crate::lowering) fn for_generated(
+        leaves: Vec<NirParam>,
+        function: &NirFunction,
+        module: &NirModule,
+    ) -> Option<Self> {
+        use yir_core::native_scalar_session::{ScalarKind, ScalarStateLayout, MAX_SCALAR_SLOTS};
+        let scalar = Self::new(leaves.clone());
+        if scalar
+            .as_ref()
+            .map_or(leaves.len(), |plan| plan.slots.len())
+            <= MAX_SCALAR_SLOTS
+        {
+            return scalar;
+        }
+        let records = (|| {
+            let mut slots = Vec::new();
+            let mut index = 0;
+            let mut has_record = false;
+            for parameter in &function.params {
+                if ScalarKind::parse(&parameter.ty.name).is_ok() {
+                    if leaves.get(index) != Some(parameter) {
+                        return None;
+                    }
+                    slots.push(Slot::Scalar(index));
+                    index += 1;
+                } else {
+                    let layout = module_owned_struct_layout(module, &parameter.ty)?;
+                    let shape = ScalarStateLayout::parse(&layout).ok()?;
+                    let start = index;
+                    for (path, kind) in shape.fields() {
+                        let leaf = leaves.get(index)?;
+                        if leaf.name != format!("{}.{path}", parameter.name)
+                            || ScalarKind::parse(&leaf.ty.name).ok().as_ref() != Some(kind)
+                        {
+                            return None;
+                        }
+                        index += 1;
+                    }
+                    slots.push(Slot::Record {
+                        parameter: parameter.clone(),
+                        layout,
+                        leaves: start..index,
+                    });
+                    has_record = true;
+                }
+            }
+            (has_record && index == leaves.len()).then_some(slots)
+        })();
+        records.map(|slots| Self { leaves, slots }).or(scalar)
+    }
+
     pub(in crate::lowering) fn new(leaves: Vec<NirParam>) -> Option<Self> {
         let bools = leaves
             .iter()
@@ -62,6 +159,26 @@ impl CapturePlan {
         let mut decoded = BTreeMap::new();
         let mut physical_index = 0;
         for slot in &self.slots {
+            if let Slot::Record {
+                parameter, layout, ..
+            } = slot
+            {
+                let node = emit(
+                    "param_value_struct",
+                    vec![physical_index.to_string(), layout.clone()],
+                    &[],
+                    state,
+                );
+                parameters.push(YirFunctionParameter {
+                    name: parameter.name.clone(),
+                    ty: parameter.ty.render(),
+                    ownership: yir_core::YirValueOwnership::Value,
+                    node: node.clone(),
+                });
+                decoded.insert(parameter.name.clone(), node);
+                physical_index += 1;
+                continue;
+            }
             let param = match slot {
                 Slot::Scalar(index) => self.leaves[*index].clone(),
                 Slot::Bools(group) => NirParam {
@@ -75,6 +192,7 @@ impl CapturePlan {
                         is_optional: false,
                     },
                 },
+                Slot::Record { .. } => unreachable!("record handled above"),
             };
             let word = aggregate_params::materialize_scalar_parameter(
                 &function.name,
@@ -102,6 +220,7 @@ impl CapturePlan {
                         decoded.insert(self.leaves[*index].name.clone(), value);
                     }
                 }
+                Slot::Record { .. } => unreachable!("record handled above"),
             }
         }
         for param in &function.params {
@@ -120,9 +239,25 @@ impl CapturePlan {
             return Err("private value capture layout/argument mismatch".into());
         }
         let mut packed = Vec::new();
+        let decoded = if self
+            .slots
+            .iter()
+            .any(|slot| matches!(slot, Slot::Record { .. }))
+        {
+            self.leaves
+                .iter()
+                .zip(args)
+                .map(|(param, arg)| (param.name.clone(), arg.clone()))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
         for slot in &self.slots {
             match slot {
                 Slot::Scalar(index) => packed.push(args[*index].clone()),
+                Slot::Record { parameter, .. } => {
+                    packed.push(restore(&parameter.name, &parameter.ty, &decoded, state)?)
+                }
                 Slot::Bools(group) => {
                     let mut word = None;
                     for (bit, index) in group.iter().enumerate() {

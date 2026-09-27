@@ -33,6 +33,7 @@ mod tests_mutex_lifecycle;
 mod tests_owned_struct_layout;
 #[cfg(test)]
 mod tests_scalar_logic;
+pub mod value_parameters;
 
 use branch_effect::{execute_cpu_branch_effect_action, CPU_BRANCH_EFFECT_ACTIONS};
 use carry_payload::*;
@@ -59,6 +60,30 @@ impl RegisteredMod for CpuMod {
     }
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {
         describe_cpu_node(node, resource)
+    }
+    fn function_parameter(
+        &self,
+        node: &Node,
+        _resource: &Resource,
+    ) -> Result<Option<yir_core::FunctionParameterContract>, String> {
+        Ok(
+            value_parameters::parse(node)?.map(|parameter| yir_core::FunctionParameterContract {
+                index: parameter.index,
+                ty: parameter.layout.type_name,
+                ownership: yir_core::YirValueOwnership::Value,
+            }),
+        )
+    }
+    fn validate_function_argument(
+        &self,
+        node: &Node,
+        _resource: &Resource,
+        value: &Value,
+    ) -> Result<(), String> {
+        if let Some(parameter) = value_parameters::parse(node)? {
+            parameter.validate(value)?;
+        }
+        Ok(())
     }
     fn function_exit(
         &self,

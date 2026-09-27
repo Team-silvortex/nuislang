@@ -110,6 +110,22 @@ pub fn verify_module_with_registry(
 
     verify_function_table(module, &nodes)?;
     yir_core::validate_application_sessions(module)?;
+    let parameter_bindings = module
+        .functions
+        .iter()
+        .flat_map(|function| {
+            function
+                .parameters
+                .iter()
+                .enumerate()
+                .map(move |(index, parameter)| {
+                    (
+                        parameter.node.as_str(),
+                        (function.domain.as_str(), index, parameter),
+                    )
+                })
+        })
+        .collect::<HashMap<_, _>>();
 
     for (node_index, node) in module.nodes.iter().enumerate() {
         let resource = resources
@@ -128,6 +144,22 @@ pub fn verify_module_with_registry(
                 node.name, node.op.module
             )
         })?;
+
+        if let Some(contract) = module_impl.function_parameter(node, resource)? {
+            if !parameter_bindings.get(node.name.as_str()).is_some_and(
+                |(domain, index, parameter)| {
+                    *domain == node.op.module
+                        && *index == contract.index
+                        && parameter.ty == contract.ty
+                        && parameter.ownership == contract.ownership
+                },
+            ) {
+                return Err(format!(
+                    "registered parameter `{}` disagrees with its function declaration",
+                    node.name
+                ));
+            }
+        }
 
         let semantics = match registry.describe_branch_effect_node(node)? {
             Some(semantics) => semantics,

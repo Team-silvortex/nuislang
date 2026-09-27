@@ -8,10 +8,15 @@ mod tests;
 #[path = "capture_scoped_carries_tests.rs"]
 mod carry_tests;
 
+#[cfg(test)]
+#[path = "capture_scoped_elision_tests.rs"]
+mod elision_tests;
+
 #[derive(Default)]
 pub(super) struct Inputs {
     pub(super) protected: BTreeSet<usize>,
     pub(super) carried: BTreeSet<usize>,
+    pub(super) elidable: BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
 }
 
 // Only an exact flat record reconstruction grants field-mapped backedge inputs.
@@ -58,7 +63,6 @@ pub(super) fn protected_inputs(
                     }) {
                         let mut written = BTreeSet::new();
                         branches::collect_bindings(body, &mut written);
-                        let inputs = protected.entry(callee.clone()).or_default();
                         let carried = functions
                             .get(callee.as_str())
                             .map(|function| {
@@ -67,14 +71,23 @@ pub(super) fn protected_inputs(
                                 )
                             })
                             .unwrap_or_default();
+                        let seen = protected.contains_key(callee);
+                        let inputs = protected.entry(callee.clone()).or_default();
+                        if seen {
+                            // Every scoped call must agree on the nominal record
+                            // and its complete output slot range before elision.
+                            inputs.elidable.retain(|index, seed| carried.get(index) == Some(seed));
+                        } else {
+                            inputs.elidable = carried.clone();
+                        }
                         for (index, arg) in args.iter().enumerate() {
                             if access(arg).is_none_or(|path| {
-                                written.contains(&path[0]) && !carried.contains(&index)
+                                written.contains(&path[0]) && !carried.contains_key(&index)
                             }) {
                                 inputs.protected.insert(index);
                             }
                         }
-                        inputs.carried.extend(carried);
+                        inputs.carried.extend(carried.keys());
                     }
                     pending.push(body);
                 }

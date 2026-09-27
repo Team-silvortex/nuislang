@@ -142,3 +142,48 @@ fn unpack_materializes_independent_named_scalar_values() {
         .iter()
         .all(|line| line.contains("extractvalue [2 x i64]")));
 }
+
+#[test]
+fn rejected_value_return_leaves_ir_and_fresh_ids_unchanged() {
+    let plan = NativeValueReturn::helper("Packet{second:i64;first:i64}").unwrap();
+    let mut wrong = returned();
+    wrong.fields[0].1 = LlvmValueRef::I32("11".to_owned());
+    for guarded in [false, true] {
+        let mut args = vec![
+            "value".to_owned(),
+            "Packet{second:i64;first:i64}".to_owned(),
+        ];
+        if guarded {
+            args.insert(0, "condition".to_owned());
+        }
+        let node = Node {
+            name: "returned".to_owned(),
+            resource: "cpu".to_owned(),
+            op: yir_core::Operation::parse(
+                if guarded {
+                    "cpu.guard_return"
+                } else {
+                    "cpu.return_owned_struct"
+                },
+                args,
+            )
+            .unwrap(),
+        };
+        let registers = BTreeMap::from([
+            (
+                "condition".to_owned(),
+                LlvmValueRef::I64("%flag".to_owned()),
+            ),
+            ("value".to_owned(), LlvmValueRef::Struct(wrong.clone())),
+        ]);
+        let mut body = vec!["entry:".to_owned()];
+        let mut next_reg = 17;
+        let mut next_block = 23;
+        let error = plan
+            .lower(&node, &registers, &mut body, &mut next_reg, &mut next_block)
+            .unwrap_err();
+        assert!(error.contains("does not match its function return layout"));
+        assert_eq!(body, ["entry:"]);
+        assert_eq!((next_reg, next_block), (17, 23));
+    }
+}

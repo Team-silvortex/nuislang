@@ -28,6 +28,8 @@ mod loop_work;
 mod record_joins;
 #[path = "dev_tensor_drift_data_native_scoped_captures.rs"]
 mod scoped_captures;
+#[path = "dev_tensor_drift_data_native_scoped_record_inputs.rs"]
+mod scoped_record_inputs;
 #[path = "dev_tensor_drift_data_native_terminal_continuations.rs"]
 mod terminal_continuations;
 #[path = "dev_tensor_drift_data_native_terminal_snapshots.rs"]
@@ -36,6 +38,8 @@ mod terminal_snapshots;
 mod trailing_value_loops;
 #[path = "dev_tensor_drift_data_native_value_loop_exits.rs"]
 mod value_loop_exits;
+#[path = "dev_tensor_drift_data_native_value_transport.rs"]
+mod value_transport;
 
 pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
     CHECKS
@@ -47,6 +51,8 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(bool_rebinding::CHECKS.iter())
         .chain(aggregate_rebinding::CHECKS.iter())
         .chain(aggregate_values::CHECKS.iter())
+        .chain(value_transport::CHECKS.iter())
+        .chain(scoped_record_inputs::CHECKS.iter())
         .chain(scoped_captures::CHECKS.iter())
         .chain(aggregate_carries::CHECKS.iter())
         .chain(bool_carries::CHECKS.iter())

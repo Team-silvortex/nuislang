@@ -3,8 +3,8 @@
 This is the operational companion to the
 [beta-0.15 snapshot](nuis-beta-0.15.0-snapshot.md), anchored to
 `05951befc70d6a145e4978a3ff8909737e5c4fbb` (`beta-0.15.0`, 2026-09-24).
-The [beta-0.15.2 patch](nuis-beta-0.15.2-patch.md) records subsequent record joins,
-independent seeds, generated scoped input projection and selected validation results.
+The [beta-0.15.3 patch](nuis-beta-0.15.3-patch.md) records subsequent unread-input
+elision, checked record transport, scoped record parameters and selected validation results.
 Commands below are validation instructions, not blanket claims that every suite
 was rerun during documentation synchronization. Record the actual revision and
 worktree changes, platform, prerequisites, command, exit status and skip counts.
@@ -98,13 +98,13 @@ for the admitted value path. Ordinary/resource ABI behavior remains separate.
 
 Private capture tests must retain unchanged public/FFI signatures, field/argument
 order, guarded effects, work budgets and conservative rejection. Generated scoped
-helpers may project invariant inputs and proven partial flat-record carry inputs;
+helpers may project invariant inputs and proven partial or entirely unread flat-record carry inputs;
 induction and break-control identities must survive unchanged. Aliases and snapshots must not observe later writes or
 discard selected initializer work. Returning-child versions must not leak into
 parent continuations. Fallthrough and loop-written input reconstruction require an exact-type,
 field-only copy-family proof and must retain original record assignments and
-complete initializers, per-trip snapshots and backedges. Whole escapes and entirely
-unread carried records remain conservative; zero trips must not execute body work.
+complete initializers, per-trip snapshots and backedges. Whole escapes remain
+conservative; zero trips must not execute body work.
 Explicit scoped field seed maps require complete initial state and unique, same-typed
 argument mappings, including partial maps with independent seeds. Prove each initial field-seed record's
 exact nominal identity before flattening; reject mismatched or unknown origins.
@@ -114,9 +114,32 @@ Check legacy and explicit-seed parsing, metadata-free dependency/GLM reads, unus
 seed validation, zero-trip initializer failures and independent state/parameter bounds.
 Generated partial-record projection must prove the original seed/reconstruction map
 at every scoped caller, version only eligible record parameters, keep full output
-state and retain at least one field per record. Reject ambiguous or computed maps,
+state and prove the exact nominal type/width/result-slot range when no record field
+is passed. All scoped callers must agree; vetoed rewrites must publish no elision proof.
+
+The shared pure-value codec also has an opt-in host-clang argument/return probe:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p yir-lower-llvm --lib -- typed_record_arguments_round_trip_through_host_llvm --ignored --test-threads=1
+```
+
+Verify flat/nested 1..64-leaf records and scalar bit patterns at both `-O0` and
+`-O2`. This isolated probe exercises the codec; generated non-scoped source capture
+admission additionally requires the following source/native and restoration gates:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --test native_application_bridge -- typed_record_inputs typed_record_guards typed_scoped_record_inputs wide_scoped_record typed_local_declared --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuis --test native_session_workflow -- native_record_inputs_build_cache_and_restore_without_sources native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources --test-threads=1
+```
+
+The generated 64-field-plus-predicate case must run, while a source-declared 65-leaf
+namesake still rejects. Keep bounded nominal layout, exact kind and unique parameter
+binding checks, selected traps and failure sentinels. Scoped flat-i64 record inputs
+require complete seed proofs and exact per-trip maps. Wide generated branch inputs,
+mixed/nested carries, task thunks and resources remain separate; callback/public/FFI ABI is unchanged.
+Source names cannot grant authority and scalar/bool/break seeds stay required. Reject ambiguous or computed maps,
 unresolved fallthrough joins and nested-loop writes without partially mutating the
-candidate. Check 3/7/64-slot state with three arguments, break/continue/bool identities,
+candidate. Check 3/7/64-slot state with two/three arguments, multiple records, break/continue/bool identities,
 ordinary native results and initializer/second-trip traps, plus native lifecycle
 arity inspection and byte-identical source-free restoration.
 Build/cache/tamper and source-free restoration must keep exact

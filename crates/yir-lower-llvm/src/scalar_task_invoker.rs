@@ -4,12 +4,16 @@ pub(super) fn render_scalar_task_invoker(
     function_name: &str,
     signature: &CpuHelperSignature,
 ) -> Option<String> {
+    let parameters = signature
+        .params
+        .iter()
+        .map(|kind| kind.scalar())
+        .collect::<Option<Vec<_>>>()?;
     // Synchronous contexts and lowering-private value returns must not escape into task thunks.
     if !signature.implicit_parameters.is_empty()
         || signature.native_value_return.is_some()
         || !is_normalized_task_scalar(signature.ret)
-        || signature
-            .params
+        || parameters
             .iter()
             .any(|kind| !is_normalized_task_scalar(*kind))
     {
@@ -17,7 +21,7 @@ pub(super) fn render_scalar_task_invoker(
     }
     let mut body = Vec::new();
     let mut call_args = Vec::new();
-    for (index, kind) in signature.params.iter().copied().enumerate() {
+    for (index, kind) in parameters.iter().copied().enumerate() {
         let pointer = if index == 0 {
             "%context".to_owned()
         } else {

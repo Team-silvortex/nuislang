@@ -154,6 +154,16 @@ fn native_sparse_captures_partial_field_seeds_build_cache_and_restore_without_so
     check_sparse_workflow(&aliases::partial_field_seed_source(), Some(&[1, 2]), 30);
 }
 
+#[test]
+fn native_sparse_captures_unread_records_build_cache_and_restore_without_sources() {
+    check_sparse_workflow_with_iteration(
+        &aliases::unread_record_source(),
+        Some(&[1, 2]),
+        30,
+        Some(4),
+    );
+}
+
 fn check_sparse_workflow(source: &str, branch_sizes: Option<&[usize]>, offset: i64) {
     check_sparse_workflow_with_iteration(source, branch_sizes, offset, None);
 }

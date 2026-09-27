@@ -47,6 +47,8 @@ fn xfer(from: &str, to: &str) -> Edge {
 mod cpu_heap;
 #[path = "tests/data_fabric.rs"]
 mod data_fabric;
+#[path = "tests/function_parameters.rs"]
+mod function_parameters;
 #[path = "tests/glm.rs"]
 mod glm;
 #[path = "tests/graph.rs"]

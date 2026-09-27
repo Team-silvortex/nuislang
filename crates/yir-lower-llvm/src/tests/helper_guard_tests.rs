@@ -267,7 +267,9 @@ fn normalizes_spawned_bool_result_through_i64_slot() {
 fn synchronous_context_is_forwarded_but_never_captured_by_a_task_invoker() {
     use super::super::{render_scalar_task_invoker, CpuHelperSignature};
     let mut signature = CpuHelperSignature {
-        params: vec![CpuCallScalarKind::I64],
+        params: vec![crate::call_parameters::CpuCallParameterKind::Scalar(
+            CpuCallScalarKind::I64,
+        )],
         implicit_parameters: vec!["ptr %context".to_owned()],
         mutex_permit_params: vec![None],
         ret: CpuCallScalarKind::I64,
@@ -305,7 +307,9 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
     let f32_invoker = render_scalar_task_invoker(
         "identity_f32",
         &CpuHelperSignature {
-            params: vec![CpuCallScalarKind::F32],
+            params: vec![crate::call_parameters::CpuCallParameterKind::Scalar(
+                CpuCallScalarKind::F32,
+            )],
             implicit_parameters: Vec::new(),
             mutex_permit_params: vec![None],
             ret: CpuCallScalarKind::F32,
@@ -324,7 +328,10 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
     let f64_invoker = render_scalar_task_invoker(
         "pick_f64",
         &CpuHelperSignature {
-            params: vec![CpuCallScalarKind::Bool, CpuCallScalarKind::F64],
+            params: vec![CpuCallScalarKind::Bool, CpuCallScalarKind::F64]
+                .into_iter()
+                .map(crate::call_parameters::CpuCallParameterKind::Scalar)
+                .collect(),
             implicit_parameters: Vec::new(),
             mutex_permit_params: vec![None, None],
             ret: CpuCallScalarKind::F64,
@@ -743,6 +750,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         &resources,
         &ordered_node_names,
         &param_bindings,
+        &BTreeMap::new(),
         &BTreeMap::new(),
         &BTreeMap::new(),
         &BTreeMap::new(),

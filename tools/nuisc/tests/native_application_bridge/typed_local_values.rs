@@ -39,7 +39,7 @@ fn typed_local_choices_and_one_sided_rebindings_preserve_nested_snapshots_and_bi
 }
 
 #[test]
-fn typed_local_incompressible_capture_keeps_native_argument_bounds_explicit() {
+fn typed_local_declared_namesake_keeps_native_argument_bounds_explicit() {
     let fields = (0..64)
         .map(|i| format!("f{i}: i64"))
         .collect::<Vec<_>>()
@@ -51,12 +51,13 @@ fn typed_local_incompressible_capture_keeps_native_argument_bounds_explicit() {
     let source = format!(
         "mod cpu Main {{
         struct State {{ {fields} }}
-        @noinline fn relay(value: State) -> State {{ return value; }}
+        @noinline fn __nuis_conditional_value_user(value: State, flag: bool) -> State {{
+            if flag {{ return value; }}
+            return value;
+        }}
         fn start() -> State {{ return State {{ {values} }}; }}
         fn step(state: State) -> State {{
-            let next = state;
-            if state.f0 > 0 {{ let next = relay(state); }}
-            return next;
+            return __nuis_conditional_value_user(state, state.f0 > 0);
         }}
         fn stop(state: State) -> State {{ return state; }}
         fn main() -> i64 {{ return 0; }}
@@ -64,6 +65,24 @@ fn typed_local_incompressible_capture_keeps_native_argument_bounds_explicit() {
     );
     let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let declared = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|function| function.name == "__nuis_conditional_value_user")
+        .unwrap();
+    assert_eq!(declared.parameters.len(), 65);
+    assert!(declared.parameters.iter().all(|parameter| {
+        compiled
+            .yir
+            .nodes
+            .iter()
+            .find(|node| node.name == parameter.node)
+            .unwrap()
+            .op
+            .instruction
+            != "param_value_struct"
+    }));
     let error = emit_registered(&compiled.yir, "counter").unwrap_err();
     // Sixty-four independent i64 values cannot share a word with the predicate.
     assert!(error.contains("function/argument bounds"), "{error}");

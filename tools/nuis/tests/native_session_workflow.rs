@@ -13,6 +13,10 @@ mod capture_words;
 mod helper_entries;
 #[path = "native_session_workflow/loop_work.rs"]
 mod loop_work;
+#[path = "native_session_workflow/record_inputs.rs"]
+mod record_inputs;
+#[path = "native_session_workflow/scoped_record_inputs.rs"]
+mod scoped_record_inputs;
 
 const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/multi_loops.ns");
 const BREAK_SOURCE: &str =

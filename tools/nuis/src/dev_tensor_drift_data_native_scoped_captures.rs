@@ -8,9 +8,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "protected_inputs(",
             "branches::collect_bindings(body, &mut written)",
             "protected.entry(callee.clone()).or_default()",
-            "written.contains(&path[0]) && !carried.contains(&index)",
+            "written.contains(&path[0]) && !carried.contains_key(&index)",
             "inputs.protected.insert(index)",
-            "inputs.carried.extend(carried)",
+            "inputs.carried.extend(carried.keys())",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -235,12 +235,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "scoped-generated-record-partial-demand-only",
+        id: "scoped-generated-record-proven-demand-projection",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs",
         required_patterns: &[
             "snapshots::normalize_scoped(&mut candidate, layouts)",
             "inputs.protected.contains(index)",
-            "paths.is_empty() && protected.is_some_and(|inputs| inputs.carried.contains(&index))",
+            "inputs.carried.contains(&index) && !inputs.elidable.contains_key(&index)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -248,7 +248,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_scoped_carries_tests.rs",
         required_patterns: &[
             "generated_scoped_record_inputs_project_only_demanded_initial_fields",
-            "generated_scoped_projection_rejects_unproven_or_empty_carry_maps_transactionally",
+            "generated_scoped_projection_rejects_unproven_carry_maps_transactionally",
             "generated_scoped_projection_requires_all_callers_to_prove_the_backedge",
             "generated_scoped_snapshots_leave_fallthrough_and_nested_loop_writes_whole",
         ],
@@ -280,6 +280,77 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "iteration_arity: Option<usize>",
             "line.contains(\" @nuis_fn___nuis_scalar_iteration_\")",
             "assert_eq!(fs::read_to_string(restored.join(&llvm_name)).unwrap(), llvm)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-caller-agreement",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_scoped.rs",
+        required_patterns: &[
+            "pub(super) elidable: BTreeMap<usize, scoped_loop_lowering::RecordSeed>",
+            "carried.get(index) == Some(seed)",
+            "inputs.elidable = carried.clone()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-transactional-authority",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs",
+        required_patterns: &[
+            "scoped_generated.contains(&f.name)",
+            "valid_caller(&module.functions[*i].body, &name, &plan)",
+            "projected.elided_records.insert(name.clone(), seeds)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-proof-handoff",
+        path: "tools/nuisc/src/lowering/bootstrap.rs",
+        required_patterns: &["scoped_elided_record_seeds: outlined.elided_record_seeds.clone()"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-exact-seed-admission",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
+        required_patterns: &[
+            "elided: &[RecordSeed]",
+            "!elided.contains(&binding.record_seed(slot))",
+            "slot += binding.width()",
+            "actual.as_deref() != Some(binding.ty.name.as_str())",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-proof-regressions",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_scoped_elision_tests.rs",
+        required_patterns: &[
+            "generated_unread_records_keep_seeds_without_iteration_operands",
+            "generated_unread_record_elision_preserves_control_seed_identities",
+            "generated_unread_record_proofs_require_all_callers_to_agree_on_slots",
+            "generated_name_does_not_authorize_source_record_seed_elision",
+            "generated_unread_records_keep_distinct_complete_slot_ranges",
+            "generated_unread_record_elision_does_not_publish_a_vetoed_proof",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-native-entry",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "generated_unread_record_elision_preserves_native_state_and_traps",
+            "scoped_unread_record_carries.ns",
+            "Some(132)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-native-lifecycle",
+        path: "tools/nuisc/tests/native_application_bridge/typed_sparse_captures.rs",
+        required_patterns: &[
+            "typed_sparse_captures_elide_unread_record_inputs_with_full_initial_state",
+            "assert_eq!(slots, [4])",
+            "aliases::unread_record_source()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "scoped-unread-record-source-free-restoration",
+        path: "tools/nuis/tests/native_session_workflow/capture_fields.rs",
+        required_patterns: &[
+            "native_sparse_captures_unread_records_build_cache_and_restore_without_sources",
+            "aliases::unread_record_source()",
         ],
     },
 ];

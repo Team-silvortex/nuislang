@@ -147,9 +147,12 @@ pub(crate) fn branch_owned_helper_signature<'a>(
         )
     })?;
     if signature.ret != CpuCallScalarKind::OwnedBytes
-        || signature.params.first() != Some(&CpuCallScalarKind::OwnedBytes)
+        || signature.params.first().and_then(|kind| kind.scalar())
+            != Some(CpuCallScalarKind::OwnedBytes)
         || signature.params.len() != scalar_count + 1
-        || signature.params[1..].contains(&CpuCallScalarKind::OwnedBytes)
+        || signature.params[1..]
+            .iter()
+            .any(|kind| kind.scalar().is_none() || kind == &CpuCallScalarKind::OwnedBytes)
     {
         return Err(format!(
             "{} `{}` requires `{callee}` to have signature (Bytes, scalar-or-borrowed-buffer...) -> Bytes matching its encoded arguments",
@@ -163,7 +166,7 @@ pub(crate) fn lower_branch_scalar_args(
     registers: &BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &BTreeMap<String, String>,
     args: &[String],
-    kinds: &[CpuCallScalarKind],
+    kinds: &[crate::call_parameters::CpuCallParameterKind],
     mutex_permit_kinds: &[Option<MutexScalarKind>],
 ) -> Option<Vec<String>> {
     args.iter()
@@ -174,7 +177,7 @@ pub(crate) fn lower_branch_scalar_args(
                 (permit.scalar_kind == *expected_kind)
                     .then(|| vec![format!("i64 {}", permit.runtime_token)])
             }
-            None => match kind {
+            None => match kind.scalar()? {
                 CpuCallScalarKind::BorrowedBuffer => {
                     let (pointer, len) = borrowed_buffer_parts(registers, buffer_lengths, arg)?;
                     Some(vec![format!("ptr {pointer}"), format!("i64 {len}")])
@@ -182,7 +185,7 @@ pub(crate) fn lower_branch_scalar_args(
                 CpuCallScalarKind::TraversalPointer => {
                     get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
                 }
-                _ => Some(vec![lower_scalar_value_arg(registers.get(arg)?, kind)?]),
+                scalar => Some(vec![lower_scalar_value_arg(registers.get(arg)?, &scalar)?]),
             },
         })
         .collect::<Option<Vec<_>>>()
@@ -275,6 +278,20 @@ pub(crate) fn lower_cpu_call_node(
             call_inputs.len()
         ));
     }
+    let mut record_args = BTreeMap::new();
+    for (index, (arg, kind)) in call_inputs.iter().zip(&signature.params).enumerate() {
+        if let crate::call_parameters::CpuCallParameterKind::Record(layout) = kind {
+            if deferred_task_calls.contains(&node.name) {
+                return Err(
+                    "pure-value record parameters cannot escape into task thunks".to_owned(),
+                );
+            }
+            let value = registers
+                .get(arg)
+                .ok_or_else(|| format!("missing record argument `{arg}`"))?;
+            record_args.insert(index, layout.prepare(value)?);
+        }
+    }
     let lowered_args = call_inputs
         .iter()
         .zip(
@@ -283,41 +300,53 @@ pub(crate) fn lower_cpu_call_node(
                 .iter()
                 .zip(signature.mutex_permit_params.iter()),
         )
-        .map(|(arg, (kind, mutex_permit_kind))| match mutex_permit_kind {
-            Some(expected_kind) => {
-                let permit = get_mutex_permit(registers, arg)?;
-                (permit.scalar_kind == *expected_kind)
-                    .then(|| vec![format!("i64 {}", permit.runtime_token)])
+        .enumerate()
+        .map(|(index, (arg, (kind, mutex_permit_kind)))| {
+            if let Some(value) = record_args.get(&index) {
+                return Some(vec![format!(
+                    "{} {}",
+                    kind.llvm_type(),
+                    value.emit(body, next_reg)
+                )]);
             }
-            None => match kind {
-                CpuCallScalarKind::Bool => {
-                    get_bool(registers, arg).map(|value| vec![format!("i1 {value}")])
+            match mutex_permit_kind {
+                Some(expected_kind) => {
+                    let permit = get_mutex_permit(registers, arg)?;
+                    (permit.scalar_kind == *expected_kind)
+                        .then(|| vec![format!("i64 {}", permit.runtime_token)])
                 }
-                CpuCallScalarKind::I32 => {
-                    get_i32(registers, arg).map(|value| vec![format!("i32 {value}")])
-                }
-                CpuCallScalarKind::I64 => {
-                    get_i64(registers, arg).map(|value| vec![format!("i64 {value}")])
-                }
-                CpuCallScalarKind::F32 => {
-                    get_f32(registers, arg).map(|value| vec![format!("float {value}")])
-                }
-                CpuCallScalarKind::F64 => {
-                    get_f64(registers, arg).map(|value| vec![format!("double {value}")])
-                }
-                CpuCallScalarKind::BorrowedBuffer => {
-                    borrowed_buffer_parts(registers, buffer_lengths, arg)
-                        .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")])
-                }
-                CpuCallScalarKind::TraversalPointer => {
-                    get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
-                }
-                CpuCallScalarKind::OwnedBytes => match registers.get(arg) {
-                    Some(LlvmValueRef::OwnedBytes { blob }) => Some(vec![format!("ptr {blob}")]),
-                    _ => None,
+                None => match kind.scalar()? {
+                    CpuCallScalarKind::Bool => {
+                        get_bool(registers, arg).map(|value| vec![format!("i1 {value}")])
+                    }
+                    CpuCallScalarKind::I32 => {
+                        get_i32(registers, arg).map(|value| vec![format!("i32 {value}")])
+                    }
+                    CpuCallScalarKind::I64 => {
+                        get_i64(registers, arg).map(|value| vec![format!("i64 {value}")])
+                    }
+                    CpuCallScalarKind::F32 => {
+                        get_f32(registers, arg).map(|value| vec![format!("float {value}")])
+                    }
+                    CpuCallScalarKind::F64 => {
+                        get_f64(registers, arg).map(|value| vec![format!("double {value}")])
+                    }
+                    CpuCallScalarKind::BorrowedBuffer => {
+                        borrowed_buffer_parts(registers, buffer_lengths, arg)
+                            .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")])
+                    }
+                    CpuCallScalarKind::TraversalPointer => {
+                        get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
+                    }
+                    CpuCallScalarKind::OwnedBytes => match registers.get(arg) {
+                        Some(LlvmValueRef::OwnedBytes { blob }) => {
+                            Some(vec![format!("ptr {blob}")])
+                        }
+                        _ => None,
+                    },
+                    CpuCallScalarKind::OwnedExternalBuffer => None,
                 },
-                CpuCallScalarKind::OwnedExternalBuffer => None,
-            },
+            }
         })
         .collect::<Option<Vec<_>>>()
         .map(|args| args.into_iter().flatten().collect::<Vec<_>>());
@@ -333,7 +362,12 @@ pub(crate) fn lower_cpu_call_node(
         let template = parse_owned_struct_layout(&node.op.args[1])?;
         let arguments = lowered_args
             .iter()
-            .zip(signature.params.iter().copied())
+            .zip(
+                signature
+                    .params
+                    .iter()
+                    .map(|kind| kind.scalar().expect("record task arguments rejected")),
+            )
             .map(|(argument, kind)| TaskThunkArgument {
                 kind,
                 value: argument
@@ -364,19 +398,26 @@ pub(crate) fn lower_cpu_call_node(
                 | CpuCallScalarKind::F64
         )
         && signature.params.iter().all(|kind| {
-            matches!(
-                kind,
-                CpuCallScalarKind::Bool
-                    | CpuCallScalarKind::I32
-                    | CpuCallScalarKind::I64
-                    | CpuCallScalarKind::F32
-                    | CpuCallScalarKind::F64
-            )
+            kind.scalar().is_some_and(|kind| {
+                matches!(
+                    kind,
+                    CpuCallScalarKind::Bool
+                        | CpuCallScalarKind::I32
+                        | CpuCallScalarKind::I64
+                        | CpuCallScalarKind::F32
+                        | CpuCallScalarKind::F64
+                )
+            })
         })
     {
         let arguments = lowered_args
             .iter()
-            .zip(signature.params.iter().copied())
+            .zip(
+                signature
+                    .params
+                    .iter()
+                    .map(|kind| kind.scalar().expect("scalar task parameters")),
+            )
             .map(|(argument, kind)| TaskThunkArgument {
                 kind,
                 value: argument

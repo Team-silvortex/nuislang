@@ -8,6 +8,9 @@ use yir_core::{Value, YirModule};
 use yir_lower_llvm::native_session::{emit_registered, NativeSessionBridge, ScalarKind};
 use yir_runtime_host::ApplicationSession;
 
+#[path = "native_application_bridge/typed_scoped_record_inputs.rs"]
+mod typed_scoped_record_inputs;
+
 #[path = "native_application_bridge/aggregate_admission.rs"]
 mod aggregate_admission;
 #[path = "native_application_bridge/aggregate_calls.rs"]
@@ -116,6 +119,10 @@ mod typed_helper_guards;
 mod typed_helper_values;
 #[path = "native_application_bridge/typed_local_values.rs"]
 mod typed_local_values;
+#[path = "native_application_bridge/typed_record_guards.rs"]
+mod typed_record_guards;
+#[path = "native_application_bridge/typed_record_inputs.rs"]
+mod typed_record_inputs;
 #[path = "native_application_bridge/typed_sparse_captures.rs"]
 mod typed_sparse_captures;
 #[path = "native_application_bridge/value_loop_exits.rs"]

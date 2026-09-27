@@ -8,8 +8,9 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.2`](versioning/nuis-beta-0.15.2-patch.md)
-(2026-09-25), covering record joins, independent seeds and generated scoped record inputs.
+The current patch is [`beta-0.15.3`](versioning/nuis-beta-0.15.3-patch.md)
+(2026-09-27), covering unread-input elision, checked pure-value transport and
+generated whole-record parameters, including bounded scoped flat-i64 loops.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -43,9 +44,18 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
-The `05951bef` checkpoint and `beta-0.15.2` retain `active/86`. The next task is to
-remove entirely unconsumed flat-record inputs from generated scoped helper signatures
-without losing initial state, carry/break identities or native-session boundaries. Version
+The `05951bef` checkpoint and `beta-0.15.3` retain `active/86`. Current work removes
+proven entirely unread generated record inputs while preserving full initial seeds.
+The next task is to lower whole-record inputs in generated branch helpers without flattening wide captures or speculating unselected arms.
+Generated scoped flat-i64 inputs now use explicit per-trip record maps after every
+caller agrees on the complete seed range. A 64-field record plus induction and a
+bounded break loop execute natively; separate wide branch helpers still hit the
+64-argument bound. Mixed/nested carries and resource inputs remain outside this slice.
+Generated non-scoped capture plans now use typed YIR record parameters when scalar
+compaction still exceeds 64 parameters. The incompressible 64-field-plus-predicate
+case now executes with bounded value transport; public/source/FFI and callback ABI
+remain unchanged. Registered parameter contracts check nominal layout and exact
+runtime values; the shared codec handles native arguments and returns. Version
 documentation and repository cleanup do not change capability scores.
 
 Current session evidence:
@@ -350,10 +360,12 @@ generated scoped iteration targets now project invariant fields and retain their
 independent argument maps. The 64-field source loop uses four rather than 66 iteration
 arguments; nested break identities retain their existing mapping.
 Explicit flat-i64 field arguments can now omit unread slots while independent seeds preserve complete initial state.
-Generated scoped helpers now also project partially read flat-i64 record inputs after
+Generated scoped helpers now project partially read and entirely unread flat-i64 record inputs after
 separating parameter snapshots from updates and proving every scoped caller's exact
-seed/reconstruction map. Source regressions retain 3/7/64 state slots with three
-iteration arguments. Empty demand, full uses, unresolved joins and nested writes
+seed/reconstruction map. Source regressions retain 3/7/64 state slots with two/three
+iteration arguments. Empty demand requires every scoped caller to agree on the nominal type,
+width and result-slot range, with compiler-private proof passed to lowering only
+after a successful rewrite. Full uses, unresolved joins and nested writes
 remain conservative; sparse state storage is not implemented by this projection. These are bounded CPU
 correctness/transport results, not native resource/provider dispatch or measured runtime speedups.
 The parser also rejects excessive call/group expression re-entry before stack

@@ -133,6 +133,88 @@ fn returned_carries(first: Value, second: Value) -> Value {
 }
 
 #[test]
+fn scoped_records_resolve_dynamic_leaves_without_losing_zero_trip_seeds() {
+    use yir_core::RegisteredExecutionStep as Step;
+    let mut node = multiple_carry_loop();
+    node.op.args.truncate(10);
+    node.op
+        .args
+        .extend(yir_core::loop_carry_contract::encode_scoped_i64_seeds(&[
+            "seed".into(),
+            "second".into(),
+        ]));
+    node.op.args.push("$value_record:Input{second:i64;first:i64;iteration:i64;fixed:i64}|$owned_struct_carry:1:second|$owned_struct_carry:0:seed|$current|fixed".into());
+    node.op.args[7] = (node.op.args.len() - 8).to_string();
+    for limit in [0, 2] {
+        let mut state = loop_state(0, limit, 1);
+        state.bind_value("seed", Value::Int(10));
+        state.bind_value("second", Value::Int(20));
+        state.bind_value("fixed", Value::Int(-7));
+        assert_eq!(
+            CpuMod.describe(&node, &resource()).unwrap().dependencies,
+            ["initial", "limit", "step", "second", "seed", "fixed"]
+        );
+        let mut execution = CpuMod
+            .begin_execution(&node, &resource(), &state)
+            .unwrap()
+            .unwrap();
+        let mut result = execution.resume(&mut state, None).unwrap();
+        for trip in 0..limit {
+            let Step::Call { arguments, .. } = result else {
+                panic!("iteration call");
+            };
+            let [Value::Struct(input)] = arguments.as_slice() else {
+                panic!("one record input");
+            };
+            assert_eq!(input.type_name, "Input");
+            assert_eq!(
+                input.fields,
+                [
+                    ("second".into(), Value::Int(20 + trip)),
+                    ("first".into(), Value::Int(10 + trip)),
+                    ("iteration".into(), Value::Int(trip)),
+                    ("fixed".into(), Value::Int(-7)),
+                ]
+            );
+            // A rejected result must not consume the previous iteration's state.
+            assert!(execution
+                .resume(
+                    &mut state,
+                    Some(returned_carries(Value::Int(99), Value::Bool(true)))
+                )
+                .is_err());
+            result = execution
+                .resume(
+                    &mut state,
+                    Some(returned_carries(
+                        Value::Int(11 + trip),
+                        Value::Int(21 + trip),
+                    )),
+                )
+                .unwrap();
+        }
+        let Step::Complete(Value::Struct(result)) = result else {
+            panic!("loop result");
+        };
+        assert_eq!(
+            result.fields,
+            [
+                ("current".into(), Value::Int(limit)),
+                ("carry0".into(), Value::Int(10 + limit)),
+                ("carry1".into(), Value::Int(20 + limit)),
+            ]
+        );
+        state.bind_value("fixed", Value::I32(-7));
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+        state.values.remove("fixed");
+        assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+    }
+    node.op.args[6] = "scoped_call".into();
+    let state = loop_state(0, 2, 1);
+    assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+}
+
+#[test]
 fn separate_seeds_keep_unpassed_state_and_break_control() {
     use yir_core::RegisteredExecutionStep as Step;
     let mut node = multiple_carry_loop();
