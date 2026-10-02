@@ -4,7 +4,7 @@ use super::*;
 #[path = "capture_bindings_tests.rs"]
 mod tests;
 
-pub(super) fn normalize(function: &mut NirFunction) {
+pub(super) fn normalize(function: &mut NirFunction, controls: &BTreeSet<String>) {
     if !walk::supported(&function.body) {
         return;
     }
@@ -13,7 +13,8 @@ pub(super) fn normalize(function: &mut NirFunction) {
         .iter()
         .map(|param| (param.name.clone(), param.name.clone()))
         .collect::<BTreeMap<_, _>>();
-    let mut reserved = visible.keys().cloned().collect();
+    let mut reserved: BTreeSet<String> = visible.keys().cloned().collect();
+    reserved.extend(controls.iter().cloned());
     branches::collect_bindings(&function.body, &mut reserved);
     walk::visit(&function.body, |expr| {
         if let NirExpr::Var(name) = expr {
@@ -31,7 +32,10 @@ pub(super) fn normalize(function: &mut NirFunction) {
                     // Existing names are writes to the visible binding, not new
                     // declarations. Initializers always read the preceding scope.
                     let identity = visible.entry(name.clone()).or_insert_with(|| {
-                        if nested {
+                        // A normal branch helper can contain a scoped child loop.
+                        // Its registered break identity is also used outside the NIR
+                        // body; renaming it here would invalidate the scoped contract.
+                        if nested && !controls.contains(name) {
                             branches::fresh_name("__nuis_capture_local", &mut reserved)
                         } else {
                             name.clone()

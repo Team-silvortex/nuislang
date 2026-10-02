@@ -10,6 +10,8 @@ mod aggregate_values;
 mod bool_carries;
 #[path = "dev_tensor_drift_data_native_bool_rebinding.rs"]
 mod bool_rebinding;
+#[path = "dev_tensor_drift_data_native_child_invariants.rs"]
+mod child_invariants;
 #[path = "dev_tensor_drift_data_native_control_elision.rs"]
 mod control_elision;
 #[path = "dev_tensor_drift_data_native_counted_returns.rs"]
@@ -64,6 +66,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(terminal_continuations::CHECKS.iter())
         .chain(terminal_snapshots::CHECKS.iter())
         .chain(record_joins::CHECKS.iter())
+        .chain(child_invariants::CHECKS.iter())
 }
 
 const CHECKS: &[DevTensorDriftCheckSpec] = &[

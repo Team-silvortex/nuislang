@@ -25,6 +25,7 @@ fn project(module: &mut NirModule, names: &[&str]) -> bool {
         &names.iter().map(|name| (*name).to_owned()).collect(),
         &BTreeSet::new(),
         &layouts,
+        &BTreeMap::new(),
     );
     crate::nir_verify::verify_nir_module(module).unwrap();
     changed.changed

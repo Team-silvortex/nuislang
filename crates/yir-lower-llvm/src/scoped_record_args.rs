@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use yir_core::{loop_carry_contract::ScopedRecordInput, OwnedStructFieldLayout, OwnedStructLayout};
+use yir_core::{
+    loop_carry_contract::ScopedRecordInput, native_scalar_session::ScalarKind,
+    OwnedStructFieldLayout, OwnedStructLayout,
+};
 
 use crate::{
     call_parameters::CpuCallParameterKind, native_session::value_transport::PreparedNativeValue,
@@ -25,7 +28,17 @@ pub(crate) fn leaves<'a>(
             Ok(record
                 .operands
                 .into_iter()
-                .map(|input| (input, CpuCallScalarKind::I64))
+                .zip(record.layout.fields())
+                .map(|(input, (_, kind))| {
+                    let kind = match kind {
+                        ScalarKind::Bool => CpuCallScalarKind::Bool,
+                        ScalarKind::I32 => CpuCallScalarKind::I32,
+                        ScalarKind::I64 => CpuCallScalarKind::I64,
+                        ScalarKind::F32 => CpuCallScalarKind::F32,
+                        ScalarKind::F64 => CpuCallScalarKind::F64,
+                    };
+                    (input, kind)
+                })
                 .collect())
         }
         (None, CpuCallParameterKind::Scalar(kind)) => Ok(vec![(operand, *kind)]),
@@ -46,7 +59,7 @@ pub(crate) fn prepare(
     };
     let values = inputs
         .into_iter()
-        .map(|(input, _)| {
+        .map(|(input, kind)| {
             let value = if input == "$current" {
                 LlvmValueRef::I64(current.into())
             } else {
@@ -56,8 +69,11 @@ pub(crate) fn prepare(
                     .cloned()
                     .ok_or_else(|| format!("missing scoped record leaf `{input}`"))?
             };
-            if !matches!(value, LlvmValueRef::I64(_)) {
-                return Err(format!("scoped record leaf `{input}` requires exact i64"));
+            if crate::call_lowering::lower_scalar_value_arg(&value, &kind).is_none() {
+                return Err(format!(
+                    "scoped record leaf `{input}` requires exact {}",
+                    crate::call_return::cpu_scalar_kind_llvm_type(kind)
+                ));
             }
             Ok(value)
         })

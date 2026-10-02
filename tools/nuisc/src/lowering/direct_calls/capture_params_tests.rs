@@ -87,8 +87,8 @@ fn scoped_record_plans_keep_boolean_slots_and_unproven_records_independent() {
     let ordinary = CapturePlan::for_generated(flat.clone(), function, &module).unwrap();
     assert!(ordinary.slots.len() <= 64);
     assert!(ordinary.slots.iter().any(|s| matches!(s, Slot::Bools(_))));
-    assert!(!ordinary.supports_scoped(function, &BTreeMap::new()));
-    assert!(CapturePlan::for_scoped(flat.clone(), function, &module, &BTreeMap::new()).is_none());
+    assert!(!ordinary.supports_scoped(function, &BTreeSet::new()));
+    assert!(CapturePlan::for_scoped(flat.clone(), function, &module, &BTreeSet::new()).is_none());
     let allowed = BTreeSet::from([0]);
     let plan = CapturePlan::records(flat.clone(), function, &module, Some(&allowed)).unwrap();
     assert_eq!(plan.slots.len(), 6);
@@ -279,7 +279,7 @@ fn scoped_record_plan_groups_exact_leaf_ranges_between_scalar_inputs() {
         record
     );
     assert!(plan.lower_scoped_arguments(&input[..65]).is_err());
-    assert!(!plan.supports_scoped(function, &BTreeMap::new()));
+    assert!(!plan.supports_scoped(function, &BTreeSet::new()));
     assert!(CapturePlan::new(leaves(&["bool", "bool"]))
         .unwrap()
         .lower_scoped_arguments(&["first".into(), "second".into()])

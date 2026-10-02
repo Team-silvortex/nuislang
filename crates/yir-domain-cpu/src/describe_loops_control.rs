@@ -66,28 +66,13 @@ pub(super) fn describe_cpu_loops_control_node(
                     let carry =
                         yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?
                             .expect("matched scalar carry action");
-                    std::iter::once(carry.initial.to_owned())
-                        .chain(
-                            carry
-                                .operands
-                                .iter()
-                                .filter(|arg| {
-                                    arg.as_str() != "$current" && arg.as_str() != "$carry"
-                                })
-                                .cloned(),
-                        )
-                        .collect()
+                    carry.dependencies()?
                 }
-                ("cpu", "scoped_call", arity) if arity >= 1 => node.op.args[9..]
-                    .iter()
-                    .filter(|arg| arg.as_str() != "$current")
-                    .map(|arg| {
-                        arg.strip_prefix("copy_owned:")
-                            .or_else(|| arg.strip_prefix("move_owned:"))
-                            .unwrap_or(arg)
-                            .to_owned()
-                    })
-                    .collect(),
+                ("cpu", "scoped_call", _) => {
+                    yir_core::loop_carry_contract::parse_scoped_call(&node.op.args)?
+                        .expect("matched scoped action")
+                        .dependencies()?
+                }
                 ("cpu", "scoped_call_owned_return", arity) if arity >= 2 => node.op.args[10..]
                     .iter()
                     .filter(|arg| arg.as_str() != "$current")

@@ -346,3 +346,35 @@ fn carried_field_seeds_preserve_nominal_origins_through_calls_and_fields() {
         }
     }
 }
+
+#[test]
+fn compact_record_seed_origins_require_bounded_typed_parameter_layouts() {
+    for name in ["Packet", "Other"] {
+        let args = vec![
+            "0".into(),
+            format!("{name}{{left:i64;right:Leaf{{value:f64;flag:bool}}}}"),
+        ];
+        assert_eq!(value_parameter_type(&args).as_deref(), Some(name));
+    }
+    for args in [
+        vec![],
+        vec!["0".into()],
+        vec!["-1".into(), "Packet{left:i64}".into()],
+        vec!["0".into(), "Packet{left:i64}".into(), "extra".into()],
+        vec!["0".into(), "Packet{left:Bytes}".into()],
+        vec!["0".into(), "Packet{left:i64;left:i64}".into()],
+        vec!["0".into(), "Packet{}".into()],
+        vec![
+            "0".into(),
+            format!(
+                "Packet{{{}}}",
+                (0..65)
+                    .map(|i| format!("f{i}:i64"))
+                    .collect::<Vec<_>>()
+                    .join(";")
+            ),
+        ],
+    ] {
+        assert_eq!(value_parameter_type(&args), None, "{args:?}");
+    }
+}

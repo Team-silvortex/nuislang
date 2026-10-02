@@ -31,7 +31,7 @@ impl CapturePlan {
     pub(in crate::lowering) fn supports_scoped(
         &self,
         function: &NirFunction,
-        seeds: &BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
+        records: &BTreeSet<usize>,
     ) -> bool {
         self.slots
             .iter()
@@ -43,7 +43,7 @@ impl CapturePlan {
                     .params
                     .iter()
                     .position(|param| param == parameter)
-                    .is_some_and(|index| seeds.contains_key(&index)),
+                    .is_some_and(|index| records.contains(&index)),
             })
     }
 
@@ -90,16 +90,15 @@ impl CapturePlan {
         leaves: Vec<NirParam>,
         function: &NirFunction,
         module: &NirModule,
-        seeds: &BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
+        records: &BTreeSet<usize>,
     ) -> Option<Self> {
         // Boolean compaction is not a scoped backedge map. Choose a proven
         // record plan directly, even when a boolean-only plan would fit.
         if leaves.len() <= yir_core::native_scalar_session::MAX_SCALAR_SLOTS {
             return None;
         }
-        let records = seeds.keys().copied().collect();
-        Self::records(leaves, function, module, Some(&records))
-            .filter(|plan| plan.supports_scoped(function, seeds))
+        Self::records(leaves, function, module, Some(records))
+            .filter(|plan| plan.supports_scoped(function, records))
     }
 
     fn records(

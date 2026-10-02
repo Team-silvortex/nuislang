@@ -68,8 +68,8 @@ fn return_storage_revalidates_new_inner_writes_without_weakening_source_order() 
         .map(|call| call.seeds.len())
         .max();
     // The independent payload remains required, but the source carry's outer
-    // invariant tag can now leave the backedge without granting the invalid read.
-    assert_eq!(max, Some(18));
+    // invariant tag/count can leave the backedge without granting the invalid read.
+    assert_eq!(max, Some(17));
 }
 
 #[test]

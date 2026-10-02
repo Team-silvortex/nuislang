@@ -41,44 +41,43 @@ pub(super) fn projectable_record_seed_inputs(
     tail: &[NirStmt],
     function: &NirFunction,
     definitions: &BTreeMap<&str, &NirStructDef>,
-) -> BTreeMap<usize, RecordSeed> {
+) -> Option<BTreeMap<usize, RecordSeed>> {
     let NirStmt::Let {
         name,
         ty: Some(ty),
         value: NirExpr::Call { callee, args },
     } = action
     else {
-        return BTreeMap::new();
+        return None;
     };
-    if callee != &function.name || function.return_type.as_ref() != Some(ty) {
-        return BTreeMap::new();
+    if callee != &function.name
+        || function.return_type.as_ref() != Some(ty)
+        || function.params.len() != args.len()
+    {
+        return None;
     }
-    let Some(carries) = scalar_carries::projected_bindings(name, ty, tail, definitions) else {
-        return BTreeMap::new();
-    };
+    let carries = scalar_carries::projected_bindings(name, ty, tail, definitions)?;
     let breaking =
         scalar_carries::break_guard(tail.get(carries.len()), carries.last().unwrap().name);
-    if scalar_carries::validate_seeds(&carries, breaking, function, args, callee, definitions)
-        .is_err()
-    {
-        return BTreeMap::new();
-    }
-    function
-        .params
-        .iter()
-        .zip(args)
-        .enumerate()
-        .filter_map(|(index, (param, arg))| {
-            let mut slot = 0;
-            for carry in &carries {
-                if carry.whole_record_seed(param, arg, definitions) {
-                    return Some((index, carry.record_seed(slot)));
+    scalar_carries::validate_seeds(&carries, breaking, function, args, callee, definitions).ok()?;
+    Some(
+        function
+            .params
+            .iter()
+            .zip(args)
+            .enumerate()
+            .filter_map(|(index, (param, arg))| {
+                let mut slot = 0;
+                for carry in &carries {
+                    if carry.whole_record_seed(param, arg, definitions) {
+                        return Some((index, carry.record_seed(slot)));
+                    }
+                    slot += carry.width();
                 }
-                slot += carry.width();
-            }
-            None
-        })
-        .collect()
+                None
+            })
+            .collect(),
+    )
 }
 
 pub(super) fn collect_scoped_loop_helper_functions(
@@ -464,8 +463,11 @@ pub(super) fn lower_scoped_call_while(
         }
     }
     if let Some(plan) = state.capture_plans.get(callee) {
-        if !matches!(&result, ScopedLoopResult::Scalars { .. }) {
-            return Err("scoped record inputs require proven scalar carry mappings".into());
+        if !matches!(
+            &result,
+            ScopedLoopResult::None | ScopedLoopResult::Scalar(_) | ScopedLoopResult::Scalars { .. }
+        ) {
+            return Err("scoped record inputs require scalar actions with proven inputs".into());
         }
         let operands = plan.lower_scoped_arguments(&action_args[operand_start..])?;
         action_args.truncate(operand_start);

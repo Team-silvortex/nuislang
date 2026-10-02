@@ -29,7 +29,7 @@ fn sibling_aliases_and_later_bindings_have_independent_identities() {
         else { const saved: Pair = state; relay(saved.y); }
         let saved = state; return saved.x;",
     );
-    normalize(&mut f);
+    normalize(&mut f, &BTreeSet::new());
     let NirStmt::If {
         then_body,
         else_body,
@@ -65,7 +65,7 @@ fn nested_and_loop_writes_keep_their_visible_binding_identity() {
         }
         return outer.x;",
     );
-    normalize(&mut f);
+    normalize(&mut f, &BTreeSet::new());
     let NirStmt::If { then_body, .. } = &f.body[1] else {
         panic!()
     };
@@ -97,7 +97,7 @@ fn private_names_reserve_later_bindings_and_do_not_rename_fields_or_callees() {
         "if flag { let relay = state; return relay(relay.x); }
         let __nuis_capture_local_0 = 41; return __nuis_capture_local_0;",
     );
-    normalize(&mut f);
+    normalize(&mut f, &BTreeSet::new());
     let NirStmt::If { then_body, .. } = &f.body[0] else {
         panic!()
     };
@@ -117,6 +117,32 @@ fn unsupported_expressions_leave_the_complete_candidate_unchanged() {
     f.body
         .push(NirStmt::Return(Some(NirExpr::Text("unsupported".into()))));
     let before = f.body.clone();
-    normalize(&mut f);
+    normalize(&mut f, &BTreeSet::new());
     assert_eq!(f.body, before);
+}
+
+#[test]
+fn registered_control_identities_survive_nested_capture_normalization() {
+    let mut f = function(
+        "if flag {
+            let signal = 0; let __nuis_buffer_break_forged = 0;
+            let saved = state;
+            while signal < 1 { let signal = signal + 1; }
+            return saved.x + signal + __nuis_buffer_break_forged;
+        } return state.y;",
+    );
+    normalize(&mut f, &BTreeSet::from(["signal".into()]));
+    let NirStmt::If { then_body, .. } = &f.body[0] else {
+        panic!()
+    };
+    assert_eq!(binding(&then_body[0]).0, "signal");
+    assert_ne!(binding(&then_body[1]).0, "__nuis_buffer_break_forged");
+    assert_ne!(binding(&then_body[2]).0, "saved");
+    let NirStmt::While { condition, body } = &then_body[3] else {
+        panic!()
+    };
+    assert_eq!(binding(&body[0]).0, "signal");
+    assert!(
+        matches!(condition, NirExpr::Binary { lhs, .. } if **lhs == NirExpr::Var("signal".into()))
+    );
 }

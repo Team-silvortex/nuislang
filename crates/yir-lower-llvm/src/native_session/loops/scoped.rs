@@ -46,23 +46,17 @@ pub(crate) fn parse(node: &Node) -> Result<Option<ScopedCall<'_>>, String> {
             carries: Some(carries),
         }));
     }
-    if args[6] != "scoped_call"
-        || args[7]
-            .parse::<usize>()
-            .ok()
-            .is_none_or(|arity| arity == 0 || arity.checked_add(8) != Some(args.len()))
+    let call = yir_core::loop_carry_contract::parse_scoped_call(args)?.ok_or_else(fail)?;
+    if call
+        .operands
+        .iter()
+        .any(|arg| arg.starts_with("copy_owned:") || arg.starts_with("move_owned:"))
     {
         return Err(fail());
     }
-    let named = |value: &str| {
-        !value.is_empty() && !value.contains(['$', ':']) && !value.chars().any(char::is_whitespace)
-    };
-    if !named(&args[8]) || args[9..].iter().any(|arg| arg != "$current" && !named(arg)) {
-        return Err(fail());
-    }
     Ok(Some(ScopedCall {
-        callee: &args[8],
-        operands: &args[9..],
+        callee: call.callee,
+        operands: call.operands,
         initial: None,
         carries: None,
     }))
@@ -71,6 +65,41 @@ pub(crate) fn parse(node: &Node) -> Result<Option<ScopedCall<'_>>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_scoped_readonly_records_keep_carry_and_resource_boundaries() {
+        for scalar in [false, true] {
+            let mut args = "begin end step lt add cpu scoped_call 0 helper"
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            if scalar {
+                args[6] = "scoped_call_i64_carry".into();
+                args.extend(["seed".into(), "$carry".into()]);
+            }
+            args.push("$value_record:Input{x:f32;i:i64}|gain|$current".into());
+            args[7] = (args.len() - 8).to_string();
+            let mut node = Node {
+                name: "loop".into(),
+                resource: "cpu0".into(),
+                op: yir_core::Operation::parse("cpu.loop_while_i64_effect", args).unwrap(),
+            };
+            let call = parse(&node).unwrap().unwrap();
+            assert_eq!(call.initial, if scalar { Some("seed") } else { None });
+            assert!(call.carries.is_none());
+            for invalid in [
+                "$value_record:Input{x:i64}|$owned_struct_carry:0:seed",
+                "$value_record:Input{x:i64}|$carry",
+                "$value_record:Input{x:f32}|$current",
+                "$value_record:Input{x:i64}|copy_owned:seed",
+                "copy_owned:seed",
+                "move_owned:seed",
+            ] {
+                *node.op.args.last_mut().unwrap() = invalid.into();
+                assert!(parse(&node).is_err(), "{invalid}");
+            }
+        }
+    }
 
     #[test]
     fn native_scoped_multi_carry_slot_bound_is_not_a_precombined_arity() {

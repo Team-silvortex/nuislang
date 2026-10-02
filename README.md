@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.5`](docs/versioning/nuis-beta-0.15.5-patch.md) (2026-10-02).
+[`beta-0.15.6`](docs/versioning/nuis-beta-0.15.6-patch.md) (2026-10-02).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -360,9 +360,28 @@ Admitted returns can reuse an exact, initialized mutable record after a second s
 Unobserved leading-loop exit indices no longer need a recovery carry; visible suffixes and generated helper outputs still do.
 Proven return-only loop exits now share the compiler-owned pending bit with the canonical break slot; ordinary breaks stay independent.
 Bounded per-write fixed points now prove invariant leaves across nested return loops; changing leaves share compact private typed records.
-Every original RHS still executes once, and whole-function revalidation can veto the rewrite.
-The return fixture executes 9/30/31/57/58/59/60/61/62/63/64-word states with outer N and inner N-1 carries.
-A changed outer tag still requires 65 slots at width 64 and rejects; native bounds, return signals, observed exits and resource boundaries are unchanged.
+Every evaluated RHS remains once; only proven unused, total input-record copies may disappear. Whole-function revalidation can veto the rewrite.
+Ordinary child break/continue paths now retain assignment own-read order, registered control
+identities and checked compact-record seeds through final lowering, without relaxing source admission.
+Native probes retain 64-word state with zero/one/two child trips and atomic selected-trap failure.
+Ordinary child loops now share per-write invariant proof without sharing return-signal authority.
+Observed child exit indices run at 9/63/64 words: the break fixture needs only two child
+control words, and the continue fixture needs no child record backedge. Unused ready-input
+reconstructions can disappear; this rule does not erase calls, checked fields, codecs or resources.
+Partly observed total reconstructions now project exact typed fields before private capture planning.
+Their 64-word break/continue workflows execute and restore without source; checked field uses,
+observed indices and failure-atomic publication remain. Opaque snapshot calls in child breaks
+and no-carry/single-carry continues retain evaluation through private read-only mixed-record inputs;
+all callers must prove invariant roots. Checked constructors now fit through cached nominal
+field ranges within the original analysis budget, without discarding field evaluation or traps.
+Versioned preheader snapshots now prove equality across saved records, subrecords and fields,
+with ordered-pair branch joins and per-field parent-entry summaries across all trips and intermediate writes.
+Varying parent fields get distinct fresh identities; stable fields retain their evaluated origins. The return fixture
+uses outer N-1 and inner N-4 carries: 60/63 at width 64. A changed outer tag now runs with
+60/64 carries, including an admitted preheader `if`; changing both tag and count still requires 65 outer slots and rejects.
+Branch joins retain equality proved on every arm, not equality between arms, old versions or separate calls.
+Native bounds, proof budgets, return signals, evaluated fields, observed exits and resource boundaries are unchanged.
+Carried-word reductions and private argument counts are separate; this is not a measured speedup.
 Recursive shapes remain bounded. Earlier shared-codec round trips
 also passed with host clang at `-O0` and `-O2`. Neither this work nor
 the repository cleanup raises the persistent-session coordinate above its bounded `active/86`.

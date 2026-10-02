@@ -222,6 +222,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &capture_functions,
         &generated_helpers,
         &value_layouts,
+        &outlined.break_controls,
     );
     if projected.changed {
         crate::nir_verify::verify_nir_module(module)?;

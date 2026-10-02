@@ -40,29 +40,33 @@ pub(super) fn visit(body: &[NirStmt], mut visitor: impl FnMut(&NirExpr) -> bool)
 pub(super) fn supported(body: &[NirStmt]) -> bool {
     let mut valid = true;
     visit(body, |expr| {
-        valid &= matches!(
-            expr,
-            NirExpr::Var(_)
-                | NirExpr::Int(_)
-                | NirExpr::Bool(_)
-                | NirExpr::F32(_)
-                | NirExpr::F64(_)
-                | NirExpr::Binary { .. }
-                | NirExpr::Call { .. }
-                | NirExpr::StructLiteral { .. }
-                | NirExpr::FieldAccess { .. }
-                | NirExpr::CastI64ToI32(_)
-                | NirExpr::CastI32ToI64(_)
-                | NirExpr::CastBoolToI64(_)
-                | NirExpr::CastI64ToBool(_)
-                | NirExpr::PackF32Word(_)
-                | NirExpr::UnpackF32Word(_)
-                | NirExpr::PackF64Word(_)
-                | NirExpr::UnpackF64Word(_)
-        );
+        valid &= supported_expr(expr);
         true
     });
     valid
+}
+
+pub(super) fn supported_expr(expr: &NirExpr) -> bool {
+    matches!(
+        expr,
+        NirExpr::Var(_)
+            | NirExpr::Int(_)
+            | NirExpr::Bool(_)
+            | NirExpr::F32(_)
+            | NirExpr::F64(_)
+            | NirExpr::Binary { .. }
+            | NirExpr::Call { .. }
+            | NirExpr::StructLiteral { .. }
+            | NirExpr::FieldAccess { .. }
+            | NirExpr::CastI64ToI32(_)
+            | NirExpr::CastI32ToI64(_)
+            | NirExpr::CastBoolToI64(_)
+            | NirExpr::CastI64ToBool(_)
+            | NirExpr::PackF32Word(_)
+            | NirExpr::UnpackF32Word(_)
+            | NirExpr::PackF64Word(_)
+            | NirExpr::UnpackF64Word(_)
+    )
 }
 
 pub(super) fn rewrite(body: &mut [NirStmt], visitor: impl FnMut(&mut NirExpr)) {

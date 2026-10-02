@@ -486,7 +486,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_layouts.rs",
         required_patterns: &[
             "generated.contains(&function.name)",
-            "scoped_record_seeds(module, &scoped)",
+            "scoped_record_transport_inputs(module, &scoped)",
             "direct_calls::CapturePlan::for_scoped(",
         ],
     },
@@ -495,7 +495,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/direct_calls/capture_params.rs",
         required_patterns: &[
             "fn supports_scoped(",
-            "seeds.contains_key(&index)",
+            "records.contains(&index)",
             "Slot::Bools(_) => false",
             "fn lower_scoped_arguments(",
             "ScopedRecordInput::encode(layout, inputs)",
@@ -555,8 +555,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "## Scoped Record Inputs",
             "$value_record:<layout>|<leaf0>|...",
-            "Only multi-carry scoped actions admit it",
-            "complete seed range",
+            "Only multi-carry scoped actions admit carry mappings",
+            "complete seed map or an unwritten ready-input root",
+            "Read-only transport grants no backedge or elision authority",
             "## Generated Branch Inputs",
             "Source names",
             "are never generation authority",

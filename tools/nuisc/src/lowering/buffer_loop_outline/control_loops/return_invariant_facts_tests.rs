@@ -47,6 +47,49 @@ fn return_invariant_facts_follow_nested_identity_and_constructor_names() {
 }
 
 #[test]
+fn return_invariant_field_ranges_bound_wide_reads_without_caching_origins() {
+    let fields = (0..64)
+        .map(|i| format!("f{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = (0..64)
+        .rev()
+        .map(|i| format!("f{i}: before.f{i}{}", if i == 0 { " + 1" } else { "" }))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let module = parse_nuis_module(&format!(
+        "mod cpu Main {{
+        struct Wide {{ {fields} }}
+        fn work(seed: Wide) -> Wide {{
+            let before = seed;
+            let seed = Wide {{ {values} }};
+            let seed = seed;
+            let seed = before;
+            return seed;
+        }}
+    }}"
+    ))
+    .unwrap();
+    let layouts = control_values::layouts(&module);
+    let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
+    let work = &module.functions[0];
+    let scope = [("seed".into(), scalar_type("Wide"))].into_iter().collect();
+    let result = analyze(
+        &work.body[..work.body.len() - 1],
+        &scope,
+        &layouts,
+        &catalog,
+        &mut Budget(4096),
+    )
+    .unwrap();
+    assert!(
+        !result["seed"].1[0],
+        "later self-copies must not restore a changed origin"
+    );
+    assert!(result["seed"].1[1..].iter().all(|stable| *stable));
+}
+
+#[test]
 fn return_invariant_facts_check_every_write_not_only_the_backedge() {
     let result = masks("let before = a;
         let a = Nest { left: Pair { x: before.left.x, tag: before.left.tag + 1 }, right: before.right };
@@ -131,4 +174,32 @@ fn return_invariant_facts_reject_unknown_shapes_types_and_exhausted_proofs() {
     layouts.insert("Cycle".into(), vec![("child".into(), scalar_type("Cycle"))]);
     let scope = [("a".into(), scalar_type("Cycle"))].into_iter().collect();
     assert!(analyze(&[], &scope, &layouts, &catalog, &mut Budget(MAX_WORK)).is_none());
+}
+
+#[test]
+fn return_invariant_cached_shapes_keep_nominal_qualifier_checks() {
+    let (module, _, _) = fixture("let a = a;");
+    let layouts = control_values::layouts(&module);
+    let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
+    let mut budget = Budget(MAX_WORK);
+    let mut proof = Proof {
+        layouts: &layouts,
+        catalog: &catalog,
+        budget: &mut budget,
+        shapes: BTreeMap::new(),
+        stable: BTreeMap::new(),
+        entries: Env::new(),
+        observations: Vec::new(),
+    };
+    let plain = scalar_type("Nest");
+    let shape = proof.shape(&plain).unwrap();
+    assert_eq!(shape.fields["left"].1, 0..2);
+    assert_eq!(shape.fields["right"].1, 2..4);
+    assert!(Rc::ptr_eq(&shape, &proof.shape(&plain).unwrap()));
+    let mut reference = plain.clone();
+    reference.is_ref = true;
+    assert!(proof.shape(&reference).is_none());
+    let mut optional = plain;
+    optional.is_optional = true;
+    assert!(proof.shape(&optional).is_none());
 }

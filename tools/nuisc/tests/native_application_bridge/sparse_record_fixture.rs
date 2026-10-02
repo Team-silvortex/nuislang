@@ -32,6 +32,35 @@ pub fn return_source(width: usize) -> String {
     )
 }
 
+pub fn child_return_source(width: usize) -> String {
+    with_width(
+        include_str!("../control_flow_syntax_native/scoped_return_child_exits.ns"),
+        width,
+    )
+}
+
+pub fn joined_return_source(width: usize) -> String {
+    return_source(width)
+        .replace(
+            "let limit = state.count;",
+            "let bounds = state;
+             if state.count % 2 == 0 { let bounds = carry; }
+             else { let saved = carry; let bounds = saved; }
+             let limit = bounds.count;",
+        )
+        .replace(
+            "tag: selected.tag, enabled: !enabled",
+            "tag: i32_from_i64(17), enabled: !enabled",
+        )
+}
+
+pub fn parent_return_source(width: usize) -> String {
+    return_source(width).replace(
+        "tag: previous.tag, enabled: previous.enabled",
+        "tag: state.left.tag, enabled: previous.enabled",
+    )
+}
+
 fn with_width(source: &str, width: usize) -> String {
     assert!((9..=64).contains(&width));
     if width == 9 {

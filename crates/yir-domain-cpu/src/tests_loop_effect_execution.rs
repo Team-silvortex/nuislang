@@ -113,6 +113,112 @@ fn scalar_carry_loop() -> Node {
     node
 }
 
+#[test]
+fn scoped_readonly_records_execute_without_multi_carry_authority() {
+    use yir_core::{native_scalar_session::ScalarStateLayout, RegisteredExecutionStep as Step};
+    let layout =
+        ScalarStateLayout::parse("Input{flag:bool;tag:i32;gain:f32;value:f64;index:i64}").unwrap();
+    for scalar in [false, true] {
+        let mut node = if scalar {
+            scalar_carry_loop()
+        } else {
+            scoped_loop("$current")
+        };
+        node.op.args.push("$value_record:Input{flag:bool;tag:i32;gain:f32;value:f64;index:i64}|flag|tag|gain|value|$current".into());
+        node.op.args[7] = (node.op.args.len() - 8).to_string();
+        for limit in [0, 2] {
+            let mut state = loop_state(0, limit, 1);
+            state.bind_value("seed", Value::Int(10));
+            state.bind_value("flag", Value::Bool(true));
+            state.bind_value("tag", Value::I32(-17));
+            state.bind_value("gain", Value::F32(f32::from_bits(0x8000_0000)));
+            state.bind_value("value", Value::F64(f64::from_bits(0x7ff8_0000_0000_1234)));
+            let inputs = CpuMod.describe(&node, &resource()).unwrap().dependencies;
+            let expected = if scalar {
+                vec![
+                    "initial", "limit", "step", "seed", "flag", "tag", "gain", "value",
+                ]
+            } else {
+                vec!["initial", "limit", "step", "flag", "tag", "gain", "value"]
+            };
+            assert_eq!(inputs, expected);
+            let mut execution = CpuMod
+                .begin_execution(&node, &resource(), &state)
+                .unwrap()
+                .unwrap();
+            // Captures snapshot their exact bits before the first iteration.
+            for name in ["flag", "tag", "gain", "value"] {
+                state.values.remove(name);
+            }
+            let mut result = execution.resume(&mut state, None).unwrap();
+            for trip in 0..limit {
+                let Step::Call { arguments, .. } = result else {
+                    panic!("iteration call");
+                };
+                assert_eq!(arguments[0], Value::Int(trip));
+                assert_eq!(
+                    arguments[1],
+                    Value::Int(if scalar { 10 + trip } else { trip })
+                );
+                let Value::Struct(record) = arguments.last().unwrap() else {
+                    panic!("record input");
+                };
+                let words = layout
+                    .fields()
+                    .iter()
+                    .zip(&record.fields)
+                    .map(|((_, kind), (_, value))| kind.pack(value).unwrap())
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    words,
+                    [
+                        1,
+                        -17_i64 as u64,
+                        0x8000_0000,
+                        0x7ff8_0000_0000_1234,
+                        trip as u64
+                    ]
+                );
+                if scalar {
+                    assert!(execution
+                        .resume(&mut state, Some(Value::Bool(true)))
+                        .is_err());
+                }
+                result = execution
+                    .resume(&mut state, Some(Value::Int(11 + trip)))
+                    .unwrap();
+            }
+            let Step::Complete(value) = result else {
+                panic!("loop completion");
+            };
+            if scalar {
+                let Value::Struct(value) = value else {
+                    panic!("carry state");
+                };
+                assert_eq!(
+                    value.fields,
+                    [
+                        ("current".into(), Value::Int(limit)),
+                        ("carry0".into(), Value::Int(10 + limit))
+                    ]
+                );
+            } else {
+                assert_eq!(value, Value::Int(limit));
+            }
+            assert!(CpuMod.begin_execution(&node, &resource(), &state).is_err());
+        }
+        for leaf in ["$carry", "$owned_struct_carry:0:seed", "copy_owned:seed"] {
+            let mut invalid = node.clone();
+            *invalid.op.args.last_mut().unwrap() =
+                format!("$value_record:Input{{value:i64}}|{leaf}");
+            assert!(CpuMod.describe(&invalid, &resource()).is_err());
+            assert!(CpuMod
+                .begin_execution(&invalid, &resource(), &loop_state(0, 0, 1))
+                .is_err());
+        }
+    }
+}
+
 fn multiple_carry_loop() -> Node {
     let mut node = scalar_carry_loop();
     node.op.args[6] = "scoped_call_i64_carries".to_owned();

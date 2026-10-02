@@ -17,6 +17,7 @@ pub(super) struct Inputs {
     pub(super) protected: BTreeSet<usize>,
     pub(super) carried: BTreeSet<usize>,
     pub(super) elidable: BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
+    pub(super) transport: BTreeSet<usize>,
 }
 
 // Only an exact typed record reconstruction grants field-mapped backedge inputs.
@@ -63,22 +64,46 @@ pub(super) fn protected_inputs(
                     }) {
                         let mut written = BTreeSet::new();
                         branches::collect_bindings(body, &mut written);
-                        let carried = functions
+                        let seeds = functions
                             .get(callee.as_str())
-                            .map(|function| {
+                            .and_then(|function| {
                                 scoped_loop_lowering::projectable_record_seed_inputs(
                                     &body[0], &body[1..], function, &definitions,
                                 )
-                            })
-                            .unwrap_or_default();
+                            });
+                        // Packing does not grant backedge authority. Every caller
+                        // must prove its action shape and leave the captured root
+                        // unwritten, including nested and zero-trip bodies.
+                        let readonly = functions.get(callee.as_str()).is_some_and(|function| {
+                            function.params.len() == args.len()
+                                && match &body[0] {
+                                    NirStmt::Expr(_) => function.return_type.as_ref().is_none_or(|ty| ty == &scalar_type("i64")),
+                                    NirStmt::Let { name, ty: Some(ty), .. } => {
+                                        ty == &scalar_type("i64")
+                                            && function.return_type.as_ref() == Some(ty)
+                                            && args.iter().filter(|arg| matches!(arg, NirExpr::Var(input) if input == name)).count() == 1
+                                    }
+                                    _ => false,
+                                }
+                        });
+                        let transport = (seeds.is_some() || readonly).then(|| {
+                            args.iter().enumerate().filter_map(|(index, arg)| {
+                                (seeds.as_ref().is_some_and(|carried| carried.contains_key(&index))
+                                    || access(arg).is_some_and(|path| !written.contains(&path[0])))
+                                .then_some(index)
+                            }).collect::<BTreeSet<_>>()
+                        }).unwrap_or_default();
+                        let carried = seeds.unwrap_or_default();
                         let seen = protected.contains_key(callee);
                         let inputs = protected.entry(callee.clone()).or_default();
                         if seen {
                             // Every scoped call must agree on the nominal record
                             // and its complete output slot range before elision.
                             inputs.elidable.retain(|index, seed| carried.get(index) == Some(seed));
+                            inputs.transport.retain(|index| transport.contains(index));
                         } else {
                             inputs.elidable = carried.clone();
+                            inputs.transport = transport;
                         }
                         for (index, arg) in args.iter().enumerate() {
                             if !carried.contains_key(&index)

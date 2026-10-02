@@ -2,6 +2,119 @@ use super::*;
 
 const SOURCE: &str = include_str!("scoped_field_seeds.ns");
 
+#[path = "scoped_return_join_cases.rs"]
+mod join_cases;
+
+#[test]
+fn scoped_return_joins_execute_correlated_arms_old_versions_and_selected_checks() {
+    for case in join_cases::CASES {
+        for choose in [false, true] {
+            for limit in [0, 1, 3] {
+                let source = join_cases::source(case, choose, limit);
+                let status = compile_and_run(&format!("joined_{case}_{choose}_{limit}"), &source);
+                assert_eq!(
+                    status.code(),
+                    join_cases::expected(case, choose, limit).map(|v| v as i32),
+                    "{source}"
+                );
+                if join_cases::expected(case, choose, limit).is_none() {
+                    use std::os::unix::process::ExitStatusExt;
+                    assert!(
+                        matches!(status.signal(), Some(4 | 5)),
+                        "selected preheader check must still trap: {status:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn scoped_return_preheaders_preserve_old_versions_and_later_parent_trips() {
+    for limit in [0, 1, 3] {
+        let delayed = format!("mod cpu Main {{
+            struct State {{ value: i64, tag: i64 }}
+            fn step(seed: State, other: State, limit: i64) -> State {{
+                let carry = seed; let delayed = seed; let i = 0;
+                while i < limit {{
+                    let i = i + 1; let carry = carry; let delayed = delayed;
+                    let carry = delayed; let delayed = other;
+                    if i == 2 {{ return carry; }}
+                }}
+                return carry;
+            }}
+            fn main() -> i64 {{
+                let result = step(State {{ value: 37, tag: 5 }}, State {{ value: 99, tag: 7 }}, {limit});
+                return result.value + result.tag;
+            }}
+        }}");
+        assert_eq!(
+            compile_and_run(&format!("delayed_snapshot_{limit}"), &delayed).code(),
+            Some(if limit < 2 { 42 } else { 106 })
+        );
+        let parent = format!(
+            "mod cpu Main {{
+            struct State {{ value: i64, tag: i64 }}
+            fn step(seed: State, limit: i64) -> State {{
+                let carry = seed; let tag = carry.tag; let i = 0;
+                while i < limit {{
+                    let i = i + 1; let carry = carry; let j = 0;
+                    while j < 2 {{
+                        let j = j + 1; let carry = carry;
+                        let carry = State {{ value: carry.value + 1, tag: tag }};
+                    }}
+                    let carry = State {{ value: carry.value, tag: carry.tag + i }};
+                    if i == 2 {{ return carry; }}
+                }}
+                return carry;
+            }}
+            fn main() -> i64 {{
+                let result = step(State {{ value: 10, tag: 7 }}, {limit});
+                return result.value + result.tag;
+            }}
+        }}"
+        );
+        assert_eq!(
+            compile_and_run(&format!("parent_snapshot_{limit}"), &parent).code(),
+            Some(match limit {
+                0 => 17,
+                1 => 20,
+                _ => 23,
+            })
+        );
+        let opaque = format!(
+            "mod cpu Main {{
+            struct State {{ value: i64, tag: i64 }}
+            @noinline fn relay(value: State) -> State {{
+                return State {{ value: value.value, tag: value.tag + 1 }};
+            }}
+            fn step(seed: State, limit: i64) -> State {{
+                let carry = relay(seed); let tag = carry.tag; let carry = relay(carry);
+                let i = 0;
+                while i < limit {{
+                    let i = i + 1; let carry = carry;
+                    let carry = State {{ value: carry.value + 1, tag: tag }};
+                    if i == 2 {{ return carry; }}
+                }}
+                return carry;
+            }}
+            fn main() -> i64 {{
+                let result = step(State {{ value: 10, tag: 7 }}, {limit});
+                return result.value + result.tag;
+            }}
+        }}"
+        );
+        assert_eq!(
+            compile_and_run(&format!("opaque_snapshot_{limit}"), &opaque).code(),
+            Some(match limit {
+                0 => 19,
+                1 => 19,
+                _ => 20,
+            })
+        );
+    }
+}
+
 #[path = "../native_application_bridge/scoped_record_fixture.rs"]
 mod record_fixture;
 
@@ -10,6 +123,60 @@ mod index_recovery;
 
 #[path = "scoped_return_signal_cases.rs"]
 mod return_signal;
+
+#[test]
+fn scoped_readonly_record_single_carry_runs_with_both_induction_orders() {
+    let fields = (0..63)
+        .map(|i| format!("f{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = (0..63)
+        .map(|i| format!("f{i}: 7"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    for leading in [false, true] {
+        for limit in [0, 3] {
+            let step = "let i = i + 1;";
+            let source = format!(
+                "mod cpu Main {{
+                struct Wide {{ {fields} }}
+                @noinline fn inspect(input: Wide) -> Wide {{ return input; }}
+                @noinline fn walk(input: Wide, limit: i64) -> i64 {{
+                    let i = 0; let total = 1;
+                    while i < limit {{ {} let snapshot = inspect(input);
+                        let total = total + snapshot.f0 + i; {} }}
+                    return total + i * 10;
+                }}
+                fn main() -> i64 {{ return walk(Wide {{ {values} }}, {limit}); }}
+            }}",
+                if leading { step } else { "" },
+                if leading { "" } else { step }
+            );
+            let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+            assert!(compiled.yir.nodes.iter().any(|node| {
+                node.op
+                    .args
+                    .get(6)
+                    .is_some_and(|action| action == "scoped_call_i64_carry")
+                    && node
+                        .op
+                        .args
+                        .iter()
+                        .any(|arg| arg.starts_with("$value_record:"))
+            }));
+            assert_eq!(
+                compile_and_run(&format!("readonly_single_{leading}_{limit}"), &source).code(),
+                Some(if limit == 0 {
+                    1
+                } else if leading {
+                    58
+                } else {
+                    55
+                })
+            );
+        }
+    }
+}
 
 #[test]
 fn scoped_return_signal_preserves_native_break_continue_and_parent_propagation() {
@@ -321,6 +488,39 @@ fn generated_branch_record_inputs_preserve_ordinary_native_execution_and_traps()
         .replace("start(5)", "start(2)")
         .replace("value.f0 + 1", "10 / (value.f0 - 2)");
     let status = compile_and_run("branch_record_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
+#[test]
+fn scoped_nested_return_child_exits_execute_and_keep_selected_traps_lazy() {
+    let source = include_str!("scoped_return_child_exits.ns");
+    for exit in ["break", "continue"] {
+        let source = source.replace("if k == 1 { break; }", &format!("if k == 1 {{ {exit}; }}"));
+        for limit in [0, 1, 2, 3, 4] {
+            let case = source.replace("i32_from_i64(7), 3)", &format!("i32_from_i64(7), {limit})"));
+            assert_eq!(
+                compile_and_run(&format!("return_child_{exit}_{limit}"), &case).code(),
+                Some(if limit < 2 { 201 } else { 19 })
+            );
+        }
+    }
+    let source = source.replace(
+        "if k == 1 { break; }",
+        "let selected_trap = 1 / (k - k); if k == 1 { break; }",
+    );
+    // Three outer trips imply a zero-trip ordinary child; the return path must
+    // still skip its own suffix. Two outer trips select the new child trap.
+    assert_eq!(
+        compile_and_run("return_child_zero_trap", &source).code(),
+        Some(19)
+    );
+    let trapped = source.replace("i32_from_i64(7), 3)", "i32_from_i64(7), 2)");
+    let status = compile_and_run("return_child_selected_trap", &trapped);
     assert!(!status.success());
     #[cfg(unix)]
     {

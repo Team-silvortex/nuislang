@@ -19,7 +19,7 @@ pub(super) fn reconstruction(
     layouts: &impl ValueLayouts,
 ) -> Option<NirExpr> {
     let mut probe = function.clone();
-    bindings::normalize(&mut probe);
+    bindings::normalize(&mut probe, &BTreeSet::new());
     let mut demand = Demand::new(&probe, definitions, layouts)?;
     let mut live = demand.block(&probe.body[position + 1..], Live::new(), None, 0)?;
     let needed = live.remove(name).unwrap_or_default();
@@ -93,7 +93,7 @@ mod tests {
             .collect();
         let layouts = control_values::TypedLayouts::collect(&module);
         let mut probe = module.functions[0].clone();
-        bindings::normalize(&mut probe);
+        bindings::normalize(&mut probe, &BTreeSet::new());
         let mut demand = Demand::new(&probe, &definitions, &layouts).unwrap();
         let live = demand.block(&probe.body, Live::new(), None, 0).unwrap();
         assert_eq!(

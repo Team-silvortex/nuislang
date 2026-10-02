@@ -310,11 +310,17 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .next_step
         .starts_with("reduce nested return snapshot carries while preserving observed exits"));
     assert!(session.evidence.starts_with(
-        "Nested return loops now promote invariant leaves across bounded per-write fixed points"
+        "Per-field parent re-entry snapshots now retain stable identities within native carry bounds"
     ));
+    assert!(session.evidence.contains("ordered origin pairs"));
+    assert!(session.evidence.contains("inner N-4 and outer N-1"));
+    assert!(session.validation_command.contains("native_parent_entries"));
+    assert!(session
+        .validation_command
+        .contains("native_joined_preheaders"));
     assert!(session
         .blocker
-        .contains("changed outer tag still needs 65 private carry slots"));
+        .contains("changing both tag and count still needs 65 and rejects"));
     assert!(session.validation_command.contains("return_invariant"));
     assert!(session.validation_command.contains("return_signal"));
     assert!(session.validation_command.contains("return_storage"));
@@ -322,6 +328,41 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session.validation_command.contains("index_recovery"));
     assert!(session.evidence.contains("outer N and inner N-1"));
     assert!(session.next_step.contains("ordinary child exits"));
+    assert!(session
+        .evidence
+        .contains("unread total input-record reconstructions"));
+    assert!(session
+        .evidence
+        .contains("Original admission still rejects future sibling reads"));
+    assert!(session
+        .blocker
+        .contains("Changing record backedges remain bounded"));
+    assert!(session
+        .validation_command
+        .contains("native_checked_child_snapshots"));
+    assert!(session
+        .validation_command
+        .contains("scoped_readonly_record"));
+    assert!(session
+        .validation_command
+        .contains("native_opaque_continue_snapshots"));
+    assert!(session.validation_command.contains("record_views"));
+    assert!(session
+        .validation_command
+        .contains("native_partial_child_snapshots"));
+    assert!(session.validation_command.contains("dead_record_snapshots"));
+    assert!(session
+        .validation_command
+        .contains("native_observed_child_exit_indices_restore_full_width_state_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("registered_control_identities"));
+    assert!(session
+        .validation_command
+        .contains("compact_record_seed_origins"));
+    assert!(session
+        .validation_command
+        .contains("native_nested_child_exits_restore_full_width_state_without_sources"));
     assert!(session
         .validation_command
         .contains("native_full_width_nested_returns_restore_complete_state_without_sources"));

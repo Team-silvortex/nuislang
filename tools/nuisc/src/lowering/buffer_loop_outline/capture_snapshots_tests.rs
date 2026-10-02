@@ -25,6 +25,7 @@ fn project(module: &mut NirModule, names: &[&str]) -> bool {
         &names.iter().map(|name| (*name).to_owned()).collect(),
         &BTreeSet::new(),
         &layouts,
+        &BTreeMap::new(),
     );
     crate::nir_verify::verify_nir_module(module).unwrap();
     changed.changed
@@ -429,7 +430,7 @@ fn scoped_snapshot_writes_across_branches_and_loop_iterations_stay_unchanged() {
         let mut module = module(&format!("fn helper(state: State, flag: bool, other: bool) -> i64 {{ {body} }}"));
         let layouts = control_values::TypedLayouts::collect(&module);
         let helper = &mut module.functions[0];
-        super::super::bindings::normalize(helper);
+        super::super::bindings::normalize(helper, &BTreeSet::new());
         let before = helper.clone();
         normalize(helper, &layouts);
         assert_eq!(*helper, before);

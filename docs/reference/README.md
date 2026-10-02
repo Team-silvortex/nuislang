@@ -14,7 +14,7 @@ task/pointer rules?", read:
 For the current `beta-0.15.*` application-led line, start with:
 
 * [Mainline map](../current-mainline-map.md)
-* [Beta-0.15.5 nested typed carry and return patch](../versioning/nuis-beta-0.15.5-patch.md)
+* [Beta-0.15.6 scoped input and parent snapshot patch](../versioning/nuis-beta-0.15.6-patch.md)
 * [Beta-0.15 checkpoint](../versioning/nuis-beta-0.15.0-snapshot.md)
 * [Beta-0.15 validation checklist](../versioning/nuis-beta-0.15.0-release-checklist.md)
 * [Native scalar session bridge](nuis-native-scalar-session-bridge-v1.md)

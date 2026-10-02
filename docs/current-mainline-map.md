@@ -8,9 +8,10 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.5`](versioning/nuis-beta-0.15.5-patch.md)
-(2026-10-02), covering nested scalar records, sparse typed carry projection and
-bounded nested return invariants, including 64-word source-free restoration.
+The current patch is [`beta-0.15.6`](versioning/nuis-beta-0.15.6-patch.md)
+(2026-10-02), covering typed read-only scoped inputs, ordinary child exits,
+preheader branch joins and per-field parent-entry snapshots, including
+64-word source-free restoration.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -44,9 +45,10 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
-The `05951bef` checkpoint and `beta-0.15.5` retain `active/86`. Current work adds
-exact sparse mixed/nested bool/i32/i64/f32/f64 field-path maps without changing the shared loop contract.
-The next task is to reduce nested return snapshot carries while preserving observed exits.
+The `05951bef` checkpoint and `beta-0.15.6` retain `active/86`. Current work adds
+exact sparse mixed/nested bool/i32/i64/f32/f64 field-path maps and typed read-only scoped inputs.
+The next task is stable post-loop snapshot proof and further changing backedges,
+while preserving observed exits and the existing bounded fallback.
 Branch-local record/subrecord aliases and identity-preserving inherited writes now retain
 lexical/version proofs. Materialized outer joins retain assignments under backward field-demand proof;
 changing nested-loop snapshots now use bounded fixed-point demand with lexical break/continue targets.
@@ -55,9 +57,15 @@ Original source admission remains mandatory; a second validation can veto reuse 
 Bounded continuation analysis removes only unobserved leading-index recovery; suffixes, generated outputs and parent backedges retain it.
 Return-only exits share the private pending/break signal under bounded, compiler-minted provenance; ordinary breaks stay independent.
 Bounded fixed points join zero trips and every child write, keeping proven invariant leaves outside nested backedges and grouping changing leaves into private records.
-The fixture carries outer N and inner N-1 words, including native 64-word state; a changed outer tag still needs 65 slots and rejects.
-Ordinary child-exit rewrites can still fail source-order revalidation and retain an admitted inner-only plan or the old body; broadening this admission is the next boundary.
-Scoped capture planning uses complete record seed proofs instead of inapplicable ordinary-call boolean packing.
+Versioned preheader record/subrecord/field snapshots now prove cross-binding equality, with fresh identities for separately evaluated opaque results, ordered-pair branch joins and per-field parent-entry fixed points. Parent summaries include zero trips and every intermediate write on all trips: stable leaves retain origins, varying leaves get independent entry identities, and child locals cannot escape. A join preserves a relation only if it holds on every arm; swapped arms/old versions/separate calls remain distinct, and failure leaves the entry environment intact. The original 65536-work/64-depth budget and inner-only/original-body fallback remain.
+The fixture carries outer N-1 and inner N-4 words (60/63 at width 64); a changed outer tag executes with 60/64, including an admitted preheader `if`. An opaque count snapshot on one arm still rejects 65 outer slots, as does changing both tag and count. The immutable-parameter parent-entry fixture uses 7/12 private arguments, versus 6/11 for the baseline; fewer carried words do not establish a speedup. Existing scalar rebinding outside loops is not newly admitted.
+Ordinary child-exit rewrites now retain assignment own-read order, registered break identities and checked compact-record seed types through native lowering.
+Break/continue probes run 9/63/64-word states across zero/one/two child trips, now including observed child indices at full width.
+Per-write invariants also cover ordinary child loops, independently of return-signal sharing. Dead total input-record reconstructions no longer force full captures; calls, checked fields, codecs and resources stay intact.
+The observed break fixture retains two child control words; continue needs no child record backedge. Partly observed total reconstructions now project exact typed fields, including local copies and subrecords, under bounded immutable-input proof.
+Their 64-word break/continue workflows retain checked field uses and observed exits, with 4/2 child arguments and source-free restoration. Opaque snapshot calls use private read-only records in multi-carry breaks and no-carry/single-carry continues without discarding evaluation. Every caller must prove an unwritten source root; dynamic loop-state mappings remain i64 and record carry mappings require a multi-carry seed map. Checked constructors fit by reusing immutable nominal layouts and field ranges inside the same proof budget, with fresh per-write origins. The current preheader-snapshot proof retains native field-order traps and source-free 6/6/11 break and 4/6/11 continue workflows. Private entry arities are distinct from carry widths; this proves execution, not a measured speedup. Changing outer record backedges and opaque carry mutation remain bounded.
+Failed or exhausted nested proof still retains an admitted inner-only plan or the original body, without relaxing source admission.
+Scoped capture planning uses complete record seed or read-only input proofs instead of inapplicable ordinary-call boolean packing; read-only transport grants no seed/elision authority.
 Exact shared budgets, selected traps and atomic failure publication remain required without widening the native profile.
 Generated scoped flat-i64 inputs now use explicit per-trip record maps after every
 caller agrees on the complete seed range. A 64-field record plus induction and a

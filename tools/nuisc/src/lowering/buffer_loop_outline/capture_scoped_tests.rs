@@ -17,7 +17,7 @@ pub(super) fn function<'a>(module: &'a NirModule, name: &str) -> &'a NirFunction
 pub(super) fn project_scoped(module: &mut NirModule, names: &[&str]) -> bool {
     let layouts = control_values::TypedLayouts::collect(module);
     let names = names.iter().map(|name| (*name).to_owned()).collect();
-    let changed = project(module, &names, &names, &layouts);
+    let changed = project(module, &names, &names, &layouts, &BTreeMap::new());
     crate::nir_verify::verify_nir_module(module).unwrap();
     changed.changed
 }
@@ -113,6 +113,118 @@ fn scoped_projection_keeps_computed_and_whole_uses_transactional() {
         let before = module.clone();
         assert!(!project_scoped(&mut module, &["helper"]));
         assert_eq!(module, before);
+    }
+}
+
+#[test]
+fn scoped_readonly_record_transport_requires_every_caller_and_does_not_grant_seed_authority() {
+    let helper = "struct Words { carry0: i64, carry1: i64 }
+        fn relay(input: State) -> State { return input; }
+        fn helper(input: State, old: Pair, index: i64) -> Words {
+            let snapshot = relay(input);
+            return Words { carry0: old.x + snapshot.a.x, carry1: old.y + index };
+        }";
+    let caller = |name: &str, arg: &str, tail: &str| {
+        format!(
+            "fn {name}(state: State) -> Pair {{
+            let stable = state; let carry = state.a; let i = 0;
+            while i < 2 {{
+                let words: Words = helper({arg}, carry, i);
+                let carry: Pair = Pair {{ x: words.carry0, y: words.carry1 }};
+                {tail} let i = i + 1;
+            }} return carry;
+        }}"
+        )
+    };
+    for (arg, tail, readonly) in [
+        ("stable", "", true),
+        ("relay(stable)", "", false),
+        ("stable", "let stable = state;", false),
+        ("stable", "if i > 0 { let stable = state; }", false),
+        (
+            "stable",
+            "let j = 0; while j < 0 { let stable = state; let j = j + 1; }",
+            false,
+        ),
+    ] {
+        let source = format!(
+            "{helper} {} {}",
+            caller("first", "stable", ""),
+            caller("second", arg, tail)
+        );
+        for reverse in [false, true] {
+            let mut module = module(&source);
+            if reverse {
+                module.functions.reverse();
+            }
+            let inputs = protected_inputs(&module, &BTreeSet::from(["helper".into()]));
+            assert_eq!(inputs["helper"].transport.contains(&0), readonly);
+            assert!(inputs["helper"].transport.contains(&1));
+            assert!(!inputs["helper"].transport.contains(&2));
+            assert!(!inputs["helper"].elidable.contains_key(&0));
+            assert!(inputs["helper"].elidable.contains_key(&1));
+        }
+    }
+    let source = format!(
+        "{helper} {} {}",
+        caller("first", "stable", ""),
+        caller("second", "stable", "").replace(
+            "let carry: Pair = Pair { x: words.carry0, y: words.carry1 };",
+            ""
+        )
+    );
+    let module = module(&source);
+    assert!(
+        protected_inputs(&module, &BTreeSet::from(["helper".into()]))["helper"]
+            .transport
+            .is_empty()
+    );
+}
+
+#[test]
+fn scoped_readonly_record_transport_covers_plain_and_single_carry_actions() {
+    for scalar in [false, true] {
+        let caller = |name: &str, arg: &str, tail: &str| {
+            format!(
+                "fn {name}(state: State) -> i64 {{ let stable = state; let i = 0; let carry = 0;
+            while i < 2 {{ {}helper({arg}, carry, i); {tail} let i = i + 1; }} return carry; }}",
+                if scalar { "let carry: i64 = " } else { "" }
+            )
+        };
+        for (arg, tail, allowed) in [
+            ("stable", "", true),
+            ("relay(stable)", "", false),
+            ("stable", "let stable = state;", false),
+            ("stable", "if i > 0 { let stable = state; }", false),
+            (
+                "stable",
+                "let j = 0; while j < 0 { let stable = state; let j = j + 1; }",
+                false,
+            ),
+        ] {
+            let source = format!(
+                "fn relay(value: State) -> State {{ return value; }}
+                fn helper(input: State, old: i64, index: i64) -> i64 {{
+                    let snapshot = relay(input); return snapshot.a.x + old + index;
+                }} {} {}",
+                caller("first", "stable", ""),
+                caller("second", arg, tail)
+            );
+            for reverse in [false, true] {
+                let mut module = module(&source);
+                if reverse {
+                    module.functions.reverse();
+                }
+                let inputs = protected_inputs(&module, &BTreeSet::from(["helper".into()]));
+                assert_eq!(inputs["helper"].transport.contains(&0), allowed);
+                assert!(inputs["helper"].carried.is_empty());
+                assert!(inputs["helper"].elidable.is_empty());
+                assert!(!inputs["helper"].transport.contains(&2));
+                if scalar {
+                    assert!(!inputs["helper"].transport.contains(&1));
+                }
+            }
+        }
     }
 }
 

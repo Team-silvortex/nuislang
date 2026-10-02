@@ -5,8 +5,12 @@ use control_values::ValueLayouts;
 mod aliases;
 #[path = "capture_bindings.rs"]
 mod bindings;
+#[path = "capture_dead_records.rs"]
+mod dead_records;
 #[path = "capture_joins.rs"]
 mod joins;
+#[path = "capture_record_views.rs"]
+mod record_views;
 #[path = "capture_record_words.rs"]
 mod record_words;
 #[path = "capture_scoped.rs"]
@@ -43,13 +47,13 @@ pub(super) struct ProjectedCaptures {
     pub(super) elided_records: BTreeMap<String, Vec<scoped_loop_lowering::RecordSeed>>,
 }
 
-pub(super) fn scoped_record_seeds(
+pub(super) fn scoped_record_transport_inputs(
     module: &NirModule,
     targets: &BTreeSet<String>,
-) -> BTreeMap<String, BTreeMap<usize, scoped_loop_lowering::RecordSeed>> {
+) -> BTreeMap<String, BTreeSet<usize>> {
     scoped_inputs::protected_inputs(module, targets)
         .into_iter()
-        .map(|(name, inputs)| (name, inputs.elidable))
+        .map(|(name, inputs)| (name, inputs.transport))
         .collect()
 }
 
@@ -58,6 +62,7 @@ pub(super) fn project(
     generated: &BTreeSet<String>,
     scoped_generated: &BTreeSet<String>,
     layouts: &impl ValueLayouts,
+    break_controls: &BTreeMap<String, String>,
 ) -> ProjectedCaptures {
     let mut projected = ProjectedCaptures::default();
     if generated.is_empty() {
@@ -105,7 +110,14 @@ pub(super) fn project(
         let word_inputs =
             record_words::normalize(&mut candidate, protected.get(&name), &definitions, layouts);
         if !scoped.contains(&name) {
-            bindings::normalize(&mut candidate);
+            // A registered name belongs to its scoped call, not every helper
+            // that happens to declare the same source spelling.
+            let control_names = call_graph[index]
+                .iter()
+                .filter_map(|callee| break_controls.get(callee))
+                .cloned()
+                .collect();
+            bindings::normalize(&mut candidate, &control_names);
             joins::normalize(&mut candidate, layouts);
             snapshots::normalize(&mut candidate, layouts);
         } else {
@@ -114,6 +126,8 @@ pub(super) fn project(
         // Scoped helpers retain the outliner's control identities, including
         // nested break flags. Only immutable input-version aliases may disappear.
         aliases::normalize(&mut candidate, layouts);
+        record_views::normalize(&mut candidate, layouts);
+        dead_records::normalize(&mut candidate, layouts);
         let Some(mut plan) = plan(&candidate, protected.get(&name), layouts) else {
             continue;
         };

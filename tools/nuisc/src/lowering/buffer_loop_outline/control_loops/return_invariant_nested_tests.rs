@@ -2,7 +2,7 @@ use super::*;
 use crate::frontend::parse_nuis_module;
 
 #[test]
-fn return_invariants_keep_admitted_inner_plan_when_outer_revalidation_fails() {
+fn return_invariants_preserve_own_reads_across_ordinary_child_exits() {
     let source = include_str!(
         "../../../../tests/control_flow_syntax_native/scoped_return_typed_record_carries.ns"
     )
@@ -44,17 +44,17 @@ fn return_invariants_keep_admitted_inner_plan_when_outer_revalidation_fails() {
         )
         .is_some()
     };
-    assert!(!valid(&outer));
+    assert!(valid(&outer));
     assert!(valid(&inner));
     let prepared = prepare(function, &layouts, &catalog, &BTreeSet::new())
         .unwrap()
         .unwrap();
-    assert_eq!(prepared.body, inner.0);
-    assert_eq!(prepared.structs, inner.1);
+    assert_eq!(prepared.body, outer.0);
+    assert_eq!(prepared.structs, outer.1);
     assert_eq!(execute(&module), Ok(19));
 }
 
-fn execute(module: &NirModule) -> Result<i64, ()> {
+pub(super) fn execute(module: &NirModule) -> Result<i64, ()> {
     let manifest =
         crate::registry::load_manifest(std::path::Path::new("nustar-packages"), "official.cpu")
             .unwrap();
@@ -121,9 +121,7 @@ fn return_invariant_nested_loops_match_observed_indices_exits_and_arithmetic_ora
                                 return result.value * 100 + result.tag;
                             }}
                         }}", if leading { step } else { "" }, if trap { "1 / (i - 3)" } else { "i" }, if leading { "" } else { step });
-                        if exit.is_empty() {
-                            tests::promoted(&source);
-                        }
+                        tests::promoted(&source);
                         let module = parse_nuis_module(&source).unwrap();
                         let layouts = control_values::layouts(&module);
                         let mut independent = module.clone();

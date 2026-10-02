@@ -72,6 +72,7 @@ pub(super) fn begin_execution(
     validate_loop_step_kind(&node.op.args[4], &node.name)?;
     let carry = yir_core::loop_carry_contract::parse_scoped_i64_carry(&node.op.args)?;
     let carries = yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args)?;
+    let plain = yir_core::loop_carry_contract::parse_scoped_call(&node.op.args)?;
     let break_on_return = carries
         .as_ref()
         .is_some_and(|carries| carries.break_on_return);
@@ -85,15 +86,13 @@ pub(super) fn begin_execution(
         .as_ref()
         .map(|carry| carry.operands)
         .or_else(|| carry.as_ref().map(|carry| carry.operands))
-        .unwrap_or(&node.op.args[9..]);
+        .or_else(|| plain.as_ref().map(|call| call.operands))
+        .ok_or_else(invalid)?;
     let mut moved = std::collections::BTreeSet::new();
     let arguments = operands
         .iter()
         .map(|input| {
             if let Some(record) = record_inputs::RecordInput::parse(input, state)? {
-                if carries.is_none() {
-                    return Err(invalid());
-                }
                 Ok(Argument::Record(record))
             } else if input == "$current" {
                 Ok(Argument::Current)

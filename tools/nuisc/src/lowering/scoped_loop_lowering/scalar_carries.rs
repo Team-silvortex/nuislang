@@ -477,6 +477,7 @@ fn initial_record_type(node: &str, state: &LoweringState<'_>) -> Option<String> 
         }
         let name = match op.instruction.as_str() {
             "struct" => op.args.first()?.clone(),
+            "param_value_struct" => value_parameter_type(&op.args)?,
             "call_owned_struct" => {
                 break state
                     .function_map
@@ -517,6 +518,15 @@ fn initial_record_type(node: &str, state: &LoweringState<'_>) -> Option<String> 
             .clone();
     }
     mixed_words::fields(&ty, &state.struct_defs).map(|_| ty.name)
+}
+
+fn value_parameter_type(args: &[String]) -> Option<String> {
+    // Compact private captures already carry a checked nominal layout. Keep
+    // the same bounded scalar-only contract when they seed a nested loop.
+    let [index, encoded] = args else { return None };
+    index.parse::<usize>().ok()?;
+    yir_core::native_scalar_session::ScalarStateLayout::parse(encoded).ok()?;
+    Some(yir_core::parse_owned_struct_layout(encoded).ok()?.type_name)
 }
 
 pub(super) fn field(result: &str, field: String, state: &mut LoweringState<'_>) -> String {

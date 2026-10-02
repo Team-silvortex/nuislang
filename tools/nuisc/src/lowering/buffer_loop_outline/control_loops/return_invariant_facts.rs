@@ -1,14 +1,27 @@
 use super::*;
+use std::ops::Range;
 use std::rc::Rc;
 
 #[path = "return_invariant_loops.rs"]
 mod loops;
 
+#[path = "return_invariant_snapshots.rs"]
+mod snapshots;
+
+#[path = "return_invariant_parent_entries.rs"]
+mod parent_entries;
+
+pub(super) use snapshots::Snapshots;
+
 #[cfg(test)]
 #[path = "return_invariant_facts_tests.rs"]
 mod tests;
 
-type Origin = (String, Vec<String>);
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Origin {
+    Entry(String, Vec<String>),
+    Snapshot(usize, usize),
+}
 
 #[derive(PartialEq, Eq)]
 struct Value {
@@ -18,6 +31,13 @@ struct Value {
 
 type Env = BTreeMap<String, Rc<Value>>;
 
+struct RecordShape {
+    tree: Shape,
+    leaves: Vec<(Vec<String>, NirTypeRef)>,
+    fields: BTreeMap<String, (NirTypeRef, Range<usize>)>,
+}
+
+#[cfg(test)]
 pub(super) fn analyze(
     body: &[NirStmt],
     scope: &Scope,
@@ -25,39 +45,56 @@ pub(super) fn analyze(
     catalog: &ScalarHelpers,
     budget: &mut Budget,
 ) -> Option<BTreeMap<String, (Shape, Vec<bool>)>> {
-    let mut proof = Proof {
-        layouts,
-        catalog,
-        budget,
-        shapes: BTreeMap::new(),
-        stable: BTreeMap::new(),
-        observations: Vec::new(),
-    };
+    analyze_at(body, scope, layouts, catalog, budget, None)
+}
+
+pub(super) fn analyze_at(
+    body: &[NirStmt],
+    scope: &Scope,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+    budget: &mut Budget,
+    snapshots: Option<&Snapshots>,
+) -> Option<BTreeMap<String, (Shape, Vec<bool>)>> {
+    let mut proof = Proof::new(layouts, catalog, budget);
     let writes = sequences::carry_names(body)
         .into_iter()
         .collect::<BTreeSet<_>>();
     let mut env = Env::new();
     for (name, ty) in scope {
         let shape = proof.shape(ty)?;
-        let paths = shape.leaves();
+        let paths = &shape.leaves;
         proof.budget.charge(paths.len())?;
-        if !shape.fields.is_empty() && writes.contains(name) {
+        if !shape.tree.fields.is_empty() && writes.contains(name) {
             proof
                 .stable
-                .insert(name.clone(), (shape, vec![true; paths.len()]));
+                .insert(name.clone(), (shape.tree.clone(), vec![true; paths.len()]));
         }
-        env.insert(
-            name.clone(),
+        let value = if let Some(value) = snapshots.and_then(|s| s.env.get(name)) {
+            if value.ty != *ty || value.words.len() != paths.len() {
+                return None;
+            }
+            Rc::clone(value)
+        } else {
             Rc::new(Value {
                 ty: ty.clone(),
                 words: paths
-                    .into_iter()
-                    .map(|(path, _)| Some((name.clone(), path)))
+                    .iter()
+                    .map(|(path, _)| Some(Origin::Entry(name.clone(), path.clone())))
                     .collect(),
-            }),
-        );
+            })
+        };
+        env.insert(name.clone(), value);
     }
-    proof.block(body, &mut env, 0)?;
+    proof.budget.charge(env.len())?;
+    proof.entries = env.clone();
+    if snapshots.is_some() {
+        // Entry aliases can agree on the first trip and diverge on a later one.
+        // Check their fixed point as well as each intermediate publication.
+        proof.loop_summary(&NirExpr::Bool(true), body, &mut env, 0)?;
+    } else {
+        proof.block(body, &mut env, 0)?;
+    }
     proof
         .stable
         .retain(|_, (_, fields)| fields.iter().any(|stable| *stable));
@@ -68,13 +105,31 @@ struct Proof<'a> {
     layouts: &'a control_values::CarryLayouts,
     catalog: &'a ScalarHelpers,
     budget: &'a mut Budget,
-    shapes: BTreeMap<String, Shape>,
+    shapes: BTreeMap<String, Rc<RecordShape>>,
     stable: BTreeMap<String, (Shape, Vec<bool>)>,
+    entries: Env,
     observations: Vec<Env>,
 }
 
 impl Proof<'_> {
-    fn shape(&mut self, ty: &NirTypeRef) -> Option<Shape> {
+    fn new<'a>(
+        layouts: &'a control_values::CarryLayouts,
+        catalog: &'a ScalarHelpers,
+        budget: &'a mut Budget,
+    ) -> Proof<'a> {
+        Proof {
+            layouts,
+            catalog,
+            budget,
+            shapes: BTreeMap::new(),
+            stable: BTreeMap::new(),
+            entries: Env::new(),
+            observations: Vec::new(),
+        }
+    }
+
+    fn shape(&mut self, ty: &NirTypeRef) -> Option<Rc<RecordShape>> {
+        self.budget.charge(1)?;
         if !self.shapes.contains_key(&ty.name) {
             if self
                 .layouts
@@ -90,18 +145,36 @@ impl Proof<'_> {
             if leaves.len() > 64 {
                 return None;
             }
-            self.shapes.insert(ty.name.clone(), shape);
+            self.budget.charge(shape.fields.len())?;
+            let mut start = 0;
+            let fields = shape
+                .fields
+                .iter()
+                .map(|(name, child)| {
+                    let end = start + child.leaves().len();
+                    let field = (name.clone(), (child.ty.clone(), start..end));
+                    start = end;
+                    field
+                })
+                .collect();
+            self.shapes.insert(
+                ty.name.clone(),
+                Rc::new(RecordShape {
+                    tree: shape,
+                    leaves,
+                    fields,
+                }),
+            );
         }
         let shape = self.shapes.get(&ty.name)?;
-        if shape.ty != *ty {
+        if shape.tree.ty != *ty {
             return None;
         }
-        self.budget.charge(shape.leaves().len())?;
-        Some(shape.clone())
+        Some(Rc::clone(shape))
     }
 
     fn unknown(&mut self, ty: NirTypeRef) -> Option<Rc<Value>> {
-        let width = self.shape(&ty)?.leaves().len();
+        let width = self.shape(&ty)?.leaves.len();
         self.budget.charge(width)?;
         Some(Rc::new(Value {
             ty,
@@ -126,9 +199,10 @@ impl Proof<'_> {
                             return None;
                         }
                         self.budget.charge(paths.len())?;
-                        for (index, (path, _)) in paths.into_iter().enumerate() {
-                            stable[index] &=
-                                value.words[index].as_ref() == Some(&(name.clone(), path));
+                        let entry = self.entries.get(name)?;
+                        for (index, _) in paths.into_iter().enumerate() {
+                            stable[index] &= entry.words[index].is_some()
+                                && value.words[index] == entry.words[index];
                         }
                     }
                     self.observe(name, &value)?;
@@ -202,22 +276,18 @@ impl Proof<'_> {
             NirExpr::F64(_) => self.unknown(scalar_type("f64")),
             NirExpr::FieldAccess { base, field } => {
                 let base = self.expression(base, env, depth + 1)?;
-                let ty = self
-                    .layouts
-                    .get(&base.ty.name)?
-                    .iter()
-                    .find(|(name, _)| name == field)?
-                    .1
-                    .clone();
-                let paths = self.shape(&base.ty)?.leaves();
-                self.budget.charge(paths.len())?;
-                let words = paths
-                    .iter()
-                    .zip(&base.words)
-                    .filter(|((path, _), _)| path.first() == Some(field))
-                    .map(|(_, word)| word.clone())
-                    .collect();
-                Some(Rc::new(Value { ty, words }))
+                // Reusing a validated layout avoids scanning every sibling for
+                // each selected field of a wide constructor. Origins stay fresh.
+                let shape = self.shape(&base.ty)?;
+                let (ty, range) = shape.fields.get(field)?;
+                if base.words.len() != shape.leaves.len() {
+                    return None;
+                }
+                self.budget.charge(range.len())?;
+                Some(Rc::new(Value {
+                    ty: ty.clone(),
+                    words: base.words.get(range.clone())?.to_vec(),
+                }))
             }
             NirExpr::StructLiteral {
                 type_name,

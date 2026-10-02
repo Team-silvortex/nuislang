@@ -206,7 +206,7 @@ fn generated_unread_record_proofs_require_all_callers_to_agree_on_slots() {
             let before = module.clone();
             let names = BTreeSet::from(["helper".into()]);
             let layouts = control_values::TypedLayouts::collect(&module);
-            let projected = project(&mut module, &names, &names, &layouts);
+            let projected = project(&mut module, &names, &names, &layouts, &BTreeMap::new());
             assert_eq!(projected.changed, !swapped);
             assert_eq!(projected.elided_records.contains_key("helper"), !swapped);
             if swapped {
@@ -239,6 +239,7 @@ fn generated_name_does_not_authorize_source_record_seed_elision() {
             &BTreeSet::from([name.into()]),
             &BTreeSet::new(),
             &layouts,
+            &BTreeMap::new(),
         );
         assert!(!projected.changed);
         assert!(projected.elided_records.is_empty());
@@ -286,7 +287,7 @@ fn generated_unread_record_elision_does_not_publish_a_vetoed_proof() {
     let before = module.clone();
     let names = BTreeSet::from(["helper".into()]);
     let layouts = control_values::TypedLayouts::collect(&module);
-    let projected = project(&mut module, &names, &names, &layouts);
+    let projected = project(&mut module, &names, &names, &layouts, &BTreeMap::new());
     assert!(!projected.changed);
     assert!(projected.elided_records.is_empty());
     assert_eq!(module, before);

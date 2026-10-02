@@ -13,6 +13,18 @@ mod tests;
 #[path = "return_invariant_nested_tests.rs"]
 mod nested_tests;
 
+#[cfg(test)]
+#[path = "return_invariant_admission_tests.rs"]
+mod admission_tests;
+
+#[cfg(test)]
+#[path = "return_invariant_child_tests.rs"]
+mod child_tests;
+
+#[cfg(test)]
+#[path = "return_invariant_joins_tests.rs"]
+mod joins_tests;
+
 const MAX_WORK: usize = 65_536;
 const MAX_DEPTH: usize = 64;
 
@@ -60,6 +72,7 @@ pub(super) fn rewrite(
         changed: false,
         structs: Vec::new(),
         nested,
+        snapshot_clock: 0,
     }
     .run(body, scope)
 }
@@ -80,11 +93,14 @@ struct Pass<'a> {
     changed: bool,
     structs: Vec<NirStructDef>,
     nested: bool,
+    snapshot_clock: usize,
 }
 
 impl Pass<'_> {
     fn run(&mut self, body: &[NirStmt], scope: Scope) -> Option<(Vec<NirStmt>, Vec<NirStructDef>)> {
-        let output = self.block(body, scope, 0)?;
+        let snapshots =
+            facts::Snapshots::new(&scope, &self.layouts, self.catalog, &mut self.budget)?;
+        let (output, _) = self.block(body, scope, snapshots, 0)?;
         self.changed
             .then(|| (output, std::mem::take(&mut self.structs)))
     }
@@ -158,24 +174,55 @@ impl Pass<'_> {
         })
     }
 
-    fn block(&mut self, body: &[NirStmt], mut scope: Scope, depth: usize) -> Option<Vec<NirStmt>> {
+    fn block(
+        &mut self,
+        body: &[NirStmt],
+        mut scope: Scope,
+        mut snapshots: facts::Snapshots,
+        depth: usize,
+    ) -> Option<(Vec<NirStmt>, facts::Snapshots)> {
         let mut output = Vec::new();
         for stmt in body {
             self.budget.tick(depth)?;
             match stmt {
                 NirStmt::While { condition, body } => {
                     self.budget.charge(scope.len())?;
-                    let rewritten = self.block(body, scope.clone(), depth + 1)?;
+                    let child_snapshots = if self.nested && contains_loop(body) {
+                        snapshots.parent_entries(
+                            body,
+                            &self.layouts,
+                            self.catalog,
+                            &mut self.budget,
+                            &mut self.snapshot_clock,
+                            depth + 1,
+                        )?
+                    } else {
+                        let mut entries = snapshots.clone();
+                        entries.forget_writes(
+                            body,
+                            &mut self.budget,
+                            &mut self.snapshot_clock,
+                            depth + 1,
+                        )?;
+                        entries
+                    };
+                    let (rewritten, _) =
+                        self.block(body, scope.clone(), child_snapshots, depth + 1)?;
                     let iteration = induction::parse(condition, &rewritten)?;
-                    let records = if (self.nested || !contains_loop(&rewritten))
-                        && exits::return_owned(iteration.effects, self.signal)
+                    // Per-write invariance does not depend on exit ownership.
+                    // Ordinary exits keep their own control/index state; only
+                    // the legacy fallback remains innermost-return-only.
+                    let records = if self.nested
+                        || (!contains_loop(&rewritten)
+                            && exits::return_owned(iteration.effects, self.signal))
                     {
-                        let stable = facts::analyze(
+                        let stable = facts::analyze_at(
                             iteration.effects,
                             &scope,
                             &self.layouts,
                             self.catalog,
                             &mut self.budget,
+                            Some(&snapshots),
                         )?;
                         stable
                             .into_iter()
@@ -184,6 +231,12 @@ impl Pass<'_> {
                     } else {
                         vec![]
                     };
+                    snapshots.forget_writes(
+                        body,
+                        &mut self.budget,
+                        &mut self.snapshot_clock,
+                        depth + 1,
+                    )?;
                     if records.is_empty() {
                         output.push(NirStmt::While {
                             condition: condition.clone(),
@@ -232,13 +285,27 @@ impl Pass<'_> {
                     else_body,
                 } => {
                     self.budget.charge(scope.len().checked_mul(2)?)?;
+                    let condition = self.expression(condition, &[], depth + 1)?;
+                    let (then_body, left) =
+                        self.block(then_body, scope.clone(), snapshots.clone(), depth + 1)?;
+                    let (else_body, right) =
+                        self.block(else_body, scope.clone(), snapshots.clone(), depth + 1)?;
                     output.push(NirStmt::If {
-                        condition: self.expression(condition, &[], depth + 1)?,
-                        then_body: self.block(then_body, scope.clone(), depth + 1)?,
-                        else_body: self.block(else_body, scope.clone(), depth + 1)?,
+                        condition,
+                        then_body,
+                        else_body,
                     });
+                    snapshots.join(&left, &right, &mut self.budget, &mut self.snapshot_clock)?;
                 }
                 NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                    snapshots.bind(
+                        stmt,
+                        &self.layouts,
+                        self.catalog,
+                        &mut self.budget,
+                        &mut self.snapshot_clock,
+                        depth + 1,
+                    )?;
                     scope.insert(
                         name.clone(),
                         control_values::value_type(value, &scope, self.catalog, &self.layouts)?,
@@ -252,7 +319,7 @@ impl Pass<'_> {
                 _ => output.extend(self.effects(std::slice::from_ref(stmt), &[], depth + 1)?),
             }
         }
-        Some(output)
+        Some((output, snapshots))
     }
 
     fn effects(
@@ -268,6 +335,13 @@ impl Pass<'_> {
                 NirStmt::Let { name, ty, value } => {
                     let value = self.expression(value, records, depth + 1)?;
                     if let Some(record) = records.iter().find(|r| &r.name == name) {
+                        if let Some((name, ty)) = &record.carry {
+                            // A child backedge resets ordered-read availability. Keep
+                            // this assignment's own-read authority at its original site,
+                            // before splitting the RHS snapshot from field publication.
+                            self.budget.charge(2)?;
+                            output.push(binding(name, ty, NirExpr::Var(name.clone())));
+                        }
                         // Preserve the complete original RHS once, before any leaf publication.
                         let temporary =
                             branches::fresh_name("__nuis_loop_snapshot", &mut self.names);

@@ -10,10 +10,10 @@ pub(super) fn collect(
     generated: &BTreeSet<String>,
     layouts: &impl ValueLayouts,
 ) -> BTreeMap<String, direct_calls::CapturePlan> {
-    // Scoped record transport needs a complete, agreed seed map at every caller.
+    // Every caller must prove either a complete seed map or a read-only input.
     let eligible = generated.iter().map(String::as_str).collect();
     let scoped = scoped_loop_lowering::collect_scoped_call_targets(module, &eligible);
-    let scoped_inputs = capture_projection::scoped_record_seeds(module, &scoped);
+    let scoped_inputs = capture_projection::scoped_record_transport_inputs(module, &scoped);
     module
         .functions
         .iter()

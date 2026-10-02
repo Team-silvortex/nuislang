@@ -2,8 +2,10 @@ use crate::native_scalar_session::{ScalarKind, ScalarStateLayout};
 
 const PREFIX: &str = "$value_record:";
 
-/// One by-value argument assembled from explicitly ordered per-trip i64 leaves.
-/// Only scoped multi-carry actions admit this descriptor; it is not a node name.
+/// One by-value argument assembled from explicitly ordered scalar leaves.
+/// Captures retain their exact kinds; induction and carry mappings remain i64.
+/// Carry mappings require a multi-carry action. Other scoped scalar actions
+/// admit read-only captures and induction only; this descriptor is not a node name.
 pub struct ScopedRecordInput<'a> {
     pub layout: ScalarStateLayout,
     pub operands: Vec<&'a str>,
@@ -15,24 +17,21 @@ impl<'a> ScopedRecordInput<'a> {
             return Ok(None);
         };
         let invalid = || {
-            "invalid scoped value record: expected bounded i64 layout and exact leaf mappings"
+            "invalid scoped value record: expected bounded scalar layout and exact leaf mappings"
                 .to_owned()
         };
         let (encoded, inputs) = payload.split_once('|').ok_or_else(invalid)?;
         let layout = ScalarStateLayout::parse(encoded)?;
         let operands = inputs.split('|').collect::<Vec<_>>();
-        if operands.len() != layout.fields().len()
-            || layout
-                .fields()
-                .iter()
-                .any(|(_, kind)| *kind != ScalarKind::I64)
-        {
+        if operands.len() != layout.fields().len() {
             return Err(invalid());
         }
-        for operand in &operands {
-            let name = crate::parse_loop_owned_struct_carry(operand)?
-                .map(|(_, seed)| seed)
-                .unwrap_or(operand);
+        for (operand, (_, kind)) in operands.iter().zip(layout.fields()) {
+            let carry = crate::parse_loop_owned_struct_carry(operand)?;
+            if (*operand == "$current" || carry.is_some()) && *kind != ScalarKind::I64 {
+                return Err(invalid());
+            }
+            let name = carry.map(|(_, seed)| seed).unwrap_or(operand);
             if *operand != "$current"
                 && (name.is_empty()
                     || name.contains(['$', ':', '|'])

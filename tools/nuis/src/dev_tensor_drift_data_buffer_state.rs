@@ -582,8 +582,8 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "carries.break_on_return",
             "native_scoped_multi_carry_slot_bound_is_not_a_precombined_arity",
             "does not admit this scoped action",
-            "arity.checked_add(8)",
-            "args[6] != \"scoped_call\"",
+            "parse_scoped_call(args)?.ok_or_else(fail)",
+            "native_scoped_readonly_records_keep_carry_and_resource_boundaries",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -1,6 +1,8 @@
 // Canonical payload arity rules for YIR loop/carry metadata.
 
+mod scoped_call;
 mod scoped_scalar;
+pub use scoped_call::{parse_scoped_call, ScopedCall};
 pub use scoped_scalar::{parse_scoped_i64_carry, ScopedI64Carry};
 mod scoped_record;
 mod scoped_scalars;

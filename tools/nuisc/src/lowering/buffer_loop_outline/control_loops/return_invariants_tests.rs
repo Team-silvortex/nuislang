@@ -111,7 +111,7 @@ fn return_invariants_promote_proven_nested_leaves_and_revalidate_the_function() 
 }
 
 #[test]
-fn return_invariants_keep_ordinary_breaks_and_unproved_fields_on_the_old_path() {
+fn return_invariants_keep_ordinary_breaks_independent_while_promoting_outer_leaves() {
     let source = MIXED.replace("if j == 2 {", "if j == 1 { break; } if j == 2 {");
     let module = parse_nuis_module(&source).unwrap();
     let layouts = control_values::layouts(&module);
@@ -138,8 +138,9 @@ fn return_invariants_keep_ordinary_breaks_and_unproved_fields_on_the_old_path() 
             .unwrap()
             .unwrap()
             .body,
-        baseline.body
+        candidate
     );
+    assert_eq!(super::nested_tests::execute(&module), Ok(201));
 }
 
 #[test]
@@ -201,6 +202,7 @@ fn return_invariants_fresh_names_and_failed_attempts_leave_input_untouched() {
         changed: false,
         structs: Vec::new(),
         nested: true,
+        snapshot_clock: 0,
     };
     let scope = function
         .params

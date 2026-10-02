@@ -102,6 +102,11 @@ pub(crate) fn begin_loop_effect_action(
             } else {
                 None
             };
+            let plain = if action_instruction == "scoped_call"
+                && node.op.instruction == "loop_while_i64_effect" && action_offset == 5
+            {
+                yir_core::loop_carry_contract::parse_scoped_call(&node.op.args)?
+            } else { None };
             let operands = if let Some(carry) = &multi {
                 carry.operands
             } else if let Some(carry) = &scalar_carry {
@@ -150,9 +155,16 @@ pub(crate) fn begin_loop_effect_action(
             }
             // Validate every record before emitting any argument packing.
             let prepared = operands.iter().zip(&signature.params)
-                .map(|(operand, kind)| crate::scoped_record_args::prepare(
-                    operand, kind, current, registers, scalar_overrides,
-                )).collect::<Result<Vec<_>, _>>()?;
+                .map(|(operand, kind)| {
+                    if operand.starts_with("$value_record:")
+                        && multi.is_none() && scalar_carry.is_none() && plain.is_none()
+                    {
+                        return Err("scoped value records require a validated scalar action".into());
+                    }
+                    crate::scoped_record_args::prepare(
+                        operand, kind, current, registers, scalar_overrides,
+                    )
+                }).collect::<Result<Vec<_>, _>>()?;
             let lowered = operands
                 .iter()
                 .zip(signature.params.iter())

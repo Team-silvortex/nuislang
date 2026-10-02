@@ -216,7 +216,7 @@ fn argument(input: &WordInput, binding: &str) -> NirExpr {
 fn project_fixture(module: &mut NirModule) -> bool {
     let layouts = control_values::TypedLayouts::collect(module);
     let names = BTreeSet::from(["helper".into()]);
-    super::super::project(module, &names, &names, &layouts).changed
+    super::super::project(module, &names, &names, &layouts, &BTreeMap::new()).changed
 }
 
 #[test]

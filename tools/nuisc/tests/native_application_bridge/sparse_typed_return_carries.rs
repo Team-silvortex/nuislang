@@ -3,6 +3,9 @@ use super::*;
 #[path = "sparse_typed_return_probe.rs"]
 mod probe;
 
+#[path = "sparse_typed_return_child_exits.rs"]
+mod child_exits;
+
 #[test]
 fn typed_sparse_nested_return_capture_geometry() {
     let mut actual = Vec::new();
@@ -18,15 +21,15 @@ fn typed_sparse_nested_return_capture_geometry() {
     assert_eq!(
         actual,
         [
-            (9, false, vec![8, 9]),
-            (57, false, vec![56, 57]),
-            (58, true, vec![57, 58]),
-            (59, true, vec![58, 59]),
-            (60, true, vec![59, 60]),
-            (61, true, vec![60, 61]),
-            (62, true, vec![61, 62]),
-            (63, true, vec![62, 63]),
-            (64, true, vec![63, 64]),
+            (9, false, vec![5, 8]),
+            (57, false, vec![53, 56]),
+            (58, false, vec![54, 57]),
+            (59, false, vec![55, 58]),
+            (60, false, vec![56, 59]),
+            (61, true, vec![57, 60]),
+            (62, true, vec![58, 61]),
+            (63, true, vec![59, 62]),
+            (64, true, vec![60, 63]),
         ]
     );
 }
@@ -67,7 +70,7 @@ fn typed_sparse_nested_returns_publish_current_snapshots_and_skip_dead_suffixes(
         let source = fixture::return_source(width);
         let project = Project::with_source(&source);
         let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
-        assert_eq!(carried_widths(&compiled.yir), [width - 1, width]);
+        assert_eq!(carried_widths(&compiled.yir), [width - 4, width - 1]);
         let cases = (0..=4)
             .map(|limit| {
                 let initial = initial(width, limit);
@@ -78,8 +81,8 @@ fn typed_sparse_nested_returns_publish_current_snapshots_and_skip_dead_suffixes(
                 )
             })
             .collect();
-        if width >= 58 {
-            typed_record_inputs::check_compact(&source, cases, width - 4);
+        if width >= 61 {
+            typed_record_inputs::check_compact(&source, cases, width - 7);
         } else {
             typed_record_inputs::check_flattened(&source, cases);
         }
@@ -89,15 +92,17 @@ fn typed_sparse_nested_returns_publish_current_snapshots_and_skip_dead_suffixes(
 #[test]
 fn typed_sparse_nested_returns_reject_expanded_private_state_before_native_emission() {
     for (width, rejected) in [(64, 65)] {
-        // A real outer tag mutation removes the final invariant. Do not erase
-        // its return/control word merely to make a 64-word callback fit.
-        let source = fixture::return_source(width).replace(
-            "tag: selected.tag, enabled: !enabled",
-            "tag: i32_from_i64(17), enabled: !enabled",
-        );
+        // Mutating both tag and count removes the remaining invariants. Keep
+        // the return/control word and reject an actually incompressible state.
+        let source = fixture::return_source(width)
+            .replace(
+                "tag: selected.tag, enabled: !enabled",
+                "tag: i32_from_i64(17), enabled: !enabled",
+            )
+            .replace("count: limit", "count: limit + 1");
         let project = Project::with_source(&source);
         let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
-        assert_eq!(carried_widths(&compiled.yir), [width - 1, width + 1]);
+        assert_eq!(carried_widths(&compiled.yir), [width - 3, width + 1]);
         let error = emit_registered(&compiled.yir, "counter").unwrap_err();
         assert!(
             error.contains(&format!(
@@ -111,6 +116,126 @@ fn typed_sparse_nested_returns_reject_expanded_private_state_before_native_emiss
             "{error}"
         );
     }
+}
+
+#[test]
+fn typed_sparse_nested_returns_execute_changed_outer_tags_with_preheader_snapshots() {
+    for width in [9, 63, 64] {
+        let source = fixture::return_source(width).replace(
+            "tag: selected.tag, enabled: !enabled",
+            "tag: i32_from_i64(17), enabled: !enabled",
+        );
+        let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+        assert_eq!(carried_widths(&compiled.yir), [width - 4, width]);
+        let cases = [0, 1, 3, 4]
+            .into_iter()
+            .map(|limit| {
+                let initial = initial(width, limit);
+                let mut event = event(&initial, limit);
+                if limit > 0 {
+                    event[2] = 17;
+                }
+                (
+                    vec![initial[0], initial[1], initial[2], limit],
+                    vec![initial, event.clone(), event],
+                )
+            })
+            .collect();
+        if width == 9 {
+            typed_record_inputs::check_flattened(&source, cases);
+        } else {
+            typed_record_inputs::check_compact(&source, cases, width - 7);
+        }
+    }
+}
+
+#[test]
+fn typed_sparse_nested_returns_execute_joined_preheader_snapshots_at_full_width() {
+    for width in [9, 63, 64] {
+        let source = fixture::joined_return_source(width);
+        let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+        assert_eq!(carried_widths(&compiled.yir), [width - 4, width]);
+        let cases = [0, 1, 3, 4]
+            .into_iter()
+            .map(|limit| {
+                let initial = initial(width, limit);
+                let mut event = event(&initial, limit);
+                if limit > 0 {
+                    event[2] = 17;
+                }
+                (
+                    vec![initial[0], initial[1], initial[2], limit],
+                    vec![initial, event.clone(), event],
+                )
+            })
+            .collect();
+        if width == 9 {
+            typed_record_inputs::check_flattened(&source, cases);
+        } else {
+            typed_record_inputs::check_compact(&source, cases, width - 7);
+        }
+    }
+}
+
+#[test]
+fn typed_sparse_nested_returns_preserve_parent_entry_fields_and_reject_first_trip_aliases() {
+    for width in [9, 63, 64] {
+        for changed_tag in [false, true] {
+            let mut source = fixture::parent_return_source(width);
+            if changed_tag {
+                source = source.replace(
+                    "tag: selected.tag, enabled: !enabled",
+                    "tag: i32_from_i64(17), enabled: !enabled",
+                );
+            }
+            let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+            assert_eq!(
+                carried_widths(&compiled.yir),
+                [
+                    width - if changed_tag { 2 } else { 4 },
+                    width - usize::from(!changed_tag)
+                ]
+            );
+            let cases = [0, 1, 3, 4]
+                .into_iter()
+                .map(|limit| {
+                    let initial = initial(width, limit);
+                    let mut event = event(&initial, limit);
+                    if changed_tag && limit == 1 {
+                        event[2] = 17;
+                    }
+                    (
+                        vec![initial[0], initial[1], initial[2], limit],
+                        vec![initial, event.clone(), event],
+                    )
+                })
+                .collect();
+            if width == 9 {
+                typed_record_inputs::check_flattened(&source, cases);
+            } else {
+                typed_record_inputs::check_compact(
+                    &source,
+                    cases,
+                    width - if changed_tag { 6 } else { 7 },
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn typed_sparse_nested_return_joins_reject_one_changed_arm_before_native_emission() {
+    let source = fixture::joined_return_source(64)
+        .replace("let bounds = carry;", "let bounds = relay(carry);");
+    let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+    assert_eq!(carried_widths(&compiled.yir), [61, 65]);
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let error = emit_registered(&compiled.yir, "counter").unwrap_err();
+    assert!(
+        error.contains("65 carried words exceed the 64-word native limit"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -156,7 +281,7 @@ fn typed_sparse_nested_returns_preserve_invariant_negative_zero_and_nan_payloads
         if width == 9 {
             typed_record_inputs::check_flattened(&source, cases);
         } else {
-            typed_record_inputs::check_compact(&source, cases, width - 4);
+            typed_record_inputs::check_compact(&source, cases, width - 7);
         }
     }
 }

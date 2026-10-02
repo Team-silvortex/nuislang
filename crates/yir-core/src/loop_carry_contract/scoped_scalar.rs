@@ -1,10 +1,18 @@
-/// One i64 helper result carried between iterations, with ordinary named captures.
+/// One i64 helper result carried between iterations, with named or record captures.
 /// The enclosing loop returns `LoopState { current: i64, carry0: i64 }`.
 #[derive(Debug)]
 pub struct ScopedI64Carry<'a> {
     pub callee: &'a str,
     pub initial: &'a str,
     pub operands: &'a [String],
+}
+
+impl ScopedI64Carry<'_> {
+    pub fn dependencies(&self) -> Result<Vec<String>, String> {
+        let mut inputs = vec![self.initial.to_owned()];
+        inputs.extend(super::scoped_call::dependencies(self.operands)?);
+        Ok(inputs)
+    }
 }
 
 pub fn parse_scoped_i64_carry(args: &[String]) -> Result<Option<ScopedI64Carry<'_>>, String> {
@@ -20,9 +28,7 @@ pub fn parse_scoped_i64_carry(args: &[String]) -> Result<Option<ScopedI64Carry<'
     {
         return Err(invalid());
     }
-    let named = |value: &str| {
-        !value.is_empty() && !value.contains(['$', ':']) && !value.chars().any(char::is_whitespace)
-    };
+    use super::scoped_call::{named, readonly_record};
     let operands = &args[10..];
     if !named(&args[8])
         || !named(&args[9])
@@ -31,11 +37,13 @@ pub fn parse_scoped_i64_carry(args: &[String]) -> Result<Option<ScopedI64Carry<'
             .filter(|arg| arg.as_str() == "$carry")
             .count()
             != 1
-        || operands
-            .iter()
-            .any(|arg| arg != "$current" && arg != "$carry" && !named(arg))
     {
         return Err(invalid());
+    }
+    for arg in operands {
+        if !readonly_record(arg)? && arg != "$current" && arg != "$carry" && !named(arg) {
+            return Err(invalid());
+        }
     }
     Ok(Some(ScopedI64Carry {
         callee: &args[8],

@@ -461,7 +461,10 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
         _ => op.args.len(),
     };
     let mut moves_owned = false;
-    for operand in op.args.iter().skip(operand_start) {
+    for operand in op.args.iter().skip(operand_start).flat_map(|operand| {
+        crate::loop_carry_contract::scoped_input_leaves(operand)
+            .unwrap_or_else(|_| vec![operand.as_str()])
+    }) {
         if operand == "$current"
             || (operand == "$carry"
                 && op.args.get(6).map(String::as_str) == Some("scoped_call_i64_carry"))
@@ -480,7 +483,7 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
             moves_owned = true;
             (input, GlmValueClass::Res, GlmUseMode::Own)
         } else {
-            (operand.as_str(), GlmValueClass::Val, GlmUseMode::Read)
+            (operand, GlmValueClass::Val, GlmUseMode::Read)
         };
         accesses.push(GlmAccess {
             input: input.to_owned(),

@@ -13,13 +13,63 @@ fn module(body: &str) -> NirModule {
 fn run(module: &mut NirModule, generated: &[&str]) -> bool {
     let layouts = control_values::TypedLayouts::collect(module);
     let generated = generated.iter().map(|s| (*s).to_owned()).collect();
-    let changed = project(module, &generated, &BTreeSet::new(), &layouts);
+    let changed = project(
+        module,
+        &generated,
+        &BTreeSet::new(),
+        &layouts,
+        &BTreeMap::new(),
+    );
     crate::nir_verify::verify_nir_module(module).unwrap();
     changed.changed
 }
 
 fn function<'a>(module: &'a NirModule, name: &str) -> &'a NirFunction {
     module.functions.iter().find(|f| f.name == name).unwrap()
+}
+
+#[test]
+fn registered_control_identities_do_not_leak_to_unrelated_helpers() {
+    let mut module = module(
+        "fn unrelated_iteration() -> i64 { return 0; }
+        fn helper(state: State, flag: bool) -> i64 {
+            if flag { let signal = 11; print(signal); }
+            else { let signal = 22; print(signal); }
+            let signal = state.a.x; return signal;
+        }
+        fn entry(state: State, flag: bool) -> i64 { return helper(state, flag); }",
+    );
+    let layouts = control_values::TypedLayouts::collect(&module);
+    assert!(
+        project(
+            &mut module,
+            &BTreeSet::from(["helper".into()]),
+            &BTreeSet::new(),
+            &layouts,
+            &BTreeMap::from([("unrelated_iteration".into(), "signal".into())]),
+        )
+        .changed
+    );
+    crate::nir_verify::verify_nir_module(&module).unwrap();
+    let helper = function(&module, "helper");
+    let NirStmt::If {
+        then_body,
+        else_body,
+        ..
+    } = &helper.body[0]
+    else {
+        panic!()
+    };
+    let NirStmt::Let { name: left, .. } = &then_body[0] else {
+        panic!()
+    };
+    let NirStmt::Let { name: right, .. } = &else_body[0] else {
+        panic!()
+    };
+    assert_ne!(left, right);
+    assert_ne!(left, "signal");
+    assert_ne!(right, "signal");
+    assert!(matches!(&helper.body[1], NirStmt::Let { name, .. } if name == "signal"));
 }
 
 #[test]
@@ -180,7 +230,8 @@ fn projection_vetoes_calls_hidden_in_unsupported_expressions() {
                 &mut module,
                 &BTreeSet::from(["helper".into()]),
                 &BTreeSet::new(),
-                &layouts
+                &layouts,
+                &BTreeMap::new(),
             )
             .changed
         );

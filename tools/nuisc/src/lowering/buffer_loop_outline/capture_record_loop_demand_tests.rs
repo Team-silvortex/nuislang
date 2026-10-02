@@ -13,13 +13,13 @@ fn materialized_word_loop_returns_keep_pending_values_and_control_seeds() {
             yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args).unwrap()
         })
         .collect::<Vec<_>>();
-    assert_eq!(calls.iter().map(|call| call.seeds.len()).max(), Some(9));
+    assert_eq!(calls.iter().map(|call| call.seeds.len()).max(), Some(8));
     let mut widths = calls
         .iter()
         .map(|call| call.seeds.len())
         .collect::<Vec<_>>();
     widths.sort_unstable();
-    assert_eq!(widths, [8, 9]);
+    assert_eq!(widths, [5, 8]);
     assert_eq!(calls.iter().filter(|call| call.break_on_return).count(), 2);
     assert_eq!(scoped_inputs::carry_tests::reference(&mut yir).unwrap(), 19);
 }
