@@ -1,14 +1,114 @@
 use super::*;
 
+#[path = "return_storage.rs"]
+mod storage;
+
+#[path = "return_invariants.rs"]
+mod invariants;
+
+pub(in crate::lowering::buffer_loop_outline) struct Signal(String);
+
+impl Signal {
+    pub(in crate::lowering::buffer_loop_outline) fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+pub(in crate::lowering::buffer_loop_outline) struct Prepared {
+    pub body: Vec<NirStmt>,
+    pub signal: Signal,
+    pub structs: Vec<NirStructDef>,
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn prepare(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+    names: &BTreeSet<String>,
+) -> Option<Option<Prepared>> {
+    if !contains_loop_return(&function.body) {
+        return Some(None);
+    }
+    catalog.get(&function.name)?;
+    let mut plan =
+        coalesced(function, layouts, catalog).or_else(|| rewrite(function, layouts, None))?;
+    // A rejected outer rewrite must not discard the established inner-only
+    // optimization. Each of these two bounded attempts starts from the same plan.
+    for nested in [true, false] {
+        let Some((body, structs)) = invariants::rewrite(
+            function,
+            &plan.body,
+            &plan.signal,
+            layouts,
+            catalog,
+            names,
+            nested,
+        ) else {
+            continue;
+        };
+        let mut candidate_layouts = layouts.clone();
+        for definition in &structs {
+            candidate_layouts.insert(
+                definition.name.clone(),
+                definition
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.clone(), f.ty.clone()))
+                    .collect(),
+            );
+        }
+        if scalar_helpers::validate_control_body(function, &body, catalog, &candidate_layouts)
+            .is_some()
+        {
+            plan.body = body;
+            plan.structs = structs;
+            break;
+        }
+    }
+    Some(Some(plan))
+}
+
 // Reuse typed carries and scoped break rather than teaching native loop opcodes
-// about function returns. Admission and outlining must consume the same rewrite.
+// about function returns. Source admission always checks independent storage;
+// outlining may subsequently coalesce it, subject to the same body validator.
 pub(in crate::lowering::buffer_loop_outline) fn normalize(
     function: &NirFunction,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
 ) -> Option<Option<Vec<NirStmt>>> {
     if !contains_loop_return(&function.body) {
         return Some(None);
     }
+    rewrite(function, layouts, None).map(|plan| Some(plan.body))
+}
+
+#[cfg(test)]
+pub(in crate::lowering::buffer_loop_outline) fn coalesce(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+) -> Option<Vec<NirStmt>> {
+    coalesced(function, layouts, catalog).map(|plan| plan.body)
+}
+
+fn coalesced(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+) -> Option<Prepared> {
+    // Reusing a binding must not make otherwise invalid source admissible,
+    // particularly by granting a return expression an assignment's self-read.
+    catalog.get(&function.name)?;
+    let storage = storage::candidate(function, layouts, catalog)?;
+    let plan = rewrite(function, layouts, Some(storage))?;
+    scalar_helpers::validate_control_body(function, &plan.body, catalog, layouts)?;
+    Some(plan)
+}
+
+fn rewrite(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+    storage: Option<String>,
+) -> Option<Prepared> {
     let result = function.return_type.as_ref()?;
     if !control_values::supported_type(result, layouts) {
         return None;
@@ -16,22 +116,27 @@ pub(in crate::lowering::buffer_loop_outline) fn normalize(
     let mut names = function.params.iter().map(|p| p.name.clone()).collect();
     branches::collect_bindings(&function.body, &mut names);
     reserve_references(&function.body, &mut names)?;
+    let independent = storage.is_none();
     let state = State {
         flag: branches::fresh_name("__nuis_return_pending", &mut names),
-        value: branches::fresh_name("__nuis_return_value", &mut names),
+        value: storage.unwrap_or_else(|| branches::fresh_name("__nuis_return_value", &mut names)),
         result,
     };
     let (body, _) = state.block(&function.body, false, 0)?;
-    let mut output = vec![
-        binding(&state.flag, &scalar_type("i64"), NirExpr::Int(0)),
-        binding(
+    let mut output = vec![binding(&state.flag, &scalar_type("i64"), NirExpr::Int(0))];
+    if independent {
+        output.push(binding(
             &state.value,
             result,
             control_values::zero_value(result, layouts),
-        ),
-    ];
+        ));
+    }
     output.extend(body);
-    Some(Some(output))
+    Some(Prepared {
+        body: output,
+        signal: Signal(state.flag),
+        structs: Vec::new(),
+    })
 }
 
 fn contains_loop_return(body: &[NirStmt]) -> bool {

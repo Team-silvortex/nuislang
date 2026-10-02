@@ -13,7 +13,7 @@ pub(super) type ScalarHelpers = BTreeMap<String, ScalarHelper>;
 pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
     collect_profile(
         module,
-        &control_values::FlatLayouts::new(),
+        &control_values::CarryLayouts::new(),
         None,
         &ScalarHelpers::new(),
     )
@@ -21,7 +21,7 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
 
 pub(super) fn collect_with_layouts(
     module: &NirModule,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
 ) -> ScalarHelpers {
     collect_profile(module, layouts, Some(layouts), &ScalarHelpers::new())
 }
@@ -31,14 +31,45 @@ pub(super) fn collect_typed_values(
     layouts: &control_values::TypedLayouts,
     loop_catalog: &ScalarHelpers,
 ) -> ScalarHelpers {
-    // Reuse proven flat helpers as dependencies, but admit no new loop bodies.
+    // Reuse proven loop helpers as dependencies, but admit no new loop bodies.
     collect_profile(module, layouts, None, loop_catalog)
+}
+
+pub(super) fn control_roots(
+    module: &NirModule,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+) -> BTreeSet<String> {
+    let flat = layouts
+        .iter()
+        .filter(|(_, fields)| {
+            fields
+                .iter()
+                .all(|(_, ty)| crate::lowering::scalar_record_shape::scalar(ty))
+        })
+        .map(|(name, fields)| (name.clone(), fields.clone()))
+        .collect();
+    // Nested value eligibility is not whole-function control authority. Preserve
+    // the established non-loop selection route and its helper-entry budget.
+    let mut roots = collect_with_layouts(module, &flat)
+        .into_keys()
+        .collect::<BTreeSet<_>>();
+    roots.extend(
+        module
+            .functions
+            .iter()
+            .filter(|function| {
+                catalog.contains_key(&function.name) && control_loops::contains_loop(&function.body)
+            })
+            .map(|function| function.name.clone()),
+    );
+    roots
 }
 
 fn collect_profile(
     module: &NirModule,
     layouts: &impl control_values::ValueLayouts,
-    loop_layouts: Option<&control_values::FlatLayouts>,
+    loop_layouts: Option<&control_values::CarryLayouts>,
     seeded: &ScalarHelpers,
 ) -> ScalarHelpers {
     let functions = module
@@ -135,7 +166,7 @@ fn validate_body(
     function: &NirFunction,
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
-    loop_layouts: Option<&control_values::FlatLayouts>,
+    loop_layouts: Option<&control_values::CarryLayouts>,
 ) -> Option<()> {
     let normalized = if let Some(loop_layouts) = loop_layouts {
         control_loops::returns::normalize(function, loop_layouts)?
@@ -159,6 +190,29 @@ fn validate_body(
     .then_some(())
 }
 
+pub(super) fn validate_control_body(
+    function: &NirFunction,
+    body: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &control_values::CarryLayouts,
+) -> Option<()> {
+    let mut locals = function
+        .params
+        .iter()
+        .map(|param| (param.name.clone(), param.ty.clone()))
+        .collect();
+    validate_block(
+        body,
+        &mut locals,
+        &mut BTreeSet::new(),
+        function.return_type.as_ref()?,
+        catalog,
+        layouts,
+        Some(layouts),
+    )?
+    .then_some(())
+}
+
 // Branch scopes never export bindings; every path through the helper must return.
 fn validate_block(
     body: &[NirStmt],
@@ -167,7 +221,7 @@ fn validate_block(
     result: &NirTypeRef,
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
-    loop_layouts: Option<&control_values::FlatLayouts>,
+    loop_layouts: Option<&control_values::CarryLayouts>,
 ) -> Option<bool> {
     let mut returned = false;
     for stmt in body {
@@ -642,7 +696,7 @@ mod tests {
             &mut helpers,
             &mut guarded,
             &catalog,
-            &control_values::FlatLayouts::new(),
+            &control_values::CarryLayouts::new(),
         );
         // The final ready return needs neither a continuation nor an empty-arm guard.
         assert_eq!(helpers.len(), 64 * 3 - 2);

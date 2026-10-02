@@ -79,6 +79,8 @@ mod owned_loop_lowering;
 mod owned_struct_layout;
 #[path = "lowering/result_nodes.rs"]
 mod result_nodes;
+#[path = "lowering/scalar_record_shape.rs"]
+mod scalar_record_shape;
 #[path = "lowering/scheduler_contracts.rs"]
 mod scheduler_contracts;
 #[path = "lowering/scoped_loop_lowering.rs"]

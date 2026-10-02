@@ -68,7 +68,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "54 reachable native functions",
             "Generated-use counting is iterative",
-            "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps",
+            "reduce nested return snapshot carries while preserving observed exits",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -130,7 +130,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "51 reachable native functions",
             "disjoint lexical bindings",
             "63 to 32 private helpers",
-            "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps",
+            "reduce nested return snapshot carries while preserving observed exits",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -203,7 +203,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Scope-aware local hygiene",
             "Private names reserve future source bindings",
             "five actual entries instead of six",
-            "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps",
+            "reduce nested return snapshot carries while preserving observed exits",
         ],
     },
 ];

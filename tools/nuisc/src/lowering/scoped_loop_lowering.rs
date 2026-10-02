@@ -13,6 +13,12 @@ pub(super) struct RecordSeed {
     ty: NirTypeRef,
 }
 
+impl RecordSeed {
+    pub(super) fn source_type(&self) -> &NirTypeRef {
+        &self.ty
+    }
+}
+
 enum ScopedLoopResult<'a> {
     None,
     Scalar(&'a str),

@@ -65,7 +65,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "A shared bounded pure-value record codec now serves native helper and callback returns",
             "retain the checked non-scoped record parameter contract",
-            "nested record carries still lack exact field-path scoped seed and backedge maps",
+            "Changing nested-loop versions now have bounded fixed-point demand and lexical exit-edge proof",
         ],
     },
     DevTensorDriftCheckSpec {

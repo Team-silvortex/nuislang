@@ -5,7 +5,7 @@ use super::*;
 pub(super) fn outline(
     module: &mut NirModule,
     catalog: &ScalarHelpers,
-    control_catalog: &ScalarHelpers,
+    control_roots: &BTreeSet<String>,
     layouts: &impl control_values::ValueLayouts,
     names: &mut BTreeSet<String>,
 ) -> BTreeSet<String> {
@@ -14,7 +14,7 @@ pub(super) fn outline(
     for function in &mut module.functions {
         // Typed value admission alone does not provide full control lowering.
         // Keep local selection extraction unless that route is already admitted.
-        if control_catalog.contains_key(&function.name) {
+        if control_roots.contains(&function.name) {
             continue;
         }
         let mut scope = function

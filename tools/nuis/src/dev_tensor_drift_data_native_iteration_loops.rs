@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts)",
             "candidates.remove(&name)",
             "if *count == 0",
-            "&control_values::FlatLayouts::new(),",
+            "&control_values::CarryLayouts::new(),",
             "dependency_collection_handles_deep_unvalidated_structure_iteratively",
             "let mut pending = vec![body]",
             "let mut pending = vec![expr]",

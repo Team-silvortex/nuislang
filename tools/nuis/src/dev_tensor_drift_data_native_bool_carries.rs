@@ -59,7 +59,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "private_bool_transport_capture_does_not_widen_source_admission",
             "collect_inputs(&expr, &mut inputs)",
-            "value_type(&expr, &scope, &ScalarHelpers::new(), &FlatLayouts::new()).is_none()",
+            "value_type(&expr, &scope, &ScalarHelpers::new(), &CarryLayouts::new()).is_none()",
         ],
     },
     DevTensorDriftCheckSpec {

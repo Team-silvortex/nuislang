@@ -5,6 +5,231 @@ const SOURCE: &str = include_str!("scoped_field_seeds.ns");
 #[path = "../native_application_bridge/scoped_record_fixture.rs"]
 mod record_fixture;
 
+#[path = "scoped_index_recovery_cases.rs"]
+mod index_recovery;
+
+#[path = "scoped_return_signal_cases.rs"]
+mod return_signal;
+
+#[test]
+fn scoped_return_signal_preserves_native_break_continue_and_parent_propagation() {
+    for (case, _, _) in return_signal::CASES {
+        for leading in [false, true] {
+            for (limit, stop) in [(0, 0), (4, 1), (4, 3)] {
+                let source = return_signal::source(case, leading, limit, stop);
+                assert_eq!(
+                    compile_and_run(
+                        &format!("return_signal_{case}_{leading}_{limit}_{stop}"),
+                        &source
+                    )
+                    .code(),
+                    Some(return_signal::expected(case, leading, limit, stop) as i32),
+                    "{case} leading={leading} limit={limit} stop={stop}",
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn scoped_index_recovery_preserves_native_exits_and_generated_backedges() {
+    for case in index_recovery::cases() {
+        assert!(case.recoveries <= 1);
+        for limit in [0, 3] {
+            let source = index_recovery::source(&case.body, limit);
+            assert_eq!(
+                compile_and_run(&format!("index_recovery_{}_{limit}", case.name), &source).code(),
+                Some(case.expected[limit] as i32),
+                "{} limit={limit}",
+                case.name,
+            );
+        }
+    }
+}
+
+#[test]
+fn scoped_index_recovery_keeps_selected_work_and_skips_unreachable_traps() {
+    let case = index_recovery::cases().remove(0);
+    let body = case.body.replace(
+        "let total = total + index;",
+        "let unused = 10 / (limit - index); let total = total + index;",
+    );
+    for limit in [0, 3] {
+        assert_eq!(
+            compile_and_run(
+                &format!("index_recovery_lazy_{limit}"),
+                &index_recovery::source(&body, limit)
+            )
+            .code(),
+            Some(case.expected[limit] as i32),
+        );
+    }
+    let status = compile_and_run(
+        "index_recovery_selected_trap",
+        &index_recovery::source(&body, 1),
+    );
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
+#[test]
+fn materialized_typed_record_nested_returns_execute_and_keep_payload_traps_lazy() {
+    let source = include_str!("scoped_return_typed_record_carries.ns");
+    assert_eq!(
+        compile_and_run("materialized_nested_return", source).code(),
+        Some(19)
+    );
+    let trapped = source.replace("return State { left: selected,",
+        "return State { left: Leaf { value: selected.value, gain: selected.gain, tag: i32_from_i64(10 / (2 - j)), enabled: selected.enabled },");
+    let status = compile_and_run("materialized_nested_return_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+    for limit in [0, 1] {
+        let lazy = trapped.replace("i32_from_i64(7), 3", &format!("i32_from_i64(7), {limit}"));
+        assert_eq!(
+            compile_and_run(&format!("materialized_nested_return_lazy_{limit}"), &lazy).code(),
+            Some(201)
+        );
+    }
+}
+
+#[test]
+fn materialized_typed_record_loops_execute_and_keep_nested_traps_lazy() {
+    let source = include_str!("scoped_loop_typed_record_carries.ns");
+    assert_eq!(
+        compile_and_run("materialized_record_loop", source).code(),
+        Some(19)
+    );
+    let trapped = source.replace("tag: previous.tag", "tag: i32_from_i64(10 / (2 - j))");
+    let status = compile_and_run("materialized_record_loop_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+    for limit in [0, 1] {
+        let lazy = trapped.replace("i32_from_i64(7), 3", &format!("i32_from_i64(7), {limit}"));
+        assert_eq!(
+            compile_and_run(&format!("materialized_loop_lazy_{limit}"), &lazy).code(),
+            Some(201)
+        );
+    }
+    for exit in ["break", "continue"] {
+        let lazy = trapped.replace(
+            "let previous = selected;",
+            &format!("let previous = selected; if j == 2 {{ {exit}; }}"),
+        );
+        assert_eq!(
+            compile_and_run(&format!("materialized_loop_lazy_{exit}"), &lazy).code(),
+            Some(201)
+        );
+    }
+}
+
+#[test]
+fn materialized_typed_record_joins_execute_and_keep_selected_traps() {
+    let source = include_str!("scoped_join_typed_record_carries.ns");
+    assert_eq!(
+        compile_and_run("materialized_record_join", source).code(),
+        Some(19)
+    );
+    let trapped = source.replacen(
+        "tag: previous.tag",
+        "tag: i32_from_i64(10 / (limit - i))",
+        1,
+    );
+    let status = compile_and_run("materialized_record_join_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+    for limit in [0, 2] {
+        let lazy = trapped.replace("i32_from_i64(7), 3", &format!("i32_from_i64(7), {limit}"));
+        assert_eq!(
+            compile_and_run(&format!("materialized_record_join_lazy_{limit}"), &lazy).code(),
+            Some(201)
+        );
+    }
+}
+
+#[test]
+fn sparse_branch_typed_snapshots_execute_and_preserve_branch_local_traps() {
+    let source = include_str!("scoped_branch_typed_record_carries.ns");
+    assert_eq!(
+        compile_and_run("sparse_branch_snapshots", source).code(),
+        Some(19)
+    );
+    let trapped = source.replace(
+        "let leaf = local.left;",
+        "let leaf = local.left;\n\
+        let checked = Leaf { value: 0.0, gain: 0.0,\n\
+            tag: i32_from_i64(10 / (limit - i)), enabled: false };",
+    );
+    let status = compile_and_run("sparse_branch_snapshot_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+    for limit in [0, 2] {
+        let lazy = trapped.replace("i32_from_i64(7), 3", &format!("i32_from_i64(7), {limit}"));
+        assert_eq!(
+            compile_and_run(&format!("sparse_branch_lazy_{limit}"), &lazy).code(),
+            Some(201)
+        );
+    }
+}
+
+#[test]
+fn sparse_typed_record_carries_execute_and_keep_unused_checked_work() {
+    let source = include_str!("scoped_sparse_typed_record_carries.ns");
+    assert_eq!(
+        compile_and_run("sparse_typed_record_words", source).code(),
+        Some(19)
+    );
+    let trapped = source.replace("tag: i32_from_i64(9)", "tag: i32_from_i64(9 / (limit - i))");
+    assert!(!compile_and_run("sparse_typed_unused_field_trap", &trapped).success());
+    let zero = trapped
+        .replace("i32_from_i64(7), 3", "i32_from_i64(7), 0")
+        .replace(
+            "i32_from_i64(9) { return 202; }",
+            "i32_from_i64(7) { return 202; }",
+        );
+    assert_eq!(
+        compile_and_run("sparse_typed_zero_trip", &zero).code(),
+        Some(203)
+    );
+}
+
+#[test]
+fn nested_record_carries_preserve_native_paths_snapshots_breaks_and_lazy_traps() {
+    let source = include_str!("scoped_nested_record_carries.ns");
+    assert_eq!(
+        compile_and_run("nested_record_words", source).code(),
+        Some(37)
+    );
+    let trapped = source.replace("walk(5, 2)", "walk(5, 0)");
+    let status = compile_and_run("nested_record_words_trap", &trapped);
+    assert!(!status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert!(matches!(status.signal(), Some(4 | 5)), "{status:?}");
+    }
+}
+
 #[test]
 fn f64_record_carries_preserve_native_values_scalar_slots_and_lazy_traps() {
     let source = include_str!("scoped_f64_record_carries.ns");

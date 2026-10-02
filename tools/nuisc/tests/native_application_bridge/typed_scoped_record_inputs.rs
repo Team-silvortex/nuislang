@@ -5,17 +5,24 @@ pub(super) mod fixture;
 
 #[test]
 fn typed_scoped_record_inputs_preserve_full_seeds_and_per_trip_updates() {
-    check(64, false);
+    check(64, false, false);
 }
 
 #[test]
 fn typed_scoped_record_inputs_keep_break_mapping_independent_of_record_width() {
-    check(62, true);
+    check(62, true, true);
+    check(63, true, false);
 }
 
 #[test]
 fn typed_scoped_record_inputs_preserve_independent_boolean_carry_and_break() {
-    let source = fixture::source(61, true)
+    for (width, observed) in [(61, true), (62, false)] {
+        check_boolean_break(width, observed);
+    }
+}
+
+fn check_boolean_break(width: usize, observed: bool) {
+    let mut source = fixture::source(width, true)
         .replace(
             "let carry = state; let i = 0;",
             "let carry = state; let i = 0; let flag = true;",
@@ -28,6 +35,9 @@ fn typed_scoped_record_inputs_preserve_independent_boolean_carry_and_break() {
             "return carry;",
             "if flag { return carry; } return relay(carry);",
         );
+    if observed {
+        source = source.replace("if flag {", "if flag || i < 0 {");
+    }
     let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     assert!(compiled
@@ -46,7 +56,9 @@ fn typed_scoped_record_inputs_preserve_independent_boolean_carry_and_break() {
     let cases = [-3_i64, 0, 1, 5]
         .into_iter()
         .map(|seed| {
-            let initial = (0..61).map(|i| (seed + i) as u64).collect::<Vec<_>>();
+            let initial = (0..width)
+                .map(|i| (seed + i as i64) as u64)
+                .collect::<Vec<_>>();
             let trips = (seed + 1).clamp(0, 3);
             let delta = trips.min(2) + 2 * (trips - 2).max(0) + trips % 2;
             let event = initial
@@ -198,8 +210,14 @@ fn typed_scoped_record_branch_inputs_keep_constructor_math_behind_its_guard() {
     );
 }
 
-fn check(count: usize, breaking: bool) {
-    let source = fixture::source(count, breaking);
+fn check(count: usize, breaking: bool, observed: bool) {
+    let mut source = fixture::source(count, breaking);
+    if observed {
+        source = source.replace(
+            "return carry;",
+            "if i >= 0 { return carry; } return relay(carry);",
+        );
+    }
     let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     let mapped = compiled
@@ -233,7 +251,8 @@ fn check(count: usize, breaking: bool) {
             .collect::<Vec<_>>()
     );
     for call in mapped {
-        assert_eq!(call.seeds.len(), count + 2 * usize::from(breaking));
+        let control_slots = usize::from(breaking) * (1 + usize::from(observed));
+        assert_eq!(call.seeds.len(), count + control_slots);
         let function = compiled
             .yir
             .functions

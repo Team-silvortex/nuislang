@@ -20,7 +20,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "fields.is_some()",
             "Private branch transport stays flat-i64",
             "type_name: ty.name.clone()",
-            ".map(|(field, ty)| (field.clone(), decode(ty, word())))",
+            "shape.reconstruct(&mut |ty| decode(ty, word()))",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -36,10 +36,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-flat-rebinding-total-guard-projections",
         path: "tools/nuisc/src/lowering/direct_calls/control_boundaries.rs",
         required_patterns: &[
-            "fn is_flat_parameter_field",
-            "let NirExpr::Var(name) = base.as_ref()",
-            "definition.where_bounds.is_empty()",
-            "direct_call_scalar_kind(&entry.ty) == Some(kind)",
+            "fn is_parameter_field",
+            "let NirExpr::Var(name) = base",
+            "Shape::from_definitions(&param.ty, structs)",
+            "direct_call_scalar_kind(&current.ty) == Some(kind)",
         ],
     },
     DevTensorDriftCheckSpec {

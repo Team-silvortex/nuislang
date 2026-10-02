@@ -799,10 +799,307 @@ checks break timing and selected versus skipped traps. A dedicated CLI workflow
 covers build/cache identity, tamper rejection and source-free artifact restoration.
 Loop-bound admission is unchanged: these carry probes bind a field-derived bound
 to a local before the loop, rather than claiming arbitrary field-valued conditions.
-Sparse mixed projections, nested record carries and resource-bearing carries remain
-separate admission work; ordinary non-loop nested values keep their existing support.
+At that checkpoint, sparse mixed projections, nested record carries and resources
+remained separate admission work; the nested carry extension follows below.
 
-Next: extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
+That checkpoint selected: extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
+
+## Nested Scoped Carries
+
+Generated scoped carries now admit acyclic, nonempty nominal record trees with
+`bool/i32/i64/f32/f64` leaves. The shared pure-shape proof rejects references,
+optionals, generic arguments/definitions, duplicate fields, unknown/resource types
+and cycles transitively. The entire tree must be pure, including unaccessed siblings.
+Record depth is bounded at 64 and nested expansion at 4096 nodes. Explicit flat
+record width retains its existing admission policy; native value limits remain 64 leaves.
+Value eligibility and whole-function control authority remain separate: a new
+nested type does not reroute existing non-loop helpers or inflate their entry budgets.
+New control roots require an actual loop; their proven dependencies follow reachability.
+
+Private word maps use ordered field segments, not concatenated path strings. Leaf
+order follows the declared record tree, so `left.value` and `right.value` cannot
+alias. Each seed must match the exact source binding, complete path, scalar codec
+and word slot. Reconstruction checks each child's nominal type, field order/count
+and exact decode before creating a fresh nested value tree. Wrong parent paths,
+same-width child types, duplicate/missing fields and computed seeds cannot substitute.
+Nested all-i64 records also require complete maps before sparse projection; projected
+inputs use exact leaf-slot proofs rather than the flat-i64 shortcut. The existing YIR scoped action still transports flat i64
+words, so no backend-specific loop opcode or wire-format revision is introduced.
+
+Guard defaults permit only total typed parameter paths through a proven pure tree.
+Calls, arithmetic and resource-bearing siblings remain rejected. Original values,
+zero-trip seeds and per-trip snapshots stay independent; mixed leaves keep the
+existing bool, signed-i32 and bit-preserving float codecs. Selected failures and
+both work budgets retain the existing atomic callback publication contract.
+
+[Nested native/reference probes](../../tools/nuisc/tests/native_application_bridge/nested_scoped_record_carries.rs)
+cover all five scalar kinds, equal leaf names, raw float bits, three-level records,
+nested loops, early returns, snapshots, 64-leaf private inputs and failure sentinels.
+The [ordinary native fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_nested_record_carries.ns)
+checks break timing and skipped versus selected traps. The nested CLI case retains
+cache reuse, tamper rejection and source-free restoration with identical LLVM and
+open/event/close states. These are host CPU transport tests, not fresh GPU/Linux or
+performance evidence. Public/source/FFI/callback ABI and graph limits are unchanged.
+
+That checkpoint selected sparse mixed/nested input projection, implemented below.
+
+## Sparse Typed Inputs
+
+Generated scoped iterations may now project a subset of mixed/nested record words,
+or omit an entirely unread record input, while retaining the complete initial state.
+The compiler first proves the complete source-to-word map and typed nominal backedge.
+It removes only exact input reconstructions and proven ready record aliases, or
+reconstructs unused input leaves with neutral values after separate field-demand proof;
+computed constructors and their unaccessed checked fields still execute in source order.
+Each projected operand uses the exact source binding, ordered field path and scalar
+codec to identify its current backedge slot. This is not an invariant read of the
+first iteration's snapshot. Scalar controls and induction retain independent maps.
+
+Normalization is transactional across all callers. Every encoded argument must be
+the full canonical map of one ready source record, including fields later omitted.
+Raw word variables, calls/arithmetic in word constructors, changed codecs or paths,
+duplicate slots and malformed reconstruction cannot grant sparse-input authority.
+Unproven whole-input demand and exhausted loop-demand proofs conservatively keep
+the complete input rather than publishing a partial fixed point. No new loop protocol,
+wire representation, public/source/FFI/callback signature or backend rule is introduced.
+
+[Compiler regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_record_words_tests.rs)
+cover all-caller rollback, storage-order independence, flat/mixed/nested shapes,
+subrecord aliases, entirely unread inputs and initializer/per-trip failures.
+[Native/reference probes](../../tools/nuisc/tests/native_application_bridge/sparse_typed_record_carries.rs)
+keep 9/64 seed words with six iteration arguments, preserving signed i32, float bits,
+zero-trip state and repeated boolean/float backedges without aggregate allocation.
+An entirely unread nine-word carry retains all zero-trip state with two control inputs.
+The [ordinary native fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_sparse_typed_record_carries.ns)
+and [source-free CLI workflow](../../tools/nuis/tests/native_session_workflow/sparse_typed_records.rs)
+exercise real execution, cache reuse, tamper rejection and identical restored LLVM.
+
+### Child Snapshot Proof
+
+Each child scope inherits only preceding visible bindings. New record/subrecord
+aliases remain child-local; their names neither constrain sibling branches nor leak
+into the parent suffix. Rebinding an inherited alias is removable only when its
+complete decoded nominal leaf tree stays identical. This proves one immutable
+version across fallthrough joins and loop backedges, including zero iterations.
+It does not infer a mutable join or replace a changing value with its initial seed.
+
+The alias-removal path rejects assignments to already materialized outer records or
+parameters, different snapshot origins, whole escapes and incompatible nominal types.
+The separate input-demand proof below may retain those assignments and project only
+entry words; incompatible types and unproven whole-input demand remain conservative.
+Computed constructors and unaccessed checked fields remain in the selected child.
+The [scope regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_record_scopes_tests.rs)
+cover identity writes, sibling names, invariant loop aliases, retained changed-origin assignments,
+outer materialization, storage-order independence and transactional fallback.
+The [branch fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_branch_typed_record_carries.ns)
+alternates f32/f64 updates against current backedges. Native/reference checks preserve
+complete 9/64-word state with six iteration arguments. Ordinary native execution
+retains lazy/selected child traps; the nine-word source-free CLI probe preserves
+repeated lifecycle events without adding backend-specific handling.
+
+### Materialized Join Proof
+
+The [input-demand analysis](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_record_demand.rs)
+uses a hygienic copy of the function; it never renames the actual scoped control
+identities. Backward leaf demand follows ready record/subrecord copies, kills old
+versions at assignments, unions both branch entry demands and treats each return
+as an exit. One-sided assignments retain fallthrough input; overwrites on both arms
+can remove demand for the preceding value without deleting either assignment.
+
+Computed constructors and calls observe every operand, including unused checked
+fields. A later overwrite cannot hide an earlier division, call or selected trap.
+Only the exact canonical input reconstruction may replace unobserved leaves with
+typed neutral values. All following statements, stores and joins remain unchanged;
+complete carry seeds and current-trip field-slot maps still preserve zero-trip
+state, stored snapshots and independent lifecycle events. Every caller must pass
+the full canonical source/path/codec proof before any candidate change commits.
+
+The analysis falls back without changing the candidate at depth 64 or after its
+65,536-unit work budget. These are optimization bounds, not source restrictions.
+Changing nested loops use bounded fixed-point and lexical exit-edge proof; the
+existing immutable-identity alias path remains available for invariant loop copies.
+Opaque whole-record reads keep all demanded leaves rather than assuming an escape
+can be erased. Public/source/FFI/callback ABI and native graph limits are unchanged.
+
+[Join regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_record_joins_tests.rs)
+check one-sided versus two-sided overwrites, early returns, differently typed
+sibling names, all-caller rollback and unused checked-field dependencies. The
+[materialized-join fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_join_typed_record_carries.ns)
+retains outer record assignments while alternating f32/f64 updates. Native/reference
+probes keep complete 9/64-word state with six iteration arguments; the nine-word
+CLI workflow retains cache/tamper checks and source-free restoration. This is host
+CPU evidence, not fresh GPU/Linux execution, formal safety or measured speedup.
+
+### Nested Loop Demand
+
+Each loop header starts with the following suffix's demand and the condition's
+reads, preserving the zero-trip/normal-exit path. Backward body analysis repeatedly
+unions additional demand into that header until stable. This follows cyclic
+record/subrecord copies across successive iterations, not just one body execution.
+Break uses the nearest loop exit; continue uses that loop's header. Nested loops
+have independent targets, while a function return observes its own result and
+does not inherit unreachable suffix reads or writes.
+
+All nested analyses share the existing depth/work budget. Exhaustion or a control
+exit without a matching loop abandons input reconstruction, never granting partial
+projection authority. Original assignments, typed codecs, complete seeds, control
+identities and every caller's canonical map remain required. Loop conditions and
+unused checked constructor fields contribute their operands even when the final
+value is not selected. Opaque whole-input reads remain conservative.
+
+[Loop-demand regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/capture_record_loop_demand_tests.rs)
+cover cyclic snapshots, nearest exit targets, zero trips, header reads, checked
+unused fields, malformed callers and unchanged assignment tails. The before/after
+reference execution probe uses an i64 marker because private bool-word casts must
+not re-enter source-level admission; the actual native source fixture covers bool.
+Direct NIR analysis does not widen source loop-shape admission or native scheduling.
+The [nested-loop source fixture](../../tools/nuisc/tests/control_flow_syntax_native/scoped_loop_typed_record_carries.ns)
+executes mixed typed updates with empty inner/outer loops and local break/continue
+variants. Native/reference 9/64-word states retain six outer iteration arguments
+and zero aggregate allocation/drop counters. Ordinary native tests retain selected
+inner traps and skipped work; the CLI case checks repeated events, cache/tamper
+handling and identical source-free restored LLVM/state.
+
+### Nested Return And Budget Proof
+
+The [nested-return source](../../tools/nuisc/tests/control_flow_syntax_native/scoped_return_typed_record_carries.ns)
+updates mixed leaf snapshots inside two counted loops, then returns the current
+inner value before the outer update and a dead division suffix. Compiler proof
+retains each lexical exit and the selected return payload. Native/reference
+execution compares every state word for zero through four outer trips using
+9/30/31/57/58/59/60/61/62/63/64-word states. Exact initialized mutable record storage may be reused
+for a selected return, unobserved leading-index recovery is omitted, and proven
+return-only exits share the pending/break signal. Invariant-field promotion reduces the inner backedge to N-1 words and the outer backedge to N. These are private representation
+changes, not wider native limits or weaker public state validation.
+
+Source admission first validates the independent payload rewrite. Only then can
+[storage selection](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_storage.rs)
+choose an exact nominal record from the straight-line function-entry bindings
+which already participates in loop writes. Parameters, constants, scalars,
+branch-local/late bindings and merely layout-compatible records are not candidates.
+The complete selected expression is evaluated before overwriting that record or
+setting the pending bit. Propagation evacuates all enclosing loops before any
+normal suffix can observe the overwritten value; non-return paths keep the source
+state and original initializer effects. No resource/destructor storage is admitted.
+
+The coalesced body must pass the same control validator again. A newly introduced
+inner write which invalidates source-ordered reads vetoes the optimization and
+retains independent storage. Original invalid forward reads never gain assignment
+self-read authority. [Storage regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_storage_tests.rs)
+cover hygiene, nominal/mutability boundaries, rollback and differential execution
+against independent payload storage, including leading/trailing steps and traps.
+
+[Continuation observation](../../tools/nuisc/src/lowering/buffer_loop_outline/continuation_reads.rs)
+conservatively includes all suffix reads, enclosing continuations and every
+generated helper output. Only a leading index absent from this set can omit its
+post-break recovery slot. The source step still executes; the canonical break bit,
+complete loop reservation and helper-entry debits remain unchanged. Unknown syntax,
+depth 64 or exhausted 65,536-unit scan/materialization work retains recovery.
+Reads after redefinition and untaken-arm reads are deliberately not killed.
+[Exit regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/index_recovery_tests.rs)
+cover direct/outer suffixes, parent backedges and branch-helper outputs. Scalar
+branch input collection also accepts already-lowered loop exit markers without
+panicking or omitting expression-call inputs; source admission remains separate.
+Whole-record break probes keep the observed-index 62-word record and 61-word
+record-plus-bool cases. Unobserved-index variants now fit 63 and 62 words,
+respectively; both still require actual scoped record transport and exact seeds.
+
+[Return-signal proof](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_signal.rs)
+uses an opaque identity minted by this pass's return rewrite, not a source-name
+convention. Every break owned by the loop must immediately follow canonical pending
+publication or be the exact child-return propagation guard. Child-loop breaks have
+their own owner; any ordinary same-loop break vetoes sharing. Other reads/writes of
+the signal, unknown syntax, depth 64 or exhausted 65,536-unit work retain separate
+signals. Payload evaluation still completes before publication, mixed continues
+keep their own running bit, and the single pending/break slot remains last and
+zero-seeded. No source or shared YIR annotation grants this optimization authority.
+[Differential regressions](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_signal_tests.rs)
+compare 300 inputs against both independently normalized control signals and
+source-result oracles, with reversed YIR node order. Six shapes cover direct
+returns, same-loop/child/parent breaks, continue and source-name spoofing, with
+leading/trailing steps and enclosing branches. Ordinary native execution checks
+36 corresponding cases. Pre-normalized input without this pass's provenance keeps
+separate signals. The 57-word fixture takes flat input transport; 58 through 64-word
+fixtures require actual compact-record transport, with an exact N-4-word private
+parameter checked in LLVM rather than weakening the whole-record assertion.
+
+[Invariant-field proof](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_invariant_facts.rs)
+tracks exact entry binding/field identities through copies, nested constructors and
+both branch arms. Every write must preserve a field, not just the final backedge;
+temporary mutations, cross-root swaps, arithmetic identities and opaque calls do
+not grant invariance. Unknown syntax, depth 64 or exhausted 65,536-unit analysis
+and rewrite work retain the prior representation.
+
+[Nested-loop proof](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_invariant_loops.rs)
+joins zero trips and every intermediate write, including writes inside child loops.
+Each entry origin can only become unknown. Repeated transfer reaches a bounded
+fixed point without simulating a trip count. This retains transient snapshots that
+an ordinary break or continue can expose before a restoring suffix, and invalidates
+aliases that become different only on later iterations. Child-local bindings never
+escape into the summary. Exhaustion discards the attempted rewrite transactionally.
+At most two 65,536-unit attempts are made: nested promotion first, then the prior
+innermost-only mode if needed. Rejection of an outer candidate must not erase an
+admitted inner-only representation. Both attempts start from the same original
+plan and install body and private definitions only after whole-function validation.
+
+[Promotion](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_invariants.rs)
+applies to nested loops with compiler-proven return-owned exits.
+Invariant leaves stay captured outside the loop; changing leaves share a compact
+private typed record. Reads and the loop exit reconstruct the original nominal
+record. Each original assignment RHS still executes once at its original position,
+before any compact record update. Source admission is unchanged, and the complete
+candidate body plus private definitions must pass transactional revalidation.
+No source/public/FFI type, callback ABI or shared YIR protocol is extended.
+
+Scoped capture planning chooses complete proven record seed maps directly, rather
+than first selecting a boolean-packed ordinary-call plan that scoped calls cannot
+consume. Records without a seed proof remain flat; independent boolean slots are
+not packed. This avoids trading fewer carried words for an over-bound helper
+signature. The [proof and differential tests](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_invariants_tests.rs)
+also retain zero trips, leading/trailing steps, hygiene and selected traps.
+The [nested differential matrix](../../tools/nuisc/src/lowering/buffer_loop_outline/control_loops/return_invariant_nested_tests.rs)
+compares independent payload normalization and arithmetic oracles, including
+observed outer indices, child breaks/continues and selected traps. Ordinary child
+breaks do not gain return-signal authority; a candidate that invalidates ordered
+reads falls back to an admitted inner-only plan, or the original body with no new
+private definitions. A separate regression verifies exact inner-plan retention.
+
+[Budget and return probes](../../tools/nuisc/tests/native_application_bridge/sparse_typed_return_carries.rs)
+check 9/63/64-word exact six-loop-reservation/24-helper-entry success, one-short failure,
+zero budgets and fresh callback counters. Four requested outer trips still reserve
+seven total trips, although the second outer iteration returns. Early exits do not
+refund planned work. The ordinary 64-word nested-loop fixture separately retains
+exact six-reservation/13-entry success and one-short failures without early returns.
+
+The [native probe](../../tools/nuisc/tests/native_application_bridge/sparse_typed_return_probe.rs)
+observes stack-owned budgets and all output words before retaining the real trap.
+Disjoint output remains sentinel-filled; fully overlapping input/output remains
+bit-identical to the supplied input on failure, with both border sentinels intact.
+No aggregate allocation/drop calls are introduced. A selected return-expression
+division fails before publishing state, while zero/one-trip paths skip it. The
+reference host keeps its last accepted state after the semantic failure; its
+execution fuel is not equated with native loop/entry budgets. Malformed f32/i32/bool
+leaves reject before even a zero native entry budget, including initially unused
+right-hand fields.
+
+Ordinary native execution covers the same return/dead-suffix/selected-payload paths.
+The 9/64-word CLI workflows check repeated events, cache reuse, tamper rejection and
+identical LLVM/lifecycle state after removing source and restoring the artifact.
+Private iteration arities remain 12/16 at width 9 and are 5/11 at width 64, where
+complete record seed maps avoid exceeding the helper-argument bound.
+This is host CPU evidence, not a new callback ABI, interpreter fallback or GPU proof.
+
+The 64-word early-return fixture now fits outer width 64 and inner width 63.
+The pending/break bit still occupies one slot: a proven invariant outer tag, not
+the return signal, has left the backedge. Changing that tag removes the proof and
+still rejects at 65 outer words, with private return/control state named in the
+diagnostic. A public state within 64 words does not imply every lowered control
+composition fits. Observed indices, ordinary exits and failed revalidation retain
+their required state; no native bound is raised.
+
+Next: reduce nested return snapshot carries while preserving observed exits;
+broaden outer invariant admission across ordinary child exits while retaining
+source-ordered read validation.
 
 ## Evidence And Limits
 
@@ -844,7 +1141,7 @@ duplicate parents, oversized/deep layouts, spoofed returned values and hidden ef
 The local-rebinding guard probes additionally check exact five-entry success,
 four/zero-entry failure, unused selected results and malformed-input rejection,
 with unchanged output sentinels and zero aggregate allocations/drops.
-Wider-scalar/nested loop carries, resource state, provider dispatch, native image-host
+Sparse mixed/nested loop inputs, resource state, provider dispatch, native image-host
 selection, cross-target execution and performance still need separate evidence.
 
 The 2026-09-23/24 macOS aarch64 alias/snapshot checkpoint passed 699 compiler/registry-unit,
@@ -1147,3 +1444,319 @@ lineage. The coordinate stays `active/86`; exact nested pure-scalar field-path s
 and backedge maps are next. Formatting, source/test/document budgets, local links
 and UTF-8 pass. This is local macOS aarch64 evidence, not a full-workspace run,
 fresh Linux/GPU acceptance, formal-safety certification or measured performance.
+
+The subsequent 2026-09-27 nested-carry checkpoint passed 1660 frontend/lowering/NIR
+tests, 129 selected native/reference bridge tests, 25 ordinary native tests, seven
+CLI restoration workflows, five reference image/window tests and 26 tensor tests:
+1852 distinct selected tests, excluding overlapping reruns. The host-path policy
+test passed separately. The initial nested source probe reproduced unsupported
+loop lowering before implementation. Expanded regression then caught value-type
+admission accidentally rerouting existing non-loop helpers; separating control-root
+authority restored the existing guarded selection routes and exact entry budgets.
+
+Nested all-i64 and mixed five-kind trees preserve same-named leaf paths, raw float
+bits, zero trips, snapshots, nested loops, early returns and bounded private inputs.
+Selected failures and both work budgets preserve 64 output sentinels with zero
+aggregate allocations/drops in the tested native profile. The ordinary nested
+fixture returns 37 and traps only on the selected invalid path. All seven CLI
+shapes retain cache identity, tamper rejection and source-free restoration with
+identical LLVM and lifecycle states. The coordinate remains `active/86`; sparse
+mixed/nested scoped input projection is next. This is local macOS aarch64 evidence,
+not a full-workspace run, fresh Linux/GPU result or performance/safety certification.
+
+The rebuilt CLI reports 1541 clean drift checks with clean coverage, hierarchy and
+lineage. Source/test/document line budgets, formatting, local links, UTF-8 and
+the host-independent documentation-path policy remain satisfied.
+
+The subsequent 2026-09-27 sparse-input checkpoint passed 1668 frontend/lowering/NIR
+tests, 133 distinct selected native/reference bridge tests, 26 ordinary native tests,
+eight CLI restoration workflows, five reference image/window tests and 26 tensor
+tests: 1866 distinct selected tests, excluding overlapping reruns. The host-path
+policy test passed separately. All-caller negative probes reject wrong codecs,
+source paths, computed words, malformed maps, whole escapes and unproven child writes
+without partially changing the candidate. Flat, nested and entirely unread inputs
+retain complete zero-trip state and all checked initializer/per-trip work.
+
+Native 9/64-word state uses six iteration arguments; an unread nine-word group uses
+two controls. Raw-bit transport, current-trip float accumulation, boolean backedges,
+overlapping callback buffers and zero aggregate allocation/drop probes pass. The new
+CLI case preserves two independent events, cache reuse, tamper rejection and identical
+LLVM/state after removing all source/build files and restoring the standalone artifact.
+The coordinate remains `active/86`; child-scope mixed/nested snapshot joins and loop
+versions require separate proof. These are local macOS aarch64 results, not a full
+workspace run, fresh Linux/GPU acceptance or a measured performance/safety guarantee.
+
+The rebuilt CLI reports 1550 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2934 local document links, UTF-8, host-independent paths and
+the source/test/document line budgets pass.
+
+The subsequent 2026-09-27 child-snapshot checkpoint passed 1674 frontend/lowering/NIR
+tests, 134 selected native/reference bridge tests, 27 ordinary native tests, nine CLI
+restoration workflows, five reference image/window tests, 26 tensor tests and the
+host-path policy test: 1876 distinct selected tests, excluding overlapping reruns.
+The six scope regressions were rerun after adding the preceding-materialized-binding
+negative case. New child aliases and identical inherited alias writes project;
+different origins, computed outer writes, whole escapes and malformed types do not.
+
+Alternating f32/f64 branches retain 9/64 seeds with six iteration arguments across
+zero through four trips. Selected child traps remain observable; unselected work
+and zero-trip bodies remain lazy. The nine-word CLI case preserves two events,
+cache reuse, tamper rejection and identical source-free restored LLVM/state.
+The live CLI reports 1555 clean drift checks with clean coverage, hierarchy and
+lineage. The coordinate remains `active/86`; materialized outer joins and genuinely
+changing loop versions still need separate proof. These are local macOS aarch64
+results, not a full-workspace run, fresh Linux/GPU proof or measured speedup.
+
+The subsequent 2026-09-27 materialized-join checkpoint passed 1682 selected
+frontend/lowering/NIR tests, 136 native/reference bridge tests, 28 ordinary native
+tests, ten CLI restoration workflows, five reference image/window tests, 26 tensor
+tests and the host-path policy case: 1888 distinct selected tests without counting
+overlapping reruns twice. One-sided versus two-sided overwrites preserve the exact
+outer assignment tail while demanding six versus five helper arguments. An unused
+checked-field dependency adds the required seventh argument rather than disappearing.
+The analysis keeps early-return/opaque whole-input demand and rejects a malformed
+second caller transactionally; sibling binding hygiene never renames actual control.
+
+Alternating materialized f32/f64 joins keep complete 9/64-word state with six
+iteration arguments, current versions, zero-trip storage and zero aggregate
+allocation/drop counters. Selected traps and skipped paths retain ordinary native
+behavior. All ten CLI workflows preserve cache reuse, tamper rejection and identical
+LLVM/lifecycle state after source-free artifact restoration.
+
+The live CLI reports 1562 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2939 local document links, UTF-8 and source/test/document line
+budgets pass. The coordinate remains `active/86`; changing nested-loop snapshots
+need a separate fixed-point and exit-edge proof. This is local macOS aarch64 CPU
+evidence, not a full-workspace run, fresh Linux/GPU acceptance, formal safety or
+measured speedup. No source/public/FFI/callback ABI or shared loop protocol changed.
+
+The subsequent 2026-09-27 loop-demand checkpoint passed 1692 selected
+frontend/lowering/NIR tests, 138 native/reference bridge tests, 29 ordinary native
+tests, eleven CLI restoration workflows, five reference image/window tests,
+26 tensor tests and the host-path policy case: 1902 distinct selected tests,
+excluding overlapping reruns. Four new reduction regressions failed against the
+previous loop-rejecting analysis and pass with bounded fixed-point demand.
+The before/after reference oracle retains alternating 12/33 values over zero to
+four trips. Its i64 marker avoids re-entering source admission with private bool
+transport casts; the `.ns` native fixtures separately cover actual bool state.
+
+Nested mixed-state native/reference probes preserve complete 9/64-word state and
+six outer iteration operands, including zero-trip inner/outer loops and nearest
+break/continue behavior. Selected nested division traps and skipped paths retain
+ordinary native behavior. All eleven CLI workflows keep cache identity, tamper
+rejection and identical LLVM/lifecycle state after source-free restoration.
+
+The live CLI reports 1569 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2941 local links, UTF-8 and source/test/document line limits
+pass. Progress remains `active/86`; sparse typed nested-loop early returns and
+exact shared-work-budget failure composition require dedicated native evidence.
+This is local macOS aarch64 CPU evidence, not a full-workspace, fresh Linux/GPU,
+formal-safety or performance result. Source loop-shape admission, public ABI and
+the shared loop protocol remain unchanged.
+
+The subsequent 2026-09-27 nested-return/budget checkpoint passed 1693 selected
+frontend/lowering/NIR tests, 149 distinct native/reference bridge tests, 30 ordinary
+native tests, twelve CLI workflows, 26 native LLVM unit tests, five reference
+image/window tests, 26 tensor tests and the host-path policy case: 1942 distinct
+selected tests, excluding repeated and overlapping runs. One ignored LLVM probe
+was not executed. The focused return/work-budget suite was rerun after adding
+same-process repeated invocation at exact budget exhaustion. An initial CLI assertion
+counted only i64 parameters; the corrected assertion counts every typed parameter,
+retains exact helper arities and passes all twelve workflows.
+
+The 9/30-word return fixtures preserve current snapshots, lazy suffixes and all
+output words. Exact work/entry failures, selected payload traps and invalid scalar
+words preserve disjoint sentinels or the fully aliased input. The same callback can
+re-enter with fresh counters after exact exhaustion. The 64-word ordinary nested
+fixture separately retains exact work limits; its early-return variant is not
+silently admitted. Expanded 31/64-word return states report 65/131 private carry
+words against the unchanged 64-word bound before native emission.
+
+The live CLI reports 1577 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2944 local links, UTF-8 and changed-file line limits pass.
+Progress remains `active/86`; the next weakness is private return/control carry
+expansion, not an undifferentiated execution gap. No source/public/FFI/callback ABI
+or shared loop protocol changed. This is local macOS aarch64 CPU evidence, not a
+full-workspace run, fresh Linux/GPU acceptance, formal safety or a speedup claim.
+
+The subsequent 2026-09-27 return-storage checkpoint passed 1699 selected
+frontend/lowering/NIR tests, 149 distinct native/reference bridge tests, 31 ordinary
+native tests, twelve CLI workflows, 26 native LLVM unit tests, five reference
+image/window tests, 26 tensor tests and the host-path policy case: 1949 distinct
+selected tests, excluding repeated/overlapping runs. One ignored LLVM probe was
+not executed. Positive and negative width assertions were rerun after pinning both
+outer N+3 and inner N+7 carries for this fixture.
+
+Revalidated whole-record payload reuse now admits 9/30/31/57-word states. The
+nine-word source has 12/16 private carry words and 14/18 iteration arguments,
+down from maximum 21 carried words and 22/23 arguments. Full native work-budget,
+trap and invalid-input probes cover 9/57 words; all output words, border sentinels,
+zero allocation/drop counts and fresh invocation budgets remain checked.
+Leading/trailing differential execution matches independent payload storage over
+30 cases including selected traps. Unsafe-to-rewrite read order keeps independent
+storage, while invalid source never acquires new write/read authority.
+
+All twelve CLI workflows retain warm-cache behavior, pre-open tamper rejection and
+identical LLVM/lifecycle state after source-free restoration. The 58/64-word return
+variants still reject at 65/67 words in the first over-bound loop; their inner
+widths reach 65/71. Further live-carry reduction remains a separate task.
+The live CLI reports 1581 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2946 local links, UTF-8 and changed-file line limits pass.
+Progress remains `active/86`; no callback/source/FFI ABI or shared YIR protocol was
+widened. This is local macOS aarch64 CPU evidence, not fresh Linux/GPU execution,
+formal safety or measured speedup.
+
+The subsequent 2026-09-27 index-recovery checkpoint passed 1706 selected
+frontend/lowering/NIR tests, 149 distinct native/reference bridge tests, 33 ordinary
+native tests, twelve CLI workflows, 26 native LLVM unit tests, five reference
+image/window tests, 26 tensor tests and the host-path policy case: 1958 distinct
+selected tests, excluding repeated/overlapping runs. One ignored LLVM probe was
+not executed. The wide bridge run exposed two historical fixtures which now fit
+the flattened-input path. Their observed-index cases remain, and larger dead-index
+cases restore actual scoped record transport; both passed the focused rerun.
+
+Bounded continuation observation removes only dead leading-index recovery.
+Six source shapes preserve thirty independent results across zero through four
+trips, including enclosing suffixes, generated branch outputs and parent backedges.
+Ordinary native execution retains selected arithmetic traps and skipped work.
+The same regressions exposed and repaired scalar branch input collection panicking
+on already-lowered loop exits, without weakening original source admission.
+
+The return fixture now executes 9/30/31/57/58-word state with outer N+2 and inner
+N+6 carries. Nine-word carry widths fall from 12/16 to 11/15, and CLI iteration
+arities from 14/18 to 13/17. Exact 9/58-word budgets, canonical input rejection,
+selected payload traps and aliased/disjoint failure atomicity pass. The 59/64-word
+variants still reject first at 65/66 private words; no native limit is raised.
+All twelve CLI workflows retain cache reuse, pre-open tamper rejection and identical
+LLVM/lifecycle state after source-free restoration.
+
+The live CLI reports 1590 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2948 local links, UTF-8 and changed-file line limits pass.
+Progress remains `active/86`; further nested snapshot/control carry reduction is
+separate. No source/public/FFI/callback ABI or shared YIR protocol changed. This is
+local macOS aarch64 CPU evidence, not a full-workspace run, fresh Linux/GPU execution,
+formal safety or a measured speedup.
+
+### Return Signal Checkpoint (2026-10-02)
+
+The return-signal checkpoint passed 1712 selected frontend/lowering/NIR tests,
+149 native/reference bridge tests, 34 ordinary native tests, twelve CLI workflows,
+26 native LLVM unit tests, five reference image/window tests, 26 tensor tests and
+the host-path policy case: 1965 distinct selected tests, excluding overlapping
+focused reruns. One ignored LLVM probe was not run.
+
+Opaque return-rewrite provenance and bounded exit-ownership proof permit one
+canonical pending/break word per return-only loop. Same-loop ordinary breaks,
+unsupported signal reads/writes and exhausted proofs retain the independent
+representation. Child breaks stay local, mixed continues retain their running
+control, and payload evaluation still precedes publication. Three hundred
+differential source inputs and 36 ordinary native cases retain independent
+oracles, source-name hygiene, leading/trailing steps and enclosing branches.
+
+The mixed return fixture now executes 9/30/31/57/58/59-word state with outer N+1
+and inner N+5 carries. Nine-word widths fall from 11/15 to 10/14, and private CLI
+iteration arities from 13/17 to 12/16. The 57-word case now proves flattened input;
+58/59-word cases still require real whole-record transport. Exact 9/59-word shared
+budgets, selected payload traps, canonical input rejection and fully aliased or
+disjoint failure-atomic output pass. The 60/64-word variants still reject at the
+first 65-word private loop; their inner widths reach 65/69. Native bounds are not
+raised. All twelve CLI workflows retain cache reuse, pre-open tamper rejection
+and identical LLVM/lifecycle state after source-free restoration.
+
+The live CLI reports 1599 clean drift checks with clean coverage, hierarchy and
+lineage. Formatting, 2950 local links, 4581 UTF-8 files and changed-file line limits
+pass. Progress remains `active/86`; the next task is nested return snapshot carry
+reduction with observed exits preserved. No source/public/FFI/callback ABI or
+shared YIR protocol changed. This is local macOS aarch64 CPU evidence, not fresh
+Linux/GPU execution, full-workspace validation, formal safety or a measured speedup.
+
+### Invariant Snapshot Checkpoint (2026-10-02)
+
+Per-write identity proof now promotes invariant leaves out of innermost return-owned
+loops. Changing leaves remain grouped in compact private typed records, not an
+unbounded list of independent parameters. Exact original RHS evaluation, source
+admission, source-order revalidation and transactional private-type installation
+are retained. Sixty differential source inputs compare independent payload
+normalization and explicit result/trap oracles with reversed YIR order.
+
+This work exposed a private capture-planning regression: ordinary boolean packing
+could appear to fit the parameter bound, then be rejected as an invalid scoped
+backedge representation. Scoped planning now selects only complete proven record
+seed maps directly; unproven records and independent boolean slots stay flat.
+No new loop protocol, special source naming authority or raised bound is used.
+
+The mixed return fixture executes 9/30/31/57/58/59/60/61/62/63-word states, with
+outer N+1 and inner N-1 carries. Nine-word widths fall from 10/14 to 8/10.
+The 57-word input stays flat; 58 through 63-word cases check actual N-4-word
+compact LLVM parameters. Exact 9/63-word budgets, aliased/disjoint atomic failures,
+canonical validation before work, selected payload traps, negative-zero and NaN
+payload preservation all pass. The 64-word variant retains inner width 63 but
+rejects its 65-word outer carry. This is a fixture boundary, not a general
+63-word language limit or evidence of measured runtime speedup.
+
+All twelve CLI workflows retain cache reuse, pre-open tamper rejection and exact
+LLVM/lifecycle state after source-free restoration. The nine-word return fixture
+still has 12/16 private iteration parameters: fewer backedge words do not imply
+that every captured input also disappears. Public/source/FFI/callback ABI is unchanged.
+
+Progress remains `active/86`. Remaining outer return/control state and wider
+observed-exit liveness are the next boundary; resources and live GPU scheduling
+remain separate. This checkpoint is local macOS aarch64 CPU evidence.
+
+Validation passed 1723 selected frontend/lowering/NIR tests, 151 native/reference
+bridge tests, 34 ordinary native tests, twelve CLI workflows, 26 native LLVM unit
+tests, five reference image/window tests, 26 tensor tests and the host-path policy
+case: 1978 distinct selected tests, excluding overlapping focused reruns. One
+ignored LLVM probe was not run. The live CLI reports 1607 clean drift checks with
+clean coverage, hierarchy and lineage. Formatting, 2953 local links, 4585 UTF-8
+files and changed-file line limits pass. This is not full-workspace validation,
+fresh Linux/GPU execution, formal safety or measured performance evidence.
+
+### Nested Invariant Checkpoint (2026-10-02)
+
+Invariant promotion now reaches outer return-owned loops through a bounded
+per-write fixed point. Summaries include zero trips and every intermediate write,
+not just a final backedge. Delayed alias changes and snapshots exposed by ordinary
+break/continue paths cannot become false invariants; local aliases do not escape.
+Each entry origin only stays equal or becomes unknown. Work/depth exhaustion stays
+conservative, without enumerating the number of runtime iterations.
+
+At most two independently bounded attempts are made. If nested promotion fails
+admission, the established innermost-only representation is tried from the original
+plan. A dedicated regression verifies that valid inner bodies and private types
+survive outer rejection, while failed candidates cannot install their definitions.
+Original source admission, full RHS evaluation and whole-function revalidation
+remain mandatory. The independent-return-storage counterexample still cannot reuse
+invalid payload storage; its source carry can separately shed one proven invariant.
+
+The mixed fixture now executes 9/30/31/57/58/59/60/61/62/63/64-word states with
+outer N and inner N-1 carries. The former 65/63 boundary at width 64 is now 64/63.
+The return/control bit is retained: a proven unchanged tag leaves the outer
+backedge instead. Changing that tag still rejects 65 outer words. Exact budgets,
+selected payload traps, malformed-input rejection before work, negative-zero/NaN
+bits and disjoint/overlapping atomic publication retain their contracts.
+
+The 144-input nested differential matrix checks independent return normalization
+and hand-written result/trap oracles, including observed indices, leading/trailing
+steps, child breaks/continues and zero trips. Native probes retain all state words
+and no aggregate allocation/drop calls. The 9/64-word source-free CLI fixtures
+inspect 12/16 and 5/11 private iteration arities respectively, while retaining
+repeated events, cache hits, pre-open tamper rejection and exact restored LLVM/state.
+
+Progress remains `active/86`. Broader ordered-read admission across ordinary child
+exits is next; observed exits and changed fields keep their necessary state. No
+source/public/FFI/callback ABI or shared YIR protocol changed. This is local macOS
+aarch64 CPU evidence, not fresh Linux/GPU execution, formal safety or speedup data.
+
+Validation passed 1729 selected frontend/lowering/NIR tests, 151 native/reference
+bridge tests, 34 ordinary native tests, thirteen CLI workflows, 26 native LLVM
+unit tests, five reference image/window tests, 26 tensor tests and one host-path
+policy case: 1985 distinct selected tests, excluding overlapping focused reruns.
+The 9/64-word CLI return pair reran after the fallback guard. One optional LLVM
+probe remained ignored. This is targeted regression coverage, not a full-workspace
+or cross-platform certification.
+
+The freshly built CLI reports 1611 clean drift checks and clean coverage, hierarchy
+and lineage. Formatting, 2955 local documentation links, 4588 UTF-8 files and the
+line caps for 99 changed/new Rust and Markdown files pass. The selected coordinate
+and its next-action lineage remain unchanged apart from the narrower child-exit task.

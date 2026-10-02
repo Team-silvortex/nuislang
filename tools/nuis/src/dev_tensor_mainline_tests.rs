@@ -306,12 +306,64 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .evidence
         .contains("two exact 76800-byte Metal frames"));
-    assert!(session.next_step.starts_with(
-        "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps"
-    ));
+    assert!(session
+        .next_step
+        .starts_with("reduce nested return snapshot carries while preserving observed exits"));
     assert!(session.evidence.starts_with(
-        "Generated scoped f64 record carries now retain full-width bit-preserving private word maps"
+        "Nested return loops now promote invariant leaves across bounded per-write fixed points"
     ));
+    assert!(session
+        .blocker
+        .contains("changed outer tag still needs 65 private carry slots"));
+    assert!(session.validation_command.contains("return_invariant"));
+    assert!(session.validation_command.contains("return_signal"));
+    assert!(session.validation_command.contains("return_storage"));
+    assert!(session.validation_command.contains("continuation_reads"));
+    assert!(session.validation_command.contains("index_recovery"));
+    assert!(session.evidence.contains("outer N and inner N-1"));
+    assert!(session.next_step.contains("ordinary child exits"));
+    assert!(session
+        .validation_command
+        .contains("native_full_width_nested_returns_restore_complete_state_without_sources"));
+    assert!(session.evidence.contains("original leading step"));
+    assert!(session.validation_command.contains("typed_sparse_nested_"));
+    assert!(session
+        .validation_command
+        .contains("native_materialized_nested_returns_restore_complete_state_without_sources"));
+    assert!(session.validation_command.contains("typed_nested_"));
+    assert!(session
+        .validation_command
+        .contains("typed_sparse_branch_snapshots"));
+    assert!(session
+        .validation_command
+        .contains("native_sparse_branch_snapshots_restore_current_versions_without_sources"));
+    assert!(session.blocker.contains(
+        "Changing nested-loop versions now have bounded fixed-point demand and lexical exit-edge proof"
+    ));
+    assert!(session
+        .validation_command
+        .contains("materialized_record_demand"));
+    assert!(session
+        .validation_command
+        .contains("typed_materialized_join_snapshots"));
+    assert!(session
+        .validation_command
+        .contains("native_materialized_join_snapshots_restore_current_versions_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("typed_materialized_loop_snapshots"));
+    assert!(session
+        .validation_command
+        .contains("native_materialized_loop_snapshots_restore_nested_versions_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("typed_sparse_record_carries"));
+    assert!(session
+        .validation_command
+        .contains("native_sparse_typed_record_inputs_restore_complete_seeds_without_sources"));
+    assert!(session
+        .validation_command
+        .contains("native_nested_record_carries_cache_and_restore_exact_paths_without_sources"));
     assert!(session
         .validation_command
         .contains("typed_f64_scoped_record_carries"));
@@ -355,9 +407,10 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .validation_command
         .contains("native_record_inputs_build_cache_and_restore_without_sources"));
-    assert!(session.blocker.contains(
-        "nested record carries still lack exact field-path scoped seed and backedge maps"
-    ));
+    assert!(session
+        .blocker
+        .contains("Branch-local aliases and identity-preserving snapshot writes now have explicit lexical/version proof"));
+    assert!(!session.blocker.contains("nested record carries still lack"));
     assert!(session
         .next_action
         .contains("retain the checked non-scoped record parameter contract"));

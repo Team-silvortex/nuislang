@@ -3,31 +3,12 @@ use super::*;
 pub(super) fn fields(
     ty: &NirTypeRef,
     definitions: &BTreeMap<&str, &NirStructDef>,
-) -> Option<Vec<(String, NirTypeRef)>> {
-    let definition = definitions.get(ty.name.as_str())?;
-    if ty.is_ref
-        || ty.is_optional
-        || !ty.generic_args.is_empty()
-        || !definition.generic_params.is_empty()
-        || !definition.where_bounds.is_empty()
-        || definition.fields.is_empty()
-        || definition.fields.iter().any(|field| {
-            !is_scalar_i64(&field.ty)
-                && !is_bool(&field.ty)
-                && !is_i32(&field.ty)
-                && !is_f32(&field.ty)
-                && !is_f64(&field.ty)
-        })
-    {
+) -> Option<Vec<(Vec<String>, NirTypeRef)>> {
+    let shape = Shape::from_definitions(ty, definitions)?;
+    if shape.fields.is_empty() {
         return None;
     }
-    Some(
-        definition
-            .fields
-            .iter()
-            .map(|field| (field.name.clone(), field.ty.clone()))
-            .collect(),
-    )
+    Some(shape.leaves())
 }
 
 pub(super) fn projected(value: &NirExpr, ty: &NirTypeRef, result: &str, slot: usize) -> bool {
@@ -44,12 +25,16 @@ pub(super) fn projected(value: &NirExpr, ty: &NirTypeRef, result: &str, slot: us
     }
 }
 
+#[cfg(test)]
 pub(super) fn source_word(binding: &str, field: &str, ty: &NirTypeRef) -> NirExpr {
-    let value = NirExpr::FieldAccess {
-        base: Box::new(NirExpr::Var(binding.to_owned())),
-        field: field.to_owned(),
-    };
-    encode(value, ty)
+    source_path_word(binding, &[field.to_owned()], ty)
+}
+
+pub(super) fn source_path_word(binding: &str, path: &[String], ty: &NirTypeRef) -> NirExpr {
+    encode(
+        crate::lowering::scalar_record_shape::source_value(binding, path),
+        ty,
+    )
 }
 
 pub(super) fn encode(value: NirExpr, ty: &NirTypeRef) -> NirExpr {
@@ -93,11 +78,46 @@ pub(super) fn seed(
             .zip(&words)
             .zip(&binding.fields)
             .enumerate()
-            .all(|(index, (((name, value), word), (field, ty)))| {
+            .all(|(index, (((name, value), word), (path, ty)))| {
                 name == word
                     && word == &format!("carry{index}")
-                    && value == &source_word(binding.name, field, ty)
+                    && value == &source_path_word(binding.name, path, ty)
             })
+}
+
+pub(super) fn rebuild(
+    shape: &Shape,
+    words: &mut impl Iterator<Item = String>,
+    state: &mut LoweringState<'_>,
+) -> String {
+    if shape.fields.is_empty() {
+        return words.next().expect("validated leaf count");
+    }
+    let fields = shape
+        .fields
+        .iter()
+        .map(|(field, child)| (field, rebuild(child, words, state)))
+        .collect::<Vec<_>>();
+    let name = next_name(state, "loop_value_result");
+    let mut args = vec![shape.ty.name.clone()];
+    args.extend(
+        fields
+            .iter()
+            .map(|(field, value)| format!("{field}={value}")),
+    );
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "struct".to_owned(),
+            args,
+        },
+    });
+    for (_, value) in fields {
+        push_dep_edges(state, &value, &name);
+    }
+    name
 }
 
 pub(super) fn decode(word: &str, ty: &NirTypeRef, state: &mut LoweringState<'_>) -> String {

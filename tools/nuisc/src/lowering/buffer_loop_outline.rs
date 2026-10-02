@@ -11,6 +11,8 @@ mod capture_layouts;
 mod capture_projection;
 #[path = "buffer_loop_outline/conditional_values.rs"]
 mod conditional_values;
+#[path = "buffer_loop_outline/continuation_reads.rs"]
+mod continuation_reads;
 #[path = "buffer_loop_outline/control_flow.rs"]
 mod control_flow;
 #[path = "buffer_loop_outline/control_loops.rs"]
@@ -58,8 +60,9 @@ pub(super) struct BufferLoopOutlines {
 // supplies induction/carry values, validated break control and borrowed-buffer lifetimes.
 pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopOutlines, String> {
     let mut catalog = scalar_helpers::collect(module);
-    let layouts = control_values::layouts(module);
+    let mut layouts = control_values::layouts(module);
     let mut control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+    let mut control_roots = scalar_helpers::control_roots(module, &layouts, &control_catalog);
     let value_layouts = control_values::TypedLayouts::collect(module);
     let mut value_catalog =
         scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
@@ -84,22 +87,38 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let selections = conditional_values::outline(
         module,
         &value_catalog,
-        &control_catalog,
+        &control_roots,
         &value_layouts,
         &mut names,
     );
     if !selections.is_empty() {
         catalog = scalar_helpers::collect(module);
         control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+        control_roots = scalar_helpers::control_roots(module, &layouts, &control_catalog);
         value_catalog =
             scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
     }
+    let mut return_signals = BTreeMap::new();
     for function in &mut module.functions {
         if control_catalog.contains_key(&function.name) {
-            if let Some(body) = control_loops::returns::normalize(function, &layouts)
-                .expect("admitted counted return flow")
+            if let Some(plan) =
+                control_loops::returns::prepare(function, &layouts, &control_catalog, &names)
+                    .expect("admitted counted return flow")
             {
-                function.body = body;
+                function.body = plan.body;
+                return_signals.insert(function.name.clone(), plan.signal);
+                for definition in plan.structs {
+                    names.insert(definition.name.clone());
+                    layouts.insert(
+                        definition.name.clone(),
+                        definition
+                            .fields
+                            .iter()
+                            .map(|f| (f.name.clone(), f.ty.clone()))
+                            .collect(),
+                    );
+                    module.structs.push(definition);
+                }
             }
         }
     }
@@ -114,7 +133,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         }
         // Typed admission serves the extracted selections and their dependencies;
         // existing direct typed returns do not need additional branch helpers.
-        if (control_catalog.contains_key(&function.name) || selections.contains(&function.name))
+        if (control_roots.contains(&function.name) || selections.contains(&function.name))
             && value_catalog.get(&function.name).is_some_and(|helper| {
                 // Pure calls can still expand into substantial work. Keep
                 // conditional calls behind guards, not an eager value select.
@@ -169,7 +188,9 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &layouts,
         &mut outlined.break_controls,
         preserve_entry_flow,
+        &return_signals,
     );
+    let value_layouts = control_values::TypedLayouts::collect(module);
     scalar_control::outline(
         module,
         &outlined.functions,
@@ -328,6 +349,8 @@ fn outline_loop(
         &plan.mutations,
         structs,
         break_controls,
+        None,
+        None,
     );
     helper_body.push(NirStmt::Return(Some(returned)));
     let args = plan

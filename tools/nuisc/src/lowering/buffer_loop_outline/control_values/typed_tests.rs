@@ -37,7 +37,7 @@ fn module() -> NirModule {
 }
 
 #[test]
-fn typed_values_reuse_flat_dependencies_without_admitting_mixed_loop_carries_or_effects() {
+fn typed_values_reuse_nested_loop_dependencies_without_admitting_effects_or_cycles() {
     let module = module();
     let flat = layouts(&module);
     let loops = scalar_helpers::collect_with_layouts(&module, &flat);
@@ -45,11 +45,12 @@ fn typed_values_reuse_flat_dependencies_without_admitting_mixed_loop_carries_or_
     let values = scalar_helpers::collect_typed_values(&module, &typed, &loops);
     assert_eq!(
         values.keys().map(String::as_str).collect::<Vec<_>>(),
-        ["checked", "count", "leaf", "main", "wrapped"]
+        ["checked", "count", "leaf", "main", "mixed_loop", "wrapped"]
     );
     assert!(values["wrapped"].may_loop);
-    assert!(!loops.contains_key("leaf"));
-    assert!(!supported_type(&scalar_type("Packet"), &flat));
+    assert!(loops.contains_key("leaf"));
+    assert!(values["mixed_loop"].may_loop);
+    assert!(supported_type(&scalar_type("Packet"), &flat));
     let mut reversed = module.clone();
     reversed.structs.reverse();
     reversed.functions.reverse();
@@ -64,10 +65,34 @@ fn typed_values_reuse_flat_dependencies_without_admitting_mixed_loop_carries_or_
         value_type(&zero, &Scope::new(), &values, &typed),
         Some(scalar_type("Packet"))
     );
-    assert!(value_type(&zero, &Scope::new(), &values, &flat).is_none());
+    assert_eq!(
+        value_type(&zero, &Scope::new(), &values, &flat),
+        Some(scalar_type("Packet"))
+    );
     let mut inputs = BTreeSet::new();
     collect_inputs(&zero, &mut inputs);
     assert!(inputs.is_empty());
+}
+
+#[test]
+fn nested_value_admission_does_not_grant_nonloop_control_outlining_authority() {
+    let module = module();
+    let layouts = layouts(&module);
+    let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
+    let roots = scalar_helpers::control_roots(&module, &layouts, &catalog);
+    assert!(roots.contains("count"));
+    assert!(roots.contains("mixed_loop"));
+    assert!(catalog["wrapped"].may_loop);
+    for name in ["leaf", "wrapped", "effect", "caller", "cycle_a", "cycle_b"] {
+        assert!(!roots.contains(name), "{name}");
+    }
+    let mut reversed = module.clone();
+    reversed.functions.reverse();
+    reversed.structs.reverse();
+    assert_eq!(
+        roots,
+        scalar_helpers::control_roots(&reversed, &layouts, &catalog)
+    );
 }
 
 #[test]

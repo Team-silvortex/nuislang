@@ -33,7 +33,7 @@ pub(super) fn validate(
     scope: &Scope,
     loop_bindings: &BTreeSet<String>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
 ) -> Option<()> {
     let prepared = &iteration.prepared;
     // Reuse the strict single-step admission, including exact i64 and local

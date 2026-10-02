@@ -7,7 +7,7 @@ tests, the development tensor, and `docs/reference/` in that order.
 ## Read This First
 
 Use this short route for the current `beta-0.15.*` repository. The current patch is
-[`beta-0.15.4`](versioning/nuis-beta-0.15.4-patch.md) (2026-09-27); the minor
+[`beta-0.15.5`](versioning/nuis-beta-0.15.5-patch.md) (2026-10-02); the minor
 baseline remains `05951bef` (`beta-0.15.0`):
 
 1. [Current mainline map](current-mainline-map.md)

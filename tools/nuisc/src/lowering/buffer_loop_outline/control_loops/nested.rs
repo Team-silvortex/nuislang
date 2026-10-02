@@ -53,9 +53,11 @@ pub(in crate::lowering::buffer_loop_outline) fn outline_iteration(
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
     control_catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
     structs: &mut Vec<NirStructDef>,
     break_controls: &mut BTreeMap<String, String>,
+    continuation: Option<&BTreeSet<String>>,
+    return_signal: Option<&returns::Signal>,
 ) -> exits::Boundary {
     // Child effects were checked as scoped expressions, not metadata predicates.
     // Keep that execution mode even for a single conditional scalar update.
@@ -69,8 +71,9 @@ pub(in crate::lowering::buffer_loop_outline) fn outline_iteration(
             layouts,
             structs,
             break_controls,
+            return_signal,
         }
-        .iteration(condition, body, scope)
+        .iteration(condition, body, scope, continuation)
     } else {
         exits::Boundary::default()
     }
@@ -82,9 +85,10 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
     control_catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
     break_controls: &mut BTreeMap<String, String>,
     preserve_entry_flow: bool,
+    return_signals: &BTreeMap<String, returns::Signal>,
 ) {
     // Exit recovery introduces bindings outside the loop. Reserve future source
     // locals too, not just the values visible at the loop's entry.
@@ -111,8 +115,9 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
             layouts,
             structs: &mut module.structs,
             break_controls,
+            return_signal: return_signals.get(&function.name),
         };
-        builder.block(&mut function.body, scope);
+        builder.block(&mut function.body, scope, Some(&BTreeSet::new()));
     }
 }
 
@@ -121,15 +126,22 @@ struct Builder<'a> {
     helpers: &'a mut Vec<NirFunction>,
     guarded: &'a mut BTreeSet<String>,
     control_catalog: &'a ScalarHelpers,
-    layouts: &'a control_values::FlatLayouts,
+    layouts: &'a control_values::CarryLayouts,
     structs: &'a mut Vec<NirStructDef>,
     break_controls: &'a mut BTreeMap<String, String>,
+    return_signal: Option<&'a returns::Signal>,
 }
 
 impl Builder<'_> {
-    fn block(&mut self, body: &mut Vec<NirStmt>, mut scope: Scope) {
+    fn block(
+        &mut self,
+        body: &mut Vec<NirStmt>,
+        mut scope: Scope,
+        continuation: Option<&BTreeSet<String>>,
+    ) {
+        let mut reads = continuation_reads::Plan::new(body, continuation);
         let mut output = Vec::new();
-        for mut stmt in std::mem::take(body) {
+        for (position, mut stmt) in std::mem::take(body).into_iter().enumerate() {
             match &mut stmt {
                 NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
                     let ty = control_values::value_type(
@@ -146,14 +158,16 @@ impl Builder<'_> {
                     else_body,
                     ..
                 } => {
-                    self.block(then_body, scope.clone());
-                    self.block(else_body, scope.clone());
+                    let after = reads.as_mut().and_then(|reads| reads.after(position));
+                    self.block(then_body, scope.clone(), after.as_ref());
+                    self.block(else_body, scope.clone(), after.as_ref());
                 }
                 NirStmt::While { condition, body }
                     if present(body, &scope)
                         || induction::parse(condition, body).is_some_and(|i| !i.leading) =>
                 {
-                    let boundary = self.iteration(condition, body, &scope);
+                    let after = reads.as_mut().and_then(|reads| reads.after(position));
+                    let boundary = self.iteration(condition, body, &scope, after.as_ref());
                     output.extend(boundary.before);
                     output.push(stmt);
                     output.extend(boundary.after);
@@ -171,6 +185,7 @@ impl Builder<'_> {
         condition: &NirExpr,
         body: &mut Vec<NirStmt>,
         scope: &Scope,
+        continuation: Option<&BTreeSet<String>>,
     ) -> exits::Boundary {
         let original = std::mem::take(body);
         let iteration = induction::parse(condition, &original).expect("admitted induction step");
@@ -181,7 +196,14 @@ impl Builder<'_> {
         else {
             unreachable!("admitted induction binding")
         };
-        let plan = exits::prepare(&iteration, scope, self.names);
+        let recover_index = continuation.is_none_or(|reads| reads.contains(induction));
+        let plan = exits::prepare(
+            &iteration,
+            scope,
+            self.names,
+            recover_index,
+            self.return_signal,
+        );
         let effects = plan.effects;
         let scope = &plan.scope;
         // A state field belongs to a binding, not to a statement. Repeated
@@ -224,6 +246,7 @@ impl Builder<'_> {
                 .any(|name| matches!(scope[name].name.as_str(), "bool" | "i32" | "f32" | "f64")))
         .then(|| scalar_carries::state_type(&transport, self.names, self.structs));
         let returned = scalar_carries::value(&transport, aggregate.as_ref());
+        let returned_reads = carries.iter().cloned().collect();
         let name = branches::fresh_name("__nuis_scalar_iteration", self.names);
         if let Some(flag) = &plan.breaking {
             self.break_controls.insert(name.clone(), flag.clone());
@@ -247,6 +270,8 @@ impl Builder<'_> {
             &mutations,
             self.structs,
             self.break_controls,
+            Some(&returned_reads),
+            self.return_signal,
         ));
         helper_body.push(NirStmt::Return(Some(returned)));
         // Backedge slots remain i64 even for other scalar bindings. Decode in the

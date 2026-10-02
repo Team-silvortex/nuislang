@@ -1,0 +1,54 @@
+mod cpu Main {
+    struct Leaf { value: f64, gain: f32, tag: i32, enabled: bool }
+    struct State { left: Leaf, right: Leaf, count: i64 }
+
+    @noinline fn relay(value: State) -> State { return value; }
+
+    fn start(value: f64, gain: f32, tag: i32, limit: i64) -> State {
+        return relay(State {
+            left: Leaf { value: value, gain: gain, tag: tag, enabled: false },
+            right: Leaf { value: 1.5, gain: 2.5, tag: i32_from_i64(7), enabled: true },
+            count: limit
+        });
+    }
+
+    fn step(state: State) -> State {
+        let carry = state; let i = 0; let limit = state.count;
+        while i < limit {
+            let i = i + 1;
+            let carry = carry; let previous = carry.left;
+            let selected = previous;
+            if i % 2 == 1 {
+                let selected = Leaf {
+                    value: previous.value + 0.5, gain: previous.gain + 0.25,
+                    tag: previous.tag, enabled: previous.enabled
+                };
+            } else {
+                let selected = Leaf {
+                    value: previous.value + 1.0, gain: previous.gain + 0.5,
+                    tag: previous.tag, enabled: previous.enabled
+                };
+            }
+            let enabled = selected.enabled;
+            let carry = State {
+                left: Leaf { value: selected.value, gain: selected.gain,
+                    tag: selected.tag, enabled: !enabled },
+                right: Leaf { value: 3.5, gain: 4.5, tag: i32_from_i64(9), enabled: false },
+                count: limit
+            };
+        }
+        return carry;
+    }
+
+    fn stop(state: State) -> State { return state; }
+    @noinline fn result_code(result: State) -> i64 {
+        if result.left.value != 3.5 { return 201; }
+        if result.left.gain != 3.5 { return 202; }
+        if result.left.tag != i32_from_i64(7) { return 203; }
+        if result.left.enabled { return 19; }
+        return 204;
+    }
+    fn main() -> i64 {
+        return result_code(step(start(1.5, 2.5, i32_from_i64(7), 3)));
+    }
+}

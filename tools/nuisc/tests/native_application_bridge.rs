@@ -16,6 +16,10 @@ mod f64_scoped_record_carries;
 mod i32_scoped_record_carries;
 #[path = "native_application_bridge/mixed_scoped_record_carries.rs"]
 mod mixed_scoped_record_carries;
+#[path = "native_application_bridge/nested_scoped_record_carries.rs"]
+mod nested_scoped_record_carries;
+#[path = "native_application_bridge/sparse_typed_record_carries.rs"]
+mod sparse_typed_record_carries;
 #[path = "native_application_bridge/typed_scoped_record_inputs.rs"]
 mod typed_scoped_record_inputs;
 

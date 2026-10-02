@@ -50,15 +50,29 @@ fn typed_record_inputs_preserve_mixed_nested_snapshot_bits() {
 }
 
 pub(super) fn check(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>) {
-    check_transport(source, cases, true);
+    check_transport(source, cases, true, None);
 }
 
 pub(super) fn check_flattened(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>) {
-    check_transport(source, cases, false);
+    check_transport(source, cases, false, None);
 }
 
-fn check_transport(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>, whole: bool) {
+pub(super) fn check_compact(
+    source: &str,
+    cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>,
+    record_width: usize,
+) {
+    check_transport(source, cases, true, Some(record_width));
+}
+
+fn check_transport(
+    source: &str,
+    cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>,
+    whole: bool,
+    packed_width: Option<usize>,
+) {
     let width = cases[0].1[0].len();
+    let packed_width = packed_width.unwrap_or(width);
     let project = Project::with_source(source);
     let mut compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     compiled.yir.nodes.reverse();
@@ -119,7 +133,7 @@ fn check_transport(source: &str, cases: Vec<(Vec<u64>, Vec<Vec<u64>>)>, whole: b
                     .split_once('(')
                     .unwrap()
                     .1
-                    .contains(&format!("[{width} x i64] %arg"))),
+                    .contains(&format!("[{packed_width} x i64] %arg"))),
         whole
     );
     assert!(!bridge

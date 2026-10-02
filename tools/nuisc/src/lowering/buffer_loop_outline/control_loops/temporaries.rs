@@ -19,7 +19,7 @@ pub(super) fn validate(
     updates: &BTreeSet<String>,
     induction: &str,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
 ) -> Option<()> {
     let mut locals = Locals {
         scope: scope.clone(),
@@ -42,7 +42,7 @@ fn block(
     locals: &mut Locals,
     updates: &BTreeSet<String>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
     depth: usize,
 ) -> Option<()> {
     for stmt in body {
@@ -125,7 +125,7 @@ fn expression(
     updates: &BTreeSet<String>,
     own: Option<&str>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
     depth: usize,
 ) -> Option<NirTypeRef> {
     if depth > 64 {

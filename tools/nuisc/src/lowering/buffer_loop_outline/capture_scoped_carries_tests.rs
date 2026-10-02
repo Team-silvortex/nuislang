@@ -177,7 +177,9 @@ fn generated_partial_carries_execute_with_complete_seed_storage() {
     assert_eq!(reference(&mut yir).unwrap(), 154);
 }
 
-pub(super) fn reference(yir: &mut yir_core::YirModule) -> Result<i64, String> {
+pub(in crate::lowering::buffer_loop_outline::capture_projection) fn reference(
+    yir: &mut yir_core::YirModule,
+) -> Result<i64, String> {
     yir.nodes.reverse();
     yir.functions.reverse();
     for function in &mut yir.functions {

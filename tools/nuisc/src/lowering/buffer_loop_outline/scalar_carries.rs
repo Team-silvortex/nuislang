@@ -1,15 +1,16 @@
 use super::*;
+use crate::lowering::scalar_record_shape::{self, Shape};
 use nuis_semantics::model::NirStructField;
 
 pub(super) struct Plan {
-    bindings: Vec<(String, NirTypeRef, Option<Vec<(String, NirTypeRef)>>)>,
+    bindings: Vec<(String, NirTypeRef, Option<Shape>)>,
 }
 
 impl Plan {
     pub(super) fn new(
         carries: &[String],
         scope: &Scope,
-        layouts: Option<&control_values::FlatLayouts>,
+        layouts: Option<&control_values::CarryLayouts>,
     ) -> Self {
         let bindings = carries
             .iter()
@@ -24,7 +25,10 @@ impl Plan {
                     None
                 } else {
                     assert_eq!(ty, scalar_type(&ty.name));
-                    Some(layouts.expect("admitted flat carry")[&ty.name].clone())
+                    Some(
+                        Shape::from_layouts(&ty, layouts.expect("admitted record carry"))
+                            .expect("validated pure record shape"),
+                    )
                 };
                 (name.clone(), ty, fields)
             })
@@ -41,18 +45,11 @@ impl Plan {
             .iter()
             .flat_map(|(name, ty, fields)| {
                 let base = NirExpr::Var(name.clone());
-                if let Some(fields) = fields {
-                    fields
+                if let Some(shape) = fields {
+                    shape
+                        .leaves()
                         .iter()
-                        .map(|(field, ty)| {
-                            encode(
-                                ty,
-                                NirExpr::FieldAccess {
-                                    base: Box::new(base.clone()),
-                                    field: field.clone(),
-                                },
-                            )
-                        })
+                        .map(|(path, ty)| encode(ty, scalar_record_shape::source_value(name, path)))
                         .collect()
                 } else {
                     vec![encode(ty, base)]
@@ -133,15 +130,8 @@ fn projections(temporary: &str, plan: &Plan) -> Vec<NirStmt> {
         value
     };
     for (name, ty, fields) in &plan.bindings {
-        let value = if let Some(fields) = fields {
-            NirExpr::StructLiteral {
-                type_name: ty.name.clone(),
-                type_args: vec![],
-                fields: fields
-                    .iter()
-                    .map(|(field, ty)| (field.clone(), decode(ty, word())))
-                    .collect(),
-            }
+        let value = if let Some(shape) = fields {
+            shape.reconstruct(&mut |ty| decode(ty, word()))
         } else {
             decode(ty, word())
         };
@@ -157,7 +147,7 @@ fn projections(temporary: &str, plan: &Plan) -> Vec<NirStmt> {
 pub(super) fn record_input(
     param: &mut NirParam,
     scope: &Scope,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
     names: &mut BTreeSet<String>,
     structs: &mut Vec<NirStructDef>,
     bindings: &mut BTreeSet<String>,
@@ -204,7 +194,7 @@ pub(super) fn binding(name: &str, scope: &Scope, word: NirExpr) -> NirStmt {
     }
 }
 
-fn decode(ty: &NirTypeRef, word: NirExpr) -> NirExpr {
+pub(super) fn decode(ty: &NirTypeRef, word: NirExpr) -> NirExpr {
     if ty == &scalar_type("bool") {
         NirExpr::CastI64ToBool(Box::new(word))
     } else if ty == &scalar_type("i32") {

@@ -157,7 +157,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
             "nuis-beta-0.15.0-snapshot.md",
             "nuis-beta-0.15.0-release-checklist.md",
             "05951bef",
-            "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps",
+            "reduce nested return snapshot carries while preserving observed exits",
             "nuis-beta-0.11-application-led-mainline.md",
             "nuis-beta-0.10.0-self-hosting-entry.md",
             "nuis-beta-0.6.0-mainline-entry.md",

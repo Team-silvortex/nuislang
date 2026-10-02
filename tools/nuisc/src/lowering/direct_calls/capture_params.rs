@@ -74,7 +74,7 @@ impl CapturePlan {
         function: &NirFunction,
         module: &NirModule,
     ) -> Option<Self> {
-        use yir_core::native_scalar_session::{ScalarKind, ScalarStateLayout, MAX_SCALAR_SLOTS};
+        use yir_core::native_scalar_session::MAX_SCALAR_SLOTS;
         let scalar = Self::new(leaves.clone());
         if scalar
             .as_ref()
@@ -83,11 +83,37 @@ impl CapturePlan {
         {
             return scalar;
         }
-        let records = (|| {
+        Self::records(leaves.clone(), function, module, None).or(scalar)
+    }
+
+    pub(in crate::lowering) fn for_scoped(
+        leaves: Vec<NirParam>,
+        function: &NirFunction,
+        module: &NirModule,
+        seeds: &BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
+    ) -> Option<Self> {
+        // Boolean compaction is not a scoped backedge map. Choose a proven
+        // record plan directly, even when a boolean-only plan would fit.
+        if leaves.len() <= yir_core::native_scalar_session::MAX_SCALAR_SLOTS {
+            return None;
+        }
+        let records = seeds.keys().copied().collect();
+        Self::records(leaves, function, module, Some(&records))
+            .filter(|plan| plan.supports_scoped(function, seeds))
+    }
+
+    fn records(
+        leaves: Vec<NirParam>,
+        function: &NirFunction,
+        module: &NirModule,
+        allowed: Option<&BTreeSet<usize>>,
+    ) -> Option<Self> {
+        use yir_core::native_scalar_session::{ScalarKind, ScalarStateLayout};
+        let slots = (|| {
             let mut slots = Vec::new();
             let mut index = 0;
             let mut has_record = false;
-            for parameter in &function.params {
+            for (position, parameter) in function.params.iter().enumerate() {
                 if ScalarKind::parse(&parameter.ty.name).is_ok() {
                     if leaves.get(index) != Some(parameter) {
                         return None;
@@ -107,17 +133,21 @@ impl CapturePlan {
                         }
                         index += 1;
                     }
-                    slots.push(Slot::Record {
-                        parameter: parameter.clone(),
-                        layout,
-                        leaves: start..index,
-                    });
-                    has_record = true;
+                    if allowed.is_none_or(|allowed| allowed.contains(&position)) {
+                        slots.push(Slot::Record {
+                            parameter: parameter.clone(),
+                            layout,
+                            leaves: start..index,
+                        });
+                        has_record = true;
+                    } else {
+                        slots.extend((start..index).map(Slot::Scalar));
+                    }
                 }
             }
             (has_record && index == leaves.len()).then_some(slots)
         })();
-        records.map(|slots| Self { leaves, slots }).or(scalar)
+        slots.map(|slots| Self { leaves, slots })
     }
 
     pub(in crate::lowering) fn new(leaves: Vec<NirParam>) -> Option<Self> {

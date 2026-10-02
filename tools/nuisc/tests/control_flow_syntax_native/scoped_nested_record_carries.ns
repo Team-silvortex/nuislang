@@ -1,0 +1,31 @@
+mod cpu Main {
+    struct Leaf { value: f64, count: i64, enabled: bool }
+    struct Packet { left: Leaf, right: Leaf }
+    @noinline fn advance(value: Packet, divisor: i64) -> Packet {
+        return Packet { right: value.left,
+            left: Leaf { value: value.right.value + 0.5,
+                count: value.right.count + 6 / divisor, enabled: !value.right.enabled } };
+    }
+    @noinline fn walk(limit: i64, divisor: i64) -> Packet {
+        let carry = Packet {
+            left: Leaf { value: 1.5, count: 7, enabled: true },
+            right: Leaf { value: 2.5, count: 9, enabled: false } };
+        let saved = carry;
+        let i = 0;
+        while i < limit {
+            let i = i + 1;
+            let carry = advance(carry, divisor);
+            if i == 3 { break; }
+        }
+        return Packet { left: carry.left, right: saved.right };
+    }
+    fn main() -> i64 {
+        let result = walk(5, 2);
+        if result.left.value != 3.5 { return 200; }
+        if result.left.enabled { return 201; }
+        if result.right.value != 2.5 { return 202; }
+        let zero = walk(0, 0);
+        if zero.left.value != 1.5 { return 203; }
+        return result.left.count + result.right.count + zero.left.count + 6;
+    }
+}

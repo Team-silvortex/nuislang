@@ -10,11 +10,14 @@ pub(super) fn outline_effects(
     mutations: &MutationScope,
     structs: &mut Vec<NirStructDef>,
     break_controls: &mut BTreeMap<String, String>,
+    continuation: Option<&BTreeSet<String>>,
+    return_signal: Option<&control_loops::returns::Signal>,
 ) -> Vec<NirStmt> {
     let mut bindings = scope.keys().cloned().collect::<BTreeSet<_>>();
     collect_bindings(&body, &mut bindings);
+    let mut reads = continuation_reads::Plan::new(&body, continuation);
     let mut outlined = Vec::new();
-    for stmt in body {
+    for (position, stmt) in body.into_iter().enumerate() {
         match stmt {
             NirStmt::If {
                 condition,
@@ -39,6 +42,9 @@ pub(super) fn outline_effects(
                     .needs_struct()
                     .then(|| scalar_carries::state_type(&transport, names, structs));
                 let returned = scalar_carries::value(&transport, aggregate.as_ref());
+                // Each arm helper returns all declared carries, even if its
+                // caller later discards one. Those are observable exit values.
+                let arm_reads = carries.iter().cloned().collect();
                 // Snapshot once: the selected arm may mutate a buffer read by the condition.
                 let predicate = fresh_name("__nuis_buffer_condition", &mut bindings);
                 outlined.push(NirStmt::Let {
@@ -83,6 +89,8 @@ pub(super) fn outline_effects(
                         mutations,
                         structs,
                         break_controls,
+                        Some(&arm_reads),
+                        return_signal,
                     ));
                     arm_body.push(NirStmt::Return(Some(returned.clone())));
                     // Only existing values cross this boundary, never branch-local reads/math.
@@ -136,6 +144,7 @@ pub(super) fn outline_effects(
                         );
                     }
                     validation::EffectTypes::Values(catalog, layouts) => {
+                        let after = reads.as_mut().and_then(|reads| reads.after(position));
                         let boundary = control_loops::outline_iteration(
                             &condition,
                             &mut body,
@@ -147,6 +156,8 @@ pub(super) fn outline_effects(
                             layouts,
                             structs,
                             break_controls,
+                            after.as_ref(),
+                            return_signal,
                         );
                         outlined.extend(boundary.before);
                         outlined.push(NirStmt::While { condition, body });

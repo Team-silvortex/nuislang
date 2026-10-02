@@ -28,9 +28,19 @@ pub(super) use entry_flow::preserve as preserve_entry_flow;
 mod exits_tests;
 
 #[cfg(test)]
+#[path = "control_loops/index_recovery_tests.rs"]
+mod index_recovery_tests;
+
+#[cfg(test)]
 #[path = "control_loops/trailing_tests.rs"]
 mod trailing_tests;
 
+#[cfg(test)]
+#[path = "control_loops/return_signal_tests.rs"]
+mod return_signal_tests;
+#[cfg(test)]
+#[path = "control_loops/return_storage_tests.rs"]
+mod return_storage_tests;
 #[cfg(test)]
 #[path = "control_loops/returns_tests.rs"]
 mod returns_tests;
@@ -59,7 +69,7 @@ pub(super) fn validate(
     scope: &Scope,
     loop_bindings: &BTreeSet<String>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
 ) -> Option<()> {
     let iteration = induction::parse(condition, body)?;
     if !iteration.leading || nested::present(body, scope) {

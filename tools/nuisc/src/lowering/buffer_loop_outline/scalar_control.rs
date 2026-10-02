@@ -288,6 +288,7 @@ fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {
         match stmt {
             NirStmt::Let { value, .. }
             | NirStmt::Const { value, .. }
+            | NirStmt::Expr(value)
             | NirStmt::Return(Some(value)) => collect_expr_inputs(value, inputs),
             NirStmt::If {
                 condition,
@@ -302,6 +303,9 @@ fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {
                 collect_expr_inputs(condition, inputs);
                 collect_inputs(body, inputs);
             }
+            // Loop outlining keeps exits inside the driver boundary. They
+            // carry no expression inputs, but may occur in a scalar branch.
+            NirStmt::Break | NirStmt::Continue => {}
             _ => unreachable!("normalized scalar body"),
         }
     }

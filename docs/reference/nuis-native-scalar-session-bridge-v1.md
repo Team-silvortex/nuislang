@@ -1962,11 +1962,11 @@ fresh GPU/Linux, full-workspace or performance evidence.
 
 ## Next Boundary
 
-Extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
+Reduce private return/control carry expansion without widening native callback bounds.
 Independent same-name branch aliases now project fields; existing outer writes, user signatures and scoped-action
 metadata stay unchanged. Scoped alias branches use 2/2/2/3 arguments; non-scoped 64-i64-plus-predicate inputs now pass by value.
 Scoped iterations preserve invariant fields and loop-written snapshots; loop branch helpers now share guarded record input transport.
-Generated bool/i32/i64/f32/f64 record carries use private word maps and typed reconstruction; f32/f64 bit packing is distinct from numeric casts; nested carries remain separate.
+Generated mixed/nested carries retain all-caller codec and bounded fixed-point proof. Native nested loops keep 9/64 seeds; admitted early returns reuse exact initialized mutable records only after source-order revalidation. Bounded continuation observation removes only dead leading-index recovery, preserving source suffixes, generated helper outputs and parent backedges. Bounded return-exit proof coalesces only compiler-minted pending/break signals, never ordinary source breaks. Per-write nested invariant proof joins zero trips and every intermediate child write, with changing leaves in compact private records and every original RHS preserved. The return fixture now preserves 9/30/31/57/58/59/60/61/62/63/64-word states (outer N, inner N-1); changing the outer tag still rejects at 65 outer slots for width 64. Scoped transport requires complete record seed maps, not ordinary-call boolean packing. Shared budgets, atomic failures and conservative independent-storage/recovery/signal/invariant fallback remain required without widening native bounds.
 Keep guarded local values, selected-only failures and reference image/window regressions.
 Retain reference named-field normalization, nominal/kind/malformed-state rejection,
 source effect order and inverse-constructor native/reference parity. Retain typed
@@ -1978,7 +1978,7 @@ suffixes, and the counted-return
 source timing and propagation proof without changing the separate Buffer exit profile.
 Retain leading/trailing step timing, leading-step break recovery, loop-local continue, each selected inner
 invocation's preflight and both shared work counters. Keep resource
-payloads and wider-scalar/nested loop carries separate. Retain outer bool
+payloads and over-limit private return/control carry expansion separate. Retain outer bool
 carry seeds and explicit typed backedge conversion, outer flat-i64 carries,
 zero-trip seeds, exact nominal reconstruction,
 source-ordered backedge projections and local aggregate and bool rebinding,

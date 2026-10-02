@@ -1,0 +1,284 @@
+use super::*;
+
+#[path = "sparse_typed_return_probe.rs"]
+mod probe;
+
+#[test]
+fn typed_sparse_nested_return_capture_geometry() {
+    let mut actual = Vec::new();
+    for width in [9, 57, 58, 59, 60, 61, 62, 63, 64] {
+        let compiled = nuisc::pipeline::compile_source(&fixture::return_source(width)).unwrap();
+        let whole = compiled
+            .yir
+            .nodes
+            .iter()
+            .any(|node| node.op.instruction == "param_value_struct");
+        actual.push((width, whole, carried_widths(&compiled.yir)));
+    }
+    assert_eq!(
+        actual,
+        [
+            (9, false, vec![8, 9]),
+            (57, false, vec![56, 57]),
+            (58, true, vec![57, 58]),
+            (59, true, vec![58, 59]),
+            (60, true, vec![59, 60]),
+            (61, true, vec![60, 61]),
+            (62, true, vec![61, 62]),
+            (63, true, vec![62, 63]),
+            (64, true, vec![63, 64]),
+        ]
+    );
+}
+
+#[test]
+fn typed_sparse_nested_returns_share_work_budgets_without_partial_publication() {
+    for width in [9, 63, 64] {
+        // Both 3 and 4 trips return in the second outer iteration. Reservations
+        // still include every planned outer trip, not just the executed bodies.
+        let cases = [
+            (0, 0, 1, Some(0), [0, 0]),
+            (1, 2, 10, Some(0), [0, 0]),
+            (3, 6, 24, Some(0), [0, 0]),
+            (4, 7, 24, Some(0), [0, 0]),
+            (3, 5, 64, None, [1, 53]),
+            (4, 6, 64, None, [1, 53]),
+            (3, 6, 23, None, [0, 0]),
+            (3, 0, 64, None, [0, 63]),
+            (0, 0, 0, None, [0, 0]),
+        ]
+        .map(|(limit, loops, entries, status, remaining)| probe::Case {
+            limit,
+            loops,
+            entries,
+            status,
+            remaining,
+            corrupt: None,
+            alias: false,
+            semantic_trap: false,
+        });
+        probe::check(&fixture::return_source(width), width, &with_aliases(&cases));
+    }
+}
+
+#[test]
+fn typed_sparse_nested_returns_publish_current_snapshots_and_skip_dead_suffixes() {
+    for width in [9, 30, 31, 57, 58, 59, 60, 61, 62, 63, 64] {
+        let source = fixture::return_source(width);
+        let project = Project::with_source(&source);
+        let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+        assert_eq!(carried_widths(&compiled.yir), [width - 1, width]);
+        let cases = (0..=4)
+            .map(|limit| {
+                let initial = initial(width, limit);
+                let event = event(&initial, limit);
+                (
+                    vec![initial[0], initial[1], initial[2], limit],
+                    vec![initial, event.clone(), event],
+                )
+            })
+            .collect();
+        if width >= 58 {
+            typed_record_inputs::check_compact(&source, cases, width - 4);
+        } else {
+            typed_record_inputs::check_flattened(&source, cases);
+        }
+    }
+}
+
+#[test]
+fn typed_sparse_nested_returns_reject_expanded_private_state_before_native_emission() {
+    for (width, rejected) in [(64, 65)] {
+        // A real outer tag mutation removes the final invariant. Do not erase
+        // its return/control word merely to make a 64-word callback fit.
+        let source = fixture::return_source(width).replace(
+            "tag: selected.tag, enabled: !enabled",
+            "tag: i32_from_i64(17), enabled: !enabled",
+        );
+        let project = Project::with_source(&source);
+        let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+        assert_eq!(carried_widths(&compiled.yir), [width - 1, width + 1]);
+        let error = emit_registered(&compiled.yir, "counter").unwrap_err();
+        assert!(
+            error.contains(&format!(
+                "{} carried words exceed the 64-word native limit",
+                rejected
+            )),
+            "{error}"
+        );
+        assert!(
+            error.contains("including private return/control state"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn typed_sparse_nested_returns_preserve_invariant_negative_zero_and_nan_payloads() {
+    for width in [9, 63, 64] {
+        let source = fixture::return_source(width)
+            .replace(
+                "left: Leaf { value: value, gain: gain, tag: tag, enabled: false }",
+                "left: Leaf { value: 0.0, gain: 1.0, tag: tag, enabled: false }",
+            )
+            .replace(
+                "right: Leaf { value: 1.5, gain: 2.5, tag: i32_from_i64(7), enabled: true }",
+                "right: Leaf { value: value, gain: gain, tag: tag, enabled: true }",
+            )
+            .replace(
+                "right: Leaf { value: 3.5, gain: 4.5, tag: i32_from_i64(9), enabled: false }",
+                "right: carry.right",
+            );
+        let mut cases = Vec::new();
+        for (value, gain) in [
+            (0x8000_0000_0000_0000, 0x8000_0000),
+            (0x7ff8_0000_0000_4321, 0x7fc0_1234),
+        ] {
+            for limit in [0, 3] {
+                let mut initial = initial(width, limit);
+                initial[0] = 0_f64.to_bits();
+                initial[1] = u64::from(1_f32.to_bits());
+                let tag = initial[2];
+                initial[4..8].copy_from_slice(&[value, gain, tag, 1]);
+                let mut result = initial.clone();
+                if limit > 0 {
+                    result[0] = 2_f64.to_bits();
+                    result[1] = u64::from(2_f32.to_bits());
+                    result[3] = 1;
+                    result[9..].fill(99);
+                }
+                cases.push((
+                    vec![value, gain, initial[2], limit],
+                    vec![initial, result.clone(), result],
+                ));
+            }
+        }
+        if width == 9 {
+            typed_record_inputs::check_flattened(&source, cases);
+        } else {
+            typed_record_inputs::check_compact(&source, cases, width - 4);
+        }
+    }
+}
+
+fn carried_widths(yir: &yir_core::YirModule) -> Vec<usize> {
+    let mut widths = yir
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            yir_core::loop_carry_contract::parse_scoped_i64_carries(&node.op.args).unwrap()
+        })
+        .map(|call| call.seeds.len())
+        .collect::<Vec<_>>();
+    widths.sort_unstable();
+    widths
+}
+
+#[test]
+fn typed_sparse_nested_loops_keep_64_word_budget_failures_atomic() {
+    let cases = [
+        (0, 0, 1, Some(0), [0, 0]),
+        (1, 2, 5, Some(0), [0, 0]),
+        (3, 6, 13, Some(0), [0, 0]),
+        (3, 5, 64, None, [1, 58]),
+        (3, 6, 12, None, [0, 0]),
+    ]
+    .map(|(limit, loops, entries, status, remaining)| probe::Case {
+        limit,
+        loops,
+        entries,
+        status,
+        remaining,
+        corrupt: None,
+        alias: false,
+        semantic_trap: false,
+    });
+    probe::check(&fixture::loop_source(64), 64, &with_aliases(&cases));
+}
+
+#[test]
+fn typed_sparse_nested_return_payload_failures_leave_the_last_state_untouched() {
+    for width in [9, 63, 64] {
+        let source = if width == 64 {
+            fixture::return_source(width).replace(
+                "right: carry.right, count: limit",
+                "right: carry.right, count: 10 / (2 - j)",
+            )
+        } else {
+            fixture::return_source(width).replace("return State { left: selected,",
+                "return State { left: Leaf { value: selected.value, gain: selected.gain, tag: i32_from_i64(10 / (2 - j)), enabled: selected.enabled },")
+        };
+        let cases =
+            [(0, [64, 63]), (1, [62, 54]), (3, [58, 43])].map(|(limit, remaining)| probe::Case {
+                limit,
+                loops: 64,
+                entries: 64,
+                status: if limit == 3 { None } else { Some(0) },
+                remaining,
+                corrupt: None,
+                alias: false,
+                semantic_trap: limit == 3,
+            });
+        probe::check(&source, width, &with_aliases(&cases));
+    }
+}
+
+#[test]
+fn typed_sparse_nested_returns_reject_unused_noncanonical_inputs_before_work() {
+    for width in [9, 63, 64] {
+        // These right-hand leaves are overwritten before the selected return.
+        // Removing their decode must not bypass public callback validation.
+        let cases = [(5, 1_u64 << 32), (6, 0x8000_0000), (7, 2)].map(|corrupt| probe::Case {
+            limit: 3,
+            loops: 0,
+            entries: 0,
+            status: Some(2),
+            remaining: [-1, -1],
+            corrupt: Some(corrupt),
+            alias: false,
+            semantic_trap: false,
+        });
+        probe::check(&fixture::return_source(width), width, &with_aliases(&cases));
+    }
+}
+
+fn with_aliases(cases: &[probe::Case]) -> Vec<probe::Case> {
+    cases
+        .iter()
+        .flat_map(|case| {
+            [false, true].map(|alias| probe::Case {
+                alias,
+                ..case.clone()
+            })
+        })
+        .collect()
+}
+
+fn initial(width: usize, limit: u64) -> Vec<u64> {
+    let mut words = vec![
+        (-1.5_f64).to_bits(),
+        u64::from(2.5_f32.to_bits()),
+        i32::MIN as i64 as u64,
+        0,
+        1.5_f64.to_bits(),
+        u64::from(2.5_f32.to_bits()),
+        7,
+        1,
+        limit,
+    ];
+    words.resize(width, 27);
+    words
+}
+
+fn event(initial: &[u64], limit: u64) -> Vec<u64> {
+    let mut result = initial.to_vec();
+    if limit > 0 {
+        let delta = if limit == 1 { 0.5 } else { 2.0 };
+        result[0] = (f64::from_bits(initial[0]) + delta).to_bits();
+        result[1] = u64::from((f32::from_bits(initial[1] as u32) + delta as f32 / 2.0).to_bits());
+        result[3] ^= 1;
+        result[4..8].copy_from_slice(&[3.5_f64.to_bits(), u64::from(4.5_f32.to_bits()), 9, 0]);
+        result[9..].fill(99);
+    }
+    result
+}

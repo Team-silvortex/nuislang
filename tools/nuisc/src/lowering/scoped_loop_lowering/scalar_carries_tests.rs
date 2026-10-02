@@ -6,6 +6,8 @@ mod seed_maps;
 
 #[path = "mixed_record_words_tests.rs"]
 mod mixed_words_tests;
+#[path = "nested_record_words_tests.rs"]
+mod nested_words_tests;
 #[path = "scalar_carry_seed_storage_tests.rs"]
 mod seed_storage;
 

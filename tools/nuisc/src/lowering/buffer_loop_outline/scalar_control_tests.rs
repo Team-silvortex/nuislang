@@ -1,6 +1,30 @@
 use super::*;
 use crate::frontend::parse_nuis_module;
 
+#[test]
+fn scalar_branch_inputs_keep_loop_effects_without_reading_exit_markers() {
+    let body = [NirStmt::While {
+        condition: NirExpr::Var("header".into()),
+        body: vec![
+            NirStmt::Expr(NirExpr::Call {
+                callee: "helper".into(),
+                args: vec![NirExpr::Var("state".into())],
+            }),
+            NirStmt::If {
+                condition: NirExpr::Var("selected".into()),
+                then_body: vec![NirStmt::Break],
+                else_body: vec![NirStmt::Continue],
+            },
+        ],
+    }];
+    let mut inputs = BTreeSet::new();
+    collect_inputs(&body, &mut inputs);
+    assert_eq!(
+        inputs,
+        BTreeSet::from(["header".into(), "state".into(), "selected".into()])
+    );
+}
+
 fn outlined(source: &str) -> (NirModule, Vec<NirFunction>, BTreeSet<String>) {
     let mut module = parse_nuis_module(source).unwrap();
     let layouts = control_values::layouts(&module);

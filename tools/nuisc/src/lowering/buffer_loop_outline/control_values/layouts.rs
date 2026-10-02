@@ -1,13 +1,13 @@
 use super::*;
 
 // Value selection and loop carry admission share expression rules, not authority.
-// FlatLayouts remains the independent flat-scalar profile with i64-word backedges.
+// CarryLayouts admits only proven pure trees, transported with i64-word backedges.
 pub(crate) trait ValueLayouts {
     fn scalar(&self, name: &str) -> bool;
     fn fields(&self, name: &str) -> Option<impl ExactSizeIterator<Item = (&str, NirTypeRef)>>;
 }
 
-impl ValueLayouts for FlatLayouts {
+impl ValueLayouts for CarryLayouts {
     fn scalar(&self, name: &str) -> bool {
         matches!(name, "i64" | "bool" | "i32" | "f32" | "f64")
     }
@@ -34,6 +34,10 @@ impl ValueLayouts for TypedLayouts {
 }
 
 impl TypedLayouts {
+    pub(super) fn into_carries(self) -> CarryLayouts {
+        self.0
+    }
+
     pub(in crate::lowering::buffer_loop_outline) fn collect(module: &NirModule) -> Self {
         let mut layouts = Self::default();
         let mut definitions = BTreeMap::new();

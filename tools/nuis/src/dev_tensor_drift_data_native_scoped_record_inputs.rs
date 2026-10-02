@@ -2,12 +2,266 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-normalization-proof",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_record_words.rs",
+        required_patterns: &[
+            "pub(super) struct WordInput",
+            "pub(super) fn valid_argument",
+            "scalar_carries::encode(&ty, source_value(&path[0], &leaf))",
+            "value == &reconstruction",
+            "inherited.contains(name) && origins.get(name) != Some(&origin)",
+            "inherited.contains(name) && origins.contains_key(name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-child-lexical-version-proof",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_record_words.rs",
+        required_patterns: &[
+            "function.body[..=position]",
+            "rewrite_block(then_body, origins.clone(), visible.clone(), &visible)",
+            "rewrite_block(else_body, origins.clone(), visible.clone(), &visible)",
+            "rewrite_block(body, origins.clone(), visible.clone(), &visible)",
+            "inherited.contains(name) && origins.get(name) != Some(&origin)",
+            "inherited.contains(name) && origins.contains_key(name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-child-scope-regressions",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_record_scopes_tests.rs",
+        required_patterns: &[
+            "sparse_word_scopes_project_branch_local_aliases_without_sibling_leaks",
+            "sparse_word_scopes_keep_identity_versions_across_joins_and_loop_backedges",
+            "sparse_word_scopes_materialize_outer_writes_and_reject_unproven_versions",
+            "sparse_word_scopes_preserve_nonidentity_joins_and_loop_versions",
+            "sparse_word_scopes_keep_computed_child_initializers_and_outer_parameter_writes",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-child-native-execution",
+        path: "tools/nuisc/tests/native_application_bridge/sparse_typed_record_carries.rs",
+        required_patterns: &[
+            "typed_sparse_branch_snapshots_keep_current_words_and_complete_64_word_state",
+            "for width in [9, 64]",
+            "[0_u64, 1, 2, 3, 4]",
+            "typed_record_inputs::check_flattened",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-child-trap-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "sparse_branch_typed_snapshots_execute_and_preserve_branch_local_traps",
+            "sparse_branch_snapshot_trap",
+            "sparse_branch_lazy_{limit}",
+            "Some(201)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-child-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/sparse_typed_records.rs",
+        required_patterns: &[
+            "native_sparse_branch_snapshots_restore_current_versions_without_sources",
+            "value += 2.0",
+            "gain += 1.0",
+            "materialize-artifact",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-all-caller-transaction",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs",
+        required_patterns: &[
+            "record_words::normalize",
+            "plan.word_inputs = word_inputs",
+            "valid_caller(&module.functions[*i].body, &name, &plan)",
+            "words.valid_argument(arg)",
+            "record_words::project(&arg, &field.path)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-backedge-slot-proof",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
+        required_patterns: &[
+            "binding.fields.iter().position(|(path, ty)|",
+            "arg == &mixed_words::source_path_word(binding.name, path, ty)",
+            "pub(super) fn needs_separate_seeds",
+            "pub(super) fn lower_initial_seeds",
+            "duplicate seed coverage",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-negative-and-shape-regressions",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_record_words_tests.rs",
+        required_patterns: &[
+            "sparse_typed_record_inputs_keep_full_seeds_and_exact_leaf_backedges",
+            "sparse_typed_record_inputs_support_flat_shapes_and_unread_complete_states",
+            "sparse_typed_record_projection_preserves_subrecord_aliases_and_initializer_traps",
+            "sparse_word_projection_requires_canonical_seeds_at_every_caller",
+            "sparse_word_projection_preserves_loop_writes_and_rejects_unproven_inputs",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-seed-coverage-rejections",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/nested_record_words_tests.rs",
+        required_patterns: &[
+            "sparse_nested_word_seeds_match_typed_paths_and_reject_duplicate_coverage",
+            "duplicate seed coverage",
+            "binding.record_seed(0)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-source-execution",
+        path: "tools/nuisc/tests/native_application_bridge/sparse_typed_record_carries.rs",
+        required_patterns: &[
+            "typed_sparse_record_carries_preserve_full_zero_trip_state_and_raw_leaf_bits",
+            "typed_sparse_record_carries_separate_64_seed_words_from_six_iteration_arguments",
+            "typed_sparse_record_carries_read_current_float_words_each_trip",
+            "typed_sparse_record_carries_can_omit_every_input_word_without_losing_zero_trip_state",
+            "assert_eq!(call.seeds.len(), width)",
+            "assert_eq!(call.operands.len(), 6)",
+            "typed_record_inputs::check_flattened",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-ordinary-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "sparse_typed_record_carries_execute_and_keep_unused_checked_work",
+            "sparse_typed_unused_field_trap",
+            "sparse_typed_zero_trip",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/sparse_typed_records.rs",
+        required_patterns: &[
+            "native_sparse_typed_record_inputs_restore_complete_seeds_without_sources",
+            "compile_cache: hit",
+            "materialize-artifact",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-sparse-typed-input-documented-boundary",
+        path: "docs/reference/nuis-native-scalar-value-returns-v1.md",
+        required_patterns: &[
+            "## Sparse Typed Inputs",
+            "Normalization is transactional across all callers",
+            "9/64 seed words with six iteration arguments",
+            "reduce nested return snapshot carries while preserving observed exits",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-control-authority-boundary",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_values/typed_tests.rs",
+        required_patterns: &[
+            "nested_value_admission_does_not_grant_nonloop_control_outlining_authority",
+            "scalar_helpers::control_roots",
+            "assert!(catalog[\"wrapped\"].may_loop)",
+            "assert!(!roots.contains(name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-pure-shape-proof",
+        path: "tools/nuisc/src/lowering/scalar_record_shape.rs",
+        required_patterns: &[
+            "pub(super) struct Shape",
+            "depth >= 64",
+            "4096.max(flat_width + 1)",
+            "active.insert(ty.name.clone())",
+            "pub fn leaves(",
+            "pub fn reconstruct(",
+            "pub fn values",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-shape-boundaries",
+        path: "tools/nuisc/src/lowering/scalar_record_shape_tests.rs",
+        required_patterns: &[
+            "pure_record_shapes_keep_segment_paths_and_exact_nested_nominal_constructors",
+            "pure_record_shapes_reject_resources_cycles_and_qualified_types_transitively",
+            "pure_record_shapes_bound_recursive_expansion_without_restricting_explicit_flat_width",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-scoped-word-maps",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
+        required_patterns: &[
+            "fields: Vec<(Vec<String>, NirTypeRef)>",
+            "tree.values(value)?",
+            "path.len() != 1 || !is_scalar_i64(ty)",
+            "mixed_words::rebuild(",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-exact-map-rejections",
+        path: "tools/nuisc/src/lowering/scoped_loop_lowering/nested_record_words_tests.rs",
+        required_patterns: &[
+            "nested_record_word_maps_require_exact_segment_paths_and_typed_codecs",
+            "nested_record_backedges_reject_child_nominal_slot_and_codec_drift",
+            "nested_i64_maps_still_require_complete_path_seeds",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-total-guard-defaults",
+        path: "tools/nuisc/src/lowering/direct_calls/mixed_guard_seed_tests.rs",
+        required_patterns: &[
+            "nested_guard_defaults_require_a_pure_parameter_tree_not_just_a_pure_leaf",
+            "sibling_resource",
+            "wrong_path",
+            "wrong_codec",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-source-execution",
+        path: "tools/nuisc/tests/native_application_bridge/nested_scoped_record_carries.rs",
+        required_patterns: &[
+            "typed_nested_scoped_record_carries_preserve_paths_and_all_scalar_bits",
+            "typed_nested_scoped_record_carries_compose_nested_loops_and_snapshots",
+            "typed_nested_scoped_record_carries_keep_early_returns_and_dead_traps_lazy",
+            "typed_nested_i64_record_carries_do_not_alias_equal_leaf_names",
+            "typed_nested_record_carries_keep_wide_private_words_allocation_free",
+            "typed_nested_record_carries_keep_selected_traps_and_shared_budgets_atomic",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-ordinary-execution",
+        path: "tools/nuisc/tests/control_flow_syntax_native/scoped_field_seeds.rs",
+        required_patterns: &[
+            "nested_record_carries_preserve_native_paths_snapshots_breaks_and_lazy_traps",
+            "scoped_nested_record_carries.ns",
+            "nested_record_words_trap",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-source-free-workflow",
+        path: "tools/nuis/tests/native_session_workflow/scoped_record_inputs.rs",
+        required_patterns: &[
+            "native_nested_record_carries_cache_and_restore_exact_paths_without_sources",
+            "nested_fixture::source()",
+            "compile_cache: hit",
+            "materialize-artifact",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-record-documented-contract",
+        path: "docs/reference/nuis-native-scalar-value-returns-v1.md",
+        required_patterns: &[
+            "## Nested Scoped Carries",
+            "ordered field segments",
+            "Nested all-i64 records also require complete maps",
+            "resource-bearing siblings remain rejected",
+            "reduce nested return snapshot carries while preserving observed exits",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "native-f64-record-word-map-proof",
         path: "tools/nuisc/src/lowering/scoped_loop_lowering/mixed_record_words.rs",
         required_patterns: &[
             "PackF64Word",
             "UnpackF64Word",
-            "source_word(binding.name, field, ty)",
+            "source_path_word(binding.name, path, ty)",
             "\"unpack_f64_word\"",
         ],
     },
@@ -106,7 +360,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "PackF32Word",
             "UnpackF32Word",
-            "source_word(binding.name, field, ty)",
+            "source_path_word(binding.name, path, ty)",
             "\"unpack_f32_word\"",
         ],
     },
@@ -233,7 +487,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "generated.contains(&function.name)",
             "scoped_record_seeds(module, &scoped)",
-            "plan.supports_scoped(function, seeds)",
+            "direct_calls::CapturePlan::for_scoped(",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -274,6 +528,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "typed_scoped_record_inputs_preserve_full_seeds_and_per_trip_updates",
             "typed_scoped_record_inputs_keep_break_mapping_independent_of_record_width",
             "typed_scoped_record_inputs_preserve_independent_boolean_carry_and_break",
+            "check(62, true, true)",
+            "check(63, true, false)",
+            "[(61, true), (62, false)]",
+            "must exercise actual scoped record transport",
             "typed_scoped_record_inputs_keep_iteration_failures_and_entry_limits_atomic",
             "typed_scoped_record_inputs_reject_descriptor_and_parameter_drift",
             "typed_scoped_record_branch_helpers_transport_whole_inputs_without_widening_bounds",
@@ -356,7 +614,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "flat_fields(&param.ty, definitions)",
             "type_name == &param.ty.name",
-            "source_word(binding.name, field, ty)",
+            "source_path_word(binding.name, path, ty)",
             "CastBoolToI64",
             "CastI64ToBool",
             "(\"loop_bool_result\", \"cast_i64_to_bool\")",
@@ -419,7 +677,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "CastI32ToI64",
             "CastI64ToI32",
-            "source_word(binding.name, field, ty)",
+            "source_path_word(binding.name, path, ty)",
             "(\"loop_i32_result\", \"cast_i64_to_i32\")",
         ],
     },

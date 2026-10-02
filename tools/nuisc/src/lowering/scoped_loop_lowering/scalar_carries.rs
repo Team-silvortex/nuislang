@@ -1,4 +1,5 @@
 use super::*;
+use crate::lowering::scalar_record_shape::Shape;
 use nuis_semantics::model::NirParam;
 
 #[path = "mixed_record_words.rs"]
@@ -7,7 +8,8 @@ mod mixed_words;
 pub(super) struct Projection<'a> {
     pub name: &'a str,
     pub ty: &'a NirTypeRef,
-    fields: Vec<(String, NirTypeRef)>,
+    fields: Vec<(Vec<String>, NirTypeRef)>,
+    shape: Option<Shape>,
 }
 
 impl Projection<'_> {
@@ -62,6 +64,7 @@ pub(super) fn projected_bindings<'a>(
         if name == result || bindings.iter().any(|binding| binding.name == name) {
             return None;
         }
+        let mut shape = None;
         let fields = if is_scalar_i64(ty) {
             if !projected_word(value, result, slot) {
                 return None;
@@ -73,29 +76,28 @@ pub(super) fn projected_bindings<'a>(
             }
             Vec::new()
         } else {
-            let fields = mixed_words::fields(ty, definitions)?;
-            let NirExpr::StructLiteral {
-                type_name,
-                type_args,
-                fields: values,
-            } = value
-            else {
-                return None;
-            };
-            if type_name != &ty.name
-                || !type_args.is_empty()
-                || values.len() != fields.len()
-                || !values.iter().zip(&fields).enumerate().all(
-                    |(offset, ((name, value), (field, ty)))| {
-                        name == field && mixed_words::projected(value, ty, result, slot + offset)
-                    },
-                )
+            let tree = Shape::from_definitions(ty, definitions)?;
+            let fields = tree.leaves();
+            let values = tree.values(value)?;
+            if !values
+                .iter()
+                .zip(&fields)
+                .enumerate()
+                .all(|(offset, (value, (_, ty)))| {
+                    mixed_words::projected(value, ty, result, slot + offset)
+                })
             {
                 return None;
             }
+            shape = Some(tree);
             fields
         };
-        let projection = Projection { name, ty, fields };
+        let projection = Projection {
+            name,
+            ty,
+            fields,
+            shape,
+        };
         slot += projection.width();
         bindings.push(projection);
     }
@@ -126,7 +128,10 @@ fn is_f64(ty: &NirTypeRef) -> bool {
 }
 
 fn has_encoded_fields(binding: &Projection<'_>) -> bool {
-    binding.fields.iter().any(|(_, ty)| !is_scalar_i64(ty))
+    binding
+        .fields
+        .iter()
+        .any(|(path, ty)| path.len() != 1 || !is_scalar_i64(ty))
 }
 
 fn seed_range(
@@ -136,7 +141,19 @@ fn seed_range(
     definitions: &BTreeMap<&str, &NirStructDef>,
 ) -> Option<(usize, usize)> {
     if has_encoded_fields(binding) {
-        return mixed_words::seed(binding, param, arg, definitions).then_some((0, binding.width()));
+        if mixed_words::seed(binding, param, arg, definitions) {
+            return Some((0, binding.width()));
+        }
+        // A projected word still refers to the current typed backedge slot.
+        // Complete initial storage is independent of the iteration's demand.
+        return is_scalar_i64(&param.ty)
+            .then(|| {
+                binding.fields.iter().position(|(path, ty)| {
+                    arg == &mixed_words::source_path_word(binding.name, path, ty)
+                })
+            })
+            .flatten()
+            .map(|slot| (slot, 1));
     }
     let whole =
         if is_bool(binding.ty) || is_i32(binding.ty) || is_f32(binding.ty) || is_f64(binding.ty) {
@@ -161,7 +178,7 @@ fn seed_range(
     binding
         .fields
         .iter()
-        .position(|(name, _)| name == field)
+        .position(|(path, _)| path.as_slice() == std::slice::from_ref(field))
         .map(|index| (index, 1))
 }
 
@@ -366,7 +383,7 @@ pub(super) fn lower_initial_seeds(
         } else if has_encoded_fields(binding) {
             for (field, ty) in &binding.fields {
                 seeds.push(lower_expr(
-                    &mixed_words::source_word(binding.name, field, ty),
+                    &mixed_words::source_path_word(binding.name, field, ty),
                     state,
                     bindings,
                 )?);
@@ -547,29 +564,12 @@ pub(super) fn bind_result(
         } else if binding.fields.is_empty() {
             words[0].clone()
         } else {
-            // New value nodes preserve pre-loop snapshots, including on zero trips.
-            let name = next_name(state, "loop_value_result");
-            let mut args = vec![binding.ty.name.clone()];
-            args.extend(
-                binding
-                    .fields
-                    .iter()
-                    .zip(&words)
-                    .map(|((field, _), word)| format!("{field}={word}")),
-            );
-            state.yir.nodes.push(Node {
-                name: name.clone(),
-                resource: "cpu0".to_owned(),
-                op: Operation {
-                    module: "cpu".to_owned(),
-                    instruction: "struct".to_owned(),
-                    args,
-                },
-            });
-            for word in words {
-                push_dep_edges(state, &word, &name);
-            }
-            name
+            // New nominal tree nodes preserve pre-loop snapshots, including on zero trips.
+            mixed_words::rebuild(
+                binding.shape.as_ref().expect("record projection"),
+                &mut words.into_iter(),
+                state,
+            )
         };
         bindings.insert(binding.name.to_owned(), value);
         const_bindings.remove(binding.name);

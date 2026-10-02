@@ -196,7 +196,7 @@ fn is_pass_through_guard_seed(
             && direct_call_scalar_kind(&param.ty) == Some(kind)))
     };
     let scalar_seed = |value: &NirExpr, kind| {
-        parameter(value, kind) || is_flat_parameter_field(function, value, structs, kind)
+        parameter(value, kind) || is_parameter_field(function, value, structs, kind)
     };
     let word_seed = |value: &NirExpr| {
         scalar_seed(value, DirectCallScalarKind::I64)
@@ -244,47 +244,46 @@ fn is_pass_through_guard_seed(
             })
 }
 
-fn is_flat_parameter_field(
+fn is_parameter_field(
     function: &NirFunction,
     value: &NirExpr,
     structs: &BTreeMap<&str, &NirStructDef>,
     kind: DirectCallScalarKind,
 ) -> bool {
-    let NirExpr::FieldAccess { base, field } = value else {
-        return false;
-    };
-    let NirExpr::Var(name) = base.as_ref() else {
+    let mut path = Vec::new();
+    let mut base = value;
+    while let NirExpr::FieldAccess {
+        base: parent,
+        field,
+    } = base
+    {
+        if path.len() >= 64 {
+            return false;
+        }
+        path.push(field);
+        base = parent;
+    }
+    let NirExpr::Var(name) = base else {
         return false;
     };
     let Some(param) = function.params.iter().find(|param| &param.name == name) else {
         return false;
     };
-    let Some(definition) = structs.get(param.ty.name.as_str()) else {
+    let Some(shape) =
+        crate::lowering::scalar_record_shape::Shape::from_definitions(&param.ty, structs)
+    else {
         return false;
     };
-    // A captured flat-value projection is total. Calls, nested records and
-    // resource-bearing fields must never become speculative guard defaults.
-    !param.ty.is_ref
-        && !param.ty.is_optional
-        && param.ty.generic_args.is_empty()
-        && definition.generic_params.is_empty()
-        && definition.where_bounds.is_empty()
-        && definition
-            .fields
-            .iter()
-            .any(|entry| &entry.name == field && direct_call_scalar_kind(&entry.ty) == Some(kind))
-        && definition.fields.iter().all(|entry| {
-            matches!(
-                direct_call_scalar_kind(&entry.ty),
-                Some(
-                    DirectCallScalarKind::I64
-                        | DirectCallScalarKind::Bool
-                        | DirectCallScalarKind::I32
-                        | DirectCallScalarKind::F32
-                        | DirectCallScalarKind::F64
-                )
-            )
-        })
+    // Prove the entire pure tree, not just the accessed path: a resource-bearing
+    // sibling must not gain authority to cross a speculative guard boundary.
+    let mut current = &shape;
+    for field in path.into_iter().rev() {
+        let Some((_, child)) = current.fields.iter().find(|(name, _)| name == field) else {
+            return false;
+        };
+        current = child;
+    }
+    direct_call_scalar_kind(&current.ty) == Some(kind)
 }
 
 #[cfg(test)]

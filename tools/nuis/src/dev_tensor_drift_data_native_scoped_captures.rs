@@ -8,7 +8,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "protected_inputs(",
             "branches::collect_bindings(body, &mut written)",
             "protected.entry(callee.clone()).or_default()",
-            "written.contains(&path[0]) && !carried.contains_key(&index)",
+            "if !carried.contains_key(&index)",
+            "&& access(arg).is_none_or(|path| written.contains(&path[0]))",
             "inputs.protected.insert(index)",
             "inputs.carried.extend(carried.keys())",
         ],
@@ -72,7 +73,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/scoped_loop_lowering/scalar_carries.rs",
         required_patterns: &[
             "fn seed_range",
-            "position(|(name, _)| name == field)",
+            "position(|(path, _)| path.as_slice() == std::slice::from_ref(field))",
             "seed_range(binding, param, arg, &state.struct_defs).is_some()",
             "function.params.len() != args.len()",
             "std::mem::replace(slot, true)",

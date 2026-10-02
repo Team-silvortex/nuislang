@@ -7,6 +7,8 @@ mod aliases;
 mod bindings;
 #[path = "capture_joins.rs"]
 mod joins;
+#[path = "capture_record_words.rs"]
+mod record_words;
 #[path = "capture_scoped.rs"]
 mod scoped_inputs;
 #[path = "capture_snapshot_scopes.rs"]
@@ -32,6 +34,7 @@ enum Input {
 struct Plan {
     inputs: Vec<Input>,
     replacements: BTreeMap<Vec<String>, String>,
+    word_inputs: BTreeMap<usize, record_words::WordInput>,
 }
 
 #[derive(Default)]
@@ -94,6 +97,13 @@ pub(super) fn project(
         // Normalize only a candidate copy. A whole use or an unrewritable caller
         // must keep both the original signature and its original body.
         let mut candidate = module.functions[index].clone();
+        let definitions = module
+            .structs
+            .iter()
+            .map(|d| (d.name.as_str(), d))
+            .collect();
+        let word_inputs =
+            record_words::normalize(&mut candidate, protected.get(&name), &definitions, layouts);
         if !scoped.contains(&name) {
             bindings::normalize(&mut candidate);
             joins::normalize(&mut candidate, layouts);
@@ -104,9 +114,10 @@ pub(super) fn project(
         // Scoped helpers retain the outliner's control identities, including
         // nested break flags. Only immutable input-version aliases may disappear.
         aliases::normalize(&mut candidate, layouts);
-        let Some(plan) = plan(&candidate, protected.get(&name), layouts) else {
+        let Some(mut plan) = plan(&candidate, protected.get(&name), layouts) else {
             continue;
         };
+        plan.word_inputs = word_inputs;
         let callers = call_graph
             .iter()
             .enumerate()
@@ -162,11 +173,17 @@ pub(super) fn project(
                     .inputs
                     .iter()
                     .zip(std::mem::take(args))
-                    .flat_map(|(input, arg)| match input {
+                    .enumerate()
+                    .flat_map(|(index, (input, arg))| match input {
                         Input::Keep(_) => vec![arg],
                         Input::Fields(fields) => fields
                             .iter()
                             .map(|field| {
+                                if plan.word_inputs.contains_key(&index) {
+                                    return record_words::project(&arg, &field.path)
+                                        .expect("preflighted word field")
+                                        .clone();
+                                }
                                 field.path.iter().fold(arg.clone(), |base, field| {
                                     NirExpr::FieldAccess {
                                         base: Box::new(base),
@@ -209,9 +226,18 @@ fn valid_caller(body: &[NirStmt], name: &str, plan: &Plan) -> bool {
                 // Only ready immutable value paths may be duplicated or dropped.
                 // Keep scalar/predicate arguments exactly once, in source order.
                 valid &= args.len() == plan.inputs.len()
-                    && plan.inputs.iter().zip(args).all(|(input, arg)| {
-                        matches!(input, Input::Keep(_)) || access(arg).is_some()
-                    });
+                    && plan
+                        .inputs
+                        .iter()
+                        .zip(args)
+                        .enumerate()
+                        .all(|(index, (input, arg))| {
+                            if let Some(words) = plan.word_inputs.get(&index) {
+                                words.valid_argument(arg)
+                            } else {
+                                matches!(input, Input::Keep(_)) || access(arg).is_some()
+                            }
+                        });
             }
         }
         true
@@ -304,6 +330,7 @@ fn plan(
     changed.then_some(Plan {
         inputs,
         replacements,
+        word_inputs: BTreeMap::new(),
     })
 }
 

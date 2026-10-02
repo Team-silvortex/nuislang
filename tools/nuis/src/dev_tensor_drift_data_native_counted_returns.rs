@@ -29,7 +29,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline.rs",
         required_patterns: &[
             "if control_catalog.contains_key(&function.name)",
-            "control_loops::returns::normalize(function, &layouts)",
+            "control_loops::returns::prepare(function, &layouts, &control_catalog, &names)",
+            "return_signals.insert(function.name.clone(), plan.signal)",
             "admitted counted return flow",
             "scalar_control::outline(",
         ],

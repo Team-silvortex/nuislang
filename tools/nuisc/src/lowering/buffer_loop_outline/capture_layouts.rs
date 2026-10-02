@@ -35,14 +35,17 @@ pub(super) fn collect(
                     }));
                 }
             }
-            direct_calls::CapturePlan::for_generated(leaves, function, module)
-                .filter(|plan| {
-                    !scoped.contains(&function.name)
-                        || scoped_inputs
-                            .get(&function.name)
-                            .is_some_and(|seeds| plan.supports_scoped(function, seeds))
-                })
-                .map(|plan| (function.name.clone(), plan))
+            let plan = if scoped.contains(&function.name) {
+                direct_calls::CapturePlan::for_scoped(
+                    leaves,
+                    function,
+                    module,
+                    scoped_inputs.get(&function.name)?,
+                )
+            } else {
+                direct_calls::CapturePlan::for_generated(leaves, function, module)
+            };
+            plan.map(|plan| (function.name.clone(), plan))
         })
         .collect()
 }

@@ -14,7 +14,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-leading-exit-normalization",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_flow.rs",
         required_patterns: &[
-            "normalize_with_step(effects, scope, None, true)",
+            "normalize_with_step(effects, scope, None, true, None)",
             "bounded && depth >= 32",
             "depth + usize::from(bounded)",
             "A child loop owns its control scope",

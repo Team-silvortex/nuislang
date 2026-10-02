@@ -9,7 +9,7 @@ pub(super) fn outline(
     helpers: &mut Vec<NirFunction>,
     guarded: &mut BTreeSet<String>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
 ) {
     let mut scope = function
         .params

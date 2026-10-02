@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.4`](docs/versioning/nuis-beta-0.15.4-patch.md) (2026-09-27).
+[`beta-0.15.5`](docs/versioning/nuis-beta-0.15.5-patch.md) (2026-10-02).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -346,7 +346,24 @@ Generated scoped bool/i32/i64/f32/f64 record carries now use checked private wor
 typed reconstruction, including zero trips, snapshots and loop exits. The YIR loop
 contract and source/public/FFI signatures stay unchanged. Signed i32 fields retain
 sign extension, width-correct arithmetic and exact backedge decoding. F32/F64 fields use
-bit-preserving word packing, not numeric casts; nested carries remain separate. Earlier shared-codec round trips
+bit-preserving word packing, not numeric casts. Nested pure-scalar carries now retain exact
+field-segment seed/backedge maps and nominal reconstruction at every record level.
+Same-named leaves remain distinct; complete word maps include nested all-i64 trees.
+Sparse mixed/nested iteration inputs now retain complete initial storage while passing only
+proven typed leaf words. A 64-leaf state uses six iteration arguments in the bounded probe.
+Branch-local record snapshots and identity-preserving alias writes now retain explicit lexical/version proofs.
+Materialized outer joins now retain real assignments while backward field demand projects only needed input words.
+Changing nested-loop snapshots now retain zero-trip/header demand and nearest-loop break/continue targets through bounded fixed-point proof.
+Nested early returns now preserve current mixed snapshots and failure-atomic publication in native probes.
+Exact shared-budget success/failure and overlapping input/output checks retain real traps and canonical input validation.
+Admitted returns can reuse an exact, initialized mutable record after a second source-order check.
+Unobserved leading-loop exit indices no longer need a recovery carry; visible suffixes and generated helper outputs still do.
+Proven return-only loop exits now share the compiler-owned pending bit with the canonical break slot; ordinary breaks stay independent.
+Bounded per-write fixed points now prove invariant leaves across nested return loops; changing leaves share compact private typed records.
+Every original RHS still executes once, and whole-function revalidation can veto the rewrite.
+The return fixture executes 9/30/31/57/58/59/60/61/62/63/64-word states with outer N and inner N-1 carries.
+A changed outer tag still requires 65 slots at width 64 and rejects; native bounds, return signals, observed exits and resource boundaries are unchanged.
+Recursive shapes remain bounded. Earlier shared-codec round trips
 also passed with host clang at `-O0` and `-O2`. Neither this work nor
 the repository cleanup raises the persistent-session coordinate above its bounded `active/86`.
 Deep call/group nesting now reports a bounded parser diagnostic;

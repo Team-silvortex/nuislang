@@ -20,7 +20,7 @@ fn private_bool_transport_capture_does_not_widen_source_admission() {
         let mut inputs = BTreeSet::new();
         collect_inputs(&expr, &mut inputs);
         assert_eq!(inputs, BTreeSet::from([name.to_owned()]));
-        assert!(value_type(&expr, &scope, &ScalarHelpers::new(), &FlatLayouts::new()).is_none());
+        assert!(value_type(&expr, &scope, &ScalarHelpers::new(), &CarryLayouts::new()).is_none());
     }
 }
 
@@ -51,7 +51,7 @@ fn value_catalog_keeps_transitive_types_effects_cycles_and_buffer_admission_sepa
     let layouts = layouts(&module);
     assert_eq!(
         layouts.keys().map(String::as_str).collect::<Vec<_>>(),
-        ["Mixed", "Pair"]
+        ["Mixed", "Nested", "Pair"]
     );
     let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
     let keys = |catalog: &ScalarHelpers| catalog.keys().cloned().collect::<Vec<_>>();

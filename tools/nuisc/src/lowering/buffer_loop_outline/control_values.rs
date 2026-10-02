@@ -11,34 +11,12 @@ mod typed_tests;
 mod value_layouts;
 pub(super) use value_layouts::{TypedLayouts, ValueLayouts};
 
-pub(super) type FlatLayouts = BTreeMap<String, Vec<(String, NirTypeRef)>>;
+pub(super) type CarryLayouts = BTreeMap<String, Vec<(String, NirTypeRef)>>;
 
 // This is source-level pure-value normalization. Native slot/layout admission
 // remains a separate backend contract, not a compiler-wide ABI restriction.
-pub(super) fn layouts(module: &NirModule) -> FlatLayouts {
-    module
-        .structs
-        .iter()
-        .filter(|definition| {
-            definition.generic_params.is_empty()
-                && definition.where_bounds.is_empty()
-                && !definition.fields.is_empty()
-                && definition.fields.iter().all(|f| {
-                    matches!(f.ty.name.as_str(), "i64" | "bool" | "i32" | "f32" | "f64")
-                        && f.ty == scalar_type(&f.ty.name)
-                })
-        })
-        .map(|definition| {
-            (
-                definition.name.clone(),
-                definition
-                    .fields
-                    .iter()
-                    .map(|f| (f.name.clone(), f.ty.clone()))
-                    .collect(),
-            )
-        })
-        .collect()
+pub(super) fn layouts(module: &NirModule) -> CarryLayouts {
+    TypedLayouts::collect(module).into_carries()
 }
 
 pub(super) fn supported_type(ty: &NirTypeRef, layouts: &impl ValueLayouts) -> bool {

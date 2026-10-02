@@ -3,8 +3,8 @@
 This is the operational companion to the
 [beta-0.15 snapshot](nuis-beta-0.15.0-snapshot.md), anchored to
 `05951befc70d6a145e4978a3ff8909737e5c4fbb` (`beta-0.15.0`, 2026-09-24).
-The [beta-0.15.4 patch](nuis-beta-0.15.4-patch.md) records subsequent guarded branch
-record inputs, typed scoped carries and selected validation results.
+The [beta-0.15.5 patch](nuis-beta-0.15.5-patch.md) records subsequent nested records,
+sparse typed carries, bounded return invariants and selected validation results.
 Commands below are validation instructions, not blanket claims that every suite
 was rerun during documentation synchronization. Record the actual revision and
 worktree changes, platform, prerequisites, command, exit status and skip counts.
@@ -137,8 +137,9 @@ Verify flat/nested 1..64-leaf records and scalar bit patterns at both `-O0` and
 admission additionally requires the following source/native and restoration gates:
 
 ```sh
-CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --test native_application_bridge -- typed_record_inputs typed_record_guards typed_scoped_record_inputs typed_mixed_scoped_record_carries typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries wide_scoped_record typed_local_declared --test-threads=1
-CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuis --test native_session_workflow -- native_record_inputs_build_cache_and_restore_without_sources native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources native_branch_record_inputs_cache_and_restore_guarded_branches_without_sources native_mixed_record_carries_cache_and_restore_typed_maps_without_sources native_i32_record_carries_cache_and_restore_signed_maps_without_sources native_f32_record_carries_cache_and_restore_bit_maps_without_sources native_f64_record_carries_cache_and_restore_full_width_maps_without_sources --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --lib -- return_invariant return_signal return_storage continuation_reads index_recovery scalar_branch_inputs materialized_word_loop_returns capture_params --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --test native_application_bridge -- typed_record_inputs typed_record_guards typed_scoped_record_inputs typed_mixed_scoped_record_carries typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries typed_nested_ typed_sparse_record_carries typed_sparse_branch_snapshots typed_materialized_join_snapshots typed_materialized_loop_snapshots typed_sparse_nested_ wide_scoped_record typed_local_declared --test-threads=1
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuis --test native_session_workflow -- native_record_inputs_build_cache_and_restore_without_sources native_scoped_record_inputs_cache_and_restore_the_full_mapping_without_sources native_branch_record_inputs_cache_and_restore_guarded_branches_without_sources native_mixed_record_carries_cache_and_restore_typed_maps_without_sources native_i32_record_carries_cache_and_restore_signed_maps_without_sources native_f32_record_carries_cache_and_restore_bit_maps_without_sources native_f64_record_carries_cache_and_restore_full_width_maps_without_sources native_nested_record_carries_cache_and_restore_exact_paths_without_sources native_sparse_typed_record_inputs_restore_complete_seeds_without_sources native_sparse_branch_snapshots_restore_current_versions_without_sources native_materialized_join_snapshots_restore_current_versions_without_sources native_materialized_loop_snapshots_restore_nested_versions_without_sources native_materialized_nested_returns_restore_complete_state_without_sources native_full_width_nested_returns_restore_complete_state_without_sources --test-threads=1
 ```
 
 The generated 64-field-plus-predicate case must run, while a source-declared 65-leaf
@@ -146,14 +147,30 @@ namesake still rejects. Keep bounded nominal layout, exact kind and unique param
 binding checks, selected traps and failure sentinels. Scoped flat-i64 record inputs
 require complete seed proofs and exact per-trip maps. Wide generated branch inputs
 must retain one-time predicates and skip unselected calls/constructor arithmetic.
-Mixed/nested carries, task thunks and resources remain separate; callback/public/FFI ABI is unchanged.
+Nested pure-scalar carries require complete field-segment seed/backedge maps and exact child nominal types.
+Sparse mixed/nested inputs retain complete seeds, exact typed leaf maps and child-local/identity-version proofs.
+Materialized outer joins retain real assignments, checked operands and fallthrough demand. Changing nested-loop snapshots
+require converged header demand, zero-trip state and nearest-loop break/continue targets. Nested returns must keep 9/30/31/57/58/59/60/61/62/63/64-word
+state, exact shared budgets, canonical rejection and failure-atomic overlapping output. Width 64 fits outer 64/inner 63, but a changed outer tag must still
+reject 65 outer private carries. Exact initialized record reuse must retain original source admission and transactional revalidation.
+Nested return-owned loops may promote only leaves preserved at every write, using bounded fixed points that include zero trips and intermediate child exits. Keep original RHS evaluation, private compact record seed maps, nominal reconstruction and proof fallback; scoped calls must not consume ordinary-call boolean packing. Ordinary child-exit rewrites that fail ordered-read revalidation must retain the old body.
+Dead leading-index recovery requires bounded suffix/generated-output proof; unknown syntax or exhausted work keeps recovery.
+Direct/outer suffixes, branch-helper outputs and parent backedges must retain observed exit indices. Finer carry liveness, task thunks and resources remain separate.
+Only compiler-minted return signals with bounded return-owned exit proof may share a canonical break slot. Keep same-loop ordinary breaks independent, child exits local, mixed continues separate and payload evaluation before publication. Retain 300 differential source cases, 36 native cases and both flattened/whole-record boundary transport.
+Callback/public/FFI ABI is unchanged.
 Source names cannot grant authority and scalar/bool/break seeds stay required. Reject ambiguous or computed maps,
-unresolved fallthrough joins and nested-loop writes without partially mutating the
+unresolved fallthrough joins and exhausted nested-loop demand proofs without partially mutating the
 candidate. Check 3/7/64-slot state with two/three arguments, multiple records, break/continue/bool identities,
 ordinary native results and initializer/second-trip traps, plus native lifecycle
 arity inspection and byte-identical source-free restoration.
 Build/cache/tamper and source-free restoration must keep exact
 artifact identity without interpreter fallback for a selected native failure.
+
+Sparse mixed/nested compiler proof gates:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -j1 -p nuisc --lib -- record_words::tests sparse_nested_word_seeds materialized_record_demand --test-threads=1
+```
 
 ## Provider And Migration Boundaries
 

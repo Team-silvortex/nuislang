@@ -3,6 +3,9 @@ use super::*;
 #[path = "../../../nuisc/tests/native_application_bridge/scoped_record_fixture.rs"]
 mod fixture;
 
+#[path = "../../../nuisc/tests/native_application_bridge/nested_record_fixture.rs"]
+mod nested_fixture;
+
 #[derive(Clone, Copy)]
 enum Shape {
     Scoped,
@@ -11,17 +14,19 @@ enum Shape {
     Signed,
     Float,
     Double,
+    Nested,
 }
 
 fn verify_runs(project: &Project, output: &Path, shape: Shape) -> Vec<Vec<String>> {
     let branching = matches!(shape, Shape::Branch);
     let mixed = matches!(
         shape,
-        Shape::Mixed | Shape::Signed | Shape::Float | Shape::Double
+        Shape::Mixed | Shape::Signed | Shape::Float | Shape::Double | Shape::Nested
     );
     let signed = matches!(shape, Shape::Signed);
     let float = matches!(shape, Shape::Float);
     let double = matches!(shape, Shape::Double);
+    let nested = matches!(shape, Shape::Nested);
     [-3_i64, 0, 5]
         .into_iter()
         .map(|seed| {
@@ -56,6 +61,11 @@ fn verify_runs(project: &Project, output: &Path, shape: Shape) -> Vec<Vec<String
             if double {
                 words[62] = (-1.5_f64).to_bits() as i64;
             }
+            if nested {
+                words[60] = (2147483646_i64 + seed) as i32 as i64;
+                words[61] = i64::from(1.5_f32.to_bits());
+                words[62] = (-1.5_f64).to_bits() as i64;
+            }
             let expected = ["open", "event", "event", "close"]
                 .into_iter()
                 .map(|phase| {
@@ -69,13 +79,13 @@ fn verify_runs(project: &Project, output: &Path, shape: Shape) -> Vec<Vec<String
                         for (index, word) in words.iter_mut().enumerate() {
                             if mixed && index == 63 {
                                 *word ^= trips % 2;
-                            } else if signed && index == 62 {
+                            } else if (signed && index == 62) || (nested && index == 60) {
                                 *word = (*word as i32).wrapping_add(delta as i32) as i64;
-                            } else if float && index == 62 {
+                            } else if (float && index == 62) || (nested && index == 61) {
                                 *word = i64::from(
                                     (f32::from_bits(*word as u32) + delta as f32 * 0.5).to_bits(),
                                 );
-                            } else if double && index == 62 {
+                            } else if (double || nested) && index == 62 {
                                 *word = (f64::from_bits(*word as u64) + delta as f64 * 0.5)
                                     .to_bits() as i64;
                             } else {
@@ -90,20 +100,29 @@ fn verify_runs(project: &Project, output: &Path, shape: Shape) -> Vec<Vec<String
                         .iter()
                         .enumerate()
                         .map(|(i, value)| {
+                            let field = if nested { i % 32 } else { i };
                             if mixed && i == 63 {
-                                format!("f{i}: {}", *value != 0)
-                            } else if signed && i == 62 {
-                                format!("f{i}: {value}i32")
-                            } else if float && i == 62 {
-                                format!("f{i}: {}f32", f32::from_bits(*value as u32))
-                            } else if double && i == 62 {
-                                format!("f{i}: {}f64", f64::from_bits(*value as u64))
+                                format!("f{field}: {}", *value != 0)
+                            } else if (signed && i == 62) || (nested && i == 60) {
+                                format!("f{field}: {value}i32")
+                            } else if (float && i == 62) || (nested && i == 61) {
+                                format!("f{field}: {}f32", f32::from_bits(*value as u32))
+                            } else if (double || nested) && i == 62 {
+                                format!("f{field}: {}f64", f64::from_bits(*value as u64))
                             } else {
-                                format!("f{i}: {value}")
+                                format!("f{field}: {value}")
                             }
                         })
-                        .collect::<Vec<_>>()
-                        .join(", ");
+                        .collect::<Vec<_>>();
+                    let fields = if nested {
+                        format!(
+                            "left: Left{{{}}}, right: Right{{{}}}",
+                            fields[..32].join(", "),
+                            fields[32..].join(", ")
+                        )
+                    } else {
+                        fields.join(", ")
+                    };
                     format!("{phase}:State{{{fields}}}")
                 })
                 .collect::<Vec<_>>();
@@ -143,6 +162,11 @@ fn native_f64_record_carries_cache_and_restore_full_width_maps_without_sources()
     check(Shape::Double);
 }
 
+#[test]
+fn native_nested_record_carries_cache_and_restore_exact_paths_without_sources() {
+    check(Shape::Nested);
+}
+
 fn check(shape: Shape) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
@@ -178,6 +202,9 @@ fn check(shape: Shape) {
             .replace("f62: i64", "f62: f64")
             .replace("f62: seed + 62", "f62: -1.5")
             .replace("f62: value.f62 + 1", "f62: value.f62 + 0.5");
+    }
+    if matches!(shape, Shape::Nested) {
+        source = nested_fixture::source();
     }
     let project = Project::new(&source);
     project.build(None);

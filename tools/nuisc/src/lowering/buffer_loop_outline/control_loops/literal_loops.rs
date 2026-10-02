@@ -6,7 +6,7 @@ pub(super) fn validate(
     locals: &mut Locals,
     updates: &BTreeSet<String>,
     catalog: &ScalarHelpers,
-    layouts: &control_values::FlatLayouts,
+    layouts: &control_values::CarryLayouts,
     depth: usize,
 ) -> Option<()> {
     let iteration = induction::parse(condition, body)?;

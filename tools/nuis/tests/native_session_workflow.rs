@@ -17,6 +17,8 @@ mod loop_work;
 mod record_inputs;
 #[path = "native_session_workflow/scoped_record_inputs.rs"]
 mod scoped_record_inputs;
+#[path = "native_session_workflow/sparse_typed_records.rs"]
+mod sparse_typed_records;
 
 const SOURCE: &str = include_str!("../../nuisc/tests/native_application_bridge/multi_loops.ns");
 const BREAK_SOURCE: &str =

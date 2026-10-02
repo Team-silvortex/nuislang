@@ -6,7 +6,7 @@ mod tests;
 
 #[cfg(test)]
 #[path = "capture_scoped_carries_tests.rs"]
-mod carry_tests;
+pub(super) mod carry_tests;
 
 #[cfg(test)]
 #[path = "capture_scoped_elision_tests.rs"]
@@ -19,7 +19,7 @@ pub(super) struct Inputs {
     pub(super) elidable: BTreeMap<usize, scoped_loop_lowering::RecordSeed>,
 }
 
-// Only an exact flat record reconstruction grants field-mapped backedge inputs.
+// Only an exact typed record reconstruction grants field-mapped backedge inputs.
 // Other loop-written arguments retain induction/carry/break seed identities.
 pub(super) fn protected_inputs(
     module: &NirModule,
@@ -81,9 +81,9 @@ pub(super) fn protected_inputs(
                             inputs.elidable = carried.clone();
                         }
                         for (index, arg) in args.iter().enumerate() {
-                            if access(arg).is_none_or(|path| {
-                                written.contains(&path[0]) && !carried.contains_key(&index)
-                            }) {
+                            if !carried.contains_key(&index)
+                                && access(arg).is_none_or(|path| written.contains(&path[0]))
+                            {
                                 inputs.protected.insert(index);
                             }
                         }

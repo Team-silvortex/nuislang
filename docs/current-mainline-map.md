@@ -8,9 +8,9 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.4`](versioning/nuis-beta-0.15.4-patch.md)
-(2026-09-27), covering guarded whole-record branch inputs and exact flat
-bool/i32/i64/f32/f64 scoped carries, including source-free artifact restoration.
+The current patch is [`beta-0.15.5`](versioning/nuis-beta-0.15.5-patch.md)
+(2026-10-02), covering nested scalar records, sparse typed carry projection and
+bounded nested return invariants, including 64-word source-free restoration.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -44,16 +44,33 @@ Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
-The `05951bef` checkpoint and `beta-0.15.4` retain `active/86`. Current work adds
-explicit bool/i32/i64/f32/f64 record word maps without changing the shared loop contract.
-The next task is to extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps.
+The `05951bef` checkpoint and `beta-0.15.5` retain `active/86`. Current work adds
+exact sparse mixed/nested bool/i32/i64/f32/f64 field-path maps without changing the shared loop contract.
+The next task is to reduce nested return snapshot carries while preserving observed exits.
+Branch-local record/subrecord aliases and identity-preserving inherited writes now retain
+lexical/version proofs. Materialized outer joins retain assignments under backward field-demand proof;
+changing nested-loop snapshots now use bounded fixed-point demand with lexical break/continue targets.
+Nested early-return probes now cover 9/30/31/57/58/59/60/61/62/63/64-word states by reusing an exact initialized mutable record.
+Original source admission remains mandatory; a second validation can veto reuse and retain independent storage.
+Bounded continuation analysis removes only unobserved leading-index recovery; suffixes, generated outputs and parent backedges retain it.
+Return-only exits share the private pending/break signal under bounded, compiler-minted provenance; ordinary breaks stay independent.
+Bounded fixed points join zero trips and every child write, keeping proven invariant leaves outside nested backedges and grouping changing leaves into private records.
+The fixture carries outer N and inner N-1 words, including native 64-word state; a changed outer tag still needs 65 slots and rejects.
+Ordinary child-exit rewrites can still fail source-order revalidation and retain an admitted inner-only plan or the old body; broadening this admission is the next boundary.
+Scoped capture planning uses complete record seed proofs instead of inapplicable ordinary-call boolean packing.
+Exact shared budgets, selected traps and atomic failure publication remain required without widening the native profile.
 Generated scoped flat-i64 inputs now use explicit per-trip record maps after every
 caller agrees on the complete seed range. A 64-field record plus induction and a
 bounded break loop execute natively. Generated loop branch helpers now retain whole
 records with guarded call/constructor work instead of exceeding the 64-argument bound.
 Generated flat bool/i32/i64/f32/f64 carries now retain typed initial state, per-trip decoding
-and immutable snapshots. F32/F64 use exact bit packing; nested carries and resource inputs remain
-outside this slice; ordinary non-loop typed records keep their existing support.
+and immutable snapshots. F32/F64 use exact bit packing; nested pure-scalar carries now use
+complete field-segment maps and nominal reconstruction at every depth. Same-named leaves
+cannot alias, and nested all-i64 carries require the same complete proof. Sparse typed inputs
+now preserve full seed storage and checked initializer work, with exact per-trip slot maps.
+All callers must prove canonical codecs before unused input reconstructions can disappear.
+Over-limit private return/control carry expansion and resource inputs remain separate;
+public signatures, source loop-shape admission and native bounds are unchanged.
 Generated non-scoped capture plans now use typed YIR record parameters when scalar
 compaction still exceeds 64 parameters. The incompressible 64-field-plus-predicate
 case now executes with bounded value transport; public/source/FFI and callback ABI

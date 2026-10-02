@@ -49,6 +49,62 @@ fn boolean_capture_groups_preserve_scalar_order_and_bound_word_width() {
 }
 
 #[test]
+fn scoped_record_plans_keep_boolean_slots_and_unproven_records_independent() {
+    let fields = (0..60)
+        .map(|i| format!("f{i}: i64"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let module = crate::frontend::parse_nuis_module(&format!(
+        "mod cpu Main {{ struct Carry {{ {fields} }}
+            struct Fixed {{ x: bool, y: bool, z: i64 }}
+            fn work(state: Carry, fixed: Fixed, flag: bool, index: i64) -> i64 {{ return index; }} }}"
+    )).unwrap();
+    let function = &module.functions[0];
+    let definitions = module
+        .structs
+        .iter()
+        .map(|d| (d.name.as_str(), d))
+        .collect();
+    let flat = function
+        .params
+        .iter()
+        .flat_map(|p| {
+            crate::lowering::scalar_record_shape::Shape::from_definitions(&p.ty, &definitions)
+                .unwrap()
+                .leaves()
+                .into_iter()
+                .map(|(path, ty)| NirParam {
+                    name: if path.is_empty() {
+                        p.name.clone()
+                    } else {
+                        format!("{}.{}", p.name, path.join("."))
+                    },
+                    ty,
+                })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(flat.len(), 65);
+    let ordinary = CapturePlan::for_generated(flat.clone(), function, &module).unwrap();
+    assert!(ordinary.slots.len() <= 64);
+    assert!(ordinary.slots.iter().any(|s| matches!(s, Slot::Bools(_))));
+    assert!(!ordinary.supports_scoped(function, &BTreeMap::new()));
+    assert!(CapturePlan::for_scoped(flat.clone(), function, &module, &BTreeMap::new()).is_none());
+    let allowed = BTreeSet::from([0]);
+    let plan = CapturePlan::records(flat.clone(), function, &module, Some(&allowed)).unwrap();
+    assert_eq!(plan.slots.len(), 6);
+    assert!(
+        matches!(&plan.slots[0], Slot::Record { parameter, leaves, .. } if parameter.name == "state" && *leaves == (0..60))
+    );
+    assert_eq!(
+        &plan.slots[1..],
+        &(60..65).map(Slot::Scalar).collect::<Vec<_>>()
+    );
+    let mut malformed = flat;
+    malformed[60].name = "state.f0".into();
+    assert!(CapturePlan::records(malformed, function, &module, Some(&allowed)).is_none());
+}
+
+#[test]
 fn generated_capture_transport_does_not_rewrite_user_signatures_or_namesakes() {
     let source = "mod cpu Main {
         struct Pair { a: bool, b: bool }

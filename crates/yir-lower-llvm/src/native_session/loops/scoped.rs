@@ -32,7 +32,12 @@ pub(crate) fn parse(node: &Node) -> Result<Option<ScopedCall<'_>>, String> {
     }
     if let Some(carries) = yir_core::loop_carry_contract::parse_scoped_i64_carries(args)? {
         if carries.seeds.len() > super::super::MAX_SCALAR_SLOTS {
-            return Err(fail());
+            return Err(format!(
+                "{}: {} carried words exceed the {}-word native limit (including private return/control state)",
+                fail(),
+                carries.seeds.len(),
+                super::super::MAX_SCALAR_SLOTS,
+            ));
         }
         return Ok(Some(ScopedCall {
             callee: carries.callee,
@@ -106,10 +111,9 @@ mod tests {
                         "ordinary field names cannot redefine a scoped carry"
                     );
                 } else {
-                    assert!(parse(&node)
-                        .err()
-                        .expect("carry bound must reject")
-                        .contains("does not admit this scoped action"));
+                    let error = parse(&node).err().expect("carry bound must reject");
+                    assert!(error.contains("65 carried words exceed the 64-word native limit"));
+                    assert!(error.contains("including private return/control state"));
                 }
             }
         }

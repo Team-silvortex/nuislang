@@ -1,6 +1,64 @@
 use super::*;
 
 #[test]
+fn nested_guard_defaults_require_a_pure_parameter_tree_not_just_a_pure_leaf() {
+    let source = "mod cpu Main {
+        struct Leaf { value: f64 }
+        struct Root { left: Leaf, right: Leaf }
+        fn branch(packet: Root) -> i64 { return 0; }
+    }";
+    for change in [
+        "valid",
+        "sibling_resource",
+        "child_reference",
+        "child_optional",
+        "cycle",
+        "wrong_path",
+        "wrong_codec",
+    ] {
+        let mut module = crate::frontend::parse_nuis_module(source).unwrap();
+        let root = module
+            .structs
+            .iter_mut()
+            .find(|d| d.name == "Root")
+            .unwrap();
+        match change {
+            "sibling_resource" => root.fields[1].ty.name = "Buffer".into(),
+            "child_reference" => root.fields[0].ty.is_ref = true,
+            "child_optional" => root.fields[0].ty.is_optional = true,
+            "cycle" => root.fields[1].ty.name = "Root".into(),
+            _ => {}
+        }
+        let field = crate::lowering::scalar_record_shape::source_value(
+            "packet",
+            &[
+                "left".into(),
+                if change == "wrong_path" {
+                    "missing".into()
+                } else {
+                    "value".into()
+                },
+            ],
+        );
+        let encoded = if change == "wrong_codec" {
+            NirExpr::PackF32Word(Box::new(field))
+        } else {
+            NirExpr::PackF64Word(Box::new(field))
+        };
+        let definitions = module
+            .structs
+            .iter()
+            .map(|d| (d.name.as_str(), d))
+            .collect();
+        assert_eq!(
+            is_pass_through_guard_seed(&module.functions[0], &encoded, &definitions),
+            change == "valid",
+            "{change}"
+        );
+    }
+}
+
+#[test]
 fn f64_guard_defaults_require_bit_packing_of_exact_parameter_fields() {
     let module = crate::frontend::parse_nuis_module(
         "mod cpu Main {

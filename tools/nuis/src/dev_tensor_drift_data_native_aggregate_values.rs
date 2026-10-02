@@ -174,7 +174,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Native callback roots now use allocation-free LLVM value returns",
             "zero aggregate allocations/drops",
             "Reference callback state binding now follows registered field paths",
-            "extend generated scoped record word transport to nested pure-scalar records with exact field-path seed and backedge maps",
+            "reduce nested return snapshot carries while preserving observed exits",
             "Same-name branch-local aliases now have independent lexical identities",
             "Native scalar helpers now admit bounded mixed/nested scalar return layouts",
             "The mixed/nested helper CLI fixture now passes build/run-artifact",
@@ -298,7 +298,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "guarded-local-value-extraction",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values.rs",
         required_patterns: &[
-            "if control_catalog.contains_key(&function.name)",
+            "if control_roots.contains(&function.name)",
             "control_values::value_type(value, scope, self.catalog, self.layouts)?",
             "yes.name == no.name && yes.ty == no.ty && yes.constant == no.constant",
             "params.extend(captured_params(yes.inputs, scope));",
@@ -356,7 +356,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_values/layouts.rs",
         required_patterns: &[
             "trait ValueLayouts",
-            "impl ValueLayouts for FlatLayouts",
+            "impl ValueLayouts for CarryLayouts",
             "impl ValueLayouts for TypedLayouts",
             "while let Some(name) = ready.pop_first()",
             "depth > 64 || (nested && nodes > 4096)",
@@ -366,7 +366,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "guarded-typed-value-source-boundaries",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_values/typed_tests.rs",
         required_patterns: &[
-            "typed_values_reuse_flat_dependencies_without_admitting_mixed_loop_carries_or_effects",
+            "typed_values_reuse_nested_loop_dependencies_without_admitting_effects_or_cycles",
             "typed_layouts_reject_cycles_resources_empty_and_duplicate_fields_transitively",
             "typed_constructors_require_exact_leaf_types_unique_fields_and_nominal_records",
             "typed_layouts_bound_neutral_initializer_expansion_before_materializing_a_type_dag",
@@ -387,7 +387,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_layouts.rs",
         required_patterns: &[
             "generated.contains(&function.name)",
-            "!scoped.contains(&function.name)",
+            "if scoped.contains(&function.name)",
             "scoped_loop_lowering::collect_scoped_call_targets(module, &eligible)",
             "control_values::supported_type(&param.ty, layouts)",
             "direct_calls::CapturePlan::for_generated(leaves, function, module)",

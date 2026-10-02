@@ -26,7 +26,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-trailing-value-bounded-normalization",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_flow.rs",
         required_patterns: &[
-            "normalize_with_step(effects, scope, Some(step), true)",
+            "normalize_with_step(effects, scope, Some(step), true, None)",
             "same_step(rewritten.last()?, step)",
             "bounded && depth >= 32",
             "depth + usize::from(bounded)",

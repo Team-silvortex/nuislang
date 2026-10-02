@@ -13,13 +13,13 @@ pub(super) fn normalize(
     scope: &Scope,
     step: &NirStmt,
 ) -> Option<Option<Normalized>> {
-    normalize_with_step(effects, scope, Some(step), false)
+    normalize_with_step(effects, scope, Some(step), false, None)
 }
 
 // The pure-value profile has already advanced its induction before these effects.
-// Continue only skips the suffix; break's advanced index is transported separately.
+// Continue only skips the suffix; an observed break index is recovered separately.
 pub(super) fn normalize_leading(effects: &[NirStmt], scope: &Scope) -> Option<Option<Normalized>> {
-    normalize_with_step(effects, scope, None, true)
+    normalize_with_step(effects, scope, None, true, None)
 }
 
 pub(super) fn normalize_trailing(
@@ -27,7 +27,16 @@ pub(super) fn normalize_trailing(
     scope: &Scope,
     step: &NirStmt,
 ) -> Option<Option<Normalized>> {
-    normalize_with_step(effects, scope, Some(step), true)
+    normalize_with_step(effects, scope, Some(step), true, None)
+}
+
+pub(super) fn normalize_return_exit(
+    effects: &[NirStmt],
+    scope: &Scope,
+    step: Option<&NirStmt>,
+    signal: &str,
+) -> Option<Option<Normalized>> {
+    normalize_with_step(effects, scope, step, true, Some(signal))
 }
 
 fn normalize_with_step(
@@ -35,14 +44,18 @@ fn normalize_with_step(
     scope: &Scope,
     step: Option<&NirStmt>,
     bounded: bool,
+    return_signal: Option<&str>,
 ) -> Option<Option<Normalized>> {
     if !contains_exit(effects, false) {
         return Some(None);
     }
     let mut names = scope.keys().cloned().collect();
     branches::collect_bindings(effects, &mut names);
-    let breaking = contains_exit(effects, true)
-        .then(|| branches::fresh_name("__nuis_buffer_break", &mut names));
+    let breaking = contains_exit(effects, true).then(|| {
+        return_signal
+            .map(str::to_owned)
+            .unwrap_or_else(|| branches::fresh_name("__nuis_buffer_break", &mut names))
+    });
     // Break-only loops need one flag, not an aggregate branch result just to
     // transport two complementary control bits. Mixed exits keep separate bits.
     let break_only = breaking.is_some() && !contains_continue(effects);

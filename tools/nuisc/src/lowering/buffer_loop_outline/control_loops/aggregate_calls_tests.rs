@@ -50,6 +50,7 @@ fn iteration_flat_values_keep_nominal_layouts_and_local_capture_scope() {
         "let total: i64 = total + Packet { first: index, second: stride }.first;",
         "let unused = relay(index, stride);",
         "let local = mixed(index); let total: i64 = total + local.first;",
+        "let local = nested(index); let total: i64 = total + local.packet.first;",
         "let local = loop_wrapper(index); let total: i64 = total + local.first;",
         "let local = relay(index, stride); let saved = local; let local: Packet = relay(local.second, stride); let total: i64 = total + saved.first + local.first;",
         "let local = relay(index, stride); if index < bound { let local: Packet = relay(local.first, stride); } let total: i64 = total + read(local);",
@@ -75,7 +76,6 @@ fn iteration_flat_values_keep_nominal_layouts_and_local_capture_scope() {
 #[test]
 fn iteration_flat_values_reject_effects_cycles_and_nominal_rebinding_drift() {
     for body in [
-        "let local = nested(index); let total: i64 = total + local.packet.first;",
         "let local = effect(index); let total: i64 = total + local.first;",
         "let local = effect_wrapper(index); let total: i64 = total + local.first;",
         "let local = cycle(index); let total: i64 = total + local.first;",

@@ -55,6 +55,10 @@ pub(super) fn supported(body: &[NirStmt]) -> bool {
                 | NirExpr::CastI32ToI64(_)
                 | NirExpr::CastBoolToI64(_)
                 | NirExpr::CastI64ToBool(_)
+                | NirExpr::PackF32Word(_)
+                | NirExpr::UnpackF32Word(_)
+                | NirExpr::PackF64Word(_)
+                | NirExpr::UnpackF64Word(_)
         );
         true
     });
@@ -109,6 +113,10 @@ fn rewrite_expressions(mut expressions: Vec<&mut NirExpr>, mut visitor: impl FnM
             | NirExpr::CastI64ToI32(base)
             | NirExpr::CastI32ToI64(base)
             | NirExpr::CastBoolToI64(base)
+            | NirExpr::PackF32Word(base)
+            | NirExpr::UnpackF32Word(base)
+            | NirExpr::PackF64Word(base)
+            | NirExpr::UnpackF64Word(base)
             | NirExpr::CastI64ToBool(base) => expressions.push(base),
             NirExpr::Var(_)
             | NirExpr::Int(_)

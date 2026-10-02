@@ -4,11 +4,11 @@ use super::*;
 #[derive(Clone, Copy)]
 pub(super) enum EffectTypes<'a> {
     Buffer(&'a ScalarHelpers),
-    Values(&'a ScalarHelpers, &'a control_values::FlatLayouts),
+    Values(&'a ScalarHelpers, &'a control_values::CarryLayouts),
 }
 
 impl<'a> EffectTypes<'a> {
-    pub(super) fn layouts(self) -> Option<&'a control_values::FlatLayouts> {
+    pub(super) fn layouts(self) -> Option<&'a control_values::CarryLayouts> {
         match self {
             Self::Buffer(_) => None,
             Self::Values(_, layouts) => Some(layouts),
