@@ -40,6 +40,7 @@ mod compiler_token_pagination;
 mod domain_unit;
 mod envelope;
 mod error;
+mod file_publication;
 mod host_bridge_plan;
 mod payload_blob;
 pub mod protocol;
@@ -436,6 +437,7 @@ pub use envelope::{
     render_nuis_executable_envelope, write_nuis_executable_envelope, NuisExecutableEnvelope,
 };
 pub use error::ArtifactError;
+pub use file_publication::{atomic_copy_artifact_file, atomic_write_artifact_file};
 pub use host_bridge_plan::{
     parse_host_bridge_plan_index, parse_host_bridge_plan_index_from_source, HostBridgePlanEntry,
     HostBridgePlanIndex,

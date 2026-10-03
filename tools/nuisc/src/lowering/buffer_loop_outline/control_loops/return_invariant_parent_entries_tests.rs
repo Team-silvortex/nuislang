@@ -1,7 +1,7 @@
 use super::super::tests::fixture;
 use super::*;
 
-fn entry_mask(prefix: &str, parent: &str, child: &str) -> BTreeMap<String, Vec<bool>> {
+pub(super) fn entry_mask(prefix: &str, parent: &str, child: &str) -> BTreeMap<String, Vec<bool>> {
     let (module, scope, body) = fixture(&format!("{prefix} while flag {{ {parent} }}"));
     let layouts = control_values::layouts(&module);
     let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
@@ -18,7 +18,9 @@ fn entry_mask(prefix: &str, parent: &str, child: &str) -> BTreeMap<String, Vec<b
         unreachable!()
     };
     let entries = snapshots
-        .parent_entries(body, &layouts, &catalog, &mut budget, &mut clock, 0)
+        .loop_facts(body, &layouts, &catalog, &mut budget, 0)
+        .unwrap()
+        .at_boundary(&mut budget, &mut clock)
         .unwrap();
     let (_, _, child) = fixture(&format!("{prefix} {child}"));
     let scope = entries
@@ -79,7 +81,9 @@ fn return_invariant_parent_entries_do_not_share_varying_fields_or_export_locals(
     let mut budget = Budget(MAX_WORK);
     let snapshots = Snapshots::new(&scope, &layouts, &catalog, &mut budget).unwrap();
     let entries = snapshots
-        .parent_entries(&body, &layouts, &catalog, &mut budget, &mut 0, 0)
+        .loop_facts(&body, &layouts, &catalog, &mut budget, 0)
+        .unwrap()
+        .at_boundary(&mut budget, &mut 0)
         .unwrap();
     assert!(!entries.env.contains_key("local"));
 }
@@ -93,21 +97,16 @@ fn return_invariant_parent_entries_reject_exhaustion_and_preserve_the_input() {
     let snapshots = Snapshots::new(&scope, &layouts, &catalog, &mut budget).unwrap();
     let before = snapshots.env.clone();
     assert!(snapshots
-        .parent_entries(&body, &layouts, &catalog, &mut Budget(1), &mut 0, 0)
+        .loop_facts(&body, &layouts, &catalog, &mut Budget(1), 0)
         .is_none());
     assert!(snapshots
-        .parent_entries(&body, &layouts, &catalog, &mut budget, &mut 0, MAX_DEPTH)
+        .loop_facts(&body, &layouts, &catalog, &mut budget, MAX_DEPTH)
         .is_none());
     let mut exhausted_clock = usize::MAX;
     assert!(snapshots
-        .parent_entries(
-            &body,
-            &layouts,
-            &catalog,
-            &mut budget,
-            &mut exhausted_clock,
-            0
-        )
+        .loop_facts(&body, &layouts, &catalog, &mut budget, 0)
+        .unwrap()
+        .at_boundary(&mut budget, &mut exhausted_clock)
         .is_none());
     assert!(snapshots.env == before);
 }

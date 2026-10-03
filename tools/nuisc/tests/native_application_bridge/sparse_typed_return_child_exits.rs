@@ -8,27 +8,42 @@ fn typed_nested_preheader_snapshots_keep_explicit_private_iteration_arities() {
         .map(|i| format!(", extra{i}: carry.extra{i}"))
         .collect::<String>();
     let mut cases = vec![
-        ("full", fixture::return_source(64), vec![6, 11]),
-        ("narrow", fixture::return_source(9), vec![9, 12]),
+        ("full", fixture::return_source(64), vec![5, 11]),
+        ("narrow", fixture::return_source(9), vec![9, 11]),
         (
             "changed-tag",
             fixture::return_source(64).replace(
                 "tag: selected.tag, enabled: !enabled",
                 "tag: i32_from_i64(17), enabled: !enabled",
             ),
-            vec![5, 11],
+            vec![4, 11],
         ),
         (
             "joined-preheader",
             fixture::joined_return_source(64),
-            vec![5, 11],
+            vec![4, 11],
         ),
         (
             "parent-entry",
             fixture::parent_return_source(64),
-            vec![7, 12],
+            vec![6, 12],
         ),
-        ("unobserved", base, vec![2, 6, 11]),
+        (
+            "post-loop",
+            fixture::post_loop_return_source(64, ""),
+            vec![5, 6, 12],
+        ),
+        (
+            "post-loop-break",
+            fixture::post_loop_return_source(64, "break;"),
+            vec![6, 6, 12],
+        ),
+        (
+            "post-loop-continue",
+            fixture::post_loop_return_source(64, "continue;"),
+            vec![5, 6, 12],
+        ),
+        ("unobserved", base, vec![2, 5, 11]),
     ];
     for continuing in [false, true] {
         let exit = if continuing { "continue" } else { "break" };
@@ -36,7 +51,7 @@ fn typed_nested_preheader_snapshots_keep_explicit_private_iteration_arities() {
         cases.push((
             "observed",
             source.clone(),
-            vec![if continuing { 1 } else { 3 }, 6, 11],
+            vec![if continuing { 1 } else { 3 }, 5, 11],
         ));
         cases.push(("partial", source.replace(&format!("if k == 1 {{ {exit}; }}"),
             &format!("let snapshot = carry; let checked_snapshot = 10 / snapshot.count; if k == 1 {{ {exit}; }}")),
@@ -46,14 +61,23 @@ fn typed_nested_preheader_snapshots_keep_explicit_private_iteration_arities() {
             vec![if continuing { 4 } else { 6 }, 6, 11]));
         cases.push(("checked", source.replace(&format!("if k == 1 {{ {exit}; }}"), &format!(
             "let snapshot = State {{ left: carry.left, right: carry.right, count: carry.count + 1{extra} }}; let checked_snapshot = 10 / (snapshot.count - carry.count); if k == 1 {{ {exit}; }}")),
-            vec![if continuing { 4 } else { 6 }, 6, 11]));
+            vec![if continuing { 2 } else { 4 }, 6, 11]));
     }
     let mut actual = Vec::new();
     let mut expected = Vec::new();
     for (name, source, arities) in cases {
         let project = Project::with_source(&source);
         let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
-        let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+        let bridge = emit_registered(&compiled.yir, "counter").unwrap_or_else(|error| {
+            let wide = compiled
+                .yir
+                .functions
+                .iter()
+                .filter(|f| f.parameters.len() > 64 || f.body_nodes.len() > 4096)
+                .map(|f| (&f.name, f.parameters.len(), f.body_nodes.len()))
+                .collect::<Vec<_>>();
+            panic!("{name}: {error}; wide helpers: {wide:?}");
+        });
         let mut widths = bridge
             .llvm_ir
             .lines()

@@ -11,16 +11,26 @@ mod snapshots;
 #[path = "return_invariant_parent_entries.rs"]
 mod parent_entries;
 
+#[path = "return_invariant_literals.rs"]
+mod literals;
+
+use literals::Literal;
+
 pub(super) use snapshots::Snapshots;
 
 #[cfg(test)]
 #[path = "return_invariant_facts_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "return_invariant_literal_tests.rs"]
+mod literal_tests;
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Origin {
     Entry(String, Vec<String>),
     Snapshot(usize, usize),
+    Literal(Literal),
 }
 
 #[derive(PartialEq, Eq)]
@@ -270,10 +280,9 @@ impl Proof<'_> {
         self.budget.tick(depth)?;
         match expr {
             NirExpr::Var(name) => env.get(name).cloned(),
-            NirExpr::Int(_) => self.unknown(scalar_type("i64")),
-            NirExpr::Bool(_) => self.unknown(scalar_type("bool")),
-            NirExpr::F32(_) => self.unknown(scalar_type("f32")),
-            NirExpr::F64(_) => self.unknown(scalar_type("f64")),
+            NirExpr::Int(value) => self.literal(Literal::I64(*value)),
+            NirExpr::Bool(value) => self.literal(Literal::Bool(*value)),
+            NirExpr::F32(_) | NirExpr::F64(_) => self.float_literal(expr),
             NirExpr::FieldAccess { base, field } => {
                 let base = self.expression(base, env, depth + 1)?;
                 // Reusing a validated layout avoids scanning every sibling for
@@ -362,15 +371,15 @@ impl Proof<'_> {
                 };
                 self.unknown(ty)
             }
-            NirExpr::CastI64ToI32(value)
-            | NirExpr::CastI32ToI64(value)
-            | NirExpr::PackF32Word(value)
+            NirExpr::CastI64ToI32(_) | NirExpr::CastI32ToI64(_) => {
+                self.integer_cast(expr, env, depth + 1)
+            }
+            NirExpr::PackF32Word(value)
             | NirExpr::UnpackF32Word(value)
             | NirExpr::PackF64Word(value)
             | NirExpr::UnpackF64Word(value) => {
                 self.expression(value, env, depth + 1)?;
                 let name = match expr {
-                    NirExpr::CastI64ToI32(_) => "i32",
                     NirExpr::UnpackF32Word(_) => "f32",
                     NirExpr::UnpackF64Word(_) => "f64",
                     _ => "i64",

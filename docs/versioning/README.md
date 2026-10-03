@@ -14,16 +14,18 @@ below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead
 
 For the current `beta-0.15.*` line instead of historical backfill, start with:
 
-* [nuis-beta-0.15.6-patch.md](nuis-beta-0.15.6-patch.md)
+* [nuis-beta-0.15.7-patch.md](nuis-beta-0.15.7-patch.md)
 * [nuis-beta-0.15.0-snapshot.md](nuis-beta-0.15.0-snapshot.md)
 * [nuis-beta-0.15.0-release-checklist.md](nuis-beta-0.15.0-release-checklist.md)
 
-The current source patch is `beta-0.15.6` (2026-10-02), following `1b97ccb1`.
+The current source patch is `beta-0.15.7` (2026-10-03), following `a083a422`.
 The minor snapshot retains the baseline `05951bef` (`beta-0.15.0`, 2026-09-24).
 Git remains authoritative for exact source revisions. Patch evidence does not
 certify every suite listed in the checklist, and historical results remain
 separate. Cargo package versions and protocol versions remain independent.
 
+The [beta-0.15.6 patch](nuis-beta-0.15.6-patch.md) retains the typed read-only
+scoped input, preheader join and parent-entry snapshot checkpoint.
 The [beta-0.15.5 patch](nuis-beta-0.15.5-patch.md) retains the nested typed carry
 and return-invariant checkpoint.
 The [beta-0.15.4 patch](nuis-beta-0.15.4-patch.md) retains the guarded branch-input

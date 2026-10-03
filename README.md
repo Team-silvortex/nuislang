@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.6`](docs/versioning/nuis-beta-0.15.6-patch.md) (2026-10-02).
+[`beta-0.15.7`](docs/versioning/nuis-beta-0.15.7-patch.md) (2026-10-03).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -375,12 +375,26 @@ and no-carry/single-carry continues retain evaluation through private read-only 
 all callers must prove invariant roots. Checked constructors now fit through cached nominal
 field ranges within the original analysis budget, without discarding field evaluation or traps.
 Versioned preheader snapshots now prove equality across saved records, subrecords and fields,
-with ordered-pair branch joins and per-field parent-entry summaries across all trips and intermediate writes.
-Varying parent fields get distinct fresh identities; stable fields retain their evaluated origins. The return fixture
+with ordered-pair branch joins and per-field loop summaries across all trips and intermediate writes.
+Parent entries and post-loop uses share one bounded summary, but freshen varying fields separately at each boundary.
+Stable fields retain their evaluated origins; see the [loop snapshot proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md).
+Unobserved total input-field copies can now disappear without erasing computed fields or transport provenance.
+Bounded scalar input-alias chains also expose those copies: a 64-field guarded record
+fixture uses 2/3 private arguments, or 3/3 when it retains an unused selected call.
+Changed locals, codecs, scoped control identities and public inputs remain conservative.
+Cache and restored host binaries now use [fresh-file publication](docs/reference/nuis-artifact-file-publication-v1.md).
+A minimal cache regression reproduced host `SIGKILL` after in-place replacement despite
+a valid on-disk signature; the fix changes file publication, not LLVM or callback admission.
+The full-width preceding-loop helper shrinks from 62/63 private arguments to 5/6; this is not a benchmark. The return fixture
 uses outer N-1 and inner N-4 carries: 60/63 at width 64. A changed outer tag now runs with
-60/64 carries, including an admitted preheader `if`; changing both tag and count still requires 65 outer slots and rejects.
+60/64 carries, including an admitted preheader `if`; in that baseline, changing both tag and count still requires 65 outer slots and rejects.
+Typed literal origins now prove repeated integer/bool/finite-float fields across joined
+preheaders and every intermediate write. A separate literal-seeded wide variant fits
+60/64 carries despite changed tag/count; repeated mixed constants reduce its outer
+carry to 60, while opaque calls still reject 65. All 64 output words, original RHS
+work and source-free restoration remain checked; no native bound is widened.
 Branch joins retain equality proved on every arm, not equality between arms, old versions or separate calls.
-Native bounds, proof budgets, return signals, evaluated fields, observed exits and resource boundaries are unchanged.
+Native bounds, proof budgets, return signals, computed fields, observed exits and resource boundaries are unchanged.
 Carried-word reductions and private argument counts are separate; this is not a measured speedup.
 Recursive shapes remain bounded. Earlier shared-codec round trips
 also passed with host clang at `-O0` and `-O2`. Neither this work nor

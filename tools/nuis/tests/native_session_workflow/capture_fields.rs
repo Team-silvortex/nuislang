@@ -13,7 +13,7 @@ fn verify_runs(project: &Project, output: &Path, offset: i64) -> Vec<Vec<String>
         ("12,3,0,99", 12, 3, 0, 99, 33),
         ("-15,-3,0,99", -15, -3, 0, 99, -33),
     ] {
-        let run = success(project.command(
+        let run = project.command(
             "run-artifact",
             output,
             &[
@@ -26,7 +26,13 @@ fn verify_runs(project: &Project, output: &Path, offset: i64) -> Vec<Vec<String>
                 "--close-args",
                 "",
             ],
-        ));
+        );
+        assert!(
+            run.status.success(),
+            "native capture launch at {} with {input}: {}",
+            output.display(),
+            String::from_utf8_lossy(&run.stderr)
+        );
         assert!(run.stdout.is_empty());
         assert!(String::from_utf8_lossy(&run.stderr).contains("native_session_completed=1"));
         let states = states(&run);
@@ -83,13 +89,16 @@ fn verify_selected_failures(project: &Project, output: &Path) {
             "{input}: {stderr}"
         );
         assert!(
+            !stderr.contains("SIGKILL"),
+            "host kill is not a checked failure: {input}: {stderr}"
+        );
+        assert!(
             !stderr.contains("native_session_completed=1"),
             "{input}: {stderr}"
         );
-        assert!(
-            states(&run).iter().all(|state| state.starts_with("open:")),
-            "{input}: {stderr}"
-        );
+        let observed = states(&run);
+        assert_eq!(observed.len(), 1, "{input}: {stderr}");
+        assert!(observed[0].starts_with("open:"), "{input}: {stderr}");
         assert!(run.stdout.is_empty());
     }
 }
@@ -102,6 +111,17 @@ fn native_sparse_captures_build_cache_and_restore_without_sources() {
 #[test]
 fn native_sparse_captures_aliases_build_cache_and_restore_without_sources() {
     check_sparse_workflow(&aliases::source(), Some(&[1, 2]), 0);
+}
+
+#[test]
+fn native_scalar_alias_copies_build_cache_and_restore_without_sources() {
+    eprintln!("scalar-alias artifact variant: pure");
+    check_sparse_workflow(&aliases::scalar_copy_source(false), Some(&[1, 2]), 0);
+    eprintln!("scalar-alias artifact variant: unused-call");
+    check_sparse_workflow(&aliases::scalar_copy_source(true), Some(&[2, 2]), 0);
+    // A protected transport remains a single readonly 64-word array parameter.
+    eprintln!("scalar-alias artifact variant: protected-transport");
+    check_sparse_workflow(&aliases::scalar_transport_source(), Some(&[0, 2]), 0);
 }
 
 #[test]
@@ -220,10 +240,15 @@ fn check_sparse_workflow_with_iteration(
     }
     assert!(!llvm.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1("));
     assert!(!llvm.contains("call void @nuis_scheduler_owned_aggregate_drop_v1("));
+    eprintln!(
+        "native capture workflow: fresh build at {}",
+        output.display()
+    );
     let expected = verify_runs(&project, &output, offset);
     verify_selected_failures(&project, &output);
     let cached = project.build(None);
     assert!(cached.contains("compile_cache: hit"), "{cached}");
+    eprintln!("native capture workflow: cache hit at {}", output.display());
     assert_eq!(verify_runs(&project, &output, offset), expected);
     rejected_before_open(project.command(
         "run-artifact",
@@ -249,6 +274,10 @@ fn check_sparse_workflow_with_iteration(
         &[restored.to_str().unwrap()],
     ));
     assert_eq!(fs::read_to_string(restored.join(&llvm_name)).unwrap(), llvm);
+    eprintln!(
+        "native capture workflow: source-free restore at {}",
+        restored.display()
+    );
     assert_eq!(verify_runs(&project, &restored, offset), expected);
     verify_selected_failures(&project, &restored);
 }

@@ -17,7 +17,7 @@ pub(super) fn copy_directory_recursive(source: &Path, target: &Path) -> Result<(
                 fs::create_dir_all(parent)
                     .map_err(|error| format!("failed to create `{}`: {error}", parent.display()))?;
             }
-            fs::copy(&from, &to).map_err(|error| {
+            nuis_artifact::atomic_copy_artifact_file(&from, &to).map_err(|error| {
                 format!(
                     "failed to copy `{}` -> `{}`: {error}",
                     from.display(),

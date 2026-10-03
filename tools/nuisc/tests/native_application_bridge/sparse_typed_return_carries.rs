@@ -6,6 +6,9 @@ mod probe;
 #[path = "sparse_typed_return_child_exits.rs"]
 mod child_exits;
 
+#[path = "sparse_typed_return_literals.rs"]
+mod literals;
+
 #[test]
 fn typed_sparse_nested_return_capture_geometry() {
     let mut actual = Vec::new();
@@ -221,6 +224,55 @@ fn typed_sparse_nested_returns_preserve_parent_entry_fields_and_reject_first_tri
             }
         }
     }
+}
+
+#[test]
+fn typed_sparse_nested_returns_keep_post_loop_fields_and_current_snapshot_bits() {
+    for width in [9, 64] {
+        for exit in ["", "break;", "continue;"] {
+            let source = fixture::post_loop_return_source(width, exit);
+            let compiled = nuisc::pipeline::compile_source(&source).unwrap();
+            let widths = carried_widths(&compiled.yir);
+            assert_eq!(
+                widths,
+                [if exit == "break;" { 2 } else { 1 }, width - 4, width - 1],
+                "{exit}"
+            );
+            let cases = [0, 1, 3, 4]
+                .into_iter()
+                .map(|limit| {
+                    let initial = initial(width, limit);
+                    let event = event(&initial, limit);
+                    (
+                        vec![initial[0], initial[1], initial[2], limit],
+                        vec![initial, event.clone(), event],
+                    )
+                })
+                .collect();
+            if width == 9 {
+                typed_record_inputs::check_flattened(&source, cases);
+            } else {
+                typed_record_inputs::check_compact(&source, cases, width - 7);
+            }
+        }
+    }
+}
+
+#[test]
+fn typed_sparse_post_loop_unknown_fields_keep_the_native_carry_limit() {
+    let source = fixture::post_loop_return_source(64, "")
+        .replace("left: carry.left,", "left: Leaf { value: carry.left.value, gain: carry.left.gain, tag: i32_from_i64(17), enabled: carry.left.enabled },")
+        .replace("count: carry.count", "count: carry.count + 1");
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    assert!(carried_widths(&compiled.yir)
+        .iter()
+        .any(|width| *width > 64));
+    let error = emit_registered(&compiled.yir, "counter").unwrap_err();
+    assert!(
+        error.contains("carried words exceed the 64-word native limit"),
+        "{error}"
+    );
 }
 
 #[test]

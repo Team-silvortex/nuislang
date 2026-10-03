@@ -14,11 +14,13 @@ task/pointer rules?", read:
 For the current `beta-0.15.*` application-led line, start with:
 
 * [Mainline map](../current-mainline-map.md)
-* [Beta-0.15.6 scoped input and parent snapshot patch](../versioning/nuis-beta-0.15.6-patch.md)
+* [Beta-0.15.7 loop snapshots and artifact publication patch](../versioning/nuis-beta-0.15.7-patch.md)
 * [Beta-0.15 checkpoint](../versioning/nuis-beta-0.15.0-snapshot.md)
 * [Beta-0.15 validation checklist](../versioning/nuis-beta-0.15.0-release-checklist.md)
 * [Native scalar session bridge](nuis-native-scalar-session-bridge-v1.md)
 * [Native value returns and private captures](nuis-native-scalar-value-returns-v1.md)
+* [Native loop snapshots and boundary proof](nuis-native-scalar-loop-snapshots-v1.md)
+* [Artifact file publication and native launch reliability](nuis-artifact-file-publication-v1.md)
 * [Window contract](nuis-yir-window-session-v3.md)
 * [Cancellation and host retirement](nuis-yir-application-cancellation-v1.md)
 * [Provider-owned session drain](nuis-yir-provider-session-drain-v1.md)

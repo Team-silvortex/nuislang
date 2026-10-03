@@ -157,7 +157,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
             "nuis-beta-0.15.0-snapshot.md",
             "nuis-beta-0.15.0-release-checklist.md",
             "05951bef",
-            "stable post-loop snapshot proof and further changing backedges",
+            "further changing backedges and wide private captures",
             "nuis-beta-0.11-application-led-mainline.md",
             "nuis-beta-0.10.0-self-hosting-entry.md",
             "nuis-beta-0.6.0-mainline-entry.md",

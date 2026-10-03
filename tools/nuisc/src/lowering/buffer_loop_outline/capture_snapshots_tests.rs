@@ -161,7 +161,9 @@ fn snapshot_projection_keeps_nominal_subrecords_in_private_call_chains() {
         assert!(project(&mut module, &["inner", "outer"]));
         assert_eq!(function(&module, "inner").params[0].ty.name, "Pair");
         let outer = function(&module, "outer");
-        assert_eq!(outer.params.len(), 2);
+        // The unused reconstruction no longer captures state.b, but the live
+        // old.a subrecord must still cross the private boundary as a nominal Pair.
+        assert_eq!(outer.params.len(), 1);
         assert!(outer.params.iter().all(|p| p.ty.name == "Pair"));
         assert_eq!(outer.return_type.as_ref().unwrap().name, "Pair");
     }

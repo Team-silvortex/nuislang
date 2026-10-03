@@ -21,6 +21,9 @@ mod cache_key;
 #[path = "cache_maintenance.rs"]
 mod cache_maintenance;
 #[cfg(test)]
+#[path = "cache_restore_native_tests.rs"]
+mod cache_restore_native_tests;
+#[cfg(test)]
 #[path = "cache_tests.rs"]
 mod cache_tests;
 #[path = "cache_types.rs"]

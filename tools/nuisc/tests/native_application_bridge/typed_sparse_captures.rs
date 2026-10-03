@@ -15,6 +15,40 @@ fn typed_sparse_captures_follow_aliases_inside_guarded_private_helpers() {
 }
 
 #[test]
+fn typed_sparse_scalar_aliases_unlock_full_width_private_record_copies() {
+    check_sparse_captures(&aliases::scalar_copy_source(false), Some(&[2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_scalar_aliases_preserve_unused_calls_at_the_selected_branch() {
+    check_sparse_captures(&aliases::scalar_copy_source(true), Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_scalar_aliases_keep_call_backed_record_transport_conservative() {
+    let source = aliases::scalar_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert!(branch.parameters.iter().any(|p| p.ty == "Payload"));
+    // The readonly aggregate is one typed argument, not 64 scalar parameters.
+    assert_eq!(branch.parameters.len(), 2);
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert!(signature.contains("[64 x i64] %arg1"), "{signature}");
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
+}
+
+#[test]
 fn typed_sparse_captures_preserve_old_and_rebound_record_versions() {
     check_sparse_captures(&aliases::rebound_source(), Some(&[2, 3]), 30);
 }
@@ -222,12 +256,7 @@ fn check_sparse_captures(source: &str, branch_sizes: Option<&[usize]>, offset: i
             .map(|f| f.parameters.len())
             .collect::<Vec<_>>();
         sizes.sort();
-        assert_eq!(
-            sizes,
-            branch_sizes,
-            "{}",
-            nuisc::render::render_yir(&compiled.yir)
-        );
+        assert_eq!(sizes, branch_sizes, "private guarded argument counts");
     } else {
         let selection = compiled
             .yir

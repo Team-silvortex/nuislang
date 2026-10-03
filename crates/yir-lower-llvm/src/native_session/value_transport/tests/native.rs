@@ -108,7 +108,7 @@ fn input(
         expected.push(word);
     }
     // Opposite source orders must still use the declared transport layout.
-    if case % 2 == 0 {
+    if case & 1 == 0 {
         fields.reverse();
     }
     let value = LlvmValueRef::Struct(StructLlvmValueRef {

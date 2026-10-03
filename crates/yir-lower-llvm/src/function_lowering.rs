@@ -637,8 +637,7 @@ pub(super) fn emit_cpu_function(
         }
     }
     *global_counter = state.next_global;
-    let ret = if !state.ends_with_terminal_return && declared_result.is_some() {
-        let name = declared_result.expect("declared result");
+    let ret = if let (false, Some(name)) = (state.ends_with_terminal_return, declared_result) {
         let value = state
             .registers
             .get(name)

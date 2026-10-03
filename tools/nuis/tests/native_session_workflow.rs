@@ -11,8 +11,14 @@ mod capture_fields;
 mod capture_words;
 #[path = "native_session_workflow/helper_entries.rs"]
 mod helper_entries;
+#[path = "native_session_workflow/launch_diagnostics.rs"]
+mod launch_diagnostics;
+#[path = "native_session_workflow/literal_snapshots.rs"]
+mod literal_snapshots;
 #[path = "native_session_workflow/loop_work.rs"]
 mod loop_work;
+#[path = "native_session_workflow/publication.rs"]
+mod publication;
 #[path = "native_session_workflow/record_inputs.rs"]
 mod record_inputs;
 #[path = "native_session_workflow/scoped_record_inputs.rs"]
@@ -104,7 +110,7 @@ impl Project {
     }
 
     fn command(&self, verb: &str, input: &Path, arguments: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_nuis"))
+        let output = Command::new(env!("CARGO_BIN_EXE_nuis"))
             .arg(verb)
             .arg(input)
             .args(arguments)
@@ -112,7 +118,14 @@ impl Project {
             .env("CARGO_INCREMENTAL", "0")
             .env_remove("NUIS_TEST_QUIET_SUCCESS_LOGS")
             .output()
-            .unwrap()
+            .unwrap();
+        launch_diagnostics::record(verb, input, &output);
+        assert!(
+            !String::from_utf8_lossy(&output.stderr).contains("SIGKILL"),
+            "unexpected host SIGKILL at {}; negative tests must not accept host kills",
+            input.display()
+        );
+        output
     }
 
     fn build(&self, mode: Option<&str>) -> String {
@@ -127,6 +140,13 @@ impl Project {
 }
 impl Drop for Project {
     fn drop(&mut self) {
+        if std::thread::panicking()
+            && std::env::var_os("NUIS_NATIVE_WORKFLOW_KEEP_FAILED").as_deref()
+                == Some(std::ffi::OsStr::new("1"))
+        {
+            eprintln!("native workflow failure retained at {}", self.0.display());
+            return;
+        }
         let _ = fs::remove_dir_all(&self.0);
     }
 }

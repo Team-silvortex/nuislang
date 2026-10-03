@@ -69,7 +69,11 @@ fn registered_control_identities_do_not_leak_to_unrelated_helpers() {
     assert_ne!(left, right);
     assert_ne!(left, "signal");
     assert_ne!(right, "signal");
-    assert!(matches!(&helper.body[1], NirStmt::Let { name, .. } if name == "signal"));
+    // An unrelated registration cannot protect this suffix's pure scalar alias.
+    assert_eq!(helper.body.len(), 2);
+    assert!(
+        matches!(&helper.body[1], NirStmt::Return(Some(NirExpr::Var(name))) if name != "signal")
+    );
 }
 
 #[test]

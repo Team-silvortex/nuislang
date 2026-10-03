@@ -19,6 +19,38 @@ pub fn source() -> String {
     .replace("choose(state)", "choose(state.payload)")
 }
 
+pub fn scalar_copy_source(computed: bool) -> String {
+    let copies = (0..64)
+        .map(|i| format!("let copy{i}: i64 = payload.f{i}; const saved{i}: i64 = copy{i};"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let fields = (0..64)
+        .map(|i| {
+            if computed && i == 62 {
+                format!("f{i}: relay(payload.f{i})")
+            } else {
+                format!("f{i}: saved{i}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = source().replace(
+        "let saved = payload;",
+        &format!("{copies} let saved = Payload {{ {fields} }};"),
+    );
+    if computed {
+        source
+            .replace("let second: Payload = saved;", "")
+            .replace("return relay(second.f0);", "return saved.f0;")
+    } else {
+        source
+    }
+}
+
+pub fn scalar_transport_source() -> String {
+    scalar_copy_source(true).replace("return saved.f0;", "return relay(saved.f0);")
+}
+
 pub fn rebound_source() -> String {
     let fields = (0..64)
         .map(|i| format!("f{i}: {}", if i == 0 { 30 } else { 0 }))

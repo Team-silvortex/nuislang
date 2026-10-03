@@ -7,7 +7,7 @@ tests, the development tensor, and `docs/reference/` in that order.
 ## Read This First
 
 Use this short route for the current `beta-0.15.*` repository. The current patch is
-[`beta-0.15.6`](versioning/nuis-beta-0.15.6-patch.md) (2026-10-02); the minor
+[`beta-0.15.7`](versioning/nuis-beta-0.15.7-patch.md) (2026-10-03); the minor
 baseline remains `05951bef` (`beta-0.15.0`):
 
 1. [Current mainline map](current-mainline-map.md)
@@ -18,6 +18,11 @@ baseline remains `05951bef` (`beta-0.15.0`):
 6. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
 7. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
 8. [Focused validation checklist](versioning/nuis-beta-0.15.0-release-checklist.md)
+
+The [native loop snapshot proof](reference/nuis-native-scalar-loop-snapshots-v1.md)
+tracks post-loop boundaries and safe capture normalization without replacing the released patch history.
+The [artifact publication contract](reference/nuis-artifact-file-publication-v1.md)
+records the reproduced cache-overwrite `SIGKILL` class and fresh-file replacement.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

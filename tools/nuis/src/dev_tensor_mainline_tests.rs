@@ -309,9 +309,18 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert!(session
         .next_step
         .starts_with("reduce nested return snapshot carries while preserving observed exits"));
-    assert!(session.evidence.starts_with(
-        "Per-field parent re-entry snapshots now retain stable identities within native carry bounds"
-    ));
+    assert!(session
+        .evidence
+        .starts_with("Total scalar input aliases now unlock bounded record captures"));
+    assert!(session.evidence.contains("108 differential combinations"));
+    assert!(session.evidence.contains("5/6/12 and 6/6/12"));
+    assert!(session.evidence.contains("48 guarded-return combinations"));
+    assert!(session
+        .evidence
+        .contains("64-field guarded branches use 2/3"));
+    assert!(session
+        .validation_command
+        .contains("native_post_loop_snapshots"));
     assert!(session.evidence.contains("ordered origin pairs"));
     assert!(session.evidence.contains("inner N-4 and outer N-1"));
     assert!(session.validation_command.contains("native_parent_entries"));
@@ -320,7 +329,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
         .contains("native_joined_preheaders"));
     assert!(session
         .blocker
-        .contains("changing both tag and count still needs 65 and rejects"));
+        .contains("without another proven invariant still needs 65 and rejects"));
     assert!(session.validation_command.contains("return_invariant"));
     assert!(session.validation_command.contains("return_signal"));
     assert!(session.validation_command.contains("return_storage"));

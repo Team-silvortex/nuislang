@@ -22,6 +22,14 @@ mod admission_tests;
 mod child_tests;
 
 #[cfg(test)]
+#[path = "return_invariant_post_loop_tests.rs"]
+mod post_loop_tests;
+
+#[cfg(test)]
+#[path = "return_invariant_literal_execution_tests.rs"]
+mod literal_execution_tests;
+
+#[cfg(test)]
 #[path = "return_invariant_joins_tests.rs"]
 mod joins_tests;
 
@@ -187,15 +195,21 @@ impl Pass<'_> {
             match stmt {
                 NirStmt::While { condition, body } => {
                     self.budget.charge(scope.len())?;
-                    let child_snapshots = if self.nested && contains_loop(body) {
-                        snapshots.parent_entries(
+                    let loop_facts = if self.nested {
+                        Some(snapshots.loop_facts(
                             body,
                             &self.layouts,
                             self.catalog,
                             &mut self.budget,
-                            &mut self.snapshot_clock,
                             depth + 1,
-                        )?
+                        )?)
+                    } else {
+                        None
+                    };
+                    let child_snapshots = if self.nested && contains_loop(body) {
+                        loop_facts
+                            .as_ref()?
+                            .at_boundary(&mut self.budget, &mut self.snapshot_clock)?
                     } else {
                         let mut entries = snapshots.clone();
                         entries.forget_writes(
@@ -231,12 +245,17 @@ impl Pass<'_> {
                     } else {
                         vec![]
                     };
-                    snapshots.forget_writes(
-                        body,
-                        &mut self.budget,
-                        &mut self.snapshot_clock,
-                        depth + 1,
-                    )?;
+                    if let Some(facts) = &loop_facts {
+                        snapshots =
+                            facts.at_boundary(&mut self.budget, &mut self.snapshot_clock)?;
+                    } else {
+                        snapshots.forget_writes(
+                            body,
+                            &mut self.budget,
+                            &mut self.snapshot_clock,
+                            depth + 1,
+                        )?;
+                    }
                     if records.is_empty() {
                         output.push(NirStmt::While {
                             condition: condition.clone(),

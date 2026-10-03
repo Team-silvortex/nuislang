@@ -67,7 +67,7 @@ fn materialize_artifact_bundle(input: &Path, output_dir: &Path) -> Result<Vec<Pa
     let artifact_path = output_dir.join("nuis.compiled.artifact");
     let binary_path = output_dir.join(&artifact.binary_name);
     nuisc::aot::write_nuis_executable_envelope(&envelope_path, &artifact.envelope)?;
-    fs::write(&binary_path, &artifact.binary_blob)
+    nuis_artifact::atomic_write_artifact_file(&binary_path, &artifact.binary_blob)
         .map_err(|error| format!("failed to write `{}`: {error}", binary_path.display()))?;
     let relocated_manifest = nuisc::aot::render_relocated_unpacked_build_manifest(
         &artifact,

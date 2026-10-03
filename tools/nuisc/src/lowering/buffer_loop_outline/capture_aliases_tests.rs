@@ -45,8 +45,9 @@ fn immutable_alias_chains_expose_only_used_nested_fields() {
     let helper = function(&module, "helper");
     assert_eq!(helper.params.len(), 2);
     assert!(helper.params.iter().all(|p| p.ty.name == "i64"));
-    assert_eq!(helper.body.len(), 2);
-    assert!(matches!(&helper.body[0], NirStmt::Let { name, .. } if name == "leaf"));
+    // Both record aliases and the final total scalar alias may now disappear.
+    assert_eq!(helper.body.len(), 1);
+    assert!(matches!(&helper.body[0], NirStmt::Return(Some(_))));
     assert_eq!(function(&module, "entry").params[0].ty.name, "State");
 }
 

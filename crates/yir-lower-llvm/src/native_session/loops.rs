@@ -54,18 +54,18 @@ pub(super) fn validate(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Result<(),
         return Err(fail("has an unsupported induction step"));
     }
     if let Some([initial, limit, step]) = constant_inputs(node, nodes) {
-        bounded_iterations(initial, limit, step, &args[3], &args[4])
-            .map_err(|error| fail(error))?;
+        bounded_iterations(initial, limit, step, &args[3], &args[4]).map_err(&fail)?;
     }
     if !chain {
         return Ok(());
     }
     let carries = &args[5..];
-    let count = carries.len() / 2;
-    if carries.len() % 2 != 0 || count == 0 || count > MAX_SCALAR_SLOTS {
+    let pairs = carries.chunks_exact(2);
+    let count = pairs.len();
+    if !pairs.remainder().is_empty() || count == 0 || count > MAX_SCALAR_SLOTS {
         return Err(fail("exceeds its flat scalar-carry shape/bound"));
     }
-    for (index, pair) in carries.chunks_exact(2).enumerate() {
+    for (index, pair) in pairs.enumerate() {
         let kind = pair[1].as_str();
         if !linear_source(kind, index, count) {
             return Err(fail("does not admit this scalar carry source"));
@@ -147,6 +147,37 @@ fn bounded_iterations(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flat_scalar_chain_validation_keeps_pair_shape_and_exact_native_bound() {
+        for instruction in ["cpu.loop_while_i64_chain", "cpu.loop_while_scalar_chain"] {
+            for words in [0, 1, 2, 3, 126, 127, 128, 129, 130] {
+                let mut args = ["initial", "limit", "step", "lt", "add"]
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                args.extend((0..words).map(|i| {
+                    if i & 1 == 0 {
+                        format!("seed{}", i / 2)
+                    } else {
+                        "add_current".into()
+                    }
+                }));
+                let node = Node {
+                    name: "loop".into(),
+                    resource: "cpu0".into(),
+                    op: yir_core::Operation::parse(instruction, args).unwrap(),
+                };
+                let result = validate(&node, &BTreeMap::new());
+                let accepted = matches!(words, 2 | 126 | 128);
+                assert_eq!(
+                    result.is_ok(),
+                    accepted,
+                    "{instruction}, {words}: {result:?}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn counted_loop_proof_handles_directions_zero_trips_and_exact_limits() {

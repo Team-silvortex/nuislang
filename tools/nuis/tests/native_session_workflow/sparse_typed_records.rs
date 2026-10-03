@@ -93,7 +93,7 @@ fn native_materialized_nested_returns_restore_complete_state_without_sources() {
             "../../../nuisc/tests/control_flow_syntax_native/scoped_return_typed_record_carries.ns"
         ),
         true,
-        &[9, 12],
+        &[9, 11],
         9,
     );
 }
@@ -103,7 +103,7 @@ fn native_full_width_nested_returns_restore_complete_state_without_sources() {
     let source = full_width_source(include_str!(
         "../../../nuisc/tests/control_flow_syntax_native/scoped_return_typed_record_carries.ns"
     ));
-    check_captures(&source, true, &[6, 11], 64);
+    check_captures(&source, true, &[5, 11], 64);
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn native_changed_outer_tags_restore_preheader_snapshots_without_source() {
         "tag: selected.tag, enabled: !enabled",
         "tag: i32_from_i64(17), enabled: !enabled",
     );
-    check_captures_with_tags(&source, true, &[5, 11], 64, &[0, 3], None, true);
+    check_captures_with_tags(&source, true, &[4, 11], 64, &[0, 3], None, true);
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn native_joined_preheaders_restore_full_width_snapshots_without_source() {
     check_captures_with_tags(
         &fixture::joined_return_source(64),
         true,
-        &[5, 11],
+        &[4, 11],
         64,
         &[0, 3, 4],
         None,
@@ -136,7 +136,7 @@ fn native_parent_entries_restore_full_width_invariants_without_source() {
     check_captures_at_limits(
         &fixture::parent_return_source(64),
         true,
-        &[7, 12],
+        &[6, 12],
         64,
         &[0, 3, 4],
         None,
@@ -144,8 +144,26 @@ fn native_parent_entries_restore_full_width_invariants_without_source() {
 }
 
 #[test]
+fn native_post_loop_snapshots_restore_full_width_invariants_without_source() {
+    for (exit, captures) in [
+        ("", [5, 6, 12]),
+        ("break;", [6, 6, 12]),
+        ("continue;", [5, 6, 12]),
+    ] {
+        check_captures_at_limits(
+            &fixture::post_loop_return_source(64, exit),
+            true,
+            &captures,
+            64,
+            &[0, 3, 4],
+            None,
+        );
+    }
+}
+
+#[test]
 fn native_nested_child_exits_restore_full_width_state_without_sources() {
-    check_captures_at_limits(&child_source(), true, &[2, 6, 11], 64, &[0, 2, 3, 4], None);
+    check_captures_at_limits(&child_source(), true, &[2, 5, 11], 64, &[0, 2, 3, 4], None);
 }
 
 #[test]
@@ -155,7 +173,7 @@ fn native_observed_child_exit_indices_restore_full_width_state_without_sources()
         if continuing {
             source = source.replace("if k == 1 { break; }", "if k == 1 { continue; }");
         }
-        let captures = if continuing { [1, 6, 11] } else { [3, 6, 11] };
+        let captures = if continuing { [1, 5, 11] } else { [3, 5, 11] };
         check_captures_at_limits(
             &source,
             true,
@@ -219,7 +237,7 @@ fn native_checked_child_snapshots_restore_computed_records_without_source() {
             .replace("if k == 1 { break; }", &format!(
                 "let snapshot = State {{ left: carry.left, right: carry.right, count: carry.count + 1{extra} }}; let checked_snapshot = 10 / (snapshot.count - carry.count); if k == 1 {{ {exit}; }}"
             ));
-        let captures = if continuing { [4, 6, 11] } else { [6, 6, 11] };
+        let captures = if continuing { [2, 6, 11] } else { [4, 6, 11] };
         check_captures_at_limits(
             &source,
             true,

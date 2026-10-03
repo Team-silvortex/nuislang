@@ -4,16 +4,23 @@ use super::*;
 #[path = "return_invariant_parent_entries_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "return_invariant_post_loop_snapshots_tests.rs"]
+mod post_loop_tests;
+
+pub(in super::super) struct LoopFacts {
+    env: Env,
+}
+
 impl Snapshots {
-    pub(in super::super) fn parent_entries(
+    pub(in super::super) fn loop_facts(
         &self,
         body: &[NirStmt],
         layouts: &control_values::CarryLayouts,
         catalog: &ScalarHelpers,
         budget: &mut Budget,
-        next: &mut usize,
         depth: usize,
-    ) -> Option<Self> {
+    ) -> Option<LoopFacts> {
         let mut proof = Proof::new(layouts, catalog, budget);
         proof.budget.charge(self.env.len())?;
         for value in self.env.values() {
@@ -22,19 +29,31 @@ impl Snapshots {
             }
         }
         let mut env = self.env.clone();
-        // A child may run after any intermediate publication on any parent
-        // trip. The summary includes zero trips and every write, not just exits.
+        // Both child entries and post-loop users must include zero trips and
+        // every intermediate publication, not just the final backedge.
         proof.loop_summary(&NirExpr::Bool(true), body, &mut env, depth)?;
-        let budget = proof.budget;
+        Some(LoopFacts { env })
+    }
+}
+
+impl LoopFacts {
+    pub(in super::super) fn at_boundary(
+        &self,
+        budget: &mut Budget,
+        next: &mut usize,
+    ) -> Option<Snapshots> {
+        budget.charge(self.env.len())?;
+        let mut env = self.env.clone();
+        let mut clock = *next;
         for value in env.values_mut() {
             budget.charge(value.words.len() + 1)?;
             if value.words.iter().all(Option::is_some) {
                 continue;
             }
-            let version = *next;
-            *next = next.checked_add(1)?;
-            // Varying fields get independent entry identities. Two unknown
-            // summaries never establish equality, even if both bindings vary.
+            let version = clock;
+            clock = clock.checked_add(1)?;
+            // Varying fields are independent across bindings AND boundaries.
+            // Reusing entry identities at exit would equate old live copies.
             *value = Rc::new(Value {
                 ty: value.ty.clone(),
                 words: value
@@ -47,6 +66,7 @@ impl Snapshots {
                     .collect(),
             });
         }
-        Some(Self { env })
+        *next = clock;
+        Some(Snapshots { env })
     }
 }

@@ -302,7 +302,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/native_session_workflow/sparse_typed_records.rs",
         required_patterns: &[
             "native_materialized_nested_returns_restore_complete_state_without_sources",
-            "&[9, 12]",
+            "&[9, 11]",
             "assert_eq!(iterations, captures)",
             "materialize-artifact",
         ],
@@ -312,7 +312,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/native_session_workflow/sparse_typed_records.rs",
         required_patterns: &[
             "native_full_width_nested_returns_restore_complete_state_without_sources",
-            "check_captures(&source, true, &[6, 11], 64)",
+            "check_captures(&source, true, &[5, 11], 64)",
             "assert_eq!(iterations, captures)",
             "(9..width).map",
             "fs::remove_file(project.0.join(\"main.ns\"))",

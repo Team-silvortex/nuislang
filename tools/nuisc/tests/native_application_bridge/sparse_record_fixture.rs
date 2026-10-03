@@ -61,6 +61,63 @@ pub fn parent_return_source(width: usize) -> String {
     )
 }
 
+pub fn literal_return_source(width: usize) -> String {
+    assert!((10..=64).contains(&width));
+    let extra = (9..width)
+        .map(|i| {
+            format!(
+                ", extra{i}: {}",
+                if i == 9 {
+                    "99".into()
+                } else {
+                    format!("state.extra{i}")
+                }
+            )
+        })
+        .collect::<String>();
+    let initialize = format!(
+        "let carry = State {{ left: state.left, right: state.right, count: state.count{extra} }};"
+    );
+    let source = return_source(width);
+    let (prefix, step) = source.split_once("fn step(").unwrap();
+    let step = step
+        .replace("tag: selected.tag, enabled: !enabled", "tag: i32_from_i64(17), enabled: !enabled")
+        .replace("count: limit", "count: limit + 1")
+        .replace("let carry = state; let i = 0;", &format!(
+            "{initialize} if state.count % 2 == 0 {{ {initialize} }} else {{ {initialize} }} let i = 0;"
+        ));
+    format!("{prefix}fn step({step}")
+}
+
+pub fn post_loop_return_source(width: usize, exit: &str) -> String {
+    let extra = (9..width)
+        .map(|i| format!(", extra{i}: carry.extra{i}"))
+        .collect::<String>();
+    let exit = if exit.is_empty() {
+        String::new()
+    } else {
+        format!("if warm == 2 {{ {exit} }}")
+    };
+    parent_return_source(width).replace(
+        "let carry = state; let i = 0;",
+        &format!(
+            "let carry = state; let warm = 0; let warm_limit = state.count;
+         while warm < warm_limit {{
+             let warm = warm + 1;
+             let carry = carry; let previous = carry.right;
+             let carry = State {{
+                 left: carry.left,
+                 right: Leaf {{ value: previous.value + 0.5, gain: previous.gain,
+                     tag: previous.tag, enabled: previous.enabled }},
+                 count: carry.count{extra}
+             }};
+             {exit}
+         }}
+         let i = 0;"
+        ),
+    )
+}
+
 fn with_width(source: &str, width: usize) -> String {
     assert!((9..=64).contains(&width));
     if width == 9 {

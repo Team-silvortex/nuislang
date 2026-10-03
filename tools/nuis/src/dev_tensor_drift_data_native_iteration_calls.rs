@@ -6,6 +6,8 @@ mod aggregate_carries;
 mod aggregate_rebinding;
 #[path = "dev_tensor_drift_data_native_aggregate_values.rs"]
 mod aggregate_values;
+#[path = "dev_tensor_drift_data_artifact_publication.rs"]
+mod artifact_publication;
 #[path = "dev_tensor_drift_data_native_bool_carries.rs"]
 mod bool_carries;
 #[path = "dev_tensor_drift_data_native_bool_rebinding.rs"]
@@ -22,12 +24,16 @@ mod flat_values;
 mod helper_entries;
 #[path = "dev_tensor_drift_data_native_literal_loops.rs"]
 mod literal_loops;
+#[path = "dev_tensor_drift_data_native_literal_snapshots.rs"]
+mod literal_snapshots;
 #[path = "dev_tensor_drift_data_native_iteration_loops.rs"]
 mod loop_calls;
 #[path = "dev_tensor_drift_data_native_loop_work.rs"]
 mod loop_work;
 #[path = "dev_tensor_drift_data_native_record_joins.rs"]
 mod record_joins;
+#[path = "dev_tensor_drift_data_native_scalar_aliases.rs"]
+mod scalar_aliases;
 #[path = "dev_tensor_drift_data_native_scoped_captures.rs"]
 mod scoped_captures;
 #[path = "dev_tensor_drift_data_native_scoped_record_inputs.rs"]
@@ -59,6 +65,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(aggregate_carries::CHECKS.iter())
         .chain(bool_carries::CHECKS.iter())
         .chain(literal_loops::CHECKS.iter())
+        .chain(literal_snapshots::CHECKS.iter())
         .chain(value_loop_exits::CHECKS.iter())
         .chain(trailing_value_loops::CHECKS.iter())
         .chain(counted_returns::CHECKS.iter())
@@ -67,6 +74,8 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(terminal_snapshots::CHECKS.iter())
         .chain(record_joins::CHECKS.iter())
         .chain(child_invariants::CHECKS.iter())
+        .chain(scalar_aliases::CHECKS.iter())
+        .chain(artifact_publication::CHECKS.iter())
 }
 
 const CHECKS: &[DevTensorDriftCheckSpec] = &[

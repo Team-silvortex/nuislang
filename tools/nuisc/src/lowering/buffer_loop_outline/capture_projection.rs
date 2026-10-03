@@ -9,10 +9,14 @@ mod bindings;
 mod dead_records;
 #[path = "capture_joins.rs"]
 mod joins;
+#[path = "capture_record_copies.rs"]
+mod record_copies;
 #[path = "capture_record_views.rs"]
 mod record_views;
 #[path = "capture_record_words.rs"]
 mod record_words;
+#[path = "capture_scalar_aliases.rs"]
+mod scalar_aliases;
 #[path = "capture_scoped.rs"]
 mod scoped_inputs;
 #[path = "capture_snapshot_scopes.rs"]
@@ -109,14 +113,14 @@ pub(super) fn project(
             .collect();
         let word_inputs =
             record_words::normalize(&mut candidate, protected.get(&name), &definitions, layouts);
+        let control_names = call_graph[index]
+            .iter()
+            .filter_map(|callee| break_controls.get(callee))
+            .cloned()
+            .collect();
         if !scoped.contains(&name) {
             // A registered name belongs to its scoped call, not every helper
             // that happens to declare the same source spelling.
-            let control_names = call_graph[index]
-                .iter()
-                .filter_map(|callee| break_controls.get(callee))
-                .cloned()
-                .collect();
             bindings::normalize(&mut candidate, &control_names);
             joins::normalize(&mut candidate, layouts);
             snapshots::normalize(&mut candidate, layouts);
@@ -126,8 +130,18 @@ pub(super) fn project(
         // Scoped helpers retain the outliner's control identities, including
         // nested break flags. Only immutable input-version aliases may disappear.
         aliases::normalize(&mut candidate, layouts);
+        // Scoped helpers still own named control identities and transport seeds.
+        if !scoped.contains(&name) {
+            scalar_aliases::normalize(&mut candidate, layouts, &control_names);
+        }
         record_views::normalize(&mut candidate, layouts);
         dead_records::normalize(&mut candidate, layouts);
+        let transport_types = word_inputs
+            .values()
+            .flat_map(|input| input.transport_types())
+            .map(|ty| ty.name.clone())
+            .collect();
+        record_copies::normalize(&mut candidate, layouts, &transport_types);
         let Some(mut plan) = plan(&candidate, protected.get(&name), layouts) else {
             continue;
         };

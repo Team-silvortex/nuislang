@@ -14,6 +14,10 @@ pub(super) struct WordInput {
 }
 
 impl WordInput {
+    pub(super) fn transport_types(&self) -> [&NirTypeRef; 2] {
+        [&self.param.ty, &self.shape.ty]
+    }
+
     pub(super) fn valid_argument(&self, arg: &NirExpr) -> bool {
         let NirExpr::StructLiteral {
             type_name,

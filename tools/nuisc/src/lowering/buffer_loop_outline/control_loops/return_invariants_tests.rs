@@ -21,7 +21,7 @@ pub(super) fn promoted(source: &str) -> (NirFunction, Vec<NirStmt>, Vec<NirStmt>
         &BTreeSet::new(),
         true,
     )
-    .unwrap();
+    .unwrap_or_else(|| panic!("bounded nested return rewrite rejected: {source}"));
     let plan = prepare(function, &layouts, &catalog, &BTreeSet::new())
         .unwrap()
         .unwrap();
