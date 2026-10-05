@@ -1,0 +1,108 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-bounded-pure-exact-bool-admission",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_entry.rs",
+        required_patterns: &[
+            "Preflight precedes recursive typing/cloning",
+            "conditional_values::prefix::expression(condition)",
+            "control_values::value_type(condition, scope, catalog, layouts)",
+            "== Some(scalar_type(\"bool\"))",
+            "does not widen logical return roots or branch/capture contracts",
+            "NirBinaryOp::Div | NirBinaryOp::Rem",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-original-site-once-only-saved-bool",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns.rs",
+        required_patterns: &[
+            "mod entry;",
+            "if !entry::admitted(condition, scope, catalog, layouts)",
+            "if !entry::has_work(condition)",
+            "if !has_return",
+            "!scope.get(name).is_some_and(scalar)",
+            "Evaluate the original entry once at its source site",
+            "Helpers and exit readiness consume only the saved bool",
+            "value: plan.condition",
+            "fallthrough::select(NirExpr::Var(condition), yes, no)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-reference-order-and-partial-exit-proofs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_entry_tests.rs",
+        required_patterns: &[
+            "conditional_return_entry_predicates_evaluate_once_at_original_site_before_complete_arms",
+            "assert_eq!(cases, 180)",
+            "conditional_return_entry_predicates_feed_saved_bool_to_replay_and_stored_exit_routes",
+            "assert_eq!(cases, 12)",
+            "conditional_return_entry_predicates_keep_current_parent_records_and_condition_only_work_local",
+            "assert_eq!(cases, 9)",
+            "let entry = entry + 2; let packet = produce(entry)",
+            "execute(&source, Some(0), &[99, 0], 0)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-source-site-budget-hygiene-and-veto-proofs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_entry_tests.rs",
+        required_patterns: &[
+            "conditional_return_entry_predicates_preserve_source_site_hygiene_and_no_helper_replay",
+            "assert_eq!(value, original)",
+            "assert_eq!(module, once)",
+            "conditional_return_entry_predicates_preflight_4096_nodes_and_depth_before_recursive_typing",
+            "NirExpr::CastI64ToI32(Box::new(tree(11)))",
+            "for count in [62, 63]",
+            "conditional_return_entry_predicates_retain_logical_effect_type_and_capture_vetoes",
+            "assert_eq!(module, before)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-default-source-binaries-and-guarded-traps",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_entry_native_tests.rs",
+        required_patterns: &[
+            "conditional_return_entry_predicates_execute_default_aot_original_site_and_short_circuit_paths",
+            "conditional_return_entry_predicates_execute_default_aot_partial_exits_and_continuation_work",
+            "super::super::super::tests::native::run",
+            "Some(\"99\\n77\\n19\")",
+            "Some(\"99\\n11\")",
+            "(true, 0, true, 2, None)",
+            "run(&source, expected)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-reference-documentation-and-boundaries",
+        path: "docs/reference/nuis-native-scalar-loop-snapshots-v1.md",
+        required_patterns: &[
+            "## Pure Computed Outer-Entry Predicates",
+            "Eight compiler tests cover 201 runtime source cases and 402 ordinary/reversed",
+            "The original expression is stored once in a fresh typed parent binding exactly",
+            "The generated helper receives only the saved bool",
+            "An entry call or division/remainder can itself supply the required computation",
+            "Arm captures remain exact owned bool/i64",
+            "AOT variants use the retained timeout",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-retained-original-veto-fixtures-now-execute",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_complete_predicate_tests.rs",
+        required_patterns: &[
+            "let outer = base.replace(\"if outer {\", \"if helper(produce(divisor)) {\")",
+            "assert_eq!(outline_test(&mut module).len(), 1)",
+            "execute(&outer, Some(11), &[99, 11], 3)",
+            "assert_eq!(module, before",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-entry-tensor-receipt-and-original-site-next-gap",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Computed outer-entry follow-up:",
+            "Computed outer-entry acceptance:",
+            "201 runtime source cases and 402 ordinary/reversed reference executions",
+            "conditional_return_entry_predicates",
+            "Previous stored-signal checkpoint:",
+            "active/88",
+            "intermediate branch suffixes",
+        ],
+    },
+];

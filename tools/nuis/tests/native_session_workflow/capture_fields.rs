@@ -119,9 +119,198 @@ fn native_scalar_alias_copies_build_cache_and_restore_without_sources() {
     check_sparse_workflow(&aliases::scalar_copy_source(false), Some(&[1, 2]), 0);
     eprintln!("scalar-alias artifact variant: unused-call");
     check_sparse_workflow(&aliases::scalar_copy_source(true), Some(&[2, 2]), 0);
-    // A protected transport remains a single readonly 64-word array parameter.
+    eprintln!("scalar-alias artifact variant: scalar-call-field");
+    check_sparse_workflow(&aliases::scalar_transport_source(), Some(&[2, 2]), 0);
+    // A whole-record transport still retains its readonly 64-word parameter.
     eprintln!("scalar-alias artifact variant: protected-transport");
-    check_sparse_workflow(&aliases::scalar_transport_source(), Some(&[0, 2]), 0);
+    check_sparse_workflow(&aliases::aggregate_transport_source(), Some(&[0, 2]), 0);
+}
+
+#[test]
+fn native_scalar_call_field_checks_remain_selected_after_source_free_restore() {
+    check_selected_unused_call(&aliases::scalar_checked_transport_source());
+}
+
+#[test]
+fn native_evaluated_scalar_records_preserve_source_free_calls_and_checks() {
+    check_sparse_workflow(&aliases::evaluated_scalar_source(false), Some(&[2, 2]), 0);
+    check_selected_unused_call(&aliases::evaluated_scalar_source(true));
+    check_sparse_workflow(
+        &aliases::evaluated_scalar_transport_source(),
+        Some(&[0, 2]),
+        0,
+    );
+}
+
+#[test]
+fn native_aggregate_result_views_preserve_independent_source_free_returns_and_checks() {
+    check_sparse_workflow(&aliases::aggregate_result_source(false), Some(&[2, 2]), 0);
+    let checked = aliases::aggregate_result_source(true);
+    assert!(checked.contains("let first = produce(payload.f0, payload.f62 + 1)"));
+    assert!(checked.contains("const later: Payload = produce(payload.f0 + 30, payload.f62)"));
+    check_selected_unused_call(&checked);
+    check_sparse_workflow(
+        &aliases::aggregate_result_transport_source(),
+        Some(&[0, 2]),
+        0,
+    );
+}
+
+#[test]
+fn native_inline_record_arguments_preserve_source_free_field_checks_and_results() {
+    check_sparse_workflow(
+        &aliases::inline_record_argument_source(false),
+        Some(&[2, 2]),
+        0,
+    );
+    let checked = aliases::inline_record_argument_source(true);
+    assert!(checked.contains("unused: checked(payload.f62 + 1)"));
+    assert!(checked.contains("{ unused: checked(payload.f62),"));
+    check_selected_unused_call(&checked);
+    check_sparse_workflow(
+        &aliases::inline_record_argument_transport_source(),
+        Some(&[0, 2]),
+        0,
+    );
+}
+
+#[test]
+fn native_materialized_record_arguments_preserve_source_free_order_and_checks() {
+    check_sparse_workflow(
+        &aliases::materialized_record_argument_source(false),
+        Some(&[2, 2]),
+        0,
+    );
+    let checked = aliases::materialized_record_argument_source(true);
+    assert!(checked.contains("let first = produce(first_alias)"));
+    assert!(checked.contains("const later: Payload = produce(later_alias)"));
+    assert!(checked.contains("unused: checked(payload.f62 + 1)"));
+    assert!(checked.contains("{ unused: checked(payload.f62),"));
+    check_selected_unused_call(&checked);
+    check_sparse_workflow(
+        &aliases::materialized_record_argument_transport_source(),
+        Some(&[0, 2]),
+        0,
+    );
+}
+
+#[test]
+fn native_stored_projections_preserve_source_free_unselected_result_checks() {
+    check_sparse_workflow(&aliases::stored_projection_source(false), Some(&[2, 2]), 0);
+    let checked = aliases::stored_projection_source(true);
+    assert!(checked.contains("let first = produce(payload.f0, payload.f62 + 1).selected"));
+    assert!(checked
+        .contains("const later: SelectedPayload = produce(payload.f0 + 30, payload.f62).selected"));
+    assert!(checked.contains("f62: checked(unused)"));
+    check_selected_unused_call(&checked);
+    check_sparse_workflow(
+        &aliases::stored_projection_transport_source(),
+        Some(&[0, 2]),
+        0,
+    );
+}
+
+fn check_selected_unused_call(source: &str) {
+    if !cfg!(all(
+        any(target_os = "macos", target_os = "linux"),
+        target_pointer_width = "64"
+    )) {
+        return;
+    }
+    let project = Project::new(source);
+    project.build(None);
+    let output = project.0.join("build");
+    let report =
+        nuisc::aot::verify_build_manifest(&output.join("nuis.build.manifest.toml")).unwrap();
+    let llvm_name = format!("{}.ll", report.artifact_binary_name);
+    let llvm = fs::read_to_string(output.join(&llvm_name)).unwrap();
+    assert!(llvm.contains("call i64 @nuis_fn_checked("));
+    assert!(!llvm.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1("));
+    assert!(!llvm.contains("call void @nuis_scheduler_owned_aggregate_drop_v1("));
+    let check = |path: &Path| {
+        for flag in [0, 1] {
+            let input = format!("12,3,{flag},99");
+            let run = project.command(
+                "run-artifact",
+                path,
+                &[
+                    "--native-session",
+                    "counter",
+                    "--open-args",
+                    &input,
+                    "--event-args",
+                    "",
+                    "--close-args",
+                    "",
+                ],
+            );
+            let stderr = String::from_utf8_lossy(&run.stderr);
+            assert!(run.stdout.is_empty());
+            let observed = states(&run);
+            assert_eq!(run.status.success(), flag == 0, "{input}: {stderr}");
+            assert_eq!(
+                observed.len(),
+                if flag == 0 { 3 } else { 1 },
+                "{input}: {stderr}"
+            );
+            if flag == 1 {
+                assert!(stderr.contains("no fallback was attempted"), "{stderr}");
+                assert!(!stderr.contains("native_session_completed=1"), "{stderr}");
+                assert!(!stderr.contains("SIGKILL"), "{stderr}");
+            }
+            for (phase, state) in ["open", "event", "close"].iter().zip(&observed) {
+                let fields = (0..64)
+                    .map(|i| {
+                        let value = match i {
+                            0 => {
+                                if *phase == "open" {
+                                    12
+                                } else {
+                                    33
+                                }
+                            }
+                            1 => 3,
+                            2 => flag,
+                            63 => 99,
+                            _ => i,
+                        };
+                        format!("f{i}: {value}")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                assert_eq!(
+                    state,
+                    &format!("{phase}:State{{payload: Payload{{{fields}}}}}")
+                );
+            }
+        }
+    };
+    check(&output);
+    assert!(project.build(None).contains("compile_cache: hit"));
+    check(&output);
+    fs::write(output.join(&llvm_name), format!("{llvm}\n")).unwrap();
+    rejected_before_open(project.command(
+        "run-artifact",
+        &output,
+        &["--native-session", "counter", "--open-args", "12,3,0,99"],
+    ));
+    fs::write(output.join(&llvm_name), &llvm).unwrap();
+    let artifact = project.0.join("nuis.compiled.artifact");
+    fs::copy(output.join("nuis.compiled.artifact"), &artifact).unwrap();
+    fs::remove_dir_all(&output).unwrap();
+    fs::remove_file(project.0.join("main.ns")).unwrap();
+    fs::remove_file(project.0.join("nuis.toml")).unwrap();
+    success(project.command("verify-artifact", &artifact, &[]));
+    let restored = project.0.join("restored");
+    for _ in 0..2 {
+        success(project.command(
+            "materialize-artifact",
+            &artifact,
+            &[restored.to_str().unwrap()],
+        ));
+        assert_eq!(fs::read_to_string(restored.join(&llvm_name)).unwrap(), llvm);
+        check(&restored);
+    }
 }
 
 #[test]

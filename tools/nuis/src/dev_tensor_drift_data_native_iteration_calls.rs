@@ -4,6 +4,8 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 mod aggregate_carries;
 #[path = "dev_tensor_drift_data_native_aggregate_rebinding.rs"]
 mod aggregate_rebinding;
+#[path = "dev_tensor_drift_data_native_aggregate_result_views.rs"]
+mod aggregate_result_views;
 #[path = "dev_tensor_drift_data_native_aggregate_values.rs"]
 mod aggregate_values;
 #[path = "dev_tensor_drift_data_artifact_publication.rs"]
@@ -12,32 +14,66 @@ mod artifact_publication;
 mod bool_carries;
 #[path = "dev_tensor_drift_data_native_bool_rebinding.rs"]
 mod bool_rebinding;
+#[path = "dev_tensor_drift_data_native_caller_records.rs"]
+mod caller_records;
+#[path = "dev_tensor_drift_data_native_caller_spills.rs"]
+mod caller_spills;
 #[path = "dev_tensor_drift_data_native_child_invariants.rs"]
 mod child_invariants;
+#[path = "dev_tensor_drift_data_native_computed_logical_gates.rs"]
+mod computed_logical_gates;
+#[path = "dev_tensor_drift_data_native_computed_return_arms.rs"]
+mod computed_return_arms;
+#[path = "dev_tensor_drift_data_native_conditional_returns.rs"]
+mod conditional_returns;
 #[path = "dev_tensor_drift_data_native_control_elision.rs"]
 mod control_elision;
 #[path = "dev_tensor_drift_data_native_counted_returns.rs"]
 mod counted_returns;
+#[path = "dev_tensor_drift_data_native_entry_predicates.rs"]
+mod entry_predicates;
+#[path = "dev_tensor_drift_data_native_evaluated_scalar_records.rs"]
+mod evaluated_scalar_records;
 #[path = "dev_tensor_drift_data_native_iteration_values.rs"]
 mod flat_values;
 #[path = "dev_tensor_drift_data_native_helper_entries.rs"]
 mod helper_entries;
+#[path = "dev_tensor_drift_data_native_inline_record_args.rs"]
+mod inline_record_args;
+#[path = "dev_tensor_drift_data_native_inline_return_conditions.rs"]
+mod inline_return_conditions;
 #[path = "dev_tensor_drift_data_native_literal_loops.rs"]
 mod literal_loops;
 #[path = "dev_tensor_drift_data_native_literal_snapshots.rs"]
 mod literal_snapshots;
+#[path = "dev_tensor_drift_data_native_logical_arm_roots.rs"]
+mod logical_arm_roots;
+#[path = "dev_tensor_drift_data_native_logical_entries.rs"]
+mod logical_entries;
+#[path = "dev_tensor_drift_data_native_logical_trees.rs"]
+mod logical_trees;
 #[path = "dev_tensor_drift_data_native_iteration_loops.rs"]
 mod loop_calls;
 #[path = "dev_tensor_drift_data_native_loop_work.rs"]
 mod loop_work;
+#[path = "dev_tensor_drift_data_native_materialized_record_args.rs"]
+mod materialized_record_args;
 #[path = "dev_tensor_drift_data_native_record_joins.rs"]
 mod record_joins;
+#[path = "dev_tensor_drift_data_native_return_signals.rs"]
+mod return_signals;
+#[path = "dev_tensor_drift_data_native_return_suffixes.rs"]
+mod return_suffixes;
 #[path = "dev_tensor_drift_data_native_scalar_aliases.rs"]
 mod scalar_aliases;
+#[path = "dev_tensor_drift_data_native_scalar_call_fields.rs"]
+mod scalar_call_fields;
 #[path = "dev_tensor_drift_data_native_scoped_captures.rs"]
 mod scoped_captures;
 #[path = "dev_tensor_drift_data_native_scoped_record_inputs.rs"]
 mod scoped_record_inputs;
+#[path = "dev_tensor_drift_data_native_stored_projections.rs"]
+mod stored_projections;
 #[path = "dev_tensor_drift_data_native_terminal_continuations.rs"]
 mod terminal_continuations;
 #[path = "dev_tensor_drift_data_native_terminal_snapshots.rs"]
@@ -53,6 +89,14 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
     CHECKS
         .iter()
         .chain(flat_values::CHECKS.iter())
+        .chain(return_signals::CHECKS.iter())
+        .chain(return_suffixes::CHECKS.iter())
+        .chain(entry_predicates::CHECKS.iter())
+        .chain(logical_entries::CHECKS.iter())
+        .chain(logical_arm_roots::CHECKS.iter())
+        .chain(computed_logical_gates::CHECKS.iter())
+        .chain(computed_return_arms::CHECKS.iter())
+        .chain(logical_trees::CHECKS.iter())
         .chain(loop_calls::CHECKS.iter())
         .chain(loop_work::CHECKS.iter())
         .chain(helper_entries::CHECKS.iter())
@@ -75,6 +119,16 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         .chain(record_joins::CHECKS.iter())
         .chain(child_invariants::CHECKS.iter())
         .chain(scalar_aliases::CHECKS.iter())
+        .chain(scalar_call_fields::CHECKS.iter())
+        .chain(evaluated_scalar_records::CHECKS.iter())
+        .chain(aggregate_result_views::CHECKS.iter())
+        .chain(inline_record_args::CHECKS.iter())
+        .chain(materialized_record_args::CHECKS.iter())
+        .chain(stored_projections::CHECKS.iter())
+        .chain(caller_records::CHECKS.iter())
+        .chain(caller_spills::CHECKS.iter())
+        .chain(conditional_returns::CHECKS.iter())
+        .chain(inline_return_conditions::CHECKS.iter())
         .chain(artifact_publication::CHECKS.iter())
 }
 

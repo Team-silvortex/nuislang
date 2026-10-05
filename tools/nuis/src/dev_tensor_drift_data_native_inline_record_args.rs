@@ -1,0 +1,106 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-bounded-nominal-typing",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_record_views.rs",
+        required_patterns: &[
+            "let declared = layouts.fields(type_name)?",
+            "charge(remaining, declared.len())?",
+            "fields.len() != declared.len()",
+            "if !type_args.is_empty()",
+            "!= expected.remove(name)?",
+            "This proves an argument kind, not a total/erasable constructor",
+            ".filter(|_| !matches!(value, NirExpr::StructLiteral { .. }))",
+            "scalar_helpers::typed_call_type(callee, &types, catalog)",
+            "scalar_aliases::validate_expansion(&result, &mut context.remaining)?",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-transactional-catalog-boundary",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs",
+        required_patterns: &[
+            "result_catalog.retain(|name, _| !generated.contains(name))",
+            "if !scoped.contains(&name)",
+            "record_views::normalize_call_results(",
+            "valid_caller(&module.functions[*i].body, &name, &plan)",
+            "matches!(input, Input::Keep(_)) || access(arg).is_some()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-unit-and-oracle-evidence",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_inline_record_args_tests.rs",
+        required_patterns: &[
+            "inline_record_args_keep_full_nested_ordered_arguments_and_independent_calls",
+            "inline_record_args_require_exact_nominal_fields_kinds_and_no_generics",
+            "inline_record_args_reject_unknown_calls_changed_versions_and_unsupported_fields",
+            "inline_record_args_keep_whole_consumers_and_unbound_result_projections_conservative",
+            "inline_record_args_keep_lexical_readiness_and_the_original_scalar_only_mode",
+            "inline_record_args_exhaustion_and_depth_never_install_partial_views",
+            "inline_record_args_preserve_checked_unused_fields_with_an_independent_oracle",
+            "inline_record_args_project_only_after_every_caller_agrees_without_spilling_calls",
+            "for budget in 1..1024",
+            "assert_eq!(module, before)",
+            "yir.nodes.reverse()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-native-full-results-and-field-work",
+        path: "tools/nuisc/tests/native_application_bridge/typed_sparse_captures.rs",
+        required_patterns: &[
+            "typed_sparse_inline_record_arguments_keep_original_work_and_full_results",
+            "typed_sparse_inline_record_arguments_keep_whole_consumers_conservative",
+            "body.matches(\"call [64 x i64] @nuis_fn_produce(\").count()",
+            "body.matches(\"call i64 @nuis_fn_relay(\").count()",
+            "!body.contains(\"insertvalue [64 x i64]\")",
+            "check_sparse_captures(&source, Some(&[3, 3]), 0)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-mixed-order-and-checked-fixtures",
+        path: "tools/nuisc/tests/native_application_bridge/typed_alias_capture_fixture.rs",
+        required_patterns: &[
+            "pub fn inline_record_argument_source(checked: bool)",
+            "pub fn inline_record_argument_transport_source()",
+            "CallInput { used: relay(payload.f0), unused: relay(payload.f62) }",
+            "CallInput { unused: relay(payload.f62), used: relay(payload.f0 + 30) }",
+            "unused: checked(payload.f62 + 1)",
+            "{ unused: checked(payload.f62),",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-source-free-checked-publication",
+        path: "tools/nuis/tests/native_session_workflow/capture_fields.rs",
+        required_patterns: &[
+            "native_inline_record_arguments_preserve_source_free_field_checks_and_results",
+            "let checked = aliases::inline_record_argument_source(true)",
+            "&aliases::inline_record_argument_transport_source(),",
+            "check_selected_unused_call(&checked)",
+            "if flag == 0 { 3 } else { 1 }",
+            "!stderr.contains(\"SIGKILL\")",
+            "for _ in 0..2",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-tensor-scope",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Directly written record call-argument follow-up:",
+            "argument typing is not constructor elision or computed-call spilling",
+            "native_inline_record_arguments",
+            "active/86 is unchanged",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-inline-record-arguments-documentation-boundary",
+        path: "docs/reference/nuis-native-scalar-loop-snapshots-v1.md",
+        required_patterns: &[
+            "## Inline Record Call Arguments",
+            "This is a type proof, not an erasable-constructor proof",
+            "helper(make(Input { ... }))",
+            "before entering the second producer",
+            "whole-body rollback",
+        ],
+    },
+];

@@ -16,6 +16,7 @@ const MAX_FUNCTION_CALL_DEPTH: usize = 128;
 const MAX_SCOPED_LOOP_ITERATIONS: usize = 100_000;
 
 mod call_result;
+mod entry_exits;
 mod function_session;
 mod registered_execution;
 use call_result::validate_call_result;
@@ -31,18 +32,14 @@ pub(super) fn execute_module_with_registry(
         .iter()
         .flat_map(|function| function.body_nodes.iter().cloned())
         .collect::<BTreeSet<_>>();
-    let entry_nodes = module
-        .functions
-        .iter()
-        .filter(|function| function.role == YirFunctionRole::Entry)
-        .flat_map(|function| function.body_nodes.iter().cloned())
-        .collect::<BTreeSet<_>>();
+    let mut entries = entry_exits::EntryExits::new(module);
     let mut delayed = BTreeMap::new();
     for node_name in order {
-        if all_function_nodes.contains(&node_name) && !entry_nodes.contains(&node_name) {
+        if all_function_nodes.contains(&node_name) && !entries.admits(&node_name) {
             continue;
         }
         engine.execute_named_node(&node_name, &mut delayed)?;
+        entries.observe(&node_name, &mut engine, &mut delayed)?;
     }
     reject_remaining_delayed(&delayed)?;
     Ok(engine.into_trace())

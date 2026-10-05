@@ -21,7 +21,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Scoped helpers still own named control identities and transport seeds",
             "scalar_aliases::normalize(&mut candidate, layouts, &control_names)",
             "record_views::normalize(&mut candidate, layouts)",
-            ".all(|i| valid_caller(&module.functions[*i].body, &name, &plan))",
+            "valid_caller(&module.functions[*i].body, &name, &plan)",
+            "caller_records::valid(&module.functions[*i], &name, &plan, layouts)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -56,7 +57,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "native_scalar_alias_copies_build_cache_and_restore_without_sources",
             "&aliases::scalar_copy_source(false), Some(&[1, 2])",
             "&aliases::scalar_copy_source(true), Some(&[2, 2])",
-            "&aliases::scalar_transport_source(), Some(&[0, 2])",
+            "&aliases::aggregate_transport_source(), Some(&[0, 2])",
             "fs::remove_file(project.0.join(\"main.ns\"))",
             "assert_eq!(fs::read_to_string(restored.join(&llvm_name)).unwrap(), llvm)",
         ],

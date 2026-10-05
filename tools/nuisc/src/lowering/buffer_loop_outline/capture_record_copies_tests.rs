@@ -1,6 +1,9 @@
 use super::*;
 use crate::lowering::scalar_record_shape::source_value;
 
+#[path = "capture_record_scalar_calls_tests.rs"]
+mod scalar_calls;
+
 const COPY: &str = "State { left: Leaf { value: state.left.value,
     gain: state.left.gain, tag: state.left.tag, enabled: state.left.enabled },
     right: other.right, count: state.count + other.count }";
@@ -159,7 +162,7 @@ fn private_record_copies_preserve_exact_pure_transport_and_codec_reconstructions
     for codecs in [false, true] {
         let source = COPY.replace("state.count + other.count", "state.count");
         let mut module = module(
-            &format!("let snapshot = {source}; return read_count(snapshot.count);"),
+            &format!("let snapshot = {source}; return consume(snapshot);"),
             "",
         );
         if codecs {
@@ -188,14 +191,14 @@ fn private_record_copies_preserve_exact_pure_transport_and_codec_reconstructions
 
 #[test]
 fn private_record_copies_preserve_registered_types_and_immutable_transport_chains() {
-    for alias in ["snapshot.count", "forwarded"] {
+    for alias in ["snapshot", "forwarded"] {
         let binding = if alias == "forwarded" {
-            "let selected = snapshot.count; const forwarded: i64 = selected;"
+            "let selected = snapshot; const forwarded: State = selected;"
         } else {
             ""
         };
         let mut module = module(
-            &format!("let snapshot = {COPY}; {binding} return read_count({alias});"),
+            &format!("let snapshot = {COPY}; {binding} return consume({alias});"),
             "",
         );
         let before = module.clone();
@@ -303,11 +306,12 @@ fn private_record_copies_require_exact_nominal_types_and_valid_observed_paths() 
 fn private_record_copies_keep_all_callers_transactional() {
     for computed in [false, true] {
         let call = if computed { "relay(state)" } else { "state" };
+        let suffix = if computed { " + 0" } else { "" };
         let mut module = module(
             &format!("let snapshot = {COPY}; return snapshot.count;"),
             &format!(
                 "fn first(state: State) -> i64 {{ return helper(state, state); }}
-                fn second(state: State) -> i64 {{ return helper({call}, state); }}"
+                fn second(state: State) -> i64 {{ return helper({call}, state){suffix}; }}"
             ),
         );
         let layouts = control_values::TypedLayouts::collect(&module);

@@ -118,7 +118,7 @@ fn terminal_snapshots_preserve_whole_uses_and_computed_caller_transactions() {
         } else {
             ("Pair", "old.a", "helper(relay(state), flag)")
         };
-        let mut module = module(&format!("fn relay(state: State) -> State {{ return state; }}
+        let mut module = module(&format!("fn relay(state: State) -> State {{ print(0); return state; }}
             fn helper(state: State, flag: bool) -> {returned} {{
                 let old = state;
                 if flag {{

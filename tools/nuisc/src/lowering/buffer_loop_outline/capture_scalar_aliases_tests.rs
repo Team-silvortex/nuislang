@@ -198,7 +198,7 @@ fn private_scalar_aliases_remain_transactional_when_any_caller_is_computed() {
         "let count = state.count; let snapshot = State { left: state.left, right: state.right, count: count }; if snapshot.left.tag == i32_from_i64(7) { return 1; } return 0;",
         "fn relay(state: State) -> State { return state; }
          fn entry(state: State, other: State, flag: bool) -> i64 { return helper(state, other, flag); }
-         fn veto(state: State, other: State, flag: bool) -> i64 { return helper(relay(state), other, flag); }"
+         fn veto(state: State, other: State, flag: bool) -> i64 { return 0 + helper(relay(state), other, flag); }"
     );
     let before = module.clone();
     let layouts = control_values::TypedLayouts::collect(&module);

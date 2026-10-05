@@ -450,6 +450,15 @@ impl Parser {
     }
 
     pub(super) fn parse_argument_list(&mut self, terminator: char) -> Result<Vec<AstExpr>, String> {
+        // Call delimiters disambiguate literals from an enclosing condition's block.
+        let old = self.allow_struct_literals;
+        self.allow_struct_literals = true;
+        let parsed = self.parse_argument_list_contents(terminator);
+        self.allow_struct_literals = old;
+        parsed
+    }
+
+    fn parse_argument_list_contents(&mut self, terminator: char) -> Result<Vec<AstExpr>, String> {
         let mut args = Vec::new();
         if self.peek_symbol(terminator) {
             return Ok(args);

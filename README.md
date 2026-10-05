@@ -381,7 +381,130 @@ Stable fields retain their evaluated origins; see the [loop snapshot proof](docs
 Unobserved total input-field copies can now disappear without erasing computed fields or transport provenance.
 Bounded scalar input-alias chains also expose those copies: a 64-field guarded record
 fixture uses 2/3 private arguments, or 3/3 when it retains an unused selected call.
-Changed locals, codecs, scoped control identities and public inputs remain conservative.
+That input-alias proof does not promote computed/local versions or codecs, and it
+leaves scoped control identities and public inputs unchanged.
+Exact scalar call-field demand now distinguishes a field observation from whole-record
+transport. The computed 64-field fixture forwards a scalar with two `i64` captures
+plus its guard, while its calls still execute and a real whole-record consumer
+retains the readonly 64-word input. Public state and native bounds are unchanged.
+Already-evaluated immutable scalar locals now have a separate record-view proof:
+private record copies may disappear, but their original calls, codecs and checked
+work remain in place. This does not grant constant or loop-backedge authority.
+Completed pure aggregate calls now have a separate bounded result-view proof:
+two independent 64-word returns stay fully evaluated and separately stored, while
+later total copies no longer force a full private capture. The selected branch
+uses two `i64` captures plus its guard; whole-record consumers remain conservative.
+Inline computed calls at projected helper sites, opaque/effectful results and changing versions are
+not granted this authority, and no public ABI or native limit is widened.
+Completed calls can now retain directly written, nested record arguments under
+exact nominal/field-kind proof. Every original argument field and selected check
+still executes once; only later copies of the completed result can disappear.
+This does not spill or project an inline computed argument at a private helper
+call site, and one unproven caller still vetoes the complete rewrite.
+Materialized immutable record arguments now carry the same exact kind proof
+through local aliases into later calls. Checked constructors remain at their
+original bindings, and whole call operands retain their storage; only later
+total result copies can disappear. Scope, version and transport exclusions remain.
+Stored call-result field initializers now have a separate bounded proof:
+`let part = produce(...).field` keeps the entire producer and all unselected
+result work, then permits later total copies of the stored part to disappear.
+Unbound inline projections remain conservative; this stored-result proof does not
+authorize caller spilling.
+An additional [caller-side total record proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#total-inline-caller-records)
+selects fields from inline constructors built only from unwritten input paths.
+Every field and caller must pass; computed fields and registered codec boundaries
+remain conservative. Scoped targets keep their original caller proof, and this
+does not expand source-function projection eligibility.
+Computed record operands now have a separate [binding-root materialization proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#binding-root-caller-materialization):
+`let/const` root calls can preserve every complete operand in ordered typed bindings
+before private projection. Checks in unused fields still run. A separate
+[return-root proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#return-root-caller-materialization)
+now preserves complete operands immediately before `return helper(...)`, without
+moving work across branches or early exits. A separate
+[if-condition-root proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#if-condition-root-caller-materialization)
+preserves complete operands before direct `if helper(...)` calls with an exact
+owned `bool` result. The separate [selected short-circuit RHS proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#selected-short-circuit-rhs-materialization)
+keeps complete operands inside the selected arm of `gate && helper(...)` or
+`gate || helper(...)`, with a stable owned bool input/literal gate. Shared guarded
+value lowering now supports bounded fresh pure prefixes and prevents eager RHS
+checks in these source conditions without requiring private projection.
+The shared [source logical value-root route](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#source-logical-value-roots)
+also guards supported `let/const` initializers and owned-bool `return` roots outside
+loops, including admitted selected arms and current local versions. Reference
+entry exits now use the registered return contract instead of executing the tail.
+The separate [effectful-parent conditional-return proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#effectful-parent-conditional-returns)
+guards top-level pure `bool`/`i64` return computations while retaining parent
+effects, current scalar versions and exits. It does not relax the speculation
+barrier or authorize branch-local effects, enclosing branches or loop returns.
+A separate [pure return-prefix proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#pure-prefixes-before-conditional-returns)
+keeps bounded fresh `let/const` calculations and local records inside the selected
+return arm, including unused checks. Parent effects and scalar capture rules stay
+unchanged; prefix work is not skipped merely because a later RHS short-circuits.
+A separate [pure terminal-tree proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#pure-terminal-return-trees)
+admits bounded complete nested return branches under the original outer guard.
+Every leaf returns, sibling locals stay isolated, and parent effects or a
+continuation suffix are never copied into the pure helper.
+A separate [pure fallthrough-tree proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#pure-fallthrough-return-trees)
+admits empty continuation leaves beside pure return leaves. Stable parent bool
+inputs determine whether to exit after the selected helper runs; a real `false/0`
+return is not confused with the helper's unused seed. Computed exit predicates
+and effectful continuation bodies remain outside that proof.
+A separate [pure continuation-work proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#pure-work-before-continuation-leaves)
+also keeps fresh `let/const` work in continuation leaves and direct outer arms.
+Unused checks and calls remain selected; an internal seed follows that work
+without becoming a source exit. At least one original return is still required.
+A separate [local atom-alias proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#local-atom-aliases-for-exit-readiness)
+lets fresh boolean alias chains select a partial return. Only aliases of current
+parent bool atoms or literals are flattened for readiness; original local work
+stays in place. Call-derived/computed predicates and branch effects remain excluded.
+A separate [total comparison-readiness proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#total-comparisons-for-exit-readiness)
+admits local bool equality/inequality and signed i64 comparisons of stable atoms
+or their aliases. Normalized conditions stay at most three nodes; calls, fields,
+arithmetic-derived operands and nested comparisons remain excluded.
+A separate [inline partial-tree comparison proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#inline-total-comparisons-in-partial-return-trees)
+allows those total comparisons directly in internal `if` conditions beside
+continuation leaves, reusing the shared typed facts and unchanged budgets.
+This does not authorize call-derived partial-tree predicates or replay any original work.
+A separate [complete-tree computed-predicate proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#pure-computed-predicates-in-complete-return-trees)
+allows exact owned bool conditions from bounded pure calls, field reads and
+checked calculations when every internal leaf returns. The original condition
+runs once inside selected work, with no reconstructed exit flag.
+A separate [stored partial-tree exit signal](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#stored-exit-signals-for-partial-return-trees)
+now admits bounded pure computed conditions beside continuation leaves. A private
+typed result stores exit readiness and the actual bool/i64 value together;
+the parent reads that completed snapshot without replaying a condition or call.
+Original logical returns are materialized before record construction so their
+short-circuit RHS remains guarded.
+A separate [computed outer-entry proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#pure-computed-outer-entry-predicates)
+now evaluates bounded pure bool calls, field reads and arithmetic/comparisons
+once at the original parent statement site. Helpers and exit readiness read only
+the saved bool; earlier exits, parent effects and checked operands stay ordered.
+This does not widen logical entry conditions, branch effects or resource captures.
+A separate [bounded intermediate-suffix proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#bounded-pure-intermediate-suffixes)
+now carries pure branch tails into continuing paths, never past an observed return.
+Original lexical scopes and expanded statement/expression budgets are checked
+before cloning; branch effects and resource captures remain excluded.
+A separate [single-edge logical entry proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#single-edge-logical-outer-entries)
+now admits an owned bool atom/literal on the left of `&&` or `||` with a bounded
+pure nonlogical RHS. Shared value-root lowering guards the complete RHS before
+publishing the saved entry bool; later bounded extensions are listed below.
+A separate [logical return-arm root proof](docs/reference/nuis-native-scalar-loop-snapshots-v1.md#guarded-logical-roots-in-return-arms)
+adds the same single edge at internal `if` conditions and fresh bool `let/const`
+roots, including partial returns and bounded pure suffixes. Shared guards retain
+selected checks; non-total exit decisions use stored signals, never predicate replay.
+A separate [computed logical gate proof](docs/reference/nuis-native-computed-logical-gates-v1.md)
+adds bounded pure calls, field checks and comparisons on the left of source bool
+value roots and outer return entries. The left runs once before the guarded RHS;
+The [computed return-arm extension](docs/reference/nuis-native-computed-logical-gates-v1.md#computed-return-arm-gates)
+adds this gate to bounded return-tree conditions, fresh bool bindings and return
+roots, retaining shared original/expanded budgets and scalar-only parent captures.
+Non-total partial exits use stored signals; local record checks stay selected.
+A [nested logical-tree extension](docs/reference/nuis-native-computed-logical-gates-v1.md#nested-logical-trees)
+guards direct `&&`/`||` children at these roots with shared work/depth/32-edge
+budgets and linear helper growth, retaining original scope, exits and selected checks.
+Other logical leaf embeddings, loops and scoped/word transports retain their
+original projection rules. Delimited call arguments now admit
+struct literals inside conditions without consuming the enclosing statement block.
 Cache and restored host binaries now use [fresh-file publication](docs/reference/nuis-artifact-file-publication-v1.md).
 A minimal cache regression reproduced host `SIGKILL` after in-place replacement despite
 a valid on-disk signature; the fix changes file publication, not LLVM or callback admission.

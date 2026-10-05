@@ -248,3 +248,105 @@ fn registered_function_exit_errors_propagate_without_fallback_or_retry() {
     assert_eq!(executions.load(Ordering::Relaxed), 1);
     assert_eq!(resumes.load(Ordering::Relaxed), 1);
 }
+
+fn entry_exit_module() -> YirModule {
+    let mut module = module("helper");
+    module.nodes.clear();
+    module.functions.clear();
+    for (name, op, args) in [
+        ("early", "exit_probe.stop", vec![]),
+        ("tail", "exit_probe.tail", vec![]),
+        ("other", "cpu.const_i64", vec!["7".into()]),
+        ("global", "cpu.const_i64", vec!["9".into()]),
+    ] {
+        module.nodes.push(Node {
+            name: name.into(),
+            resource: "cpu0".into(),
+            op: Operation::parse(op, args).unwrap(),
+        });
+    }
+    module.functions.push(YirFunction {
+        name: "main".into(),
+        domain: "cpu".into(),
+        role: YirFunctionRole::Entry,
+        parameters: vec![],
+        body_nodes: vec!["early".into(), "tail".into()],
+        result: Some(YirFunctionResult {
+            ty: "i64".into(),
+            ownership: YirValueOwnership::Value,
+            node: "tail".into(),
+        }),
+    });
+    for (from, to) in [("early", "tail"), ("tail", "other"), ("other", "global")] {
+        module.edges.push(yir_core::Edge {
+            kind: yir_core::EdgeKind::Effect,
+            from: from.into(),
+            to: to.into(),
+        });
+    }
+    module
+}
+
+#[test]
+fn registered_entry_exit_skips_only_owned_tail_and_publishes_the_actual_result() {
+    for reversed in [false, true] {
+        let mut module = entry_exit_module();
+        if reversed {
+            module.nodes.reverse();
+            module.edges.reverse();
+            module.functions.reverse();
+            for function in &mut module.functions {
+                function.body_nodes.reverse();
+            }
+        }
+        let executions = Arc::new(AtomicUsize::new(0));
+        let mut registry = yir_verify::default_registry();
+        registry.register(ExitMod {
+            executions: executions.clone(),
+            reject: false,
+        });
+        let trace = yir_exec::execute_module_with_registry(&module, &registry).unwrap();
+        assert_eq!(executions.load(Ordering::Relaxed), 1);
+        assert_eq!(trace.values["tail"], Value::Int(42));
+        assert_eq!(trace.values["other"], Value::Int(7));
+        assert_eq!(trace.values["global"], Value::Int(9));
+        assert!(!trace
+            .lane_steps
+            .values()
+            .flatten()
+            .any(|step| step.ends_with(" -> tail")));
+    }
+}
+
+#[test]
+fn registered_entry_exit_errors_propagate_without_executing_tail_or_retrying() {
+    let module = entry_exit_module();
+    let executions = Arc::new(AtomicUsize::new(0));
+    let mut registry = yir_verify::default_registry();
+    registry.register(ExitMod {
+        executions: executions.clone(),
+        reject: true,
+    });
+    let error = yir_exec::execute_module_with_registry(&module, &registry).unwrap_err();
+    assert!(error.contains("registered exit rejected"), "{error}");
+    assert_eq!(executions.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn registered_entry_exit_does_not_relax_single_entry_verification() {
+    let mut module = entry_exit_module();
+    let mut second = module.functions[0].clone();
+    second.name = "second".into();
+    second.body_nodes = vec!["other".into()];
+    second.result.as_mut().unwrap().node = "other".into();
+    module.functions.push(second);
+    let executions = Arc::new(AtomicUsize::new(0));
+    let mut registry = yir_verify::default_registry();
+    registry.register(ExitMod {
+        executions: executions.clone(),
+        reject: false,
+    });
+    let error = yir_exec::execute_module_with_registry(&module, &registry).unwrap_err();
+    assert!(error.contains("2 entry functions"), "{error}");
+    assert_eq!(executions.load(Ordering::Relaxed), 0);
+}

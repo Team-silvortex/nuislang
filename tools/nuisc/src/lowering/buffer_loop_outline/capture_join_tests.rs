@@ -176,7 +176,7 @@ fn fallthrough_record_joins_leave_whole_uses_and_computed_callers_unchanged() {
         (
             "if flag { let state = State { a: state.b, b: state.a, unused: 0 }; }",
             "state.a.x",
-            "helper(relay(state), flag)",
+            "0 + helper(relay(state), flag)",
         ),
     ] {
         let mut module = module(&format!(

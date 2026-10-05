@@ -26,7 +26,7 @@ fn typed_sparse_scalar_aliases_preserve_unused_calls_at_the_selected_branch() {
 
 #[test]
 fn typed_sparse_scalar_aliases_keep_call_backed_record_transport_conservative() {
-    let source = aliases::scalar_transport_source();
+    let source = aliases::aggregate_transport_source();
     let project = Project::with_source(&source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     let branch = compiled
@@ -49,8 +49,437 @@ fn typed_sparse_scalar_aliases_keep_call_backed_record_transport_conservative() 
 }
 
 #[test]
+fn typed_sparse_scalar_call_fields_reduce_private_captures_without_dropping_calls() {
+    let source = aliases::scalar_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert!(!signature.contains("[64 x i64]"), "{signature}");
+    assert_eq!(signature.matches("i64 %").count(), 2, "{signature}");
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    assert_eq!(body.matches("call i64 @nuis_fn_relay(").count(), 2);
+    check_sparse_captures(&source, Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_scalar_call_fields_keep_unobserved_checked_constructor_calls() {
+    let project = Project::with_source(&aliases::scalar_checked_transport_source());
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    assert_eq!(body.matches("call i64 @nuis_fn_checked(").count(), 1);
+    assert_eq!(body.matches("call i64 @nuis_fn_relay(").count(), 1);
+}
+
+#[test]
+fn typed_sparse_evaluated_scalar_records_remove_copies_without_repeating_rhs() {
+    let source = aliases::evaluated_scalar_source(false);
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert_eq!(signature.matches("i64 %").count(), 2, "{signature}");
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    assert_eq!(body.matches("call i64 @nuis_fn_relay(").count(), 3);
+    assert!(!body.contains("[64 x i64]"), "{body}");
+    check_sparse_captures(&source, Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_evaluated_scalar_records_keep_whole_record_transport() {
+    let source = aliases::evaluated_scalar_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert!(branch.parameters.iter().any(|p| p.ty == "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert!(signature.contains("[64 x i64] %arg1"), "{signature}");
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_aggregate_result_views_keep_two_complete_independent_returns() {
+    let source = aliases::aggregate_result_source(false);
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert_eq!(signature.matches("i64 %").count(), 2, "{signature}");
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    let returned = body
+        .lines()
+        .filter(|line| line.contains("call [64 x i64] @nuis_fn_produce("))
+        .collect::<Vec<_>>();
+    assert_eq!(returned.len(), 2, "{body}");
+    assert_ne!(
+        returned[0].split_once('=').unwrap().0,
+        returned[1].split_once('=').unwrap().0
+    );
+    assert!(!body.contains("insertvalue [64 x i64]"), "{body}");
+    assert!(bridge
+        .llvm_ir
+        .contains("define [64 x i64] @nuis_fn_produce("));
+    check_sparse_captures(&source, Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_aggregate_result_views_keep_whole_record_consumers_conservative() {
+    let source = aliases::aggregate_result_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert!(branch.parameters.iter().any(|p| p.ty == "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert!(signature.contains("[64 x i64] %arg1"), "{signature}");
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
+}
+
+#[test]
 fn typed_sparse_captures_preserve_old_and_rebound_record_versions() {
     check_sparse_captures(&aliases::rebound_source(), Some(&[2, 3]), 30);
+}
+
+#[test]
+fn typed_sparse_inline_record_arguments_keep_original_work_and_full_results() {
+    let source = aliases::inline_record_argument_source(false);
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert_eq!(signature.matches("i64 %").count(), 2, "{signature}");
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    assert_eq!(
+        body.matches("call [64 x i64] @nuis_fn_produce(").count(),
+        2,
+        "{body}"
+    );
+    assert_eq!(
+        body.matches("call i64 @nuis_fn_relay(").count(),
+        5,
+        "{body}"
+    );
+    assert!(!body.contains("insertvalue [64 x i64]"), "{body}");
+    check_sparse_captures(&source, Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_materialized_record_arguments_keep_stored_operands_and_full_results() {
+    let source = aliases::materialized_record_argument_source(false);
+    assert!(source.contains("let first = produce(first_alias)"));
+    assert!(source.contains("const later: Payload = produce(later_alias)"));
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert_eq!(signature.matches("i64 %").count(), 2, "{signature}");
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    assert_eq!(
+        body.matches("call [64 x i64] @nuis_fn_produce(").count(),
+        2,
+        "{body}"
+    );
+    assert_eq!(
+        body.matches("call i64 @nuis_fn_relay(").count(),
+        5,
+        "{body}"
+    );
+    // NIR keeps the stored arguments, while the existing native ABI flattens
+    // their two fields. Check actual evaluation order and SSA operand identity.
+    let calls = body
+        .lines()
+        .filter(|line| {
+            line.contains("call i64 @nuis_fn_relay(")
+                || line.contains("call [64 x i64] @nuis_fn_produce(")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(calls.len(), 7, "{body}");
+    for index in [0, 1, 3, 4, 6] {
+        assert!(calls[index].contains("call i64 @nuis_fn_relay("), "{body}");
+    }
+    let value = |line: &str| line.trim().split_once(" = ").unwrap().0.to_owned();
+    assert!(
+        calls[2].contains(&format!(
+            "@nuis_fn_produce(i64 {}, i64 {},",
+            value(calls[0]),
+            value(calls[1])
+        )),
+        "{body}"
+    );
+    assert!(
+        calls[5].contains(&format!(
+            "@nuis_fn_produce(i64 {}, i64 {},",
+            value(calls[4]),
+            value(calls[3])
+        )),
+        "{body}"
+    );
+    assert!(!body.contains("insertvalue [64 x i64]"), "{body}");
+    check_sparse_captures(&source, Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_materialized_record_arguments_keep_whole_consumers_conservative() {
+    let source = aliases::materialized_record_argument_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert!(branch.parameters.iter().any(|p| p.ty == "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert!(signature.contains("[64 x i64] %arg1"), "{signature}");
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_stored_projections_keep_full_returns_before_selecting_subrecords() {
+    let source = aliases::stored_projection_source(false);
+    assert!(source.contains("let first = produce(payload.f0, payload.f62).selected"));
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap_or_else(|| {
+            panic!(
+                "missing scalar branch; functions: {:?}",
+                compiled
+                    .yir
+                    .functions
+                    .iter()
+                    .map(|f| &f.name)
+                    .collect::<Vec<_>>()
+            )
+        });
+    assert_eq!(branch.parameters.len(), 3);
+    assert!(branch.parameters.iter().all(|p| p.ty != "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert_eq!(signature.matches("i64 %").count(), 2, "{signature}");
+    let body = bridge
+        .llvm_ir
+        .split_once(signature)
+        .unwrap()
+        .1
+        .split_once("\n}")
+        .unwrap()
+        .0;
+    let returns = body
+        .lines()
+        .filter(|line| line.contains("call [64 x i64] @nuis_fn_produce("))
+        .collect::<Vec<_>>();
+    assert_eq!(returns.len(), 2, "{body}");
+    assert_ne!(
+        returns[0].split_once('=').unwrap().0,
+        returns[1].split_once('=').unwrap().0
+    );
+    assert_eq!(
+        body.matches("call i64 @nuis_fn_relay(").count(),
+        1,
+        "{body}"
+    );
+    assert!(!body.contains("insertvalue [64 x i64]"), "{body}");
+    assert!(bridge
+        .llvm_ir
+        .contains("define [64 x i64] @nuis_fn_produce("));
+    check_sparse_captures(&source, Some(&[3, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_stored_projections_keep_whole_record_consumers_conservative() {
+    let source = aliases::stored_projection_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap_or_else(|| {
+            panic!(
+                "missing scalar branch; functions: {:?}",
+                compiled
+                    .yir
+                    .functions
+                    .iter()
+                    .map(|f| &f.name)
+                    .collect::<Vec<_>>()
+            )
+        });
+    assert!(branch.parameters.iter().any(|p| p.ty == "Payload"));
+    let bridge = emit_registered(&compiled.yir, "counter").unwrap();
+    let signature = bridge
+        .llvm_ir
+        .lines()
+        .find(|line| line.starts_with("define i64 @nuis_fn___nuis_scalar_branch_0("))
+        .unwrap();
+    assert!(signature.contains("[64 x i64] %arg1"), "{signature}");
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
+}
+
+#[test]
+fn typed_sparse_inline_record_arguments_keep_whole_consumers_conservative() {
+    let source = aliases::inline_record_argument_transport_source();
+    let project = Project::with_source(&source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let branch = compiled
+        .yir
+        .functions
+        .iter()
+        .find(|f| f.name == "__nuis_scalar_branch_0")
+        .unwrap();
+    assert!(branch.parameters.iter().any(|p| p.ty == "Payload"));
+    check_sparse_captures(&source, Some(&[2, 3]), 0);
 }
 
 #[test]

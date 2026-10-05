@@ -1,5 +1,16 @@
 use super::*;
 
+#[path = "conditional_values_logical.rs"]
+mod logical;
+#[path = "conditional_values_prefix.rs"]
+pub(super) mod prefix;
+#[cfg(test)]
+#[path = "conditional_values_prefix_tests.rs"]
+mod prefix_tests;
+#[cfg(test)]
+#[path = "conditional_values_roots_tests.rs"]
+mod roots_tests;
+
 // An effectful parent is not a pure helper, but its local value selection can
 // still use the same guarded scalar-control contract as a standalone function.
 pub(super) fn outline(
@@ -12,11 +23,8 @@ pub(super) fn outline(
     let checked = speculation::collect_checked_arithmetic(module);
     let mut helpers = Vec::new();
     for function in &mut module.functions {
-        // Typed value admission alone does not provide full control lowering.
-        // Keep local selection extraction unless that route is already admitted.
-        if control_roots.contains(&function.name) {
-            continue;
-        }
+        // Full control roots keep their existing local-selection route, but
+        // condition laziness must not depend on which route owns the function.
         let mut scope = function
             .params
             .iter()
@@ -31,8 +39,10 @@ pub(super) fn outline(
             checked: &checked,
             helpers: &mut helpers,
             bindings,
+            extract_selections: !control_roots.contains(&function.name),
+            predicate_returns: function.return_type.as_ref() == Some(&scalar_type("bool")),
         };
-        builder.block(&mut function.body, &mut scope);
+        builder.block(&mut function.body, &mut scope, false);
     }
     let generated = helpers
         .iter()
@@ -49,6 +59,8 @@ struct Builder<'a, L> {
     checked: &'a BTreeSet<String>,
     helpers: &'a mut Vec<NirFunction>,
     bindings: BTreeSet<String>,
+    extract_selections: bool,
+    predicate_returns: bool,
 }
 
 struct Selection {
@@ -60,11 +72,21 @@ struct Selection {
 }
 
 impl<L: control_values::ValueLayouts> Builder<'_, L> {
-    fn block(&mut self, body: &mut [NirStmt], scope: &mut Scope) {
+    fn block(&mut self, body: &mut [NirStmt], scope: &mut Scope, in_loop: bool) {
         for stmt in body {
             match stmt {
                 NirStmt::Let { name, ty, value } => {
-                    let ty = ty.clone().or_else(|| {
+                    // Capture the current version before the destination is
+                    // rebound; the complete RHS remains inside its guard.
+                    let mut guarded_kind = None;
+                    if !in_loop && ty.as_ref().is_none_or(|ty| ty == &scalar_type("bool")) {
+                        if let Some(guarded) = self.gated_condition(value, scope) {
+                            *value = guarded;
+                            guarded_kind = Some(scalar_type("bool"));
+                        }
+                    }
+                    // Generated calls are not in the original catalog yet.
+                    let ty = ty.clone().or(guarded_kind).or_else(|| {
                         control_values::value_type(value, scope, self.catalog, self.layouts)
                     });
                     scope.remove(name);
@@ -72,14 +94,39 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                         scope.insert(name.clone(), ty);
                     }
                 }
-                NirStmt::Const { name, ty, .. } => {
+                NirStmt::Const { name, ty, value } => {
+                    if !in_loop && ty == &scalar_type("bool") {
+                        if let Some(guarded) = self.gated_condition(value, scope) {
+                            *value = guarded;
+                        }
+                    }
                     scope.insert(name.clone(), ty.clone());
+                }
+                NirStmt::Return(Some(value)) if !in_loop && self.predicate_returns => {
+                    if let Some(guarded) = self.gated_condition(value, scope) {
+                        *value = guarded;
+                    }
                 }
                 NirStmt::If {
                     condition,
                     then_body,
                     else_body,
                 } => {
+                    let atom_gate = matches!(condition, NirExpr::Binary { lhs, .. }
+                        if matches!(lhs.as_ref(), NirExpr::Bool(_) | NirExpr::Var(_)));
+                    // Loop conditions retain their separately proved atom gate.
+                    if !in_loop
+                        || (atom_gate && prefix::expression_roots(vec![(condition, 0, true)]))
+                    {
+                        if let Some(guarded) = self.gated_condition(condition, scope) {
+                            *condition = guarded;
+                        }
+                    }
+                    if !self.extract_selections {
+                        self.block(then_body, &mut scope.clone(), in_loop);
+                        self.block(else_body, &mut scope.clone(), in_loop);
+                        continue;
+                    }
                     if let Some((then_value, else_value)) = self.arms(then_body, else_body, scope) {
                         let guarded = [then_body.as_slice(), else_body.as_slice()]
                             .into_iter()
@@ -90,6 +137,8 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                         let ty = then_value.ty.clone();
                         let name = then_value.name.clone();
                         if guarded {
+                            let then_value = self.guard_selection(then_value, scope, in_loop);
+                            let else_value = self.guard_selection(else_value, scope, in_loop);
                             *stmt = self.extract(
                                 condition.clone(),
                                 then_value,
@@ -102,16 +151,30 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                     } else if let Some((yes, no, discarded)) =
                         self.one_sided(then_body, else_body, scope)
                     {
+                        let yes = self.guard_selection(yes, scope, in_loop);
+                        let no = self.guard_selection(no, scope, in_loop);
                         *stmt = self.extract(condition.clone(), yes, no, scope, discarded);
                     } else {
-                        self.block(then_body, &mut scope.clone());
-                        self.block(else_body, &mut scope.clone());
+                        self.block(then_body, &mut scope.clone(), in_loop);
+                        self.block(else_body, &mut scope.clone(), in_loop);
                     }
                 }
-                NirStmt::While { body, .. } => self.block(body, &mut scope.clone()),
+                NirStmt::While { body, .. } => self.block(body, &mut scope.clone(), true),
                 _ => {}
             }
         }
+    }
+
+    fn guard_selection(&mut self, mut value: Selection, scope: &Scope, in_loop: bool) -> Selection {
+        // An admitted arm becomes a return body before extraction. Normalize
+        // its logical root too, without recursively extracting local selections.
+        let selections = std::mem::replace(&mut self.extract_selections, false);
+        let returns =
+            std::mem::replace(&mut self.predicate_returns, value.ty == scalar_type("bool"));
+        self.block(&mut value.body, &mut scope.clone(), in_loop);
+        self.extract_selections = selections;
+        self.predicate_returns = returns;
+        value
     }
 
     fn one_sided(
@@ -174,6 +237,43 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                 self.value(name, ty.as_ref(), value, false, scope)
             }
             [NirStmt::Const { name, ty, value }] => self.value(name, Some(ty), value, true, scope),
+            [locals @ .., last] if !locals.is_empty() && prefix::bounded(body) => {
+                let mut inner = scope.clone();
+                let mut local_names = BTreeSet::new();
+                let mut inputs = BTreeSet::new();
+                for stmt in locals {
+                    let (name, declared, value) = match stmt {
+                        NirStmt::Let { name, ty, value } => (name, ty.as_ref(), value),
+                        NirStmt::Const { name, ty, value } => (name, Some(ty), value),
+                        _ => return None,
+                    };
+                    // Intermediate work cannot mutate an outer carry or hide
+                    // an earlier local. Only the final selection may rebind.
+                    if inner.contains_key(name) {
+                        return None;
+                    }
+                    let value = self.value(name, declared, value, false, &inner)?;
+                    inputs.extend(value.inputs);
+                    local_names.insert(name.clone());
+                    inner.insert(name.clone(), value.ty);
+                }
+                let mut selected = match last {
+                    NirStmt::Let { name, ty, value } if !local_names.contains(name) => {
+                        self.value(name, ty.as_ref(), value, false, &inner)?
+                    }
+                    NirStmt::Const { name, ty, value } if !local_names.contains(name) => {
+                        self.value(name, Some(ty), value, true, &inner)?
+                    }
+                    _ => return None,
+                };
+                inputs.extend(selected.inputs);
+                inputs.retain(|name| !local_names.contains(name));
+                selected.inputs = inputs;
+                let mut preserved = locals.to_vec();
+                preserved.extend(selected.body);
+                selected.body = preserved;
+                Some(selected)
+            }
             [NirStmt::If {
                 condition,
                 then_body,

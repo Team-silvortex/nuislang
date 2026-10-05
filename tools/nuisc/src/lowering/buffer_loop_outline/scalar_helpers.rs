@@ -35,6 +35,14 @@ pub(super) fn collect_typed_values(
     collect_profile(module, layouts, None, loop_catalog)
 }
 
+pub(super) fn collect_capture_values(
+    module: &NirModule,
+    layouts: &impl control_values::ValueLayouts,
+) -> ScalarHelpers {
+    // Completed pure-value calls, without provisional or loop-body authority.
+    collect_profile(module, layouts, None, &ScalarHelpers::new())
+}
+
 pub(super) fn control_roots(
     module: &NirModule,
     layouts: &control_values::CarryLayouts,
@@ -49,8 +57,8 @@ pub(super) fn control_roots(
         })
         .map(|(name, fields)| (name.clone(), fields.clone()))
         .collect();
-    // Nested value eligibility is not whole-function control authority. Preserve
-    // the established non-loop selection route and its helper-entry budget.
+    // Nested interfaces remain on the local selection route. A flat interface
+    // can use completed nested values internally without widening its transport.
     let mut roots = collect_with_layouts(module, &flat)
         .into_keys()
         .collect::<BTreeSet<_>>();
@@ -59,7 +67,16 @@ pub(super) fn control_roots(
             .functions
             .iter()
             .filter(|function| {
-                catalog.contains_key(&function.name) && control_loops::contains_loop(&function.body)
+                catalog.contains_key(&function.name)
+                    && (control_loops::contains_loop(&function.body)
+                        || (function
+                            .params
+                            .iter()
+                            .all(|param| control_values::supported_type(&param.ty, &flat))
+                            && function
+                                .return_type
+                                .as_ref()
+                                .is_some_and(|ty| control_values::supported_type(ty, &flat))))
             })
             .map(|function| function.name.clone()),
     );

@@ -6,6 +6,7 @@ pub(super) fn selected_return(
 ) -> Result<Option<Value>, String> {
     let (minimum, maximum, then_result, else_result) = match node.op.instruction.as_str() {
         "guard_return" => (2, 3, 1, None),
+        "guard_print_return" => (3, 3, 2, None),
         "guard_drop_owned_bytes_return" => (3, 3, 2, None),
         "branch_drop_owned_bytes_return" => (5, 5, 2, Some(4)),
         _ => return Ok(None),
@@ -59,6 +60,7 @@ mod tests {
         for node in [
             node("guard_return", &["ready", "returned"]),
             node("guard_return", &["ready", "returned", "Layout{value:i64}"]),
+            node("guard_print_return", &["ready", "printed", "returned"]),
             node(
                 "guard_drop_owned_bytes_return",
                 &["ready", "bytes", "returned"],
@@ -106,6 +108,7 @@ mod tests {
     fn malformed_exit_contracts_fail_without_panicking() {
         for (instruction, arity) in [
             ("guard_return", 2),
+            ("guard_print_return", 3),
             ("guard_drop_owned_bytes_return", 3),
             ("branch_drop_owned_bytes_return", 5),
         ] {

@@ -188,13 +188,14 @@ fn record_views_require_exact_nominal_fields_binding_types_and_value_inputs() {
 fn record_views_keep_all_callers_transactional() {
     for computed in [false, true] {
         let call = if computed { "relay(state)" } else { "state" };
+        let suffix = if computed { " + 0" } else { "" };
         let mut module = module(
             &format!(
                 "let snapshot = {COPY}; let checked = 10 / snapshot.count; return snapshot.count;"
             ),
             &format!(
                 "fn first(state: State) -> i64 {{ return helper(state, state); }}
-             fn second(state: State) -> i64 {{ return helper({call}, state); }}"
+             fn second(state: State) -> i64 {{ return helper({call}, state){suffix}; }}"
             ),
         );
         let layouts = control_values::TypedLayouts::collect(&module);

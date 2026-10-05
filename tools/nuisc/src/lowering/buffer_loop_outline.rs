@@ -9,6 +9,8 @@ mod branches;
 mod capture_layouts;
 #[path = "buffer_loop_outline/capture_projection.rs"]
 mod capture_projection;
+#[path = "buffer_loop_outline/conditional_returns.rs"]
+mod conditional_returns;
 #[path = "buffer_loop_outline/conditional_values.rs"]
 mod conditional_values;
 #[path = "buffer_loop_outline/continuation_reads.rs"]
@@ -63,7 +65,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let mut layouts = control_values::layouts(module);
     let mut control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
     let mut control_roots = scalar_helpers::control_roots(module, &layouts, &control_catalog);
-    let value_layouts = control_values::TypedLayouts::collect(module);
+    let mut value_layouts = control_values::TypedLayouts::collect(module);
     let mut value_catalog =
         scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
     let mut names = module
@@ -84,13 +86,28 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
                 .map(|definition| definition.name.clone()),
         )
         .collect::<BTreeSet<_>>();
-    let selections = conditional_values::outline(
+    let mut selections = conditional_returns::outline(
         module,
         &value_catalog,
         &control_roots,
         &value_layouts,
         &mut names,
     );
+    if !selections.is_empty() {
+        // Stored return signals introduce private typed result layouts.
+        layouts = control_values::layouts(module);
+        value_layouts = control_values::TypedLayouts::collect(module);
+        control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+        value_catalog =
+            scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
+    }
+    selections.extend(conditional_values::outline(
+        module,
+        &value_catalog,
+        &control_roots,
+        &value_layouts,
+        &mut names,
+    ));
     if !selections.is_empty() {
         catalog = scalar_helpers::collect(module);
         control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);

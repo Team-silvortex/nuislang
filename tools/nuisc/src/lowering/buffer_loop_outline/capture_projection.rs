@@ -5,6 +5,10 @@ use control_values::ValueLayouts;
 mod aliases;
 #[path = "capture_bindings.rs"]
 mod bindings;
+#[path = "capture_caller_records.rs"]
+mod caller_records;
+#[path = "capture_caller_spills.rs"]
+mod caller_spills;
 #[path = "capture_dead_records.rs"]
 mod dead_records;
 #[path = "capture_joins.rs"]
@@ -41,6 +45,8 @@ enum Input {
 
 struct Plan {
     inputs: Vec<Input>,
+    original_types: Vec<NirTypeRef>,
+    predicate_result: bool,
     replacements: BTreeMap<Vec<String>, String>,
     word_inputs: BTreeMap<usize, record_words::WordInput>,
 }
@@ -72,6 +78,12 @@ pub(super) fn project(
     if generated.is_empty() {
         return projected;
     }
+    // Scalar-only call signatures stay valid as aggregate captures are projected.
+    let scalar_catalog = scalar_helpers::collect(module);
+    let mut result_catalog = scalar_helpers::collect_capture_values(module, layouts);
+    // Projected signatures may change below. Only unchanged source signatures
+    // can grant call-result typing; their calls and complete returns stay intact.
+    result_catalog.retain(|name, _| !generated.contains(name));
     let eligible = generated.iter().map(String::as_str).collect();
     let scoped = scoped_loop_lowering::collect_scoped_call_targets(module, &eligible);
     let protected = scoped_inputs::protected_inputs(module, &scoped);
@@ -141,6 +153,22 @@ pub(super) fn project(
             .flat_map(|input| input.transport_types())
             .map(|ty| ty.name.clone())
             .collect();
+        if !scoped.contains(&name) {
+            record_views::normalize_evaluated(
+                &mut candidate,
+                layouts,
+                &scalar_catalog,
+                &control_names,
+                &transport_types,
+            );
+            record_views::normalize_call_results(
+                &mut candidate,
+                layouts,
+                &result_catalog,
+                &control_names,
+                &transport_types,
+            );
+        }
         record_copies::normalize(&mut candidate, layouts, &transport_types);
         let Some(mut plan) = plan(&candidate, protected.get(&name), layouts) else {
             continue;
@@ -152,10 +180,31 @@ pub(super) fn project(
             .filter(|(_, calls)| calls.contains(&name))
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
-        if !callers
-            .iter()
-            .all(|i| valid_caller(&module.functions[*i].body, &name, &plan))
-        {
+        let mut prepared_callers = BTreeMap::new();
+        let caller_controls = break_controls.values().cloned().collect();
+        if !callers.iter().all(|i| {
+            if valid_caller(&module.functions[*i].body, &name, &plan)
+                || (!scoped.contains(&name)
+                    && caller_records::valid(&module.functions[*i], &name, &plan, layouts))
+            {
+                return true;
+            }
+            if scoped.contains(&name) {
+                return false;
+            }
+            let Some(caller) = caller_spills::prepare(
+                &module.functions[*i],
+                &name,
+                &plan,
+                layouts,
+                &result_catalog,
+                &caller_controls,
+            ) else {
+                return false;
+            };
+            prepared_callers.insert(*i, caller);
+            true
+        }) {
             continue;
         }
         if let Some(inputs) = protected.get(&name) {
@@ -189,6 +238,9 @@ pub(super) fn project(
             })
             .collect();
         module.functions[index] = candidate;
+        for (index, caller) in prepared_callers {
+            module.functions[index] = caller;
+        }
         for index in callers {
             walk::rewrite(&mut module.functions[index].body, |expr| {
                 let NirExpr::Call { callee, args } = expr else {
@@ -212,12 +264,7 @@ pub(super) fn project(
                                         .expect("preflighted word field")
                                         .clone();
                                 }
-                                field.path.iter().fold(arg.clone(), |base, field| {
-                                    NirExpr::FieldAccess {
-                                        base: Box::new(base),
-                                        field: field.clone(),
-                                    }
-                                })
+                                caller_records::project(&arg, &field.path)
                             })
                             .collect(),
                     })
@@ -357,6 +404,8 @@ fn plan(
     }
     changed.then_some(Plan {
         inputs,
+        original_types: function.params.iter().map(|p| p.ty.clone()).collect(),
+        predicate_result: function.return_type.as_ref() == Some(&scalar_type("bool")),
         replacements,
         word_inputs: BTreeMap::new(),
     })

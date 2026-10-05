@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::NirExpr;
+use nuis_semantics::model::{NirBinaryOp, NirExpr};
 
 use super::optimize_expr_data::simplify_data_expr;
 use super::optimize_expr_helpers::{is_inline_safe_arg, simplify_expr_vec};
@@ -552,7 +552,22 @@ pub(super) fn simplify_expr(
             let (rhs, right) = simplify_expr(*rhs, env, inline_templates, active_inline);
             if let (NirExpr::Int(lhs_value), NirExpr::Int(rhs_value)) = (&lhs, &rhs) {
                 if let Some(folded) = fold_int_binary(op, *lhs_value, *rhs_value) {
-                    return (NirExpr::Int(folded), true);
+                    // Comparisons stay bool through bindings and branch folding;
+                    // their integer implementation result is not a source kind.
+                    let value = if matches!(
+                        op,
+                        NirBinaryOp::Eq
+                            | NirBinaryOp::Ne
+                            | NirBinaryOp::Lt
+                            | NirBinaryOp::Le
+                            | NirBinaryOp::Gt
+                            | NirBinaryOp::Ge
+                    ) {
+                        NirExpr::Bool(folded != 0)
+                    } else {
+                        NirExpr::Int(folded)
+                    };
+                    return (value, true);
                 }
             }
             (

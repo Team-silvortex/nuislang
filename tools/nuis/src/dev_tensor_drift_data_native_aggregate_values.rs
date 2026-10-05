@@ -298,7 +298,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "guarded-local-value-extraction",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values.rs",
         required_patterns: &[
-            "if control_roots.contains(&function.name)",
+            "extract_selections: !control_roots.contains(&function.name)",
+            "if !self.extract_selections",
             "control_values::value_type(value, scope, self.catalog, self.layouts)?",
             "yes.name == no.name && yes.ty == no.ty && yes.constant == no.constant",
             "params.extend(captured_params(yes.inputs, scope));",
@@ -309,7 +310,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "guarded-local-value-lowering-registration",
         path: "tools/nuisc/src/lowering/buffer_loop_outline.rs",
         required_patterns: &[
-            "let selections = conditional_values::outline(",
+            "let mut selections = conditional_returns::outline(",
+            "selections.extend(conditional_values::outline(",
             "&control_catalog,",
             "scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog)",
             "catalog = scalar_helpers::collect(module);",

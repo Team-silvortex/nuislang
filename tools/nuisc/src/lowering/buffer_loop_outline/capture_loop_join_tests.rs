@@ -150,7 +150,7 @@ fn loop_record_inputs_follow_cyclic_copies_and_nominal_prefixes() {
 fn loop_record_inputs_reject_whole_escapes_and_computed_callers_transactionally() {
     for (result, caller) in [
         ("consume(before)", "helper(state, flag)"),
-        ("before.a.x", "helper(relay(state), flag)"),
+        ("before.a.x", "0 + helper(relay(state), flag)"),
     ] {
         let mut module = module(&format!(
             "fn consume(state: State) -> i64 {{ return state.a.x; }}

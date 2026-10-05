@@ -161,7 +161,7 @@ fn normalized(
     (context.remaining > 0).then_some(result)
 }
 
-fn validate_expansion(body: &[NirStmt], remaining: &mut usize) -> Option<()> {
+pub(super) fn validate_expansion(body: &[NirStmt], remaining: &mut usize) -> Option<()> {
     let mut blocks = vec![body];
     let mut expressions = Vec::new();
     while let Some(body) = blocks.pop() {

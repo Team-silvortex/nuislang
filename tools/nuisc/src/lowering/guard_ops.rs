@@ -210,8 +210,9 @@ pub(super) fn lower_guard_print_return(
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: return_name,
-        to: name,
+        to: name.clone(),
     });
+    chain_statement_effect(state, &name);
 }
 
 pub(super) fn lower_guard_host_call_return(

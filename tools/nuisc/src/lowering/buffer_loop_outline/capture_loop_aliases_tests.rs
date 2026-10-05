@@ -65,7 +65,7 @@ fn loop_aliases_keep_mutating_origins_until_copy_family_reconstruction() {
 fn loop_alias_projection_preserves_whole_uses_and_computed_caller_transactions() {
     for (value, call) in [
         ("consume(saved)", "helper(state)"),
-        ("saved.a.x", "helper(relay(state))"),
+        ("saved.a.x", "0 + helper(relay(state))"),
     ] {
         let mut module = module(&format!(
             "fn consume(state: State) -> i64 {{ return state.a.x; }}

@@ -176,7 +176,7 @@ fn whole_old_records_and_computed_callers_keep_original_snapshots() {
         ("let old = state; let state = State { a: state.b, b: state.a, unused: 0 }; return old.a;", "helper(relay(state))"),
     ] {
         let returned = if body.ends_with("return old;") { "State" } else { "Pair" };
-        let mut module = module(&format!("fn relay(state: State) -> State {{ return state; }}
+        let mut module = module(&format!("fn relay(state: State) -> State {{ print(0); return state; }}
             fn helper(state: State) -> {returned} {{ {body} }}
             fn entry(state: State) -> {returned} {{ return {call}; }}"));
         let before = module.clone();
@@ -450,7 +450,7 @@ fn scoped_snapshot_projection_is_transactional_for_whole_records_and_computed_ca
             "helper(relay(state), flag)"
         };
         let mut module = module(&format!(
-            "fn relay(state: State) -> State {{ return state; }}
+            "fn relay(state: State) -> State {{ print(0); return state; }}
             fn helper(state: State, flag: bool) -> {returned} {{
                 if flag {{
                     let current = state; let old = current;

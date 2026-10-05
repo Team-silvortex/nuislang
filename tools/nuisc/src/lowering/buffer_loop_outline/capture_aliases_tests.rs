@@ -120,7 +120,7 @@ fn whole_alias_uses_and_caller_veto_leave_the_original_body_unchanged() {
         ("let saved = state; return consume(saved);", "helper(state)"),
         (
             "let saved = state; return saved.a.x;",
-            "helper(relay(state))",
+            "0 + helper(relay(state))",
         ),
     ] {
         let mut module = module(&format!(
@@ -248,7 +248,7 @@ fn branch_alias_normalization_remains_transactional_on_computed_callers() {
             if flag { let saved = state.a; return saved.x; }
             else { let saved = state.b; return saved.y; }
         }
-        fn entry(state: State, flag: bool) -> i64 { return helper(relay(state), flag); }",
+        fn entry(state: State, flag: bool) -> i64 { return 0 + helper(relay(state), flag); }",
     );
     let before = function(&module, "helper").body.clone();
     assert!(!project(&mut module, &["helper"]));

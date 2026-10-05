@@ -220,6 +220,70 @@ fn project_fixture(module: &mut NirModule) -> bool {
 }
 
 #[test]
+fn caller_record_constructors_cannot_bypass_registered_word_transport_proofs() {
+    let (module, input) = fixture();
+    let layouts = control_values::TypedLayouts::collect(&module);
+    let mut caller = module.functions[1].clone();
+    let original = argument(&input, "state");
+    caller.body = vec![NirStmt::Return(Some(NirExpr::Call {
+        callee: "helper".into(),
+        args: vec![original, NirExpr::Int(0)],
+    }))];
+    let mut plan = Plan {
+        predicate_result: false,
+        inputs: vec![
+            Input::Fields(vec![Projection {
+                path: vec!["carry0".into()],
+                param: NirParam {
+                    name: "word".into(),
+                    ty: scalar_type("i64"),
+                },
+            }]),
+            Input::Keep(module.functions[0].params[1].clone()),
+        ],
+        original_types: module.functions[0]
+            .params
+            .iter()
+            .map(|param| param.ty.clone())
+            .collect(),
+        replacements: BTreeMap::new(),
+        word_inputs: BTreeMap::new(),
+    };
+    let words = input.param.clone();
+    plan.word_inputs.insert(0, input);
+    assert!(caller_records::valid(&caller, "helper", &plan, &layouts));
+    assert!(caller_spills::prepare(
+        &caller,
+        "helper",
+        &plan,
+        &layouts,
+        &ScalarHelpers::new(),
+        &BTreeSet::new(),
+    )
+    .is_none());
+
+    caller.params = vec![words.clone()];
+    let NirStmt::Return(Some(NirExpr::Call { args, .. })) = &mut caller.body[0] else {
+        panic!()
+    };
+    let fields = (0..10)
+        .map(|i| {
+            let field = format!("carry{i}");
+            (field.clone(), source_value(&words.name, &[field]))
+        })
+        .collect();
+    args[0] = NirExpr::StructLiteral {
+        type_name: words.ty.name.clone(),
+        type_args: vec![],
+        fields,
+    };
+    // A total, exact constructor is still not the registered codec of Packet.
+    assert!(!caller_records::valid(&caller, "helper", &plan, &layouts));
+    plan.word_inputs.clear();
+    assert!(caller_records::valid(&caller, "helper", &plan, &layouts));
+}
+
+#[test]
 fn sparse_word_projection_is_typed_transactional_and_storage_order_independent() {
     for reverse in [false, true] {
         let (mut module, _) = fixture();

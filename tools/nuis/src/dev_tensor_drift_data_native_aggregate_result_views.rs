@@ -1,0 +1,105 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-bounded-completed-proof",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_record_views.rs",
+        required_patterns: &[
+            "pub(super) fn normalize_call_results(",
+            "call_results: true",
+            "matches!(value, NirExpr::Call { .. })",
+            "!evaluated.transport_types.contains(&ty.name)",
+            "Do not add a call result to erasable, even when never read",
+            "normalized_mode(function, layouts, Some(evaluated), 65_536)",
+            "scalar_aliases::validate_expansion(&result, &mut context.remaining)?",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-catalog-and-transactional-integration",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_projection.rs",
+        required_patterns: &[
+            "scalar_helpers::collect_capture_values(module, layouts)",
+            "result_catalog.retain(|name, _| !generated.contains(name))",
+            "record_views::normalize_call_results(",
+            "&result_catalog,",
+            "valid_caller(&module.functions[*i].body, &name, &plan)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-unit-and-independent-oracle-evidence",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/capture_call_result_views_tests.rs",
+        required_patterns: &[
+            "call_result_views_reuse_completed_records_without_erasing_or_duplicating_calls",
+            "call_result_views_keep_unused_calls_and_exact_mixed_field_kinds",
+            "call_result_views_do_not_grant_whole_escape_inline_call_or_changed_version_authority",
+            "call_result_views_require_completed_nonrecursive_owned_value_catalog",
+            "call_result_views_require_nominal_kinds_control_wire_and_budget_proofs",
+            "call_result_views_never_export_child_roots_or_read_results_before_definition",
+            "call_result_views_bound_depth_and_never_commit_a_budget_partial_body",
+            "call_result_views_project_wide_captures_transactionally_without_changing_result_layout",
+            "call_result_views_preserve_selected_checks_and_independent_results_differentially",
+            "yir.nodes.reverse()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-full-width-independent-native-results",
+        path: "tools/nuisc/tests/native_application_bridge/typed_sparse_captures.rs",
+        required_patterns: &[
+            "typed_sparse_aggregate_result_views_keep_two_complete_independent_returns",
+            "typed_sparse_aggregate_result_views_keep_whole_record_consumers_conservative",
+            "call [64 x i64] @nuis_fn_produce(",
+            "define [64 x i64] @nuis_fn_produce(",
+            "!body.contains(\"insertvalue [64 x i64]\")",
+            "check_sparse_captures(&source, Some(&[3, 3]), 0)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-distinct-and-checked-fixtures",
+        path: "tools/nuisc/tests/native_application_bridge/typed_alias_capture_fixture.rs",
+        required_patterns: &[
+            "pub fn aggregate_result_source(checked: bool)",
+            "pub fn aggregate_result_transport_source()",
+            "let first = produce(payload.f0, payload.f62)",
+            "const later: Payload = produce(payload.f0 + 30, payload.f62)",
+            "let first = produce(payload.f0, payload.f62 + 1)",
+            "checked(unused)",
+            "return consume_snapshot(second)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-source-free-selected-check-evidence",
+        path: "tools/nuis/tests/native_session_workflow/capture_fields.rs",
+        required_patterns: &[
+            "native_aggregate_result_views_preserve_independent_source_free_returns_and_checks",
+            "let checked = aliases::aggregate_result_source(true)",
+            "check_selected_unused_call(&checked)",
+            "&aliases::aggregate_result_transport_source(),",
+            "if flag == 0 { 3 } else { 1 }",
+            "!stderr.contains(\"SIGKILL\")",
+            "for _ in 0..2",
+            "fs::remove_file(project.0.join(\"main.ns\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-tensor-boundary",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Completed aggregate-call result-view follow-up:",
+            "two independent full 64-word returns",
+            "opaque/effectful aggregate results and computed inline aggregate caller arguments outside binding/return/direct-if or selected single-edge RHS materialization remain unproven",
+            "native_aggregate_result_views",
+            "active/86 is unchanged",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-aggregate-result-view-documentation-boundary",
+        path: "docs/reference/nuis-native-scalar-loop-snapshots-v1.md",
+        required_patterns: &[
+            "## Completed Aggregate Call Result Views",
+            "A call binding is never erasable",
+            "two distinct full `[64 x i64]` returns",
+            "Nine unit tests",
+            "this is not general aggregate-call-backed capture closure",
+        ],
+    },
+];

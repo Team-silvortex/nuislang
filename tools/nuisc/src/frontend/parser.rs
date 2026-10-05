@@ -12,6 +12,9 @@ use super::lexer::{describe_token, Token};
 mod parser_attributes;
 #[path = "parser_blocks.rs"]
 mod parser_blocks;
+#[cfg(test)]
+#[path = "parser_condition_arguments_tests.rs"]
+mod parser_condition_arguments_tests;
 #[path = "parser_destructure.rs"]
 mod parser_destructure;
 #[cfg(test)]

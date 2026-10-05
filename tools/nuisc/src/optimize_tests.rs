@@ -100,8 +100,77 @@ fn folds_integer_comparison_constants() {
     assert!(changed);
     assert_eq!(
         module.functions[0].body,
-        vec![NirStmt::Return(Some(NirExpr::Int(1)))]
+        vec![NirStmt::Return(Some(NirExpr::Bool(true)))]
     );
+}
+
+#[test]
+fn constant_comparisons_keep_bool_kind_through_aliases_and_struct_fields() {
+    let source = "mod cpu Main { struct Flags { ready: bool } fn main() -> i64 { let decision: bool = 2 > 0; const selected: bool = decision; let flags = Flags { ready: selected }; if flags.ready { return 7; } else { return 9; } } }";
+    let mut module = crate::frontend::parse_nuis_module(source).unwrap();
+    assert!(simplify_nir_module(&mut module));
+    let NirStmt::Let {
+        value: NirExpr::StructLiteral { fields, .. },
+        ..
+    } = &module.functions[0].body[0]
+    else {
+        panic!()
+    };
+    assert_eq!(fields, &[("ready".to_owned(), NirExpr::Bool(true))]);
+    crate::nir_verify::verify_nir_module(&module).unwrap();
+    crate::pipeline::compile_source(source).unwrap();
+}
+
+#[test]
+fn constant_comparisons_select_typed_branches_without_changing_selected_effects() {
+    for op in [
+        NirBinaryOp::Eq,
+        NirBinaryOp::Ne,
+        NirBinaryOp::Lt,
+        NirBinaryOp::Le,
+        NirBinaryOp::Gt,
+        NirBinaryOp::Ge,
+    ] {
+        for (lhs, rhs) in [
+            (0, 0),
+            (0, 2),
+            (-2, 0),
+            (2, -2),
+            (i64::MIN, i64::MAX),
+            (i64::MAX, i64::MIN),
+        ] {
+            let selected = super::fold_int_binary(op, lhs, rhs).unwrap() != 0;
+            let yes = vec![
+                NirStmt::Print(NirExpr::Int(77)),
+                NirStmt::Return(Some(NirExpr::Int(7))),
+            ];
+            let no = vec![
+                NirStmt::Print(NirExpr::Int(88)),
+                NirStmt::Return(Some(NirExpr::Int(9))),
+            ];
+            let mut module = sample_module(vec![
+                NirStmt::Let {
+                    name: "decision".into(),
+                    ty: Some(NirTypeRef {
+                        name: "bool".into(),
+                        ..i64_type()
+                    }),
+                    value: NirExpr::Binary {
+                        op,
+                        lhs: Box::new(NirExpr::Int(lhs)),
+                        rhs: Box::new(NirExpr::Int(rhs)),
+                    },
+                },
+                NirStmt::If {
+                    condition: NirExpr::Var("decision".into()),
+                    then_body: yes.clone(),
+                    else_body: no.clone(),
+                },
+            ]);
+            assert!(simplify_nir_module(&mut module));
+            assert_eq!(module.functions[0].body, if selected { yes } else { no });
+        }
+    }
 }
 
 #[test]

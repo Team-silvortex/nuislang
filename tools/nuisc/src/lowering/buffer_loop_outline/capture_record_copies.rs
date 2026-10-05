@@ -6,7 +6,7 @@ mod tests;
 
 // Do not move or erase computed fields. A private snapshot's unobserved, total
 // input copies may become zeroes while every other field still executes in place.
-// Constructors backing call operands retain their exact transport provenance
+// Constructors backing record-valued operands retain exact transport provenance
 // for the all-caller word proofs in later (enclosing) capture plans.
 pub(super) fn normalize(
     function: &mut NirFunction,
@@ -95,7 +95,7 @@ fn normalized(
         }
     }
     for value in returned {
-        transport_roots(value, &mut transport, &mut remaining)?;
+        transport_roots(value, &candidates, layouts, &mut transport, &mut remaining)?;
     }
     walk::visit(&function.body, |expr| {
         if charge(&mut remaining, 1).is_none() {
@@ -103,7 +103,9 @@ fn normalized(
         }
         if let NirExpr::Call { args, .. } = expr {
             for arg in args {
-                if transport_roots(arg, &mut transport, &mut remaining).is_none() {
+                if transport_roots(arg, &candidates, layouts, &mut transport, &mut remaining)
+                    .is_none()
+                {
                     break;
                 }
             }
@@ -123,7 +125,7 @@ fn normalized(
         }
         if let Some(value) = definitions.get(name.as_str()) {
             let mut roots = BTreeSet::new();
-            transport_roots(value, &mut roots, &mut remaining)?;
+            transport_roots(value, &candidates, layouts, &mut roots, &mut remaining)?;
             for root in roots {
                 if transport.insert(root.clone()) {
                     pending.push(root);
@@ -202,20 +204,53 @@ fn normalized(
 
 fn transport_roots(
     value: &NirExpr,
+    candidates: &BTreeMap<String, NirTypeRef>,
+    layouts: &impl ValueLayouts,
     transport: &mut BTreeSet<String>,
     remaining: &mut usize,
 ) -> Option<()> {
-    let mut pending = vec![value];
-    while let Some(arg) = pending.pop() {
+    let mut pending = vec![(value, true)];
+    while let Some((arg, direct)) = pending.pop() {
         charge(remaining, 1)?;
         if let Some(path) = access(arg) {
             charge(remaining, path.len())?;
-            transport.insert(path[0].clone());
+            // An exact scalar leaf is an observation, not aggregate transport.
+            // The demand walk below retains it and all computed sibling fields.
+            if !direct || !scalar_observation(&path, candidates, layouts, remaining)? {
+                transport.insert(path[0].clone());
+            }
         } else {
-            crate::nir_walk::walk_child_exprs(arg, &mut |child| pending.push(child));
+            // Composite/encoded transport keeps its complete source identity.
+            crate::nir_walk::walk_child_exprs(arg, &mut |child| pending.push((child, false)));
         }
     }
     Some(())
+}
+
+fn scalar_observation(
+    path: &[String],
+    candidates: &BTreeMap<String, NirTypeRef>,
+    layouts: &impl ValueLayouts,
+    remaining: &mut usize,
+) -> Option<bool> {
+    let Some(mut ty) = candidates.get(&path[0]).cloned() else {
+        return Some(false);
+    };
+    for field in &path[1..] {
+        let Some(fields) = layouts.fields(&ty.name) else {
+            return Some(false);
+        };
+        charge(remaining, fields.len())?;
+        let Some(next) = fields
+            .into_iter()
+            .find(|(name, _)| *name == field)
+            .map(|(_, ty)| ty)
+        else {
+            return Some(false);
+        };
+        ty = next;
+    }
+    Some(layouts.scalar(&ty.name) && control_values::supported_type(&ty, layouts))
 }
 
 fn candidate(

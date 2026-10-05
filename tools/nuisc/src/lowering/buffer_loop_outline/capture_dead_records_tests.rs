@@ -167,10 +167,11 @@ fn dead_record_snapshots_do_not_treat_resources_or_borrows_as_ready_values() {
 #[test]
 fn dead_record_snapshots_keep_all_callers_transactional() {
     for computed in [false, true] {
+        let suffix = if computed { " + 0" } else { "" };
         let callers = format!(
             "
             fn first(state: State) -> i64 {{ return helper(state, state); }}
-            fn second(state: State) -> i64 {{ return helper({}, state); }}
+            fn second(state: State) -> i64 {{ return helper({}, state){suffix}; }}
         ",
             if computed { "relay(state)" } else { "state" }
         );

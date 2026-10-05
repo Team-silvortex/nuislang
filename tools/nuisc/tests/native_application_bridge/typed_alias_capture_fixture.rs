@@ -51,6 +51,285 @@ pub fn scalar_transport_source() -> String {
     scalar_copy_source(true).replace("return saved.f0;", "return relay(saved.f0);")
 }
 
+pub fn scalar_checked_transport_source() -> String {
+    scalar_transport_source()
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn checked(value: i64) -> i64 { return 1 / (value - 62); }
+    @noinline fn relay",
+        )
+        .replace("f62: relay(payload.f62)", "f62: checked(payload.f62)")
+}
+
+pub fn aggregate_transport_source() -> String {
+    scalar_transport_source()
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn consume_snapshot(value: Payload) -> i64 { return value.f0; }
+    @noinline fn relay",
+        )
+        .replace("return relay(saved.f0);", "return consume_snapshot(saved);")
+}
+
+pub fn evaluated_scalar_source(checked: bool) -> String {
+    let fields = (0..64)
+        .map(|i| {
+            format!(
+                "f{i}: {}",
+                match i {
+                    0 => "selected".into(),
+                    62 => "unused".into(),
+                    _ => format!("payload.f{i}"),
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = source().replace(
+        "let saved = payload;",
+        &format!(
+            "let selected = relay(payload.f0); const unused: i64 = relay(payload.f62);
+            let saved = Payload {{ {fields} }};"
+        ),
+    );
+    if checked {
+        source
+            .replace(
+                "    @noinline fn relay",
+                "    @noinline fn checked(value: i64) -> i64 { return 1 / (value - 62); }
+    @noinline fn relay",
+            )
+            .replace(
+                "const unused: i64 = relay(payload.f62)",
+                "const unused: i64 = checked(payload.f62)",
+            )
+    } else {
+        source
+    }
+}
+
+pub fn evaluated_scalar_transport_source() -> String {
+    evaluated_scalar_source(false)
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn consume_snapshot(value: Payload) -> i64 { return value.f0; }
+    @noinline fn relay",
+        )
+        .replace(
+            "return relay(second.f0);",
+            "return consume_snapshot(second);",
+        )
+}
+
+pub fn aggregate_result_source(checked: bool) -> String {
+    let produced = (0..64)
+        .map(|i| {
+            format!(
+                "f{i}: {}",
+                match i {
+                    0 => "relay(value)".into(),
+                    62 => if checked {
+                        "checked(unused)"
+                    } else {
+                        "relay(unused)"
+                    }
+                    .into(),
+                    _ => i.to_string(),
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let copied = (0..64)
+        .map(|i| {
+            format!(
+                "f{i}: {}",
+                match i {
+                    0 => "first.f0".into(),
+                    62 => "later.f62".into(),
+                    _ => format!("payload.f{i}"),
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = source()
+        .replace(
+            "    @noinline fn relay",
+            &format!(
+                "    @noinline fn checked(value: i64) -> i64 {{ return 1 / (value - 62); }}
+    @noinline fn produce(value: i64, unused: i64) -> Payload {{ return Payload {{ {produced} }}; }}
+    @noinline fn relay"
+            ),
+        )
+        .replace(
+            "let saved = payload;",
+            &format!(
+                "let first = produce(payload.f0, payload.f62);
+            const later: Payload = produce(payload.f0 + 30, payload.f62);
+            let saved = Payload {{ {copied} }};"
+            ),
+        );
+    if checked {
+        // The first result completes; only the later unused field traps.
+        source.replace(
+            "let first = produce(payload.f0, payload.f62);",
+            "let first = produce(payload.f0, payload.f62 + 1);",
+        )
+    } else {
+        source
+    }
+}
+
+pub fn aggregate_result_transport_source() -> String {
+    aggregate_result_source(false)
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn consume_snapshot(value: Payload) -> i64 { return value.f0; }
+    @noinline fn relay",
+        )
+        .replace(
+            "return relay(second.f0);",
+            "return consume_snapshot(second);",
+        )
+}
+
+pub fn inline_record_argument_source(checked: bool) -> String {
+    let source = aggregate_result_source(false)
+        .replace(
+            "    @noinline fn produce(value: i64, unused: i64)",
+            "    struct CallInput { used: i64, unused: i64 }
+    @noinline fn produce(input: CallInput)",
+        )
+        .replace("f0: relay(value)", "f0: input.used")
+        .replace("f62: relay(unused)", "f62: input.unused")
+        .replace(
+            "let first = produce(payload.f0, payload.f62);",
+            "let first = produce(CallInput { used: relay(payload.f0), unused: relay(payload.f62) });",
+        )
+        .replace(
+            "const later: Payload = produce(payload.f0 + 30, payload.f62);",
+            "const later: Payload = produce(CallInput { unused: relay(payload.f62), used: relay(payload.f0 + 30) });",
+        );
+    if checked {
+        source
+            .replace(
+                "unused: relay(payload.f62) });",
+                "unused: checked(payload.f62 + 1) });",
+            )
+            .replace(
+                "{ unused: relay(payload.f62),",
+                "{ unused: checked(payload.f62),",
+            )
+    } else {
+        source
+    }
+}
+
+pub fn inline_record_argument_transport_source() -> String {
+    inline_record_argument_source(false)
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn consume_snapshot(value: Payload) -> i64 { return value.f0; }
+    @noinline fn relay",
+        )
+        .replace(
+            "return relay(second.f0);",
+            "return consume_snapshot(second);",
+        )
+}
+
+pub fn materialized_record_argument_source(checked: bool) -> String {
+    // Keep the argument constructors (including their reversed field order)
+    // before the calls, and pass only stored immutable values through aliases.
+    let source = inline_record_argument_source(checked);
+    let first = if checked {
+        "checked(payload.f62 + 1)"
+    } else {
+        "relay(payload.f62)"
+    };
+    let later = if checked {
+        "checked(payload.f62)"
+    } else {
+        "relay(payload.f62)"
+    };
+    source
+        .replace(
+            &format!("let first = produce(CallInput {{ used: relay(payload.f0), unused: {first} }});"),
+            &format!("let first_input = CallInput {{ used: relay(payload.f0), unused: {first} }};
+            let first_alias = first_input; let first = produce(first_alias);"),
+        )
+        .replace(
+            &format!("const later: Payload = produce(CallInput {{ unused: {later}, used: relay(payload.f0 + 30) }});"),
+            &format!("const later_input: CallInput = CallInput {{ unused: {later}, used: relay(payload.f0 + 30) }};
+            let later_alias = later_input; const later: Payload = produce(later_alias);"),
+        )
+}
+
+pub fn materialized_record_argument_transport_source() -> String {
+    materialized_record_argument_source(false)
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn consume_snapshot(value: Payload) -> i64 { return value.f0; }
+    @noinline fn relay",
+        )
+        .replace(
+            "return relay(second.f0);",
+            "return consume_snapshot(second);",
+        )
+}
+
+pub fn stored_projection_source(checked: bool) -> String {
+    let source = aggregate_result_source(checked);
+    let signature =
+        "    @noinline fn produce(value: i64, unused: i64) -> Payload { return Payload { ";
+    let (prefix, tail) = source.split_once(signature).unwrap();
+    let (fields, suffix) = tail.split_once(" }; }").unwrap();
+    let fields = fields.split(", ").collect::<Vec<_>>();
+    assert_eq!(fields.len(), 64);
+    let definition = |range: std::ops::Range<usize>| {
+        range
+            .map(|i| format!("f{i}: i64"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let first_unused = if checked {
+        "payload.f62 + 1"
+    } else {
+        "payload.f62"
+    };
+    format!(
+        "{prefix} struct SelectedPayload {{ {} }} struct IgnoredPayload {{ {} }}
+    struct CallEnvelope {{ selected: SelectedPayload, ignored: IgnoredPayload }}
+    @noinline fn produce(value: i64, unused: i64) -> CallEnvelope {{
+        return CallEnvelope {{ selected: SelectedPayload {{ {} }}, ignored: IgnoredPayload {{ {} }} }};
+    }}{suffix}",
+        definition(0..32), definition(32..64), fields[..32].join(", "), fields[32..].join(", "),
+    )
+    .replace(
+        &format!("let first = produce(payload.f0, {first_unused});"),
+        &format!("let first = produce(payload.f0, {first_unused}).selected;"),
+    )
+    .replace(
+        "const later: Payload = produce(payload.f0 + 30, payload.f62);",
+        "const later: SelectedPayload = produce(payload.f0 + 30, payload.f62).selected;",
+    )
+    .replace("f62: later.f62", "f62: later.f30")
+}
+
+pub fn stored_projection_transport_source() -> String {
+    stored_projection_source(false)
+        .replace(
+            "    @noinline fn relay",
+            "    @noinline fn consume_snapshot(value: Payload) -> i64 { return value.f0; }
+    @noinline fn relay",
+        )
+        .replace(
+            "return relay(second.f0);",
+            "return consume_snapshot(second);",
+        )
+}
+
 pub fn rebound_source() -> String {
     let fields = (0..64)
         .map(|i| format!("f{i}: {}", if i == 0 { 30 } else { 0 }))

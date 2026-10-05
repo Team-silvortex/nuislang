@@ -96,6 +96,58 @@ fn nested_value_admission_does_not_grant_nonloop_control_outlining_authority() {
 }
 
 #[test]
+fn flat_control_interfaces_admit_completed_nested_results_without_nested_transport_authority() {
+    let module = parse_nuis_module(
+        "mod cpu Main {
+        struct Input { value: i64, divisor: i64 }
+        struct Selected { value: i64 }
+        struct Envelope { selected: Selected, ignored: i64 }
+        fn checked(value: i64) -> i64 { return 10 / value; }
+        fn produce(input: Input) -> Envelope {
+            return Envelope { selected: Selected { value: input.value },
+                ignored: checked(input.divisor) };
+        }
+        fn choose(flag: bool, input: Input) -> i64 {
+            if flag { let saved = produce(input).selected; return saved.value; }
+            return checked(input.divisor);
+        }
+        fn nested_input(value: Envelope) -> i64 { return value.selected.value; }
+        fn nested_return(input: Input) -> Envelope { return produce(input); }
+        fn effect(input: Input) -> Envelope { print(input.value); return produce(input); }
+        fn caller(input: Input) -> i64 { let saved = effect(input).selected; return saved.value; }
+        fn cycle_a(input: Input) -> Envelope { return cycle_b(input); }
+        fn cycle_b(input: Input) -> Envelope { return cycle_a(input); }
+        fn cycle_caller(input: Input) -> i64 { let saved = cycle_a(input).selected; return saved.value; }
+        fn main() -> i64 { return 0; }
+    }",
+    )
+    .unwrap();
+    for reversed in [false, true] {
+        let mut module = module.clone();
+        if reversed {
+            module.functions.reverse();
+            module.structs.reverse();
+        }
+        let layouts = layouts(&module);
+        let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
+        let roots = scalar_helpers::control_roots(&module, &layouts, &catalog);
+        assert!(roots.contains("choose"));
+        for name in [
+            "produce",
+            "nested_input",
+            "nested_return",
+            "effect",
+            "caller",
+            "cycle_a",
+            "cycle_b",
+            "cycle_caller",
+        ] {
+            assert!(!roots.contains(name), "{name}");
+        }
+    }
+}
+
+#[test]
 fn typed_layouts_reject_cycles_resources_empty_and_duplicate_fields_transitively() {
     for mutation in ["cycle", "resource", "empty", "duplicate", "generic"] {
         let mut module = module();
