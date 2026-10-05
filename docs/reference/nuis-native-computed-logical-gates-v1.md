@@ -246,8 +246,12 @@ full-workspace, fresh Linux/GPU, benchmark or formal-safety acceptance.
 ## Boundaries
 
 The original checkpoint recorded `active/92`.
-The return-arm checkpoint recorded `active/93`; the current coordinate is `active/94`,
-not completed application closure. Logical gates hidden inside ordinary leaves,
+The return-arm checkpoint recorded `active/93`; the nested-tree checkpoint's
+current coordinate is `active/94`. Subsequent work is `active/95` under the
+[leading print-prefix proof](nuis-native-return-print-prefixes-v1.md), followed by
+`active/96` under the [computed print-argument proof](nuis-native-computed-return-prints-v1.md).
+The [interleaved atom-alias proof](nuis-native-return-print-aliases-v1.md) follows at
+`active/97`. None is completed application closure. Logical gates hidden inside ordinary leaves,
 effectful prefixes, loops, changing capture transports and borrowed/resource/aggregate parent
 return-helper captures remain outside this proof. There are no public ABI, native
 limit or ownership/GLM exemptions. This is selected local CPU/source evidence,

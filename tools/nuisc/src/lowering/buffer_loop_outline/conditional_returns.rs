@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "conditional_returns_effects.rs"]
+mod effects;
 #[path = "conditional_returns_entry.rs"]
 mod entry;
 #[path = "conditional_returns_fallthrough.rs"]
@@ -19,7 +21,7 @@ mod suffix;
 mod terminal;
 #[cfg(test)]
 #[path = "conditional_returns_tests.rs"]
-mod tests;
+pub(super) mod tests;
 
 // Keep parent effects and exits in place. Only an admitted top-level return
 // computation moves behind the existing pure scalar-control helper contract.
@@ -86,6 +88,50 @@ pub(super) fn outline(
                         ));
                         continue;
                     }
+                    if let Some(plan) = effects::prepare(
+                        condition, then_body, else_body, result, &scope, catalog, layouts, &checked,
+                    ) {
+                        output.extend(effects::install(
+                            plan,
+                            result,
+                            names,
+                            &mut bindings,
+                            &mut helpers,
+                            &mut definitions,
+                        ));
+                        continue;
+                    }
+                    if let Some((yes, no)) = effects::aliases::prepare(
+                        then_body, else_body, result, &scope, catalog, layouts,
+                    ) {
+                        if let Some(plan) = effects::prepare(
+                            condition, &yes, &no, result, &scope, catalog, layouts, &checked,
+                        ) {
+                            output.extend(effects::install(
+                                plan,
+                                result,
+                                names,
+                                &mut bindings,
+                                &mut helpers,
+                                &mut definitions,
+                            ));
+                            continue;
+                        }
+                    }
+                    if let Some(plan) = effects::regions::prepare(
+                        condition, then_body, else_body, result, &scope, catalog, layouts,
+                        &checked, &bindings,
+                    ) {
+                        output.extend(effects::regions::install(
+                            plan,
+                            result,
+                            names,
+                            &mut bindings,
+                            &mut helpers,
+                            &mut definitions,
+                        ));
+                        continue;
+                    }
                 }
                 // Do not lift work out of loops or an enclosing source branch.
                 _ => {}
@@ -122,6 +168,23 @@ fn prepare(
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
     checked: &BTreeSet<String>,
+) -> Option<Plan> {
+    prepare_staged(
+        condition, then_body, else_body, result, scope, catalog, layouts, checked, false,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn prepare_staged(
+    condition: &NirExpr,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    result: &NirTypeRef,
+    scope: &Scope,
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+    checked: &BTreeSet<String>,
+    selected_initializer_work: bool,
 ) -> Option<Plan> {
     if !entry::admitted(condition, scope, catalog, layouts) {
         return None;
@@ -178,7 +241,10 @@ fn prepare(
     if !has_return {
         return None;
     }
+    // Only the separately proven selected-initializer region may supply this
+    // work authority. Ordinary print arguments still grant no tail eligibility.
     if !entry::has_work(condition)
+        && !selected_initializer_work
         && ![then_body, else_body].into_iter().any(|body| {
             speculation::block_has_checked_arithmetic(body, checked)
                 || scalar_helpers::contains_calls(body)

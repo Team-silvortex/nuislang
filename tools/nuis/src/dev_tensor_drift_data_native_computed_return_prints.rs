@@ -1,0 +1,115 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-bounded-original-typing-and-scalar-captures",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_print_values.rs",
+        required_patterns: &[
+            "scope.get(name) == Some(&scalar_type(\"i64\"))",
+            "!conditional_values::prefix::expression(value)",
+            "control_values::value_type(value, scope, catalog, layouts)",
+            "!= Some(scalar_type(\"i64\"))",
+            "control_values::collect_inputs(value, &mut inputs)",
+            "!scope.get(name).is_some_and(scalar)",
+            "Some(captured_params(inputs, scope))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-pure-selected-helper-and-ready-parent-arguments",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_print_values.rs",
+        required_patterns: &[
+            "branches::fresh_name(\"__nuis_print_condition\", &mut parameter_names)",
+            "let mut args = vec![condition.clone()]",
+            "params[1..]",
+            "NirExpr::Var(param.name.clone())",
+            "then_body: vec![NirStmt::Return(Some(print.value.clone()))]",
+            "else_body: vec![NirStmt::Return(Some(NirExpr::Int(0)))]",
+            "Only ready parent atoms cross the call boundary",
+            "value: NirExpr::Call { callee: name, args }",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-parent-print-order-and-independent-tail-authority",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effects.rs",
+        required_patterns: &[
+            "yes: Vec<print_values::PrintValue<'a>>",
+            "if !preflight(body, prints.len())",
+            "!suffix::reserve_prefix(tail, &values)",
+            ".collect::<Option<Vec<_>>>()?",
+            "Effects never enter the pure helper catalog or confer source-exit rights",
+            "print_values::install(print, &condition, names, bindings, helpers, &mut output)",
+            "then_body: vec![NirStmt::Print(value)]",
+            "output.extend(super::install(",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-source-oracle-selected-failure-before-return-work",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_print_values_fixtures.rs",
+        required_patterns: &[
+            "100 / stamp", "100 % stamp", "observe(stamp)", "produce(stamp).value",
+            "prints.iter().position(|value| *value == 55)",
+            "prints.truncate(index)",
+            "return (None, prints, calls)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-runtime-order-captures-idempotence-and-vetoes",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_print_values_tests.rs",
+        required_patterns: &[
+            "assert_eq!(cases, 576)",
+            "conditional_return_computed_prints_keep_pure_helpers_minimal_and_install_atomic",
+            "assert_eq!(module, once)", "assert_eq!(module, before, \"{mutation}\")",
+            "print-only-work", "logical-argument",
+            "conditional_return_computed_prints_preserve_each_call_and_current_parent_binding",
+            ".enumerate()",
+            "let first = calls[0].0",
+            "trace.events[first + 1..second]",
+            "conditional_return_computed_prints_keep_selected_overflow_and_fresh_names",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-shared-node-and-depth-budget-boundaries",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_print_values_budget_tests.rs",
+        required_patterns: &[
+            "for args in [4092, 4093]",
+            "body.insert(2, NirStmt::Print(extra.clone()))",
+            "preflight(&body, 3), args == 4092",
+            "for depth in [63, 64]",
+            "conditional_values::prefix::expression(&value), depth == 63",
+            "suffix::reserve_prefix",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-default-source-aot-selected-work-and-traps",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_print_values_native_tests.rs",
+        required_patterns: &[
+            "conditional_return_computed_prints_execute_native_selected_calls_traps_and_zero_exits",
+            "conditional_return_computed_prints_execute_native_selected_signed_overflow",
+            "run(&text, result.map(|_| output.as_str()))",
+            "(-9223372036854775807 - 1) {op} stamp",
+            "run(&text, if outer { None } else { Some(\"99\\n77\\n19\") })",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-documentation-and-tensor-history",
+        path: "docs/reference/nuis-native-computed-return-prints-v1.md",
+        required_patterns: &[
+            "576", "1152 ordinary/reversed YIR executions", "Nineteen AOT variants",
+            "nine selected traps", "print-only computation grants no return-tail eligibility",
+            "after `98ca713e`", "active/96", "Computed argument verification:",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-computed-return-prints-selected-tensor-preserves-atom-checkpoint",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Computed return-print argument follow-up:",
+            "Computed return-print argument acceptance:",
+            "Previous leading print-prefix checkpoint:",
+            "Leading return-print prefix acceptance:",
+            "Final selected acceptance passes 2072 distinct tests",
+            "Print-only work grants no tail eligibility",
+            "active/96", "conditional_return_computed_prints",
+        ],
+    },
+];

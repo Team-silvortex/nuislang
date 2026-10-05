@@ -1912,7 +1912,9 @@ logical/effectful-return acceptance.
 
 ## Remaining Boundaries
 
-The persistent-session coordinate is now `active/94`. Empty fallthrough leaves
+The persistent-session coordinate is now `active/99`; the separate
+[logical initializer proof](nuis-native-logical-staged-initializers-v1.md) retains short-circuit order, once-only snapshots and parent prints.
+Empty fallthrough leaves
 and fresh pure continuation bindings now have independent bounded proofs above.
 Fresh helper-local atom aliases now have a separate bounded readiness proof.
 Local total comparisons of stable bool/i64 atoms now have a separate proof.

@@ -4,6 +4,8 @@ use super::*;
 mod if_lowering_chains;
 #[path = "if_lowering_effects.rs"]
 mod if_lowering_effects;
+#[path = "if_lowering_prints.rs"]
+mod if_lowering_prints;
 #[path = "if_lowering_runtime.rs"]
 mod if_lowering_runtime;
 
@@ -235,6 +237,16 @@ pub(super) fn lower_if_pair(
             lower_expr(effect, state, bindings)?;
             return Ok(LoweredIfOutcome::Continued);
         }
+    }
+
+    if let Some(lowered) = if_lowering_prints::lower(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
     }
 
     if let Some(lowered) = lower_branch_effect(

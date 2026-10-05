@@ -19,7 +19,30 @@ pub(super) fn prepare(
     validate(body, scope.clone(), result, catalog, layouts)?;
     let mut statements = 32;
     let plan = plan(body.iter().collect(), &mut statements)?;
-    let mut pending = vec![plan.as_slice()];
+    let expressions = plan_expressions(&plan)?;
+    // Bound expanded code before cloning any expression. Normalization cannot
+    // buy a larger statement/node budget through statically duplicated tails.
+    conditional_values::prefix::computed_expression_roots(expressions).then(|| materialize(plan))
+}
+
+// Leading parent prints reserve both statements and atom nodes in the expanded
+// pure plan before the ordinary return preparer can materialize it.
+pub(super) fn reserve_prefix(body: &[NirStmt], prefix: &[&NirExpr]) -> bool {
+    let Some(mut statements) = 32usize.checked_sub(prefix.len()) else {
+        return false;
+    };
+    let Some(plan) = plan(body.iter().collect(), &mut statements) else {
+        return false;
+    };
+    let Some(mut expressions) = plan_expressions(&plan) else {
+        return false;
+    };
+    expressions.extend(prefix.iter().map(|value| (*value, 0, false)));
+    conditional_values::prefix::computed_expression_roots(expressions)
+}
+
+fn plan_expressions<'a>(plan: &[Part<'a>]) -> Option<Vec<(&'a NirExpr, usize, bool)>> {
+    let mut pending = vec![plan];
     let mut expressions = Vec::new();
     while let Some(body) = pending.pop() {
         for part in body {
@@ -34,13 +57,35 @@ pub(super) fn prepare(
                     expressions.push((*condition, 0, true));
                     pending.extend([yes.as_slice(), no.as_slice()]);
                 }
-                _ => unreachable!("preflighted source sequence"),
+                _ => return None,
             }
         }
     }
-    // Bound expanded code before cloning any expression. Normalization cannot
-    // buy a larger statement/node budget through statically duplicated tails.
-    conditional_values::prefix::computed_expression_roots(expressions).then(|| materialize(plan))
+    Some(expressions)
+}
+
+// Staged initializers may own logical roots; print arguments remain ordinary
+// leaves. Charge every source root together with the expanded pure tail.
+pub(super) fn reserve_staged_prefix(body: &[NirStmt], prefix: &[NirStmt]) -> bool {
+    let Some(mut statements) = 32usize.checked_sub(prefix.len()) else {
+        return false;
+    };
+    let Some(plan) = plan(body.iter().collect(), &mut statements) else {
+        return false;
+    };
+    let Some(mut expressions) = plan_expressions(&plan) else {
+        return false;
+    };
+    for stmt in prefix {
+        match stmt {
+            NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => {
+                expressions.push((value, 0, true));
+            }
+            NirStmt::Print(value) => expressions.push((value, 0, false)),
+            _ => return false,
+        }
+    }
+    conditional_values::prefix::computed_expression_roots(expressions)
 }
 
 fn preflight(body: &[NirStmt]) -> bool {
@@ -75,7 +120,7 @@ fn preflight(body: &[NirStmt]) -> bool {
     intermediate && conditional_values::prefix::computed_expression_roots(expressions)
 }
 
-fn validate(
+pub(super) fn validate(
     body: &[NirStmt],
     mut scope: Scope,
     result: &NirTypeRef,

@@ -1,0 +1,128 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-original-admission-before-helper-mutation",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effects.rs",
+        required_patterns: &[
+            "body.split_at(count)",
+            "if yes.is_empty() && no.is_empty()",
+            "if !preflight(body, prints.len())",
+            "print_values::prepare(value, scope, catalog, layouts)",
+            "!suffix::reserve_prefix(tail, &values)",
+            "Effects never enter the pure helper catalog or confer source-exit rights",
+            "condition, yes_tail, no_tail, result, scope, catalog, layouts, checked",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-parent-once-only-gate-and-original-print-order",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effects.rs",
+        required_patterns: &[
+            "branches::fresh_name(\"__nuis_effect_return_gate\", bindings)",
+            "value: plan.pure.condition",
+            "for (prints, selected) in [(plan.yes, true), (plan.no, false)]",
+            "rhs: Box::new(NirExpr::Bool(false))",
+            "then_body: vec![NirStmt::Print(value)]",
+            "plan.pure.condition = NirExpr::Var(gate)",
+            "output.extend(super::install(",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-expanded-budget-reservation-before-clone",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_suffix.rs",
+        required_patterns: &[
+            "pub(super) fn reserve_prefix",
+            "32usize.checked_sub(prefix.len())",
+            "plan(body.iter().collect(), &mut statements)",
+            "plan_expressions(&plan)",
+            "expressions.extend(prefix.iter().map(|value| (*value, 0, false)))",
+            "computed_expression_roots(expressions)",
+            "then(|| materialize(plan))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-ready-atom-single-arm-shortcut",
+        path: "tools/nuisc/src/lowering/if_lowering_prints.rs",
+        required_patterns: &[
+            "([NirStmt::Print(value)], [])",
+            "!matches!(value, NirExpr::Int(_) | NirExpr::Var(_))",
+            "Fallible/effectful print arguments",
+            "lower_guard_print(condition, value, state)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-guarded-print-statement-effect-anchor",
+        path: "tools/nuisc/src/lowering/guard_ops.rs",
+        required_patterns: &[
+            "pub(super) fn lower_guard_print(",
+            "instruction: \"guard_print\"",
+            "from: print_name,\n        to: name.clone(),\n    });\n    chain_statement_effect(state, &name);",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-independent-source-oracle-and-atomic-vetoes",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effects_tests.rs",
+        required_patterns: &[
+            "assert_eq!(cases, 864)",
+            "assert_eq!(cases, 432)",
+            "assert_eq!(cases + 1, 49)",
+            "conditional_return_effects_keep_helpers_pure_captures_minimal_and_install_idempotent",
+            "assert_eq!(module, once)",
+            "conditional_return_effects_reject_interleaving_calls_resources_and_new_capture_authority",
+            "print(10 / left);",
+            "callee-effect",
+            "assert_eq!(module, before)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-original-expanded-budget-boundaries",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effects_budget_tests.rs",
+        required_patterns: &[
+            "for count in [30, 31]",
+            "for prints in [1, 2]",
+            "Expanded pure plan: If + 2 branch locals + 2*(13 locals + Return) = 31",
+            "for args in [4092, 4093]",
+            "for edges in [32, 33]",
+            "for depth in [63, 64]",
+            "assert_eq!(module, before)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-documented-scope-and-remaining-effect-regions",
+        path: "docs/reference/nuis-native-return-print-prefixes-v1.md",
+        required_patterns: &[
+            "Prints never enter the",
+            "1345",
+            "2690 ordinary/reversed YIR executions",
+            "Sixteen AOT variants",
+            "four selected traps",
+            "Interleaved effects,",
+            "internal-leaf effects, selected fallible print arguments",
+            "after `98ca713e`",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-default-source-aot-exits-traps-and-zero-results",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effects_native_tests.rs",
+        required_patterns: &[
+            "use super::super::super::tests::native::run",
+            "conditional_return_effects_execute_native_print_order_exits_and_selected_traps",
+            "conditional_return_effects_execute_native_zero_return_without_fallthrough_replay",
+            "run(&text, result.map(|_| output.as_str()))",
+            "print(result); return 0;",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-return-print-prefixes-selected-tensor-preserves-previous-proof-history",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Leading return-print prefix follow-up:",
+            "Leading return-print prefix acceptance:",
+            "Previous nested logical-tree checkpoint:",
+            "conditional_return_effects",
+            "active/95",
+            "Nested logical-tree acceptance:",
+            "Final selected acceptance passes 2063 distinct tests",
+        ],
+    },
+];

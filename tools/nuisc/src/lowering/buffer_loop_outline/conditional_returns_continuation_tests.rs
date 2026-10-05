@@ -406,8 +406,29 @@ fn conditional_return_continuations_retain_effect_rebind_scope_kind_capture_and_
             usize::from(gate),
         );
     }
+    // Retain the former print-only opposite continuation as selected/skipped
+    // parent-effect evidence, without granting a new source return.
+    for outer in [false, true] {
+        let admitted = source(
+            "outer-then",
+            "record",
+            "&&",
+            outer,
+            false,
+            false,
+            true,
+            2,
+            false,
+        )
+        .replace(continuing("record"), "print(88);");
+        execute(
+            &admitted,
+            Some(if outer { 11 } else { 19 }),
+            if outer { &[99, 11] } else { &[99, 88, 77, 19] },
+            usize::from(outer),
+        );
+    }
     for candidate in [
-        "print(88);",
         "let divisor = 10 / divisor;",
         "let first = divisor; let first = divisor;",
         "while gate { let ignored = 10 / divisor; }",

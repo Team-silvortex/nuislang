@@ -89,10 +89,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-caller-records-drift-registration",
         path: "tools/nuis/src/dev_tensor_drift_data_native_iteration_calls.rs",
-        required_patterns: &[
-            "mod caller_records;",
-            ".chain(caller_records::CHECKS.iter())",
-        ],
+        required_patterns: &["mod caller_records;", "caller_records::CHECKS,"],
     },
     DevTensorDriftCheckSpec {
         id: "native-caller-records-tensor-scope",

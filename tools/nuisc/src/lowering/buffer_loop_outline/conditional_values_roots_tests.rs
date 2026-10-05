@@ -306,7 +306,32 @@ fn conditional_root_values_retain_effectful_nested_return_speculation_rejection(
             }
             yir_lower_llvm::emit_module(&compiled.yir).unwrap();
         }
-        let effectful = original.replace(&selected, &format!("print(99); if gate {{ print(88); if gate {{ return gate {op} helper(produce(divisor)); }} }} return false;"));
+        // Keep the formerly rejected outer prefix as positive evidence, while
+        // the same effect inside the pure nested tail stays independently vetoed.
+        for (gate, divisor) in [(false, 0), (true, 2), (true, -2), (true, 0)] {
+            let effectful = source("return", op, gate, divisor, true)
+                .replace(&selected, &format!("print(99); if gate {{ print(88); if gate {{ return gate {op} helper(produce(divisor)); }} }} return false;"))
+                .replace("fn produce(", "@noinline fn produce(")
+                .replace("fn helper(", "@noinline fn helper(");
+            let rhs = gate && op == "&&";
+            let result = if gate && (op == "||" || divisor > 0) {
+                11
+            } else {
+                19
+            };
+            let prints = if gate {
+                vec![99, 88, result]
+            } else {
+                vec![99, result]
+            };
+            super::super::conditional_returns::tests::execute(
+                &effectful,
+                (!(rhs && divisor == 0)).then_some(result),
+                &prints,
+                usize::from(rhs),
+            );
+        }
+        let effectful = original.replace(&selected, &format!("print(99); if gate {{ if gate {{ print(88); return gate {op} helper(produce(divisor)); }} }} return false;"));
         let error = crate::pipeline::compile_source(&effectful)
             .err()
             .expect("unproven branch-effect return must stay rejected");

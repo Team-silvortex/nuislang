@@ -40,7 +40,12 @@ pub(super) fn source(
     )
 }
 
-pub(super) fn execute(source: &str, expected: Option<i64>, prints: &[i64], calls: usize) {
+pub(in crate::lowering::buffer_loop_outline) fn execute(
+    source: &str,
+    expected: Option<i64>,
+    prints: &[i64],
+    calls: usize,
+) {
     let compiled =
         crate::pipeline::compile_source(source).unwrap_or_else(|error| panic!("{error}\n{source}"));
     for reversed in [false, true] {
@@ -73,6 +78,8 @@ pub(super) fn execute(source: &str, expected: Option<i64>, prints: &[i64], calls
                 .iter()
                 .filter(|event| {
                     event.contains("cpu.print")
+                        || (event.contains("cpu.guard_print ")
+                            && event.contains(": if true then print "))
                         || (event.contains("cpu.guard_print_return")
                             && event.contains(": if true then print "))
                 })
@@ -81,6 +88,7 @@ pub(super) fn execute(source: &str, expected: Option<i64>, prints: &[i64], calls
             for (event, printed) in observed.iter().zip(prints) {
                 assert!(
                     event.ends_with(&format!(": {printed}"))
+                        || event.ends_with(&format!("then print {printed}"))
                         || event.ends_with(&format!("and return {printed}")),
                     "{event}\n{source}"
                 );
@@ -313,11 +321,20 @@ fn conditional_returns_keep_loop_nested_effect_resource_kind_and_work_vetoes() {
         "if outer { return gate && (gate || helper(produce(divisor))); }",
     );
     execute(&admitted, Some(11), &[99, 11], 0);
+    // Former leading-print vetoes are now independently admitted parent effects.
+    let admitted = original.replace(
+        selected,
+        "if outer { print(88); return helper(produce(divisor)); }",
+    );
+    execute(&admitted, Some(11), &[99, 88, 11], 1);
+    let admitted = original.replace(
+        selected,
+        "if outer { return helper(produce(divisor)); } else { print(88); }",
+    );
+    execute(&admitted, Some(11), &[99, 11], 1);
     for replacement in [
         "while outer { return gate && helper(produce(divisor)); }",
-        "if outer { print(88); return helper(produce(divisor)); }",
         "if outer { let gate: bool = helper(produce(divisor)); return gate; }",
-        "if outer { return helper(produce(divisor)); } else { print(88); }",
     ] {
         let mut module =
             crate::frontend::parse_nuis_module(&original.replace(selected, replacement)).unwrap();

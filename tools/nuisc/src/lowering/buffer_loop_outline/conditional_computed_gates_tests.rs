@@ -541,6 +541,12 @@ fn conditional_computed_gates_retain_nested_effect_type_loop_capture_vetoes_and_
                 }
             }
         }
+        if mutation == "branch" {
+            // Keep the old veto fixture as a positive leading-parent-print proof.
+            assert_eq!(outline_test(&mut module).len(), 1);
+            crate::nir_verify::verify_nir_module(&module).unwrap();
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{mutation}");
         assert_eq!(module, before);

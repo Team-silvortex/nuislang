@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.7`](docs/versioning/nuis-beta-0.15.7-patch.md) (2026-10-03).
+[`beta-0.15.8`](docs/versioning/nuis-beta-0.15.8-patch.md) (`98ca713e`, 2026-10-05).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -37,6 +37,22 @@ Start with the [current mainline map](docs/current-mainline-map.md),
 [application-led roadmap](docs/versioning/nuis-beta-0.11-application-led-mainline.md).
 This is a formal staged self-hosting migration line, not a claim of a self-hosted
 compiler, stable public API, or production-ready engine.
+
+Post-release work adds [bounded leading return-print prefixes](docs/reference/nuis-native-return-print-prefixes-v1.md):
+save the entry once, keep guarded integer prints in the parent, then execute the
+independently admitted pure return tail. The subsequent
+[computed print-argument proof](docs/reference/nuis-native-computed-return-prints-v1.md)
+keeps checked/call-backed argument work inside selected pure value helpers, with
+the actual prints still in the parent. [Interleaved scalar aliases](docs/reference/nuis-native-return-print-aliases-v1.md)
+now compose with those prints under original-scope and nonexpanding-copy proof.
+The [staged initializer proof](docs/reference/nuis-native-staged-return-effects-v1.md)
+adds selected checked/call-backed scalar bindings, evaluated once and reused by
+prints and return tails, including checks in unused bindings.
+The [logical initializer follow-up](docs/reference/nuis-native-logical-staged-initializers-v1.md)
+adds direct nested short-circuit roots to these selected bindings, preserving
+once-only snapshots, original scalar captures and shared prefix/tail budgets.
+This is worktree development after the
+committed patch, not general effectful-helper or application-closure acceptance.
 
 ```text
 nuis source / nuis.toml

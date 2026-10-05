@@ -8,10 +8,25 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.7`](versioning/nuis-beta-0.15.7-patch.md)
-(2026-10-03), covering post-loop snapshots, bounded capture normalization,
-typed literal origins and fresh-file native artifact publication, including
-64-word source-free restoration and repeated same-path launches.
+The current patch is [`beta-0.15.8`](versioning/nuis-beta-0.15.8-patch.md)
+(`98ca713e`, 2026-10-05), including bounded computed return predicates and nested
+logical trees. [Leading return-print prefixes](reference/nuis-native-return-print-prefixes-v1.md)
+are subsequent worktree development: parent-only effects, a once-only entry and
+an independently admitted pure return tail, not general effectful helpers.
+The subsequent [computed print-argument proof](reference/nuis-native-computed-return-prints-v1.md)
+guards pure checked/call-backed argument work before each parent print, without
+granting new return-tail eligibility or logical-leaf/capture authority.
+The [interleaved scalar-alias follow-up](reference/nuis-native-return-print-aliases-v1.md)
+adds fresh total atom copies/literals around prints, preserving original lexical
+validation and charging removed copies against the original/expanded budgets.
+The [staged initializer follow-up](reference/nuis-native-staged-return-effects-v1.md)
+preserves ordered selected bool/i64 computations as once-only ready snapshots,
+including unused checked work. Only its separately proven initializer work may
+support a pure return tail; actual source exits and ordinary-root limits remain.
+The [logical initializer follow-up](reference/nuis-native-logical-staged-initializers-v1.md)
+extends only direct logical initializer roots, reusing the existing short-circuit
+pass while charging prefix expressions and expanded tails together. Ordinary
+print/call leaves and original scalar capture authority are not widened.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -43,12 +58,21 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- dev-tensor --json
 The current goal is `standard-library/ns-nova/interactive-image-workflow`.
 Its selected prerequisite is
 `standard-library/ns-nova/persistent-application-session`.
+The committed `beta-0.15.8` checkpoint retained `active/94`; the leading print-prefix
+worktree checkpoint retained `active/95`; the computed print-argument follow-up
+retained `active/96`; the interleaved atom-alias follow-up retained `active/97`;
+the staged initializer follow-up retained `active/98`; the logical initializer
+follow-up is `active/99`, confirmed by the rebuilt CLI,
+with separate validation evidence. This remains
+an application prerequisite, not a completed native application.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.
 The `05951bef` checkpoint and `beta-0.15.7` retain `active/86`. Current work adds
 exact sparse mixed/nested bool/i32/i64/f32/f64 field-path maps and typed read-only scoped inputs.
-The next task is further changing backedges and wide private captures,
-while preserving observed exits and the existing bounded fallback.
+The next task is broader internal
+control/effect regions, preserving observed exits, ready snapshots and bounded fallback.
+The separate backlog of further changing backedges and wide private captures
+retains its own proof gates and does not replace this selected frontier.
 Branch-local record/subrecord aliases and identity-preserving inherited writes now retain
 lexical/version proofs. Materialized outer joins retain assignments under backward field-demand proof;
 changing nested-loop snapshots now use bounded fixed-point demand with lexical break/continue targets.
