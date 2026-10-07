@@ -26,7 +26,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if inner.contains_key(name)",
             "declared.is_some_and(|declared| declared != &ty)",
             "capture(condition, outer, inputs)",
-            "!scope.get(name).is_some_and(scalar)",
+            ".is_some_and(|ty| return_values::capture(result, ty))",
         ],
     },
     DevTensorDriftCheckSpec {

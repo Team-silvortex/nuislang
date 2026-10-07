@@ -1,0 +1,49 @@
+mod cpu Main {
+    struct State {
+        seed: i64, gate: bool, second_gate: bool,
+        left_divisor: i64, right_divisor: i64, result: i64
+    }
+    @noinline fn decide(gate: bool) -> bool { print(98); return gate; }
+    @noinline fn first(value: i64, divisor: i64) -> i64 {
+        print(61);
+        return value / divisor;
+    }
+    @noinline fn second(value: i64, divisor: i64) -> i64 {
+        print(62);
+        return value / divisor;
+    }
+    @noinline fn yes(value: i64, first: i64, second: i64) -> i64 {
+        print(70);
+        return value + first + second;
+    }
+    @noinline fn no(value: i64, first: i64, second: i64) -> i64 {
+        print(71);
+        return value - first - second;
+    }
+    fn observe(value: i64, gate: bool, second_gate: bool,
+               left_divisor: i64, right_divisor: i64) -> i64 {
+        print(99);
+        let selected: i64 = value;
+        let selected: i64 = selected + 1;
+        if decide(gate) {
+            let selected: i64 = yes(selected, first(selected, left_divisor), second(selected, left_divisor));
+        }
+        if decide(second_gate) {} else {
+            let selected: i64 = no(selected, first(selected, right_divisor), second(selected, right_divisor));
+        }
+        print(80);
+        return selected;
+    }
+    fn start(value: i64, gate: bool, second_gate: bool,
+             left_divisor: i64, right_divisor: i64) -> State {
+        return State { seed: value, gate: gate, second_gate: second_gate,
+            left_divisor: left_divisor, right_divisor: right_divisor,
+            result: observe(value, gate, second_gate, left_divisor, right_divisor) };
+    }
+    fn step(state: State, gate: bool, second_gate: bool,
+            left_divisor: i64, right_divisor: i64) -> State {
+        return start(state.seed, gate, second_gate, left_divisor, right_divisor);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

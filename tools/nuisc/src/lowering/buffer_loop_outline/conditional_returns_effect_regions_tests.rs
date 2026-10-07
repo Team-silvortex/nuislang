@@ -7,6 +7,8 @@ use fixtures::{events, simple_expected, simple_source, staged_expected, staged_s
 mod budget;
 #[path = "conditional_returns_effect_control_tests.rs"]
 mod control;
+#[path = "conditional_returns_effect_equal_join_tests.rs"]
+mod equal_joins;
 #[path = "conditional_returns_effect_exit_tests.rs"]
 mod exits;
 #[path = "conditional_returns_effect_join_tests.rs"]
@@ -19,6 +21,10 @@ mod native;
 mod one_sided_joins;
 #[path = "conditional_returns_effect_partial_join_tests.rs"]
 mod partial_joins;
+#[path = "conditional_returns_effect_typed_return_tests.rs"]
+mod typed_returns;
+#[path = "conditional_returns_effect_typed_snapshot_tests.rs"]
+mod typed_snapshots;
 
 #[test]
 fn conditional_return_staged_initializers_preserve_selected_work_order_and_exits() {

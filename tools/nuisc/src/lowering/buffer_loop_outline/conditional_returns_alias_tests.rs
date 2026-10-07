@@ -1,4 +1,6 @@
-use super::super::tests::{execute, outline_test, source as simple_source};
+use super::super::tests::{
+    assert_selected_effect_not_pure, execute, outline_test, source as simple_source,
+};
 use super::continuation_tests::assert_seed_after_work;
 use super::*;
 
@@ -359,6 +361,10 @@ fn conditional_return_aliases_share_budgets_before_alias_proof_and_leave_rejecti
                 continue;
             }
         };
+        if candidate.contains("print(88)") {
+            assert_selected_effect_not_pure(&source);
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{candidate}");
         assert_eq!(module, before, "{candidate}");

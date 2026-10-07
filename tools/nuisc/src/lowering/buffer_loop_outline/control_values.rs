@@ -166,6 +166,10 @@ pub(super) fn has_aggregate_expressions(body: &[NirStmt]) -> bool {
             NirExpr::StructLiteral { .. } | NirExpr::FieldAccess { .. } => true,
             NirExpr::Binary { lhs, rhs, .. } => expression(lhs) || expression(rhs),
             NirExpr::Call { args, .. } => args.iter().any(expression),
+            NirExpr::PackF32Word(value)
+            | NirExpr::UnpackF32Word(value)
+            | NirExpr::PackF64Word(value)
+            | NirExpr::UnpackF64Word(value) => expression(value),
             _ => false,
         }
     }
@@ -189,6 +193,7 @@ pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> 
         return None;
     }
     match op {
+        NirBinaryOp::Xor if lhs == scalar_type("i64") => Some(lhs),
         NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
             if lhs == scalar_type("f32") || lhs == scalar_type("f64") =>
         {

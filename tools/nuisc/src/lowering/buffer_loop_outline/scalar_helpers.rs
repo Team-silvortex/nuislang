@@ -433,7 +433,11 @@ fn collect_expr_calls(expr: &NirExpr, calls: &mut BTreeSet<String>) {
             }
             NirExpr::FieldAccess { base, .. }
             | NirExpr::CastI64ToI32(base)
-            | NirExpr::CastI32ToI64(base) => pending.push(base),
+            | NirExpr::CastI32ToI64(base)
+            | NirExpr::PackF32Word(base)
+            | NirExpr::UnpackF32Word(base)
+            | NirExpr::PackF64Word(base)
+            | NirExpr::UnpackF64Word(base) => pending.push(base),
             NirExpr::LoadAt { index, .. } => pending.push(index),
             NirExpr::StoreAt { index, value, .. } => {
                 pending.extend([index.as_ref(), value.as_ref()])

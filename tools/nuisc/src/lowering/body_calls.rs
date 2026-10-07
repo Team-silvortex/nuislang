@@ -36,10 +36,7 @@ pub(in crate::lowering) fn lower_call_expr(
     }
 
     if state.direct_call_functions.contains(callee) {
-        let lowered_args = args
-            .iter()
-            .map(|arg| lower_expr(arg, state, bindings))
-            .collect::<Result<Vec<_>, _>>()?;
+        let lowered_args = lower_ordered_call_arguments(args, state, bindings)?;
         return push_direct_call_node(function, &lowered_args, state);
     }
 
@@ -58,8 +55,8 @@ pub(in crate::lowering) fn lower_call_expr(
     }
 
     let mut local_bindings = BTreeMap::new();
-    for (param, arg) in function.params.iter().zip(args.iter()) {
-        let lowered = lower_expr(arg, state, bindings)?;
+    let lowered_args = lower_ordered_call_arguments(args, state, bindings)?;
+    for (param, lowered) in function.params.iter().zip(lowered_args) {
         local_bindings.insert(param.name.clone(), lowered);
     }
 
@@ -68,6 +65,26 @@ pub(in crate::lowering) fn lower_call_expr(
     state.call_stack.pop();
 
     returned.ok_or_else(|| format!("function `{callee}` did not return a value"))
+}
+
+fn lower_ordered_call_arguments(
+    args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Vec<String>, String> {
+    let mut lowered = Vec::with_capacity(args.len());
+    for arg in args {
+        let previous = state.last_effect_anchor.clone();
+        let node_start = state.yir.nodes.len();
+        let edge_start = state.yir.edges.len();
+        lowered.push(lower_expr(arg, state, bindings)?);
+        if let Some(previous) = previous {
+            super::edge_helpers::order_emitted_roots_after(
+                state, node_start, edge_start, &previous,
+            );
+        }
+    }
+    Ok(lowered)
 }
 
 pub(in crate::lowering) fn lower_async_call_boundary(

@@ -21,6 +21,8 @@ mod control_flow;
 mod control_loops;
 #[path = "buffer_loop_outline/control_values.rs"]
 mod control_values;
+#[path = "buffer_loop_outline/effectful_selections.rs"]
+mod effectful_selections;
 #[path = "buffer_loop_outline/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]
@@ -86,6 +88,10 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
                 .map(|definition| definition.name.clone()),
         )
         .collect::<BTreeSet<_>>();
+    let effectful_selections = effectful_selections::outline(module, &mut names);
+    if !effectful_selections.is_empty() {
+        crate::nir_verify::verify_nir_module(module)?;
+    }
     let mut selections = conditional_returns::outline(
         module,
         &value_catalog,
@@ -142,7 +148,11 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let preserve_entry_flow =
         control_catalog.contains_key("main") && control_loops::preserve_entry_flow(module);
     let mut helpers = Vec::new();
-    let mut outlined = BufferLoopOutlines::default();
+    let mut outlined = BufferLoopOutlines {
+        functions: effectful_selections.clone(),
+        guarded_functions: effectful_selections,
+        ..BufferLoopOutlines::default()
+    };
     let checked_arithmetic = speculation::collect_checked_arithmetic(module);
     for function in &module.functions {
         if preserve_entry_flow && function.name == "main" {

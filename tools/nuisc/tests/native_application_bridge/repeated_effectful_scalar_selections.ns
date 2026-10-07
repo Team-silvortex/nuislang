@@ -1,0 +1,79 @@
+mod cpu Main {
+    struct State {
+        seed: i64, enabled: bool, outer: bool, first: bool, second: bool,
+        left_prefix: i64, right_prefix: i64, left_first: i64, right_first: i64,
+        left_middle: i64, right_middle: i64, left_predicate: i64, right_predicate: i64,
+        left_second: i64, right_second: i64, left_suffix: i64, right_suffix: i64, result: i64
+    }
+    @noinline fn active_condition(gate: bool) -> bool { print(94); return gate; }
+    @noinline fn outer_condition(gate: bool) -> bool { print(97); return gate; }
+    @noinline fn prefix(value: i64, divisor: i64) -> i64 { print(61); return value / divisor; }
+    @noinline fn first_condition(gate: bool) -> bool { print(98); return gate; }
+    @noinline fn first_leaf(value: i64, argument: i64) -> i64 { print(70); return value + argument; }
+    @noinline fn middle(value: i64, divisor: i64) -> i64 { print(62); return value * 2 / divisor; }
+    @noinline fn second_condition(gate: bool, staged: i64, saved: i64, divisor: i64) -> bool {
+        print(95);
+        let proof = saved / divisor;
+        return gate == (proof == staged);
+    }
+    @noinline fn second_leaf(value: i64, argument: i64) -> i64 { print(71); return value + argument; }
+    @noinline fn suffix(value: i64, divisor: i64) -> i64 { print(63); return value / divisor; }
+    @noinline fn publish(value: i64) -> i64 { print(64); return value; }
+    fn observe(value: i64, enabled: bool, outer: bool, first: bool, second: bool,
+               left_prefix: i64, right_prefix: i64, left_first: i64, right_first: i64,
+               left_middle: i64, right_middle: i64, left_predicate: i64, right_predicate: i64,
+               left_second: i64, right_second: i64, left_suffix: i64, right_suffix: i64) -> i64 {
+        print(99);
+        let saved = value + 1;
+        if active_condition(enabled) {
+            if outer_condition(outer) {
+                let staged = prefix(saved, left_prefix);
+                let saved = saved + staged;
+                if first_condition(first) { let saved = first_leaf(saved, saved / left_first); }
+                let staged = middle(saved, left_middle);
+                let saved = saved + staged;
+                if second_condition(second, staged, saved, left_predicate) {
+                    let saved = second_leaf(saved, staged / left_second);
+                }
+                let staged = suffix(saved + staged, left_suffix);
+                let saved = publish(saved + staged);
+            } else {
+                let staged = prefix(saved, right_prefix);
+                let saved = saved - staged;
+                if first_condition(first) {} else { let saved = first_leaf(saved, saved / right_first); }
+                let staged = middle(saved, right_middle);
+                let saved = saved + staged;
+                if second_condition(second, staged, saved, right_predicate) {} else {
+                    let saved = second_leaf(saved, staged / right_second);
+                }
+                let staged = suffix(saved + staged, right_suffix);
+                let saved = publish(saved + staged);
+            }
+        }
+        print(80);
+        return saved;
+    }
+    fn start(value: i64, enabled: bool, outer: bool, first: bool, second: bool,
+             left_prefix: i64, right_prefix: i64, left_first: i64, right_first: i64,
+             left_middle: i64, right_middle: i64, left_predicate: i64, right_predicate: i64,
+             left_second: i64, right_second: i64, left_suffix: i64, right_suffix: i64) -> State {
+        return State { seed: value, enabled: enabled, outer: outer, first: first, second: second,
+            left_prefix: left_prefix, right_prefix: right_prefix, left_first: left_first, right_first: right_first,
+            left_middle: left_middle, right_middle: right_middle,
+            left_predicate: left_predicate, right_predicate: right_predicate,
+            left_second: left_second, right_second: right_second, left_suffix: left_suffix, right_suffix: right_suffix,
+            result: observe(value, enabled, outer, first, second, left_prefix, right_prefix, left_first, right_first,
+                left_middle, right_middle, left_predicate, right_predicate,
+                left_second, right_second, left_suffix, right_suffix) };
+    }
+    fn step(state: State, enabled: bool, outer: bool, first: bool, second: bool,
+            left_prefix: i64, right_prefix: i64, left_first: i64, right_first: i64,
+            left_middle: i64, right_middle: i64, left_predicate: i64, right_predicate: i64,
+            left_second: i64, right_second: i64, left_suffix: i64, right_suffix: i64) -> State {
+        return start(state.seed, enabled, outer, first, second, left_prefix, right_prefix, left_first, right_first,
+            left_middle, right_middle, left_predicate, right_predicate,
+            left_second, right_second, left_suffix, right_suffix);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

@@ -142,6 +142,8 @@ pub(super) fn emit_cpu_function(
             && !matches!(
                 node.op.instruction.as_str(),
                 "guard_return"
+                    | "print"
+                    | "guard_print"
                     | "return_owned_struct"
                     | "return_bool"
                     | "return_i32"

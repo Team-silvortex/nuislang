@@ -326,7 +326,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "fallible_local_value_in_effectful_function_is_selected_before_evaluation",
             "selected_local_values_keep_checked_failures_even_when_unused",
             "nested_local_values_capture_rebindings_and_evaluate_effectful_predicate_once",
-            "fallible_local_selection_does_not_admit_effectful_arms",
+            "fallible_local_selection_guards_effectful_calls_without_pure_admission",
             "one_sided_checked_rebinding_keeps_the_existing_outer_value",
             "mixed_nested_local_selection_keeps_snapshots_and_effectful_predicate_once",
             "typed_literal_narrowing_emits_wrapped_i32_constants_without_cast_instructions",

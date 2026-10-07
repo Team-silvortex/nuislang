@@ -103,10 +103,19 @@ impl Profile {
         let mode = unique_value(source, "packaging_mode", path)?;
         let metadata = metadata_inputs(source, path)?;
         if crate::aot_native_session::registration_id(&mode)?.is_some() {
+            let policy = crate::aot_native_session::build_policy(&mode)?.is_some();
             Ok(Self {
                 prefix: "native_session",
-                schema: "nuis-native-session-build-inputs-v1",
-                checkpoint: "native-scalar-llvm-v1",
+                schema: if policy {
+                    "nuis-native-session-build-inputs-v2"
+                } else {
+                    "nuis-native-session-build-inputs-v1"
+                },
+                checkpoint: if policy {
+                    "native-scalar-literal-print-llvm-v1"
+                } else {
+                    "native-scalar-llvm-v1"
+                },
                 native: true,
                 metadata,
             })

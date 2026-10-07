@@ -1,7 +1,10 @@
 use super::*;
 
+#[path = "conditional_returns_effect_boundary_tests.rs"]
+mod effect_boundaries;
 #[path = "conditional_returns_native_tests.rs"]
 pub(super) mod native;
+pub(super) use effect_boundaries::assert_selected_effect_not_pure;
 
 pub(super) fn source(
     shape: &str,

@@ -35,7 +35,7 @@ pub(super) fn prepare(
         return None;
     }
     let ty = continuing.scope.get(target)?;
-    if !scalar(ty) {
+    if !data_scalars::admitted(ty) {
         return None;
     }
     // All computation was already staged at its source position. Joining may
@@ -55,13 +55,18 @@ pub(super) fn prepare(
     if ready.get(condition) != Some(&scalar_type("bool")) {
         return None;
     }
-    let mut inputs = BTreeSet::from([condition.to_string()]);
+    let mut inputs = BTreeSet::new();
     for value in yes.iter().chain(no.iter()) {
         control_values::collect_inputs(value, &mut inputs);
     }
+    // Only distinct validated atoms need a selector. Even equal results may
+    // read the saved condition as data, which the atom inputs above retain.
+    if matches!((&yes, &no), (Some(yes), Some(no)) if yes != no) {
+        inputs.insert(condition.to_string());
+    }
     if inputs
         .iter()
-        .any(|name| !ready.get(name).is_some_and(scalar))
+        .any(|name| !ready.get(name).is_some_and(data_scalars::admitted))
     {
         return None;
     }
@@ -78,6 +83,10 @@ pub(super) fn prepare(
     Some((target.into(), joined))
 }
 
+#[cfg(test)]
+#[path = "conditional_returns_effect_join_capture_tests.rs"]
+mod tests;
+
 fn destination(body: &[NirStmt]) -> Option<(&str, bool)> {
     match body.last()? {
         NirStmt::Let { name, .. } => Some((name, false)),
@@ -91,6 +100,8 @@ fn atom(value: &NirExpr, ty: &NirTypeRef, ready: &Scope) -> bool {
         NirExpr::Var(name) => ready.get(name) == Some(ty),
         NirExpr::Int(_) => ty == &scalar_type("i64"),
         NirExpr::Bool(_) => ty == &scalar_type("bool"),
+        NirExpr::F32(_) => ty == &scalar_type("f32"),
+        NirExpr::F64(_) => ty == &scalar_type("f64"),
         _ => false,
     }
 }
@@ -112,14 +123,11 @@ pub(super) fn install(
     let mut args = vec![live.clone()];
     args.extend(params[1..].iter().map(|p| NirExpr::Var(p.name.clone())));
     let name = branches::fresh_name("__nuis_effect_join_value", names);
-    let seed = if joined.ty == scalar_type("bool") {
-        NirExpr::Bool(false)
-    } else {
-        NirExpr::Int(0)
-    };
-    // A wholly exiting arm has no value. The merged source-live mask authorizes
-    // this single snapshot only after the actual continuing arm has executed.
+    let seed = data_scalars::seed(&joined.ty);
+    // Source-arm presence stays separate from atom equality. Only the merged
+    // source-live mask authorizes a value after its continuing arm has executed.
     let selected = match (joined.yes, joined.no) {
+        (Some(yes), Some(no)) if yes == no => NirStmt::Return(Some(yes)),
         (Some(yes), Some(no)) => NirStmt::If {
             condition: NirExpr::Var(joined.condition),
             then_body: vec![NirStmt::Return(Some(yes))],

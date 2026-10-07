@@ -13,6 +13,7 @@ It emits a complete LLVM unit containing the registered open/event/close helpers
 their admitted helper closure and one static export per role. No source function names or application policies
 are hardcoded. Export symbols encode the registration ID as UTF-8 bytes in hex.
 The contract identifier is `nuis-native-scalar-session-bridge-v1`.
+The default APIs remain pure; [literal-print policy](nuis-native-literal-print-policy-v1.md) adds individually checked constant i64 sites without changing default build/launch admission.
 
 The first admitted profile is deliberately small:
 

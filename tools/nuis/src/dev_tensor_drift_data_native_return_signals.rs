@@ -36,7 +36,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "signal::prepare(body, result, scope, catalog, layouts)?",
             "has_return |= arm.has_return",
             "if !has_return",
-            "!scope.get(name).is_some_and(scalar)",
+            ".is_some_and(|ty| return_values::capture(result, ty))",
             "Wrap original leaves, never the other proof's synthetic scalar seeds",
             "yes = (!then_body.is_empty()).then(|| then_body.to_vec())",
             "plan.yes.unwrap_or_default()",

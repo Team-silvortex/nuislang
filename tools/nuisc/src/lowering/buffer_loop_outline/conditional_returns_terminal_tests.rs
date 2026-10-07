@@ -1,4 +1,6 @@
-use super::super::tests::{execute, outline_test, source as simple_source};
+use super::super::tests::{
+    assert_selected_effect_not_pure, execute, outline_test, source as simple_source,
+};
 use super::*;
 
 #[path = "conditional_returns_terminal_native_tests.rs"]
@@ -250,6 +252,10 @@ fn conditional_return_terminal_trees_retain_fallthrough_effect_rebind_scope_kind
                 continue;
             }
         };
+        if arm.contains("print(88)") {
+            assert_selected_effect_not_pure(&original.replace(&selected, arm));
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{arm}");
         assert_eq!(module, before, "{arm}");

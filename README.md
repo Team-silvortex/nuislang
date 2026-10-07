@@ -16,15 +16,18 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.9`](docs/versioning/nuis-beta-0.15.9-patch.md) (`585eb409`, 2026-10-05).
+The repository is on `beta-0.16.*`; the current committed minor baseline is
+[`beta-0.16.0`](docs/versioning/nuis-beta-0.16.0-snapshot.md) (`dff1bdbc`, 2026-10-07).
 Git history is authoritative; Cargo package versions are independent of the
-project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
+project release. Use the [beta-0.16 checklist](docs/versioning/nuis-beta-0.16.0-release-checklist.md)
+for current work. The previous minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
 that baseline, not a compatibility freeze or acceptance of later changes. The
 [beta-0.14 snapshot](docs/versioning/nuis-beta-0.14.0-snapshot.md) and
 [beta-0.12 snapshot](docs/versioning/nuis-beta-0.12.0-snapshot.md) remain
-historical checkpoints, not current acceptance results.
+historical checkpoints, not current acceptance results. The
+[beta-0.15.9 patch](docs/versioning/nuis-beta-0.15.9-patch.md) remains a historical
+receipt, not the current version.
 
 The mainline is **ns-nova application-led development**: grow one Nuis-owned
 interactive image application, fix the foundation gaps it exposes, measure
@@ -38,7 +41,7 @@ Start with the [current mainline map](docs/current-mainline-map.md),
 This is a formal staged self-hosting migration line, not a claim of a self-hosted
 compiler, stable public API, or production-ready engine.
 
-The committed patch includes [bounded leading return-print prefixes](docs/reference/nuis-native-return-print-prefixes-v1.md):
+The earlier committed proofs include [bounded leading return-print prefixes](docs/reference/nuis-native-return-print-prefixes-v1.md):
 save the entry once, keep guarded integer prints in the parent, then execute the
 independently admitted pure return tail. The subsequent
 [computed print-argument proof](docs/reference/nuis-native-computed-return-prints-v1.md)
@@ -68,9 +71,54 @@ also admits internal source returns when each result arm still proves a final
 paired value on its continuing paths, using the existing merged live masks.
 The [one-sided result follow-up](docs/reference/nuis-native-one-sided-effect-result-joins-v1.md)
 also admits a continuing result opposite a wholly exiting arm, preserving explicit
-source returns and result presence. Rebinding, resources and general
-effectful helpers remain excluded. These follow-ups are worktree development after
-the committed patch, not application-closure acceptance.
+source returns and result presence. The
+[join-capture optimization](docs/reference/nuis-native-effect-join-captures-v1.md)
+removes unused single-value selectors without dropping condition work or live masks.
+The [equal-atom follow-up](docs/reference/nuis-native-equal-effect-result-joins-v1.md)
+also removes selection between identical validated atoms while preserving both
+source arms' selected work and result presence.
+The [typed effect-snapshot follow-up](docs/reference/nuis-native-typed-effect-snapshots-v1.md)
+adds exact owned i32/f32/f64 data within selected regions, with typed inactive seeds
+and bool-only path masks. The
+[selected-region return handoff](docs/reference/nuis-native-typed-effect-returns-v1.md)
+now also carries those exact kinds into enclosing returns without widening
+ordinary tails or computed-print authority; native evidence uses ordinary AOT,
+while the pure scalar session bridge still rejects effectful callbacks.
+The separate [literal-print policy](docs/reference/nuis-native-literal-print-policy-v1.md)
+now provides explicitly authorized constant i64 prints through registered native
+callbacks, with checked effect order and unchanged default vetoes. The
+[explicit build policy](docs/reference/nuis-native-literal-print-build-policy-v1.md)
+now binds those grants and work limits through build, cache, source-free artifact
+restoration and verified native launch; it is not automatic authority or a general
+effectful application host.
+The [guarded effectful scalar-call follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md)
+adds bounded two-sided call selections and one-sided existing-scalar rebinding,
+with once-only predicates, retained current values, guarded argument evaluation
+and explicit effect/trap order. Bounded nested existing-scalar updates now keep
+descendant predicates and their arguments inside ancestor guards; unsupported
+eager effectful arms reject. Bounded sequential leaves now keep private scalar
+staging, current-version rebindings and unused effectful calls behind those guards,
+returning only one existing scalar rather than exporting child-scope bindings.
+Scalar staging before a final child selection now forwards new local versions
+and retains completed prefix updates when that child is skipped, without
+exporting private captures to the parent.
+A separate bounded suffix proof now runs scalar statements after the child's
+actual merged value, preserving selected or post-prefix retained versions and
+private staging within its one-child proof. A separate two-child region proof now
+carries each merged target through bounded intervening bindings into the next
+predicate, arguments and suffix, without exporting child-private bindings or
+admitting multiple outer writes. Native fresh/cache/source-free runs check both
+selection polarities, poisoned inactive paths and selected-stage traps.
+The [floating literal negation repair](docs/reference/nuis-native-float-literal-negation-v1.md)
+preserves source negative zero and nested literal signs with native bit-pattern
+checks. The [nonliteral sign-negation follow-up](docs/reference/nuis-native-float-sign-negation-v1.md)
+also preserves variable/call zero signs and NaN payload bits using existing typed
+word operations, with once-only evaluation and linked native evidence.
+General multi-statement rebinding, resources and arbitrary effectful helper shapes remain
+outside these bounded routes. The continuing/exiting/result proofs are now
+in the beta-0.16.0 baseline; capture, equal-atom and typed-data proofs remain worktree
+follow-ups after it, as do both floating-negation repairs and typed return handoff. None certifies complete
+application closure.
 
 ```text
 nuis source / nuis.toml

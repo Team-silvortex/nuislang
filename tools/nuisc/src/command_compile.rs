@@ -195,12 +195,19 @@ pub(crate) fn run_compile_resolved(
             .map_err(|error| format!("targeted project compilation failed: {error}"))?;
         let llvm_ir = if requested_packaging_mode == Some("headless-aot-bundle") {
             None
-        } else if let Some(id) = requested_packaging_mode
+        } else if requested_packaging_mode
             .map(crate::aot_native_session::registration_id)
             .transpose()?
             .flatten()
+            .is_some()
         {
-            Some(yir_lower_llvm::native_session::emit_registered(&checkpoint.yir, id)?.llvm_ir)
+            Some(
+                crate::aot_native_session::emit_for_packaging_mode(
+                    &checkpoint.yir,
+                    requested_packaging_mode.unwrap(),
+                )?
+                .llvm_ir,
+            )
         } else {
             Some(
                 crate::nustar_codegen_registry::emit_module_with_loaded_nustar(

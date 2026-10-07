@@ -12,19 +12,20 @@ below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead
 
 ### Current Line
 
-For the current `beta-0.15.*` line instead of historical backfill, start with:
+For the current `beta-0.16.*` line instead of historical backfill, start with:
 
-* [nuis-beta-0.15.9-patch.md](nuis-beta-0.15.9-patch.md)
-* [nuis-beta-0.15.0-snapshot.md](nuis-beta-0.15.0-snapshot.md)
-* [nuis-beta-0.15.0-release-checklist.md](nuis-beta-0.15.0-release-checklist.md)
+* [nuis-beta-0.16.0-snapshot.md](nuis-beta-0.16.0-snapshot.md)
+* [nuis-beta-0.16.0-release-checklist.md](nuis-beta-0.16.0-release-checklist.md)
 
-The current source patch is `585eb409` (`beta-0.15.9`, 2026-10-05), following `98ca713e`.
-The minor snapshot retains the baseline `05951bef` (`beta-0.15.0`, 2026-09-24).
+The current committed minor baseline is `dff1bdbc` (`beta-0.16.0`, 2026-10-07).
+The [previous patch](nuis-beta-0.15.9-patch.md) retains `585eb409`, and the
+[previous minor snapshot](nuis-beta-0.15.0-snapshot.md) retains `05951bef`
+(`beta-0.15.0`, 2026-09-24).
 Git remains authoritative for exact source revisions. Patch evidence does not
 certify every suite listed in the checklist, and historical results remain
 separate. Cargo package versions and protocol versions remain independent.
 
-The patch includes [leading return prints](../reference/nuis-native-return-print-prefixes-v1.md),
+The earlier proofs include [leading return prints](../reference/nuis-native-return-print-prefixes-v1.md),
 [computed print arguments](../reference/nuis-native-computed-return-prints-v1.md),
 [interleaved scalar aliases](../reference/nuis-native-return-print-aliases-v1.md)
 and [staged initializers](../reference/nuis-native-staged-return-effects-v1.md),
@@ -37,7 +38,14 @@ including its [exit-only continuation extension](../reference/nuis-native-exit-o
 and [paired scalar result joins](../reference/nuis-native-effect-result-joins-v1.md)
 with their [partial-exit extension](../reference/nuis-native-partial-effect-result-joins-v1.md)
 and [one-sided result extension](../reference/nuis-native-one-sided-effect-result-joins-v1.md),
-are subsequent worktree development after `585eb409`, with separate receipts.
+were developed after `585eb409` and are included in `dff1bdbc`; their separate
+receipts retain their original scope and dates.
+
+The [join-capture optimization](../reference/nuis-native-effect-join-captures-v1.md)
+is worktree development after `dff1bdbc` (`beta-0.16.0`), with its own bounded
+CPU receipt, not a new release or measured-performance claim.
+The [equal-atom follow-up](../reference/nuis-native-equal-effect-result-joins-v1.md)
+extends that worktree proof with its own acceptance receipt.
 
 The [beta-0.15.7 patch](nuis-beta-0.15.7-patch.md) retains the typed-literal,
 fresh-publication and `active/86` checkpoint; subsequent worktree proofs have
@@ -251,7 +259,8 @@ Read:
 
 Practical rule:
 
-* start at the current `beta-0.15.*` native-value/session checkpoint and validation checklist
+* start at the current `beta-0.16.*` effect-region/session checkpoint and validation checklist
+* use `beta-0.15.*` for the preceding native-value/session checkpoint
 * use `beta-0.14.*` for the previous native-session checkpoint
 * use `beta-0.12.*` for the previous application-session snapshot
 * use `beta-0.11.*` for the governing application-led direction

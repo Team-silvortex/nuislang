@@ -1,0 +1,71 @@
+mod cpu Main {
+    struct State {
+        seed: i64, outer: bool, inner: bool, leaf: bool,
+        outer_divisor: i64, then_divisor: i64, else_divisor: i64,
+        leaf_divisor: i64, left_divisor: i64, right_divisor: i64, result: i64
+    }
+    @noinline fn outer_condition(gate: bool, value: i64, divisor: i64) -> bool {
+        print(97);
+        let proof: i64 = value / divisor;
+        return gate == (proof != 0);
+    }
+    @noinline fn condition_argument(value: i64) -> i64 { print(91); return value; }
+    @noinline fn inner_condition(gate: bool, value: i64, divisor: i64) -> bool {
+        print(98);
+        let proof: i64 = value / divisor;
+        return gate == (proof != 0);
+    }
+    @noinline fn other_condition(gate: bool, value: i64, divisor: i64) -> bool {
+        print(95);
+        let proof: i64 = value / divisor;
+        return gate == (proof != 0);
+    }
+    @noinline fn leaf_condition(gate: bool, value: i64, divisor: i64) -> bool {
+        print(96);
+        let proof: i64 = value / divisor;
+        return gate == (proof != 0);
+    }
+    @noinline fn first(value: i64, divisor: i64) -> i64 { print(61); return value / divisor; }
+    @noinline fn second(value: i64, divisor: i64) -> i64 { print(62); return value / divisor; }
+    @noinline fn yes(value: i64, a: i64, b: i64) -> i64 { print(70); return value + a + b; }
+    @noinline fn no(value: i64, a: i64, b: i64) -> i64 { print(71); return value - a - b; }
+    fn observe(value: i64, outer: bool, inner: bool, leaf: bool,
+               outer_divisor: i64, then_divisor: i64, else_divisor: i64,
+               leaf_divisor: i64, left_divisor: i64, right_divisor: i64) -> i64 {
+        print(99);
+        let saved: i64 = value;
+        let saved: i64 = saved + 1;
+        if outer_condition(outer, value, outer_divisor) {
+            if inner_condition(inner, condition_argument(saved), then_divisor) {
+                if leaf_condition(leaf, saved, leaf_divisor) {
+                    let saved = yes(saved, first(saved, left_divisor), second(saved, left_divisor));
+                } else {
+                    let saved = no(saved, first(saved, right_divisor), second(saved, right_divisor));
+                }
+            }
+        } else {
+            if other_condition(inner, condition_argument(saved), else_divisor) {} else {
+                let saved = no(saved, first(saved, right_divisor), second(saved, right_divisor));
+            }
+        }
+        print(80);
+        return saved;
+    }
+    fn start(value: i64, outer: bool, inner: bool, leaf: bool,
+             outer_divisor: i64, then_divisor: i64, else_divisor: i64,
+             leaf_divisor: i64, left_divisor: i64, right_divisor: i64) -> State {
+        return State { seed: value, outer: outer, inner: inner, leaf: leaf,
+            outer_divisor: outer_divisor, then_divisor: then_divisor, else_divisor: else_divisor,
+            leaf_divisor: leaf_divisor, left_divisor: left_divisor, right_divisor: right_divisor,
+            result: observe(value, outer, inner, leaf, outer_divisor, then_divisor, else_divisor,
+                leaf_divisor, left_divisor, right_divisor) };
+    }
+    fn step(state: State, outer: bool, inner: bool, leaf: bool,
+            outer_divisor: i64, then_divisor: i64, else_divisor: i64,
+            leaf_divisor: i64, left_divisor: i64, right_divisor: i64) -> State {
+        return start(state.seed, outer, inner, leaf, outer_divisor, then_divisor, else_divisor,
+            leaf_divisor, left_divisor, right_divisor);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

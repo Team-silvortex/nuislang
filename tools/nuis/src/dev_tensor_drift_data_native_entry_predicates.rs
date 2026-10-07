@@ -21,7 +21,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if !entry::admitted(condition, scope, catalog, layouts)",
             "if !entry::has_work(condition)",
             "if !has_return",
-            "!scope.get(name).is_some_and(scalar)",
+            ".is_some_and(|ty| return_values::capture(result, ty))",
             "Evaluate the original entry once at its source site",
             "Helpers and exit readiness consume only the saved bool",
             "value: plan.condition",

@@ -1,4 +1,6 @@
-use super::super::tests::{execute, outline_test, source as simple_source};
+use super::super::tests::{
+    assert_selected_effect_not_pure, execute, outline_test, source as simple_source,
+};
 use super::*;
 
 #[path = "conditional_returns_complete_predicate_native_tests.rs"]
@@ -421,6 +423,10 @@ fn conditional_return_complete_predicates_bound_condition_work_and_retain_partia
         "if helper(produce(divisor)) { return false; } else { return true; } let ignored = divisor;",
     ] {
         let mut module = crate::frontend::parse_nuis_module(&base.replace(&arm("call", "&&"), candidate)).unwrap();
+        if candidate.contains("print(88)") {
+            assert_selected_effect_not_pure(&base.replace(&arm("call", "&&"), candidate));
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{candidate}");
         assert_eq!(module, before, "{candidate}");

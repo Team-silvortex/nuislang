@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{admission::admitted, ScalarKind, MAX_SCALAR_SLOTS};
+use super::{admission::admitted, LiteralPrintPolicy, ScalarKind, MAX_SCALAR_SLOTS};
 use yir_core::{ModRegistry, Node, Resource, YirFunction, YirModule, YirValueOwnership};
 
 pub(super) struct FunctionAdmission<'a> {
@@ -9,6 +9,7 @@ pub(super) struct FunctionAdmission<'a> {
     pub resources: BTreeMap<&'a str, &'a Resource>,
     pub incoming: BTreeMap<&'a str, Vec<&'a str>>,
     pub registry: &'a ModRegistry,
+    pub literal_prints: Option<&'a LiteralPrintPolicy>,
 }
 
 impl<'a> FunctionAdmission<'a> {
@@ -41,7 +42,12 @@ impl<'a> FunctionAdmission<'a> {
             if self.module.node_lanes.get(name) != Some(&lane)
                 || node.op.module != "cpu"
                 || !resource.kind.is_family("cpu")
-                || !admitted(&node.op.instruction)
+                || (!admitted(&node.op.instruction)
+                    && !self
+                        .literal_prints
+                        .map(|policy| policy.permit(node, &self.nodes))
+                        .transpose()?
+                        .unwrap_or(false))
             {
                 return Err(format!(
                     "native scalar bridge does not admit {} `{name}`",

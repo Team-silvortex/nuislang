@@ -1,4 +1,6 @@
-use super::super::tests::{execute, outline_test, source as simple_source};
+use super::super::tests::{
+    assert_selected_effect_not_pure, execute, outline_test, source as simple_source,
+};
 use super::*;
 
 #[path = "conditional_returns_fallthrough_native_tests.rs"]
@@ -404,6 +406,10 @@ fn conditional_return_fallthrough_trees_veto_computed_exit_decisions_effects_reb
         let mut module =
             crate::frontend::parse_nuis_module(&original.replace(&body("then", "&&"), replacement))
                 .unwrap();
+        if replacement.contains("print(88)") {
+            assert_selected_effect_not_pure(&original.replace(&body("then", "&&"), replacement));
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{replacement}");
         assert_eq!(module, before, "{replacement}");

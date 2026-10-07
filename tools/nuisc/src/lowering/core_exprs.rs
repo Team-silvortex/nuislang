@@ -414,6 +414,9 @@ fn lower_binary(
     });
     push_dep_edges(state, &lhs_name, &name);
     push_dep_edges(state, &rhs_name, &name);
+    if matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem) {
+        body_lowering::chain_statement_effect(state, &name);
+    }
     Ok(name)
 }
 

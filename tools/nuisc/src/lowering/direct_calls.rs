@@ -785,5 +785,7 @@ pub(super) fn push_direct_call_node(
     for arg in &flattened_args {
         push_dep_edges(state, arg, &name);
     }
+    // Calls may hide effects or traps even when their result is unused.
+    chain_statement_effect(state, &name);
     Ok(name)
 }

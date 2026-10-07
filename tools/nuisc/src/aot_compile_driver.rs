@@ -91,14 +91,14 @@ fn write_and_link_impl(
     } = program;
     let packaging_mode = select_packaging_mode(yir, requested_packaging_mode)?;
     let native_id = crate::aot_native_session::registration_id(packaging_mode)?;
-    if let Some(id) = native_id {
+    if native_id.is_some() {
         if source.is_none() || cpu_target.cross_compile {
             return Err(
                 "native session packaging requires source handoff and the current host target"
                     .to_owned(),
             );
         }
-        let bridge = yir_lower_llvm::native_session::emit_registered(yir, id)?;
+        let bridge = crate::aot_native_session::emit_for_packaging_mode(yir, packaging_mode)?;
         if llvm_ir != Some(bridge.llvm_ir.as_str()) {
             return Err(
                 "native session packaging requires the selected registration LLVM checkpoint"

@@ -7,6 +7,7 @@ mod fact_cast_tests;
 mod fact_domain_tests;
 mod fact_lowering_tests;
 mod fact_scalar_tests;
+mod float_literal_tests;
 mod flow_async_tests;
 mod flow_reject_tests;
 mod flow_sync_tests;

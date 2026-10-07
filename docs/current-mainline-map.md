@@ -6,11 +6,13 @@ before changing a capability claim.
 
 ## Fast Reading Order
 
-The current `beta-0.15.*` priority is the ns-nova application-led dependency
+The current `beta-0.16.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.9`](versioning/nuis-beta-0.15.9-patch.md)
-(`585eb409`, 2026-10-05), including bounded computed return predicates, nested
-logical trees and the following parent-effect proofs.
+The current committed baseline is [`beta-0.16.0`](versioning/nuis-beta-0.16.0-snapshot.md)
+(`dff1bdbc`, 2026-10-07), with its [current checklist](versioning/nuis-beta-0.16.0-release-checklist.md).
+The [beta-0.15.9 patch](versioning/nuis-beta-0.15.9-patch.md) remains historical;
+bounded computed return predicates, nested logical trees and the following
+parent-effect proofs retain their original receipt scope.
 [Leading return-print prefixes](reference/nuis-native-return-print-prefixes-v1.md)
 retain parent-only effects, a once-only entry and
 an independently admitted pure return tail, not general effectful helpers.
@@ -29,7 +31,8 @@ extends only direct logical initializer roots, reusing the existing short-circui
 pass while charging prefix expressions and expanded tails together. Ordinary
 print/call leaves and original scalar capture authority are not widened.
 The subsequent [continuing effect-region proof](reference/nuis-native-continuing-effect-regions-v1.md)
-is worktree development after this patch. Bounded internal `if` regions retain
+was developed after that historical patch and is included in beta-0.16.0.
+Bounded internal `if` regions retain
 once-only selected conditions, saved parent/child paths and isolated child scopes;
 the [effect-region exit follow-up](reference/nuis-native-effect-region-exits-v1.md)
 adds internal owned bool/i64 returns and masks later prefix/tail work without
@@ -43,8 +46,43 @@ permits internal source returns when each result arm still reaches its paired
 value on continuing paths. The
 [one-sided result follow-up](reference/nuis-native-one-sided-effect-result-joins-v1.md)
 adds one continuing result opposite a wholly exiting arm, with explicit source
-returns distinct from initializer tails. Rebinding, resource work and general
-child-scope exports remain open.
+returns distinct from initializer tails. The
+[join-capture optimization](reference/nuis-native-effect-join-captures-v1.md)
+removes only unused single-value selection inputs, retaining source work and live masks.
+The [equal-atom proof](reference/nuis-native-equal-effect-result-joins-v1.md)
+also removes redundant result selection only after both source arms validate
+identical ready atoms, retaining selected work and merged live authority.
+The [typed effect-snapshot follow-up](reference/nuis-native-typed-effect-snapshots-v1.md)
+adds exact owned i32/f32/f64 data inside selected regions with kind-specific seeds;
+path masks and enclosing return authority remain separate.
+The [floating literal negation repair](reference/nuis-native-float-literal-negation-v1.md)
+adds source signed-zero and native bit-pattern evidence without widening that
+profile. The [nonliteral sign-negation follow-up](reference/nuis-native-float-sign-negation-v1.md)
+preserves zero signs and NaN payload bits with once-only evaluation and existing
+typed word operations. The
+[typed selected-return handoff](reference/nuis-native-typed-effect-returns-v1.md)
+adds exact i32/f32/f64 enclosing returns only for admitted selected regions.
+Ordinary AOT checks actual returned words; the pure native session bridge still
+rejects effectful callbacks. The separate
+[literal-print policy](reference/nuis-native-literal-print-policy-v1.md) checks explicit
+constant i64 effects through registered native callbacks. The
+[explicit build policy](reference/nuis-native-literal-print-build-policy-v1.md)
+binds grants and limits through build/cache/launch identity without implicit
+authority. The [guarded scalar-call repair](reference/nuis-native-effectful-scalar-selection-v1.md)
+now preserves source effect/trap order for bounded two-sided selections and
+one-sided existing-scalar rebinding, keeping inactive arguments behind guards and
+retaining the current value when an update is skipped. Bounded nested updates
+keep descendant conditions inside ancestor guards. Bounded sequential scalar
+leaves now preserve private staging and repeated binding versions. A bounded
+prefix before a final child selection now forwards new versions and retains
+completed prefix updates on child skips. A separately proved bounded suffix now
+consumes the child's selected or retained value and private prefix staging in
+source order. Two sibling child selections now have a separate bounded proof,
+carrying each merged target and private staging into later predicates and calls.
+Adjacent children, longer sibling sequences, broader typed selected-return CLI
+proof and generalized effect transport remain
+separate. General rebinding, resource work and child-scope
+exports remain open.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 

@@ -1,6 +1,6 @@
 # Native Scalar Loop Snapshot Proof
 
-This reference describes the current `beta-0.15.*` return-loop snapshot proof,
+This reference records the return-loop snapshot proof developed on `beta-0.15.*`,
 including the 2026-10-03 post-loop extension and capture normalization. It supplements
 [native value returns](nuis-native-scalar-value-returns-v1.md) and the
 [session bridge](nuis-native-scalar-session-bridge-v1.md); it does not replace

@@ -1,0 +1,50 @@
+mod cpu Main {
+    struct State {
+        seed: i64, outer: bool, inner: bool,
+        prefix_divisor: i64, later_divisor: i64, result: i64
+    }
+    @noinline fn outer_condition(gate: bool) -> bool { print(97); return gate; }
+    @noinline fn inner_condition(gate: bool) -> bool { print(98); return gate; }
+    @noinline fn probe(value: i64) -> i64 { print(60); return value; }
+    @noinline fn first(value: i64, divisor: i64) -> i64 { print(61); return value / divisor; }
+    @noinline fn second(value: i64, divisor: i64) -> i64 { print(62); return value / divisor; }
+    @noinline fn yes(value: i64) -> i64 { print(70); return value * 2; }
+    @noinline fn no(value: i64) -> i64 { print(71); return value * 2; }
+    fn observe(value: i64, outer: bool, inner: bool,
+               prefix_divisor: i64, later_divisor: i64) -> i64 {
+        print(99);
+        let saved = value;
+        let saved = saved + 1;
+        if outer_condition(outer) {
+            if inner_condition(inner) {
+                let unused = probe(saved);
+                let staged = first(saved, prefix_divisor);
+                let saved = saved + staged;
+                let staged = second(saved, later_divisor);
+                let staged = yes(staged);
+                let saved = saved + staged;
+            } else {
+                let unused = probe(saved);
+                let staged = first(saved, prefix_divisor);
+                let saved = saved - staged;
+                let staged = second(saved, later_divisor);
+                let staged = no(staged);
+                let saved = saved - staged;
+            }
+        }
+        print(80);
+        return saved;
+    }
+    fn start(value: i64, outer: bool, inner: bool,
+             prefix_divisor: i64, later_divisor: i64) -> State {
+        return State { seed: value, outer: outer, inner: inner,
+            prefix_divisor: prefix_divisor, later_divisor: later_divisor,
+            result: observe(value, outer, inner, prefix_divisor, later_divisor) };
+    }
+    fn step(state: State, outer: bool, inner: bool,
+            prefix_divisor: i64, later_divisor: i64) -> State {
+        return start(state.seed, outer, inner, prefix_divisor, later_divisor);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

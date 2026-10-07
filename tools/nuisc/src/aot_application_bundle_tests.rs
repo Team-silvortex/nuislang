@@ -13,6 +13,10 @@ fn fixture() -> Fixture {
 }
 
 fn fixture_for_mode(mode: &str) -> Fixture {
+    fixture_with_source(mode, None)
+}
+
+fn fixture_with_source(mode: &str, source: Option<&str>) -> Fixture {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -23,11 +27,11 @@ fn fixture_for_mode(mode: &str) -> Fixture {
     ));
     fs::create_dir(&dir).unwrap();
     let native_id = crate::aot_native_session::registration_id(mode).unwrap();
-    let source = if native_id.is_some() {
+    let source = source.unwrap_or(if native_id.is_some() {
         include_str!("../tests/native_application_bridge/main.ns")
     } else {
         "mod cpu Main { fn main() { print(1); } }\n"
-    };
+    });
     let compiled = if let Some(id) = native_id {
         fs::write(dir.join("main.ns"), source).unwrap();
         fs::write(dir.join("nuis.toml"), format!("name = \"metadata_fixture\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\napplication_sessions = [\"{id} open=start event=step close=stop state=state\"]\n")).unwrap();
@@ -54,9 +58,20 @@ fn fixture_for_mode(mode: &str) -> Fixture {
         fs::write(dir.join(name), bytes).unwrap();
     }
     if let Some(id) = native_id {
-        let bridge = yir_lower_llvm::native_session::emit_registered(&compiled.yir, id).unwrap();
+        let bridge =
+            crate::aot_native_session::emit_for_packaging_mode(&compiled.yir, mode).unwrap();
         fs::write(dir.join("demo.ll"), bridge.llvm_ir).unwrap();
         fs::write(dir.join("bundle.txt"), format!("cpu_host_binary_mode=native_scalar_session\nruntime_bootstrap_mode=static_native_session\napplication_session_id={id}\nnative_session_contract={}\nnative_session_identity=exact-yir-graph\nnative_session_layout={}\nsingle_binary=true\n", yir_core::native_scalar_session::CONTRACT, bridge.state_layout.source())).unwrap();
+        if let Some(policy) = crate::aot_native_session::build_policy(mode).unwrap() {
+            use std::io::Write;
+            let mut bundle = fs::OpenOptions::new()
+                .append(true)
+                .open(dir.join("bundle.txt"))
+                .unwrap();
+            for (key, value) in policy.bundle_claims() {
+                writeln!(bundle, "{key}={value}").unwrap();
+            }
+        }
     }
     let file = |name| dir.join(name).display().to_string();
     crate::aot::write_build_manifest(
@@ -84,6 +99,12 @@ fn fixture_for_mode(mode: &str) -> Fixture {
     .unwrap();
     Fixture(dir)
 }
+
+#[path = "aot_application_bundle_policy_tests.rs"]
+mod policy_tests;
+
+#[path = "aot_application_effect_call_tests.rs"]
+mod effect_call_tests;
 
 #[test]
 fn native_inputs_reject_rehashed_llvm_bundle_and_profile_drift() {

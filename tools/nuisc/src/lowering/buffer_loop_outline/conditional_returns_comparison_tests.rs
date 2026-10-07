@@ -1,4 +1,6 @@
-use super::super::tests::{execute, outline_test, source as simple_source};
+use super::super::tests::{
+    assert_selected_effect_not_pure, execute, outline_test, source as simple_source,
+};
 use super::continuation_tests::assert_seed_after_work;
 use super::*;
 
@@ -448,6 +450,10 @@ fn conditional_return_comparisons_bound_alias_expansion_and_retain_non_total_vet
         "let divisor = 2; let selected = divisor > 0; if selected { return helper(produce(divisor)); }",
     ] {
         let mut module = crate::frontend::parse_nuis_module(&base.replace(&arm("forwarded > 0", "&&", false), candidate)).unwrap();
+        if candidate.contains("print(88)") {
+            assert_selected_effect_not_pure(&base.replace(&arm("forwarded > 0", "&&", false), candidate));
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{candidate}");
         assert_eq!(module, before, "{candidate}");

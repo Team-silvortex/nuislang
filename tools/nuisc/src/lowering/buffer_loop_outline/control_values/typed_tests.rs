@@ -268,3 +268,104 @@ fn typed_layouts_bound_neutral_initializer_expansion_before_materializing_a_type
         ));
     }
 }
+
+#[test]
+fn unary_float_negation_sign_words_admit_exact_i64_xor_without_profile_widening() {
+    for ty in ["i64", "bool"] {
+        assert_eq!(
+            binary_type(NirBinaryOp::Xor, scalar_type(ty), scalar_type(ty)),
+            Some(scalar_type(ty))
+        );
+    }
+    for ty in ["i32", "f32", "f64", "Bytes"] {
+        assert!(binary_type(NirBinaryOp::Xor, scalar_type(ty), scalar_type(ty)).is_none());
+    }
+    for mutation in ["reference", "optional", "generic"] {
+        let mut ty = scalar_type("i64");
+        match mutation {
+            "reference" => ty.is_ref = true,
+            "optional" => ty.is_optional = true,
+            "generic" => ty.generic_args.push(scalar_type("bool")),
+            _ => unreachable!(),
+        }
+        assert!(binary_type(NirBinaryOp::Xor, ty.clone(), ty).is_none());
+    }
+    assert!(binary_type(NirBinaryOp::Xor, scalar_type("i64"), scalar_type("bool")).is_none());
+    let module = parse_nuis_module(
+        "mod cpu Main {
+        fn negative32(value: f32) -> f32 { return -relay32(value); }
+        fn negative64(value: f64) -> f64 { return -relay64(value); }
+        fn relay32(value: f32) -> f32 { return value; }
+        fn relay64(value: f64) -> f64 { return value; }
+        fn cycle_a(value: f64) -> f64 { return -cycle_b(value); }
+        fn cycle_b(value: f64) -> f64 { return -cycle_a(value); }
+        fn effect(value: f64) -> f64 { print(9); return value; }
+        fn effect_caller(value: f64) -> f64 { return -effect(value); }
+        fn main() -> i64 { return 0; }
+    }",
+    )
+    .unwrap();
+    let flat = layouts(&module);
+    let loops = scalar_helpers::collect_with_layouts(&module, &flat);
+    let typed = TypedLayouts::collect(&module);
+    let values = scalar_helpers::collect_typed_values(&module, &typed, &loops);
+    for name in ["cycle_a", "cycle_b", "effect", "effect_caller"] {
+        assert!(!values.contains_key(name), "{name}");
+    }
+    let mut reversed = module.clone();
+    reversed.functions.reverse();
+    let reordered = scalar_helpers::collect_typed_values(&reversed, &typed, &loops);
+    assert_eq!(
+        values.keys().collect::<Vec<_>>(),
+        reordered.keys().collect::<Vec<_>>()
+    );
+    for (name, ty) in [("negative32", "f32"), ("negative64", "f64")] {
+        assert!(values.contains_key(name));
+        let function = module.functions.iter().find(|f| f.name == name).unwrap();
+        assert!(scalar_helpers::contains_calls(&function.body));
+        let NirStmt::Return(Some(expr)) = &function.body[0] else {
+            panic!()
+        };
+        let scope = Scope::from([("value".into(), scalar_type(ty))]);
+        assert_eq!(
+            value_type(expr, &scope, &values, &typed),
+            Some(scalar_type(ty))
+        );
+        assert_eq!(
+            value_type(expr, &scope, &values, &flat),
+            Some(scalar_type(ty))
+        );
+        let mut wrong = scope.clone();
+        wrong.insert(
+            "value".into(),
+            scalar_type(if ty == "f32" { "f64" } else { "f32" }),
+        );
+        assert!(value_type(expr, &wrong, &values, &typed).is_none());
+        let mut inputs = BTreeSet::new();
+        collect_inputs(expr, &mut inputs);
+        assert_eq!(inputs, BTreeSet::from(["value".into()]));
+    }
+}
+
+#[test]
+fn unary_float_negation_word_wrappers_keep_aggregate_iteration_classification() {
+    let module = parse_nuis_module(
+        "mod cpu Main {
+        struct State { value: f32 }
+        fn compute(state: State) -> f32 { let value: f32 = -state.value; return value; }
+        fn main() -> i64 { return 0; }
+    }",
+    )
+    .unwrap();
+    let function = module
+        .functions
+        .iter()
+        .find(|f| f.name == "compute")
+        .unwrap();
+    assert!(has_aggregate_expressions(&function.body));
+    assert!(!has_aggregate_expressions(&[NirStmt::Let {
+        name: "value".into(),
+        ty: Some(scalar_type("f32")),
+        value: NirExpr::UnpackF32Word(Box::new(NirExpr::Int(0))),
+    }]));
+}

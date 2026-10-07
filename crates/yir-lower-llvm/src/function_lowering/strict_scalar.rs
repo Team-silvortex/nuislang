@@ -8,6 +8,17 @@ pub(super) fn validate(
     return_kind: CpuCallScalarKind,
     aggregate_return: bool,
 ) -> Result<(), String> {
+    if matches!(node.op.instruction.as_str(), "print" | "guard_print") {
+        let value = node
+            .op
+            .args
+            .last()
+            .ok_or("native literal print lacks its value")?;
+        require_value(node, value, CpuCallScalarKind::I64, registers)?;
+        if node.op.instruction == "guard_print" {
+            require_value(node, &node.op.args[0], CpuCallScalarKind::Bool, registers)?;
+        }
+    }
     // The generic opcodes also accept other kinds; this native slice is i64-only.
     if matches!(node.op.instruction.as_str(), "div" | "rem") {
         let [left, right] = node.op.args.as_slice() else {

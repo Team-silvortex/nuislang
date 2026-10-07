@@ -47,7 +47,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "yes_source.as_deref().unwrap_or(then_body)",
             "signal::prepare(body, result, scope, catalog, layouts)?",
             "if !has_return",
-            "!scope.get(name).is_some_and(scalar)",
+            ".is_some_and(|ty| return_values::capture(result, ty))",
             "Wrap original leaves, never the other proof's synthetic scalar seeds",
         ],
     },

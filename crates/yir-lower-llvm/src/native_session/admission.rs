@@ -1,10 +1,14 @@
-use super::{calls, function::FunctionAdmission, CallbackExport, ScalarKind, ScalarStateLayout};
+use super::{
+    calls, function::FunctionAdmission, CallbackExport, LiteralPrintPolicy, ScalarKind,
+    ScalarStateLayout,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use yir_core::{ApplicationSessionSignature, YirModule};
 
 pub(super) fn select(
     module: &YirModule,
     id: &str,
+    policy: Option<&LiteralPrintPolicy>,
 ) -> Result<(YirModule, Vec<CallbackExport>, ScalarStateLayout), String> {
     let registry = yir_verify::default_registry();
     yir_verify::verify_module_with_registry(module, &registry)?;
@@ -13,6 +17,7 @@ pub(super) fn select(
     let mut admission = FunctionAdmission {
         module,
         registry: &registry,
+        literal_prints: policy,
         nodes: module
             .nodes
             .iter()
@@ -74,6 +79,9 @@ pub(super) fn select(
         selected_functions.insert(name, function.clone());
     }
     calls::validate_graph(&graph)?;
+    if let Some(policy) = policy {
+        policy.validate_closure(&selected_functions, &graph, &admission)?;
+    }
 
     let mut layouts = Vec::new();
     let mut state_layout = None;
@@ -219,6 +227,7 @@ pub(super) fn admitted(instruction: &str) -> bool {
             | "ge"
             | "and"
             | "or"
+            | "xor"
             | "not"
             | "eq_i64"
             | "ne_i64"

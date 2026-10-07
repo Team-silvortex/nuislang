@@ -9,16 +9,23 @@ use yir_core::YirModule;
 mod admission;
 pub(crate) mod aggregate_values;
 pub(crate) mod aggregates;
+mod build_policy;
 mod calls;
 mod emit;
 mod function;
 pub(crate) mod helper_entries;
+mod literal_prints;
 mod loop_work;
 pub(crate) mod loops;
 pub(crate) mod value_transport;
 
+pub use build_policy::{
+    LiteralPrintBuildPolicy, LITERAL_PRINT_BUILD_CONTRACT, MAX_BUILD_POLICY_SITE_BYTES,
+    MAX_BUILD_POLICY_TOKEN_BYTES,
+};
 pub use helper_entries::DEFAULT_HELPER_ENTRY_LIMIT;
 pub(crate) use helper_entries::HELPER_ENTRY_PARAMETER;
+pub use literal_prints::{LiteralPrintPolicy, MAX_LITERAL_PRINT_SITES};
 pub(crate) use loop_work::COUNTER_PARAMETER;
 pub use loop_work::DEFAULT_LOOP_WORK_LIMIT;
 
@@ -43,6 +50,15 @@ pub struct NativeSessionBridge {
     pub loop_work_limit: u64,
     /// Dynamic YIR function entries, including roots and outlined helpers.
     pub helper_entry_limit: u64,
+    /// Explicitly checked static literal-print sites; empty for the default pure bridge.
+    pub literal_print_sites: Vec<String>,
+}
+
+impl NativeSessionBridge {
+    /// Conservative bound, not a promise about I/O time or rollback on traps.
+    pub fn max_literal_prints_per_invocation(&self) -> u128 {
+        self.literal_print_sites.len() as u128 * u128::from(self.helper_entry_limit)
+    }
 }
 
 /// Emit static functions with ABI `i32(args: ptr, argc: i64, out: ptr, outc: i64)`.
@@ -81,7 +97,50 @@ pub fn emit_registered_with_work_limits(
     loop_work_limit: u64,
     helper_entry_limit: u64,
 ) -> Result<NativeSessionBridge, String> {
-    let (selected, callbacks, state_layout) = admission::select(module, id)?;
+    emit_with_policy(module, id, loop_work_limit, helper_entry_limit, None)
+}
+
+/// Opt in to bounded literal i64 prints at explicitly named selected YIR nodes.
+/// No computed prints, implicit helper grants, resources or arbitrary effects are
+/// admitted. Guarded prints require an exact bool. Existing input preflight and
+/// fresh work counters apply; successful prints are not rolled back after a trap.
+pub fn emit_registered_with_literal_prints(
+    module: &YirModule,
+    id: &str,
+    policy: &LiteralPrintPolicy,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) -> Result<NativeSessionBridge, String> {
+    emit_with_policy(
+        module,
+        id,
+        loop_work_limit,
+        helper_entry_limit,
+        Some(policy),
+    )
+}
+
+fn emit_with_policy(
+    module: &YirModule,
+    id: &str,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+    policy: Option<&LiteralPrintPolicy>,
+) -> Result<NativeSessionBridge, String> {
+    let (selected, callbacks, state_layout) = admission::select(module, id, policy)?;
+    let literal_print_sites = policy
+        .map(|policy| {
+            policy.selected_sites(
+                &selected
+                    .nodes
+                    .iter()
+                    .filter(|node| matches!(node.op.instruction.as_str(), "print" | "guard_print"))
+                    .map(|node| node.name.clone())
+                    .collect(),
+            )
+        })
+        .transpose()?
+        .unwrap_or_default();
     let state_fields = state_layout.fields().to_vec();
     let roots = callbacks
         .iter()
@@ -104,5 +163,6 @@ pub fn emit_registered_with_work_limits(
         state_layout,
         loop_work_limit,
         helper_entry_limit,
+        literal_print_sites,
     })
 }

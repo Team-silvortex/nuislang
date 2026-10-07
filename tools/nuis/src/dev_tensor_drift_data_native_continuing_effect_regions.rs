@@ -14,7 +14,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-continuing-effect-regions-original-condition-and-scalar-authority",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effect_regions.rs",
-        required_patterns: &["let yes_end = region_end(then_body)?", "if !preflight(body, end)", "!suffix::reserve_staged_prefix(&body[end..], &body[..end])", "if !entry::admitted(condition, scope, catalog, layouts)", "*has_initializer_work |= entry::has_work(condition)", "!ready.get(name).is_some_and(scalar)", "__nuis_effect_condition"],
+        required_patterns: &["let yes_end = region_end(then_body)?", "if !preflight(body, end)", "!suffix::reserve_staged_prefix(&body[end..], &body[..end])", "if !entry::admitted(condition, scope, catalog, layouts)", "*has_initializer_work |= entry::has_work(condition)", "!ready.get(name).is_some_and(data_scalars::admitted)", "__nuis_effect_condition"],
     },
     DevTensorDriftCheckSpec {
         id: "native-continuing-effect-regions-no-child-scope-join-or-private-source-authority",

@@ -142,6 +142,8 @@ receipt, 149-case paired-result receipt, 180-case exit-only receipt and earlier
 receipts remain historical. Complete earlier tensor evidence and task history
 are retained. The next independent optimization boundary is unnecessary saved
 selection captures in single-value joins, without weakening masks or atom proofs.
+The [join-capture follow-up](nuis-native-effect-join-captures-v1.md) addresses that
+boundary separately; the receipt above remains the original semantic acceptance.
 
 This is local macOS aarch64 CPU work. No fresh Linux/GPU run, full-workspace
 acceptance, complete heterogeneous application, measured speedup or formal

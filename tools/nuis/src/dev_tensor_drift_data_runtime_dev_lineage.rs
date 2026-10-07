@@ -150,10 +150,12 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.15-mainline-router",
+        id: "current-beta-mainline-router",
         path: "docs/current-mainline-map.md",
         required_patterns: &[
-            "current `beta-0.15.*` priority",
+            "current `beta-0.16.*` priority",
+            "nuis-beta-0.16.0-snapshot.md",
+            "nuis-beta-0.16.0-release-checklist.md",
             "nuis-beta-0.15.0-snapshot.md",
             "nuis-beta-0.15.0-release-checklist.md",
             "05951bef",
@@ -168,10 +170,12 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.15-repository-frontdoor",
+        id: "current-beta-repository-frontdoor",
         path: "README.md",
         required_patterns: &[
-            "repository is on `beta-0.15.*`",
+            "repository is on `beta-0.16.*`",
+            "nuis-beta-0.16.0-snapshot.md",
+            "nuis-beta-0.16.0-release-checklist.md",
             "ns-nova application-led development",
             "formal staged self-hosting migration line",
             "stage0-to-stage1-migration/active",

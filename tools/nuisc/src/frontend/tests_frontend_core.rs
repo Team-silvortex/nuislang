@@ -27,5 +27,7 @@ mod type_and_slice_basic;
 mod type_and_slice_typed;
 #[path = "tests_frontend_core/unary_and_project.rs"]
 mod unary_and_project;
+#[path = "tests_frontend_core/unary_float_literals.rs"]
+mod unary_float_literals;
 #[path = "tests_frontend_core/visibility_const_destructure.rs"]
 mod visibility_const_destructure;

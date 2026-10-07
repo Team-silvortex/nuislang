@@ -23,7 +23,7 @@ fn validate_packaging_mode(packaging_mode: &str) -> Result<&str, String> {
     match packaging_mode {
         "native-cpu-llvm" | "window-aot-bundle" | "headless-aot-bundle" | "nuis-self-contained-image" => Ok(packaging_mode),
         other => Err(format!(
-            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, `headless-aot-bundle`, `native-session-aot-bundle:<registration-id>`, or `nuis-self-contained-image`"
+            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, `headless-aot-bundle`, `native-session-aot-bundle:<registration-id>`, `native-session-policy-aot-bundle:<policy-token>:<registration-id>`, or `nuis-self-contained-image`"
         )),
     }
 }

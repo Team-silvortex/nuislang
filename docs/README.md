@@ -6,23 +6,42 @@ tests, the development tensor, and `docs/reference/` in that order.
 
 ## Read This First
 
-Use this short route for the current `beta-0.15.*` repository. The current patch is
-[`beta-0.15.7`](versioning/nuis-beta-0.15.7-patch.md) (2026-10-03); the minor
-baseline remains `05951bef` (`beta-0.15.0`):
+Use this short route for the current `beta-0.16.*` repository, anchored at
+[`beta-0.16.0`](versioning/nuis-beta-0.16.0-snapshot.md) (`dff1bdbc`, 2026-10-07).
+The beta-0.15 snapshots and patches remain historical:
 
 1. [Current mainline map](current-mainline-map.md)
-2. [Beta-0.15 checkpoint](versioning/nuis-beta-0.15.0-snapshot.md)
+2. [Beta-0.16 checkpoint](versioning/nuis-beta-0.16.0-snapshot.md)
 3. [Mainline dependency selection](reference/nuis-development-tensor-mainline.md)
 4. [Native scalar session bridge](reference/nuis-native-scalar-session-bridge-v1.md)
 5. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
 6. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
 7. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
-8. [Focused validation checklist](versioning/nuis-beta-0.15.0-release-checklist.md)
+8. [Focused validation checklist](versioning/nuis-beta-0.16.0-release-checklist.md)
 
 The [native loop snapshot proof](reference/nuis-native-scalar-loop-snapshots-v1.md)
 tracks post-loop boundaries and safe capture normalization without replacing the released patch history.
 The [artifact publication contract](reference/nuis-artifact-file-publication-v1.md)
 records the reproduced cache-overwrite `SIGKILL` class and fresh-file replacement.
+The [typed selected-return handoff](reference/nuis-native-typed-effect-returns-v1.md)
+separates exact scalar return evidence from native callback effect authority.
+The [explicit literal-print policy](reference/nuis-native-literal-print-policy-v1.md)
+checks bounded registered native effects without widening the default pure bridge;
+the [explicit build policy](reference/nuis-native-literal-print-build-policy-v1.md)
+now binds authorization through cache, standalone restoration and native launch.
+The [guarded scalar-call follow-up](reference/nuis-native-effectful-scalar-selection-v1.md)
+repairs source effect order and one-sided existing-scalar rebinding without
+granting effects or evaluating inactive arguments. Bounded nested updates also
+keep descendant predicates inside ancestor guards rather than hoisting them.
+Bounded sequential scalar leaves also preserve private staging, repeated binding
+versions and unused calls without exporting locals or relaxing effect grants.
+Staging before a final child selection also distinguishes original outer retention
+from the updated target retained after an executed prefix.
+A separate scalar suffix proof carries that selected or retained child value into
+ordered later bindings, preserving private staging and single-target publication.
+Two sibling child selections now have an independent bounded region proof,
+preserving current values through intervening staging, second predicates and
+suffixes with native source-free execution and selected-trap evidence.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

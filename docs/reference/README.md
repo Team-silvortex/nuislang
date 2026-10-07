@@ -11,12 +11,19 @@ task/pointer rules?", read:
 
 * [../glm-spec/glm-heterogeneous-flow-graph-positioning.md](../../docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
 
-For the current `beta-0.15.*` application-led line, start with:
+For the current `beta-0.16.*` application-led line, start with:
 
 * [Mainline map](../current-mainline-map.md)
-* [Beta-0.15.7 loop snapshots and artifact publication patch](../versioning/nuis-beta-0.15.7-patch.md)
-* [Beta-0.15 checkpoint](../versioning/nuis-beta-0.15.0-snapshot.md)
-* [Beta-0.15 validation checklist](../versioning/nuis-beta-0.15.0-release-checklist.md)
+* [Beta-0.16 checkpoint](../versioning/nuis-beta-0.16.0-snapshot.md)
+* [Beta-0.16 validation checklist](../versioning/nuis-beta-0.16.0-release-checklist.md)
+* [Equal-atom effect-result joins](nuis-native-equal-effect-result-joins-v1.md)
+* [Typed effect-region data snapshots](nuis-native-typed-effect-snapshots-v1.md)
+* [Floating literal negation and signed-zero bits](nuis-native-float-literal-negation-v1.md)
+* [Nonliteral floating sign negation and once-only bit transport](nuis-native-float-sign-negation-v1.md)
+* [Exact selected-region scalar return handoff](nuis-native-typed-effect-returns-v1.md)
+* [Explicit native callback literal-print policy](nuis-native-literal-print-policy-v1.md)
+* [Explicit literal-print build cache and launch policy](nuis-native-literal-print-build-policy-v1.md)
+* [Guarded effectful scalar selections, rebinding and source order](nuis-native-effectful-scalar-selection-v1.md)
 * [Native scalar session bridge](nuis-native-scalar-session-bridge-v1.md)
 * [Native value returns and private captures](nuis-native-scalar-value-returns-v1.md)
 * [Native loop snapshots and boundary proof](nuis-native-scalar-loop-snapshots-v1.md)

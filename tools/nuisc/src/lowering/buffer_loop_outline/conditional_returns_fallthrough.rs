@@ -124,11 +124,7 @@ fn seed_fallthroughs(body: &mut Vec<NirStmt>, result: &NirTypeRef) {
         None | Some(NirStmt::Let { .. } | NirStmt::Const { .. }) => {
             // The seed is not an exit signal. Only the parent's independent ready
             // predicate can select a return; a real return may itself be false/zero.
-            body.push(NirStmt::Return(Some(if result == &scalar_type("bool") {
-                NirExpr::Bool(false)
-            } else {
-                NirExpr::Int(0)
-            })));
+            body.push(NirStmt::Return(Some(return_values::seed(result))));
         }
         _ => unreachable!("validated partial return leaf"),
     }

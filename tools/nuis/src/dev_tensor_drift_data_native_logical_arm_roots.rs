@@ -12,7 +12,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "conditional_values::prefix::computed_expression_roots(expressions)",
             "control_values::value_type(condition, &inner, catalog, layouts)",
             "Non-total partial predicates use stored signals",
-            "scope.get(name).is_some_and(scalar)",
+            ".is_some_and(|ty| return_values::capture(result, ty))",
         ],
     },
     DevTensorDriftCheckSpec {

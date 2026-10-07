@@ -30,7 +30,41 @@ pub(super) fn callbacks(bridge: &NativeSessionBridge, source: &str) -> String {
 
 pub(super) fn entry(bridge: &NativeSessionBridge, source: &str) -> String {
     format!(
-        "{}\ndeclare ptr @{}()\ndeclare i32 @nuis_native_application_script_main(ptr, i64, ptr, i32, ptr)\n\ndefine i32 @main(i32 %argc, ptr %argv) {{\nentry:\n  %binding = call ptr @{}()\n  %status = call i32 @nuis_native_application_script_main(ptr @native_expected_yir, i64 {}, ptr %binding, i32 %argc, ptr %argv)\n  ret i32 %status\n}}\n",
-        bytes("native_expected_yir", source), getter(bridge), getter(bridge), source.len()
+        "{}{}\ndeclare ptr @{}()\ndeclare i32 @nuis_native_application_script_main(ptr, i64, ptr, i32, ptr)\n\ndefine i32 @main(i32 %argc, ptr %argv) {{\nentry:\n  %binding = call ptr @{}()\n  %status = call i32 @nuis_native_application_script_main(ptr @native_expected_yir, i64 {}, ptr %binding, i32 %argc, ptr %argv)\n  ret i32 %status\n}}\n",
+        bytes("native_expected_yir", source), literal_print_runtime(!bridge.literal_print_sites.is_empty()), getter(bridge), getter(bridge), source.len()
     )
+}
+
+fn literal_print_runtime(enabled: bool) -> String {
+    if !enabled {
+        return String::new();
+    }
+    // Existing scalar print ABI, emitted in the host unit, not new effect authority.
+    format!("{}declare i32 @printf(ptr, ...)\n\ndefine void @nuis_debug_print_i64(i64 %value) {{\nentry:\n  %written = call i32 (ptr, ...) @printf(ptr @native_literal_print_format, i64 %value)\n  ret void\n}}\n",
+        bytes("native_literal_print_format", "%lld\n\0"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_literal_print_host_runtime_is_opt_in_and_i64_only() {
+        assert!(literal_print_runtime(false).is_empty());
+        let llvm = literal_print_runtime(true);
+        assert!(llvm.contains("[6 x i8]"));
+        assert!(llvm.contains("\\25\\6C\\6C\\64\\0A\\00"));
+        assert!(llvm.contains("define void @nuis_debug_print_i64(i64 %value)"));
+        assert!(llvm.contains("@printf(ptr @native_literal_print_format, i64 %value)"));
+        for forbidden in [
+            "print_i32",
+            "print_bool",
+            "print_f32",
+            "print_f64",
+            "malloc",
+            "fflush",
+        ] {
+            assert!(!llvm.contains(forbidden), "{forbidden}");
+        }
+    }
 }

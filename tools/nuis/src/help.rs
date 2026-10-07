@@ -29,6 +29,7 @@ pub(crate) fn print_help() {
     println!(
         "    nuis build --packaging-mode native-session-aot-bundle:<id> <project-dir> <output-dir>"
     );
+    println!("    nuis build --packaging-mode native-session-policy-aot-bundle:<token>:<id> <project-dir> <output-dir>");
     println!("    nuis run-artifact <output-dir> --native-session <id> --open-args <typed-scalars> [--event-args <typed-scalars>] --close-args <typed-scalars>");
     println!("    nsld drive <output-dir>/nuis.build.manifest.toml --json");
     println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply");

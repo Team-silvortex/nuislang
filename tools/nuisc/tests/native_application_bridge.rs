@@ -95,12 +95,18 @@ mod driver;
 mod dynamic_loop_guard;
 #[path = "native_application_bridge/dynamic_loops.rs"]
 mod dynamic_loops;
+#[path = "native_application_bridge/float_unary_literals.rs"]
+mod float_unary_literals;
+#[path = "native_application_bridge/float_unary_negation.rs"]
+mod float_unary_negation;
 #[path = "native_application_bridge/helper_entries.rs"]
 mod helper_entries;
 #[path = "native_application_bridge/helpers.rs"]
 mod helpers;
 #[path = "native_application_bridge/literal_loops.rs"]
 mod literal_loops;
+#[path = "native_application_bridge/literal_print_policy.rs"]
+mod literal_print_policy;
 #[path = "native_application_bridge/loop_work.rs"]
 mod loop_work;
 #[path = "native_application_bridge/loops.rs"]
@@ -123,6 +129,8 @@ mod scoped_execution;
 mod scoped_loops;
 #[path = "native_application_bridge/typed_capture_words.rs"]
 mod typed_capture_words;
+#[path = "native_application_bridge/typed_effect_returns.rs"]
+mod typed_effect_returns;
 #[path = "native_application_bridge/typed_helper_admission.rs"]
 mod typed_helper_admission;
 #[path = "native_application_bridge/typed_helper_guards.rs"]

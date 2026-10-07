@@ -66,6 +66,65 @@ fn ready_scalar_and_record_returns_need_no_private_branch_or_continuation() {
 }
 
 #[test]
+fn registered_scalar_guards_remain_intact_without_name_prefix_admission() {
+    let mut module = parse_nuis_module(
+        "mod cpu Main {
+        fn user_named_boundary(gate: bool, value: i64, divisor: i64) -> i64 {
+            if gate { return 0; } return value / divisor;
+        }
+        fn ordinary(gate: bool, value: i64, divisor: i64) -> i64 {
+            if gate { return 0; } return value / divisor;
+        }
+        fn main() -> i64 { return 0; }
+    }",
+    )
+    .unwrap();
+    let before = module
+        .functions
+        .iter()
+        .find(|f| f.name == "user_named_boundary")
+        .unwrap()
+        .clone();
+    let layouts = control_values::layouts(&module);
+    let catalog = scalar_helpers::collect_with_layouts(&module, &layouts);
+    assert!(catalog.contains_key("user_named_boundary") && catalog.contains_key("ordinary"));
+    let retained = BTreeSet::from(["user_named_boundary".into(), "ordinary".into()]);
+    let mut guarded = BTreeSet::from(["user_named_boundary".into()]);
+    let mut names = module.functions.iter().map(|f| f.name.clone()).collect();
+    let mut helpers = Vec::new();
+    outline(
+        &mut module,
+        &retained,
+        &mut names,
+        &mut helpers,
+        &mut guarded,
+        &catalog,
+        &layouts,
+    );
+    assert_eq!(
+        module
+            .functions
+            .iter()
+            .find(|f| f.name == "user_named_boundary")
+            .unwrap(),
+        &before
+    );
+    assert!(!helpers.is_empty());
+    assert!(!matches!(
+        module
+            .functions
+            .iter()
+            .find(|f| f.name == "ordinary")
+            .unwrap()
+            .body
+            .first(),
+        Some(NirStmt::If { .. })
+    ));
+    module.functions.extend(helpers);
+    crate::nir_verify::verify_nir_module(&module).unwrap();
+}
+
+#[test]
 fn nontrivial_suffixes_remain_shared_and_branch_work_stays_guarded() {
     let (_, helpers, guarded) = outlined(
         "mod cpu Main {

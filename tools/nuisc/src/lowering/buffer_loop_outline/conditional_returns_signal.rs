@@ -89,11 +89,7 @@ pub(super) fn wrap(
         }
         last => {
             body.extend(last);
-            let seed = if result == &scalar_type("bool") {
-                NirExpr::Bool(false)
-            } else {
-                NirExpr::Int(0)
-            };
+            let seed = return_values::seed(result);
             body.push(returned(signal, false, seed));
         }
     }

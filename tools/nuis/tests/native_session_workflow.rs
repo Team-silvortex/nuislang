@@ -9,10 +9,14 @@ use std::{
 mod capture_fields;
 #[path = "native_session_workflow/capture_words.rs"]
 mod capture_words;
+#[path = "native_session_workflow/effect_calls.rs"]
+mod effect_calls;
 #[path = "native_session_workflow/helper_entries.rs"]
 mod helper_entries;
 #[path = "native_session_workflow/launch_diagnostics.rs"]
 mod launch_diagnostics;
+#[path = "native_session_workflow/literal_prints.rs"]
+mod literal_prints;
 #[path = "native_session_workflow/literal_snapshots.rs"]
 mod literal_snapshots;
 #[path = "native_session_workflow/loop_work.rs"]

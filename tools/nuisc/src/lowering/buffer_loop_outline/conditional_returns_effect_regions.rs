@@ -3,6 +3,8 @@ use super::*;
 #[path = "conditional_returns_effect_region_bounds.rs"]
 pub(in super::super) mod bounds;
 use bounds::{preflight, region_end};
+#[path = "conditional_returns_effect_region_scalars.rs"]
+mod data_scalars;
 #[path = "conditional_returns_effect_region_joins.rs"]
 mod joins;
 #[path = "conditional_returns_effect_region_tails.rs"]
@@ -258,7 +260,7 @@ fn prepare_steps(
                 control_values::collect_inputs(&value, &mut inputs);
                 if inputs
                     .iter()
-                    .any(|name| !ready.get(name).is_some_and(scalar))
+                    .any(|name| !ready.get(name).is_some_and(data_scalars::admitted))
                 {
                     return None;
                 }
@@ -290,7 +292,8 @@ fn prepare_steps(
                     NirStmt::Const { ty, .. } => Some(ty),
                     _ => unreachable!(),
                 };
-                if !scalar(&ty) || declared.is_some_and(|declared| declared != &ty) {
+                if !data_scalars::admitted(&ty) || declared.is_some_and(|declared| declared != &ty)
+                {
                     return None;
                 }
                 let value = rewrite_value(value, values);
@@ -298,15 +301,21 @@ fn prepare_steps(
                 {
                     return None;
                 }
-                let value = if matches!(value, NirExpr::Var(_) | NirExpr::Int(_) | NirExpr::Bool(_))
-                {
+                let value = if matches!(
+                    value,
+                    NirExpr::Var(_)
+                        | NirExpr::Int(_)
+                        | NirExpr::Bool(_)
+                        | NirExpr::F32(_)
+                        | NirExpr::F64(_)
+                ) {
                     value
                 } else {
                     let mut inputs = BTreeSet::new();
                     control_values::collect_inputs(&value, &mut inputs);
                     if inputs
                         .iter()
-                        .any(|name| !ready.get(name).is_some_and(scalar))
+                        .any(|name| !ready.get(name).is_some_and(data_scalars::admitted))
                     {
                         return None;
                     }
@@ -347,7 +356,7 @@ fn prepare_steps(
                 control_values::collect_inputs(&value, &mut inputs);
                 if inputs
                     .iter()
-                    .any(|name| !ready.get(name).is_some_and(scalar))
+                    .any(|name| !ready.get(name).is_some_and(data_scalars::admitted))
                 {
                     return None;
                 }
@@ -557,11 +566,7 @@ fn install_steps(
                 let mut args = vec![condition.clone()];
                 args.extend(params[1..].iter().map(|p| NirExpr::Var(p.name.clone())));
                 let function = branches::fresh_name("__nuis_conditional_prefix_value", names);
-                let seed = if ty == scalar_type("bool") {
-                    NirExpr::Bool(false)
-                } else {
-                    NirExpr::Int(0)
-                };
+                let seed = data_scalars::seed(&ty);
                 let mut initializer = helper(
                     function.clone(),
                     params,

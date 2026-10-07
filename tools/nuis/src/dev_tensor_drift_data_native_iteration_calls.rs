@@ -34,18 +34,28 @@ mod continuing_effect_regions;
 mod control_elision;
 #[path = "dev_tensor_drift_data_native_counted_returns.rs"]
 mod counted_returns;
+#[path = "dev_tensor_drift_data_native_effect_join_captures.rs"]
+mod effect_join_captures;
 #[path = "dev_tensor_drift_data_native_effect_region_exits.rs"]
 mod effect_region_exits;
 #[path = "dev_tensor_drift_data_native_effect_result_joins.rs"]
 mod effect_result_joins;
+#[path = "dev_tensor_drift_data_native_effectful_selections.rs"]
+mod effectful_selections;
 #[path = "dev_tensor_drift_data_native_entry_predicates.rs"]
 mod entry_predicates;
+#[path = "dev_tensor_drift_data_native_equal_effect_joins.rs"]
+mod equal_effect_joins;
 #[path = "dev_tensor_drift_data_native_evaluated_scalar_records.rs"]
 mod evaluated_scalar_records;
 #[path = "dev_tensor_drift_data_native_exit_only_regions.rs"]
 mod exit_only_regions;
 #[path = "dev_tensor_drift_data_native_iteration_values.rs"]
 mod flat_values;
+#[path = "dev_tensor_drift_data_native_float_literal_negation.rs"]
+mod float_literal_negation;
+#[path = "dev_tensor_drift_data_native_float_sign_negation.rs"]
+mod float_sign_negation;
 #[path = "dev_tensor_drift_data_native_helper_entries.rs"]
 mod helper_entries;
 #[path = "dev_tensor_drift_data_native_inline_record_args.rs"]
@@ -54,6 +64,10 @@ mod inline_record_args;
 mod inline_return_conditions;
 #[path = "dev_tensor_drift_data_native_literal_loops.rs"]
 mod literal_loops;
+#[path = "dev_tensor_drift_data_native_literal_print_build.rs"]
+mod literal_print_build;
+#[path = "dev_tensor_drift_data_native_literal_print_policy.rs"]
+mod literal_print_policy;
 #[path = "dev_tensor_drift_data_native_literal_snapshots.rs"]
 mod literal_snapshots;
 #[path = "dev_tensor_drift_data_native_logical_arm_roots.rs"]
@@ -102,6 +116,10 @@ mod terminal_continuations;
 mod terminal_snapshots;
 #[path = "dev_tensor_drift_data_native_trailing_value_loops.rs"]
 mod trailing_value_loops;
+#[path = "dev_tensor_drift_data_native_typed_effect_returns.rs"]
+mod typed_effect_returns;
+#[path = "dev_tensor_drift_data_native_typed_effect_snapshots.rs"]
+mod typed_effect_snapshots;
 #[path = "dev_tensor_drift_data_native_value_loop_exits.rs"]
 mod value_loop_exits;
 #[path = "dev_tensor_drift_data_native_value_transport.rs"]
@@ -130,6 +148,15 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         effect_result_joins::CHECKS,
         partial_effect_joins::CHECKS,
         one_sided_effect_joins::CHECKS,
+        effect_join_captures::CHECKS,
+        equal_effect_joins::CHECKS,
+        typed_effect_snapshots::CHECKS,
+        float_literal_negation::CHECKS,
+        float_sign_negation::CHECKS,
+        typed_effect_returns::CHECKS,
+        literal_print_policy::CHECKS,
+        literal_print_build::CHECKS,
+        effectful_selections::CHECKS,
         computed_return_prints::CHECKS,
         loop_calls::CHECKS,
         loop_work::CHECKS,

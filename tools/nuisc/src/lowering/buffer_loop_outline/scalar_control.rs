@@ -19,7 +19,10 @@ pub(super) fn outline(
     layouts: &impl control_values::ValueLayouts,
 ) {
     for function in &mut module.functions {
-        if !retained.contains(&function.name)
+        // A registered leading guard is already a complete control boundary.
+        // Re-extracting it would move its predicate before the required guard.
+        if guarded.contains(&function.name)
+            || !retained.contains(&function.name)
             || !catalog.contains_key(&function.name)
             || !function
                 .body

@@ -90,10 +90,19 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
             true
         }
         "const_f32" => {
+            let Ok(value) = node.op.args[0].parse::<f32>() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.const_f32 `{}` because literal `{}` is invalid",
+                    node.name, node.op.args[0]
+                ));
+                return true;
+            };
             let reg = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {reg} = fadd float 0.0, {}", node.op.args[0]));
+            // Materialize bits, not arithmetic: +0 + -0 would erase the sign.
+            state.body.push(format!(
+                "  {reg} = bitcast i32 {} to float",
+                value.to_bits()
+            ));
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
@@ -105,10 +114,18 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
             true
         }
         "const_f64" => {
+            let Ok(value) = node.op.args[0].parse::<f64>() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.const_f64 `{}` because literal `{}` is invalid",
+                    node.name, node.op.args[0]
+                ));
+                return true;
+            };
             let reg = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {reg} = fadd double 0.0, {}", node.op.args[0]));
+            state.body.push(format!(
+                "  {reg} = bitcast i64 {} to double",
+                value.to_bits()
+            ));
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));

@@ -1,4 +1,6 @@
-use super::super::tests::{execute, outline_test, source as simple_source};
+use super::super::tests::{
+    assert_selected_effect_not_pure, execute, outline_test, source as simple_source,
+};
 use super::continuation_tests::assert_seed_after_work;
 use super::*;
 
@@ -457,6 +459,12 @@ fn conditional_return_inline_comparisons_share_budgets_and_retain_non_total_veto
             &base.replace(&arm("input > zero", "&&", false), candidate),
         )
         .unwrap();
+        if candidate.contains("print(88)") {
+            assert_selected_effect_not_pure(
+                &base.replace(&arm("input > zero", "&&", false), candidate),
+            );
+            continue;
+        }
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{candidate}");
         assert_eq!(module, before, "{candidate}");

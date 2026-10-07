@@ -1,3 +1,4 @@
+use super::host_application_script::NativePackagingProfile;
 use super::host_runtime_library::ensure_runtime_host_staticlib_built;
 use std::{fs, path::Path, process::Command};
 use yir_core::YirModule;
@@ -11,8 +12,10 @@ pub(super) fn build(
     source: &str,
     input: &Path,
     output: &Path,
-    id: &str,
+    profile: &NativePackagingProfile,
 ) -> Result<(), String> {
+    let id = profile.id.as_str();
+    let policy = profile.policy.as_ref();
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
         target_pointer_width = "64"
@@ -27,7 +30,10 @@ pub(super) fn build(
             "native scalar session YIR exceeds the static host descriptor bound".to_owned(),
         );
     }
-    let bridge = emit_registered(module, id)?;
+    let bridge = match policy {
+        Some(policy) => policy.emit(module, id)?,
+        None => emit_registered(module, id)?,
+    };
     let runtime = ensure_runtime_host_staticlib_built()?;
     fs::create_dir_all(output)
         .map_err(|error| format!("failed to create native session output: {error}"))?;
@@ -70,6 +76,11 @@ pub(super) fn build(
         "native_session_layout={}\n",
         bridge.state_layout.source()
     ));
+    if let Some(policy) = policy {
+        for (key, value) in policy.bundle_claims() {
+            manifest.push_str(&format!("{key}={value}\n"));
+        }
+    }
     fs::write(output.join("bundle.txt"), manifest).map_err(|e| e.to_string())
 }
 

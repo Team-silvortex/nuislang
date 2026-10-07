@@ -1,13 +1,20 @@
 use std::{fs, path::Path, process::Command};
+use yir_lower_llvm::native_session::LiteralPrintBuildPolicy;
 
 pub const CONTRACT: &str = "nuis-yir-application-scalar-script-v1";
 
+pub struct NativePackagingProfile {
+    pub id: String,
+    pub policy: Option<LiteralPrintBuildPolicy>,
+}
+
 pub fn parse_options(
     mut arguments: impl Iterator<Item = String>,
-) -> Result<(usize, bool, Option<String>), String> {
+) -> Result<(usize, bool, Option<NativePackagingProfile>), String> {
     let mut scale = None;
     let mut headless = false;
     let mut native = None;
+    let mut policy = None;
     while let Some(argument) = arguments.next() {
         if argument == "--headless" && !headless {
             headless = true;
@@ -18,7 +25,12 @@ pub fn parse_options(
             if id.is_empty() || id.starts_with('-') {
                 return Err("invalid native application session ID".to_owned());
             }
+            yir_core::YirApplicationSession::validate_identifier(&id)?;
             native = Some(id);
+        } else if argument == "--native-literal-print-policy" && policy.is_none() {
+            policy = Some(LiteralPrintBuildPolicy::parse(&arguments.next().ok_or(
+                "--native-literal-print-policy requires a canonical policy token",
+            )?)?);
         } else if scale.is_none() && !argument.starts_with('-') {
             scale = Some(
                 argument
@@ -36,7 +48,14 @@ pub fn parse_options(
             "native session packaging cannot select a reference/window host profile".to_owned(),
         );
     }
-    Ok((scale.unwrap_or(8), headless, native))
+    if policy.is_some() && native.is_none() {
+        return Err("native literal-print policy requires --native-session".to_owned());
+    }
+    Ok((
+        scale.unwrap_or(8),
+        headless,
+        native.map(|id| NativePackagingProfile { id, policy }),
+    ))
 }
 
 pub fn source(embedded_module: &str) -> String {
@@ -122,15 +141,46 @@ mod tests {
 
     #[test]
     fn packaging_requires_an_explicit_host_profile_and_rejects_extra_options() {
-        let parse = |args: &[&str]| parse_options(args.iter().map(|s| s.to_string()));
-        assert_eq!(parse(&[]).unwrap(), (8, false, None));
-        assert_eq!(parse(&["4"]).unwrap(), (4, false, None));
-        assert_eq!(parse(&["--headless"]).unwrap(), (8, true, None));
-        assert_eq!(parse(&["4", "--headless"]).unwrap(), (4, true, None));
+        let parse = |args: &[&str]| {
+            parse_options(args.iter().map(|s| s.to_string())).map(|(scale, headless, native)| {
+                let (native, policy) = native
+                    .map(|profile| (Some(profile.id), profile.policy.map(|p| p.token())))
+                    .unwrap_or_default();
+                (scale, headless, native, policy)
+            })
+        };
+        assert_eq!(parse(&[]).unwrap(), (8, false, None, None));
+        assert_eq!(parse(&["4"]).unwrap(), (4, false, None, None));
+        assert_eq!(parse(&["--headless"]).unwrap(), (8, true, None, None));
+        assert_eq!(parse(&["4", "--headless"]).unwrap(), (4, true, None, None));
         assert_eq!(
             parse(&["--native-session", "counter"]).unwrap(),
-            (8, false, Some("counter".to_owned()))
+            (8, false, Some("counter".to_owned()), None)
         );
+        for args in [
+            vec![
+                "--native-session",
+                "counter",
+                "--native-literal-print-policy",
+                "v1.0.5.61",
+            ],
+            vec![
+                "--native-literal-print-policy",
+                "v1.0.5.61",
+                "--native-session",
+                "counter",
+            ],
+        ] {
+            assert_eq!(
+                parse(&args).unwrap(),
+                (
+                    8,
+                    false,
+                    Some("counter".to_owned()),
+                    Some("v1.0.5.61".to_owned())
+                )
+            );
+        }
         for invalid in [
             vec!["--headless", "--headless"],
             vec!["4", "5"],
@@ -141,6 +191,23 @@ mod tests {
             vec!["--native-session", "counter", "--headless"],
             vec!["4", "--native-session", "counter"],
             vec!["--native-session", "counter", "--native-session", "counter"],
+            vec!["--native-literal-print-policy"],
+            vec!["--native-literal-print-policy", "v1.0.5"],
+            vec!["--headless", "--native-literal-print-policy", "v1.0.5"],
+            vec![
+                "--native-session",
+                "counter",
+                "--native-literal-print-policy",
+                "v1.00.5",
+            ],
+            vec![
+                "--native-session",
+                "counter",
+                "--native-literal-print-policy",
+                "v1.0.5",
+                "--native-literal-print-policy",
+                "v1.0.5",
+            ],
         ] {
             assert!(parse(&invalid).is_err());
         }

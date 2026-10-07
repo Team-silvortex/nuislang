@@ -181,7 +181,7 @@ fn nested_local_values_capture_rebindings_and_evaluate_effectful_predicate_once(
 }
 
 #[test]
-fn fallible_local_selection_does_not_admit_effectful_arms() {
+fn fallible_local_selection_guards_effectful_calls_without_pure_admission() {
     let source = r#"mod cpu Main {
         fn effect(a: i64, b: i64) -> i64 { print(a); return a / b; }
         @noinline fn event(enabled: bool) -> i64 {
@@ -190,9 +190,37 @@ fn fallible_local_selection_does_not_admit_effectful_arms() {
         }
         fn main() -> i64 { return event(false); }
     }"#;
-    let error = crate::pipeline::compile_source(source)
+    let module = parse_nuis_module(source).unwrap();
+    assert!(!super::super::loop_purity::collect_pure_helper_functions(&module).contains("effect"));
+    let yir = crate::pipeline::compile_source(source).unwrap().yir;
+    assert_eq!(
+        yir.functions
+            .iter()
+            .filter(|f| f.name.starts_with("__nuis_effect_call_arm_"))
+            .count(),
+        2
+    );
+    let trace = yir_runtime_host::execute_module_source_with_registry(
+        &crate::render::render_yir(&yir),
+        &yir_verify::default_registry(),
+    )
+    .unwrap();
+    let prints = trace
+        .events
+        .iter()
+        .filter(|event| event.contains("cpu.print"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        prints.len(),
+        1,
+        "inactive arm must not print or divide: {prints:?}"
+    );
+    assert!(prints[0].ends_with(": 0"), "{prints:?}");
+    yir_lower_llvm::emit_module(&yir).unwrap();
+    let unsupported = source.replace("{ effect(1, 0) }", "{ print(99); effect(1, 0) }");
+    let error = crate::pipeline::compile_source(&unsupported)
         .err()
-        .expect("effectful arm must remain rejected");
+        .expect("multi-statement effectful arm is outside this proof");
     assert!(
         error.contains("conditional fallible return requires guarded helper lowering"),
         "{error}"

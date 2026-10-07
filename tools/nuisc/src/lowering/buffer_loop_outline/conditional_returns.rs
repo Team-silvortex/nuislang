@@ -13,6 +13,8 @@ mod nested_tests;
 mod predicates;
 #[path = "conditional_returns_prefix.rs"]
 mod prefix;
+#[path = "conditional_returns_values.rs"]
+mod return_values;
 #[path = "conditional_returns_signal.rs"]
 mod signal;
 #[path = "conditional_returns_suffix.rs"]
@@ -36,7 +38,11 @@ pub(super) fn outline(
     let mut helpers = Vec::new();
     let mut definitions = Vec::new();
     for function in &mut module.functions {
-        let Some(result) = function.return_type.as_ref().filter(|ty| scalar(ty)) else {
+        let Some(result) = function
+            .return_type
+            .as_ref()
+            .filter(|ty| return_values::admitted(ty))
+        else {
             continue;
         };
         if control_roots.contains(&function.name)
@@ -75,37 +81,26 @@ pub(super) fn outline(
                     then_body,
                     else_body,
                 } => {
-                    if let Some(plan) = prepare(
-                        condition, then_body, else_body, result, &scope, catalog, layouts, &checked,
-                    ) {
-                        output.extend(install(
-                            plan,
-                            result,
-                            names,
-                            &mut bindings,
-                            &mut helpers,
-                            &mut definitions,
-                        ));
-                        continue;
-                    }
-                    if let Some(plan) = effects::prepare(
-                        condition, then_body, else_body, result, &scope, catalog, layouts, &checked,
-                    ) {
-                        output.extend(effects::install(
-                            plan,
-                            result,
-                            names,
-                            &mut bindings,
-                            &mut helpers,
-                            &mut definitions,
-                        ));
-                        continue;
-                    }
-                    if let Some((yes, no)) = effects::aliases::prepare(
-                        then_body, else_body, result, &scope, catalog, layouts,
-                    ) {
+                    // Exact typed returns gain only the selected-region route,
+                    // not ordinary scalar tails or computed-print authority.
+                    if scalar(result) {
+                        if let Some(plan) = prepare(
+                            condition, then_body, else_body, result, &scope, catalog, layouts,
+                            &checked,
+                        ) {
+                            output.extend(install(
+                                plan,
+                                result,
+                                names,
+                                &mut bindings,
+                                &mut helpers,
+                                &mut definitions,
+                            ));
+                            continue;
+                        }
                         if let Some(plan) = effects::prepare(
-                            condition, &yes, &no, result, &scope, catalog, layouts, &checked,
+                            condition, then_body, else_body, result, &scope, catalog, layouts,
+                            &checked,
                         ) {
                             output.extend(effects::install(
                                 plan,
@@ -116,6 +111,23 @@ pub(super) fn outline(
                                 &mut definitions,
                             ));
                             continue;
+                        }
+                        if let Some((yes, no)) = effects::aliases::prepare(
+                            then_body, else_body, result, &scope, catalog, layouts,
+                        ) {
+                            if let Some(plan) = effects::prepare(
+                                condition, &yes, &no, result, &scope, catalog, layouts, &checked,
+                            ) {
+                                output.extend(effects::install(
+                                    plan,
+                                    result,
+                                    names,
+                                    &mut bindings,
+                                    &mut helpers,
+                                    &mut definitions,
+                                ));
+                                continue;
+                            }
                         }
                     }
                     if let Some(plan) = effects::regions::prepare(
@@ -254,10 +266,11 @@ fn prepare_staged(
     }
     // No borrowing, resource transport, outer-state mutation or provisional
     // name capture is authorized by this local return computation proof.
-    if inputs
-        .iter()
-        .any(|name| !scope.get(name).is_some_and(scalar))
-    {
+    if inputs.iter().any(|name| {
+        !scope
+            .get(name)
+            .is_some_and(|ty| return_values::capture(result, ty))
+    }) {
         return None;
     }
     if stored_exit {
@@ -316,11 +329,7 @@ fn install(
     })
     .chain(plan.params)
     .collect::<Vec<_>>();
-    let seed = if result == &scalar_type("bool") {
-        NirExpr::Bool(false)
-    } else {
-        NirExpr::Int(0)
-    };
+    let seed = return_values::seed(result);
     let skipped = vec![NirStmt::Return(Some(seed))];
     let both = plan.yes.is_some() && plan.no.is_some();
     let selected = plan.yes.is_some();

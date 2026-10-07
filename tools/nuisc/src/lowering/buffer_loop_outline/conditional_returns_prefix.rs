@@ -40,7 +40,7 @@ pub(super) fn prepare(
             return None;
         }
         let ty = control_values::value_type(value, &inner, catalog, layouts)?;
-        if declared.is_some_and(|declared| declared != &ty) {
+        if !return_values::local(result, &ty) || declared.is_some_and(|declared| declared != &ty) {
             return None;
         }
         control_values::collect_inputs(value, &mut inputs);
@@ -54,10 +54,11 @@ pub(super) fn prepare(
     }
     control_values::collect_inputs(value, &mut inputs);
     inputs.retain(|name| !local_names.contains(name));
-    if inputs
-        .iter()
-        .any(|name| !scope.get(name).is_some_and(scalar))
-    {
+    if inputs.iter().any(|name| {
+        !scope
+            .get(name)
+            .is_some_and(|ty| return_values::capture(result, ty))
+    }) {
         return None;
     }
     Some(Arm {

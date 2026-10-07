@@ -32,6 +32,11 @@ pub(crate) fn build_application_bundle(
         .arg(output_dir);
     if let Some(id) = crate::aot_native_session::registration_id(packaging_mode)? {
         command.args(["--native-session", id]);
+        if let Some(policy) = crate::aot_native_session::build_policy(packaging_mode)? {
+            command
+                .arg("--native-literal-print-policy")
+                .arg(policy.token());
+        }
     } else {
         command.arg("4");
         if packaging_mode == "headless-aot-bundle" {

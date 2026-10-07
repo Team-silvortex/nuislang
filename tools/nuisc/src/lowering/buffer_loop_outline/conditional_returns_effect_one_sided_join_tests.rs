@@ -6,6 +6,53 @@ use fixtures::{expected, source, Input, INPUTS};
 mod native;
 
 #[test]
+fn conditional_return_join_captures_match_actual_single_value_helper_reads() {
+    let mut cases = 0;
+    for kind in ["atom", "computed", "logical"] {
+        for word in [false, true] {
+            for swapped in [false, true] {
+                let text = source(kind, word, swapped, true, true, INPUTS[1]);
+                let mut module = crate::frontend::parse_nuis_module(&text).unwrap();
+                assert!(!outline_test(&mut module).is_empty());
+                let joins = module
+                    .functions
+                    .iter()
+                    .filter(|f| f.name.starts_with("__nuis_effect_join_value"))
+                    .collect::<Vec<_>>();
+                assert_eq!(joins.len(), 1);
+                let joined = joins[0];
+                assert_eq!(joined.params.len(), 2);
+                assert!(!joined
+                    .params
+                    .iter()
+                    .any(|p| p.name.starts_with("__nuis_effect_condition")));
+                let NirStmt::If {
+                    condition,
+                    then_body,
+                    ..
+                } = &joined.body[0]
+                else {
+                    panic!()
+                };
+                assert_eq!(condition, &NirExpr::Var(joined.params[0].name.clone()));
+                assert_eq!(
+                    then_body,
+                    &[NirStmt::Return(Some(NirExpr::Var(
+                        joined.params[1].name.clone()
+                    )))]
+                );
+                crate::nir_verify::verify_nir_module(&module).unwrap();
+                let once = module.clone();
+                assert!(outline_test(&mut module).is_empty());
+                assert_eq!(module, once);
+                cases += 1;
+            }
+        }
+    }
+    assert_eq!(cases, 12);
+}
+
+#[test]
 fn conditional_return_one_sided_effect_joins_preserve_real_exits_presence_and_selected_work() {
     let mut sources = BTreeSet::new();
     for kind in ["atom", "computed", "logical"] {

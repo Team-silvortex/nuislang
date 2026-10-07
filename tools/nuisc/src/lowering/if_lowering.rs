@@ -204,6 +204,13 @@ fn lower_matching_call_return(
     if then_callee != else_callee || then_args.len() != else_args.len() {
         return Ok(None);
     }
+    if then_args
+        .iter()
+        .chain(else_args)
+        .any(|arg| !is_terminal_branch_pure_expr(arg, &state.pure_helpers))
+    {
+        return Ok(None);
+    }
 
     let mut selected_bindings = bindings.clone();
     let mut selected_args = Vec::with_capacity(then_args.len());
@@ -694,6 +701,13 @@ pub(super) fn lower_if_pair(
                 ..
             },
         ) if lhs_name == rhs_name => {
+            if !is_terminal_branch_pure_expr(lhs_value, &state.pure_helpers)
+                || !is_terminal_branch_pure_expr(rhs_value, &state.pure_helpers)
+            {
+                return Err(
+                    "conditional effectful binding requires guarded helper lowering".to_owned(),
+                );
+            }
             let lhs_value = lower_expr(lhs_value, state, bindings)?;
             let rhs_value = lower_expr(rhs_value, state, bindings)?;
             let selected = lower_select(condition_name, lhs_value, rhs_value, state)?;

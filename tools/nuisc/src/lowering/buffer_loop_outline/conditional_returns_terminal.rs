@@ -36,10 +36,11 @@ pub(super) fn prepare(
         &mut inputs,
         false,
     )?;
-    if inputs
-        .iter()
-        .any(|name| !scope.get(name).is_some_and(scalar))
-    {
+    if inputs.iter().any(|name| {
+        !scope
+            .get(name)
+            .is_some_and(|ty| return_values::capture(result, ty))
+    }) {
         return None;
     }
     Some(prefix::Arm {
@@ -77,7 +78,11 @@ pub(super) fn partial_inputs(
     )?;
     inputs
         .iter()
-        .all(|name| scope.get(name).is_some_and(scalar))
+        .all(|name| {
+            scope
+                .get(name)
+                .is_some_and(|ty| return_values::capture(result, ty))
+        })
         .then_some(inputs)
 }
 
@@ -166,7 +171,7 @@ fn validate(
             return None;
         }
         let ty = control_values::value_type(value, &inner, catalog, layouts)?;
-        if declared.is_some_and(|declared| declared != &ty) {
+        if !return_values::local(result, &ty) || declared.is_some_and(|declared| declared != &ty) {
             return None;
         }
         capture(value, outer, inputs);

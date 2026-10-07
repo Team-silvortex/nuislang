@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-effect-region-exits-original-result-and-reachability-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effect_regions.rs",
-        required_patterns: &["NirStmt::Return(Some(value)) =>", "!expression(value, scope)", "!= Some(result)", "if !continues", "continues = false", "continues = yes_continues || no_continues", "if !continues && end < body.len()", "!ready.get(name).is_some_and(scalar)", "__nuis_effect_exit_value"],
+        required_patterns: &["NirStmt::Return(Some(value)) =>", "!expression(value, scope)", "!= Some(result)", "if !continues", "continues = false", "continues = yes_continues || no_continues", "if !continues && end < body.len()", "!ready.get(name).is_some_and(data_scalars::admitted)", "__nuis_effect_exit_value"],
     },
     DevTensorDriftCheckSpec {
         id: "native-effect-region-exits-distinct-exit-and-value-publication",

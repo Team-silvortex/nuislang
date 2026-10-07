@@ -30,9 +30,9 @@ pub(crate) fn handle_run_artifact_with_native_session(
     let read = |name: String| fs::read_to_string(output.join(name)).map_err(|e| e.to_string());
     let module =
         yir_syntax::parse_explicit_module(&read(format!("{}.yir", report.artifact_binary_name))?)?;
-    let layout = nuisc::aot::native_session::verify_checkpoint(
+    let layout = nuisc::aot::native_session::verify_checkpoint_for_packaging_mode(
         &module,
-        id,
+        &report.packaging_mode,
         &read(format!("{}.ll", report.artifact_binary_name))?,
         &read("bundle.txt".to_owned())?,
     )?;
