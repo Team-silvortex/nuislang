@@ -437,7 +437,7 @@ impl Parser {
             self.expect_symbol('=')?;
             self.expect_symbol('>')?;
             let body = if allow_tail_expr_in_arm {
-                self.parse_block_with_tail_expr()?
+                self.parse_control_expr_block()?
             } else {
                 self.parse_stmt_block()?
             };

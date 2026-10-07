@@ -9,12 +9,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-logical-staged-initializers-root-only-original-authority",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effect_regions.rs",
-        required_patterns: &["!conditional_values::prefix::computed_logical_root(value)", "!entry::admitted(condition, scope, catalog, layouts)", "control_values::value_type(value, &scope, catalog, layouts)", "suffix::validate(&body[end..], scope, result, catalog, layouts)", "aliases::rewrite(&mut tail, &aliases)"],
+        required_patterns: &["!conditional_values::prefix::computed_logical_root(value)", "!entry::admitted(condition, scope, catalog, layouts)", "control_values::value_type(value, scope, catalog, layouts)", "suffix::validate(&body[end..], scope, result, catalog, layouts)", "aliases::rewrite(&mut tail, &aliases)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-logical-staged-initializers-shared-expanded-reservation",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_suffix.rs",
-        required_patterns: &["pub(super) fn reserve_staged_prefix", "32usize.checked_sub(prefix.len())", "plan_expressions(&plan)", "expressions.push((value, 0, true))", "NirStmt::Print(value) => expressions.push((value, 0, false))", "expressions.extend(prefix.iter().map(|value| (*value, 0, false)))", "computed_expression_roots(expressions)"],
+        required_patterns: &["pub(super) fn reserve_staged_prefix", "32usize.checked_sub(prefix.len())", "plan_expressions(&plan)", "expressions.push((value, 0, true))", "effects::regions::bounds::append_roots(", "expressions.extend(prefix.iter().map(|value| (*value, 0, false)))", "computed_expression_roots(expressions)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-logical-staged-initializers-existing-short-circuit-composition",

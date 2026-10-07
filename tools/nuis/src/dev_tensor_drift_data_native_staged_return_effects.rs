@@ -14,12 +14,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-staged-return-effects-original-scope-and-scalar-captures",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effect_regions.rs",
-        required_patterns: &["scope.contains_key(name)", "control_values::value_type(value, &scope, catalog, layouts)", "!scalar(&ty) || declared.is_some_and(|declared| declared != &ty)", "!ready.get(name).is_some_and(scalar)", "suffix::validate(&body[end..], scope, result, catalog, layouts)", "aliases::rewrite(&mut tail, &aliases)"],
+        required_patterns: &["scope.contains_key(name)", "control_values::value_type(value, scope, catalog, layouts)", "!scalar(&ty) || declared.is_some_and(|declared| declared != &ty)", "!ready.get(name).is_some_and(scalar)", "suffix::validate(&body[end..], scope, result, catalog, layouts)", "aliases::rewrite(&mut tail, &aliases)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-staged-return-effects-ordered-selected-once-only-snapshots",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_returns_effect_regions.rs",
-        required_patterns: &["*bindings = plan.bindings;", "for step in arm.steps", "__nuis_conditional_prefix_value", "initializer.return_type = Some(ty.clone())", "then_body: vec![NirStmt::Return(Some(value))]", "else_body: vec![NirStmt::Return(Some(seed))]", "print_values::install(", "plan.pure.condition = NirExpr::Var(plan.gate);"],
+        required_patterns: &["*bindings = plan.bindings;", "let live = install_steps(", "arm.steps,", "for step in steps", "__nuis_conditional_prefix_value", "initializer.return_type = Some(ty.clone())", "then_body: vec![NirStmt::Return(Some(value))]", "else_body: vec![NirStmt::Return(Some(seed))]", "print_values::install(", "plan.pure.condition = NirExpr::Var(plan.gate);"],
     },
     DevTensorDriftCheckSpec {
         id: "native-staged-return-effects-independent-source-exit-and-work-authority",

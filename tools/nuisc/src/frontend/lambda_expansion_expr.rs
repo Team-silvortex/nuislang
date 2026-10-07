@@ -4,7 +4,7 @@ use nuis_semantics::model::{
     AstExpr, AstFunction, AstGenericParam, AstImplDef, AstMatchArm, AstTypeRef,
 };
 
-use super::lambda_expansion_block::{expand_lambda_block, ExpandLambdaBlockInput};
+use super::lambda_expansion_block::{expand_lambda_result_block, ExpandLambdaBlockInput};
 use super::lambda_expansion_synth::{
     expected_callable_type_for_call_arg, expected_callable_type_for_method_arg,
     inline_lambda_return_type_from_callable, synthesize_lambda_function,
@@ -77,7 +77,7 @@ pub(super) fn rewrite_lambda_expr(input: LambdaExprRewriteInput<'_>) -> Result<A
             else_body,
         } => AstExpr::If {
             condition: Box::new(rewrite_nested_expr!(condition, None)?),
-            then_body: expand_lambda_block(ExpandLambdaBlockInput {
+            then_body: expand_lambda_result_block(ExpandLambdaBlockInput {
                 body: then_body,
                 current_return_type: expected_expr_type,
                 inherited_generic_params,
@@ -92,7 +92,7 @@ pub(super) fn rewrite_lambda_expr(input: LambdaExprRewriteInput<'_>) -> Result<A
                 counter,
                 synthesized,
             })?,
-            else_body: expand_lambda_block(ExpandLambdaBlockInput {
+            else_body: expand_lambda_result_block(ExpandLambdaBlockInput {
                 body: else_body,
                 current_return_type: expected_expr_type,
                 inherited_generic_params,
@@ -119,7 +119,7 @@ pub(super) fn rewrite_lambda_expr(input: LambdaExprRewriteInput<'_>) -> Result<A
                             Some(guard) => Some(rewrite_nested_expr!(guard, None)?),
                             None => None,
                         },
-                        body: expand_lambda_block(ExpandLambdaBlockInput {
+                        body: expand_lambda_result_block(ExpandLambdaBlockInput {
                             body: &arm.body,
                             current_return_type: expected_expr_type,
                             inherited_generic_params,

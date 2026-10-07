@@ -416,20 +416,32 @@ fn conditional_return_suffixes_reject_scope_leaks_effects_rebinding_unreachable_
         execute(&candidate(body), Some(19), &[99, 19], calls);
     }
     for body in [
-        "if gate { return false; } print(88); let ignored = helper(produce(divisor));",
+        "if gate { return 0; } print(88); let ignored = helper(produce(divisor));",
         "if gate { return false; } let divisor = 2; let ignored = helper(produce(divisor));",
         "if gate { return false; } while gate { let ignored = divisor; }",
         "if gate { return false; } else { return true; } let ignored = helper(produce(divisor));",
         "if gate { let inside = divisor; } let inside = divisor; return helper(produce(inside));",
         "if gate { let left = divisor; } let ignored = helper(produce(divisor));",
     ] {
-        // No source return in an arm stays ineligible even when entry has work.
+        // Unsupported source scopes and effects do not acquire exit authority.
         let source = candidate(body);
         let mut module = crate::frontend::parse_nuis_module(&source).unwrap();
         let before = module.clone();
         assert!(outline_test(&mut module).is_empty(), "{body}");
         assert_eq!(module, before);
     }
+    let admitted =
+        candidate("if gate { return false; } print(88); let ignored = helper(produce(divisor));");
+    execute(&admitted, Some(19), &[99, 19], 1);
+    execute(
+        &admitted.replace(
+            "event(true, true, 2, false)",
+            "event(true, false, 2, false)",
+        ),
+        Some(19),
+        &[99, 88, 77, 19],
+        2,
+    );
     let source = candidate("if gate { let inside = divisor; } else { let inside = divisor; } return helper(produce(divisor));");
     let mut module = crate::frontend::parse_nuis_module(&source).unwrap();
     let event = module

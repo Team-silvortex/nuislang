@@ -397,8 +397,12 @@ fn conditional_return_stored_signals_share_preflight_and_retain_effect_scope_and
         let admitted = base.replace(&arm("call"), candidate);
         execute(&admitted, Some(19), &[99, 77, 19], 0);
     }
+    for candidate in ["if helper(produce(divisor)) { print(88); return false; }"] {
+        let admitted = base.replace(&arm("call"), candidate);
+        execute(&admitted, Some(19), &[99, 88, 19], 1);
+    }
     for candidate in [
-        "if helper(produce(divisor)) { print(88); return false; }",
+        "if helper(produce(divisor)) { print(88); return 0; }",
         "let divisor = 2; if helper(produce(divisor)) { return false; }",
         "if helper(produce(divisor)) { while gate { return false; } }",
         "if helper(produce(divisor)) { let ignored = divisor; }",

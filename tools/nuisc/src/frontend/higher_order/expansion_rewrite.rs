@@ -369,7 +369,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         )?),
         AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_calls_in_expr(
             value,
-            tail_expected.or(current_return_type),
+            current_return_type,
             current_return_type,
             local_types,
             context,

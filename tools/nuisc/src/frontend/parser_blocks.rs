@@ -3,14 +3,21 @@ use super::*;
 impl Parser {
     pub(super) fn parse_block_with_tail_expr(&mut self) -> Result<Vec<AstStmt>, String> {
         self.expect_symbol('{')?;
-        let body = self.parse_block_body(true)?;
+        let body = self.parse_block_body(true, true)?;
+        self.expect_symbol('}')?;
+        Ok(body)
+    }
+
+    pub(super) fn parse_control_expr_block(&mut self) -> Result<Vec<AstStmt>, String> {
+        self.expect_symbol('{')?;
+        let body = self.parse_block_body(true, false)?;
         self.expect_symbol('}')?;
         Ok(body)
     }
 
     pub(super) fn parse_stmt_block(&mut self) -> Result<Vec<AstStmt>, String> {
         self.expect_symbol('{')?;
-        let body = self.parse_block_body(false)?;
+        let body = self.parse_block_body(false, false)?;
         self.expect_symbol('}')?;
         Ok(body)
     }
@@ -18,6 +25,7 @@ impl Parser {
     pub(super) fn parse_block_body(
         &mut self,
         allow_tail_expr_stmt: bool,
+        tail_returns: bool,
     ) -> Result<Vec<AstStmt>, String> {
         let mut body = Vec::new();
         while !self.peek_symbol('}') {
@@ -26,7 +34,12 @@ impl Parser {
                 let parsed_expr = self.parse_expr();
                 match parsed_expr {
                     Ok(expr) if self.peek_symbol('}') => {
-                        body.push(AstStmt::Return(Some(expr)));
+                        // A control-expression result is not a function exit.
+                        body.push(if tail_returns {
+                            AstStmt::Return(Some(expr))
+                        } else {
+                            AstStmt::Expr(expr)
+                        });
                         break;
                     }
                     Ok(_) | Err(_) => {

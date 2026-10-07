@@ -65,8 +65,10 @@ even when the original tree fits. The older ordinary print-prefix reservation
 is preserved without widened authority. Oversized malformed original roots
 reject before recursive typing or cloning.
 
-Internal/intervening control or effects, record/resource/FFI bindings, changing
-or borrowed captures and arbitrary effectful helper bodies remain open. This
+The later [continuing effect-region proof](nuis-native-continuing-effect-regions-v1.md)
+separately admits bounded fully continuing internal `if` regions. Internal
+early returns, arbitrary effects, record/resource/FFI bindings, changing or
+borrowed captures and arbitrary effectful helper bodies remain open. This
 proof supersedes only the logical-initializer-root exclusion in the preceding
 ordinary staged checkpoint; it does not erase its boundaries or receipt.
 

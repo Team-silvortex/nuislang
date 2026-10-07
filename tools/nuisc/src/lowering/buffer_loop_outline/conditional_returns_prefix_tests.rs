@@ -242,6 +242,17 @@ fn conditional_return_prefixes_retain_outer_rebind_effect_kind_scope_and_shape_v
     let mut module = crate::frontend::parse_nuis_module(&admitted).unwrap();
     assert_eq!(outline_test(&mut module).len(), 2);
     execute(&admitted, Some(11), &[99, 88, 11], 1);
+    // A fully continuing child has a separate selected control-region proof.
+    let admitted = original.replace(
+        selected,
+        "if outer { let current = helper(produce(divisor)); if gate { print(88); } return current; }",
+    );
+    execute(&admitted, Some(11), &[99, 88, 11], 1);
+    let admitted = original.replace(
+        selected,
+        "if outer { let current = helper(produce(divisor)); if gate { print(88); return false; } return current; }",
+    );
+    execute(&admitted, Some(19), &[99, 88, 19], 1);
     for body in [
         "let gate: bool = helper(produce(divisor)); return gate;",
         "let current: i64 = divisor; let current: i64 = 10 / current; return current > 0;",
@@ -249,7 +260,7 @@ fn conditional_return_prefixes_retain_outer_rebind_effect_kind_scope_and_shape_v
         "const current: i64 = gate; return current > 0;",
         "let current = missing; return helper(produce(current));",
         "let first = current; let current = divisor; return helper(produce(first));",
-        "let current = helper(produce(divisor)); if gate { print(88); } return current;",
+        "let current = helper(produce(divisor)); if gate { print(88); return 0; } return current;",
         "let current = divisor; while gate { let current = current + 1; } return helper(produce(current));",
         "let current = divisor; return helper(produce(current)); print(88);",
         "let current = divisor; return;",

@@ -6,7 +6,7 @@ use nuis_semantics::model::{
 
 use super::super::validation_binding_env::bind_match_pattern_for_type;
 use super::super::{ast_named_type, FunctionSignature};
-use super::blocks_expected::let_binding_expected_type_from_following_use;
+use super::blocks_expected::{let_binding_expected_type_from_following_use, ExpectedBlockType};
 use super::blocks_hoists::{rewrite_generic_stmt_with_hoists, GenericStmtHoistRewriteInput};
 use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::GenericImplMethodTemplate;
@@ -53,6 +53,19 @@ pub(super) struct GenericMatchArmsRewriteInput<'a> {
 pub(super) fn rewrite_generic_calls_in_block(
     input: GenericBlockRewriteInput<'_>,
 ) -> Result<Vec<AstStmt>, String> {
+    rewrite_generic_calls_in_block_inner(input, false)
+}
+
+pub(super) fn rewrite_generic_calls_in_result_block(
+    input: GenericBlockRewriteInput<'_>,
+) -> Result<Vec<AstStmt>, String> {
+    rewrite_generic_calls_in_block_inner(input, true)
+}
+
+fn rewrite_generic_calls_in_block_inner(
+    input: GenericBlockRewriteInput<'_>,
+    result_context: bool,
+) -> Result<Vec<AstStmt>, String> {
     let GenericBlockRewriteInput {
         body,
         context,
@@ -73,10 +86,66 @@ pub(super) fn rewrite_generic_calls_in_block(
     } = input;
     let mut rewritten = Vec::new();
     for (index, stmt) in body.iter().enumerate() {
+        // Expected initializer types flow only into the result tail, not into
+        // arbitrary expression statements or a synthetic function return.
+        if result_context && index + 1 == body.len() {
+            if let AstStmt::Expr(expr) = stmt {
+                if matches!(expr, nuis_semantics::model::AstExpr::Call { callee, .. } if generic_templates.contains_key(callee))
+                {
+                    rewritten.extend(rewrite_generic_stmt_with_hoists(
+                        GenericStmtHoistRewriteInput {
+                            stmt,
+                            context,
+                            let_fallback_expected: None,
+                            current_return_type,
+                            result_context: true,
+                            env,
+                            visible_type_aliases,
+                            generic_templates,
+                            generic_impl_method_templates,
+                            higher_order_templates,
+                            function_table,
+                            signatures,
+                            impl_lookup,
+                            struct_table,
+                            function_return_types,
+                            specialization_cache,
+                            specialized_functions,
+                            specialized_signatures,
+                        },
+                    )?);
+                    continue;
+                }
+                rewritten.push(AstStmt::Expr(rewrite_generic_calls_in_expr(
+                    GenericExprRewriteInput {
+                        expr,
+                        context,
+                        expected: current_return_type,
+                        env,
+                        visible_type_aliases,
+                        generic_templates,
+                        generic_impl_method_templates,
+                        higher_order_templates,
+                        function_table,
+                        signatures,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    },
+                )?));
+                continue;
+            }
+        }
         let let_fallback_expected = let_binding_expected_type_from_following_use(
             stmt,
             &body[index + 1..],
-            current_return_type,
+            ExpectedBlockType {
+                current_return_type,
+                result_context,
+            },
             generic_templates,
             signatures,
             visible_type_aliases,
@@ -88,6 +157,7 @@ pub(super) fn rewrite_generic_calls_in_block(
                 context,
                 let_fallback_expected: let_fallback_expected.as_ref(),
                 current_return_type,
+                result_context: false,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -109,6 +179,19 @@ pub(super) fn rewrite_generic_calls_in_block(
 
 pub(super) fn rewrite_generic_calls_in_match_arms(
     input: GenericMatchArmsRewriteInput<'_>,
+) -> Result<Vec<AstMatchArm>, String> {
+    rewrite_generic_calls_in_match_arms_inner(input, false)
+}
+
+pub(super) fn rewrite_generic_calls_in_result_match_arms(
+    input: GenericMatchArmsRewriteInput<'_>,
+) -> Result<Vec<AstMatchArm>, String> {
+    rewrite_generic_calls_in_match_arms_inner(input, true)
+}
+
+fn rewrite_generic_calls_in_match_arms_inner(
+    input: GenericMatchArmsRewriteInput<'_>,
+    result_context: bool,
 ) -> Result<Vec<AstMatchArm>, String> {
     let GenericMatchArmsRewriteInput {
         arms,
@@ -167,24 +250,27 @@ pub(super) fn rewrite_generic_calls_in_match_arms(
                     })
                 })
                 .transpose()?,
-            body: rewrite_generic_calls_in_block(GenericBlockRewriteInput {
-                body: &arm.body,
-                context: &format!("{context} match-arm"),
-                current_return_type,
-                env: &mut arm_env,
-                visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            })?,
+            body: rewrite_generic_calls_in_block_inner(
+                GenericBlockRewriteInput {
+                    body: &arm.body,
+                    context: &format!("{context} match-arm"),
+                    current_return_type,
+                    env: &mut arm_env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                },
+                result_context,
+            )?,
         });
     }
     Ok(rewritten)

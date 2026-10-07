@@ -1913,7 +1913,10 @@ logical/effectful-return acceptance.
 ## Remaining Boundaries
 
 The persistent-session coordinate is now `active/99`; the separate
-[logical initializer proof](nuis-native-logical-staged-initializers-v1.md) retains short-circuit order, once-only snapshots and parent prints.
+[continuing region](nuis-native-continuing-effect-regions-v1.md) and [internal-exit](nuis-native-effect-region-exits-v1.md) proofs retain selected work, distinct exits and isolated child scopes.
+The [paired result-join proof](nuis-native-effect-result-joins-v1.md) exports only fresh owned scalar if-expression results from fully continuing selection arms, not arbitrary child bindings or exiting result arms.
+The [partial-result proof](nuis-native-partial-effect-result-joins-v1.md) separately permits source exits when each arm still reaches a paired result on its continuing paths, without one-sided result or child-scope export authority.
+The [one-sided result proof](nuis-native-one-sided-effect-result-joins-v1.md) separately permits a continuing result opposite a wholly exiting arm, preserving explicit source returns and live result presence without general child-scope exports.
 Empty fallthrough leaves
 and fresh pure continuation bindings now have independent bounded proofs above.
 Fresh helper-local atom aliases now have a separate bounded readiness proof.
@@ -1940,7 +1943,7 @@ ordinary leaf embeddings and effectful prefixes remain excluded.
 Logical outer gates and other inline conditions
 outside the computed-gate, single-edge outer-entry/return-arm and earlier proofs,
 suffixes outside the original/expanded budgets and
-effectful-prefixed source returns inside partial trees, plus branch-local effects,
+effects outside the bounded [exit-only region proof](nuis-native-exit-only-regions-v1.md),
 still require their
 own guarded-computation and parent-ordering proof; the top-level scalar return,
 terminal-tree, fallthrough and pure-continuation proofs do not authorize them. Further changing

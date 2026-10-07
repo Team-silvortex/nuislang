@@ -1,6 +1,90 @@
 use super::*;
 
 #[test]
+fn control_expression_initializers_preserve_explicit_function_exits_and_tail_values() {
+    for declaration in ["let", "const"] {
+        for expression in [
+            "if true { return 7; } else { true }",
+            "if true { true } else { return 7; }",
+            "match 1 { 1 => { return 7; }, _ => { true } }",
+            "if true { return 7; } else if false { true } else { false }",
+        ] {
+            let text = format!("mod cpu Main {{ fn main() -> i64 {{ {declaration} chosen: bool = {expression}; return if chosen {{ 11 }} else {{ 19 }}; }} }}");
+            let module = parse_nuis_module(&text).unwrap();
+            let main = module.functions.iter().find(|f| f.name == "main").unwrap();
+            let body = format!("{:?}", main.body[0]);
+            assert!(body.contains("Return(Some(Int(7)))"), "{body}");
+            assert!(!body.contains("value: Int(7)"), "{body}");
+            assert!(body.contains("name: \"chosen\""), "{body}");
+            let alternate = parse_nuis_module(&text.replace("return 7;", "return false;")).unwrap();
+            let main = alternate
+                .functions
+                .iter()
+                .find(|f| f.name == "main")
+                .unwrap();
+            assert!(format!("{:?}", main.body[0]).contains("Return(Some(Bool(false)))"));
+            assert!(parse_nuis_module(&text.replace("{ true }", "{ chosen }")).is_err());
+        }
+    }
+}
+
+#[test]
+fn control_expression_let_results_are_not_published_before_branch_validation() {
+    for expression in [
+        "if true { chosen } else { 9 }",
+        "match 1 { 1 => { chosen }, _ => { 9 } }",
+        "if chosen > 0 { 7 } else { 9 }",
+        "match chosen { 1 => { 7 }, _ => { 9 } }",
+    ] {
+        let text = format!("mod cpu Main {{ fn main() -> i64 {{ let chosen: i64 = {expression}; return chosen; }} }}");
+        assert!(parse_nuis_module(&text).is_err(), "{expression}");
+    }
+    let text = "mod cpu Main { fn main() -> i64 { let chosen: i64 = if true { let local = 7; local } else { 9 }; return local; } }";
+    assert!(parse_nuis_module(text).is_err());
+}
+
+#[test]
+fn control_expression_generic_tail_hints_do_not_leak_to_non_tail_calls() {
+    for expression in [
+        "if true { zero() } else { return 19; }",
+        "if true { let local = zero(); local } else { return 19; }",
+        "match 1 { 1 => { zero() }, _ => { return 19; } }",
+        "match 1 { 1 => { let local = zero(); local }, _ => { return 19; } }",
+    ] {
+        let text = format!("mod cpu Main {{ fn zero<T>() -> T {{ return 0; }} fn main() -> i64 {{ let chosen: i64 = {expression}; return chosen; }} }}");
+        let module = parse_nuis_module(&text).unwrap();
+        assert!(
+            module
+                .functions
+                .iter()
+                .any(|f| f.name != "main"
+                    && f.return_type.as_ref().is_some_and(|ty| ty.name == "i64"))
+        );
+        let not_tail = text.replacen("zero()", "zero(); zero()", 1);
+        assert!(parse_nuis_module(&not_tail).is_err());
+    }
+}
+
+#[test]
+fn const_control_expression_results_are_visible_only_after_validated_branches() {
+    for expression in [
+        "if true { let local = 7; local } else { let local = 9; local }",
+        "match 1 { 1 => { let local = 7; local }, _ => { let local = 9; local } }",
+    ] {
+        let text = format!("mod cpu Main {{ fn main() -> i64 {{ const chosen: i64 = {expression}; return chosen; }} }}");
+        let module = parse_nuis_module(&text).unwrap();
+        let main = module.functions.iter().find(|f| f.name == "main").unwrap();
+        assert!(
+            matches!(main.body.last(), Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "chosen")
+        );
+        assert!(parse_nuis_module(&text.replace("return chosen;", "return local;")).is_err());
+        assert!(parse_nuis_module(&text.replace("let local = 7; local", "chosen")).is_err());
+        assert!(parse_nuis_module(&text.replace("let local = 9; local", "true")).is_err());
+        assert!(parse_nuis_module(&text.replace("const chosen: i64", "const chosen")).is_err());
+    }
+}
+
+#[test]
 fn lowers_if_expression_in_let_initializer() {
     let module = parse_nuis_module(
         r#"

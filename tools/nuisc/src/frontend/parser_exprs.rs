@@ -395,16 +395,16 @@ impl Parser {
             return self.parse_if_let_expr_after_keyword();
         }
         let condition = self.parse_condition_expr()?;
-        let then_body = self.parse_block_with_tail_expr()?;
+        let then_body = self.parse_control_expr_block()?;
         if !self.peek_word("else") {
             return Err("`if` expression currently requires `else`".to_owned());
         }
         self.expect_word("else")?;
         let else_body = if self.peek_word("if") {
             self.expect_word("if")?;
-            vec![AstStmt::Return(Some(self.parse_if_expr_after_keyword()?))]
+            vec![AstStmt::Expr(self.parse_if_expr_after_keyword()?)]
         } else {
-            self.parse_block_with_tail_expr()?
+            self.parse_control_expr_block()?
         };
         Ok(AstExpr::If {
             condition: Box::new(condition),
@@ -421,16 +421,16 @@ impl Parser {
         }
         self.expect_symbol('=')?;
         let value = self.parse_match_scrutinee_expr()?;
-        let then_body = self.parse_block_with_tail_expr()?;
+        let then_body = self.parse_control_expr_block()?;
         if !self.peek_word("else") {
             return Err("`if let` expression currently requires `else`".to_owned());
         }
         self.expect_word("else")?;
         let else_body = if self.peek_word("if") {
             self.expect_word("if")?;
-            vec![AstStmt::Return(Some(self.parse_if_expr_after_keyword()?))]
+            vec![AstStmt::Expr(self.parse_if_expr_after_keyword()?)]
         } else {
-            self.parse_block_with_tail_expr()?
+            self.parse_control_expr_block()?
         };
         Ok(AstExpr::Match {
             value: Box::new(value),

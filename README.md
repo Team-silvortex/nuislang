@@ -17,7 +17,7 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 ## Current Line
 
 The repository is on `beta-0.15.*`; the current source patch is
-[`beta-0.15.8`](docs/versioning/nuis-beta-0.15.8-patch.md) (`98ca713e`, 2026-10-05).
+[`beta-0.15.9`](docs/versioning/nuis-beta-0.15.9-patch.md) (`585eb409`, 2026-10-05).
 Git history is authoritative; Cargo package versions are independent of the
 project release. The minor baseline is `05951bef` (`beta-0.15.0`, 2026-09-24).
 The [beta-0.15 snapshot](docs/versioning/nuis-beta-0.15.0-snapshot.md) records
@@ -38,7 +38,7 @@ Start with the [current mainline map](docs/current-mainline-map.md),
 This is a formal staged self-hosting migration line, not a claim of a self-hosted
 compiler, stable public API, or production-ready engine.
 
-Post-release work adds [bounded leading return-print prefixes](docs/reference/nuis-native-return-print-prefixes-v1.md):
+The committed patch includes [bounded leading return-print prefixes](docs/reference/nuis-native-return-print-prefixes-v1.md):
 save the entry once, keep guarded integer prints in the parent, then execute the
 independently admitted pure return tail. The subsequent
 [computed print-argument proof](docs/reference/nuis-native-computed-return-prints-v1.md)
@@ -51,8 +51,26 @@ prints and return tails, including checks in unused bindings.
 The [logical initializer follow-up](docs/reference/nuis-native-logical-staged-initializers-v1.md)
 adds direct nested short-circuit roots to these selected bindings, preserving
 once-only snapshots, original scalar captures and shared prefix/tail budgets.
-This is worktree development after the
-committed patch, not general effectful-helper or application-closure acceptance.
+The subsequent [continuing effect-region proof](docs/reference/nuis-native-continuing-effect-regions-v1.md)
+adds bounded internal `if` regions before/between those initializers and prints,
+with once-only selected conditions, isolated child scopes and saved parent/child
+paths. The [effect-region exit follow-up](docs/reference/nuis-native-effect-region-exits-v1.md)
+adds bounded internal scalar returns, separate exit/value snapshots and continued
+path guards that suppress later checks, prints and pure-tail work. The
+[exit-only region proof](docs/reference/nuis-native-exit-only-regions-v1.md)
+also admits internal source exits with empty or pure continuing tails, without
+promoting continuation seeds into returns. The
+[paired result-join proof](docs/reference/nuis-native-effect-result-joins-v1.md)
+now carries fresh owned bool/i64 if-expression results out of fully continuing
+selection arms without replaying work or exporting other child locals.
+The [partial-result follow-up](docs/reference/nuis-native-partial-effect-result-joins-v1.md)
+also admits internal source returns when each result arm still proves a final
+paired value on its continuing paths, using the existing merged live masks.
+The [one-sided result follow-up](docs/reference/nuis-native-one-sided-effect-result-joins-v1.md)
+also admits a continuing result opposite a wholly exiting arm, preserving explicit
+source returns and result presence. Rebinding, resources and general
+effectful helpers remain excluded. These follow-ups are worktree development after
+the committed patch, not application-closure acceptance.
 
 ```text
 nuis source / nuis.toml

@@ -136,7 +136,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     specialized_functions,
                     specialized_signatures,
                 })?),
-                then_body: super::blocks::rewrite_generic_calls_in_block(
+                then_body: super::blocks::rewrite_generic_calls_in_result_block(
                     super::blocks::GenericBlockRewriteInput {
                         body: then_body,
                         context: &format!("{context} if-then"),
@@ -156,7 +156,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                         specialized_signatures,
                     },
                 )?,
-                else_body: super::blocks::rewrite_generic_calls_in_block(
+                else_body: super::blocks::rewrite_generic_calls_in_result_block(
                     super::blocks::GenericBlockRewriteInput {
                         body: else_body,
                         context: &format!("{context} if-else"),
@@ -207,7 +207,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             );
             AstExpr::Match {
                 value: Box::new(rewritten_value),
-                arms: super::blocks::rewrite_generic_calls_in_match_arms(
+                arms: super::blocks::rewrite_generic_calls_in_result_match_arms(
                     super::blocks::GenericMatchArmsRewriteInput {
                         arms,
                         context,

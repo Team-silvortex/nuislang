@@ -67,24 +67,18 @@ fn plan_expressions<'a>(plan: &[Part<'a>]) -> Option<Vec<(&'a NirExpr, usize, bo
 // Staged initializers may own logical roots; print arguments remain ordinary
 // leaves. Charge every source root together with the expanded pure tail.
 pub(super) fn reserve_staged_prefix(body: &[NirStmt], prefix: &[NirStmt]) -> bool {
-    let Some(mut statements) = 32usize.checked_sub(prefix.len()) else {
+    let mut statements = 32usize;
+    let mut expressions = Vec::new();
+    if !effects::regions::bounds::append_roots(prefix, true, &mut statements, &mut expressions) {
         return false;
-    };
+    }
     let Some(plan) = plan(body.iter().collect(), &mut statements) else {
         return false;
     };
-    let Some(mut expressions) = plan_expressions(&plan) else {
+    let Some(tail) = plan_expressions(&plan) else {
         return false;
     };
-    for stmt in prefix {
-        match stmt {
-            NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => {
-                expressions.push((value, 0, true));
-            }
-            NirStmt::Print(value) => expressions.push((value, 0, false)),
-            _ => return false,
-        }
-    }
+    expressions.extend(tail);
     conditional_values::prefix::computed_expression_roots(expressions)
 }
 

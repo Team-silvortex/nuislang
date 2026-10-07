@@ -418,7 +418,7 @@ fn infer_ast_block_result_type(
     active_exprs: &mut BTreeSet<usize>,
 ) -> Option<AstTypeRef> {
     match body.last() {
-        Some(AstStmt::Return(Some(expr))) => infer_ast_expr_type_inner(
+        Some(AstStmt::Return(Some(expr))) | Some(AstStmt::Expr(expr)) => infer_ast_expr_type_inner(
             expr,
             env,
             impl_lookup,

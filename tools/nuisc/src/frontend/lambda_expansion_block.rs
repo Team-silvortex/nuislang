@@ -32,6 +32,19 @@ pub(super) struct ExpandLambdaBlockInput<'a> {
 pub(super) fn expand_lambda_block(
     input: ExpandLambdaBlockInput<'_>,
 ) -> Result<Vec<AstStmt>, String> {
+    expand_lambda_block_inner(input, false)
+}
+
+pub(super) fn expand_lambda_result_block(
+    input: ExpandLambdaBlockInput<'_>,
+) -> Result<Vec<AstStmt>, String> {
+    expand_lambda_block_inner(input, true)
+}
+
+fn expand_lambda_block_inner(
+    input: ExpandLambdaBlockInput<'_>,
+    result_context: bool,
+) -> Result<Vec<AstStmt>, String> {
     let ExpandLambdaBlockInput {
         body,
         current_return_type,
@@ -69,7 +82,7 @@ pub(super) fn expand_lambda_block(
             })
         };
     }
-    for stmt in body {
+    for (index, stmt) in body.iter().enumerate() {
         match stmt {
             AstStmt::Let {
                 name,
@@ -381,7 +394,12 @@ pub(super) fn expand_lambda_block(
                     synthesized,
                 })?,
             }),
-            AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_block_expr!(expr, None)?)),
+            AstStmt::Expr(expr) => {
+                let expected = (result_context && index + 1 == body.len())
+                    .then_some(current_return_type)
+                    .flatten();
+                rewritten.push(AstStmt::Expr(rewrite_block_expr!(expr, expected)?));
+            }
             AstStmt::Return(value) => rewritten.push(AstStmt::Return(match value {
                 Some(value) => Some(rewrite_block_expr!(value, current_return_type)?),
                 None => None,

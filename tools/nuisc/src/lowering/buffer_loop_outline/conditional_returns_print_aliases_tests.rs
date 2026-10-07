@@ -121,6 +121,28 @@ fn conditional_return_print_aliases_preserve_literals_sibling_scopes_and_current
 #[test]
 fn conditional_return_print_aliases_validate_original_scopes_and_veto_atomic() {
     let text = alias_source("division", "return", "atom", "both", INPUTS[2], 2);
+    for outer in [false, true] {
+        let mut input = INPUTS[2];
+        input.0 = outer;
+        let admitted = alias_source("division", "return", "atom", "both", input, 2)
+            .replace("print(66);", "if gate { print(1); } print(66);");
+        let (result, mut prints, calls) =
+            alias_expected("division", "return", "atom", "both", input, 2);
+        if !outer {
+            prints.insert(1, 1);
+        }
+        execute(&admitted, result, &prints, calls);
+        let admitted = alias_source("division", "return", "atom", "both", input, 2).replace(
+            "print(66);",
+            "if gate { print(1); return false; } print(66);",
+        );
+        execute(
+            &admitted,
+            if outer { result } else { Some(19) },
+            if outer { &prints } else { &[99, 1, 19] },
+            if outer { calls } else { 0 },
+        );
+    }
     for mutation in [
         "duplicate",
         "parent-shadow",
@@ -129,7 +151,7 @@ fn conditional_return_print_aliases_validate_original_scopes_and_veto_atomic() {
         "self",
         "forward",
         "record",
-        "internal-print",
+        "internal-return",
         "early-return",
         "print-before-alias",
     ] {
@@ -161,11 +183,14 @@ fn conditional_return_print_aliases_validate_original_scopes_and_veto_atomic() {
                 }
             }
             "duplicate" => else_body.insert(1, else_body[0].clone()),
-            "internal-print" => else_body.insert(
+            "internal-return" => else_body.insert(
                 0,
                 NirStmt::If {
                     condition: NirExpr::Var("gate".into()),
-                    then_body: vec![NirStmt::Print(NirExpr::Int(1))],
+                    then_body: vec![
+                        NirStmt::Print(NirExpr::Int(1)),
+                        NirStmt::Return(Some(NirExpr::Int(0))),
+                    ],
                     else_body: vec![],
                 },
             ),

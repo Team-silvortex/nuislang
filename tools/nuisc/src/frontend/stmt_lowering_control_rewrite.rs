@@ -376,7 +376,7 @@ pub(super) fn rewrite_control_expr_terminal_branch(
             });
             Ok(rewritten)
         }
-        AstStmt::Return(Some(value)) | AstStmt::Expr(value) => {
+        AstStmt::Expr(value) => {
             for root_kind in [ControlExprKind::If, ControlExprKind::Match] {
                 if let Some(expanded) =
                     expand_nested_control_expr_as_stmt(value, wrap, root_kind, true)?
@@ -388,7 +388,7 @@ pub(super) fn rewrite_control_expr_terminal_branch(
             rewritten.push(wrap(value.clone()));
             Ok(rewritten)
         }
-        AstStmt::Break | AstStmt::Continue => {
+        AstStmt::Return(_) | AstStmt::Break | AstStmt::Continue => {
             rewritten.push(last.clone());
             Ok(rewritten)
         }

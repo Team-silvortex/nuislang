@@ -57,7 +57,7 @@ fn contains_definition_placeholder(ty: &AstTypeRef, placeholder_names: &BTreeSet
 pub(super) fn let_binding_expected_type_from_following_use(
     stmt: &AstStmt,
     following_stmts: &[AstStmt],
-    current_return_type: Option<&AstTypeRef>,
+    context: ExpectedBlockType<'_>,
     generic_templates: &BTreeMap<String, AstFunction>,
     signatures: &BTreeMap<String, FunctionSignature>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -72,7 +72,7 @@ pub(super) fn let_binding_expected_type_from_following_use(
     expected_type_for_var_from_following_stmts(
         name,
         following_stmts,
-        current_return_type,
+        context,
         generic_templates,
         signatures,
         visible_type_aliases,
@@ -80,15 +80,25 @@ pub(super) fn let_binding_expected_type_from_following_use(
     )
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct ExpectedBlockType<'a> {
+    pub current_return_type: Option<&'a AstTypeRef>,
+    pub result_context: bool,
+}
+
 fn expected_type_for_var_from_following_stmts(
     current_name: &str,
     following_stmts: &[AstStmt],
-    current_return_type: Option<&AstTypeRef>,
+    context: ExpectedBlockType<'_>,
     generic_templates: &BTreeMap<String, AstFunction>,
     signatures: &BTreeMap<String, FunctionSignature>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     struct_table: &BTreeMap<String, AstStructDef>,
 ) -> Option<AstTypeRef> {
+    let ExpectedBlockType {
+        current_return_type,
+        result_context,
+    } = context;
     let (stmt, rest) = following_stmts.split_first()?;
     match stmt {
         AstStmt::Let {
@@ -98,7 +108,7 @@ fn expected_type_for_var_from_following_stmts(
         } if source_name == current_name => expected_type_for_var_from_following_stmts(
             name,
             rest,
-            current_return_type,
+            context,
             generic_templates,
             signatures,
             visible_type_aliases,
@@ -122,7 +132,7 @@ fn expected_type_for_var_from_following_stmts(
                 expected_type_for_var_from_following_stmts(
                     name,
                     rest,
-                    current_return_type,
+                    context,
                     generic_templates,
                     signatures,
                     visible_type_aliases,
@@ -144,21 +154,31 @@ fn expected_type_for_var_from_following_stmts(
             callee,
             generic_args,
             args,
-        })) => args.iter().enumerate().find_map(|(index, arg)| {
-            matches!(arg, AstExpr::Var(var_name) if var_name == current_name).then(|| {
-                super::exprs::call_arg_expected_type(super::exprs::CallArgExpectedTypeInput {
-                    callee,
-                    generic_args,
-                    index,
-                    expected: current_return_type,
-                    generic_templates,
-                    signatures,
-                    visible_type_aliases,
-                    struct_table,
-                })
-            })?
-        }),
-        AstStmt::Return(Some(AstExpr::Var(var_name))) if var_name == current_name => {
+        }))
+        | AstStmt::Expr(AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        }) if matches!(stmt, AstStmt::Return(_)) || (result_context && rest.is_empty()) => {
+            args.iter().enumerate().find_map(|(index, arg)| {
+                matches!(arg, AstExpr::Var(var_name) if var_name == current_name).then(|| {
+                    super::exprs::call_arg_expected_type(super::exprs::CallArgExpectedTypeInput {
+                        callee,
+                        generic_args,
+                        index,
+                        expected: current_return_type,
+                        generic_templates,
+                        signatures,
+                        visible_type_aliases,
+                        struct_table,
+                    })
+                })?
+            })
+        }
+        AstStmt::Return(Some(AstExpr::Var(var_name))) | AstStmt::Expr(AstExpr::Var(var_name))
+            if var_name == current_name
+                && (matches!(stmt, AstStmt::Return(_)) || (result_context && rest.is_empty())) =>
+        {
             current_return_type.cloned()
         }
         _ => None,

@@ -17,7 +17,7 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "fn parse_if_expr_after_keyword",
             "fn parse_if_let_expr_after_keyword",
-            "AstStmt::Return(Some(self.parse_if_expr_after_keyword()?))",
+            "AstStmt::Expr(self.parse_if_expr_after_keyword()?)",
         ],
     },
     DevTensorDriftCheckSpec {

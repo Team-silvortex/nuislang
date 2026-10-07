@@ -8,10 +8,11 @@ before changing a capability claim.
 
 The current `beta-0.15.*` priority is the ns-nova application-led dependency
 chain agreed in [beta 0.11](versioning/nuis-beta-0.11-application-led-mainline.md).
-The current patch is [`beta-0.15.8`](versioning/nuis-beta-0.15.8-patch.md)
-(`98ca713e`, 2026-10-05), including bounded computed return predicates and nested
-logical trees. [Leading return-print prefixes](reference/nuis-native-return-print-prefixes-v1.md)
-are subsequent worktree development: parent-only effects, a once-only entry and
+The current patch is [`beta-0.15.9`](versioning/nuis-beta-0.15.9-patch.md)
+(`585eb409`, 2026-10-05), including bounded computed return predicates, nested
+logical trees and the following parent-effect proofs.
+[Leading return-print prefixes](reference/nuis-native-return-print-prefixes-v1.md)
+retain parent-only effects, a once-only entry and
 an independently admitted pure return tail, not general effectful helpers.
 The subsequent [computed print-argument proof](reference/nuis-native-computed-return-prints-v1.md)
 guards pure checked/call-backed argument work before each parent print, without
@@ -27,6 +28,23 @@ The [logical initializer follow-up](reference/nuis-native-logical-staged-initial
 extends only direct logical initializer roots, reusing the existing short-circuit
 pass while charging prefix expressions and expanded tails together. Ordinary
 print/call leaves and original scalar capture authority are not widened.
+The subsequent [continuing effect-region proof](reference/nuis-native-continuing-effect-regions-v1.md)
+is worktree development after this patch. Bounded internal `if` regions retain
+once-only selected conditions, saved parent/child paths and isolated child scopes;
+the [effect-region exit follow-up](reference/nuis-native-effect-region-exits-v1.md)
+adds internal owned bool/i64 returns and masks later prefix/tail work without
+replaying conditions. The [exit-only region proof](reference/nuis-native-exit-only-regions-v1.md)
+also admits empty or pure continuing tails after validated internal source exits;
+the [paired result-join proof](reference/nuis-native-effect-result-joins-v1.md)
+adds fresh owned bool/i64 if-expression results from fully continuing selection
+arms, retaining all other child-scope isolation. The
+[partial-result follow-up](reference/nuis-native-partial-effect-result-joins-v1.md)
+permits internal source returns when each result arm still reaches its paired
+value on continuing paths. The
+[one-sided result follow-up](reference/nuis-native-one-sided-effect-result-joins-v1.md)
+adds one continuing result opposite a wholly exiting arm, with explicit source
+returns distinct from initializer tails. Rebinding, resource work and general
+child-scope exports remain open.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records
 the baseline `05951bef` (`beta-0.15.0`, 2026-09-24); Git remains authoritative.
 
@@ -62,8 +80,8 @@ The committed `beta-0.15.8` checkpoint retained `active/94`; the leading print-p
 worktree checkpoint retained `active/95`; the computed print-argument follow-up
 retained `active/96`; the interleaved atom-alias follow-up retained `active/97`;
 the staged initializer follow-up retained `active/98`; the logical initializer
-follow-up is `active/99`, confirmed by the rebuilt CLI,
-with separate validation evidence. This remains
+follow-up retained `active/99`, included in `beta-0.15.9`. The continuing-region
+and effect-region exit follow-ups keep `active/99`, with separate validation evidence. This remains
 an application prerequisite, not a completed native application.
 Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
 not the globally lowest percentage. Correctness regressions may interrupt it.

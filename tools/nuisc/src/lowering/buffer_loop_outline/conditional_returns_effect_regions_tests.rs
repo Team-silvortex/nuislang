@@ -5,10 +5,20 @@ mod fixtures;
 use fixtures::{events, simple_expected, simple_source, staged_expected, staged_source};
 #[path = "conditional_returns_effect_regions_budget_tests.rs"]
 mod budget;
+#[path = "conditional_returns_effect_control_tests.rs"]
+mod control;
+#[path = "conditional_returns_effect_exit_tests.rs"]
+mod exits;
+#[path = "conditional_returns_effect_join_tests.rs"]
+mod joins;
 #[path = "conditional_returns_effect_logical_tests.rs"]
 mod logical;
 #[path = "conditional_returns_effect_regions_native_tests.rs"]
 mod native;
+#[path = "conditional_returns_effect_one_sided_join_tests.rs"]
+mod one_sided_joins;
+#[path = "conditional_returns_effect_partial_join_tests.rs"]
+mod partial_joins;
 
 #[test]
 fn conditional_return_staged_initializers_preserve_selected_work_order_and_exits() {
@@ -202,7 +212,7 @@ fn conditional_return_staged_initializers_validate_original_scopes_and_veto_atom
         "record",
         "entry-private",
         "tail-shadow",
-        "nested-print",
+        "nested-return",
         "no-return",
         "effectful-callee",
         "borrow",
@@ -282,11 +292,14 @@ fn conditional_return_staged_initializers_validate_original_scopes_and_veto_atom
                             value: NirExpr::Int(1),
                         },
                     ),
-                    "nested-print" => else_body.insert(
+                    "nested-return" => else_body.insert(
                         2,
                         NirStmt::If {
                             condition: NirExpr::Bool(true),
-                            then_body: vec![NirStmt::Print(NirExpr::Int(1))],
+                            then_body: vec![
+                                NirStmt::Print(NirExpr::Int(1)),
+                                NirStmt::Return(Some(NirExpr::Int(0))),
+                            ],
                             else_body: vec![],
                         },
                     ),

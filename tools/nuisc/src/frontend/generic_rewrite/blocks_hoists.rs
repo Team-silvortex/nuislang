@@ -16,6 +16,7 @@ pub(super) struct GenericStmtHoistRewriteInput<'a> {
     pub(super) context: &'a str,
     pub(super) let_fallback_expected: Option<&'a AstTypeRef>,
     pub(super) current_return_type: Option<&'a AstTypeRef>,
+    pub(super) result_context: bool,
     pub(super) env: &'a mut BTreeMap<String, AstTypeRef>,
     pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
     pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
@@ -39,6 +40,7 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
         context,
         let_fallback_expected,
         current_return_type,
+        result_context,
         env,
         visible_type_aliases,
         generic_templates,
@@ -191,7 +193,14 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
             callee,
             generic_args,
             args,
-        })) if generic_templates.contains_key(callee) => {
+        }))
+        | AstStmt::Expr(AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        }) if (matches!(stmt, AstStmt::Return(_)) || result_context)
+            && generic_templates.contains_key(callee) =>
+        {
             let (mut hoisted, rewritten_args) =
                 hoist_direct_result_wrapper_args(DirectResultWrapperHoistInput {
                     callee,
@@ -237,7 +246,11 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
                 specialized_functions,
                 specialized_signatures,
             })?;
-            hoisted.push(AstStmt::Return(Some(rewritten_value)));
+            hoisted.push(if result_context {
+                AstStmt::Expr(rewritten_value)
+            } else {
+                AstStmt::Return(Some(rewritten_value))
+            });
             Ok(hoisted)
         }
         _ => Ok(vec![rewrite_generic_calls_in_stmt(

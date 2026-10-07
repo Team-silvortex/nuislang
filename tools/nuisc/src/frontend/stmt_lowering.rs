@@ -108,18 +108,20 @@ pub(super) fn lower_stmt_with_async(input: StmtLoweringInput<'_>) -> Result<NirS
                         "`if` expression let binding `{name}` currently requires an explicit type annotation"
                     )
                 })?;
-                bindings.insert(name.clone(), final_type.clone());
-                return lower_if_expr!(condition, then_body, else_body, &|value| AstStmt::Let {
-                    mutable: false,
-                    name: name.clone(),
-                    ty: Some(ty.clone().unwrap_or_else(|| AstTypeRef {
-                        name: final_type.name.clone(),
-                        generic_args: Vec::new(),
-                        is_ref: final_type.is_ref,
-                        is_optional: final_type.is_optional,
-                    })),
-                    value,
-                });
+                let lowered =
+                    lower_if_expr!(condition, then_body, else_body, &|value| AstStmt::Let {
+                        mutable: false,
+                        name: name.clone(),
+                        ty: Some(ty.clone().unwrap_or_else(|| AstTypeRef {
+                            name: final_type.name.clone(),
+                            generic_args: Vec::new(),
+                            is_ref: final_type.is_ref,
+                            is_optional: final_type.is_optional,
+                        })),
+                        value,
+                    })?;
+                bindings.insert(name.clone(), final_type);
+                return Ok(lowered);
             }
             if let super::AstExpr::Match { value, arms } = value {
                 let expected = ty
@@ -134,8 +136,7 @@ pub(super) fn lower_stmt_with_async(input: StmtLoweringInput<'_>) -> Result<NirS
                         "`match` expression let binding `{name}` currently requires an explicit type annotation"
                     )
                 })?;
-                bindings.insert(name.clone(), final_type.clone());
-                return lower_match_expr!(value, arms, &|value| AstStmt::Let {
+                let lowered = lower_match_expr!(value, arms, &|value| AstStmt::Let {
                     mutable: false,
                     name: name.clone(),
                     ty: Some(ty.clone().unwrap_or_else(|| AstTypeRef {
@@ -145,7 +146,9 @@ pub(super) fn lower_stmt_with_async(input: StmtLoweringInput<'_>) -> Result<NirS
                         is_optional: final_type.is_optional,
                     })),
                     value,
-                });
+                })?;
+                bindings.insert(name.clone(), final_type);
+                return Ok(lowered);
             }
             let expected = ty
                 .as_ref()
@@ -212,11 +215,18 @@ pub(super) fn lower_stmt_with_async(input: StmtLoweringInput<'_>) -> Result<NirS
                         "`if` expression const binding `{name}` currently requires an explicit type annotation"
                     ));
                 }
-                return lower_if_expr!(condition, then_body, else_body, &|value| AstStmt::Const {
-                    name: name.clone(),
-                    ty: ty.clone(),
-                    value,
-                });
+                let expected = lower_type_ref_with_aliases(ty.as_ref().unwrap(), type_aliases)?;
+                validate_type_ref(&expected)?;
+                let lowered =
+                    lower_if_expr!(condition, then_body, else_body, &|value| AstStmt::Const {
+                        name: name.clone(),
+                        ty: ty.clone(),
+                        value,
+                    })?;
+                // Publish only the validated result, not branch-local bindings
+                // or a destination that is still being initialized.
+                bindings.insert(name.clone(), expected);
+                return Ok(lowered);
             }
             if let super::AstExpr::Match { value, arms } = value {
                 if ty.is_none() {
@@ -224,11 +234,15 @@ pub(super) fn lower_stmt_with_async(input: StmtLoweringInput<'_>) -> Result<NirS
                         "`match` expression const binding `{name}` currently requires an explicit type annotation"
                     ));
                 }
-                return lower_match_expr!(value, arms, &|value| AstStmt::Const {
+                let expected = lower_type_ref_with_aliases(ty.as_ref().unwrap(), type_aliases)?;
+                validate_type_ref(&expected)?;
+                let lowered = lower_match_expr!(value, arms, &|value| AstStmt::Const {
                     name: name.clone(),
                     ty: ty.clone(),
                     value,
-                });
+                })?;
+                bindings.insert(name.clone(), expected);
+                return Ok(lowered);
             }
             let expected = ty
                 .as_ref()

@@ -241,7 +241,7 @@ fn prepare_staged(
     if !has_return {
         return None;
     }
-    // Only the separately proven selected-initializer region may supply this
+    // Only the separately proven selected region (bindings/condition snapshots) may supply this
     // work authority. Ordinary print arguments still grant no tail eligibility.
     if !entry::has_work(condition)
         && !selected_initializer_work

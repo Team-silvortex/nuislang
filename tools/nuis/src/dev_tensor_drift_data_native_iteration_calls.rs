@@ -28,14 +28,22 @@ mod computed_return_arms;
 mod computed_return_prints;
 #[path = "dev_tensor_drift_data_native_conditional_returns.rs"]
 mod conditional_returns;
+#[path = "dev_tensor_drift_data_native_continuing_effect_regions.rs"]
+mod continuing_effect_regions;
 #[path = "dev_tensor_drift_data_native_control_elision.rs"]
 mod control_elision;
 #[path = "dev_tensor_drift_data_native_counted_returns.rs"]
 mod counted_returns;
+#[path = "dev_tensor_drift_data_native_effect_region_exits.rs"]
+mod effect_region_exits;
+#[path = "dev_tensor_drift_data_native_effect_result_joins.rs"]
+mod effect_result_joins;
 #[path = "dev_tensor_drift_data_native_entry_predicates.rs"]
 mod entry_predicates;
 #[path = "dev_tensor_drift_data_native_evaluated_scalar_records.rs"]
 mod evaluated_scalar_records;
+#[path = "dev_tensor_drift_data_native_exit_only_regions.rs"]
+mod exit_only_regions;
 #[path = "dev_tensor_drift_data_native_iteration_values.rs"]
 mod flat_values;
 #[path = "dev_tensor_drift_data_native_helper_entries.rs"]
@@ -62,6 +70,10 @@ mod loop_calls;
 mod loop_work;
 #[path = "dev_tensor_drift_data_native_materialized_record_args.rs"]
 mod materialized_record_args;
+#[path = "dev_tensor_drift_data_native_one_sided_effect_joins.rs"]
+mod one_sided_effect_joins;
+#[path = "dev_tensor_drift_data_native_partial_effect_joins.rs"]
+mod partial_effect_joins;
 #[path = "dev_tensor_drift_data_native_record_joins.rs"]
 mod record_joins;
 #[path = "dev_tensor_drift_data_native_return_print_aliases.rs"]
@@ -112,6 +124,12 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_print_aliases::CHECKS,
         staged_return_effects::CHECKS,
         logical_staged_initializers::CHECKS,
+        continuing_effect_regions::CHECKS,
+        effect_region_exits::CHECKS,
+        exit_only_regions::CHECKS,
+        effect_result_joins::CHECKS,
+        partial_effect_joins::CHECKS,
+        one_sided_effect_joins::CHECKS,
         computed_return_prints::CHECKS,
         loop_calls::CHECKS,
         loop_work::CHECKS,

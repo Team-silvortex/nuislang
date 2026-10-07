@@ -14,22 +14,30 @@ below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead
 
 For the current `beta-0.15.*` line instead of historical backfill, start with:
 
-* [nuis-beta-0.15.8-patch.md](nuis-beta-0.15.8-patch.md)
+* [nuis-beta-0.15.9-patch.md](nuis-beta-0.15.9-patch.md)
 * [nuis-beta-0.15.0-snapshot.md](nuis-beta-0.15.0-snapshot.md)
 * [nuis-beta-0.15.0-release-checklist.md](nuis-beta-0.15.0-release-checklist.md)
 
-The current source patch is `98ca713e` (`beta-0.15.8`, 2026-10-05), following `5d6cbc1a`.
+The current source patch is `585eb409` (`beta-0.15.9`, 2026-10-05), following `98ca713e`.
 The minor snapshot retains the baseline `05951bef` (`beta-0.15.0`, 2026-09-24).
 Git remains authoritative for exact source revisions. Patch evidence does not
 certify every suite listed in the checklist, and historical results remain
 separate. Cargo package versions and protocol versions remain independent.
 
-Post-release worktree proofs cover [leading return prints](../reference/nuis-native-return-print-prefixes-v1.md),
+The patch includes [leading return prints](../reference/nuis-native-return-print-prefixes-v1.md),
 [computed print arguments](../reference/nuis-native-computed-return-prints-v1.md),
 [interleaved scalar aliases](../reference/nuis-native-return-print-aliases-v1.md)
 and [staged initializers](../reference/nuis-native-staged-return-effects-v1.md),
 followed by [logical initializers](../reference/nuis-native-logical-staged-initializers-v1.md).
-Their acceptance receipts remain separate from `98ca713e`.
+Their acceptance receipts remain separate from the
+[preceding patch](nuis-beta-0.15.8-patch.md). The
+[continuing effect-region proof](../reference/nuis-native-continuing-effect-regions-v1.md)
+and [internal-exit follow-up](../reference/nuis-native-effect-region-exits-v1.md),
+including its [exit-only continuation extension](../reference/nuis-native-exit-only-regions-v1.md)
+and [paired scalar result joins](../reference/nuis-native-effect-result-joins-v1.md)
+with their [partial-exit extension](../reference/nuis-native-partial-effect-result-joins-v1.md)
+and [one-sided result extension](../reference/nuis-native-one-sided-effect-result-joins-v1.md),
+are subsequent worktree development after `585eb409`, with separate receipts.
 
 The [beta-0.15.7 patch](nuis-beta-0.15.7-patch.md) retains the typed-literal,
 fresh-publication and `active/86` checkpoint; subsequent worktree proofs have

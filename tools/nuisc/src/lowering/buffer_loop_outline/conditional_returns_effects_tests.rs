@@ -137,10 +137,14 @@ fn conditional_return_effects_reject_interleaving_calls_resources_and_new_captur
     execute(&admitted, Some(11), &[99, 2, 11], 1);
     let admitted = base.replace("print(88);", "let local = 10 / left; print(local);");
     execute(&admitted, Some(11), &[99, 5, 11], 1);
+    let admitted = base.replace("print(88);", "if gate { print(88); }");
+    execute(&admitted, Some(11), &[99, 88, 11], 1);
+    let admitted = base.replace("print(88);", "if gate { print(88); return false; }");
+    execute(&admitted, Some(19), &[99, 88, 19], 0);
     for replacement in [
         "print(helper(produce(left)));",
         "let local = produce(left); print(local.value);",
-        "if gate { print(88); }",
+        "if gate { print(88); return 0; }",
         "while gate { print(88); }",
         "print(gate);",
     ] {
