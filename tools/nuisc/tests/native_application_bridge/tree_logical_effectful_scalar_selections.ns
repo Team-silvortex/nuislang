@@ -1,0 +1,68 @@
+mod cpu Main {
+    struct State {
+        seed: i64, enabled: bool, outer: bool, a: bool, b: bool, c: bool,
+        da: i64, db: i64, dc: i64, dd: i64, de: i64, df: i64,
+        first_leaf: i64, second_leaf: i64, result: i64
+    }
+    @noinline fn active(gate: bool) -> bool { print(89); return gate; }
+    @noinline fn choose(gate: bool) -> bool { print(90); return gate; }
+    @noinline fn first_choice(outer: bool, a: bool, b: bool, c: bool) -> bool {
+        return if outer { if a { if b { true } else { c } } else { c } }
+            else { if a { c == false } else { if b { c == false } else { true } } };
+    }
+    @noinline fn expected(selected: bool, saved: i64) -> i64 {
+        return if selected { saved + saved / 2 } else { saved };
+    }
+    @noinline fn probe_a(gate: bool, saved: i64, proof: i64) -> bool { print(91); return gate == (saved == proof); }
+    @noinline fn probe_b(gate: bool, saved: i64, proof: i64) -> bool { print(92); return gate == (saved == proof); }
+    @noinline fn probe_c(gate: bool, saved: i64, proof: i64) -> bool { print(93); return gate == (saved == proof); }
+    @noinline fn probe_d(gate: bool, saved: i64, wanted: i64, proof: i64) -> bool {
+        print(94); return gate == (saved == wanted + (proof - saved));
+    }
+    @noinline fn probe_e(gate: bool, saved: i64, wanted: i64, proof: i64) -> bool {
+        print(95); return gate == (saved == wanted + (proof - saved));
+    }
+    @noinline fn probe_f(gate: bool, saved: i64, wanted: i64, proof: i64) -> bool {
+        print(96); return gate == (saved == wanted + (proof - saved));
+    }
+    @noinline fn first_work(saved: i64, value: i64) -> i64 { print(70); return saved + value; }
+    @noinline fn second_work(saved: i64, value: i64) -> i64 { print(71); return saved + value; }
+    fn observe(value: i64, enabled: bool, outer: bool, a: bool, b: bool, c: bool,
+               da: i64, db: i64, dc: i64, dd: i64, de: i64, df: i64, first_leaf: i64, second_leaf: i64) -> i64 {
+        print(99);
+        let saved = value + 1;
+        if active(enabled) {
+            if choose(outer) {
+                let wanted = expected(first_choice(outer, a, b, c), saved);
+                if (probe_a(a, saved, saved / da) && probe_b(b, saved, saved / db)) || probe_c(c, saved, saved / dc) {
+                    let saved = first_work(saved, saved / first_leaf);
+                }
+                if probe_d(a, saved, wanted, saved / dd) || (probe_e(b, saved, wanted, saved / de) && probe_f(c, saved, wanted, saved / df)) {} else {
+                    let saved = second_work(saved, saved / second_leaf);
+                }
+            } else {
+                let wanted = expected(first_choice(outer, a, b, c), saved);
+                if (probe_a(a, saved, saved / da) || probe_b(b, saved, saved / db)) && probe_c(c, saved, saved / dc) {} else {
+                    let saved = first_work(saved, saved / first_leaf);
+                }
+                if probe_d(a, saved, wanted, saved / dd) && (probe_e(b, saved, wanted, saved / de) || probe_f(c, saved, wanted, saved / df)) {
+                    let saved = second_work(saved, saved / second_leaf);
+                }
+            }
+        }
+        print(80);
+        return saved;
+    }
+    fn start(value: i64, enabled: bool, outer: bool, a: bool, b: bool, c: bool,
+             da: i64, db: i64, dc: i64, dd: i64, de: i64, df: i64, first_leaf: i64, second_leaf: i64) -> State {
+        return State { seed: value, enabled: enabled, outer: outer, a: a, b: b, c: c,
+            da: da, db: db, dc: dc, dd: dd, de: de, df: df, first_leaf: first_leaf, second_leaf: second_leaf,
+            result: observe(value, enabled, outer, a, b, c, da, db, dc, dd, de, df, first_leaf, second_leaf) };
+    }
+    fn step(state: State, enabled: bool, outer: bool, a: bool, b: bool, c: bool,
+            da: i64, db: i64, dc: i64, dd: i64, de: i64, df: i64, first_leaf: i64, second_leaf: i64) -> State {
+        return start(state.seed, enabled, outer, a, b, c, da, db, dc, dd, de, df, first_leaf, second_leaf);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

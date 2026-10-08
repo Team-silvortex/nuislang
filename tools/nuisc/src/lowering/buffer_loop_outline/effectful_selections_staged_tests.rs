@@ -268,6 +268,7 @@ fn staged_effectful_scalar_selections_share_prefix_depth_node_expression_and_cap
         let mut budget = nested::Budget {
             nodes: 64,
             expressions,
+            logical_edges: 32,
         };
         // Root/child conditions, prefix call+arg, live call+arg and both retained
         // values consume eight expression nodes together.
@@ -289,6 +290,7 @@ fn staged_effectful_scalar_selections_share_prefix_depth_node_expression_and_cap
                 let mut budget = nested::Budget {
                     nodes,
                     expressions: 256,
+                    logical_edges: 32,
                 };
                 assert_eq!(
                     nested::branch(

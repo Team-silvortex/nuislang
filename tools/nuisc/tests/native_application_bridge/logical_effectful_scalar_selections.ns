@@ -1,0 +1,60 @@
+mod cpu Main {
+    struct State {
+        seed: i64, enabled: bool, outer: bool, first: bool, second: bool, reply: bool,
+        first_rhs: i64, second_rhs: i64, first_leaf: i64, second_leaf: i64, result: i64
+    }
+    @noinline fn active(gate: bool) -> bool { print(94); return gate; }
+    @noinline fn choose(gate: bool) -> bool { print(97); return gate; }
+    @noinline fn expected(gate: bool, reply: bool, saved: i64) -> i64 {
+        return if gate { if reply { saved + saved / 2 } else { saved } } else { saved };
+    }
+    @noinline fn first_true(reply: bool, saved: i64, proof: i64) -> bool { print(95); return reply == (saved == proof); }
+    @noinline fn first_false(reply: bool, saved: i64, proof: i64) -> bool { print(95); return reply == (saved != proof); }
+    @noinline fn second_true(reply: bool, saved: i64, wanted: i64, proof: i64) -> bool {
+        print(96); return reply == (saved == wanted + (proof - saved));
+    }
+    @noinline fn second_false(reply: bool, saved: i64, wanted: i64, proof: i64) -> bool {
+        print(96); return reply == (saved != wanted + (proof - saved));
+    }
+    @noinline fn first_work(saved: i64, value: i64) -> i64 { print(70); return saved + value; }
+    @noinline fn second_work(saved: i64, value: i64) -> i64 { print(71); return saved + value; }
+    fn observe(value: i64, enabled: bool, outer: bool, first: bool, second: bool, reply: bool,
+               first_rhs: i64, second_rhs: i64, first_leaf: i64, second_leaf: i64) -> i64 {
+        print(99);
+        let saved = value + 1;
+        if active(enabled) {
+            if choose(outer) {
+                let wanted = expected(first, reply, saved);
+                if first && first_true(reply, saved, saved / first_rhs) {
+                    let saved = first_work(saved, saved / first_leaf);
+                }
+                if second || second_false(reply, saved, wanted, saved / second_rhs) {} else {
+                    let saved = second_work(saved, saved / second_leaf);
+                }
+            } else {
+                let chosen = first == false;
+                let wanted = expected(chosen, reply, saved);
+                if first || first_false(reply, saved, saved / first_rhs) {} else {
+                    let saved = first_work(saved, saved / first_leaf);
+                }
+                if second && second_true(reply, saved, wanted, saved / second_rhs) {
+                    let saved = second_work(saved, saved / second_leaf);
+                }
+            }
+        }
+        print(80);
+        return saved;
+    }
+    fn start(value: i64, enabled: bool, outer: bool, first: bool, second: bool, reply: bool,
+             first_rhs: i64, second_rhs: i64, first_leaf: i64, second_leaf: i64) -> State {
+        return State { seed: value, enabled: enabled, outer: outer, first: first, second: second, reply: reply,
+            first_rhs: first_rhs, second_rhs: second_rhs, first_leaf: first_leaf, second_leaf: second_leaf,
+            result: observe(value, enabled, outer, first, second, reply, first_rhs, second_rhs, first_leaf, second_leaf) };
+    }
+    fn step(state: State, enabled: bool, outer: bool, first: bool, second: bool, reply: bool,
+            first_rhs: i64, second_rhs: i64, first_leaf: i64, second_leaf: i64) -> State {
+        return start(state.seed, enabled, outer, first, second, reply, first_rhs, second_rhs, first_leaf, second_leaf);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

@@ -74,13 +74,24 @@ one-sided existing-scalar rebinding, keeping inactive arguments behind guards an
 retaining the current value when an update is skipped. Bounded nested updates
 keep descendant conditions inside ancestor guards. Bounded sequential scalar
 leaves now preserve private staging and repeated binding versions. A bounded
-prefix before a final child selection now forwards new versions and retains
-completed prefix updates on child skips. A separately proved bounded suffix now
-consumes the child's selected or retained value and private prefix staging in
-source order. Two sibling child selections now have a separate bounded proof,
-carrying each merged target and private staging into later predicates and calls.
-Adjacent children, longer sibling sequences, broader typed selected-return CLI
-proof and generalized effect transport remain
+prefix before a final child selection and continued single/two-child regions now
+share one ordered-region proof. Adjacent children, budget-bounded longer sibling
+sequences and final-child regions carry current merged values and private staging
+in source order without introducing synthetic work or extra sibling depth.
+Single-edge `&&`/`||` child predicates now retain exact owned-bool atom/literal
+and bounded computed nonlogical left gates once-only at original sites. Left calls
+participate in effect discovery; complete RHS work remains behind ancestor and
+short-circuit guards. Bounded direct logical trees now retain one helper per edge,
+complete selected RHS subtrees and a shared 32-edge region budget in addition to
+the original work/depth/capture bounds. Fresh owned-bool let/const direct logical
+roots now reuse this plan within selected scalar leaves and prefix/middle/suffix
+stages. Original declarations remain private and selected; current target
+versions and constant seals persist across stages. Existing owned-bool let roots
+now update private stage bindings or the sole published bool target using
+read-before-write captures. Known outer logical constant writes remain outside
+this proof. Single-statement logical child leaves and hidden ordinary leaves
+remain unproven, without widening common guard/backend or effect authority.
+Broader typed selected-return CLI proof and generalized effect transport remain
 separate. General rebinding, resource work and child-scope
 exports remain open.
 The [beta-0.15 snapshot](versioning/nuis-beta-0.15.0-snapshot.md) records

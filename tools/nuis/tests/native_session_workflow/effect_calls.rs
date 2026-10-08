@@ -17,6 +17,24 @@ mod continued;
 #[path = "effect_call_repeated.rs"]
 mod repeated;
 
+#[path = "effect_call_ordered.rs"]
+mod ordered;
+
+#[path = "effect_call_logical.rs"]
+mod logical;
+
+#[path = "effect_call_computed_logical.rs"]
+mod computed_logical;
+
+#[path = "effect_call_tree_logical.rs"]
+mod tree_logical;
+
+#[path = "effect_call_staging_logical.rs"]
+mod staging_logical;
+
+#[path = "effect_call_update_logical.rs"]
+mod update_logical;
+
 const SOURCE: &str =
     include_str!("../../../nuisc/tests/native_application_bridge/effectful_selected_calls.ns");
 const REBIND_SOURCE: &str =

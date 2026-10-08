@@ -157,8 +157,6 @@ fn repeated_effectful_scalar_selections_preserve_exact_types_polarities_prefixes
 fn repeated_effectful_scalar_selections_reject_unproved_shapes_and_private_child_exports_atomically(
 ) {
     for body in [
-        "if first { let saved = work(saved); } if second { let saved = work(saved); } let saved = work(saved);",
-        "if first { let saved = work(saved); } let staged = work(saved); if second { let saved = work(saved); }",
         "if first { let saved = work(saved); } let staged = work(saved); if second { let saved = work(saved); } let fresh = work(saved);",
         "if first { let saved = work(saved); } let other = work(saved); if second { let saved = work(saved); } let saved = work(saved);",
         "if first { let staged = work(saved); } let saved = work(saved); if second { let saved = work(saved); } let saved = work(saved);",
@@ -167,7 +165,6 @@ fn repeated_effectful_scalar_selections_reject_unproved_shapes_and_private_child
         "if first { let saved = work(saved); } print(70); if second { let saved = work(saved); } let saved = work(saved);",
         "if first { let saved = work(saved); } const staged: i64 = work(saved); if second { let saved = work(saved); } let saved = work(saved);",
         "if first { let saved = work(saved); } let staged = work(saved); if second { let saved = work(saved); } let saved = true;",
-        "if first { let saved = work(saved); } let staged = work(saved); if second { let saved = work(saved); } let staged = work(saved); if second { let saved = work(saved); } let saved = work(saved);",
     ] {
         let mut module = parse_nuis_module(&source(&format!("if gate {{ {body} }}"), "")).unwrap();
         let before = module.clone();
@@ -371,7 +368,11 @@ fn repeated_effectful_scalar_selections_share_stage_capture_depth_node_and_expre
         (64, 13, false),
         (64, 14, true),
     ] {
-        let mut budget = nested::Budget { nodes, expressions };
+        let mut budget = nested::Budget {
+            nodes,
+            expressions,
+            logical_edges: 32,
+        };
         assert_eq!(
             nested::branch(
                 condition,

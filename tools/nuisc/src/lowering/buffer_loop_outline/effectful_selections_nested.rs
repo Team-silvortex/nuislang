@@ -7,6 +7,7 @@ mod tests;
 pub(super) struct Budget {
     pub(super) nodes: usize,
     pub(super) expressions: usize,
+    pub(super) logical_edges: usize,
 }
 
 pub(super) struct Proof {
@@ -34,6 +35,7 @@ pub(super) fn prepare(
     let mut budget = Budget {
         nodes: 64,
         expressions: 256,
+        logical_edges: 32,
     };
     let proof = branch(condition, yes, no, scope, signatures, &mut budget, 0)?;
     // Effectful descendant conditions also need ancestor guards, even when the
@@ -58,6 +60,16 @@ pub(super) fn inspect(
     signatures: &Signatures,
     budget: &mut Budget,
 ) -> Option<(NirTypeRef, BTreeSet<String>, BTreeSet<String>)> {
+    inspect_at_depth(expr, scope, signatures, budget, 0)
+}
+
+pub(super) fn inspect_at_depth(
+    expr: &NirExpr,
+    scope: &Scope,
+    signatures: &Signatures,
+    budget: &mut Budget,
+    depth: usize,
+) -> Option<(NirTypeRef, BTreeSet<String>, BTreeSet<String>)> {
     let mut inputs = BTreeSet::new();
     let mut calls = BTreeSet::new();
     let ty = expression(
@@ -67,7 +79,7 @@ pub(super) fn inspect(
         &mut inputs,
         &mut calls,
         &mut budget.expressions,
-        0,
+        depth,
     )?;
     Some((ty, inputs, calls))
 }
@@ -109,18 +121,9 @@ fn body(
         statements if statements.len() > 1 => {
             if statements
                 .iter()
-                .filter(|stmt| matches!(stmt, NirStmt::If { .. }))
-                .count()
-                == 2
-            {
-                repeated::prove(statements, scope, signatures, budget, depth)
-            } else if matches!(statements.last(), Some(NirStmt::If { .. })) {
-                staged::prove(statements, scope, signatures, budget, depth)
-            } else if statements
-                .iter()
                 .any(|stmt| matches!(stmt, NirStmt::If { .. }))
             {
-                continued::prove(statements, scope, signatures, budget, depth)
+                ordered::prove(statements, scope, signatures, budget, depth)
             } else {
                 regions::prove(statements, scope, signatures, budget)
             }
@@ -153,11 +156,8 @@ pub(super) fn branch(
         return None;
     }
     consume_node(budget)?;
-    let (condition_ty, condition_inputs, condition_calls) =
-        inspect(condition, scope, signatures, budget)?;
-    if condition_ty != scalar_type("bool") {
-        return None;
-    }
+    let (condition, condition_inputs, condition_calls) =
+        predicates::prove(condition, scope, signatures, budget)?;
     let (yes, no) = if yes.is_empty() || no.is_empty() {
         let live = body(
             if yes.is_empty() { no } else { yes },
@@ -217,7 +217,7 @@ pub(super) fn branch(
     let ty = yes.ty;
     Some(Proof {
         value: SelectedValue::Nested(Box::new(Plan {
-            condition: condition.clone(),
+            condition,
             yes: yes.value,
             no: no.value,
             destination: Some((name.clone(), false)),

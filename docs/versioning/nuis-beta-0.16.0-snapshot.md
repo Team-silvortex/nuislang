@@ -81,6 +81,29 @@ exit, effect-grant or multi-target authority.
 Two sibling selections separated by bounded scalar staging now have their own
 region proof and native fresh/cache/three source-free restoration evidence;
 second predicates consume current target versions rather than ancestor captures.
+The ordered-region worktree follow-up replaces all three specialized production
+proofs with a shared walk, admitting adjacent/more/final children under unchanged
+work/capture/depth, single-target and effect-authority limits. Historical receipts
+remain separate from this newer acceptance.
+The subsequent single-edge logical-child proof preserves owned-bool atom/literal
+left gates and complete selected scalar RHS work within that region. Its receipt
+is independent of the ordered-region receipt and the committed minor baseline.
+The computed-left worktree extension adds once-only bounded nonlogical bool
+calls/comparisons and checked arguments at original child sites, with left-only
+effect discovery, unchanged guarded RHS work, source-free execution and selected
+left/RHS/leaf traps. Nested logical operands remain a separate task.
+The subsequent tree follow-up covers direct logical children under a shared
+32-edge region budget and original expression/depth/capture limits, with linear
+helper growth and separately guarded complete RHS subtrees. Hidden logical
+leaves remain outside this proof. The subsequent fresh-bool staging extension
+admits direct logical let/const initializer roots in selected scalar leaves and
+prefix/middle/suffix stages, reusing shared predicate budgets and guards. It
+retains private original declarations, actual merged versions and constant seals
+across stages. The subsequent existing-bool update follow-up permits owned-bool
+let roots in those same stages, retaining read-before-write captures and the sole
+published target. Known outer logical constant writes reject conservatively;
+single-statement logical child leaves and generalized resource/exit transport
+remain separate.
 These worktree receipts remain independent of
 the committed baseline.
 

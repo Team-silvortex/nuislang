@@ -99,16 +99,28 @@ descendant predicates and their arguments inside ancestor guards; unsupported
 eager effectful arms reject. Bounded sequential leaves now keep private scalar
 staging, current-version rebindings and unused effectful calls behind those guards,
 returning only one existing scalar rather than exporting child-scope bindings.
-Scalar staging before a final child selection now forwards new local versions
-and retains completed prefix updates when that child is skipped, without
-exporting private captures to the parent.
-A separate bounded suffix proof now runs scalar statements after the child's
-actual merged value, preserving selected or post-prefix retained versions and
-private staging within its one-child proof. A separate two-child region proof now
-carries each merged target through bounded intervening bindings into the next
-predicate, arguments and suffix, without exporting child-private bindings or
-admitting multiple outer writes. Native fresh/cache/source-free runs check both
-selection polarities, poisoned inactive paths and selected-stage traps.
+One bounded ordered-region walk now subsumes the original prefix, single-child
+suffix and two-child proofs. It admits adjacent selections, longer sibling
+sequences and regions ending in a child, carrying each actual merged target into
+later predicates, arguments and private staging. Child count is constrained by
+shared work budgets, not finite shape combinations; single-target publication,
+exact types, capture/depth limits and original effect authority remain intact.
+Single-edge `&&`/`||` child predicates now keep exact owned-bool left gates,
+including bounded nonlogical calls/comparisons and checked arguments, once-only
+at their original sites. Complete RHS work stays behind ancestor and short-circuit
+guards; left-side calls participate in effect discovery and dependency order.
+Bounded direct logical trees now extend this proof with one guarded helper per
+original edge and a shared 32-edge region budget, preserving once-only left work,
+complete selected RHS subtrees and original expression/depth/capture limits.
+Fresh owned-bool `let`/`const` logical initializers now reuse the same proof in
+selected scalar regions and prefix/middle/suffix stages. Original declarations
+stay private and after ancestor guards, with current versions and constant seals
+carried across stages. Existing owned-bool `let` roots can now update private
+stage bindings or the sole published bool target, with read-before-write
+captures and constant seals. Single-statement logical child leaves and hidden
+ordinary leaves remain separate; common guard/backend/effect authority is not widened.
+Native fresh/cache/source-free runs check selection polarities, poisoned inactive
+paths and selected-stage traps without exporting child-private bindings.
 The [floating literal negation repair](docs/reference/nuis-native-float-literal-negation-v1.md)
 preserves source negative zero and nested literal signs with native bit-pattern
 checks. The [nonliteral sign-negation follow-up](docs/reference/nuis-native-float-sign-negation-v1.md)

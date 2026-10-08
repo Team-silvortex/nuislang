@@ -40,6 +40,12 @@ target/debug/nuis dev-tensor --json
 * [ ] Require exact native success stdout/normal completion and explicit selected-trap outcomes.
 * [ ] Check child-to-suffix current versions, private staging and traps after both selected and retained child outcomes.
 * [ ] Check two-child region merges before intervening staging and second predicates, with poisoned inactive arguments and selected-stage traps.
+* [ ] Verify the unified ordered-region walk with adjacent/more/final children, empty stages, shared budgets and original single-target retention.
+* [ ] Verify single-edge logical child predicates, both RHS truth values, skipped poisoned arguments, selected RHS/leaf traps, exact types and unchanged guard-seed authority.
+* [ ] Verify computed child-left calls/comparisons and checked arguments run once at original sites, contribute left-only effects, preserve transitive Effect order and trap even when their result would skip the RHS; keep nested logical trees separate.
+* [ ] Verify direct logical child trees keep every complete RHS selected, share region edge/expression/combined-depth and complete-subtree capture budgets, grow helpers linearly and reject hidden logical leaves or late invalid descendants atomically.
+* [ ] Verify fresh bool let/const logical initializers in selected scalar leaves and prefix/middle/suffix stages, once-only selected work, exact original declarations, private bindings, cross-stage constant seals, shared condition/initializer budgets and source-free selected-stage trap evidence.
+* [ ] Verify existing owned-bool let roots in selected scalar stages, read-before-write captures, private/sole-target updates, known outer logical constant vetoes, shared original budgets, source-free bool state/stdout/byte identity and selected-stage traps. Single-statement logical child leaves remain a separate task.
 * [ ] Exercise source-free artifact restoration, identity and lifecycle contracts.
 * [ ] Rebuild the ordinary CLI after tensor changes; static text checks alone are insufficient.
 

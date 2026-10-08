@@ -13,6 +13,24 @@ mod continued;
 #[path = "aot_application_effect_call_repeated_tests.rs"]
 mod repeated;
 
+#[path = "aot_application_effect_call_ordered_tests.rs"]
+mod ordered;
+
+#[path = "aot_application_effect_call_logical_tests.rs"]
+mod logical;
+
+#[path = "aot_application_effect_call_computed_logical_tests.rs"]
+mod computed_logical;
+
+#[path = "aot_application_effect_call_tree_logical_tests.rs"]
+mod tree_logical;
+
+#[path = "aot_application_effect_call_staging_logical_tests.rs"]
+mod staging_logical;
+
+#[path = "aot_application_effect_call_update_logical_tests.rs"]
+mod update_logical;
+
 const SOURCE: &str = include_str!("../tests/native_application_bridge/effectful_selected_calls.ns");
 
 fn compiled(source: &str) -> (Fixture, yir_core::YirModule, String) {

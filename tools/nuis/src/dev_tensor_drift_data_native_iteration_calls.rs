@@ -108,6 +108,8 @@ mod scoped_captures;
 mod scoped_record_inputs;
 #[path = "dev_tensor_drift_data_native_staged_return_effects.rs"]
 mod staged_return_effects;
+#[path = "dev_tensor_drift_data_native_staging_logical.rs"]
+mod staging_logical;
 #[path = "dev_tensor_drift_data_native_stored_projections.rs"]
 mod stored_projections;
 #[path = "dev_tensor_drift_data_native_terminal_continuations.rs"]
@@ -120,6 +122,8 @@ mod trailing_value_loops;
 mod typed_effect_returns;
 #[path = "dev_tensor_drift_data_native_typed_effect_snapshots.rs"]
 mod typed_effect_snapshots;
+#[path = "dev_tensor_drift_data_native_update_logical.rs"]
+mod update_logical;
 #[path = "dev_tensor_drift_data_native_value_loop_exits.rs"]
 mod value_loop_exits;
 #[path = "dev_tensor_drift_data_native_value_transport.rs"]
@@ -157,6 +161,8 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         literal_print_policy::CHECKS,
         literal_print_build::CHECKS,
         effectful_selections::CHECKS,
+        staging_logical::CHECKS,
+        update_logical::CHECKS,
         computed_return_prints::CHECKS,
         loop_calls::CHECKS,
         loop_work::CHECKS,

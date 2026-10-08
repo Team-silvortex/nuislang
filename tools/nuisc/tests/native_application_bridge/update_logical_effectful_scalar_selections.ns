@@ -1,0 +1,65 @@
+mod cpu Main {
+    struct State {
+        seed: bool, enabled: bool, first: bool, second: bool, reply: bool,
+        da: i64, db: i64, dc: i64, dd: i64, first_leaf: i64, second_leaf: i64, result: bool
+    }
+    @noinline fn active(gate: bool) -> bool { print(89); return gate; }
+    @noinline fn choose_first(gate: bool) -> bool { print(90); return gate; }
+    @noinline fn choose_second(gate: bool) -> bool { print(95); return gate; }
+    @noinline fn expected_first(seed: bool, first: bool, reply: bool) -> bool {
+        let prefix: bool = if seed { reply } else { false };
+        return if first { prefix == false } else { prefix };
+    }
+    @noinline fn expected_second(seed: bool, first: bool, second: bool, reply: bool) -> bool {
+        let previous = expected_first(seed, first, reply);
+        let middle: bool = if previous { true } else { reply };
+        return if second { middle } else { middle == false };
+    }
+    @noinline fn check1(gate: bool, saved: bool, wanted: bool, proof: i64) -> bool {
+        print(91); return gate == ((saved == wanted) == (proof == 1));
+    }
+    @noinline fn check2(gate: bool, saved: bool, wanted: bool, proof: i64) -> bool {
+        print(92); return gate == ((saved == wanted) == (proof == 1));
+    }
+    @noinline fn check3(saved: bool, wanted: bool, proof: i64) -> bool {
+        print(93); return (saved == wanted) == (proof == 1);
+    }
+    @noinline fn check4(gate: bool, saved: bool, wanted: bool, proof: i64) -> bool {
+        print(94); return gate == ((saved == wanted) == (proof == 1));
+    }
+    @noinline fn first_flip(saved: bool, proof: i64) -> bool {
+        print(70); return saved == (proof != 1);
+    }
+    @noinline fn second_flip(saved: bool, proof: i64) -> bool {
+        print(71); return saved == (proof != 1);
+    }
+    fn observe(seed: bool, enabled: bool, first: bool, second: bool, reply: bool,
+               da: i64, db: i64, dc: i64, dd: i64, first_leaf: i64, second_leaf: i64) -> bool {
+        print(99);
+        let saved = seed;
+        if active(enabled) {
+            let before = saved;
+            let saved = saved && check1(reply, saved, before, 1 / da);
+            if choose_first(first) { let saved = first_flip(saved, 1 / first_leaf); }
+            let wanted = expected_first(seed, first, reply);
+            let saved = saved || check2(reply, saved, wanted, 1 / db);
+            if choose_second(second) {} else { let saved = second_flip(saved, 1 / second_leaf); }
+            let wanted = expected_second(seed, first, second, reply);
+            let saved = check3(saved, wanted, 1 / dc) && (saved || check4(reply, saved, wanted, 1 / dd));
+        }
+        print(80);
+        return saved;
+    }
+    fn start(seed: bool, enabled: bool, first: bool, second: bool, reply: bool,
+             da: i64, db: i64, dc: i64, dd: i64, first_leaf: i64, second_leaf: i64) -> State {
+        return State { seed: seed, enabled: enabled, first: first, second: second, reply: reply,
+            da: da, db: db, dc: dc, dd: dd, first_leaf: first_leaf, second_leaf: second_leaf,
+            result: observe(seed, enabled, first, second, reply, da, db, dc, dd, first_leaf, second_leaf) };
+    }
+    fn step(state: State, enabled: bool, first: bool, second: bool, reply: bool,
+            da: i64, db: i64, dc: i64, dd: i64, first_leaf: i64, second_leaf: i64) -> State {
+        return start(state.seed, enabled, first, second, reply, da, db, dc, dd, first_leaf, second_leaf);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

@@ -35,13 +35,22 @@ granting effects or evaluating inactive arguments. Bounded nested updates also
 keep descendant predicates inside ancestor guards rather than hoisting them.
 Bounded sequential scalar leaves also preserve private staging, repeated binding
 versions and unused calls without exporting locals or relaxing effect grants.
-Staging before a final child selection also distinguishes original outer retention
-from the updated target retained after an executed prefix.
-A separate scalar suffix proof carries that selected or retained child value into
-ordered later bindings, preserving private staging and single-target publication.
-Two sibling child selections now have an independent bounded region proof,
-preserving current values through intervening staging, second predicates and
-suffixes with native source-free execution and selected-trap evidence.
+The unified bounded ordered-region walk replaces the original prefix, suffix and
+two-child production proofs while retaining their regression fixtures. Adjacent
+and longer sibling sequences, including final-child regions, preserve current
+merged values and private staging under shared work/capture/depth limits and
+single-target publication, with native source-free execution and trap evidence.
+Single-edge logical child predicates now preserve once-only owned-bool atom/
+literal and bounded computed nonlogical left gates, including calls, comparisons
+and checked arguments. Bounded direct logical children now form trees under one
+shared region edge/work/depth budget, with linear helper growth and complete
+guarded RHS subtrees. Fresh owned-bool let/const logical initializers now share
+that proof within selected scalar regions and prefix/middle/suffix stages,
+keeping private declarations, current versions and cross-stage constant seals.
+Existing owned-bool let roots now update private stage bindings or the sole
+published bool target, preserving read-before-write captures and constant seals.
+Single-statement logical child leaves, hidden logical leaves and generalized
+resource/exit transport remain outside this distinct proof.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

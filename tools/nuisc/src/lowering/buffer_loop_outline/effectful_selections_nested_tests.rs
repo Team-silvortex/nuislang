@@ -232,6 +232,7 @@ fn nested_effectful_scalar_selections_bound_depth_tree_expression_and_predicate_
         let mut budget = Budget {
             nodes: 64,
             expressions: 2 * count - 2,
+            logical_edges: 32,
         };
         assert!(inspect(&values[0], &BTreeMap::new(), &BTreeMap::new(), &mut budget).is_none());
         let function = module

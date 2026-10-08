@@ -153,7 +153,7 @@ fn continued_effectful_scalar_selections_reject_other_writes_exports_exits_resou
         "if inner { let saved = work(saved); } const saved: i64 = work(saved);",
         "if inner { let saved = work(saved); } print(70); let saved = work(saved);",
         "if inner { let saved = work(saved); } let saved = true;",
-        "if inner { let saved = work(saved); } if inner { let saved = work(saved); } let saved = work(saved);",
+        "if inner { let saved = work(saved); } if inner { let other = work(saved); } let saved = work(saved);",
         "if inner { let saved = work(saved); } else { let other = work(other); } let saved = work(saved);",
     ] {
         let mut module = parse_nuis_module(&source(&format!("if gate {{ {body} }}"), "")).unwrap();
@@ -315,6 +315,7 @@ fn continued_effectful_scalar_selections_share_suffix_prefix_depth_capture_and_w
         let mut budget = nested::Budget {
             nodes: 64,
             expressions,
+            logical_edges: 32,
         };
         assert_eq!(
             nested::branch(
@@ -334,6 +335,7 @@ fn continued_effectful_scalar_selections_share_suffix_prefix_depth_capture_and_w
         let mut budget = nested::Budget {
             nodes,
             expressions: 256,
+            logical_edges: 32,
         };
         assert_eq!(
             nested::branch(

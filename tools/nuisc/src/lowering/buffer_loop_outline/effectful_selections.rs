@@ -10,14 +10,11 @@ mod nested;
 #[path = "effectful_selections_regions.rs"]
 mod regions;
 
-#[path = "effectful_selections_staged.rs"]
-mod staged;
+#[path = "effectful_selections_ordered.rs"]
+mod ordered;
 
-#[path = "effectful_selections_continued.rs"]
-mod continued;
-
-#[path = "effectful_selections_repeated.rs"]
-mod repeated;
+#[path = "effectful_selections_predicates.rs"]
+mod predicates;
 
 type Signatures = BTreeMap<String, (Vec<NirTypeRef>, NirTypeRef)>;
 
@@ -60,6 +57,7 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
             .map(|p| (p.name.clone(), p.ty.clone()))
             .collect::<Scope>();
         let mut bindings = scope.keys().cloned().collect();
+        let mut constants = BTreeSet::new();
         branches::collect_bindings(&function.body, &mut bindings);
         let mut output = Vec::new();
         for stmt in std::mem::take(&mut function.body) {
@@ -69,13 +67,23 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
                 else_body,
             } = &stmt
             {
-                if let Some(plan) =
+                let plan = if regions::writes_logical_constants(then_body, else_body, &constants) {
+                    None
+                } else {
                     nested::prepare(condition, then_body, else_body, &scope, &signatures, &pure)
                         .or_else(|| {
                             prepare(condition, then_body, else_body, &scope, &signatures, &pure)
                         })
-                {
+                };
+                if let Some(plan) = plan {
+                    let constant = plan
+                        .destination
+                        .as_ref()
+                        .is_some_and(|(_, constant)| *constant);
                     let (generated, name, ty) = install(plan, names, &mut bindings, &mut helpers);
+                    if constant {
+                        constants.insert(name.clone());
+                    }
                     scope.insert(name, ty);
                     output.extend(generated);
                     continue;
@@ -92,6 +100,7 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
                     }
                 }
                 NirStmt::Const { name, ty, .. } => {
+                    constants.insert(name.clone());
                     scope.insert(name.clone(), ty.clone());
                 }
                 _ => {}
@@ -111,7 +120,7 @@ fn scalar(ty: &NirTypeRef) -> bool {
 }
 
 struct Plan {
-    condition: NirExpr,
+    condition: predicates::Predicate,
     yes: SelectedValue,
     no: SelectedValue,
     destination: Option<(String, bool)>,
@@ -122,10 +131,12 @@ struct Plan {
 enum SelectedValue {
     Expression(NirExpr),
     Nested(Box<Plan>),
-    Region(Vec<NirStmt>, NirExpr),
-    Staged(Vec<NirStmt>, Box<Plan>),
-    Continued(Vec<NirStmt>, Box<Plan>, Vec<NirStmt>, NirExpr),
-    Repeated(Vec<(Vec<NirStmt>, Box<Plan>)>, Vec<NirStmt>, NirExpr),
+    Region(Vec<regions::Statement>, NirExpr),
+    Ordered(
+        Vec<(Vec<regions::Statement>, Box<Plan>)>,
+        Vec<regions::Statement>,
+        NirExpr,
+    ),
 }
 
 fn arm(body: &[NirStmt]) -> Option<(&NirExpr, Option<(&str, Option<&NirTypeRef>, bool)>)> {
@@ -211,7 +222,7 @@ fn prepare(
         })
         .collect::<Option<Vec<_>>>()?;
     Some(Plan {
-        condition: condition.clone(),
+        condition: predicates::Predicate::Scalar(condition.clone()),
         yes: SelectedValue::Expression(yes.clone()),
         no: SelectedValue::Expression(no.clone()),
         destination,
@@ -227,10 +238,11 @@ fn install(
     helpers: &mut Vec<NirFunction>,
 ) -> (Vec<NirStmt>, String, NirTypeRef) {
     let gate = branches::fresh_name("__nuis_effect_call_gate", bindings);
+    let condition = predicates::install(plan.condition, names, bindings, helpers);
     let mut output = vec![NirStmt::Let {
         name: gate.clone(),
         ty: Some(scalar_type("bool")),
-        value: plan.condition,
+        value: condition,
     }];
     let mut values = Vec::new();
     for (selected, value) in [(true, plan.yes), (false, plan.no)] {
@@ -260,29 +272,16 @@ fn install(
         let value = match value {
             SelectedValue::Expression(value) => value,
             SelectedValue::Region(statements, value) => {
-                body.extend(statements);
+                body.extend(regions::install(statements, names, bindings, helpers));
                 value
             }
-            SelectedValue::Staged(prefix, child) => {
-                body.extend(prefix);
-                let (statements, result, _) = install(*child, names, bindings, helpers);
-                body.extend(statements);
-                NirExpr::Var(result)
-            }
-            SelectedValue::Continued(prefix, child, suffix, result) => {
-                body.extend(prefix);
-                let (statements, _, _) = install(*child, names, bindings, helpers);
-                body.extend(statements);
-                body.extend(suffix);
-                result
-            }
-            SelectedValue::Repeated(children, suffix, result) => {
+            SelectedValue::Ordered(children, suffix, result) => {
                 for (stage, child) in children {
-                    body.extend(stage);
+                    body.extend(regions::install(stage, names, bindings, helpers));
                     let (statements, _, _) = install(*child, names, bindings, helpers);
                     body.extend(statements);
                 }
-                body.extend(suffix);
+                body.extend(regions::install(suffix, names, bindings, helpers));
                 result
             }
             SelectedValue::Nested(child) => {

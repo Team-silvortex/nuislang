@@ -1,0 +1,71 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-fresh-bool-root-proof-and-complete-stage-plan",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_regions.rs",
+        required_patterns: &["Logical(NirStmt, predicates::Predicate)", "pub(super) statements: Vec<Statement>",
+            "constant && local.contains_key(name)", "predicates::prove(value, &local, signatures, budget)?",
+            "Statement::Logical(statement.clone(), predicate)", "nested::inspect(value, &local, signatures, budget)?",
+            "SelectedValue::Region(staged.statements", "inputs.extend(reads.difference(&defined).cloned())"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-constant-seal-and-single-target-ordered-continuation",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_ordered.rs",
+        required_patterns: &["staging.constants.contains(&proof.name)", "&staging.constants", "staging.constants = next.constants",
+            "children.push((stage, child))", "Some(next.statements)", "name != &target", "SelectedValue::Ordered(children, suffix"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-original-ancestor-guard-before-complete-initializer-installation",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
+        required_patterns: &["Region(Vec<regions::Statement>, NirExpr)", "Descendant predicates are emitted only after this ancestor guard",
+            "body.extend(regions::install(statements, names, bindings, helpers))",
+            "body.extend(regions::install(stage, names, bindings, helpers))", "body.extend(regions::install(suffix, names, bindings, helpers))"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-five-types-private-constants-once-only-effects-atomic-vetoes-and-shared-bounds",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_staging_logical_tests.rs",
+        required_patterns: &["staging_logical_effectful_scalar_selections_keep_prefix_middle_suffix_types_private_bindings_and_hygiene",
+            "staging_logical_effectful_scalar_selections_discover_initializer_only_effects_and_keep_left_checks_once",
+            "staging_logical_effectful_scalar_selections_reject_hidden_roots_existing_writes_constants_and_late_errors_atomically",
+            "staging_logical_effectful_scalar_selections_share_original_stage_child_edge_and_expression_budgets",
+            "staging_logical_effectful_scalar_selections_bound_complete_initializer_rhs_capture_union",
+            "for count in [30, 31]", "for count in [31, 32]", "assert_eq!(names, before_names)"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-transitive-yir-order-five-types-and-policy-checkpoint-vetoes",
+        path: "tools/nuisc/src/aot_application_effect_call_staging_logical_tests.rs",
+        required_patterns: &["native_staging_logical_effectful_scalar_selections_keep_transitive_guard_check_call_order_and_exact_types",
+            "native_staging_logical_effectful_scalar_selections_preserve_policy_checkpoint_and_removed_order_vetoes",
+            "assert_eq!(predicates, 10)", "yir_core::EdgeKind::Effect", "lacks dependency order", "verify_nuis_compiled_artifact"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-real-private-prefix-middle-suffix-and-current-merge-source",
+        path: "tools/nuisc/tests/native_application_bridge/staging_logical_effectful_scalar_selections.ns",
+        required_patterns: &["const local_first: bool", "let local_first: bool", "const local_second: bool", "let local_second: bool",
+            "const local_tail: bool = first_choice(outer, a, b, c) && tail(saved, saved / tail_divisor)",
+            "wanted + (proof - saved)", "let saved = saved;", "print(97)"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-real-source-free-identity-poisoned-skipped-initializers-and-selected-stage-traps",
+        path: "tools/nuis/tests/native_session_workflow/effect_call_staging_logical.rs",
+        required_patterns: &["native_staging_logical_effectful_scalar_selections_build_cache_restore_and_keep_initializers_at_original_stages",
+            "native_staging_logical_effectful_scalar_selections_trap_at_selected_initializers_children_and_suffixes_before_publication",
+            "compile_cache: hit", "for _ in 0..3", "fs::remove_dir_all(project.0.join(\".nuis\"))",
+            "(8, 13, outer, outer, outer)", "trace.push(97)", "SIGILL", "SIGTRAP", "rejected_before_open(run)"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-scoped-contract-and-selected-acceptance",
+        path: "docs/reference/nuis-native-effectful-scalar-selection-v1.md",
+        required_patterns: &["## Guarded Logical Staging Initializers", "fresh owned-bool", "constant seal",
+            "480 successful", "20 selected", "Staging logical initializer acceptance:"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-staging-logical-six-complete-tree-history-fields-and-next-existing-bool-update-task",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &["Guarded logical staging initializers follow-up:", "Previous logical-tree checkpoint:",
+            "Previous logical-tree task checkpoint:", "Previous logical-tree blocker checkpoint:",
+            "Previous logical-tree action checkpoint:", "Previous logical-tree artifact checkpoint:",
+            "Prove guarded logical root updates of existing bools in selected scalar stages", "native_staging_logical_effectful_scalar_selections"],
+    },
+];

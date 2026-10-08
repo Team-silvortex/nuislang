@@ -218,6 +218,7 @@ fn sequential_effectful_scalar_regions_bound_statements_shared_work_and_external
     let mut budget = nested::Budget {
         nodes: 64,
         expressions: 3,
+        logical_edges: 32,
     };
     let statements = [
         NirStmt::Let {
