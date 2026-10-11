@@ -4,6 +4,14 @@ use super::*;
 #[path = "effectful_selections_nested_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_child_logical_tests.rs"]
+mod logical_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_top_logical_tests.rs"]
+mod top_logical_tests;
+
 pub(super) struct Budget {
     pub(super) nodes: usize,
     pub(super) expressions: usize,
@@ -26,10 +34,22 @@ pub(super) fn prepare(
     signatures: &Signatures,
     pure: &BTreeSet<String>,
 ) -> Option<Plan> {
-    if ![yes, no]
-        .iter()
-        .any(|body| body.len() > 1 || matches!(*body, [NirStmt::If { .. }]))
-    {
+    // Single logical let roots reuse the complete existing-target leaf proof;
+    // they do not grant fresh exports, constants, returns or hidden roots.
+    if ![yes, no].iter().any(|body| {
+        body.len() > 1
+            || matches!(*body, [NirStmt::If { .. }])
+            || matches!(
+                *body,
+                [NirStmt::Let {
+                    value: NirExpr::Binary {
+                        op: NirBinaryOp::And | NirBinaryOp::Or,
+                        ..
+                    },
+                    ..
+                }]
+            )
+    }) {
         return None;
     }
     let mut budget = Budget {
@@ -84,18 +104,51 @@ pub(super) fn inspect_at_depth(
     Some((ty, inputs, calls))
 }
 
-fn leaf(
-    name: &str,
-    declared: Option<&NirTypeRef>,
-    value: &NirExpr,
+pub(super) fn leaf(
+    statement: &NirStmt,
     scope: &Scope,
     signatures: &Signatures,
     budget: &mut Budget,
 ) -> Option<Proof> {
-    consume_node(budget)?;
-    let old_ty = scope.get(name)?;
-    if !scalar(old_ty) || declared.is_some_and(|ty| ty != old_ty) {
+    let NirStmt::Let {
+        name,
+        ty: declared,
+        value,
+    } = statement
+    else {
         return None;
+    };
+    let logical = matches!(
+        value,
+        NirExpr::Binary {
+            op: NirBinaryOp::And | NirBinaryOp::Or,
+            ..
+        }
+    );
+    if !logical {
+        consume_node(budget)?;
+    }
+    let old_ty = scope.get(name)?;
+    if !scalar(old_ty) || declared.as_ref().is_some_and(|ty| ty != old_ty) {
+        return None;
+    }
+    if logical {
+        // The stage charges this original leaf once and proves its complete RHS
+        // before cloning/installing the declaration or advancing the binding.
+        let staged = regions::stage(
+            std::slice::from_ref(statement),
+            scope,
+            &BTreeSet::new(),
+            signatures,
+            budget,
+        )?;
+        return Some(Proof {
+            value: SelectedValue::Region(staged.statements, NirExpr::Var(name.clone())),
+            name: name.clone(),
+            ty: old_ty.clone(),
+            inputs: staged.inputs,
+            calls: staged.calls,
+        });
     }
     let (ty, inputs, calls) = inspect(value, scope, signatures, budget)?;
     if &ty != old_ty {
@@ -128,9 +181,7 @@ fn body(
                 regions::prove(statements, scope, signatures, budget)
             }
         }
-        [NirStmt::Let { name, ty, value }] => {
-            leaf(name, ty.as_ref(), value, scope, signatures, budget)
-        }
+        [statement @ NirStmt::Let { .. }] => leaf(statement, scope, signatures, budget),
         [NirStmt::If {
             condition,
             then_body,
@@ -167,9 +218,11 @@ pub(super) fn branch(
             depth + 1,
         )?;
         let retained = leaf(
-            &live.name,
-            Some(&live.ty),
-            &NirExpr::Var(live.name.clone()),
+            &NirStmt::Let {
+                name: live.name.clone(),
+                ty: Some(live.ty.clone()),
+                value: NirExpr::Var(live.name.clone()),
+            },
             scope,
             signatures,
             budget,
@@ -185,6 +238,17 @@ pub(super) fn branch(
             body(no, scope, signatures, budget, depth + 1)?,
         )
     };
+    join(condition, condition_inputs, condition_calls, yes, no, scope)
+}
+
+pub(super) fn join(
+    condition: predicates::Predicate,
+    condition_inputs: BTreeSet<String>,
+    condition_calls: BTreeSet<String>,
+    yes: Proof,
+    no: Proof,
+    scope: &Scope,
+) -> Option<Proof> {
     if yes.name != no.name || yes.ty != no.ty {
         return None;
     }

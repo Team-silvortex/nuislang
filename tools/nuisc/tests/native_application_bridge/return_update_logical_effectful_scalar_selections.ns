@@ -1,0 +1,74 @@
+mod cpu Main {
+    struct State {
+        seed: bool, first: bool, second: bool, reply: bool,
+        outer: i64, init: i64, cond: i64, yes: i64, no: i64, retained_cond: i64,
+        retained_rhs: i64, unused: i64, leaf: i64, leaf_cond: i64, leaf_rhs: i64, answer: i64, result: bool
+    }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(90); return value == (proof == 1); }
+    @noinline fn initialize(value: bool, proof: i64) -> bool { print(87); return value == (proof == 1); }
+    @noinline fn condition(value: bool, proof: i64) -> bool { print(88); return value == (proof == 1); }
+    @noinline fn yes_work(value: bool, proof: i64) -> bool { print(89); return value == (proof == 1); }
+    @noinline fn no_work(value: bool, proof: i64) -> bool { print(86); return value == (proof == 1); }
+    @noinline fn retained_condition(value: bool, proof: i64) -> bool { print(85); return value == (proof == 1); }
+    @noinline fn retained_work(value: bool, proof: i64) -> bool { print(84); return value == (proof == 1); }
+    @noinline fn unused_work(proof: i64) -> i64 { print(83); return proof; }
+    @noinline fn leaf_work(value: bool, proof: i64) -> bool { print(82); return value == (proof == 1); }
+    @noinline fn leaf_condition(value: bool, proof: i64) -> bool { print(81); return value == (proof == 1); }
+    @noinline fn leaf_update(value: bool, proof: i64) -> bool { print(78); return value == (proof == 1); }
+    @noinline fn answer_work(value: bool, proof: i64) -> bool { print(97); return value == (proof == 1); }
+    fn observe(seed: bool, first: bool, second: bool, reply: bool,
+               outer: i64, init: i64, cond: i64, yes: i64, no: i64, retained_cond: i64,
+               retained_rhs: i64, unused: i64, leaf: i64, leaf_cond: i64, leaf_rhs: i64, answer: i64) -> bool {
+        print(99);
+        if choose(first, 1 / outer) {
+            let local = initialize(seed, 1 / init);
+            if condition(second, 1 / cond) {
+                let local = local || yes_work(reply, 1 / yes);
+            } else {
+                let local = local && no_work(reply, 1 / no);
+            }
+            if retained_condition(local, 1 / retained_cond) {} else {
+                let local = local || retained_work(reply, 1 / retained_rhs);
+            }
+            const sealed: bool = local || false;
+            let ignored = unused_work(1 / unused);
+            if sealed {
+                let selected = leaf_work(sealed, 1 / leaf);
+                if leaf_condition(second, 1 / leaf_cond) {
+                    let selected = selected && leaf_update(reply, 1 / leaf_rhs);
+                }
+                return selected && answer_work(reply, 1 / answer);
+            } else {
+                return sealed || answer_work(seed, 1 / answer);
+            }
+        } else {
+            let local = initialize(seed, 1 / init);
+            if condition(second, 1 / cond) {
+                let local = local && no_work(reply, 1 / no);
+            }
+            if local {
+                return local && answer_work(reply, 1 / answer);
+            } else {
+                return local || answer_work(seed, 1 / answer);
+            }
+        }
+        print(80);
+        return false;
+    }
+    fn start(seed: bool, first: bool, second: bool, reply: bool,
+             outer: i64, init: i64, cond: i64, yes: i64, no: i64, retained_cond: i64,
+             retained_rhs: i64, unused: i64, leaf: i64, leaf_cond: i64, leaf_rhs: i64, answer: i64) -> State {
+        let result = observe(seed, first, second, reply, outer, init, cond, yes, no, retained_cond, retained_rhs, unused, leaf, leaf_cond, leaf_rhs, answer);
+        print(79);
+        return State { seed: seed, first: first, second: second, reply: reply, outer: outer, init: init, cond: cond,
+            yes: yes, no: no, retained_cond: retained_cond, retained_rhs: retained_rhs, unused: unused,
+            leaf: leaf, leaf_cond: leaf_cond, leaf_rhs: leaf_rhs, answer: answer, result: result };
+    }
+    fn step(state: State, first: bool, second: bool, reply: bool,
+            outer: i64, init: i64, cond: i64, yes: i64, no: i64, retained_cond: i64,
+            retained_rhs: i64, unused: i64, leaf: i64, leaf_cond: i64, leaf_rhs: i64, answer: i64) -> State {
+        return start(state.seed, first, second, reply, outer, init, cond, yes, no, retained_cond, retained_rhs, unused, leaf, leaf_cond, leaf_rhs, answer);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

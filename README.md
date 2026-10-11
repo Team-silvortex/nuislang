@@ -117,8 +117,31 @@ selected scalar regions and prefix/middle/suffix stages. Original declarations
 stay private and after ancestor guards, with current versions and constant seals
 carried across stages. Existing owned-bool `let` roots can now update private
 stage bindings or the sole published bool target, with read-before-write
-captures and constant seals. Single-statement logical child leaves and hidden
-ordinary leaves remain separate; common guard/backend/effect authority is not widened.
+captures and constant seals. Single-statement child leaves now reuse that proof
+for an existing owned-bool target, including both-sided and retained outcomes.
+The [top-level logical-arm follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#top-level-logical-arms)
+now admits the same existing owned-bool updates in single-statement arms,
+including consecutive selections and effectful conditions with pure values.
+The [paired logical-return proof](docs/reference/nuis-native-effectful-scalar-selection-v1.md#paired-logical-bool-returns)
+now also covers two-sided single bool returns under shared predicate bounds,
+preserving actual false results, original exits and caller continuation. The
+[private return-prefix follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#private-logical-return-prefixes)
+reuses staging for bounded fresh private scalar work before those returns,
+including current versions, constant seals and unused selected calls. The
+[complete return-tree follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#nested-logical-return-trees)
+now composes bounded nested selections whose every original leaf returns,
+keeping inner conditions behind ancestor guards and leaf-local staging isolated.
+Pure child subtrees can compose without granting effects. The
+[private ancestor-staging follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#private-return-ancestor-staging)
+now keeps fresh scalar work before inner selections behind ancestor guards,
+passing current private values and seals into descendant conditions/returns
+without exporting them. The
+[private bool-update follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
+adds paired or one-sided single-statement updates of bools already defined in the
+current private prefix, including consecutive updates and retained current values.
+Entering bindings and constants remain read-only. Nested update arms, hidden
+ordinary leaves and mixed/single exits remain separate; common guard/backend/
+effect authority is not widened.
 Native fresh/cache/source-free runs check selection polarities, poisoned inactive
 paths and selected-stage traps without exporting child-private bindings.
 The [floating literal negation repair](docs/reference/nuis-native-float-literal-negation-v1.md)

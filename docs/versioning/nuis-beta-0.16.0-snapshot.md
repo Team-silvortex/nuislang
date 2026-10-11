@@ -102,8 +102,29 @@ retains private original declarations, actual merged versions and constant seals
 across stages. The subsequent existing-bool update follow-up permits owned-bool
 let roots in those same stages, retaining read-before-write captures and the sole
 published target. Known outer logical constant writes reject conservatively;
-single-statement logical child leaves and generalized resource/exit transport
-remain separate.
+the subsequent child-leaf follow-up reuses the same stage proof for original
+single-statement owned-bool updates. Both-sided and retained outcomes keep their
+previous value versions and single-target publication, without double-charging
+the original leaf. The subsequent top-level logical-arm follow-up admits the
+same existing owned-bool single-statement updates through the shared plan,
+including consecutive current merges and condition-only effects. Logical
+returns were a separate task at that checkpoint. The subsequent paired-return
+proof covers two-sided single exact owned-bool logical returns with shared
+condition/value bounds, source-return authority, actual false results and caller
+continuation. The subsequent private-prefix proof reuses staging before those
+logical returns with isolated fresh scalar scopes, current read-before-write
+versions, constant seals and complete unused-call effects. The subsequent
+complete-return-tree proof composes bounded nested selections with every original
+leaf returning, guarded descendant conditions and isolated leaf staging; pure
+child subtrees keep whole-tree effect discovery separate from admission. The
+subsequent private ancestor-staging proof keeps bounded fresh scalar work before
+terminal child selections behind ancestor guards, retaining current scopes/seals,
+unused effects and complete subtree captures under the same work limits. The
+subsequent private bool-update proof adds consecutive flat paired/one-sided
+updates of prefix-owned bools, preserving current/retained values, constant seals
+and original shared budgets without granting entering writes. Hidden
+roots, nested update arms, mixed/single exits and generalized resource
+transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.
 

@@ -15,6 +15,7 @@ mod update_tests;
 pub(super) enum Statement {
     Scalar(NirStmt),
     Logical(NirStmt, predicates::Predicate),
+    Selection(Box<Plan>),
 }
 
 pub(super) struct Staging {
@@ -201,18 +202,22 @@ pub(super) fn install(
     bindings: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
 ) -> Vec<NirStmt> {
-    statements
-        .into_iter()
-        .map(|statement| match statement {
-            Statement::Scalar(statement) => statement,
+    let mut output = Vec::with_capacity(statements.len());
+    for statement in statements {
+        match statement {
+            Statement::Scalar(statement) => output.push(statement),
             Statement::Logical(mut statement, predicate) => {
                 let value = match &mut statement {
                     NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => value,
                     _ => unreachable!(),
                 };
                 *value = predicates::install(predicate, names, bindings, helpers);
-                statement
+                output.push(statement);
             }
-        })
-        .collect()
+            Statement::Selection(plan) => {
+                output.extend(super::install(*plan, names, bindings, helpers).0);
+            }
+        }
+    }
+    output
 }

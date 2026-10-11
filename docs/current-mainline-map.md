@@ -89,8 +89,31 @@ stages. Original declarations remain private and selected; current target
 versions and constant seals persist across stages. Existing owned-bool let roots
 now update private stage bindings or the sole published bool target using
 read-before-write captures. Known outer logical constant writes remain outside
-this proof. Single-statement logical child leaves and hidden ordinary leaves
-remain unproven, without widening common guard/backend or effect authority.
+this proof. Single-statement child leaves now reuse the stage plan for an
+existing owned-bool target, preserving both-sided and retained outcomes while
+charging each original leaf once. The
+[top-level logical-arm follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#top-level-logical-arms)
+now admits those same existing owned-bool single-statement updates through the
+shared stage proof, including consecutive current merges and condition-only
+effects. The [paired logical-return proof](reference/nuis-native-effectful-scalar-selection-v1.md#paired-logical-bool-returns)
+now covers two-sided single exact owned-bool returns with shared condition/value
+budgets, original exits and caller continuation. The
+[private return-prefix follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-logical-return-prefixes)
+reuses the selected staging plan for bounded fresh private scalar work, keeping
+isolated scopes, current versions, constant seals and unused effects. The
+[complete return-tree follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#nested-logical-return-trees)
+now admits bounded all-return nested selections, including independently pure
+children, guarded descendant conditions and isolated leaf staging. Complete
+subtree reads and original work share existing capture/budget limits. The
+[private ancestor-staging follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-ancestor-staging)
+now keeps fresh scalar work before terminal child selections inside the selected
+arm, sharing current scopes/seals and whole-tree capture/work limits. Entering
+bindings stay read-only and unused prefix work remains required. The
+[private bool-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
+adds consecutive flat paired/one-sided selections of already prefix-owned bools,
+with exact current captures, constant seals and original-work-only retention.
+Hidden ordinary leaves, nested update arms and mixed/single exits remain separate,
+without widening common guard/backend or effect authority.
 Broader typed selected-return CLI proof and generalized effect transport remain
 separate. General rebinding, resource work and child-scope
 exports remain open.

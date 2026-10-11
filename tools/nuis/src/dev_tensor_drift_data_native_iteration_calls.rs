@@ -20,6 +20,8 @@ mod caller_records;
 mod caller_spills;
 #[path = "dev_tensor_drift_data_native_child_invariants.rs"]
 mod child_invariants;
+#[path = "dev_tensor_drift_data_native_child_logical.rs"]
+mod child_logical;
 #[path = "dev_tensor_drift_data_native_computed_logical_gates.rs"]
 mod computed_logical_gates;
 #[path = "dev_tensor_drift_data_native_computed_return_arms.rs"]
@@ -90,6 +92,12 @@ mod one_sided_effect_joins;
 mod partial_effect_joins;
 #[path = "dev_tensor_drift_data_native_record_joins.rs"]
 mod record_joins;
+#[path = "dev_tensor_drift_data_native_return_ancestor_logical.rs"]
+mod return_ancestor_logical;
+#[path = "dev_tensor_drift_data_native_return_logical.rs"]
+mod return_logical;
+#[path = "dev_tensor_drift_data_native_return_prefix_logical.rs"]
+mod return_prefix_logical;
 #[path = "dev_tensor_drift_data_native_return_print_aliases.rs"]
 mod return_print_aliases;
 #[path = "dev_tensor_drift_data_native_return_print_prefixes.rs"]
@@ -98,6 +106,10 @@ mod return_print_prefixes;
 mod return_signals;
 #[path = "dev_tensor_drift_data_native_return_suffixes.rs"]
 mod return_suffixes;
+#[path = "dev_tensor_drift_data_native_return_tree_logical.rs"]
+mod return_tree_logical;
+#[path = "dev_tensor_drift_data_native_return_update_logical.rs"]
+mod return_update_logical;
 #[path = "dev_tensor_drift_data_native_scalar_aliases.rs"]
 mod scalar_aliases;
 #[path = "dev_tensor_drift_data_native_scalar_call_fields.rs"]
@@ -116,6 +128,8 @@ mod stored_projections;
 mod terminal_continuations;
 #[path = "dev_tensor_drift_data_native_terminal_snapshots.rs"]
 mod terminal_snapshots;
+#[path = "dev_tensor_drift_data_native_top_logical.rs"]
+mod top_logical;
 #[path = "dev_tensor_drift_data_native_trailing_value_loops.rs"]
 mod trailing_value_loops;
 #[path = "dev_tensor_drift_data_native_typed_effect_returns.rs"]
@@ -163,6 +177,13 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         effectful_selections::CHECKS,
         staging_logical::CHECKS,
         update_logical::CHECKS,
+        child_logical::CHECKS,
+        top_logical::CHECKS,
+        return_logical::CHECKS,
+        return_prefix_logical::CHECKS,
+        return_tree_logical::CHECKS,
+        return_ancestor_logical::CHECKS,
+        return_update_logical::CHECKS,
         computed_return_prints::CHECKS,
         loop_calls::CHECKS,
         loop_work::CHECKS,

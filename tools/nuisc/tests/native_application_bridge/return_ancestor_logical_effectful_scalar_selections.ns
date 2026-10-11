@@ -1,0 +1,71 @@
+mod cpu Main {
+    struct State {
+        seed: bool, first: bool, second: bool, reply: bool,
+        outer: i64, ycond: i64, ncond: i64, a: i64, ar: i64, b: i64, br: i64,
+        c: i64, cr: i64, d: i64, dr: i64, yp: i64, ylogic: i64, yu: i64, np: i64, nu: i64, result: bool
+    }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(90); return value == (proof == 1); }
+    @noinline fn prepare_yes(value: bool, proof: i64) -> bool { print(87); return value == (proof == 1); }
+    @noinline fn stage_rhs(value: bool, proof: i64) -> bool { print(88); return value == (proof == 1); }
+    @noinline fn unused_yes(proof: i64) -> i64 { print(89); return proof; }
+    @noinline fn prepare_no(value: bool, proof: i64) -> i64 { print(84); return if value { proof } else { 0 }; }
+    @noinline fn unused_no(proof: i64) -> i64 { print(86); return proof; }
+    @noinline fn yes_condition(proof: i64) -> bool { print(91); return proof == 1; }
+    @noinline fn no_condition(proof: i64) -> bool { print(92); return proof != 1; }
+    @noinline fn yes_true(value: bool, proof: i64) -> bool { print(93); return value == (proof == 1); }
+    @noinline fn yes_false(proof: i64) -> i64 { print(94); return proof; }
+    @noinline fn no_true(value: bool, proof: i64) -> bool { print(95); return value == (proof == 1); }
+    @noinline fn no_false(proof: i64) -> i64 { print(96); return proof; }
+    @noinline fn answer(value: bool, observed: bool, wanted: bool, proof: i64) -> bool {
+        print(97); return value == ((observed == wanted) == (proof == 1));
+    }
+    fn observe(seed: bool, first: bool, second: bool, reply: bool,
+               outer: i64, ycond: i64, ncond: i64, a: i64, ar: i64, b: i64, br: i64, c: i64, cr: i64, d: i64, dr: i64,
+               yp: i64, ylogic: i64, yu: i64, np: i64, nu: i64) -> bool {
+        print(99);
+        if choose(first, 1 / outer) {
+            let local = prepare_yes(second, 1 / yp);
+            let local = local && stage_rhs(true, 1 / ylogic);
+            const sealed: bool = local || false;
+            let unused = unused_yes(1 / yu);
+            if sealed && yes_condition(1 / ycond) {
+                let leaf = yes_true(seed, 1 / a);
+                let leaf = leaf || false;
+                const leaf_sealed: bool = leaf && true;
+                return leaf_sealed && answer(reply, sealed, second, 1 / ar);
+            } else {
+                let leaf = yes_false(1 / b);
+                return seed || answer(reply, sealed, second, 1 / br);
+            }
+        } else {
+            let local = prepare_no(second, 1 / np);
+            let local = local + 0;
+            const sealed: bool = (local == 1) || false;
+            let unused = unused_no(1 / nu);
+            if sealed || no_condition(1 / ncond) {
+                let leaf = no_true(seed, 1 / c);
+                return leaf && answer(reply, sealed, second, 1 / cr);
+            } else {
+                let leaf = no_false(1 / d);
+                return seed || answer(reply, sealed, second, 1 / dr);
+            }
+        }
+        print(80);
+        return false;
+    }
+    fn start(seed: bool, first: bool, second: bool, reply: bool,
+             outer: i64, ycond: i64, ncond: i64, a: i64, ar: i64, b: i64, br: i64, c: i64, cr: i64, d: i64, dr: i64,
+             yp: i64, ylogic: i64, yu: i64, np: i64, nu: i64) -> State {
+        let result = observe(seed, first, second, reply, outer, ycond, ncond, a, ar, b, br, c, cr, d, dr, yp, ylogic, yu, np, nu);
+        print(79);
+        return State { seed: seed, first: first, second: second, reply: reply, outer: outer, ycond: ycond, ncond: ncond,
+            a: a, ar: ar, b: b, br: br, c: c, cr: cr, d: d, dr: dr, yp: yp, ylogic: ylogic, yu: yu, np: np, nu: nu, result: result };
+    }
+    fn step(state: State, first: bool, second: bool, reply: bool,
+            outer: i64, ycond: i64, ncond: i64, a: i64, ar: i64, b: i64, br: i64, c: i64, cr: i64, d: i64, dr: i64,
+            yp: i64, ylogic: i64, yu: i64, np: i64, nu: i64) -> State {
+        return start(state.seed, first, second, reply, outer, ycond, ncond, a, ar, b, br, c, cr, d, dr, yp, ylogic, yu, np, nu);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

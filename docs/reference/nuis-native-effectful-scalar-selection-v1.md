@@ -18,6 +18,13 @@ admission remain authoritative. It also handles a top-level one-sided `let`
 rebinding of an existing exact scalar. An empty `then` with a live `else` is
 supported as well as a live `then` without an `else`.
 
+Those are the ordinary nonlogical single-arm rules. The separate
+[top-level logical-arm proof](#top-level-logical-arms) below reuses the bounded
+existing-target region proof, including discovery from condition-only effects;
+it does not expand ordinary expression inspection. Logical return admission has
+its separate [paired-return proof](#paired-logical-bool-returns) below; bounded
+fresh private work uses the distinct [return-prefix follow-up](#private-logical-return-prefixes).
+
 Each expression proof is bounded to 256 nodes and fewer than 32 recursive levels.
 An arm pair captures at most 31 existing scalar bindings plus one bool predicate.
 The proof supports scalar literals, named values, exact synchronous call
@@ -369,8 +376,9 @@ arguments and scalar comparisons remain possible. Computed left gates were outsi
 this initial subset and are covered by the follow-up below. Direct nested logical
 children are covered by the tree follow-up. Logical call arguments, missing/wrong types and borrowed,
 optional, generic or resource signatures reject without partial rewriting.
-The simple top-level single-leaf proof and ordinary scalar-expression route are
-unchanged. Signature discovery never grants native effects.
+At this initial checkpoint the simple top-level single-leaf proof was unchanged;
+the later top-level logical-arm follow-up is described below. Ordinary scalar
+expression inspection and native effect grants remain unchanged.
 
 The logical root, left and RHS consume the same original 256-expression budget
 and depth below 32. Selection nodes still share the 64-node/eight-level budget.
@@ -540,8 +548,8 @@ direct logical writes to known outer constants, including prior outlined paired
 Const destinations. This is conservative admission for this proof, not a new
 general language-level constant rule. Original node/expression/edge/depth/capture
 budgets and effect/backend authority remain unchanged. Single-statement selected
-child logical updates remain the next separate proof; hidden ordinary leaves,
-resource transport and generalized exits remain outside this extension.
+child logical updates use the separate leaf extension below; hidden ordinary
+leaves, resource transport and generalized exits remain outside this extension.
 
 The [bool update fixture](../../tools/nuisc/tests/native_application_bridge/update_logical_effectful_scalar_selections.ns)
 checks the preceding bool at prefix, middle and suffix roots, with selected child
@@ -573,7 +581,7 @@ full-workspace, Linux/GPU/Windows, performance, authentication, formal
 memory-safety or self-hosting claim is made; historical socket/strict-Clippy
 findings remain separate.
 
-Current selected commands, run serially from the repository root:
+Bool-update selected commands at that checkpoint, run serially from the repository root:
 
 ```sh
 env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
@@ -590,6 +598,634 @@ drift checks with zero failures, active/99, the next single-statement logical
 child-update task and all six complete predecessor hashes. The 27 tensor units
 passed again after receipt finalization; this rerun adds no distinct test units.
 Formatting, whitespace, encoding, links and changed-file caps pass as well.
+
+## Guarded Logical Child Leaves
+
+Original single-statement `let` leaves inside admitted nested/ordered selections
+now reuse the existing stage proof when updating an existing exact owned-bool
+target with a direct logical root. The proof borrows the original statement,
+validates the complete predicate before cloning/installing it and charges the
+original leaf once. Nonlogical leaves keep their scalar inspection. No synthetic
+statement or additional result kind is introduced. At this child-leaf checkpoint,
+the top-level shape eligibility test remained unchanged; the subsequent
+[top-level follow-up](#top-level-logical-arms) extends that explicit entry shape.
+
+The original declaration stays after the child arm's leading guard. Its
+read-before-write captures refer to the preceding binding version; complete RHS
+subtrees stay behind their short-circuit guards. Both-sided child arms and
+either direction of one-sided child updates retain the original scalar join;
+unselected paths keep the actual previous bool, not an inactive helper's zero.
+Later staging/conditions/leaves see the completed earlier child merge. Constants,
+fresh exports, private child publication and different outer targets remain
+outside the proof. Invalid later leaves reject the whole candidate without
+generated names/functions. Shared original node/expression/edge/depth and
+complete capture-union limits remain unchanged, as do effect/backend grants.
+Top-level single-statement logical arms were a separate task at this checkpoint
+and are covered below. Hidden comparison/call-argument logical leaves, returns,
+resources and generalized exits remain separate.
+
+The [child logical fixture](../../tools/nuisc/tests/native_application_bridge/child_logical_effectful_scalar_selections.ns)
+has two-sided AND/OR single-statement leaves, followed by an inverted one-sided
+child with a required computed left and a nested OR. Its RHS probes compare the
+actual preceding merge. All 32 seed/enabled/first/second/reply combinations define
+480 successful transitions across fresh/cache/three source-free restorations
+and 7 selected condition/leaf trap scenarios. Skipped arguments contain zero
+divisors; required left checks still trap when the nested RHS would be skipped.
+Success requires exact bool state/stdout, policy identity and executable bytes;
+traps prohibit later effects/publication without requiring buffered output to
+flush. Emitted bridge tests also cover both ancestor and child polarities and
+transitive function-local Effect paths. Default/empty grants and removed order
+still veto. No new scalar result kind or helper-entry authority is granted.
+
+Child logical leaf acceptance: The 2026-10-08 selected acceptance passes **552
+distinct tests**: 290 compiler/outliner/artifact/direct-call/branch/async/loop/
+scalar-control, 8 typed-handoff with zero exact-name overlap, 173 LLVM including
+ignored tests, 50 native bridge, 4 CLI workflow and 27 tensor units. Focused/debug
+reruns are not additional units. The selected child/stage-update CLI matrices
+check 960 successful transitions and 14 selected traps; the new child leaf
+fixture contributes 480 and 7. Fresh/cache/three source-free restorations retain
+exact bool state/stdout, policy identity and executable bytes. Earlier receipts
+remain historical and are not substituted for this selected run.
+
+Static acceptance passes 2248 registered drift checks/15363 required patterns,
+all 17 changed/new source/test/doc caps, 4886 UTF-8 files, 3227 README/docs links
+and 4759 whole-worktree Markdown targets. Six complete predecessor fields retain
+their frozen hashes; the selected cell remains active/99. Ordinary CLI rebuild
+and final status/history checks are recorded separately below. No new
+full-workspace, Linux/GPU/Windows, performance, authentication, formal
+memory-safety or self-hosting claim is made. Historical socket/strict-Clippy
+findings remain separate.
+
+Child-leaf selected commands at that checkpoint, run serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_update_logical_effectful_scalar_selections native_child_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Final child-leaf ordinary-CLI verification: after finalizing this receipt, the
+normal `nuis` binary was rebuilt and reported clean coverage/hierarchy/lineage/
+drift, 2248/2248 drift checks with zero failures, active/99, the next top-level
+single-statement logical-arm task and all six complete predecessor hashes.
+The 27 tensor units passed again after finalization; this rerun adds no distinct
+test units. Formatting, whitespace, encoding, links and changed-file caps pass.
+
+## Top-Level Logical Arms
+
+The entry filter now explicitly admits a single `let` whose initializer is a
+direct `&&`/`||` root. It reuses the existing branch/leaf/stage/predicate proof,
+not a backend-specific path. The target must already be an exact owned bool;
+both arms must publish the same target/type, or the empty arm retains the actual
+old value. Ordinary opposite-arm values remain scalar inspections. The original
+declaration is installed after its arm guard only after complete RHS validation.
+
+Read-before-write captures and short-circuit subtrees remain unchanged.
+Consecutive independent top-level selections capture the completed previous
+merge, not the initial value. A condition-only effect can discover a candidate
+even when its logical update is pure; completely pure candidates still belong
+to the independent pure route. Known outer and previously published constants,
+fresh exports, hidden logical comparison/call-argument leaves, logical returns,
+different destinations, loops and generalized exits remain outside this proof.
+The separate paired-return follow-up below supplies original return authority;
+the let-update proof itself does not infer it.
+Late invalid opposite arms reject atomically before generating names/functions.
+Original node/expression/edge/depth limits and the complete arm capture union
+remain authoritative. No effect/backend/native-entry grants are added.
+
+The [top-level fixture](../../tools/nuisc/tests/native_application_bridge/top_logical_effectful_scalar_selections.ns)
+contains three independent selections: a one-sided AND update, a two-sided OR
+or computed-left/nested-OR update, and an inverted one-sided pure AND update
+selected by an effectful condition. RHS probes compare the preceding merge.
+Its 32 input combinations define 480 successful transitions across fresh,
+cache and three source-free restorations, plus 7 selected trap scenarios.
+Inactive arguments contain zero divisors; the required computed left still
+traps when its nested RHS would be skipped. Assertions require exact bool
+state/stdout, policy identity and executable bytes. Selected traps prohibit
+later effects and publication; buffered earlier output need not flush.
+Artifact tests check transitive function-local Effect order, both one-sided
+polarities, and unchanged default/empty-grant and removed-order vetoes.
+
+Top-level logical arm acceptance: The 2026-10-08 selected regression passes
+**558 distinct tests**: 296 compiler/outliner/artifact/direct-call/branch/async/
+loop/scalar-control, 8 typed-handoff with zero exact-name overlap, 173 LLVM
+including ignored tests, 50 native bridge, 4 CLI workflow and 27 tensor units.
+The selected top-level/child CLI matrices check 960 successful transitions and
+14 selected traps; the new top-level fixture contributes 480 and 7.
+Fresh/cache/three source-free restorations retain exact bool state/stdout,
+policy identity and executable bytes. One stdout-oracle escaping defect was
+corrected, and the complete four-unit CLI group then passed its rerun.
+Failed/focused reruns do not add distinct units. Earlier receipts remain
+historical and are not substituted for this selected run.
+
+Static acceptance passes 2257 registered drift checks/15412 required patterns,
+all 22 changed/new file caps, 4891 UTF-8 files, 3231 README/docs links and 4763
+whole-worktree Markdown targets. All six complete predecessor fields retain
+their frozen hashes; the selected cell remains active/99. Ordinary CLI rebuild
+and final live status/history verification are recorded separately below.
+No new full-workspace, Linux/GPU/Windows, performance, authentication, formal
+memory-safety or self-hosting claim is made. Historical socket/strict-Clippy
+findings remain separate.
+
+Top-level let selected commands at that checkpoint, run serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_top_logical_effectful_scalar_selections native_child_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Final top-level ordinary-CLI verification: after receipt finalization the normal
+`nuis` binary was rebuilt and reported clean coverage/hierarchy/lineage/drift,
+2257/2257 drift checks with zero failures, active/99, the next two-sided logical
+bool-return task and all six complete predecessor hashes. The 27 tensor units
+passed again after finalization; this adds no distinct units. Formatting,
+whitespace, encoding, links and changed-file caps pass as well.
+
+## Paired Logical Bool Returns
+
+A separate bounded proof admits top-level selections with one original
+`return value` in each arm and at least one direct logical return root. The
+enclosing function must declare the exact owned `bool` result. Both complete
+values and the condition reuse the existing predicate proof with one shared
+256-expression/32-edge budget and depth below 32. The original selection and
+two returns are charged once; the complete arm capture union remains at most
+31 exact current scalar bindings plus the saved gate. Signature discovery
+does not grant effects/backend/native-entry eligibility. Condition-only
+effects can discover a candidate; wholly pure candidates keep their old owner.
+
+The existing arm installer now consumes a private predicate plan as its bool
+value, after the leading arm guard. No source binding or synthetic return is
+needed inside the selected logical tree. Computed left work runs once and every
+complete RHS stays selected. The existing value join is followed by the original
+unconditional return, so a real false result cannot become continuation. The
+original parent prefix and unreachable suffix remain in place; a caller resumes
+only after the selected value has completed and the callee has returned.
+Late invalid opposite arms reject before installing names/functions. Mixed or
+one-sided exits, return prefixes, nested return trees, hidden logical leaves,
+missing/borrowed/optional/generic return declarations, loops and resource
+transport remain outside this proof. Ordinary scalar expression inspection,
+constant seals and the existing let-update proofs are unchanged.
+
+The [paired-return fixture](../../tools/nuisc/tests/native_application_bridge/return_logical_effectful_scalar_selections.ns)
+first updates a bool, then returns from either side of a logical-OR condition.
+RHS probes compare the actual preceding merge; one return has a required
+computed left before a nested OR. The callee's suffix marker 80 must never run,
+while the caller's marker 79 must run after every successful return, including
+false. All 32 input combinations define 480 successful transitions across
+fresh/cache/three source-free restorations and 7 selected trap scenarios.
+Skipped condition/value arguments contain zero divisors; required computed-left
+checks still trap when a nested RHS would be skipped. Assertions require exact
+bool state/stdout, policy identity and executable bytes; traps prohibit later
+work and publication without requiring earlier buffered output to flush.
+Artifact tests preserve transitive function-local Effect order, both return
+polarities, source-free checkpoints and default/empty-grant/removed-order vetoes.
+
+Paired logical bool return acceptance: Final selected acceptance passes 564
+distinct tests: 302 compiler/outliner/artifact/direct-call/branch/async/loop/
+scalar-control units, eight typed selected-return/effect-boundary units, 173 LLVM
+tests including ignored cases, 50 native bridge/ordinary-AOT regressions, four
+focused top-level-let/paired-return CLI workflows and 27 tensor units. Exact
+compiler/typed test names have zero overlap. Earlier receipts remain historical;
+targeted reruns and native truth variants are not additional distinct tests.
+
+The four CLI workflows cover 960 successful registered transitions and 14
+selected trap scenarios. The new paired-return fixture contributes 480
+transitions and seven condition/return-value traps. Fresh/cache/three source-free
+restorations verify exact bool state/stdout, policy identity and executable bytes.
+False results return normally to the caller; the callee suffix never runs.
+NIR placement and transitive function-local YIR Effect paths remain independent
+checks. Default/empty grants and removed-order graphs still veto; common guard,
+backend and effect authority are unchanged.
+
+Static checks pass 2266 registered drift checks, all 29 changed/new Rust/Markdown/
+Nuis file caps, 4897 recognized UTF-8 files, 3235 README/docs local links and 4767
+whole-worktree Markdown targets. All six complete preceding top-level-let fields
+retain their frozen SHA-256 hashes; the selected cell stays `active/99`. Its next
+independent task is bounded private scalar prefixes before paired logical bool
+returns, retaining current captures, constant seals and original return authority.
+Ordinary CLI rebuild/live verification is an independent finalization gate.
+
+This is bounded scalar return acceptance, not new GPU/Linux/Windows execution,
+measured performance, publisher authentication, formal memory-safety proof or
+completed self-hosting. Full-workspace, historical socket and strict-Clippy gates
+remain separate. The committed beta-0.16.2 baseline is unchanged.
+
+Reproduce this selected cohort serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_top_logical_effectful_scalar_selections native_return_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Paired-return finalization: The ordinary CLI was rebuilt after publishing the
+fresh receipt. Its live tensor reports clean coverage, hierarchy, task-card
+lineage and drift, with 2266/2266 registered checks and zero failures. It retains
+active/99, the next private-prefix task and all six complete predecessor hashes.
+The 27 tensor tests passed again after finalization; this adds no distinct units.
+
+## Private Logical Return Prefixes
+
+A separate proof admits bounded fresh private scalar staging before the paired
+logical bool returns above. Both original arms must end in a value return, at
+least one returned value must have a direct logical root, and the enclosing
+function must still declare the exact owned bool. The single-return owner keeps
+its old path; nested return trees, mixed/single exits and hidden logical roots
+are not generalized by this extension.
+
+Each arm has zero to 16 preceding original let/const statements. Staging begins
+with its own copy of the current parent scope, and every declared name must be
+absent from that parent. A private let may update a preceding private version,
+but original parent bindings cannot be written or published. Existing staging
+supports exact scalar let computations and direct logical owned-bool constants,
+not arbitrary nonlogical scalar constants. Its constant seals and complete RHS
+checks are retained. The opposite arm cannot read another arm's locals, even
+when both arms use the same private name with different scalar types.
+
+The original selection, every prefix statement and both returns are charged
+once. Conditions, prefixes and returned values share the 64-node/256-expression/
+32-logical-edge budget, the below-32 combined expression depth and complete
+31-parent-capture arm union. Captures include unused prefix reads and exclude
+only actually defined private versions. Discovery includes prefix calls even
+when their results are unused; signature discovery still grants no effects or
+backend eligibility. Wholly pure candidates retain their existing owner.
+
+The shared installer emits original staged work after the leading arm guard,
+then installs the returned predicate against those current private bindings.
+No synthetic source binding is needed for the returned logical tree. All prefix
+effects and fallible arguments finish before the return value, even when it is
+false or skips a later RHS. The existing value join and original source exit
+still suppress the callee suffix while allowing its caller to continue.
+Proof failures remain atomic before creating names or helper functions.
+
+The [private-prefix fixture](../../tools/nuisc/tests/native_application_bridge/return_prefix_logical_effectful_scalar_selections.ns)
+extends the paired-return example with private bool updates, a logical constant
+and an unused i64 call in each arm. Markers 96 and 97 must run once in the selected
+arm even when a later logical return skips work; inactive prefix arguments carry
+zero divisors. The 32 input combinations define 480 successful registered
+transitions across fresh/cache/three source-free cycles. Eleven selected traps
+cover conditions, return operands, both initial prefix calls and both unused
+prefix calls, forbidding later work and publication. Success assertions compare
+complete state/stdout, policy identity and executable bytes after removal of
+source, manifest and project cache.
+
+Private logical return prefix acceptance: Final selected acceptance passes 570
+distinct tests: 308 compiler/outliner/artifact/direct-call/branch/async/loop/
+scalar-control units, eight typed selected-return/effect-boundary units, 173 LLVM
+tests including ignored cases, 50 native bridge/ordinary-AOT regressions, four
+focused paired-return/private-prefix CLI workflows and 27 tensor units. Exact
+compiler/typed test names have zero overlap. Earlier receipts remain historical;
+targeted reruns and native truth variants are not extra distinct tests.
+
+The four CLI workflows cover 960 successful registered transitions and 18
+selected trap scenarios. The new private-prefix fixture contributes 480
+transitions and eleven condition/prefix/return-value traps. Fresh/cache/three
+source-free restorations verify exact bool state/stdout, policy identity and
+executable bytes. Required prefix and unused-call effects finish even when a
+later RHS is skipped or the result is false; current private versions and
+constant seals remain intact, the callee suffix never runs and the caller
+continues. Structural NIR placement and transitive function-local YIR Effect
+paths remain independent checks. Default/empty grants and removed-order graphs
+still veto; common guard/backend/effect authority is unchanged.
+
+Static checks pass 2276 registered drift checks, all 35 changed/new Rust/Markdown/
+Nuis file caps, 4903 recognized UTF-8 files, 3239 README/docs local links and 4771
+whole-worktree Markdown targets. All six complete preceding paired-return fields
+retain their frozen SHA-256 hashes; the selected cell stays `active/99`. Its next
+independent task is bounded nested paired logical bool return selections with
+every original leaf returning, independent private scopes and original-site work.
+Ordinary CLI rebuild/live verification is an independent finalization gate.
+
+New native evidence is bool/i64 scalar work, not new GPU/Linux/Windows execution,
+measured performance, publisher authentication, formal memory-safety proof or
+completed self-hosting. Full-workspace, historical socket and strict-Clippy gates
+remain separate. The committed beta-0.16.2 baseline is unchanged.
+
+Reproduce this selected cohort serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_return_logical_effectful_scalar_selections native_return_prefix_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Private-prefix finalization: The ordinary CLI was rebuilt after publishing the
+fresh receipt. Its live tensor reports clean coverage, hierarchy, task-card
+lineage and drift, with 2276/2276 registered checks and zero failures. It retains
+active/99, the next nested complete-return task and all six full predecessor
+hashes. The 27 tensor tests passed again after finalization; this adds no distinct
+units.
+
+## Nested Logical Return Trees
+
+The return owner now has a separate bounded proof for complete nested selection
+trees. Every original leaf must end in an exact owned-bool value return; the
+enclosing function retains that same original result authority. At least one
+leaf return has a direct logical root. At its initial checkpoint, an arm was
+either one complete child selection or zero-to-16 fresh private scalar statements
+followed by its original return. Private ancestor staging before child selections
+now has the separate extension below; partial/mixed exits remain excluded. Earlier
+receipts describe historical checkpoints, not the expanded current boundary.
+
+The whole tree shares 64 original statement nodes, 256 expression nodes and 32
+logical edges; selections have at most eight levels and combined expression depth
+stays below 32. Original selections, prefix statements and returns are charged
+once, not per generated helper. Each arm-capture union stays within 31 exact
+current scalar bindings plus its saved gate. Descendant condition reads propagate
+to ancestor captures, including reads absent from all terminal values. Every
+leaf reuses independent private staging, read-before-write versions, constant
+seals and complete unused-call effects. No child can export locals or write the
+entering parent scope, and late invalid siblings veto before names are installed.
+
+Pure child subtrees are provable independently. Non-pure call discovery belongs
+to the complete candidate, including descendant conditions and unused prefixes;
+a wholly pure candidate keeps its existing owner. Discovery still grants no
+native/backend/effect eligibility. The established guarded installer emits each
+child condition only after its ancestor guard, then preserves the child's joined
+return and the original parent exit. Real false values are not continuation
+signals. No new YIR instruction, ABI, backend path or effect exception is added.
+
+The [four-leaf fixture](../../tools/nuisc/tests/native_application_bridge/return_tree_logical_effectful_scalar_selections.ns)
+uses selected AND/OR descendant conditions, bool/i64 same-name private locals,
+private version updates and a logical constant. All 16 input combinations define
+240 successful lifecycle transitions across fresh/cache/three source-free
+restorations. Eleven selected traps cover the outer condition, both descendant
+condition RHSs, all four required prefixes and all four return RHSs. Inactive
+arguments contain zero divisors. Exact full state/stdout, policy and executable
+bytes are compared; the callee suffix 80 never runs while caller marker 79 follows
+every successful return. Traps prohibit later work/publication without demanding
+earlier buffered output survive. Structural NIR guards and transitive function-
+local YIR Effect paths are separate checks; default/empty grants and removed-order
+graphs still veto. This is scalar bool/i64 evidence, not new GPU/platform execution,
+measured performance, authentication, formal safety proof or self-hosting.
+
+Nested logical return tree acceptance: Final selected acceptance passes 576
+distinct tests: 314 compiler/outliner/artifact/direct-call/branch/async/loop/
+scalar-control units, eight typed selected-return/effect-boundary units, 173 LLVM
+tests including ignored cases, 50 native bridge/ordinary-AOT regressions, four
+private-prefix/complete-return-tree CLI workflows and 27 tensor units. Exact
+compiler/typed test names have zero overlap. Earlier receipts remain historical;
+targeted reruns and native truth variants are not extra distinct tests.
+
+The four CLI workflows cover 720 successful lifecycle transitions and 22
+selected trap scenarios. The new complete-return-tree fixture contributes 240
+transitions and eleven outer/descendant-condition, required-prefix and return-RHS
+traps. Fresh/cache/three source-free restorations compare exact full state/stdout,
+policy and executable bytes. Ancestor guards retain once-only original work and
+independent private leaves; required prefixes run even when the returned RHS is
+skipped. Actual false values return normally, the callee suffix never runs and
+the caller continues. NIR placement and transitive function-local YIR Effect paths
+are independent checks. Default/empty grants and removed-order graphs still veto;
+common guard/backend/effect authority remains unchanged.
+
+Static checks pass 2286 registered drift checks, all 41 changed/new file caps,
+4909 recognized UTF-8 files, 3243 README/docs local links and 4775 whole-worktree
+Markdown targets. All six full preceding private-prefix fields retain their
+frozen SHA-256 hashes. The selected cell stays `active/99`; the next task is
+bounded private scalar staging before nested child selections with current
+scope/seal/capture/work/return authority intact. Ordinary CLI rebuild/live
+verification is an independent finalization gate.
+
+This is scalar bool/i64 evidence, not new GPU/Linux/Windows execution, measured
+performance, publisher authentication, formal memory-safety proof or completed
+self-hosting. Full-workspace, historical socket and strict-Clippy gates remain
+separate. The committed beta-0.16.2 baseline is unchanged.
+
+Reproduce this selected cohort serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_return_prefix_logical_effectful_scalar_selections native_return_tree_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Complete-return-tree finalization: The ordinary CLI was rebuilt after publishing
+the fresh receipt. Its live tensor reports clean coverage, hierarchy, task-card
+lineage and drift, with 2286/2286 registered checks and zero failures. It retains
+active/99, the next private ancestor-staging task and all six full predecessor
+hashes. The 27 tensor tests passed again after publication; this adds no distinct
+units.
+
+## Private Return Ancestor Staging
+
+Complete logical bool return trees now admit zero-to-16 fresh private scalar
+let/const statements before a terminal child selection in a selected arm. Every
+original leaf still returns an exact owned bool, and at least one leaf return has
+a direct logical root. Leaf and ancestor work share the same fresh staging proof,
+including nonlogical scalar lets, logical bool lets/constants, private version
+updates and complete unused effects. Arbitrary nonlogical constants are not added.
+
+Each stage starts from its exact entering scope and cannot write any entering
+binding. This also seals inherited private constants across descendant stages;
+the existing stage proof separately enforces local constant seals. A stage can
+update its own fresh preceding versions. The terminal child is proven against
+the completed staged scope, so conditions and leaves consume current values,
+including ancestor locals. Complete descendant reads subtract only names actually
+defined by that stage from outward transport, while original prefix reads remain
+captures even when their results are unused. Sibling scopes remain independent.
+
+Original stages, selections and returns are charged once against the same whole-
+tree 64-statement/256-expression/32-logical-edge budget, eight selection levels,
+below-32 combined expression depth and 31-capture-plus-gate bound. Scope changes
+never reset budgets or clone prefix effects into leaves. Whole-tree discovery
+includes unused ancestor calls while pure complete children remain independently
+provable; signature discovery still grants no effects/backend eligibility.
+
+The shared installer emits ancestor work after its leading guard and before the
+original child condition. Existing predicate helpers retain selected RHS work;
+child plans retain original joined returns and caller continuation, including
+real false results. There is no new YIR instruction, ABI, effect exception or
+backend-specific path. Late invalid siblings veto before helpers/names install.
+At this initial ancestor-staging checkpoint, conditional updates within a prefix
+remained separate. The private bool-update extension below now proves flat
+prefix-owned bool updates. Entering-binding writes, generalized intermediate
+selection/suffix combinations, hidden logical leaves, partial/mixed exits, loops
+and resource transport remain outside this proof.
+
+The [ancestor-staging fixture](../../tools/nuisc/tests/native_application_bridge/return_ancestor_logical_effectful_scalar_selections.ns)
+extends the four-leaf tree with bool/i64 same-name ancestor locals, private current
+updates, logical seals and unused calls before descendant conditions. Return RHS
+probes compare the actual inherited seal to the original expected value. All 16
+input combinations define 240 successful lifecycle transitions across fresh/cache/
+three source-free restorations. Sixteen selected traps cover outer/descendant
+conditions, all leaf prefixes/RHSs, both ancestor initializers, a selected logical
+stage RHS and both unused ancestor calls. Inactive arguments have zero divisors;
+required unused calls still trap when the child condition skips a RHS or the
+eventual result is false. Exact full state/stdout, policy and executable bytes are
+compared. The callee suffix never runs and caller marker 79 follows successful
+returns. Default/empty grants and removed transitive Effect order still veto.
+
+Private return ancestor staging acceptance: Final selected acceptance passes 582
+distinct tests: 320 compiler/outliner/artifact/direct-call/branch/async/loop/
+scalar-control units, eight typed selected-return/effect-boundary units, 173 LLVM
+tests including ignored cases, 50 native bridge/ordinary-AOT regressions, four
+complete-return-tree/private-ancestor-stage CLI workflows and 27 tensor units.
+Exact compiler/typed test names have zero overlap. Earlier receipts are historical;
+targeted reruns and truth variants are not additional distinct tests.
+
+The four CLI workflows cover 480 successful lifecycle transitions and 27
+selected trap scenarios. The new staged four-leaf fixture contributes 240
+transitions and sixteen outer/ancestor-stage/descendant-condition/leaf traps.
+Fresh/cache/three source-free restorations compare complete state/stdout, policy
+and exact executable bytes. Current private values/seals reach original child
+conditions and returns; unused ancestor calls remain required before child work.
+Inactive checks stay skipped, real false results preserve original exits and
+caller continuation, and the callee suffix never runs. Structural NIR placement
+and transitive function-local YIR Effect paths remain independent checks.
+Default/empty grants and removed-order graphs still veto; common guard/backend/
+effect authority is unchanged.
+
+Static checks pass 2296 registered drift checks, all 46 changed/new file caps,
+4914 recognized UTF-8 files, 3247 README/docs local links and 4779 whole-worktree
+Markdown targets. All six full preceding complete-return-tree fields retain their
+frozen SHA-256 hashes. The cell stays `active/99`; next prove prefix-owned private
+bool-update selections before complete logical return trees under shared scope/
+seal/capture/work/return authority. Ordinary CLI rebuild/live verification is an
+independent finalization gate.
+
+This is scalar bool/i64 evidence, not new GPU/Linux/Windows execution, measured
+performance, publisher authentication, formal memory-safety proof or completed
+self-hosting. Full-workspace, historical socket and strict-Clippy gates remain
+separate. The committed beta-0.16.2 baseline is unchanged.
+
+Reproduce this selected cohort serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_return_tree_logical_effectful_scalar_selections native_return_ancestor_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Private ancestor-staging finalization: The ordinary CLI was rebuilt after
+publishing the fresh receipt. Its live tensor reports clean coverage, hierarchy,
+task-card lineage and drift, with 2296/2296 registered checks and zero failures.
+It retains active/99, the next private conditional-prefix-update task and all six
+full predecessor hashes. The 27 tensor tests passed again after publication;
+this adds no distinct units.
+
+## Private Return Bool Updates
+
+Private scalar prefixes before original bool returns or terminal complete return
+selections now admit bounded consecutive `if/else` updates. Each nonempty update
+arm must be exactly one `let` to the same exact owned bool already defined in the
+current prefix. Two-sided updates and either one-sided polarity are accepted;
+empty/empty branches, fresh child exports, non-bool targets and writes to any
+entering or sealed binding are rejected. Inherited ancestor bindings remain
+read-only even when they originated as private mutable names in another stage.
+
+The prefix walk preserves scalar/logical stages and constant seals in source
+order. It proves each update condition and both original value arms against the
+current scope, then reuses the existing guarded leaf and common join plans.
+Read-before-write captures and retained outcomes carry the actual preceding
+value, not an inactive helper seed. A retained empty arm is transport, not an
+invented source statement or expression. Original conditions, update lets,
+logical edges, subsequent stages and every original return share the established
+64-node/256-expression/32-logical-edge budget, eight selection levels, below-32
+expression depth and 31 captures plus a gate. Consecutive updates do not add
+selection nesting or reset budgets. Complete original unused reads and effects
+remain required, and only private definitions are subtracted from outward reads.
+
+The existing stage installer emits guarded update plans at their original
+positions after the enclosing ancestor guard and before later conditions,
+constants, unused work or returned values. The whole candidate is proven before
+helpers and names are installed. Whole-tree non-pure discovery includes update
+conditions or otherwise unused private update work, but grants no effect/backend
+eligibility. No YIR instruction, public ABI or Nustar-specific path is added.
+
+The [private-update fixture](../../tools/nuisc/tests/native_application_bridge/return_update_logical_effectful_scalar_selections.ns)
+uses two-sided `||`/`&&` updates, consecutive one-sided retention, a logical seal,
+unused checked work, an independently owned leaf-local update and four original
+return leaves. Its source oracle covers all 16 seed/outer/inner/reply combinations,
+poisons every inactive denominator and checks complete state and print traces.
+Fresh/cache/three source-free cycles define 240 lifecycle transitions, with exact
+policy and executable-byte identity; twelve selected traps cover outer/initializer/
+update conditions and RHSs, retained updates, unused work, leaf updates and return
+RHSs before publication. The callee marker 80 remains unreachable; successful
+real false returns still continue into caller marker 79.
+
+Structural tests independently pin current/retained captures, private placement,
+constant seals, condition-only discovery, original node/expression/edge accounting,
+16/17 prefix statements, 64/65 whole-tree nodes, 31/32 captures, 32/33 edges and
+ancestor/update depth limits. Atomic negatives include late invalid siblings,
+borrowed/optional/generic types, incoming/sealed/nonbool writes, hidden roots,
+fresh exports, nested/multiple-statement update arms, loops and partial/mixed exits.
+YIR artifact tests verify transitive function-local Effect paths and retained
+default/empty-policy and removed-order vetoes independently of the native oracle.
+
+Nested private update arms remain the next separate proof. They must preserve
+current prefix ownership, read-before-write/retained outcomes, all original work,
+shared depth/budgets and complete return authority without leaking child locals
+or granting entering/constant writes. General resources, effect authority,
+GPU/Linux/Windows execution, measured speedups, formal memory-safety proof and
+completed self-hosting are not established by this scalar CPU follow-up.
+
+Private return bool-update acceptance: The 2026-10-11 selected acceptance passes
+**588 distinct tests**: 326 compiler/outliner/artifact/direct-call/branch/async/loop/
+scalar-control units, eight typed selected-return/effect-boundary units, 173 LLVM
+tests including ignored cases, 50 native bridge/ordinary-AOT regressions, four
+private-ancestor-stage/private-bool-update CLI workflows and 27 tensor units.
+Exact compiler/typed test names have zero overlap; focused reruns and input truth
+variants are not additional distinct tests. Earlier receipts remain historical.
+
+The selected CLI cohort covers 480 successful lifecycle transitions and 28
+selected trap scenarios. The new private-update fixture contributes 240
+transitions and twelve traps. Fresh/cache/three source-free restorations compare
+full state/stdout, policy and exact executable bytes. Current read-before-write
+and retained bool outcomes remain selected; constants stay sealed, unused work
+remains required, real false results retain source exits and caller continuation,
+and inactive poisoned arguments never run. Independent NIR placement/budget and
+transitive function-local YIR Effect checks retain default/empty-grant and
+removed-order vetoes without widening common guard/backend/effect authority.
+
+Static checks pass 2307 registered drift checks, all 53 changed/new file caps,
+4920 recognized UTF-8 files, 3251 README/docs local links and 4783 whole-worktree
+Markdown targets. All six full preceding private-ancestor-staging fields retain
+their frozen SHA-256 hashes. The cell remains `active/99`; next prove nested
+private bool-update arms under the same prefix ownership, current/retained
+captures, seals, original return authority and shared tree limits. Ordinary CLI
+rebuild/live verification remains an independent finalization gate.
+
+This is scalar CPU evidence, not new GPU/Linux/Windows execution, measured
+performance, publisher authentication, formal memory-safety proof or completed
+self-hosting. Full-workspace and strict-Clippy gates remain separate; the
+committed beta-0.16.2 baseline is unchanged.
+
+Reproduce this selected cohort serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_return_ancestor_logical_effectful_scalar_selections native_return_update_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+Private bool-update finalization: The ordinary CLI was rebuilt after publishing
+the fresh receipt. Its live tensor reports clean coverage, hierarchy, task-card
+lineage and drift, with 2307/2307 registered checks and zero failures. It retains
+active/99, the next nested private-update task and all six full predecessor
+hashes; every current field matches the published source. The 27 tensor tests
+passed again after publication, adding no distinct units.
 
 ## Effect Order
 

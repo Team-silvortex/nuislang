@@ -16,6 +16,9 @@ mod ordered;
 #[path = "effectful_selections_predicates.rs"]
 mod predicates;
 
+#[path = "effectful_selections_returns.rs"]
+mod returns;
+
 type Signatures = BTreeMap<String, (Vec<NirTypeRef>, NirTypeRef)>;
 
 // Signature discovery is not body/effect admission. Generated guards retain
@@ -71,6 +74,17 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
                     None
                 } else {
                     nested::prepare(condition, then_body, else_body, &scope, &signatures, &pure)
+                        .or_else(|| {
+                            returns::prepare(
+                                function.return_type.as_ref(),
+                                condition,
+                                then_body,
+                                else_body,
+                                &scope,
+                                &signatures,
+                                &pure,
+                            )
+                        })
                         .or_else(|| {
                             prepare(condition, then_body, else_body, &scope, &signatures, &pure)
                         })
@@ -130,6 +144,9 @@ struct Plan {
 
 enum SelectedValue {
     Expression(NirExpr),
+    Predicate(predicates::Predicate),
+    StagedPredicate(Vec<regions::Statement>, predicates::Predicate),
+    StagedNested(Vec<regions::Statement>, Box<Plan>),
     Nested(Box<Plan>),
     Region(Vec<regions::Statement>, NirExpr),
     Ordered(
@@ -271,6 +288,13 @@ fn install(
         // Descendant predicates are emitted only after this ancestor guard.
         let value = match value {
             SelectedValue::Expression(value) => value,
+            SelectedValue::Predicate(predicate) => {
+                predicates::install(predicate, names, bindings, helpers)
+            }
+            SelectedValue::StagedPredicate(statements, predicate) => {
+                body.extend(regions::install(statements, names, bindings, helpers));
+                predicates::install(predicate, names, bindings, helpers)
+            }
             SelectedValue::Region(statements, value) => {
                 body.extend(regions::install(statements, names, bindings, helpers));
                 value
@@ -285,6 +309,12 @@ fn install(
                 result
             }
             SelectedValue::Nested(child) => {
+                let (statements, result, _) = install(*child, names, bindings, helpers);
+                body.extend(statements);
+                NirExpr::Var(result)
+            }
+            SelectedValue::StagedNested(stage, child) => {
+                body.extend(regions::install(stage, names, bindings, helpers));
                 let (statements, result, _) = install(*child, names, bindings, helpers);
                 body.extend(statements);
                 NirExpr::Var(result)

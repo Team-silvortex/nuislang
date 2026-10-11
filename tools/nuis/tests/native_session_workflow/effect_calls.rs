@@ -35,6 +35,27 @@ mod staging_logical;
 #[path = "effect_call_update_logical.rs"]
 mod update_logical;
 
+#[path = "effect_call_child_logical.rs"]
+mod child_logical;
+
+#[path = "effect_call_top_logical.rs"]
+mod top_logical;
+
+#[path = "effect_call_return_logical.rs"]
+mod return_logical;
+
+#[path = "effect_call_return_prefix_logical.rs"]
+mod return_prefix_logical;
+
+#[path = "effect_call_return_tree_logical.rs"]
+mod return_tree_logical;
+
+#[path = "effect_call_return_ancestor_logical.rs"]
+mod return_ancestor_logical;
+
+#[path = "effect_call_return_update_logical.rs"]
+mod return_update_logical;
+
 const SOURCE: &str =
     include_str!("../../../nuisc/tests/native_application_bridge/effectful_selected_calls.ns");
 const REBIND_SOURCE: &str =

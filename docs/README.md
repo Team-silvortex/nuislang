@@ -49,8 +49,28 @@ that proof within selected scalar regions and prefix/middle/suffix stages,
 keeping private declarations, current versions and cross-stage constant seals.
 Existing owned-bool let roots now update private stage bindings or the sole
 published bool target, preserving read-before-write captures and constant seals.
-Single-statement logical child leaves, hidden logical leaves and generalized
-resource/exit transport remain outside this distinct proof.
+Single-statement child leaves now reuse the stage proof for an existing
+owned-bool target, with both-sided or retained outcomes. The
+[top-level logical-arm follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#top-level-logical-arms)
+now also admits single-statement existing-bool updates through that shared plan,
+including consecutive current merges and condition-only effects. Hidden logical
+leaves and generalized resource/exit transport remain separate. The
+[paired logical-return proof](reference/nuis-native-effectful-scalar-selection-v1.md#paired-logical-bool-returns)
+now also covers two-sided single owned-bool returns, keeping shared condition/
+value budgets, original exits and caller continuation. The
+[private return-prefix follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-logical-return-prefixes)
+reuses selected staging with isolated fresh scopes, current versions, constant
+seals and complete unused-call effects. The
+[complete return-tree follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#nested-logical-return-trees)
+now composes bounded all-return nested selections with guarded inner conditions,
+isolated private leaves and one shared original-work budget. The
+[private ancestor-staging follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-ancestor-staging)
+now retains fresh scalar work before terminal inner selections, with current
+private versions/seals and complete descendant captures. The
+[private bool-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
+adds bounded consecutive paired/one-sided updates of prefix-owned bools, retaining
+current values without permitting incoming or sealed writes. Nested update arms
+and mixed/single exits remain separate.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

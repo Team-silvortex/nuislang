@@ -236,9 +236,7 @@ fn update_logical_effectful_scalar_selections_reject_constants_hidden_roots_othe
     ));
     rejected(&source(
         "bool",
-        "if gate {
-        if first { let saved = saved && decide(saved); }
-        if second { let saved = work(saved); } }",
+        "if gate { const saved: bool = saved && decide(saved); }",
     ));
     let text = source(
         "bool",

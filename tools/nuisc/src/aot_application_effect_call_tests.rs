@@ -31,6 +31,27 @@ mod staging_logical;
 #[path = "aot_application_effect_call_update_logical_tests.rs"]
 mod update_logical;
 
+#[path = "aot_application_effect_call_child_logical_tests.rs"]
+mod child_logical;
+
+#[path = "aot_application_effect_call_top_logical_tests.rs"]
+mod top_logical;
+
+#[path = "aot_application_effect_call_return_logical_tests.rs"]
+mod return_logical;
+
+#[path = "aot_application_effect_call_return_prefix_logical_tests.rs"]
+mod return_prefix_logical;
+
+#[path = "aot_application_effect_call_return_tree_logical_tests.rs"]
+mod return_tree_logical;
+
+#[path = "aot_application_effect_call_return_ancestor_logical_tests.rs"]
+mod return_ancestor_logical;
+
+#[path = "aot_application_effect_call_return_update_logical_tests.rs"]
+mod return_update_logical;
+
 const SOURCE: &str = include_str!("../tests/native_application_bridge/effectful_selected_calls.ns");
 
 fn compiled(source: &str) -> (Fixture, yir_core::YirModule, String) {
