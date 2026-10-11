@@ -1124,8 +1124,9 @@ this adds no distinct units.
 
 ## Private Return Bool Updates
 
-Private scalar prefixes before original bool returns or terminal complete return
-selections now admit bounded consecutive `if/else` updates. Each nonempty update
+At the flat-only checkpoint, private scalar prefixes before original bool returns
+or terminal complete return selections admitted bounded consecutive `if/else`
+updates. Each nonempty update
 arm must be exactly one `let` to the same exact owned bool already defined in the
 current prefix. Two-sided updates and either one-sided polarity are accepted;
 empty/empty branches, fresh child exports, non-bool targets and writes to any
@@ -1171,7 +1172,8 @@ fresh exports, nested/multiple-statement update arms, loops and partial/mixed ex
 YIR artifact tests verify transitive function-local Effect paths and retained
 default/empty-policy and removed-order vetoes independently of the native oracle.
 
-Nested private update arms remain the next separate proof. They must preserve
+At that checkpoint, nested private update arms remained the next separate proof.
+They must preserve
 current prefix ownership, read-before-write/retained outcomes, all original work,
 shared depth/budgets and complete return authority without leaking child locals
 or granting entering/constant writes. General resources, effect authority,
@@ -1226,6 +1228,113 @@ lineage and drift, with 2307/2307 registered checks and zero failures. It retain
 active/99, the next nested private-update task and all six full predecessor
 hashes; every current field matches the published source. The 27 tensor tests
 passed again after publication, adding no distinct units.
+
+## Nested Private Return Bool Updates
+
+At the nested-only checkpoint, update arms composed before complete logical return trees. Bounded
+terminal exports must name the same exact owned bool already defined and unsealed
+in the current prefix. Either empty arm retains the actual current value; nested
+empty/empty branches still evaluate their original conditions when another arm
+establishes a valid target. An entirely update-free candidate does not manufacture
+target authority. Terminal target discovery has its own bounded 64-statement scan
+and eight-selection-level check before proof/installation.
+
+Each nonempty child arm admits bounded private staging before its terminal update
+or nested selection. Fresh scalar/logical stages, logical constant seals, unused
+checked calls and updates of child-owned bools reuse the existing prefix owner.
+At that checkpoint, entering bindings, including the exported target, could not
+be written during staging; only terminal descendants could write the target.
+The ordered follow-up below extends only that already authorized target.
+Children do not export their other locals to siblings
+or ancestors. Complete stage reads/effects remain required, and only actual
+child-private definitions are subtracted from outward captures.
+
+Current read-before-write captures, both retention polarities, every original
+condition/stage/update/return and all complete return subtrees use one shared
+original-work budget: 64 nodes, 256 expressions, 32 logical edges, eight selection
+levels, below-32 expression depth and 31 captures plus a gate. Transport retention
+charges no invented source nodes/expressions. Independent child prefixes admit
+at most 16 original statements. Ordinary leaf, guarded join, region and staged
+nested plans are reused; no new YIR instruction, ABI or backend-specific route
+is added. Candidate failure remains atomic before helper/name installation.
+
+The [nested-update fixture](../../tools/nuisc/tests/native_application_bridge/return_nested_update_logical_effectful_scalar_selections.ns)
+has child-local initialization and paired updates, a logical seal, an unused
+checked call, two nested
+conditions, paired/retained target outcomes and a nested leaf-local update before
+four original bool returns. Its independent imperative oracle covers all 16
+seed/outer/inner/reply combinations, poisons every inactive denominator and checks
+complete state and stdout. Fresh/cache/three source-free restorations define
+240 successful lifecycle transitions with policy and exact binary-byte identity.
+Sixteen selected traps cover every checked helper site before state publication.
+Actual false returns still suppress callee marker 80 and continue into caller 79.
+
+NIR tests pin private/current capture placement, nested retention, constant seals,
+child-owned updates, original 8-node/15-expression/2-edge accounting, child-prefix
+16/17, total selection depth 8/9, capture unions 31/32 and bounded target discovery.
+Late invalid sibling reads, inherited/sealed/nonbool writes, multiple targets,
+hidden roots, early/mixed returns, loops and resource shapes reject atomically.
+Artifact tests independently require function-local transitive Effect paths from
+guards through checks/calls and retain default/empty-policy and removed-order
+vetoes.
+
+Ordered writes to the exported target earlier in an update-arm prefix were the
+next distinct proof; the [ordered private-update contract](nuis-native-private-ordered-return-updates-v1.md)
+now records that follow-up and its own fresh acceptance.
+The later [trailing-private-work contract](nuis-native-private-trailing-return-updates-v1.md)
+separately proves final private let/const stages without making them exported targets.
+The [terminal-private-child contract](nuis-native-private-terminal-child-return-updates-v1.md)
+keeps terminal child selections private while retaining the current ancestor result.
+General resources, hidden roots, mixed/partial exits,
+wider effect authority, new GPU/Linux/Windows execution, measured speedups,
+publisher authentication, formal memory safety and completed self-hosting are
+not established here. Earlier receipts above remain historical. Git baseline for
+this work is `8a760089` (`beta-0.16.3`); no version bump/commit/push is part of this
+follow-up.
+
+Nested private return bool-update acceptance: The 2026-10-11 selected acceptance
+passes **594 distinct tests**: 332 compiler/outliner/artifact/direct-call/branch/
+async/loop/scalar-control units, eight typed selected-return/effect-boundary units,
+173 LLVM tests including ignored cases, 50 native bridge/ordinary-AOT regressions,
+four flat/nested private-update CLI workflows and 27 tensor units. Exact compiler/
+typed test names have zero overlap; focused reruns and
+truth variants are not additional distinct tests. Earlier receipts remain historical.
+
+The selected CLI cohort defines 480 successful lifecycle transitions and 28
+selected traps. The nested fixture contributes 240 transitions and sixteen traps;
+fresh/cache/three source-free restorations compare full state/stdout, policy and
+exact executable bytes. All original child stages, unused checks, nested
+conditions, current/retained updates and complete bool returns remain selected.
+Inactive poisoned arguments never run, actual false results retain their source
+exits and caller continuation, and no private child values escape outward.
+
+Reproduce this selected cohort serially from the repository root:
+
+```sh
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- logical_effectful_scalar_selections native_ordered_effectful_scalar_selections ordered_effectful_scalar_selections native_repeated_effectful_scalar_selections repeated_effectful_scalar_selections native_continued_effectful_scalar_selections continued_effectful_scalar_selections native_staged_effectful_scalar_selections staged_effectful_scalar_selections sequential_effectful_scalar_regions native_sequential_effectful_scalar_regions native_nested_effectful_scalar_selections nested_effectful_scalar_selections native_effectful_selected_calls native_effectful_scalar_rebindings effectful_scalar_rebindings effectful_selection aot_application_bundle tests_direct_calls tests_guard_buffer_order tests_recursive_composed_calls tests_higher_order_direct_calls tests_branch_helpers tests_branch_host_calls tests_async_runtime::tail_recursion tests_async_runtime::recursive_helpers tests_async_runtime::compound_flow tests_loops_terminal scalar_control::tests --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- conditional_return_typed_handoff conditional_return_effect_boundaries --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p yir-lower-llvm --lib --locked -j1 -- --include-ignored --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- native_literal_print_policy conditional_return_typed_handoff reachable_helpers_reject selected_call_graph aggregate_admission:: typed_helper_admission:: helper_entries:: --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- native_return_update_logical_effectful_scalar_selections native_return_nested_update_logical_effectful_scalar_selections --test-threads=1 --quiet
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1 --quiet
+```
+
+The initial tensor cohort found a historical evidence-prefix mismatch; its fixed
+protocol anchor was restored without weakening the test, and all 27 units pass
+again. Static checks pass 2316 registered drift checks, all 18 changed/new file
+caps, 4876 recognized UTF-8 source/config/documentation files, 3255 README/docs
+local targets and 4787 whole-worktree Markdown targets. All six full preceding
+flat-private-update strings retain their frozen SHA-256 hashes. Active/99 remains
+unchanged; bounded ordered target writes in child arms are next. Ordinary CLI
+rebuild/live verification remains an independent finalization gate.
+
+Nested private-update finalization: The ordinary CLI was rebuilt after receipt
+publication. Its live tensor reports clean coverage, hierarchy, task-card lineage
+and drift, with 2316/2316 registered checks and zero failures. All six current
+fields equal their published source, and all six complete predecessor hashes
+remain unchanged. Active/99 and the ordered child-arm target-update task remain
+selected. All 27 tensor tests pass again after publication, adding no distinct
+units.
 
 ## Effect Order
 

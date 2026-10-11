@@ -68,9 +68,25 @@ pub(super) fn stage(
     budget: &mut nested::Budget,
     depth: usize,
 ) -> Option<regions::Staging> {
+    stage_authorized(prefix, scope, signatures, budget, depth, None)
+}
+
+fn stage_authorized(
+    prefix: &[NirStmt],
+    scope: &Scope,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+    authorized: Option<&updates::Target<'_>>,
+) -> Option<regions::Staging> {
     if prefix.len() > 16 {
         return None;
     }
+    if authorized.is_some_and(|target| scope.get(target.name()) != Some(&scalar_type("bool"))) {
+        return None;
+    }
+    // Permission does not define a new version. The first RHS must still
+    // capture entering values; only proven source writes advance `defined`.
     let mut staged = regions::Staging {
         local: scope.clone(),
         defined: BTreeSet::new(),
@@ -80,50 +96,75 @@ pub(super) fn stage(
         statements: Vec::new(),
     };
     for statement in prefix {
-        if let NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } = statement
-        {
-            let proof = updates::prove(
-                condition, then_body, else_body, &staged, signatures, budget, depth,
-            )?;
-            staged
-                .inputs
-                .extend(proof.inputs.difference(&staged.defined).cloned());
-            staged.calls.extend(proof.calls);
-            let SelectedValue::Nested(plan) = proof.value else {
-                unreachable!()
-            };
-            staged.statements.push(regions::Statement::Selection(plan));
-            continue;
-        }
-        // Entering bindings are read-only, including inherited private constants.
-        let name = match statement {
-            NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => name,
-            _ => return None,
-        };
-        if scope.contains_key(name) {
-            return None;
-        }
-        let next = regions::stage(
-            std::slice::from_ref(statement),
-            &staged.local,
-            &staged.constants,
+        append_authorized(
+            statement,
+            scope,
+            &mut staged,
             signatures,
             budget,
+            depth,
+            authorized,
+        )?;
+    }
+    Some(staged)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_authorized(
+    statement: &NirStmt,
+    scope: &Scope,
+    staged: &mut regions::Staging,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+    authorized: Option<&updates::Target<'_>>,
+) -> Option<()> {
+    if let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = statement
+    {
+        let proof = updates::prove(
+            condition, then_body, else_body, staged, signatures, budget, depth, authorized,
         )?;
         staged
             .inputs
-            .extend(next.inputs.difference(&staged.defined).cloned());
-        staged.calls.extend(next.calls);
-        staged.defined.extend(next.defined);
-        staged.local = next.local;
-        staged.constants = next.constants;
-        staged.statements.extend(next.statements);
+            .extend(proof.inputs.difference(&staged.defined).cloned());
+        staged.calls.extend(proof.calls);
+        let SelectedValue::Nested(plan) = proof.value else {
+            unreachable!()
+        };
+        staged.statements.push(regions::Statement::Selection(plan));
+        return Some(());
     }
-    Some(staged)
+    // All entering bindings except the delegated let target stay read-only.
+    let name = match statement {
+        NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => name,
+        _ => return None,
+    };
+    if scope.contains_key(name)
+        && (!matches!(statement, NirStmt::Let { .. })
+            || !authorized.is_some_and(|target| target.name() == name))
+    {
+        return None;
+    }
+    let next = regions::stage(
+        std::slice::from_ref(statement),
+        &staged.local,
+        &staged.constants,
+        signatures,
+        budget,
+    )?;
+    staged
+        .inputs
+        .extend(next.inputs.difference(&staged.defined).cloned());
+    staged.calls.extend(next.calls);
+    staged.defined.extend(next.defined);
+    staged.local = next.local;
+    staged.constants = next.constants;
+    staged.statements.extend(next.statements);
+    Some(())
 }
 
 pub(super) fn body(

@@ -52,6 +52,21 @@ mod return_ancestor_logical;
 #[path = "aot_application_effect_call_return_update_logical_tests.rs"]
 mod return_update_logical;
 
+#[path = "aot_application_effect_call_return_nested_update_logical_tests.rs"]
+mod return_nested_update_logical;
+
+#[path = "aot_application_effect_call_return_ordered_update_logical_tests.rs"]
+mod return_ordered_update_logical;
+
+#[path = "aot_application_effect_call_return_retention_update_logical_tests.rs"]
+mod return_retention_update_logical;
+
+#[path = "aot_application_effect_call_return_trailing_update_logical_tests.rs"]
+mod return_trailing_update_logical;
+
+#[path = "aot_application_effect_call_return_terminal_child_update_logical_tests.rs"]
+mod return_terminal_child_update_logical;
+
 const SOURCE: &str = include_str!("../tests/native_application_bridge/effectful_selected_calls.ns");
 
 fn compiled(source: &str) -> (Fixture, yir_core::YirModule, String) {

@@ -139,9 +139,24 @@ without exporting them. The
 [private bool-update follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
 adds paired or one-sided single-statement updates of bools already defined in the
 current private prefix, including consecutive updates and retained current values.
-Entering bindings and constants remain read-only. Nested update arms, hidden
-ordinary leaves and mixed/single exits remain separate; common guard/backend/
-effect authority is not widened.
+The [nested private-update follow-up](docs/reference/nuis-native-effectful-scalar-selection-v1.md#nested-private-return-bool-updates)
+also admits nested terminal updates with independent bounded private staging,
+logical seals, unused calls and actual retained outcomes under shared tree limits.
+The [ordered private-update follow-up](docs/reference/nuis-native-private-ordered-return-updates-v1.md)
+also permits bounded source-ordered writes to the one already authorized bool
+target inside its update arm, preserving incoming reads until an actual source
+write replaces them. Other entering bindings and constants remain read-only.
+The [retention-tail follow-up](docs/reference/nuis-native-private-retention-return-updates-v1.md)
+also discovers actual earlier writes when terminal selections only retain values,
+without letting fresh declarations or no-write branches manufacture ownership.
+The [trailing-private-work follow-up](docs/reference/nuis-native-private-trailing-return-updates-v1.md)
+keeps final private let/const work in the original staging environment, exporting
+only the already authorized target rather than the fresh trailing binding.
+The [terminal-private-child follow-up](docs/reference/nuis-native-private-terminal-child-return-updates-v1.md)
+also proves a terminal update of one prefix-defined private bool child while
+retaining the actual ancestor target. Mixed ancestor/child writes, hidden ordinary
+leaves and mixed/single exits remain separate; common guard/backend/effect
+authority is not widened.
 Native fresh/cache/source-free runs check selection polarities, poisoned inactive
 paths and selected-stage traps without exporting child-private bindings.
 The [floating literal negation repair](docs/reference/nuis-native-float-literal-negation-v1.md)

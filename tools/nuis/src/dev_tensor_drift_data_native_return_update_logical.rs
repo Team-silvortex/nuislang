@@ -4,12 +4,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-update-private-bool-flat-arm-seal-original-budget-and-shared-join-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_updates.rs",
-        required_patterns: &["if depth >= 8", "[NirStmt::Let { name, .. }]", "!staged.defined.contains(name)", "staged.constants.contains(name)", "staged.local.get(name)? != &scalar_type(\"bool\")", "nested::consume_node(budget)?", "predicates::prove(condition, &staged.local, signatures, budget)", "nested::leaf(statement, &staged.local, signatures, budget)", "Retention is a transport outcome", "inputs: BTreeSet::from([name.clone()])", "nested::join(condition, reads, effects, yes, no, &staged.local)"],
+        required_patterns: &["if depth >= 8", "NirStmt::Let { name, .. } if eligible.contains(name) => Some(Some(name.clone()))", "!staged.defined.contains(name)", "staged.constants.contains(name)", "staged.local.get(name)? != &scalar_type(\"bool\")", "nested::consume_node(budget)?", "predicates::prove(condition, scope, signatures, budget)", "nested::leaf(statement, &staged.local, signatures, budget)", "Retention is a transport outcome", "inputs: BTreeSet::from([name.into()])", "nested::join(condition, reads, effects, yes, no, scope)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-update-source-ordered-private-stage-current-scope-and-read-subtraction",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_prefixes.rs",
-        required_patterns: &["effectful_selections_return_updates.rs", "for statement in prefix", "updates::prove(", "&staged,", "depth,", "proof.inputs.difference(&staged.defined)", "regions::Statement::Selection(plan)", "if scope.contains_key(name)", "&staged.constants", "staged.local = next.local", "staged.constants = next.constants"],
+        required_patterns: &["effectful_selections_return_updates.rs", "for statement in prefix", "updates::prove(", "condition, then_body, else_body, staged, signatures, budget, depth, authorized,", "depth,", "proof.inputs.difference(&staged.defined)", "regions::Statement::Selection(plan)", "if scope.contains_key(name)", "&staged.constants", "staged.local = next.local", "staged.constants = next.constants"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-update-shared-guarded-installer-and-unchanged-existing-target-proof",

@@ -110,6 +110,19 @@ mod return_suffixes;
 mod return_tree_logical;
 #[path = "dev_tensor_drift_data_native_return_update_logical.rs"]
 mod return_update_logical;
+
+#[path = "dev_tensor_drift_data_native_return_nested_update_logical.rs"]
+mod return_nested_update_logical;
+
+#[path = "dev_tensor_drift_data_native_return_ordered_update_logical.rs"]
+mod return_ordered_update_logical;
+
+#[path = "dev_tensor_drift_data_native_return_retention_update_logical.rs"]
+mod return_retention_update_logical;
+#[path = "dev_tensor_drift_data_native_return_terminal_child_update_logical.rs"]
+mod return_terminal_child_update_logical;
+#[path = "dev_tensor_drift_data_native_return_trailing_update_logical.rs"]
+mod return_trailing_update_logical;
 #[path = "dev_tensor_drift_data_native_scalar_aliases.rs"]
 mod scalar_aliases;
 #[path = "dev_tensor_drift_data_native_scalar_call_fields.rs"]
@@ -184,6 +197,11 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_tree_logical::CHECKS,
         return_ancestor_logical::CHECKS,
         return_update_logical::CHECKS,
+        return_nested_update_logical::CHECKS,
+        return_ordered_update_logical::CHECKS,
+        return_retention_update_logical::CHECKS,
+        return_trailing_update_logical::CHECKS,
+        return_terminal_child_update_logical::CHECKS,
         computed_return_prints::CHECKS,
         loop_calls::CHECKS,
         loop_work::CHECKS,

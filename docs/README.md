@@ -69,8 +69,22 @@ now retains fresh scalar work before terminal inner selections, with current
 private versions/seals and complete descendant captures. The
 [private bool-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
 adds bounded consecutive paired/one-sided updates of prefix-owned bools, retaining
-current values without permitting incoming or sealed writes. Nested update arms
-and mixed/single exits remain separate.
+current values without permitting incoming or sealed writes. The
+[nested private-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#nested-private-return-bool-updates)
+adds nested terminal exports with bounded private child staging, seals and unused
+work, retaining actual current outcomes and shared original-work limits. The
+[ordered private-update follow-up](reference/nuis-native-private-ordered-return-updates-v1.md)
+adds source-ordered writes to the single authorized target in those prefixes,
+without treating permission as a source-defined version. The
+[retention-tail follow-up](reference/nuis-native-private-retention-return-updates-v1.md)
+discovers actual earlier writes when terminal selections only retain current
+values, keeping fresh declarations and no-write candidates separate from
+ownership. The [trailing-private-work follow-up](reference/nuis-native-private-trailing-return-updates-v1.md)
+also proves final private let/const work without resetting seals, dropping unused
+work or exporting the fresh binding. The [terminal-private-child follow-up](reference/nuis-native-private-terminal-child-return-updates-v1.md)
+adds terminal updates of one prefix-defined private child without exporting it
+instead of the ancestor. Mixed ancestor/child writes, other entering writes and
+mixed/single exits remain separate.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

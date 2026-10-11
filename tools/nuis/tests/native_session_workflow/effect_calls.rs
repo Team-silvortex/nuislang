@@ -56,6 +56,21 @@ mod return_ancestor_logical;
 #[path = "effect_call_return_update_logical.rs"]
 mod return_update_logical;
 
+#[path = "effect_call_return_nested_update_logical.rs"]
+mod return_nested_update_logical;
+
+#[path = "effect_call_return_ordered_update_logical.rs"]
+mod return_ordered_update_logical;
+
+#[path = "effect_call_return_retention_update_logical.rs"]
+mod return_retention_update_logical;
+
+#[path = "effect_call_return_trailing_update_logical.rs"]
+mod return_trailing_update_logical;
+
+#[path = "effect_call_return_terminal_child_update_logical.rs"]
+mod return_terminal_child_update_logical;
+
 const SOURCE: &str =
     include_str!("../../../nuisc/tests/native_application_bridge/effectful_selected_calls.ns");
 const REBIND_SOURCE: &str =

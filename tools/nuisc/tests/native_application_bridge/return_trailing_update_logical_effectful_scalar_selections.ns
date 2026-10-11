@@ -1,0 +1,83 @@
+mod cpu Main {
+    struct State {
+        seed: bool, first: bool, second: bool, reply: bool,
+        outer: i64, init: i64, cond: i64, before: i64, rhs: i64, mid: i64,
+        replace: i64, unused: i64, no: i64, after: i64, terminal: i64, tail: i64, final: i64, answer: i64, result: bool
+    }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(90); return value == (proof == 1); }
+    @noinline fn initialize(value: bool, proof: i64) -> bool { print(87); return value == (proof == 1); }
+    @noinline fn condition(value: bool, proof: i64) -> bool { print(88); return value == (proof == 1); }
+    @noinline fn before_work(value: bool, proof: i64) -> bool { print(77); return value == (proof == 1); }
+    @noinline fn rhs_work(value: bool, proof: i64) -> bool { print(89); return value == (proof == 1); }
+    @noinline fn mid_condition(value: bool, proof: i64) -> bool { print(72); return value == (proof == 1); }
+    @noinline fn replacement(value: bool, proof: i64) -> bool { print(71); return value == (proof == 1); }
+    @noinline fn unused_work(proof: i64) -> i64 { print(83); return proof; }
+    @noinline fn no_work(value: bool, proof: i64) -> bool { print(86); return value == (proof == 1); }
+    @noinline fn after_condition(value: bool, proof: i64) -> bool { print(92); return value == (proof == 1); }
+    @noinline fn terminal_condition(value: bool, proof: i64) -> bool { print(93); return value == (proof == 1); }
+    @noinline fn tail_work(value: bool, proof: i64) -> bool { print(94); return value == (proof == 1); }
+    @noinline fn final_work(value: bool, proof: i64) -> bool { print(95); return value == (proof == 1); }
+    @noinline fn answer_work(value: bool, proof: i64) -> bool { print(97); return value == (proof == 1); }
+    fn observe(seed: bool, first: bool, second: bool, reply: bool,
+               outer: i64, init: i64, cond: i64, before: i64, rhs: i64, mid: i64,
+               replace: i64, unused: i64, no: i64, after: i64, terminal: i64, tail: i64, final: i64, answer: i64) -> bool {
+        print(99);
+        if choose(first, 1 / outer) {
+            let local = initialize(seed, 1 / init);
+            if condition(second, 1 / cond) {
+                if reply { let local = local || rhs_work(first, 1 / rhs); }
+                let observed = before_work(local, 1 / before);
+                let local = observed && first;
+                if mid_condition(local, 1 / mid) { let local = local && reply; }
+                let ignored = unused_work(1 / unused);
+                let local = local || replacement(reply, 1 / replace);
+                if after_condition(local, 1 / after) {
+                    if terminal_condition(second, 1 / terminal) {} else {}
+                } else {}
+                const seal: bool = local || tail_work(second, 1 / tail);
+                let final_private = final_work(seal, 1 / final);
+            } else {
+                let local = local && no_work(reply, 1 / no);
+                if after_condition(local, 1 / after) {
+                    if terminal_condition(second, 1 / terminal) {} else {}
+                } else {}
+                const seal: bool = local || tail_work(second, 1 / tail);
+                let final_private = final_work(seal, 1 / final);
+            }
+            return local && answer_work(reply, 1 / answer);
+        } else {
+            let local = initialize(seed, 1 / init);
+            if condition(second, 1 / cond) {
+                let local = local && no_work(reply, 1 / no);
+                let ignored = unused_work(1 / unused);
+                if mid_condition(reply, 1 / mid) {} else {
+                    let local = local || rhs_work(first, 1 / rhs);
+                }
+                if after_condition(local, 1 / after) {
+                    if terminal_condition(second, 1 / terminal) {} else {}
+                } else {}
+                const seal: bool = local || tail_work(second, 1 / tail);
+                let final_private = final_work(seal, 1 / final);
+            }
+            return local || answer_work(seed, 1 / answer);
+        }
+        print(80);
+        return false;
+    }
+    fn start(seed: bool, first: bool, second: bool, reply: bool,
+             outer: i64, init: i64, cond: i64, before: i64, rhs: i64, mid: i64,
+             replace: i64, unused: i64, no: i64, after: i64, terminal: i64, tail: i64, final: i64, answer: i64) -> State {
+        let result = observe(seed, first, second, reply, outer, init, cond, before, rhs, mid, replace, unused, no, after, terminal, tail, final, answer);
+        print(79);
+        return State { seed: seed, first: first, second: second, reply: reply,
+            outer: outer, init: init, cond: cond, before: before, rhs: rhs, mid: mid,
+            replace: replace, unused: unused, no: no, after: after, terminal: terminal, tail: tail, final: final, answer: answer, result: result };
+    }
+    fn step(state: State, first: bool, second: bool, reply: bool,
+            outer: i64, init: i64, cond: i64, before: i64, rhs: i64, mid: i64,
+            replace: i64, unused: i64, no: i64, after: i64, terminal: i64, tail: i64, final: i64, answer: i64) -> State {
+        return start(state.seed, first, second, reply, outer, init, cond, before, rhs, mid, replace, unused, no, after, terminal, tail, final, answer);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

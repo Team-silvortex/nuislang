@@ -112,8 +112,22 @@ bindings stay read-only and unused prefix work remains required. The
 [private bool-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
 adds consecutive flat paired/one-sided selections of already prefix-owned bools,
 with exact current captures, constant seals and original-work-only retention.
-Hidden ordinary leaves, nested update arms and mixed/single exits remain separate,
-without widening common guard/backend or effect authority.
+The [nested private-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#nested-private-return-bool-updates)
+adds nested terminal updates with bounded private child staging, logical seals,
+unused work and actual retained outcomes under the shared tree budget.
+The [ordered private-update follow-up](reference/nuis-native-private-ordered-return-updates-v1.md)
+adds bounded current-target writes in those prefixes using a proof-only owner
+capability, with incoming reads retained until real source definitions. The
+[retention-tail follow-up](reference/nuis-native-private-retention-return-updates-v1.md)
+uses bounded read-only discovery of actual earlier writes when terminal branches
+only retain values; fresh declarations and no-write candidates cannot manufacture
+ownership. The [trailing-private-work follow-up](reference/nuis-native-private-trailing-return-updates-v1.md)
+keeps final private let/const work in the original staged scope and transports
+only the existing target. The [terminal-private-child follow-up](reference/nuis-native-private-terminal-child-return-updates-v1.md)
+also proves terminal updates of one prefix-owned private child while retaining
+the actual ancestor target. Mixed ancestor/child writes, hidden ordinary leaves
+and mixed/single exits remain separate, without widening common guard/backend
+or effect authority.
 Broader typed selected-return CLI proof and generalized effect transport remain
 separate. General rebinding, resource work and child-scope
 exports remain open.

@@ -1,7 +1,7 @@
 use super::*;
 use crate::frontend::parse_nuis_module;
 
-fn source(body: &str) -> String {
+pub(super) fn source(body: &str) -> String {
     format!(
         "mod cpu Main {{
         fn decide(v: bool) -> bool {{ print(98); return v; }}
@@ -13,14 +13,14 @@ fn source(body: &str) -> String {
     )
 }
 
-fn rewrite(body: &str) -> (NirModule, BTreeSet<String>) {
+pub(super) fn rewrite(body: &str) -> (NirModule, BTreeSet<String>) {
     let mut module = parse_nuis_module(&source(body)).unwrap();
     let mut names = module.functions.iter().map(|f| f.name.clone()).collect();
     let generated = outline(&mut module, &mut names);
     (module, generated)
 }
 
-fn reject_module(mut module: NirModule) {
+pub(super) fn reject_module(mut module: NirModule) {
     let before = module.clone();
     let mut names: BTreeSet<_> = module.functions.iter().map(|f| f.name.clone()).collect();
     let before_names = names.clone();
@@ -129,8 +129,7 @@ fn return_update_logical_effectful_scalar_selections_reject_incoming_sealed_nonb
         "let local = saved; if first { const local: bool = first || false; }",
         "let local = saved; if first { let local: i64 = 1; }",
         "let local = saved; if first { let local = boolean(local || first); }",
-        "let local = saved; if first { let local = first; let unused = token(1); }",
-        "let local = saved; if first { if saved { let local = first; } }",
+        "let local = saved; if first { let local = first; let saved = decide(first); }",
         "let local = saved; if first { return local; }",
         "let local = saved; if first { while saved { let local = first; } }",
         "let local = saved; if first {} else {}",
@@ -138,6 +137,14 @@ fn return_update_logical_effectful_scalar_selections_reject_incoming_sealed_nonb
     ] {
         reject_module(parse_nuis_module(&source(&format!("if decide(gate) {{ {prefix} return saved && first; }} else {{ return saved; }}"))).unwrap());
     }
+    // Final unused private work is now admitted; an entering write is still not.
+    assert!(!rewrite(
+        "if decide(gate) { let local = saved;
+        if first { let local = first; let unused = token(1); }
+        return saved && first; } else { return saved; }"
+    )
+    .1
+    .is_empty());
     for body in [
         "if gate { let local = saved; if first { let local = decide(first); } if first { if saved { let local = first; } return local && first; } else { return local; } } else { return saved; }",
         "if gate { let local = saved; if first { let local = first; } return local && first; } else { return saved; }",

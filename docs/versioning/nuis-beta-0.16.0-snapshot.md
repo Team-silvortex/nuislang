@@ -122,9 +122,23 @@ terminal child selections behind ancestor guards, retaining current scopes/seals
 unused effects and complete subtree captures under the same work limits. The
 subsequent private bool-update proof adds consecutive flat paired/one-sided
 updates of prefix-owned bools, preserving current/retained values, constant seals
-and original shared budgets without granting entering writes. Hidden
-roots, nested update arms, mixed/single exits and generalized resource
-transport remain separate.
+and original shared budgets without granting entering writes. The subsequent
+nested private-update proof admits terminal nested exports with isolated bounded
+child stages, seals, unused work and exact retained/current values under the same
+whole-tree limits. The subsequent
+[ordered private-update proof](../reference/nuis-native-private-ordered-return-updates-v1.md)
+admits bounded prefix writes to only that authorized target, preserving incoming
+reads, current versions and unused effects. The subsequent
+[retention-tail proof](../reference/nuis-native-private-retention-return-updates-v1.md)
+discovers actual earlier writes behind terminal retention-only selections, with
+existing owner authority and complete original work. The subsequent
+[trailing-private-work proof](../reference/nuis-native-private-trailing-return-updates-v1.md)
+keeps final private let/const work under the existing target capability and staged
+scope, without exporting fresh bindings. The subsequent
+[terminal-private-child proof](../reference/nuis-native-private-terminal-child-return-updates-v1.md)
+keeps one prefix-owned child update private and transports only the ancestor.
+Mixed ancestor/child writes, hidden roots, mixed/single exits and generalized
+resource transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.
 
