@@ -102,7 +102,7 @@ macro_rules! float_cases {
                 ] { reject_source(&body(selected)); }
                 for text in [
                     "if gate {const local: f64 = 0.0;if first {let child = saved;if saved {let local: f64 = 0.0;let child = decide(first);}} return (local == 0.0) && decide(first);} else {return saved;}",
-                    "if gate {let local = seed;if first {let child = seed;if saved {let local = relay(local);let child = relay(child);}} return (local == seed) && decide(first);} else {return saved;}",
+                    "if gate {let local = seed;if first {const child: i64 = seed;if saved {let local = relay(local);let child = relay(child);}} return (local == seed) && decide(first);} else {return saved;}",
                     "if gate {let local = seed;if first {let child = saved;if saved {let local = relay(local);let child = first;}} else {let local = child;} return (local == seed) && decide(first);} else {return saved;}",
                 ] { reject_source(text); }
                 for kind in ["ref", "optional", "generic", "u32", "String"] {
@@ -207,7 +207,7 @@ macro_rules! float_cases {
                         matches!(base.as_ref(),NirExpr::Var(n) if n=="__nuis_effect_call_pair_1"))
                     );
                 }
-                for child_ty in ["i32", "f32", "f64"] {
+                for child_ty in ["u32", "u64", "String"] {
                     let mut bad = scope.clone();
                     bad.insert("child".into(), scalar_type(child_ty));
                     assert!(transport::prepare(

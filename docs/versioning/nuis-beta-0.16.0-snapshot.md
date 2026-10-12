@@ -176,7 +176,32 @@ IEEE pair values, event traps and cache/source-free identity checks.
 The subsequent [float/i64 proof](../reference/nuis-native-private-float-i64-continuations-v1.md)
 adds exact f32/f64 outward fields beside a private i64, with real pair/final-owner
 observations, event traps and cache/source-free identity checks.
-Other numeric/numeric private pairs, hidden roots, mixed/single exits and
+The subsequent [same-width float proof](../reference/nuis-native-private-same-float-continuations-v1.md)
+adds exact f32/f32 and f64/f64 private pairs with independent IEEE fields,
+unchanged single-target authority and source-free publication checks.
+The subsequent [cross-width float proof](../reference/nuis-native-private-cross-float-continuations-v1.md)
+adds exact f32/f64 and f64/f32 private pairs with independent original-width IEEE
+observations, unchanged authority and source-free event publication.
+The subsequent [i32/i64 proof](../reference/nuis-native-private-i32-i64-continuations-v1.md)
+adds an exact i32 owner/private i64 child with independent extrema, current-value
+native probes, marker-safe full traces and source-free event publication.
+The subsequent [i64/i32 reverse proof](../reference/nuis-native-private-i64-i32-continuations-v1.md)
+adds the opposite orientation with the full i64 owner preserved, independent i32
+fields, unchanged authority and cache/source-free publication checks.
+The subsequent [same-width i32 proof](../reference/nuis-native-private-i32-i32-continuations-v1.md)
+adds exact independent i32/i32 fields with crossed extrema, source-order traps
+and unchanged authority/cache/source-free publication checks.
+The subsequent [i32/float proof](../reference/nuis-native-private-i32-float-continuations-v1.md)
+adds independently seeded i32/f32 and i32/f64 fields with actual IEEE/integer
+observations, unchanged authority and finite-CLI cache/source-free publication checks.
+The subsequent [float/i32 reverse proof](../reference/nuis-native-private-float-i32-continuations-v1.md)
+adds independently seeded f32/i32 and f64/i32 fields with actual original-width
+IEEE/integer observations, nested current zero/negative-one updates and unchanged
+authority/cache/source-free publication checks.
+The subsequent [three-field continuation proof](../reference/nuis-native-private-three-field-continuations-v1.md)
+adds two separately certified private numeric children, with field-driven typed
+records and unchanged pair authority/original-forest limits.
+Further private-child arities, hidden roots, mixed/single exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.

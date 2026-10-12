@@ -17,6 +17,7 @@ pub(super) enum Statement {
     Logical(NirStmt, predicates::Predicate),
     Selection(Box<Plan>),
     PrivatePair(Box<transport::Selection>),
+    PrivateFields(Box<transport::FieldsSelection>),
 }
 
 pub(super) struct Staging {
@@ -221,6 +222,11 @@ pub(super) fn install(
             }
             Statement::PrivatePair(plan) => {
                 output.extend(transport::install(*plan, names, bindings, helpers, structs));
+            }
+            Statement::PrivateFields(plan) => {
+                output.extend(transport::install_fields(
+                    *plan, names, bindings, helpers, structs,
+                ));
             }
         }
     }

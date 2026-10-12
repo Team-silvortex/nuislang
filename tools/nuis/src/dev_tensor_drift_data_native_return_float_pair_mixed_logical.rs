@@ -11,10 +11,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport.rs",
         required_patterns: &["[\"i32\", \"i64\", \"f32\", \"f64\"]", "[\"i64\", \"f32\", \"f64\"]", "owned_fields: Option<(NirTypeRef, NirTypeRef)>", "captures.len() > 31", "owned_pair::install", "!arm.defined.contains(*n)"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-float-pair-typed-owned-neutral-and-projections",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_owned.rs",
-        required_patterns: &["\"i64\" => NirExpr::Int(0)", "\"f32\" => NirExpr::F32(\"0.0\".into())", "\"f64\" => NirExpr::F64(\"0.0\".into())", "[(\"owner\", field_types.0), (\"child\", field_types.1)]", "NirVisibility::Private", "record(zero.0, zero.1)", "NirExpr::FieldAccess"],
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_record.rs",
+        required_patterns: &["\"i64\" => NirExpr::Int(0)", "\"f32\" => NirExpr::F32(\"0.0\".into())", "\"f64\" => NirExpr::F64(\"0.0\".into())", "fields: Vec<(String, String, NirTypeRef)>", "NirVisibility::Private", "record(true)", "NirExpr::FieldAccess"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-float-pair-exact-signed-word-expressions",

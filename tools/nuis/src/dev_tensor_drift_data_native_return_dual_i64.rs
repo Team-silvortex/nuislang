@@ -16,10 +16,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_updates.rs",
         required_patterns: &["numeric_owner(staged.local.get(owner.name())?)", "!transport::numeric_pair(", "staged.local.get(owner.name())?", "staged.local.get(&child)?", "entering.contains_key(&child)", "!writes.remove(owner.name()) || writes.len() != 1", "if writes.len() > 2"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-dual-i64-exact-owned-fields",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_owned.rs",
-        required_patterns: &["No bit is borrowed from either field", "[(\"owner\", field_types.0), (\"child\", field_types.1)]", "\"i64\" => NirExpr::Int(0)", "record(zero.0, zero.1)", "record(NirExpr::Var(owner.clone()), NirExpr::Var(child.clone()))", "NirVisibility::Private", "NirExpr::FieldAccess"],
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_record.rs",
+        required_patterns: &["Representation follows independently proved field types", "fields: Vec<(String, String, NirTypeRef)>", "\"i64\" => NirExpr::Int(0)", "record(true)", "record(false)", "NirVisibility::Private", "NirExpr::FieldAccess"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-dual-i64-original-linear-budget",
@@ -29,7 +29,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-dual-i64-unit-positive-negative-and-boundaries",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_dual_i64_tests.rs",
-        required_patterns: &["accepts_orders_retention_nested_sequences_and_one_typed_target", "rejects_third_writes_seals_wide_owners_hidden_leaves_and_exits_atomically", "owned_fields_neutral_guards_and_collision_free_projections", "shared_original_budget_and_capture_boundary", "(7, 7, true)", "for count in [31, 32]", "for depth in [7, 8]", "assert_eq!(module, before)", "assert_eq!(names, before_names)", "for child_ty in [\"i32\", \"String\"]"],
+        required_patterns: &["accepts_orders_retention_nested_sequences_and_one_typed_target", "rejects_third_writes_seals_wide_owners_hidden_leaves_and_exits_atomically", "owned_fields_neutral_guards_and_collision_free_projections", "shared_original_budget_and_capture_boundary", "(7, 7, true)", "for count in [31, 32]", "for depth in [7, 8]", "assert_eq!(module, before)", "assert_eq!(names, before_names)", "for child_ty in [\"String\"]"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-dual-i64-source-both-fields-and-orders",
@@ -49,7 +49,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-dual-i64-shared-native-failure-prefix-and-canaries",
         path: "tools/nuisc/tests/native_application_bridge/return_i32_ancestor_probe.rs",
-        required_patterns: &["observation: Option<(&str, &str)>", "llvm.insert_str(insertion, OWNER_PROBE)", "llvm.insert_str(insertion, observer)", "trace.extend(case.before_failure(index))", "Some(4 | 5)", "[(0, 91), (14, 92)]", "load volatile i64, ptr %prev", "assert!(!actual.contains(&AFTER))", "dynamic_loop_guard::run_command_bounded"],
+        required_patterns: &["observation: Option<(&str, &str)>", "llvm.insert_str(insertion, OWNER_PROBE)", "llvm.insert_str(insertion, observer)", "trace.extend(case.before_failure(index))", "Some(4 | 5)", "[(0, 91), (state_width + 1, 92)]", "load volatile i64, ptr %prev", "Full trace equality distinguishes AFTER from matching field words", "dynamic_loop_guard::run_command_bounded"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-dual-i64-aot-layout-effect-policy",

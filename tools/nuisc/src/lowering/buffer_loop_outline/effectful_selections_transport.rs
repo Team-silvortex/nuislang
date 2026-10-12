@@ -6,6 +6,15 @@ mod i32_pair;
 #[path = "effectful_selections_transport_owned.rs"]
 mod owned_pair;
 
+#[path = "effectful_selections_transport_record.rs"]
+mod record;
+
+#[path = "effectful_selections_transport_fields.rs"]
+mod fields;
+pub(super) use fields::{
+    install as install_fields, prepare as prepare_fields, Selection as FieldsSelection,
+};
+
 pub(super) fn numeric(ty: &NirTypeRef) -> bool {
     ["i32", "i64", "f32", "f64"]
         .into_iter()
@@ -14,15 +23,27 @@ pub(super) fn numeric(ty: &NirTypeRef) -> bool {
 
 // Admission is narrower than the independently typed owned-field mechanism.
 pub(super) fn numeric_pair(owner: &NirTypeRef, child: &NirTypeRef) -> bool {
+    let i32_wide = owner == &scalar_type("i32") && child == &scalar_type("i64");
+    let i32_same = owner == &scalar_type("i32") && child == &scalar_type("i32");
+    let i32_float = owner == &scalar_type("i32")
+        && ["f32", "f64"]
+            .into_iter()
+            .any(|name| child == &scalar_type(name));
+    let float_i32 = ["f32", "f64"]
+        .into_iter()
+        .any(|name| owner == &scalar_type(name))
+        && child == &scalar_type("i32");
     let i64_owner = owner == &scalar_type("i64")
-        && ["i64", "f32", "f64"]
+        && ["i32", "i64", "f32", "f64"]
             .into_iter()
             .any(|name| child == &scalar_type(name));
     let float_owner = ["f32", "f64"]
         .into_iter()
         .any(|name| owner == &scalar_type(name))
-        && child == &scalar_type("i64");
-    i64_owner || float_owner
+        && ["i64", "f32", "f64"]
+            .into_iter()
+            .any(|name| child == &scalar_type(name));
+    i64_owner || float_owner || i32_wide || i32_same || i32_float || float_i32
 }
 
 // A closed compiler-private carrier, not a source tuple or an exported result.

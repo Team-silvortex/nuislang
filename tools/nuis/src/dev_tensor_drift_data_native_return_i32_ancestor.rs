@@ -113,8 +113,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "llvm.insert_str(insertion, OWNER_PROBE)", "Source computations, private joins and real traps remain intact",
             "Some(4 | 5)", "for reversed in [false, true]", "load volatile i64, ptr %prev",
-            "[(0, 91), (14, 92)]", "expected(case, failure, index)", "dynamic_loop_guard::run_command_bounded",
-            "call ptr @nuis_scheduler_owned_aggregate_alloc_v1", "assert!(!actual.contains(&AFTER))",
+            "[(0, 91), (state_width + 1, 92)]", "expected(case, failure, index)", "dynamic_loop_guard::run_command_bounded",
+            "call ptr @nuis_scheduler_owned_aggregate_alloc_v1", "Full trace equality distinguishes AFTER from matching field words",
         ],
     },
     DevTensorDriftCheckSpec {

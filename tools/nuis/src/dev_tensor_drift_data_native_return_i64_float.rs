@@ -16,10 +16,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_updates.rs",
         required_patterns: &["!transport::numeric_pair(", "entering.contains_key(&child)", "!staged.defined.contains(&child)", "staged.constants.contains(&child)", "!writes.remove(owner.name()) || writes.len() != 1", "if writes.len() > 2"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-i64-float-typed-neutral-and-same-carrier",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_owned.rs",
-        required_patterns: &["No bit is borrowed from either field", "[(\"owner\", field_types.0), (\"child\", field_types.1)]", "\"f32\" => NirExpr::F32(\"0.0\".into())", "\"f64\" => NirExpr::F64(\"0.0\".into())", "\"i64\" => NirExpr::Int(0)", "record(zero.0, zero.1)", "record(NirExpr::Var(owner.clone()), NirExpr::Var(child.clone()))", "NirVisibility::Private", "NirExpr::FieldAccess"],
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_record.rs",
+        required_patterns: &["Representation follows independently proved field types", "fields: Vec<(String, String, NirTypeRef)>", "\"f32\" => NirExpr::F32(\"0.0\".into())", "\"f64\" => NirExpr::F64(\"0.0\".into())", "\"i64\" => NirExpr::Int(0)", "record(true)", "record(false)", "NirVisibility::Private", "NirExpr::FieldAccess"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-i64-float-eight-unit-proofs",
@@ -59,7 +59,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-i64-float-shared-actual-callback-failure-policy",
         path: "tools/nuisc/tests/native_application_bridge/return_i32_ancestor_probe.rs",
-        required_patterns: &["llvm.insert_str(insertion, observer)", "trace.extend(case.before_failure(index))", "load volatile i64, ptr %prev", "[(0, 91), (14, 92)]", "Some(4 | 5)", "dynamic_loop_guard::run_command_bounded", "nuis_scheduler_owned_aggregate_alloc_v1", "nuis_scheduler_owned_aggregate_drop_v1"],
+        required_patterns: &["llvm.insert_str(insertion, observer)", "trace.extend(case.before_failure(index))", "load volatile i64, ptr %prev", "[(0, 91), (state_width + 1, 92)]", "Some(4 | 5)", "dynamic_loop_guard::run_command_bounded", "nuis_scheduler_owned_aggregate_alloc_v1", "nuis_scheduler_owned_aggregate_drop_v1"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-i64-float-aot-exact-types-effects-policy",

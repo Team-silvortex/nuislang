@@ -120,7 +120,23 @@ pair observations and cache/source-free publication checks.
 The [float/i64 follow-up](reference/nuis-native-private-float-i64-continuations-v1.md)
 also carries a private i64 beside an exact f32/f64 outward owner, preserving
 actual IEEE bits, integer extrema and last accepted publication.
-Other numeric/numeric private pairs and resource transport,
+The [same-width float follow-up](reference/nuis-native-private-same-float-continuations-v1.md)
+adds exact f32/f32 and f64/f64 private pairs with independent input and output words.
+The [cross-width float follow-up](reference/nuis-native-private-cross-float-continuations-v1.md)
+adds f32/f64 and f64/f32 private fields without numeric conversion or narrowing.
+The [i32/i64 follow-up](reference/nuis-native-private-i32-i64-continuations-v1.md)
+adds exact signed-width fields without reusing bool/i32 packing.
+The [i64/i32 reverse follow-up](reference/nuis-native-private-i64-i32-continuations-v1.md)
+retains a full i64 outward owner beside a private i32, using the same independent fields.
+The [same-width i32 follow-up](reference/nuis-native-private-i32-i32-continuations-v1.md)
+keeps both integer fields distinct through crossed extrema and source-free publication checks.
+The [i32/float follow-up](reference/nuis-native-private-i32-float-continuations-v1.md)
+adds exact f32/f64 children beside an i32 owner, separating raw IEEE and finite CLI proofs.
+The [float/i32 reverse follow-up](reference/nuis-native-private-float-i32-continuations-v1.md)
+adds exact floating owners beside i32 children, including current zero/negative-one updates.
+The [three-field continuation proof](reference/nuis-native-private-three-field-continuations-v1.md)
+adds two private numeric children under a separate lexical certificate and a field-driven carrier.
+Further private-child arities and generalized resource transport,
 other entering writes and mixed/single exits
 remain separate.
 

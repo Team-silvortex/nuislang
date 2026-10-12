@@ -51,6 +51,34 @@ mod i64_float_tests;
 #[path = "effectful_selections_return_float_i64_tests.rs"]
 mod float_i64_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_same_float_tests.rs"]
+mod same_float_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_cross_float_tests.rs"]
+mod cross_float_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i32_i64_tests.rs"]
+mod i32_i64_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i64_i32_tests.rs"]
+mod i64_i32_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i32_i32_tests.rs"]
+mod i32_i32_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i32_float_tests.rs"]
+mod i32_float_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_float_i32_tests.rs"]
+mod float_i32_tests;
+
 #[path = "effectful_selections_return_retention_targets.rs"]
 mod retention_targets;
 
@@ -255,6 +283,23 @@ fn arm(
             else_body,
         } = statement
         {
+            if let Some(children) =
+                mixed::classify_fields(then_body, else_body, scope, &staged, &authorized, depth)?
+            {
+                let proof = mixed::continue_fields(
+                    condition,
+                    then_body,
+                    else_body,
+                    &body[index + 1..],
+                    &staged.local,
+                    &authorized,
+                    &children,
+                    signatures,
+                    budget,
+                    depth,
+                )?;
+                return Some(finish(staged, proof));
+            }
             if let Some(child) =
                 mixed::classify(then_body, else_body, scope, &staged, &authorized, depth)?
             {
@@ -282,6 +327,30 @@ fn arm(
             depth,
             Some(&authorized),
         )?;
+    }
+    if let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = last
+    {
+        if let Some(children) =
+            mixed::classify_fields(then_body, else_body, scope, &staged, &authorized, depth)?
+        {
+            let proof = mixed::continue_fields(
+                condition,
+                then_body,
+                else_body,
+                &[],
+                &staged.local,
+                &authorized,
+                &children,
+                signatures,
+                budget,
+                depth,
+            )?;
+            return Some(finish(staged, proof));
+        }
     }
     let mixed = match last {
         NirStmt::If {

@@ -11,10 +11,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_continuation_tree.rs",
         required_patterns: &["effectful_selections_return_mixed_continuation_tree_tests.rs", "nested::consume_node(budget)?", "predicates::prove(condition, &staged.local, signatures, budget)?", "Each original child is proved once", "let yes = arm(", "let no = arm(", "super::super::super::finish(staged, proof)", "reads.difference(&staged.defined)", "staged.statements.extend(copy_flat(&tail.statements)?)", "NirExpr::Var(owner.name().into())"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-nested-prefix-mixed-shared-tail-no-selection-cloning",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_continuations.rs",
-        required_patterns: &["effectful_selections_return_mixed_continuation_tree.rs", "regions::Statement::Selection(_) | regions::Statement::PrivatePair(_)", "!flat(suffix, 16)", "let mut remaining = 64", "Prove the shared tail once in its lexical scope", "tree::shape(yes", "tree::shape(no", "tree::arm("],
+        required_patterns: &["effectful_selections_return_mixed_continuation_tree.rs", "regions::Statement::PrivateFields(_)", "!flat(suffix, 16)", "let mut remaining = 64", "Prove the shared tail once in its lexical scope", "tree::shape(yes", "tree::shape(no", "tree::arm("],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-nested-prefix-mixed-six-budget-capture-scope-and-expansion-tests",

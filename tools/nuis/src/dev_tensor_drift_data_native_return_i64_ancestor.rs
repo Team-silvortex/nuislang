@@ -21,10 +21,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport.rs",
         required_patterns: &["owned_fields: Option<(NirTypeRef, NirTypeRef)>", "[\"i64\", \"f32\", \"f64\"]", "owner_type == &scalar_type(name)", "child_type == &scalar_type(\"bool\")", "!(bool_owner || i32_owner || wide_owner || numeric_pair)", "(owner_type.clone(), child_type.clone())", "captures.len() > 31", "owned_pair::install"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-i64-ancestor-exact-fields-neutral-and-projections",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_owned.rs",
-        required_patterns: &["field_types: (NirTypeRef, NirTypeRef)", "[(\"owner\", field_types.0), (\"child\", field_types.1)]", "\"bool\" => NirExpr::Bool(false)", "\"i64\" => NirExpr::Int(0)", "record(zero.0, zero.1)", "NirVisibility::Private", "NirExpr::FieldAccess", "record(NirExpr::Var(owner.clone()), NirExpr::Var(child.clone()))"],
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_record.rs",
+        required_patterns: &["for (field, name, ty) in fields", "fields: Vec<(String, String, NirTypeRef)>", "\"bool\" => NirExpr::Bool(false)", "\"i64\" => NirExpr::Int(0)", "record(true)", "NirVisibility::Private", "NirExpr::FieldAccess", "record(false)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-i64-ancestor-linear-forest-shared-original-budget",
@@ -54,7 +54,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-i64-ancestor-shared-native-probe-traps-canaries-no-allocation",
         path: "tools/nuisc/tests/native_application_bridge/return_i32_ancestor_probe.rs",
-        required_patterns: &["llvm.insert_str(insertion, OWNER_PROBE)", "Source computations, private joins and real traps remain intact", "Some(4 | 5)", "[(0, 91), (14, 92)]", "load volatile i64, ptr %prev", "assert!(!actual.contains(&AFTER))", "nuis_scheduler_owned_aggregate_alloc_v1", "dynamic_loop_guard::run_command_bounded"],
+        required_patterns: &["llvm.insert_str(insertion, OWNER_PROBE)", "Source computations, private joins and real traps remain intact", "Some(4 | 5)", "[(0, 91), (state_width + 1, 92)]", "load volatile i64, ptr %prev", "Full trace equality distinguishes AFTER from matching field words", "nuis_scheduler_owned_aggregate_alloc_v1", "dynamic_loop_guard::run_command_bounded"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-i64-ancestor-artifact-owned-layout-effect-and-policy-veto",

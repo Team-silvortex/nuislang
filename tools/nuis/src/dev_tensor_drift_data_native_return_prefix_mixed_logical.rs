@@ -11,10 +11,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_updates.rs",
         required_patterns: &["effectful_selections_return_mixed_continuations.rs", "pub(super) use continuations::prove as continue_flat", "pub(super) struct Child(String)", "entering.contains_key(&child)", "!staged.defined.contains(&child)", "staged.constants.contains(&child)", "writes.len() == 2 && writes.contains(owner.name()) && writes.contains(&child.0)", "return Some(super::finish(staged, proof))"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-prefix-mixed-flat-only-lexical-tail-original-charge-and-single-ancestor",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_continuations.rs",
-        required_patterns: &["effectful_selections_return_mixed_continuation_tests.rs", "fn flat(", "fn fresh_names(", "fn copy_flat(", "regions::Statement::Selection(_) | regions::Statement::PrivatePair(_)", "suffix.is_empty()", "!flat(suffix, 16)", "tree::shape(yes, scope, &fresh, &mut remaining, depth + 1)?", "tree::shape(no, scope, &fresh, &mut remaining, depth + 1)?", "Prove the shared tail once in its lexical scope", "nested::consume_node(budget)?", "predicates::prove(condition, scope, signatures, budget)?", "let yes = tree::arm(", "let no = tree::arm(", "nested::join(condition, inputs, calls, yes, no, scope)"],
+        required_patterns: &["effectful_selections_return_mixed_continuation_tests.rs", "fn flat(", "fn fresh_names(", "fn copy_flat(", "regions::Statement::PrivateFields(_)", "suffix.is_empty()", "!flat(suffix, 16)", "tree::shape(yes, scope, &fresh, &mut remaining, depth + 1)?", "tree::shape(no, scope, &fresh, &mut remaining, depth + 1)?", "Prove the shared tail once in its lexical scope", "nested::consume_node(budget)?", "predicates::prove(condition, scope, signatures, budget)?", "let yes = tree::arm(", "let no = tree::arm(", "nested::join(condition, inputs, calls, yes, no, scope)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-prefix-mixed-six-original-budget-scope-capture-and-expansion-test-units",

@@ -1,5 +1,9 @@
 # Native Private Float I64 Continuations V1
 
+This is the frozen 343-test float/i64 receipt. The later
+[same-width float proof](nuis-native-private-same-float-continuations-v1.md)
+separately admits exact f32/f32 and f64/f64; it does not rewrite this checkpoint.
+
 The persistent application-session CPU path carries one exact f32 or f64 outward
 ancestor beside one exact private i64 child through bounded terminal mixed
 selections and sequential continuations. This extends the

@@ -10,6 +10,10 @@ mod tree;
 #[path = "effectful_selections_return_mixed_sequences.rs"]
 mod sequences;
 
+pub(in super::super) use sequences::fields::{
+    classify as classify_fields, prove as continue_fields,
+};
+
 fn flat(body: &[NirStmt], limit: usize) -> bool {
     body.len() <= limit
         && body
@@ -40,9 +44,9 @@ fn copy_flat(statements: &[regions::Statement]) -> Option<Vec<regions::Statement
                 regions::Statement::Logical(s, p) => {
                     regions::Statement::Logical(s.clone(), p.clone())
                 }
-                regions::Statement::Selection(_) | regions::Statement::PrivatePair(_) => {
-                    return None
-                }
+                regions::Statement::Selection(_)
+                | regions::Statement::PrivatePair(_)
+                | regions::Statement::PrivateFields(_) => return None,
             })
         })
         .collect()

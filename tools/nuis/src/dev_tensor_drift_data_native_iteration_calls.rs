@@ -1,5 +1,29 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_return_i32_i64.rs"]
+mod return_i32_i64;
+
+#[path = "dev_tensor_drift_data_native_return_i64_i32.rs"]
+mod return_i64_i32;
+
+#[path = "dev_tensor_drift_data_native_return_i32_i32.rs"]
+mod return_i32_i32;
+
+#[path = "dev_tensor_drift_data_native_return_i32_float.rs"]
+mod return_i32_float;
+
+#[path = "dev_tensor_drift_data_native_return_float_i32.rs"]
+mod return_float_i32;
+
+#[path = "dev_tensor_drift_data_native_private_fields.rs"]
+mod private_fields;
+
+#[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
+mod return_cross_float;
+
+#[path = "dev_tensor_drift_data_native_return_same_float.rs"]
+mod return_same_float;
+
 #[path = "dev_tensor_drift_data_native_return_float_i64.rs"]
 mod return_float_i64;
 
@@ -258,6 +282,14 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_float_ancestor::CHECKS,
         return_dual_i64::CHECKS,
         return_i64_float::CHECKS,
+        return_i32_i64::CHECKS,
+        return_i64_i32::CHECKS,
+        return_i32_i32::CHECKS,
+        return_i32_float::CHECKS,
+        return_float_i32::CHECKS,
+        private_fields::CHECKS,
+        return_cross_float::CHECKS,
+        return_same_float::CHECKS,
         return_float_i64::CHECKS,
         return_nested_sequential_mixed_logical::CHECKS,
         computed_return_prints::CHECKS,

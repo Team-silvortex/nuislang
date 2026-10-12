@@ -17,6 +17,30 @@ mod return_i64_float;
 #[path = "native_application_bridge/return_float_i64.rs"]
 mod return_float_i64;
 
+#[path = "native_application_bridge/return_same_float.rs"]
+mod return_same_float;
+
+#[path = "native_application_bridge/return_cross_float.rs"]
+mod return_cross_float;
+
+#[path = "native_application_bridge/return_i32_i64.rs"]
+mod return_i32_i64;
+
+#[path = "native_application_bridge/return_i64_i32.rs"]
+mod return_i64_i32;
+
+#[path = "native_application_bridge/return_i32_i32.rs"]
+mod return_i32_i32;
+
+#[path = "native_application_bridge/return_i32_float.rs"]
+mod return_i32_float;
+
+#[path = "native_application_bridge/return_float_i32.rs"]
+mod return_float_i32;
+
+#[path = "native_application_bridge/return_private_fields.rs"]
+mod return_private_fields;
+
 #[path = "native_application_bridge/return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

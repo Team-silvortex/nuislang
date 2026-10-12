@@ -1,7 +1,7 @@
 # Native Effectful Scalar Selection V1
 
-The [float/i64 proof](nuis-native-private-float-i64-continuations-v1.md)
-adds the reverse exact typed orientation without extra write authority.
+[Float/i64](nuis-native-private-float-i64-continuations-v1.md), [same-width](nuis-native-private-same-float-continuations-v1.md) and [cross-width](nuis-native-private-cross-float-continuations-v1.md) float proofs retain single-target authority.
+The [i32/i64](nuis-native-private-i32-i64-continuations-v1.md), [i64/i32](nuis-native-private-i64-i32-continuations-v1.md), [i32/i32](nuis-native-private-i32-i32-continuations-v1.md), [i32/float](nuis-native-private-i32-float-continuations-v1.md) and [float/i32](nuis-native-private-float-i32-continuations-v1.md) proofs extend independent private fields; the [three-field proof](nuis-native-private-three-field-continuations-v1.md) adds a separate private-child certificate.
 
 The later [i64/float proof](nuis-native-private-i64-float-continuations-v1.md)
 adds exact f32/f64 private fields beside an i64 owner without extra write authority.

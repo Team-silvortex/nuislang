@@ -90,7 +90,7 @@ macro_rules! float_owner_cases {
             ) {
                 for selected in [
                     "if saved {let local = relay(local);let child = integer(child);let saved = first;}",
-                    "let sibling = int_seed;if saved {let local = relay(local);let child = integer(child);let sibling = int_seed;}",
+                    "const sibling: i64 = int_seed;if saved {let local = relay(local);let child = integer(child);let sibling = int_seed;}",
                     "const child: i64 = int_seed;if saved {let local = relay(local);let child = int_seed;}",
                     "if saved {let local = relay(local);const child: i64 = child;}",
                     "if saved {let local: bool = first;let child = integer(child);}",
@@ -100,7 +100,7 @@ macro_rules! float_owner_cases {
                     "if saved {let local = relay(local);let child = int_seed;} let late = missing;",
                 ] { reject_source(&body(selected)); }
                 for text in [
-                    "if gate {let local = seed;if first {let child: i32 = small_seed;if saved {let local = relay(local);let child: i32 = small_seed;}} return (local == seed) && decide(first);} else {return saved;}",
+                    "if gate {let local = seed;if first {const child: i32 = small_seed;if saved {let local = relay(local);let child: i32 = small_seed;}} return (local == seed) && decide(first);} else {return saved;}",
                     "if gate {let local = seed;if first {let child = int_seed;if saved {let local = relay(local);let child = int_seed;}} else {let local = child;} return (local == seed) && decide(first);} else {return saved;}",
                     "if gate {let local = seed;if first {let child = int_seed;if saved {let local = relay(local);let child = int_seed;} let seed = relay(seed);} return (local == seed) && decide(first);} else {return saved;}",
                 ] { reject_source(text); }
@@ -203,7 +203,7 @@ macro_rules! float_owner_cases {
                         matches!(base.as_ref(),NirExpr::Var(n) if n=="__nuis_effect_call_pair_1"))
                     );
                 }
-                for child_ty in ["i32", "f32", "f64", "String"] {
+                for child_ty in ["u32", "u64", "String"] {
                     let mut bad = scope.clone();
                     bad.insert("child".into(), scalar_type(child_ty));
                     assert!(transport::prepare(

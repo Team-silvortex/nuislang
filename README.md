@@ -193,7 +193,23 @@ with actual native pair-bit checks and unchanged write authority.
 The [float/i64 follow-up](docs/reference/nuis-native-private-float-i64-continuations-v1.md)
 adds the reverse orientation: exact f32/f64 outward fields beside a private i64,
 with actual IEEE owner and full-width child checks under the same authority.
-Other numeric/numeric private pairs and resource transport,
+The [same-width float follow-up](docs/reference/nuis-native-private-same-float-continuations-v1.md)
+adds exact f32/f32 and f64/f64 private pairs with independent raw field observations.
+The [cross-width float follow-up](docs/reference/nuis-native-private-cross-float-continuations-v1.md)
+adds exact f32/f64 and f64/f32 pairs while preserving each original IEEE width.
+The [i32/i64 follow-up](docs/reference/nuis-native-private-i32-i64-continuations-v1.md)
+adds one exact i32 outward owner beside a private i64 through independent fields.
+The [i64/i32 reverse follow-up](docs/reference/nuis-native-private-i64-i32-continuations-v1.md)
+adds the opposite orientation, retaining the full-width owner and independently typed child.
+The [same-width i32 follow-up](docs/reference/nuis-native-private-i32-i32-continuations-v1.md)
+retains two independent i32 fields, including crossed extrema and current-value observations.
+The [i32/float follow-up](docs/reference/nuis-native-private-i32-float-continuations-v1.md)
+retains an i32 owner beside an exact f32/f64 child, with independent integer/IEEE inputs.
+The [float/i32 reverse follow-up](docs/reference/nuis-native-private-float-i32-continuations-v1.md)
+retains original-width floating owners beside private i32 children, with independent seeds.
+The [three-field continuation proof](docs/reference/nuis-native-private-three-field-continuations-v1.md)
+adds two separately certified private numeric children beside one outward owner.
+Further private-child arities and generalized resource transport,
 hidden ordinary leaves and mixed/single exits remain separate; common
 guard/backend/effect authority is not widened.
 Native fresh/cache/source-free runs check selection polarities, poisoned inactive

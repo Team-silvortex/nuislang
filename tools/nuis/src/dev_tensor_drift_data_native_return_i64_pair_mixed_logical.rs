@@ -6,10 +6,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_mixed_updates.rs",
         required_patterns: &["effectful_selections_return_i64_pair_tests.rs", "transport::numeric(ty)", "staged.defined.contains(*name)", "!staged.constants.contains(*name)", "!writes.remove(owner.name()) || writes.len() != 1", "entering.contains_key(&child)", "!staged.defined.contains(&child)", "staged.constants.contains(&child)", "Do not manufacture a bool Target token", "staged.defined.extend(next.defined)"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-i64-pair-independent-full-width-owned-fields-and-zero-seed",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_owned.rs",
-        required_patterns: &["No bit is borrowed from either field", "fresh_name(\"__nuis_effect_pair_value\", names)", "[(\"owner\", field_types.0), (\"child\", field_types.1)]", "NirVisibility::Private", "SelectedValue::Region(_, value)", "record(NirExpr::Var(owner.clone()), NirExpr::Var(child.clone()))", "record(zero.0, zero.1)", "install_with_neutral", "NirExpr::FieldAccess", "plan.destination = Some((carrier.clone(), false))"],
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_record.rs",
+        required_patterns: &["Representation follows independently proved field types", "fresh_name(type_prefix, names)", "fields: Vec<(String, String, NirTypeRef)>", "NirVisibility::Private", "SelectedValue::Region(_, value)", "record(false)", "record(true)", "install_with_neutral", "NirExpr::FieldAccess", "plan.destination = Some((carrier.clone(), false))"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-i64-pair-shared-installer-and-complete-private-layout-publication",

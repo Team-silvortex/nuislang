@@ -82,7 +82,7 @@ fn return_dual_i64_private_pair_rejects_third_writes_seals_wide_owners_hidden_le
 ) {
     for selected in [
         "if saved {let local = relay(local);let child = relay(child);let saved = first;}",
-        "let sibling = seed;if saved {let local = relay(local);let child = relay(child);let sibling = 0;}",
+        "const sibling: i64 = seed;if saved {let local = relay(local);let child = relay(child);let sibling = 0;}",
         "const child: i64 = seed + 0;if saved {let local = relay(local);let child = seed;}",
         "if saved {let local = relay(local);const child: i64 = child + 0;}",
         "if saved {let local: bool = first;let child = relay(child);}",
@@ -92,7 +92,7 @@ fn return_dual_i64_private_pair_rejects_third_writes_seals_wide_owners_hidden_le
         "if saved {let local = relay(local);let child = seed;} let late = missing;",
     ] { reject_source(&body(selected)); }
     for text in [
-        "if gate {let local = seed;if first {let child: i32 = small_seed;if saved {let local = relay(local);let child: i32 = small_seed;}} return (local == seed) && decide(first);} else {return saved;}",
+        "if gate {let local = seed;if first {const child: i32 = small_seed;if saved {let local = relay(local);let child: i32 = small_seed;}} return (local == seed) && decide(first);} else {return saved;}",
         "if gate {let local = seed;if first {let child = seed;if saved {let local = relay(local);let child = seed;}} else {let local = child;} return (local == seed) && decide(first);} else {return saved;}",
         "if gate {let local = seed;if first {let child = seed;if saved {let local = relay(local);let child = seed;} let seed = 0;} return (local == seed) && decide(first);} else {return saved;}",
     ] { reject_source(text); }
@@ -195,7 +195,7 @@ fn return_dual_i64_private_pair_owned_fields_neutral_guards_and_collision_free_p
             matches!(base.as_ref(),NirExpr::Var(n) if n=="__nuis_effect_call_pair_1"))
         );
     }
-    for child_ty in ["i32", "String"] {
+    for child_ty in ["String"] {
         let mut bad = scope.clone();
         bad.insert("child".into(), scalar_type(child_ty));
         assert!(transport::prepare(

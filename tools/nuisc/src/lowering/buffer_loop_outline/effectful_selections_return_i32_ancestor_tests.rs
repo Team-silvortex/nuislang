@@ -93,7 +93,7 @@ fn return_i32_ancestor_private_bool_rejects_third_writes_seals_wide_owners_hidde
     ] { reject_source(&body(selected)); }
     for text in [
         "if gate {const local: f64 = 0.0;if first {let child = saved;if saved {let local: f64 = 0.0;let child = decide(first);}} return (local == 0.0) && decide(first);} else {return saved;}",
-        "if gate {let local = i32_from_i64(seed);if first {let child = i32_from_i64(0);if saved {let local = relay(local);let child = relay(child);}} return (local == i32_from_i64(seed)) && decide(first);} else {return saved;}",
+        "if gate {let local = i32_from_i64(seed);if first {const child: i32 = i32_from_i64(0);if saved {let local = relay(local);let child = relay(child);}} return (local == i32_from_i64(seed)) && decide(first);} else {return saved;}",
         "if gate {let local = i32_from_i64(seed);if first {let child = saved;if saved {let local = relay(local);let child = first;}} else {let local = child;} return (local == i32_from_i64(seed)) && decide(first);} else {return saved;}",
     ] { reject_source(text); }
     for kind in ["ref", "optional", "generic", "u32", "String"] {

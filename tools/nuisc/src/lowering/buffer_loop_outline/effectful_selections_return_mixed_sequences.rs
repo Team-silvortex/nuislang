@@ -7,6 +7,9 @@ mod tests;
 #[path = "effectful_selections_return_mixed_sequence_tree.rs"]
 mod tree;
 
+#[path = "effectful_selections_return_private_fields.rs"]
+pub(super) mod fields;
+
 pub(super) fn continued(yes: &[NirStmt], no: &[NirStmt]) -> Option<bool> {
     tree::continued(yes, no)
 }

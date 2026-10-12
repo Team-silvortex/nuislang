@@ -162,7 +162,31 @@ actual pair bits and unchanged readonly/single-target constraints.
 The [float/i64 follow-up](reference/nuis-native-private-float-i64-continuations-v1.md)
 adds the reverse exact orientation with actual IEEE owner/full-width child
 observations and the same single-target/readonly/seal/budget contract.
-Other numeric/numeric private pairs and resource transport, hidden
+The [same-width float follow-up](reference/nuis-native-private-same-float-continuations-v1.md)
+adds exact f32/f32 and f64/f64 private pairs, checking independently supplied IEEE
+fields through current-value sequences without granting cross-width transport.
+The separate [cross-width float follow-up](reference/nuis-native-private-cross-float-continuations-v1.md)
+adds exact f32/f64 and f64/f32 private pairs while retaining each original width,
+single-target authority, source order and independent IEEE field observations.
+The [i32/i64 follow-up](reference/nuis-native-private-i32-i64-continuations-v1.md)
+adds one exact i32 outward owner beside a private i64 through independently typed
+fields, preserving extrema/current reads and admitting valid diagnostic-marker data.
+The [i64/i32 reverse follow-up](reference/nuis-native-private-i64-i32-continuations-v1.md)
+adds full-width i64 owners beside exact i32 children, without selecting the legacy
+bool/i32 codec or narrowing the owner. Sealed-child rewrites still reject atomically.
+The [same-width i32 follow-up](reference/nuis-native-private-i32-i32-continuations-v1.md)
+adds exact i32/i32 fields without aliasing the two roles or selecting the old
+bool/i32 pair codec. Crossed extrema distinguish both fields and retained/final values.
+The [i32/float follow-up](reference/nuis-native-private-i32-float-continuations-v1.md)
+adds independently initialized i32/f32 and i32/f64 fields with actual raw child
+bits, current integer values and separate finite-decimal source-free publication checks.
+The [float/i32 reverse follow-up](reference/nuis-native-private-float-i32-continuations-v1.md)
+adds original-width floating owners and independent i32 children, retaining both
+write orders, nested current-value reads and source-free publication boundaries.
+The [three-field continuation proof](reference/nuis-native-private-three-field-continuations-v1.md)
+adds a separate two-private-child certificate, a shared field-type-driven assembler
+and nested current/retained versions without changing the original pair-write limit.
+Further private-child arities and generalized resource transport, hidden
 ordinary leaves and mixed/single exits remain separate, without widening
 common guard/backend or effect authority.
 Broader typed selected-return CLI proof and generalized effect transport remain

@@ -13,6 +13,30 @@ mod return_i64_float;
 #[path = "effect_call_return_float_i64.rs"]
 mod return_float_i64;
 
+#[path = "effect_call_return_same_float.rs"]
+mod return_same_float;
+
+#[path = "effect_call_return_cross_float.rs"]
+mod return_cross_float;
+
+#[path = "effect_call_return_i32_i64.rs"]
+mod return_i32_i64;
+
+#[path = "effect_call_return_i64_i32.rs"]
+mod return_i64_i32;
+
+#[path = "effect_call_return_i32_i32.rs"]
+mod return_i32_i32;
+
+#[path = "effect_call_return_i32_float.rs"]
+mod return_i32_float;
+
+#[path = "effect_call_return_float_i32.rs"]
+mod return_float_i32;
+
+#[path = "effect_call_return_private_fields.rs"]
+mod return_private_fields;
+
 #[path = "effect_call_return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

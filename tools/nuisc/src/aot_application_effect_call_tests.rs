@@ -9,6 +9,30 @@ mod return_i64_float;
 #[path = "aot_application_effect_call_return_float_i64_tests.rs"]
 mod return_float_i64;
 
+#[path = "aot_application_effect_call_return_same_float_tests.rs"]
+mod return_same_float;
+
+#[path = "aot_application_effect_call_return_cross_float_tests.rs"]
+mod return_cross_float;
+
+#[path = "aot_application_effect_call_return_i32_i64_tests.rs"]
+mod return_i32_i64;
+
+#[path = "aot_application_effect_call_return_i64_i32_tests.rs"]
+mod return_i64_i32;
+
+#[path = "aot_application_effect_call_return_i32_i32_tests.rs"]
+mod return_i32_i32;
+
+#[path = "aot_application_effect_call_return_i32_float_tests.rs"]
+mod return_i32_float;
+
+#[path = "aot_application_effect_call_return_float_i32_tests.rs"]
+mod return_float_i32;
+
+#[path = "aot_application_effect_call_return_private_fields_tests.rs"]
+mod return_private_fields;
+
 #[path = "aot_application_effect_call_return_float_ancestor_tests.rs"]
 mod return_float_ancestor;
 

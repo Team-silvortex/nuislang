@@ -16,10 +16,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport.rs",
         required_patterns: &["[\"i64\", \"f32\", \"f64\"]", "owner_type == &scalar_type(name)", "&& child_type == &scalar_type(\"bool\")", "(owner_type.clone(), child_type.clone())", "captures.len() > 31", "owned_pair::install"],
     },
-    DevTensorDriftCheckSpec {
+DevTensorDriftCheckSpec {
         id: "native-return-float-ancestor-exact-inactive-fields",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_owned.rs",
-        required_patterns: &["\"f32\" => NirExpr::F32(\"0.0\".into())", "\"f64\" => NirExpr::F64(\"0.0\".into())", "\"bool\" => NirExpr::Bool(false)", "record(zero.0, zero.1)", "NirExpr::FieldAccess", "NirVisibility::Private"],
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_record.rs",
+        required_patterns: &["\"f32\" => NirExpr::F32(\"0.0\".into())", "\"f64\" => NirExpr::F64(\"0.0\".into())", "\"bool\" => NirExpr::Bool(false)", "record(true)", "NirExpr::FieldAccess", "NirVisibility::Private"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-float-ancestor-whole-original-forest",
@@ -59,7 +59,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-float-ancestor-native-fatal-canaries",
         path: "tools/nuisc/tests/native_application_bridge/return_i32_ancestor_probe.rs",
-        required_patterns: &["pub(super) fn check(", "observation: Option<(&str, &str)>", "llvm.insert_str(insertion, OWNER_PROBE)", "Source computations, private joins and real traps remain intact", "Some(4 | 5)", "[(0, 91), (14, 92)]", "load volatile i64, ptr %prev", "assert!(!actual.contains(&AFTER))"],
+        required_patterns: &["pub(super) fn check(", "observation: Option<(&str, &str)>", "llvm.insert_str(insertion, OWNER_PROBE)", "Source computations, private joins and real traps remain intact", "Some(4 | 5)", "[(0, 91), (state_width + 1, 92)]", "load volatile i64, ptr %prev", "Full trace equality distinguishes AFTER from matching field words"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-float-ancestor-aot-policy-effect-veto",
