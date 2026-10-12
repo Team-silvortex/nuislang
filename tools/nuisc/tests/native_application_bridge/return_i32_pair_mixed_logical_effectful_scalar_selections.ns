@@ -1,0 +1,76 @@
+mod cpu Main {
+    struct State {
+        seed: i64, first: bool, second: bool,
+        outer: i64, init: i64, child_init: i64, cond: i64,
+        child_rhs: i64, parent_rhs: i64, after: i64, unused: i64, answer: i64,
+        result: bool
+    }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(90); return value == (proof == 1); }
+    @noinline fn initialize(value: bool, proof: i64) -> bool { print(87); return value == (proof == 1); }
+    @noinline fn child_initial(value: i64, proof: i64) -> i64 { print(91); return value + proof - 1; }
+    @noinline fn condition(value: bool, proof: i64) -> bool { print(92); return value == (proof == 1); }
+    @noinline fn child_work(value: i32, proof: i64) -> i32 { print(93); return value; }
+    @noinline fn parent_work(value: i32, expected: i32, proof: i64) -> bool { print(95); return (value == expected) == (proof == 1); }
+    @noinline fn after_work(value: i32, expected: i32, proof: i64) -> bool { print(96); return (value == expected) == (proof == 1); }
+    @noinline fn unused_work(proof: i64) -> i64 { print(83); return proof; }
+    @noinline fn answer_work(value: bool, proof: i64) -> bool { print(97); return value == (proof == 1); }
+    fn observe(seed: i64, first: bool, second: bool, outer: i64, init: i64,
+        child_init: i64, cond: i64, child_rhs: i64, parent_rhs: i64,
+        after: i64, unused: i64, answer: i64) -> bool {
+        print(99);
+        if choose(first, 1 / outer) {
+            let local = initialize(seed < 0, 1 / init);
+            if second {
+                let child = i32_from_i64(child_initial(seed, 1 / child_init));
+                if condition(local, 1 / cond) {
+                    let child = child_work(i32_from_i64(0) - child - i32_from_i64(1), 1 / child_rhs);
+                    let local = parent_work(child, i32_from_i64(seed), 1 / parent_rhs);
+                    if child < i32_from_i64(0) {
+                        let local = true;
+                        let child = child_work(child, 1 / child_rhs);
+                    } else { let local = false; }
+                    let local = local || false;
+                } else {
+                    let local = parent_work(child, i32_from_i64(seed), 1 / parent_rhs);
+                    let child = child_work(child, 1 / child_rhs);
+                    if local {
+                        let child = child_work(i32_from_i64(0) - child - i32_from_i64(1), 1 / child_rhs);
+                        let local = child != i32_from_i64(seed);
+                    }
+                    let local = local && first;
+                }
+                if local {
+                        let child = child_work(i32_from_i64(0) - child - i32_from_i64(1), 1 / child_rhs);
+                    let local = child == i32_from_i64(seed);
+                } else { let local = child != i32_from_i64(seed); }
+                let local = after_work(child, i32_from_i64(seed), 1 / after);
+                let ignored = unused_work(1 / unused);
+            }
+            return local && answer_work(first, 1 / answer);
+        } else {
+            let local = initialize(seed < 0, 1 / init);
+            return local || answer_work(second, 1 / answer);
+        }
+        print(80);
+        return false;
+    }
+    fn start(seed: i64, first: bool, second: bool, outer: i64, init: i64,
+        child_init: i64, cond: i64, child_rhs: i64, parent_rhs: i64,
+        after: i64, unused: i64, answer: i64) -> State {
+        let result = observe(seed, first, second, outer, init, child_init, cond,
+            child_rhs, parent_rhs, after, unused, answer);
+        print(79);
+        return State { seed: seed, first: first, second: second, outer: outer,
+            init: init, child_init: child_init, cond: cond, child_rhs: child_rhs,
+            parent_rhs: parent_rhs, after: after, unused: unused, answer: answer, result: result };
+    }
+    fn step(state: State, first: bool, second: bool, outer: i64, init: i64,
+        child_init: i64, cond: i64, child_rhs: i64, parent_rhs: i64,
+        after: i64, unused: i64, answer: i64) -> State {
+        return start(state.seed, first, second, outer, init, child_init, cond,
+            child_rhs, parent_rhs, after, unused, answer);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}
+

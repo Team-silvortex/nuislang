@@ -12,7 +12,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-return-prefix-shared-guarded-stage-and-predicate-installer",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["StagedPredicate(Vec<regions::Statement>, predicates::Predicate)",
-            "SelectedValue::StagedPredicate(statements, predicate)", "body.extend(regions::install(statements, names, bindings, helpers))",
+            "SelectedValue::StagedPredicate(statements, predicate)", "body.extend(regions::install(\n                    statements, names, bindings, helpers, structs,\n                ))",
             "predicates::install(predicate, names, bindings, helpers)", "let returns = plan.destination.is_none()"],
     },
     DevTensorDriftCheckSpec {

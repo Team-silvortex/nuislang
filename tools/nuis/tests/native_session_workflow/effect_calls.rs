@@ -3,6 +3,36 @@
     target_pointer_width = "64"
 ))]
 use super::*;
+
+#[path = "effect_call_return_dual_i64.rs"]
+mod return_dual_i64;
+
+#[path = "effect_call_return_i64_float.rs"]
+mod return_i64_float;
+
+#[path = "effect_call_return_float_i64.rs"]
+mod return_float_i64;
+
+#[path = "effect_call_return_i32_ancestor.rs"]
+mod return_i32_ancestor;
+
+#[path = "effect_call_return_float_ancestor.rs"]
+mod return_float_ancestor;
+
+#[path = "effect_call_return_i64_ancestor.rs"]
+mod return_i64_ancestor;
+
+#[path = "effect_call_private_event_failure.rs"]
+mod private_event_failure;
+
+#[path = "effect_call_private_event_budget.rs"]
+mod private_event_budget;
+
+#[path = "effect_call_return_float_pair_mixed_logical.rs"]
+mod return_float_pair_mixed_logical;
+
+#[path = "effect_call_return_i64_pair_mixed_logical.rs"]
+mod return_i64_pair_mixed_logical;
 use nuisc::aot::native_session::literal_print_packaging_mode;
 
 #[path = "effect_call_regions.rs"]
@@ -71,6 +101,20 @@ mod return_trailing_update_logical;
 #[path = "effect_call_return_terminal_child_update_logical.rs"]
 mod return_terminal_child_update_logical;
 
+#[path = "effect_call_return_mixed_update_logical.rs"]
+mod return_mixed_update_logical;
+#[path = "effect_call_return_nested_prefix_mixed_logical.rs"]
+mod return_nested_prefix_mixed_logical;
+#[path = "effect_call_return_nested_sequential_mixed_logical.rs"]
+mod return_nested_sequential_mixed_logical;
+#[path = "effect_call_return_prefix_mixed_logical.rs"]
+mod return_prefix_mixed_logical;
+#[path = "effect_call_return_sequential_mixed_logical.rs"]
+mod return_sequential_mixed_logical;
+
+#[path = "effect_call_return_i32_pair_mixed_logical.rs"]
+mod return_i32_pair_mixed_logical;
+
 const SOURCE: &str =
     include_str!("../../../nuisc/tests/native_application_bridge/effectful_selected_calls.ns");
 const REBIND_SOURCE: &str =
@@ -84,6 +128,10 @@ fn project() -> (Project, String) {
 }
 
 fn project_for_source(source: &str) -> (Project, String) {
+    project_for_source_with_limit(source, 100)
+}
+
+fn project_for_source_with_limit(source: &str, helper_entry_limit: u64) -> (Project, String) {
     let project = Project::new(source);
     let manifest = project.0.join("nuis.toml");
     let text = fs::read_to_string(&manifest).unwrap().replace(
@@ -99,7 +147,7 @@ fn project_for_source(source: &str) -> (Project, String) {
         .filter(|node| matches!(node.op.instruction.as_str(), "print" | "guard_print"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let mode = literal_print_packaging_mode("counter", sites, 0, 100).unwrap();
+    let mode = literal_print_packaging_mode("counter", sites, 0, helper_entry_limit).unwrap();
     fs::write(manifest, format!("{text}packaging_mode = \"{mode}\"\n")).unwrap();
     (project, mode)
 }

@@ -82,8 +82,10 @@ fn stage_authorized(
     if prefix.len() > 16 {
         return None;
     }
-    if authorized.is_some_and(|target| scope.get(target.name()) != Some(&scalar_type("bool"))) {
-        return None;
+    if let Some(target) = authorized {
+        if !updates::owner_type(scope.get(target.name())?) {
+            return None;
+        }
     }
     // Permission does not define a new version. The first RHS must still
     // capture entering values; only proven source writes advance `defined`.

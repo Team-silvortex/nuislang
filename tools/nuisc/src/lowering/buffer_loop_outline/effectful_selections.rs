@@ -10,6 +10,9 @@ mod nested;
 #[path = "effectful_selections_regions.rs"]
 mod regions;
 
+#[path = "effectful_selections_transport.rs"]
+mod transport;
+
 #[path = "effectful_selections_ordered.rs"]
 mod ordered;
 
@@ -47,6 +50,7 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
         .collect::<Signatures>();
     let pure = collect_pure_helper_functions(module);
     let mut helpers = Vec::new();
+    let mut structs = Vec::new();
     for function in &mut module.functions {
         if function.is_async
             || !function.generic_params.is_empty()
@@ -90,11 +94,16 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
                         })
                 };
                 if let Some(plan) = plan {
+                    // Reserve source types only on installation; a rejected
+                    // candidate must leave the caller's name set unchanged.
+                    names.extend(module.structs.iter().map(|d| d.name.clone()));
+                    names.extend(module.enums.iter().map(|d| d.name.clone()));
                     let constant = plan
                         .destination
                         .as_ref()
                         .is_some_and(|(_, constant)| *constant);
-                    let (generated, name, ty) = install(plan, names, &mut bindings, &mut helpers);
+                    let (generated, name, ty) =
+                        install(plan, names, &mut bindings, &mut helpers, &mut structs);
                     if constant {
                         constants.insert(name.clone());
                     }
@@ -125,6 +134,7 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
     }
     let generated = helpers.iter().map(|f| f.name.clone()).collect();
     module.functions.extend(helpers);
+    module.structs.extend(structs);
     generated
 }
 
@@ -253,6 +263,19 @@ fn install(
     names: &mut BTreeSet<String>,
     bindings: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
+    structs: &mut Vec<NirStructDef>,
+) -> (Vec<NirStmt>, String, NirTypeRef) {
+    let neutral = control_values::zero_value(&plan.ty, &control_values::TypedLayouts::default());
+    install_with_neutral(plan, neutral, names, bindings, helpers, structs)
+}
+
+fn install_with_neutral(
+    plan: Plan,
+    neutral: NirExpr,
+    names: &mut BTreeSet<String>,
+    bindings: &mut BTreeSet<String>,
+    helpers: &mut Vec<NirFunction>,
+    structs: &mut Vec<NirStructDef>,
 ) -> (Vec<NirStmt>, String, NirTypeRef) {
     let gate = branches::fresh_name("__nuis_effect_call_gate", bindings);
     let condition = predicates::install(plan.condition, names, bindings, helpers);
@@ -279,10 +302,7 @@ fn install(
                 lhs: Box::new(NirExpr::Var(gate.clone())),
                 rhs: Box::new(NirExpr::Bool(selected)),
             },
-            then_body: vec![NirStmt::Return(Some(control_values::zero_value(
-                &plan.ty,
-                &control_values::TypedLayouts::default(),
-            )))],
+            then_body: vec![NirStmt::Return(Some(neutral.clone()))],
             else_body: vec![],
         }];
         // Descendant predicates are emitted only after this ancestor guard.
@@ -292,30 +312,34 @@ fn install(
                 predicates::install(predicate, names, bindings, helpers)
             }
             SelectedValue::StagedPredicate(statements, predicate) => {
-                body.extend(regions::install(statements, names, bindings, helpers));
+                body.extend(regions::install(
+                    statements, names, bindings, helpers, structs,
+                ));
                 predicates::install(predicate, names, bindings, helpers)
             }
             SelectedValue::Region(statements, value) => {
-                body.extend(regions::install(statements, names, bindings, helpers));
+                body.extend(regions::install(
+                    statements, names, bindings, helpers, structs,
+                ));
                 value
             }
             SelectedValue::Ordered(children, suffix, result) => {
                 for (stage, child) in children {
-                    body.extend(regions::install(stage, names, bindings, helpers));
-                    let (statements, _, _) = install(*child, names, bindings, helpers);
+                    body.extend(regions::install(stage, names, bindings, helpers, structs));
+                    let (statements, _, _) = install(*child, names, bindings, helpers, structs);
                     body.extend(statements);
                 }
-                body.extend(regions::install(suffix, names, bindings, helpers));
+                body.extend(regions::install(suffix, names, bindings, helpers, structs));
                 result
             }
             SelectedValue::Nested(child) => {
-                let (statements, result, _) = install(*child, names, bindings, helpers);
+                let (statements, result, _) = install(*child, names, bindings, helpers, structs);
                 body.extend(statements);
                 NirExpr::Var(result)
             }
             SelectedValue::StagedNested(stage, child) => {
-                body.extend(regions::install(stage, names, bindings, helpers));
-                let (statements, result, _) = install(*child, names, bindings, helpers);
+                body.extend(regions::install(stage, names, bindings, helpers, structs));
+                let (statements, result, _) = install(*child, names, bindings, helpers, structs);
                 body.extend(statements);
                 NirExpr::Var(result)
             }
@@ -431,6 +455,10 @@ fn expression(
         }
         NirExpr::CastI64ToI32(v) => (next(v)? == scalar_type("i64")).then(|| scalar_type("i32")),
         NirExpr::CastI32ToI64(v) => (next(v)? == scalar_type("i32")).then(|| scalar_type("i64")),
+        NirExpr::PackF32Word(v) => (next(v)? == scalar_type("f32")).then(|| scalar_type("i64")),
+        NirExpr::UnpackF32Word(v) => (next(v)? == scalar_type("i64")).then(|| scalar_type("f32")),
+        NirExpr::PackF64Word(v) => (next(v)? == scalar_type("f64")).then(|| scalar_type("i64")),
+        NirExpr::UnpackF64Word(v) => (next(v)? == scalar_type("i64")).then(|| scalar_type("f64")),
         _ => None,
     }
 }

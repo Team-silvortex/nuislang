@@ -4,12 +4,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-ordered-update-owner-only-capability-and-terminal-authority-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_updates.rs",
-        required_patterns: &["effectful_selections_return_ordered_update_tests.rs", "pub(super) struct Target<'a>(&'a str)", "authorized: Option<&Target<'_>>", "!staged.defined.contains(name)", "!authorized.is_some_and(|target| target.name() == name)", "staged.constants.contains(name)", "staged.local.get(name)? != &scalar_type(\"bool\")", "let authorized = Target(name)", "super::stage_authorized(prefix, scope, signatures, budget, depth, Some(&authorized))?"],
+        required_patterns: &["effectful_selections_return_ordered_update_tests.rs", "pub(super) struct Target<'a>(&'a str)", "authorized: Option<&Target<'_>>", "!staged.defined.contains(name)", "!authorized.is_some_and(|target| target.name() == name)", "staged.constants.contains(name)", "!owner_type(staged.local.get(name)?)", "let authorized = Target(name)", "super::stage_authorized(&[], scope, signatures, budget, depth, Some(&authorized))?", "super::append_authorized(", "for (index, statement) in prefix.iter().enumerate()" ],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-ordered-update-shared-staging-no-permission-as-definition-and-readonly-default-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_prefixes.rs",
-        required_patterns: &["stage_authorized(prefix, scope, signatures, budget, depth, None)", "authorized: Option<&updates::Target<'_>>", "scope.get(target.name()) != Some(&scalar_type(\"bool\"))", "Permission does not define a new version", "defined: BTreeSet::new()", "depth, authorized,", "if scope.contains_key(name)", "!matches!(statement, NirStmt::Let { .. })", "!authorized.is_some_and(|target| target.name() == name)", "next.inputs.difference(&staged.defined)", "staged.defined.extend(next.defined)"],
+        required_patterns: &["stage_authorized(prefix, scope, signatures, budget, depth, None)", "authorized: Option<&updates::Target<'_>>", "updates::owner_type(scope.get(target.name())?)", "Permission does not define a new version", "defined: BTreeSet::new()", "depth, authorized,", "if scope.contains_key(name)", "!matches!(statement, NirStmt::Let { .. })", "!authorized.is_some_and(|target| target.name() == name)", "next.inputs.difference(&staged.defined)", "staged.defined.extend(next.defined)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-ordered-update-current-captures-shared-exact-boundaries-and-atomic-veto-tests",

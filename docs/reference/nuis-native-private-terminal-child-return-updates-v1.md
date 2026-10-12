@@ -106,6 +106,9 @@ separate permission/version proof. Their child writes must stay private while
 actual ancestor updates still publish; this cannot become arbitrary incoming or
 multi-target write authority. Root no-write candidates, hidden logical leaves,
 mixed/partial exits, loops, resources and generalized effects remain separate.
+The later [terminal mixed-update follow-up](nuis-native-private-mixed-return-updates-v1.md)
+records that distinct proof. The 623-test acceptance above remains historical,
+not fresh evidence for the later extension.
 This scalar-host acceptance does not establish new GPU/Linux/Windows execution,
 measured speedups, authentication, formal memory safety or completed self-hosting.
 Full workspace and strict Clippy acceptance remain separate.

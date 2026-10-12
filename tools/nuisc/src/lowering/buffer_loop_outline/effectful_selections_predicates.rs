@@ -12,6 +12,7 @@ mod computed_tests;
 #[path = "effectful_selections_logical_trees_tests.rs"]
 mod tree_tests;
 
+#[derive(Clone)]
 pub(super) enum Predicate {
     Scalar(NirExpr),
     Logical {

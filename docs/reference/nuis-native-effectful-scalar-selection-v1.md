@@ -1,5 +1,28 @@
 # Native Effectful Scalar Selection V1
 
+The [float/i64 proof](nuis-native-private-float-i64-continuations-v1.md)
+adds the reverse exact typed orientation without extra write authority.
+
+The later [i64/float proof](nuis-native-private-i64-float-continuations-v1.md)
+adds exact f32/f64 private fields beside an i64 owner without extra write authority.
+
+The later [dual-i64 proof](nuis-native-private-dual-i64-continuations-v1.md)
+adds one exact i64/i64 private pair with actual native field observations,
+unchanged single-target authority and independent event-publication evidence.
+
+The later [float-ancestor proof](nuis-native-private-float-ancestor-continuations-v1.md)
+adds exact f32/f64 outward fields beside one private bool, preserving IEEE bits
+through typed owned fields with unchanged public returns and effect authority.
+
+The later [i64-ancestor proof](nuis-native-private-i64-ancestor-continuations-v1.md)
+preserves the complete signed outward width beside one private bool through
+exact owned fields, with unchanged public return and effect authority.
+
+The subsequent [i32-ancestor proof](nuis-native-private-i32-ancestor-continuations-v1.md)
+admits one exact signed outward ancestor beside a private bool in bool-returning
+prefixes. It preserves single-target authority, original budgets and explicit
+effect grants; its focused receipt is separate from the historical cohorts below.
+
 This beta-0.16 worktree follow-up repairs source-to-YIR order propagation for
 bounded scalar call selections. A prefix print, an effectful predicate, selected
 argument calls, the selected callee and a suffix print retain their source order.
@@ -1285,6 +1308,27 @@ The later [trailing-private-work contract](nuis-native-private-trailing-return-u
 separately proves final private let/const stages without making them exported targets.
 The [terminal-private-child contract](nuis-native-private-terminal-child-return-updates-v1.md)
 keeps terminal child selections private while retaining the current ancestor result.
+The [terminal mixed-update contract](nuis-native-private-mixed-return-updates-v1.md)
+extends that terminal-only route to both ancestor/child source orders with one outward ancestor.
+The [flat mixed-continuation contract](nuis-native-private-flat-mixed-continuations-v1.md)
+keeps later child reads in guarded branch-current scopes through nonrecursive recipe copying.
+The [nested branch-tree contract](nuis-native-private-nested-mixed-continuations-v1.md)
+adds branch-current nested gates with one shared flat suffix and leaf-only recipe copying.
+The [sequential mixed-continuation contract](nuis-native-private-sequential-mixed-continuations-v1.md)
+adds closed private bool-pair transport between flat mixed selections with linear
+installation, nontrapping comparison decode and the same outward ancestor ABI.
+The [nested sequential contract](nuis-native-private-nested-sequential-mixed-continuations-v1.md)
+also composes branch-local sequences over one bounded original forest without
+tail copies. The [i32-pair contract](nuis-native-private-i32-pair-continuations-v1.md)
+adds full signed private child transport without widening the public result ABI.
+The [i64-pair contract](nuis-native-private-i64-pair-continuations-v1.md) adds a
+full-width private signed child through existing guarded owned aggregate returns.
+The [float-pair contract](nuis-native-private-float-pair-continuations-v1.md) adds
+exact floating children, IEEE comparison inference and raw native child-word proof.
+The [event-failure contract](nuis-native-private-continuation-event-failure-v1.md)
+separates last-event publication, fatal native traps and recoverable cleanup
+across the same five private child types, without changing source authority.
+Other outward scalar owners remain a separate proof.
 General resources, hidden roots, mixed/partial exits,
 wider effect authority, new GPU/Linux/Windows execution, measured speedups,
 publisher authentication, formal memory safety and completed self-hosting are

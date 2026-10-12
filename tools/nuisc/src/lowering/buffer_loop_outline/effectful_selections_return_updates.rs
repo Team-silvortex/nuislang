@@ -24,11 +24,48 @@ mod trailing_tests;
 #[path = "effectful_selections_return_terminal_child_update_tests.rs"]
 mod terminal_child_tests;
 
+#[path = "effectful_selections_return_mixed_updates.rs"]
+mod mixed;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i32_ancestor_tests.rs"]
+mod i32_ancestor_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i64_ancestor_tests.rs"]
+mod i64_ancestor_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_float_ancestor_tests.rs"]
+mod float_ancestor_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_dual_i64_tests.rs"]
+mod dual_i64_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_i64_float_tests.rs"]
+mod i64_float_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_float_i64_tests.rs"]
+mod float_i64_tests;
+
 #[path = "effectful_selections_return_retention_targets.rs"]
 mod retention_targets;
 
-// Only this owner can delegate an already proven, unsealed prefix-owned bool.
+// Only this owner delegates an already proven, unsealed prefix-owned scalar.
 pub(super) struct Target<'a>(&'a str);
+
+pub(super) fn owner_type(ty: &NirTypeRef) -> bool {
+    ty == &scalar_type("bool") || numeric_owner(ty)
+}
+
+pub(super) fn numeric_owner(ty: &NirTypeRef) -> bool {
+    ["i32", "i64", "f32", "f64"]
+        .into_iter()
+        .any(|name| ty == &scalar_type(name))
+}
 
 impl Target<'_> {
     pub(super) fn name(&self) -> &str {
@@ -78,7 +115,7 @@ pub(super) fn prove(
         || (!staged.defined.contains(name)
             && !authorized.is_some_and(|target| target.name() == name))
         || staged.constants.contains(name)
-        || staged.local.get(name)? != &scalar_type("bool")
+        || !owner_type(staged.local.get(name)?)
     {
         return None;
     }
@@ -99,7 +136,8 @@ fn eligible(staged: &regions::Staging, authorized: Option<&Target<'_>>) -> BTree
         .local
         .iter()
         .filter(|(name, ty)| {
-            **ty == scalar_type("bool")
+            (**ty == scalar_type("bool")
+                || (numeric_owner(ty) && authorized.is_none_or(|target| target.name() == *name)))
                 && !staged.constants.contains(*name)
                 && (staged.defined.contains(*name)
                     || authorized.is_some_and(|target| target.name() == *name))
@@ -199,18 +237,79 @@ fn arm(
         return Some(nested::Proof {
             value: SelectedValue::Expression(NirExpr::Var(name.into())),
             name: name.into(),
-            ty: scalar_type("bool"),
+            ty: scope.get(name)?.clone(),
             inputs: BTreeSet::from([name.into()]),
             calls: BTreeSet::new(),
         });
     };
     let authorized = Target(name);
+    if prefix.len() > 16 {
+        return None;
+    }
     let mut staged =
-        super::stage_authorized(prefix, scope, signatures, budget, depth, Some(&authorized))?;
-    let mut proof = match last {
+        super::stage_authorized(&[], scope, signatures, budget, depth, Some(&authorized))?;
+    for (index, statement) in prefix.iter().enumerate() {
+        if let NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } = statement
+        {
+            if let Some(child) =
+                mixed::classify(then_body, else_body, scope, &staged, &authorized, depth)?
+            {
+                let proof = mixed::continue_flat(
+                    condition,
+                    then_body,
+                    else_body,
+                    &body[index + 1..],
+                    &staged.local,
+                    &authorized,
+                    &child,
+                    signatures,
+                    budget,
+                    depth,
+                )?;
+                return Some(finish(staged, proof));
+            }
+        }
+        super::append_authorized(
+            statement,
+            scope,
+            &mut staged,
+            signatures,
+            budget,
+            depth,
+            Some(&authorized),
+        )?;
+    }
+    let mixed = match last {
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => mixed::classify(then_body, else_body, scope, &staged, &authorized, depth)?,
+        _ => None,
+    };
+    let proof = match last {
         statement @ NirStmt::Let { name: target, .. } if target == name => {
             nested::leaf(statement, &staged.local, signatures, budget)?
         }
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } if mixed.is_some() => mixed::prove(
+            condition,
+            then_body,
+            else_body,
+            &staged.local,
+            &authorized,
+            mixed.as_ref()?,
+            signatures,
+            budget,
+            depth,
+        )?,
         NirStmt::If {
             then_body,
             else_body,
@@ -228,7 +327,7 @@ fn arm(
             nested::Proof {
                 value: SelectedValue::Expression(NirExpr::Var(name.into())),
                 name: name.into(),
-                ty: scalar_type("bool"),
+                ty: scope.get(name)?.clone(),
                 inputs: BTreeSet::from([name.into()]),
                 calls: BTreeSet::new(),
             }
@@ -262,13 +361,17 @@ fn arm(
             nested::Proof {
                 value: SelectedValue::Expression(NirExpr::Var(name.into())),
                 name: name.into(),
-                ty: scalar_type("bool"),
+                ty: scope.get(name)?.clone(),
                 inputs: BTreeSet::from([name.into()]),
                 calls: BTreeSet::new(),
             }
         }
         _ => return None,
     };
+    Some(finish(staged, proof))
+}
+
+fn finish(staged: regions::Staging, mut proof: nested::Proof) -> nested::Proof {
     let mut inputs = staged.inputs;
     inputs.extend(proof.inputs.difference(&staged.defined).cloned());
     proof.inputs = inputs;
@@ -285,5 +388,5 @@ fn arm(
             _ => unreachable!(),
         };
     }
-    Some(proof)
+    proof
 }

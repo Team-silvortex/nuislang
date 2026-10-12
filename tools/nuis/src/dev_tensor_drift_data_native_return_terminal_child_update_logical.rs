@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-terminal-child-update-shared-eligibility-and-original-owner-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_updates.rs",
-        required_patterns: &["fn eligible(", "**ty == scalar_type(\"bool\")", "!staged.constants.contains(*name)", "staged.defined.contains(*name)", "authorized.is_some_and(|target| target.name() == *name)", "Root candidates have no delegation and still require actual write evidence", "staged.local.get(name)? != &scalar_type(\"bool\")", "=> branch(", "inputs.extend(proof.inputs.difference(&staged.defined).cloned())"],
+        required_patterns: &["fn eligible(", "**ty == scalar_type(\"bool\")", "!staged.constants.contains(*name)", "staged.defined.contains(*name)", "authorized.is_some_and(|target| target.name() == *name)", "Root candidates have no delegation and still require actual write evidence", "!owner_type(staged.local.get(name)?)", "=> branch(", "inputs.extend(proof.inputs.difference(&staged.defined).cloned())"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-terminal-child-update-atomic-private-child-tests-original-budgets-and-adjacent-boundaries",

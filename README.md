@@ -154,9 +154,48 @@ keeps final private let/const work in the original staging environment, exportin
 only the already authorized target rather than the fresh trailing binding.
 The [terminal-private-child follow-up](docs/reference/nuis-native-private-terminal-child-return-updates-v1.md)
 also proves a terminal update of one prefix-defined private bool child while
-retaining the actual ancestor target. Mixed ancestor/child writes, hidden ordinary
-leaves and mixed/single exits remain separate; common guard/backend/effect
-authority is not widened.
+retaining the actual ancestor target. The [terminal mixed-update follow-up](docs/reference/nuis-native-private-mixed-return-updates-v1.md)
+also permits both source orders of ancestor/private-child writes while exporting
+only the actual ancestor. The [flat mixed-continuation follow-up](docs/reference/nuis-native-private-flat-mixed-continuations-v1.md)
+also keeps post-prefix child reads in branch-current scopes, without a second
+outward result or recursive tail copying. The [nested branch-tree follow-up](docs/reference/nuis-native-private-nested-mixed-continuations-v1.md)
+also permits branch-current nested gates before one shared flat suffix, copying
+only flat recipes at original leaves. The [sequential mixed-continuation follow-up](docs/reference/nuis-native-private-sequential-mixed-continuations-v1.md)
+keeps both current bool versions through closed private scalar transport, with
+linear branch installation and one outward ancestor. The [nested sequential follow-up](docs/reference/nuis-native-private-nested-sequential-mixed-continuations-v1.md)
+also composes branch-local sequences through whole-original-forest preflight,
+without copying continuations. The [i32-pair follow-up](docs/reference/nuis-native-private-i32-pair-continuations-v1.md)
+also carries an exact private signed i32 beside the bool ancestor without losing
+its sign or adding trapping decode. The [i64-pair follow-up](docs/reference/nuis-native-private-i64-pair-continuations-v1.md)
+adds a full-width signed child through an exact private owned record, reusing
+aggregate guards/returns without replaying work. The [float-pair follow-up](docs/reference/nuis-native-private-float-pair-continuations-v1.md)
+adds exact f32/f64 private children and native negative-zero/NaN bit checks.
+The [event-failure follow-up](docs/reference/nuis-native-private-continuation-event-failure-v1.md)
+checks last-event publication and real failure order across all five child types.
+The [event-budget follow-up](docs/reference/nuis-native-private-continuation-event-budget-v1.md)
+checks adjacent callback-local limits, final private-entry rejection and repeated
+event/close reset through native execution and cache/source-free images.
+The [i32-ancestor follow-up](docs/reference/nuis-native-private-i32-ancestor-continuations-v1.md)
+also admits an exact signed outward ancestor beside a private bool child inside
+bool-returning prefixes, with one outward result and unchanged effect authority.
+The [i64-ancestor follow-up](docs/reference/nuis-native-private-i64-ancestor-continuations-v1.md)
+also carries the complete signed width through exact private owned fields,
+without narrowing, bit packing or changing the surrounding bool return.
+The [float-ancestor follow-up](docs/reference/nuis-native-private-float-ancestor-continuations-v1.md)
+adds exact f32/f64 outward owners beside a private bool, using typed owned fields
+and raw native callee-bit checks, without numeric packing or added allocation.
+The [dual-i64 follow-up](docs/reference/nuis-native-private-dual-i64-continuations-v1.md)
+admits one exact i64 outward owner and one private i64 child, retaining both
+full-width fields and checking actual native pair and final-owner values.
+The [i64/float follow-up](docs/reference/nuis-native-private-i64-float-continuations-v1.md)
+also carries exact f32/f64 private children beside one i64 outward target,
+with actual native pair-bit checks and unchanged write authority.
+The [float/i64 follow-up](docs/reference/nuis-native-private-float-i64-continuations-v1.md)
+adds the reverse orientation: exact f32/f64 outward fields beside a private i64,
+with actual IEEE owner and full-width child checks under the same authority.
+Other numeric/numeric private pairs and resource transport,
+hidden ordinary leaves and mixed/single exits remain separate; common
+guard/backend/effect authority is not widened.
 Native fresh/cache/source-free runs check selection polarities, poisoned inactive
 paths and selected-stage traps without exporting child-private bindings.
 The [floating literal negation repair](docs/reference/nuis-native-float-literal-negation-v1.md)

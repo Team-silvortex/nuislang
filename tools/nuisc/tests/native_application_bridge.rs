@@ -8,6 +8,33 @@ use yir_core::{Value, YirModule};
 use yir_lower_llvm::native_session::{emit_registered, NativeSessionBridge, ScalarKind};
 use yir_runtime_host::ApplicationSession;
 
+#[path = "native_application_bridge/return_dual_i64.rs"]
+mod return_dual_i64;
+
+#[path = "native_application_bridge/return_i64_float.rs"]
+mod return_i64_float;
+
+#[path = "native_application_bridge/return_float_i64.rs"]
+mod return_float_i64;
+
+#[path = "native_application_bridge/return_i32_ancestor.rs"]
+mod return_i32_ancestor;
+
+#[path = "native_application_bridge/return_float_ancestor.rs"]
+mod return_float_ancestor;
+
+#[path = "native_application_bridge/return_i64_ancestor.rs"]
+mod return_i64_ancestor;
+
+#[path = "native_application_bridge/private_event_budget.rs"]
+mod private_event_budget;
+
+#[path = "native_application_bridge/private_event_failure.rs"]
+mod private_event_failure;
+
+#[path = "native_application_bridge/return_float_pair.rs"]
+mod return_float_pair;
+
 #[path = "native_application_bridge/f32_scoped_record_carries.rs"]
 mod f32_scoped_record_carries;
 #[path = "native_application_bridge/f64_scoped_record_carries.rs"]

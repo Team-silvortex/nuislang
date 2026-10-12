@@ -125,9 +125,46 @@ ownership. The [trailing-private-work follow-up](reference/nuis-native-private-t
 keeps final private let/const work in the original staged scope and transports
 only the existing target. The [terminal-private-child follow-up](reference/nuis-native-private-terminal-child-return-updates-v1.md)
 also proves terminal updates of one prefix-owned private child while retaining
-the actual ancestor target. Mixed ancestor/child writes, hidden ordinary leaves
-and mixed/single exits remain separate, without widening common guard/backend
-or effect authority.
+the actual ancestor target. The [terminal mixed-update follow-up](reference/nuis-native-private-mixed-return-updates-v1.md)
+allows both source orders of ancestor/private-child writes with one outward
+ancestor. The [flat mixed-continuation follow-up](reference/nuis-native-private-flat-mixed-continuations-v1.md)
+keeps later child reads in branch-current scopes without a second result or
+recursive tail copying. The [nested branch-tree follow-up](reference/nuis-native-private-nested-mixed-continuations-v1.md)
+adds current nested gates before one flat suffix with leaf-only recipe copying.
+The [sequential mixed-continuation follow-up](reference/nuis-native-private-sequential-mixed-continuations-v1.md)
+adds linear private pair transport between flat mixed selections. The [nested sequential follow-up](reference/nuis-native-private-nested-sequential-mixed-continuations-v1.md)
+also proves branch-local sequences over the complete original forest without
+tail copies. The [i32-pair follow-up](reference/nuis-native-private-i32-pair-continuations-v1.md)
+also transports an exact private signed i32 with a nontrapping 33-bit codec.
+The [i64-pair follow-up](reference/nuis-native-private-i64-pair-continuations-v1.md)
+reuses guarded owned aggregate returns for a full-width signed private child.
+The [float-pair follow-up](reference/nuis-native-private-float-pair-continuations-v1.md)
+adds exact floating children, IEEE comparison inference and native bit-word proof.
+The [event-failure follow-up](reference/nuis-native-private-continuation-event-failure-v1.md)
+checks successful open/event followed by selected failures across five child types.
+The [event-budget follow-up](reference/nuis-native-private-continuation-event-budget-v1.md)
+checks one fixed long route per type at adjacent limits through real native
+execution, cache and source-free restoration; it does not certify every cut point.
+The [i32-ancestor follow-up](reference/nuis-native-private-i32-ancestor-continuations-v1.md)
+adds one exact typed outward result beside a private bool in bool-returning
+prefixes, with nontrapping transport and unchanged effect permissions.
+The [i64-ancestor follow-up](reference/nuis-native-private-i64-ancestor-continuations-v1.md)
+uses exact owned i64/bool fields, without narrowing or a new public result.
+The [float-ancestor follow-up](reference/nuis-native-private-float-ancestor-continuations-v1.md)
+adds exact f32/f64 outward owners beside a private bool, preserving IEEE bits
+through typed owned fields and actual callee observations.
+The [dual-i64 follow-up](reference/nuis-native-private-dual-i64-continuations-v1.md)
+adds one exact i64 outward owner beside a private i64 child through the same
+independently typed owned fields, without adding outward write permission.
+The [i64/float follow-up](reference/nuis-native-private-i64-float-continuations-v1.md)
+adds exact f32/f64 private children beside one i64 outward owner, preserving
+actual pair bits and unchanged readonly/single-target constraints.
+The [float/i64 follow-up](reference/nuis-native-private-float-i64-continuations-v1.md)
+adds the reverse exact orientation with actual IEEE owner/full-width child
+observations and the same single-target/readonly/seal/budget contract.
+Other numeric/numeric private pairs and resource transport, hidden
+ordinary leaves and mixed/single exits remain separate, without widening
+common guard/backend or effect authority.
 Broader typed selected-return CLI proof and generalized effect transport remain
 separate. General rebinding, resource work and child-scope
 exports remain open.

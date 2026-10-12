@@ -91,6 +91,12 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
     let effectful_selections = effectful_selections::outline(module, &mut names);
     if !effectful_selections.is_empty() {
         crate::nir_verify::verify_nir_module(module)?;
+        // Private continuation results introduce exact owned value layouts.
+        layouts = control_values::layouts(module);
+        value_layouts = control_values::TypedLayouts::collect(module);
+        control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+        value_catalog =
+            scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
     }
     let mut selections = conditional_returns::outline(
         module,

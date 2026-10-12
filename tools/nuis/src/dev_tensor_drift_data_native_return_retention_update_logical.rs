@@ -4,7 +4,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-retention-update-preferred-terminal-target-fallback-owned-exact-unsealed-eligibility-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_updates.rs",
-        required_patterns: &["effectful_selections_return_retention_update_tests.rs", "effectful_selections_return_retention_targets.rs", "let fallback = if yes_target.is_none() && no_target.is_none()", "**ty == scalar_type(\"bool\")", "!staged.constants.contains(*name)", "staged.defined.contains(*name)", "authorized.is_some_and(|target| target.name() == *name)", "let mut remaining = 64", "retention_targets::discover(yes, &eligible, &mut remaining, depth + 1)?", "retention_targets::discover(no, &eligible, &mut remaining, depth + 1)?", "retention_targets::merge(yes, no)?", ".or(fallback.as_ref())", "staged.local.get(name)? != &scalar_type(\"bool\")"],
+        required_patterns: &["effectful_selections_return_retention_update_tests.rs", "effectful_selections_return_retention_targets.rs", "let fallback = if yes_target.is_none() && no_target.is_none()", "**ty == scalar_type(\"bool\")", "!staged.constants.contains(*name)", "staged.defined.contains(*name)", "authorized.is_some_and(|target| target.name() == *name)", "let mut remaining = 64", "retention_targets::discover(yes, &eligible, &mut remaining, depth + 1)?", "retention_targets::discover(no, &eligible, &mut remaining, depth + 1)?", "retention_targets::merge(yes, no)?", ".or(fallback.as_ref())", "!owner_type(staged.local.get(name)?)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-retention-update-readonly-bounded-actual-write-discovery-not-fresh-authority-proof",

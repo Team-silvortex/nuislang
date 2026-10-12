@@ -19,8 +19,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-staging-logical-original-ancestor-guard-before-complete-initializer-installation",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["Region(Vec<regions::Statement>, NirExpr)", "Descendant predicates are emitted only after this ancestor guard",
-            "body.extend(regions::install(statements, names, bindings, helpers))",
-            "body.extend(regions::install(stage, names, bindings, helpers))", "body.extend(regions::install(suffix, names, bindings, helpers))"],
+            "body.extend(regions::install(\n                    statements, names, bindings, helpers, structs,\n                ))",
+            "body.extend(regions::install(stage, names, bindings, helpers, structs))", "body.extend(regions::install(suffix, names, bindings, helpers, structs))"],
     },
     DevTensorDriftCheckSpec {
         id: "native-staging-logical-five-types-private-constants-once-only-effects-atomic-vetoes-and-shared-bounds",

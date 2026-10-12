@@ -138,7 +138,7 @@ fn return_trailing_update_logical_effectful_scalar_selections_reject_no_write_ex
         "let local = first; const seal: bool = first || false; let seal = first;",
         "let local = first; const seal: bool = first || false; const seal: bool = first || false;",
         "let local = first; let ignored = boolean(first || saved);",
-        "let local = first; let child = first; if child { let child = first; let local = first; }",
+        "let local = first; let child = first; let sibling = first; if child { let child = first; let local = first; let sibling = first; }",
         "let local = first; print(96);",
         "let local = first; return local;",
         "let local = first; while first { let local = saved; }",

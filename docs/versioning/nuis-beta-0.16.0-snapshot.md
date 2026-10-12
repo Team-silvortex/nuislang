@@ -137,8 +137,47 @@ keeps final private let/const work under the existing target capability and stag
 scope, without exporting fresh bindings. The subsequent
 [terminal-private-child proof](../reference/nuis-native-private-terminal-child-return-updates-v1.md)
 keeps one prefix-owned child update private and transports only the ancestor.
-Mixed ancestor/child writes, hidden roots, mixed/single exits and generalized
-resource transport remain separate.
+The subsequent [terminal mixed-update proof](../reference/nuis-native-private-mixed-return-updates-v1.md)
+admits both source orders of ancestor/private-child writes while exporting only
+the actual ancestor. The subsequent [flat mixed-continuation proof](../reference/nuis-native-private-flat-mixed-continuations-v1.md)
+supports later child reads in branch-current scopes with one outward ancestor and
+nonrecursive flat recipe copying. The subsequent [nested branch-tree proof](../reference/nuis-native-private-nested-mixed-continuations-v1.md)
+adds current nested gates before one shared flat suffix, copying only recipes at
+original leaves. The subsequent [sequential mixed-continuation proof](../reference/nuis-native-private-sequential-mixed-continuations-v1.md)
+preserves both current bool versions via closed private scalar transport and linear
+installation. The subsequent [nested sequential proof](../reference/nuis-native-private-nested-sequential-mixed-continuations-v1.md)
+composes branch-local sequences with whole-original-forest preflight and no tail
+copies. The subsequent [i32-pair proof](../reference/nuis-native-private-i32-pair-continuations-v1.md)
+also retains a full signed i32 child through a closed nontrapping codec.
+The subsequent [i64-pair proof](../reference/nuis-native-private-i64-pair-continuations-v1.md)
+keeps the full signed child through existing guarded owned aggregate returns.
+The subsequent [float-pair proof](../reference/nuis-native-private-float-pair-continuations-v1.md)
+adds exact f32/f64 child values with raw-word native evidence and unchanged source authority.
+The subsequent [event-failure proof](../reference/nuis-native-private-continuation-event-failure-v1.md)
+checks the last accepted event state and distinguishes fatal traps from recoverable cleanup.
+The subsequent [event-budget proof](../reference/nuis-native-private-continuation-event-budget-v1.md)
+checks callback-local inclusive charging and final private-entry rejection under
+adjacent limits for five child types, without changing production eligibility.
+The subsequent [i32-ancestor proof](../reference/nuis-native-private-i32-ancestor-continuations-v1.md)
+extends production eligibility to one exact signed prefix-owned ancestor beside
+a private bool, without changing the surrounding bool return or effect policy.
+The subsequent [i64-ancestor proof](../reference/nuis-native-private-i64-ancestor-continuations-v1.md)
+keeps the complete signed width through exact private owned fields and one
+outward target, without widening the public bool-return contract.
+The subsequent [float-ancestor proof](../reference/nuis-native-private-float-ancestor-continuations-v1.md)
+adds exact f32/f64 outward fields beside a private bool, with native IEEE-bit,
+real event-trap and cache/source-free identity checks.
+The subsequent [dual-i64 proof](../reference/nuis-native-private-dual-i64-continuations-v1.md)
+adds an exact i64/i64 private pair with actual pair/final-owner native values,
+real event traps and cache/source-free identity checks.
+The subsequent [i64/float proof](../reference/nuis-native-private-i64-float-continuations-v1.md)
+also carries exact f32/f64 private fields beside an i64 owner, with actual
+IEEE pair values, event traps and cache/source-free identity checks.
+The subsequent [float/i64 proof](../reference/nuis-native-private-float-i64-continuations-v1.md)
+adds exact f32/f64 outward fields beside a private i64, with real pair/final-owner
+observations, event traps and cache/source-free identity checks.
+Other numeric/numeric private pairs, hidden roots, mixed/single exits and
+generalized resource transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.
 

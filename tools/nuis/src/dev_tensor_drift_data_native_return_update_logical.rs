@@ -4,7 +4,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-update-private-bool-flat-arm-seal-original-budget-and-shared-join-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_updates.rs",
-        required_patterns: &["if depth >= 8", "NirStmt::Let { name, .. } if eligible.contains(name) => Some(Some(name.clone()))", "!staged.defined.contains(name)", "staged.constants.contains(name)", "staged.local.get(name)? != &scalar_type(\"bool\")", "nested::consume_node(budget)?", "predicates::prove(condition, scope, signatures, budget)", "nested::leaf(statement, &staged.local, signatures, budget)", "Retention is a transport outcome", "inputs: BTreeSet::from([name.into()])", "nested::join(condition, reads, effects, yes, no, scope)"],
+        required_patterns: &["if depth >= 8", "NirStmt::Let { name, .. } if eligible.contains(name) => Some(Some(name.clone()))", "!staged.defined.contains(name)", "staged.constants.contains(name)", "!owner_type(staged.local.get(name)?)", "nested::consume_node(budget)?", "predicates::prove(condition, scope, signatures, budget)", "nested::leaf(statement, &staged.local, signatures, budget)", "Retention is a transport outcome", "inputs: BTreeSet::from([name.into()])", "nested::join(condition, reads, effects, yes, no, scope)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-update-source-ordered-private-stage-current-scope-and-read-subtraction",
@@ -14,7 +14,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-update-shared-guarded-installer-and-unchanged-existing-target-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_regions.rs",
-        required_patterns: &["Selection(Box<Plan>)", "Statement::Selection(plan)", "output.extend(super::install(*plan, names, bindings, helpers).0)", "Vec::with_capacity(statements.len())"],
+        required_patterns: &["Selection(Box<Plan>)", "Statement::Selection(plan)", "output.extend(super::install(*plan, names, bindings, helpers, structs).0)", "Vec::with_capacity(statements.len())"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-update-reusable-original-leaf-and-guarded-join-captures",

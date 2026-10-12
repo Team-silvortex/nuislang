@@ -209,13 +209,18 @@ pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> 
             Some(lhs)
         }
         NirBinaryOp::Lt | NirBinaryOp::Le | NirBinaryOp::Gt | NirBinaryOp::Ge
-            if lhs == scalar_type("i64") || lhs == scalar_type("i32") =>
+            if lhs == scalar_type("i64")
+                || lhs == scalar_type("i32")
+                || lhs == scalar_type("f32")
+                || lhs == scalar_type("f64") =>
         {
             Some(scalar_type("bool"))
         }
         NirBinaryOp::Eq | NirBinaryOp::Ne
             if lhs == scalar_type("i64")
                 || lhs == scalar_type("i32")
+                || lhs == scalar_type("f32")
+                || lhs == scalar_type("f64")
                 || lhs == scalar_type("bool") =>
         {
             Some(scalar_type("bool"))

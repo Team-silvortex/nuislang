@@ -209,8 +209,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-ordered-effectful-selection-complete-source-merge-installation",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["mod ordered;", "Vec<(Vec<regions::Statement>, Box<Plan>)>",
-            "SelectedValue::Ordered(children, suffix, result)", "for (stage, child) in children", "body.extend(regions::install(stage, names, bindings, helpers))",
-            "let (statements, _, _) = install(*child, names, bindings, helpers)", "body.extend(regions::install(suffix, names, bindings, helpers))"],
+            "SelectedValue::Ordered(children, suffix, result)", "for (stage, child) in children", "body.extend(regions::install(stage, names, bindings, helpers, structs))",
+            "let (statements, _, _) = install(*child, names, bindings, helpers, structs)", "body.extend(regions::install(suffix, names, bindings, helpers, structs))"],
     },
     DevTensorDriftCheckSpec {
         id: "native-ordered-effectful-selection-adjacent-final-mixed-types-vetoes-and-shared-limits",
@@ -272,7 +272,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["mod ordered;", "Vec<(Vec<regions::Statement>, Box<Plan>)>",
             "SelectedValue::Ordered(children, suffix, result)", "for (stage, child) in children",
-            "body.extend(regions::install(stage, names, bindings, helpers))", "install(*child, names, bindings, helpers)", "body.extend(regions::install(suffix, names, bindings, helpers))"],
+            "body.extend(regions::install(stage, names, bindings, helpers, structs))", "install(*child, names, bindings, helpers, structs)", "body.extend(regions::install(suffix, names, bindings, helpers, structs))"],
     },
     DevTensorDriftCheckSpec {
         id: "native-repeated-effectful-selection-current-versions-types-vetoes-and-shared-limits",
@@ -335,8 +335,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-continued-effectful-selection-prefix-child-merge-suffix-installation",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["mod ordered;", "Vec<(Vec<regions::Statement>, Box<Plan>)>",
-            "SelectedValue::Ordered(children, suffix, result)", "body.extend(regions::install(stage, names, bindings, helpers))",
-            "let (statements, _, _) = install(*child, names, bindings, helpers)", "body.extend(regions::install(suffix, names, bindings, helpers))"],
+            "SelectedValue::Ordered(children, suffix, result)", "body.extend(regions::install(stage, names, bindings, helpers, structs))",
+            "let (statements, _, _) = install(*child, names, bindings, helpers, structs)", "body.extend(regions::install(suffix, names, bindings, helpers, structs))"],
     },
     DevTensorDriftCheckSpec {
         id: "native-continued-effectful-selection-current-versions-polarities-vetoes-and-shared-limits",
@@ -397,8 +397,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-staged-effectful-selection-prefix-before-descendants-installation",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["mod ordered;", "Vec<(Vec<regions::Statement>, Box<Plan>)>",
-            "SelectedValue::Ordered(children, suffix, result)", "body.extend(regions::install(stage, names, bindings, helpers))",
-            "install(*child, names, bindings, helpers)", "control_values::zero_value"],
+            "SelectedValue::Ordered(children, suffix, result)", "body.extend(regions::install(stage, names, bindings, helpers, structs))",
+            "install(*child, names, bindings, helpers, structs)", "control_values::zero_value"],
     },
     DevTensorDriftCheckSpec {
         id: "native-staged-effectful-selection-version-retention-hygiene-and-proof-limits",
@@ -644,7 +644,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
         required_patterns: &["nested::prepare(", "enum SelectedValue", "Nested(Box<Plan>)",
             "Descendant predicates are emitted only after this ancestor guard",
-            "install(*child, names, bindings, helpers)", "body.push(NirStmt::Return(Some(value)))"],
+            "install(*child, names, bindings, helpers, structs)", "body.push(NirStmt::Return(Some(value)))"],
     },
     DevTensorDriftCheckSpec {
         id: "native-nested-effectful-selection-independent-cumulative-proof",

@@ -1,5 +1,35 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_return_float_i64.rs"]
+mod return_float_i64;
+
+#[path = "dev_tensor_drift_data_native_return_i64_float.rs"]
+mod return_i64_float;
+
+#[path = "dev_tensor_drift_data_native_return_dual_i64.rs"]
+mod return_dual_i64;
+
+#[path = "dev_tensor_drift_data_native_return_float_ancestor.rs"]
+mod return_float_ancestor;
+
+#[path = "dev_tensor_drift_data_native_return_i32_ancestor.rs"]
+mod return_i32_ancestor;
+
+#[path = "dev_tensor_drift_data_native_return_i64_ancestor.rs"]
+mod return_i64_ancestor;
+
+#[path = "dev_tensor_drift_data_native_private_event_budget.rs"]
+mod private_event_budget;
+
+#[path = "dev_tensor_drift_data_native_private_event_failure.rs"]
+mod private_event_failure;
+
+#[path = "dev_tensor_drift_data_native_return_float_pair_mixed_logical.rs"]
+mod return_float_pair_mixed_logical;
+
+#[path = "dev_tensor_drift_data_native_return_i64_pair_mixed_logical.rs"]
+mod return_i64_pair_mixed_logical;
+
 #[path = "dev_tensor_drift_data_native_aggregate_carries.rs"]
 mod aggregate_carries;
 #[path = "dev_tensor_drift_data_native_aggregate_rebinding.rs"]
@@ -94,14 +124,26 @@ mod partial_effect_joins;
 mod record_joins;
 #[path = "dev_tensor_drift_data_native_return_ancestor_logical.rs"]
 mod return_ancestor_logical;
+#[path = "dev_tensor_drift_data_native_return_i32_pair_mixed_logical.rs"]
+mod return_i32_pair_mixed_logical;
 #[path = "dev_tensor_drift_data_native_return_logical.rs"]
 mod return_logical;
+#[path = "dev_tensor_drift_data_native_return_mixed_update_logical.rs"]
+mod return_mixed_update_logical;
+#[path = "dev_tensor_drift_data_native_return_nested_prefix_mixed_logical.rs"]
+mod return_nested_prefix_mixed_logical;
+#[path = "dev_tensor_drift_data_native_return_nested_sequential_mixed_logical.rs"]
+mod return_nested_sequential_mixed_logical;
 #[path = "dev_tensor_drift_data_native_return_prefix_logical.rs"]
 mod return_prefix_logical;
+#[path = "dev_tensor_drift_data_native_return_prefix_mixed_logical.rs"]
+mod return_prefix_mixed_logical;
 #[path = "dev_tensor_drift_data_native_return_print_aliases.rs"]
 mod return_print_aliases;
 #[path = "dev_tensor_drift_data_native_return_print_prefixes.rs"]
 mod return_print_prefixes;
+#[path = "dev_tensor_drift_data_native_return_sequential_mixed_logical.rs"]
+mod return_sequential_mixed_logical;
 #[path = "dev_tensor_drift_data_native_return_signals.rs"]
 mod return_signals;
 #[path = "dev_tensor_drift_data_native_return_suffixes.rs"]
@@ -202,6 +244,22 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_retention_update_logical::CHECKS,
         return_trailing_update_logical::CHECKS,
         return_terminal_child_update_logical::CHECKS,
+        return_mixed_update_logical::CHECKS,
+        return_prefix_mixed_logical::CHECKS,
+        return_nested_prefix_mixed_logical::CHECKS,
+        return_sequential_mixed_logical::CHECKS,
+        return_i32_pair_mixed_logical::CHECKS,
+        return_i64_pair_mixed_logical::CHECKS,
+        return_float_pair_mixed_logical::CHECKS,
+        private_event_failure::CHECKS,
+        private_event_budget::CHECKS,
+        return_i32_ancestor::CHECKS,
+        return_i64_ancestor::CHECKS,
+        return_float_ancestor::CHECKS,
+        return_dual_i64::CHECKS,
+        return_i64_float::CHECKS,
+        return_float_i64::CHECKS,
+        return_nested_sequential_mixed_logical::CHECKS,
         computed_return_prints::CHECKS,
         loop_calls::CHECKS,
         loop_work::CHECKS,

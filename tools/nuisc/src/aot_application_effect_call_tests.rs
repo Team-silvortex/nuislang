@@ -1,5 +1,29 @@
 use super::*;
+
+#[path = "aot_application_effect_call_return_dual_i64_tests.rs"]
+mod return_dual_i64;
+
+#[path = "aot_application_effect_call_return_i64_float_tests.rs"]
+mod return_i64_float;
+
+#[path = "aot_application_effect_call_return_float_i64_tests.rs"]
+mod return_float_i64;
+
+#[path = "aot_application_effect_call_return_float_ancestor_tests.rs"]
+mod return_float_ancestor;
+
+#[path = "aot_application_effect_call_return_i64_ancestor_tests.rs"]
+mod return_i64_ancestor;
+
+#[path = "aot_application_effect_call_return_i32_ancestor_tests.rs"]
+mod return_i32_ancestor;
+
+#[path = "aot_application_effect_call_return_float_pair_mixed_logical_tests.rs"]
+mod return_float_pair_mixed_logical;
 use crate::aot_native_session::{emit_for_packaging_mode, literal_print_packaging_mode};
+
+#[path = "aot_application_effect_call_return_i64_pair_mixed_logical_tests.rs"]
+mod return_i64_pair_mixed_logical;
 
 #[path = "aot_application_effect_call_regions_tests.rs"]
 mod regions;
@@ -66,6 +90,20 @@ mod return_trailing_update_logical;
 
 #[path = "aot_application_effect_call_return_terminal_child_update_logical_tests.rs"]
 mod return_terminal_child_update_logical;
+
+#[path = "aot_application_effect_call_return_mixed_update_logical_tests.rs"]
+mod return_mixed_update_logical;
+#[path = "aot_application_effect_call_return_nested_prefix_mixed_logical_tests.rs"]
+mod return_nested_prefix_mixed_logical;
+#[path = "aot_application_effect_call_return_nested_sequential_mixed_logical_tests.rs"]
+mod return_nested_sequential_mixed_logical;
+#[path = "aot_application_effect_call_return_prefix_mixed_logical_tests.rs"]
+mod return_prefix_mixed_logical;
+#[path = "aot_application_effect_call_return_sequential_mixed_logical_tests.rs"]
+mod return_sequential_mixed_logical;
+
+#[path = "aot_application_effect_call_return_i32_pair_mixed_logical_tests.rs"]
+mod return_i32_pair_mixed_logical;
 
 const SOURCE: &str = include_str!("../tests/native_application_bridge/effectful_selected_calls.ns");
 

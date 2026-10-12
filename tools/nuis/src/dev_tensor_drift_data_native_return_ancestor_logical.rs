@@ -14,7 +14,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-ancestor-common-guarded-stage-before-child-installer-original-returns",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
-        required_patterns: &["StagedNested(Vec<regions::Statement>, Box<Plan>)", "SelectedValue::StagedNested(stage, child)", "body.extend(regions::install(stage, names, bindings, helpers))", "let (statements, result, _) = install(*child, names, bindings, helpers)", "let returns = plan.destination.is_none()"],
+        required_patterns: &["StagedNested(Vec<regions::Statement>, Box<Plan>)", "SelectedValue::StagedNested(stage, child)", "body.extend(regions::install(stage, names, bindings, helpers, structs))", "let (statements, result, _) = install(*child, names, bindings, helpers, structs)", "let returns = plan.destination.is_none()"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-ancestor-original-work-capture-depth-current-seal-placement-and-atomic-negative-tests",

@@ -140,9 +140,13 @@ fn driver(bridge: &NativeSessionBridge, loop_helper: &str, cases: &[Case], probe
 }
 
 pub(super) fn run_bounded(binary: &Path, directory: &Path) -> Output {
+    run_command_bounded(Command::new(binary), directory)
+}
+
+pub(super) fn run_command_bounded(mut command: Command, directory: &Path) -> Output {
     let stdout = directory.join("probe.stdout");
     let stderr = directory.join("probe.stderr");
-    let mut child = Command::new(binary)
+    let mut child = command
         .current_dir(directory)
         .stdout(fs::File::create(&stdout).unwrap())
         .stderr(fs::File::create(&stderr).unwrap())

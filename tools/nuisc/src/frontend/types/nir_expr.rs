@@ -1,6 +1,10 @@
 use super::*;
 use nuis_semantics::model::NirMutexCapabilityOp;
 
+#[cfg(test)]
+#[path = "nir_float_compare_tests.rs"]
+mod float_compare_tests;
+
 pub(crate) fn infer_nir_expr_type(
     expr: &NirExpr,
     bindings: &BTreeMap<String, NirTypeRef>,
@@ -536,6 +540,7 @@ pub(crate) fn infer_nir_expr_type(
                 NirBinaryOp::Eq | NirBinaryOp::Ne => {
                     if compatible_types(&lhs_ty, &rhs_ty)
                         && ((lhs_ty.is_integer_scalar() && rhs_ty.is_integer_scalar())
+                            || (lhs_ty.is_float_scalar() && rhs_ty.is_float_scalar())
                             || (lhs_ty.is_bool_scalar() && rhs_ty.is_bool_scalar()))
                     {
                         Some(bool_type())
@@ -545,8 +550,8 @@ pub(crate) fn infer_nir_expr_type(
                 }
                 NirBinaryOp::Lt | NirBinaryOp::Le | NirBinaryOp::Gt | NirBinaryOp::Ge => {
                     if compatible_types(&lhs_ty, &rhs_ty)
-                        && lhs_ty.is_integer_scalar()
-                        && rhs_ty.is_integer_scalar()
+                        && lhs_ty.is_numeric_scalar()
+                        && rhs_ty.is_numeric_scalar()
                     {
                         Some(bool_type())
                     } else {

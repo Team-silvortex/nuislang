@@ -16,6 +16,7 @@ pub(super) enum Statement {
     Scalar(NirStmt),
     Logical(NirStmt, predicates::Predicate),
     Selection(Box<Plan>),
+    PrivatePair(Box<transport::Selection>),
 }
 
 pub(super) struct Staging {
@@ -201,6 +202,7 @@ pub(super) fn install(
     names: &mut BTreeSet<String>,
     bindings: &mut BTreeSet<String>,
     helpers: &mut Vec<NirFunction>,
+    structs: &mut Vec<NirStructDef>,
 ) -> Vec<NirStmt> {
     let mut output = Vec::with_capacity(statements.len());
     for statement in statements {
@@ -215,7 +217,10 @@ pub(super) fn install(
                 output.push(statement);
             }
             Statement::Selection(plan) => {
-                output.extend(super::install(*plan, names, bindings, helpers).0);
+                output.extend(super::install(*plan, names, bindings, helpers, structs).0);
+            }
+            Statement::PrivatePair(plan) => {
+                output.extend(transport::install(*plan, names, bindings, helpers, structs));
             }
         }
     }

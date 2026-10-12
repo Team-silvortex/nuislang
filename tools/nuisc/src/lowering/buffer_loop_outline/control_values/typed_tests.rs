@@ -214,13 +214,23 @@ fn typed_constructors_require_exact_leaf_types_unique_fields_and_nominal_records
             Some(scalar_type("f64"))
         );
     }
-    for op in [
-        NirBinaryOp::Div,
-        NirBinaryOp::Rem,
-        NirBinaryOp::Eq,
-        NirBinaryOp::Lt,
-    ] {
+    for op in [NirBinaryOp::Div, NirBinaryOp::Rem] {
         assert!(binary_type(op, scalar_type("f64"), scalar_type("f64")).is_none());
+    }
+    for ty in ["f32", "f64"] {
+        for op in [
+            NirBinaryOp::Eq,
+            NirBinaryOp::Ne,
+            NirBinaryOp::Lt,
+            NirBinaryOp::Le,
+            NirBinaryOp::Gt,
+            NirBinaryOp::Ge,
+        ] {
+            assert_eq!(
+                binary_type(op, scalar_type(ty), scalar_type(ty)),
+                Some(scalar_type("bool"))
+            );
+        }
     }
     assert!(binary_type(NirBinaryOp::Add, scalar_type("f32"), scalar_type("f64")).is_none());
 }

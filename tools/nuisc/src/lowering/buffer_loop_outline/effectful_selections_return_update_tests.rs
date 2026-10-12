@@ -125,7 +125,7 @@ fn return_update_logical_effectful_scalar_selections_reject_incoming_sealed_nonb
         "let local = saved; let other = first; if first { let local = first; } else { let other = saved; }",
         "const local: bool = saved || false; if first { let local = first; }",
         "const local: bool = saved || false; if first { let local = local && first; }",
-        "let local = 1; if first { let local = token(2); }",
+        "const local: f64 = 1.0; if first { let local: f64 = 2.0; }",
         "let local = saved; if first { const local: bool = first || false; }",
         "let local = saved; if first { let local: i64 = 1; }",
         "let local = saved; if first { let local = boolean(local || first); }",

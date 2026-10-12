@@ -83,8 +83,46 @@ ownership. The [trailing-private-work follow-up](reference/nuis-native-private-t
 also proves final private let/const work without resetting seals, dropping unused
 work or exporting the fresh binding. The [terminal-private-child follow-up](reference/nuis-native-private-terminal-child-return-updates-v1.md)
 adds terminal updates of one prefix-defined private child without exporting it
-instead of the ancestor. Mixed ancestor/child writes, other entering writes and
-mixed/single exits remain separate.
+instead of the ancestor. The [terminal mixed-update follow-up](reference/nuis-native-private-mixed-return-updates-v1.md)
+preserves both source orders of ancestor/private-child writes with one outward
+ancestor. The [flat mixed-continuation follow-up](reference/nuis-native-private-flat-mixed-continuations-v1.md)
+keeps later child reads in branch-current scopes with one outward ancestor and
+bounded nonrecursive recipe copying. The [nested branch-tree follow-up](reference/nuis-native-private-nested-mixed-continuations-v1.md)
+keeps branch-current nested gates and copies only flat suffix recipes at original
+leaves. The [sequential mixed-continuation follow-up](reference/nuis-native-private-sequential-mixed-continuations-v1.md)
+preserves both current bool versions with bounded private scalar transport and
+linear installation. The [nested sequential follow-up](reference/nuis-native-private-nested-sequential-mixed-continuations-v1.md)
+also composes branch-local sequences with whole-forest preflight and no tail
+copies. The [i32-pair follow-up](reference/nuis-native-private-i32-pair-continuations-v1.md)
+also preserves an exact signed private child. The [i64-pair follow-up](reference/nuis-native-private-i64-pair-continuations-v1.md)
+adds an exact private owned result for a full-width signed child. The [float-pair follow-up](reference/nuis-native-private-float-pair-continuations-v1.md)
+reuses that result contract for exact f32/f64 values and bit-preserving native joins.
+The [event-failure follow-up](reference/nuis-native-private-continuation-event-failure-v1.md)
+separates last-state publication, fatal native traps and recoverable cleanup.
+The [event-budget follow-up](reference/nuis-native-private-continuation-event-budget-v1.md)
+checks exact inclusive entry limits and unchanged last state at a rejected private
+publication continuation, including repeated event/close reset.
+The [i32-ancestor follow-up](reference/nuis-native-private-i32-ancestor-continuations-v1.md)
+adds one exact signed outward ancestor beside a private bool, retaining the
+surrounding bool-return contract and original single-target authority.
+The [i64-ancestor follow-up](reference/nuis-native-private-i64-ancestor-continuations-v1.md)
+preserves the full signed width in exact private owned fields and keeps one
+outward target inside the surrounding bool return.
+The [float-ancestor follow-up](reference/nuis-native-private-float-ancestor-continuations-v1.md)
+preserves exact f32/f64 outward fields beside a private bool, with raw native
+callee-bit and event-publication checks through cache and source-free images.
+The [dual-i64 follow-up](reference/nuis-native-private-dual-i64-continuations-v1.md)
+adds one exact i64 outward owner beside a private i64 child, with actual pair
+observations and cache/source-free event-publication proof.
+The [i64/float follow-up](reference/nuis-native-private-i64-float-continuations-v1.md)
+adds exact f32/f64 private fields beside one i64 outward owner, with raw IEEE
+pair observations and cache/source-free publication checks.
+The [float/i64 follow-up](reference/nuis-native-private-float-i64-continuations-v1.md)
+also carries a private i64 beside an exact f32/f64 outward owner, preserving
+actual IEEE bits, integer extrema and last accepted publication.
+Other numeric/numeric private pairs and resource transport,
+other entering writes and mixed/single exits
+remain separate.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
 still governs this line. The explicit scripted AppKit cancellation route does not imply

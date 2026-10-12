@@ -155,7 +155,7 @@ fn return_retention_update_logical_effectful_scalar_selections_reject_fresh_or_n
         "if first { let local = first; while local { let local = saved; } if local {} else {} }",
         "if first { let local = first; print(96); if local {} else {} }",
         "if first { let local = first; let saved = token(1); }",
-        "if first { let local = first; let child = first; if child { let child = first; let local = first; } }",
+        "if first { let local = first; let child = first; let sibling = first; if child { let child = first; let local = first; let sibling = first; } }",
     ] {
         reject_module(
             parse_nuis_module(&source(&format!(
