@@ -1,5 +1,9 @@
 # Native Private Three Field Continuations V1
 
+This is the frozen complete 441-test receipt. The subsequent
+[retained-owner follow-up](nuis-native-retained-owner-three-field-continuations-v1.md)
+records initial child-only selections under an existing Target separately.
+
 The persistent application-session CPU path carries one outward numeric owner
 beside two separately certified private numeric children through bounded
 terminal selections and nested sequential continuations. It follows the
@@ -168,11 +172,13 @@ history markers:
 
 ## Remaining Boundary
 
-The next separate proof is an initial selection that changes both private
+The next separate proof at this checkpoint was an initial selection that changes both private
 children while retaining the already authorized outward owner without an owner
 write in either arm. Prove retained-owner authority rather than infer it from a
 field list or loosen entering-scope checks. Current three-field admission still
-requires initial owner-write evidence.
+requires initial owner-write evidence at this frozen checkpoint; the later
+[retained-owner receipt](nuis-native-retained-owner-three-field-continuations-v1.md)
+records the separate extension without rewriting this 441-test acceptance.
 
 Support for three private children, bool/resource combinations and generalized
 private arity remains separate. Preserve original scope/seals, readonly entering values,

@@ -33,6 +33,18 @@ mod return_float_i32;
 #[path = "aot_application_effect_call_return_private_fields_tests.rs"]
 mod return_private_fields;
 
+#[path = "aot_application_effect_call_return_retained_private_fields_tests.rs"]
+mod return_retained_private_fields;
+
+#[path = "aot_application_effect_call_return_numeric_field_vector_tests.rs"]
+mod return_numeric_field_vector;
+
+#[path = "aot_application_effect_call_return_bool_field_vector_tests.rs"]
+mod return_bool_field_vector;
+
+#[path = "aot_application_effect_call_return_two_bool_field_vector_tests.rs"]
+mod return_two_bool_field_vector;
+
 #[path = "aot_application_effect_call_return_float_ancestor_tests.rs"]
 mod return_float_ancestor;
 

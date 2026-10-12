@@ -91,7 +91,7 @@ macro_rules! float_cases {
             ) {
                 for selected in [
                     "if saved {let local = relay(local);let child = decide(first);let saved = first;}",
-                    "let sibling = first;if saved {let local = relay(local);let child = decide(first);let sibling = false;}",
+                    "const sibling: bool = first || false;if saved {let local = relay(local);let child = decide(first);let sibling = false;}",
                     "const child: bool = saved || false;if saved {let local = relay(local);let child = first;}",
                     "if saved {let local = relay(local);const child: bool = child || false;}",
                     "if saved {let local: bool = first;let child = decide(first);}",

@@ -136,7 +136,15 @@ The [float/i32 reverse follow-up](reference/nuis-native-private-float-i32-contin
 adds exact floating owners beside i32 children, including current zero/negative-one updates.
 The [three-field continuation proof](reference/nuis-native-private-three-field-continuations-v1.md)
 adds two private numeric children under a separate lexical certificate and a field-driven carrier.
-Further private-child arities and generalized resource transport,
+The [retained-owner follow-up](reference/nuis-native-retained-owner-three-field-continuations-v1.md)
+preserves an already authorized owner through initial child-only selections.
+The [numeric field-list follow-up](reference/nuis-native-numeric-field-vector-continuations-v1.md)
+adds a bounded numeric list with actual four-field and third-input computation evidence.
+The [mixed bool field-list follow-up](reference/nuis-native-bool-field-vector-continuations-v1.md)
+adds exact private bools with current/retained logical values and unchanged numeric Target authority.
+The [two-bool sibling follow-up](reference/nuis-native-two-bool-field-vector-continuations-v1.md)
+adds independent current-sibling computation and stale-read counterexamples without new admission rules.
+Higher-arity live coverage and generalized resource transport,
 other entering writes and mixed/single exits
 remain separate.
 

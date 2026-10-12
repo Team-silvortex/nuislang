@@ -17,6 +17,7 @@ pub const FIELDS: [&str; 13] = [
 ];
 #[derive(Clone)]
 pub struct Case {
+    retain_owner: bool,
     pub ty: &'static str,
     pub seed: i64,
     pub small_seed: i32,
@@ -37,6 +38,28 @@ impl Case {
         float_seed: i64,
         first: bool,
         second: bool,
+    ) -> Self {
+        Self::calculate(ty, seed, small_seed, float_seed, first, second, false)
+    }
+    #[allow(dead_code)]
+    pub fn retained(
+        ty: &'static str,
+        seed: i64,
+        small_seed: i32,
+        float_seed: i64,
+        first: bool,
+        second: bool,
+    ) -> Self {
+        Self::calculate(ty, seed, small_seed, float_seed, first, second, true)
+    }
+    fn calculate(
+        ty: &'static str,
+        seed: i64,
+        small_seed: i32,
+        float_seed: i64,
+        first: bool,
+        second: bool,
+        retain_owner: bool,
     ) -> Self {
         let sign = if ty == "f32" { 1 << 31 } else { i64::MIN };
         let negative = |bits| {
@@ -61,8 +84,10 @@ impl Case {
             let mut b = float_seed;
             trace.extend([88, 91, 92]);
             if negative(b) {
-                local = parent(local, a, b);
-                trace.push(95);
+                if !retain_owner {
+                    local = parent(local, a, b);
+                    trace.push(95);
+                }
                 a = !a;
                 trace.push(94);
                 b ^= sign;
@@ -72,19 +97,25 @@ impl Case {
                     trace.push(94);
                     b ^= sign;
                     trace.push(93);
-                    local = parent(local, a, b);
-                    trace.push(95);
+                    if !retain_owner {
+                        local = parent(local, a, b);
+                        trace.push(95);
+                    }
                 }
             } else {
                 b ^= sign;
                 trace.push(93);
                 a = !a;
                 trace.push(94);
-                local = parent(local, a, b);
-                trace.push(95);
-                if a == -1 {
+                if !retain_owner {
                     local = parent(local, a, b);
                     trace.push(95);
+                }
+                if a == -1 {
+                    if !retain_owner {
+                        local = parent(local, a, b);
+                        trace.push(95);
+                    }
                     b ^= sign;
                     trace.push(93);
                     a = !a;
@@ -93,6 +124,10 @@ impl Case {
             }
             fields = Some((local, i64::from(a), b));
             trace.push(96);
+            if retain_owner {
+                local = parent(local, a, b);
+                trace.push(95);
+            }
             if a < 0 {
                 local = parent(local, a, b);
                 trace.push(95);
@@ -102,6 +137,7 @@ impl Case {
         trace.extend([97, 79]);
         let equal = local == seed;
         Self {
+            retain_owner,
             ty,
             seed,
             small_seed,
@@ -119,13 +155,14 @@ impl Case {
         }
     }
     pub fn previous(&self) -> Self {
-        Self::new(
+        Self::calculate(
             self.ty,
             self.seed,
             self.small_seed,
             self.float_seed,
             !self.first,
             !self.second,
+            self.retain_owner,
         )
     }
     pub fn values(&self) -> Vec<String> {

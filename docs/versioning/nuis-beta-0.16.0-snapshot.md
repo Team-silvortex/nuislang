@@ -201,7 +201,19 @@ authority/cache/source-free publication checks.
 The subsequent [three-field continuation proof](../reference/nuis-native-private-three-field-continuations-v1.md)
 adds two separately certified private numeric children, with field-driven typed
 records and unchanged pair authority/original-forest limits.
-Further private-child arities, hidden roots, mixed/single exits and
+The subsequent [retained-owner follow-up](../reference/nuis-native-retained-owner-three-field-continuations-v1.md)
+retains that already authorized owner through an initial child-only selection,
+with independent actual-field/source-free evidence and unchanged root authority.
+The subsequent [numeric field-list proof](../reference/nuis-native-numeric-field-vector-continuations-v1.md)
+adds a separately certified bounded numeric list and actual three-child
+computation without relaxing owner authority or original work/capture limits.
+The subsequent [mixed bool field-list proof](../reference/nuis-native-bool-field-vector-continuations-v1.md)
+admits exact private bools under that numeric Target and reuses typed fields,
+with current-value computation and poisoned short-circuit RHS checks.
+The subsequent [two-bool sibling proof](../reference/nuis-native-two-bool-field-vector-continuations-v1.md)
+adds independent boolean inputs and observed current-sibling computation,
+without modifying the production admission or field carrier.
+Higher-arity live coverage, hidden roots, mixed/single exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.

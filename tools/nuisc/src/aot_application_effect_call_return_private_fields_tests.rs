@@ -4,8 +4,16 @@ const SOURCE: &str = include_str!("../tests/native_application_bridge/return_pri
 
 #[test]
 fn native_return_private_fields_keeps_exact_owned_layout_guarded_order_and_policy_vetoes() {
+    check_source(SOURCE);
+}
+
+pub(super) fn check_source(source: &str) {
+    check_layout(source, "{owner:i64;child_0:i32;child_1:FLOAT}");
+}
+
+pub(super) fn check_layout(source: &str, expected_layout: &str) {
     for ty in ["f32", "f64"] {
-        let (_, mut module, mode) = compiled(&SOURCE.replace("f64", ty));
+        let (_, mut module, mode) = compiled(&source.replace("f64", ty));
         let bridge = emit_for_packaging_mode(&module, &mode).unwrap();
         assert!(bridge.state_layout.source().ends_with(";result:bool}"));
         assert!(module
@@ -16,12 +24,12 @@ fn native_return_private_fields_keeps_exact_owned_layout_guarded_order_and_polic
         assert!(module
             .nodes
             .iter()
-            .any(|n| n.op.instruction == "call_owned_struct"
-                && n.op
-                    .args
-                    .get(1)
-                    .is_some_and(|layout| layout
-                        .ends_with(&format!("{{owner:i64;child_0:i32;child_1:{ty}}}")))));
+            .any(|n| {
+                n.op.instruction == "call_owned_struct"
+                    && n.op.args.get(1).is_some_and(|layout| {
+                        layout.ends_with(&expected_layout.replace("FLOAT", ty))
+                    })
+            }));
         let proof = module
             .functions
             .iter()

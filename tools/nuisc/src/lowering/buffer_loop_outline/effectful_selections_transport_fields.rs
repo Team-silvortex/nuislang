@@ -5,6 +5,15 @@ pub(in super::super) struct Selection {
     fields: Vec<(String, String, NirTypeRef)>,
 }
 
+pub(in super::super) fn arity(count: usize) -> bool {
+    // Keep the owner plus certified children within the 64-field scalar bound.
+    (2..64).contains(&count)
+}
+
+pub(in super::super) fn child_scalar(ty: &NirTypeRef) -> bool {
+    ty == &scalar_type("bool") || numeric(ty)
+}
+
 pub(in super::super) fn prepare(
     condition: predicates::Predicate,
     yes: regions::Staging,
@@ -13,15 +22,15 @@ pub(in super::super) fn prepare(
     owner: &str,
     children: &[String],
 ) -> Option<(Selection, BTreeSet<String>, BTreeSet<String>)> {
-    // The separate lexical certificate grants exactly two private numeric children.
-    if children.len() != 2 || !numeric(scope.get(owner)?) {
+    // Arity is representation capacity, never lexical write authority.
+    if !arity(children.len()) || !numeric(scope.get(owner)?) {
         return None;
     }
     let mut seen = BTreeSet::from([owner.to_owned()]);
     let mut fields = vec![("owner".into(), owner.into(), scope.get(owner)?.clone())];
     for (index, name) in children.iter().enumerate() {
         let ty = scope.get(name)?;
-        if !seen.insert(name.clone()) || !numeric(ty) {
+        if !seen.insert(name.clone()) || !child_scalar(ty) {
             return None;
         }
         fields.push((format!("child_{index}"), name.clone(), ty.clone()));

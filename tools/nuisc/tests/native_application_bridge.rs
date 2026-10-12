@@ -41,6 +41,18 @@ mod return_float_i32;
 #[path = "native_application_bridge/return_private_fields.rs"]
 mod return_private_fields;
 
+#[path = "native_application_bridge/return_retained_private_fields.rs"]
+mod return_retained_private_fields;
+
+#[path = "native_application_bridge/return_numeric_field_vector.rs"]
+mod return_numeric_field_vector;
+
+#[path = "native_application_bridge/return_bool_field_vector.rs"]
+mod return_bool_field_vector;
+
+#[path = "native_application_bridge/return_two_bool_field_vector.rs"]
+mod return_two_bool_field_vector;
+
 #[path = "native_application_bridge/return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

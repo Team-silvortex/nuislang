@@ -186,7 +186,19 @@ write orders, nested current-value reads and source-free publication boundaries.
 The [three-field continuation proof](reference/nuis-native-private-three-field-continuations-v1.md)
 adds a separate two-private-child certificate, a shared field-type-driven assembler
 and nested current/retained versions without changing the original pair-write limit.
-Further private-child arities and generalized resource transport, hidden
+The [retained-owner follow-up](reference/nuis-native-retained-owner-three-field-continuations-v1.md)
+adds initial child-only selections, retaining the existing Target rather than
+inferring owner permission from the field list or relaxing root discovery.
+The [numeric field-list follow-up](reference/nuis-native-numeric-field-vector-continuations-v1.md)
+replaces the exact two-child recipe with a separately certified numeric list,
+with actual three-child computation and unchanged original work/capture limits.
+The [mixed bool field-list follow-up](reference/nuis-native-bool-field-vector-continuations-v1.md)
+adds exact private bool logical updates and retention beside numeric children,
+without changing numeric owner permission or the original shared budgets.
+The [two-bool sibling follow-up](reference/nuis-native-two-bool-field-vector-continuations-v1.md)
+executes independent boolean inputs and updated-sibling logical reads, with
+stale-read counterexamples and unchanged shared field-list implementation.
+Higher-arity live coverage and generalized resource transport, hidden
 ordinary leaves and mixed/single exits remain separate, without widening
 common guard/backend or effect authority.
 Broader typed selected-return CLI proof and generalized effect transport remain

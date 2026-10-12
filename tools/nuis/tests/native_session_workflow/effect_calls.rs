@@ -37,6 +37,18 @@ mod return_float_i32;
 #[path = "effect_call_return_private_fields.rs"]
 mod return_private_fields;
 
+#[path = "effect_call_return_retained_private_fields.rs"]
+mod return_retained_private_fields;
+
+#[path = "effect_call_return_numeric_field_vector.rs"]
+mod return_numeric_field_vector;
+
+#[path = "effect_call_return_bool_field_vector.rs"]
+mod return_bool_field_vector;
+
+#[path = "effect_call_return_two_bool_field_vector.rs"]
+mod return_two_bool_field_vector;
+
 #[path = "effect_call_return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

@@ -12,7 +12,9 @@ mod record;
 #[path = "effectful_selections_transport_fields.rs"]
 mod fields;
 pub(super) use fields::{
-    install as install_fields, prepare as prepare_fields, Selection as FieldsSelection,
+    arity as private_field_arity, child_scalar as private_field_scalar, install as install_fields,
+    prepare as prepare_fields,
+    Selection as FieldsSelection,
 };
 
 pub(super) fn numeric(ty: &NirTypeRef) -> bool {

@@ -7,6 +7,22 @@ use super::*;
 #[path = "effectful_selections_return_private_fields_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_retained_private_fields_tests.rs"]
+mod retained_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_numeric_field_vector_tests.rs"]
+mod vector_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_bool_field_vector_tests.rs"]
+mod bool_vector_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_two_bool_field_vector_tests.rs"]
+mod two_bool_vector_tests;
+
 // This certificate is lexical write authority, not extra outward results.
 pub(in super::super::super::super) struct Children(Vec<String>);
 
@@ -28,9 +44,6 @@ fn writes(
             match statement {
                 NirStmt::Let { name, .. } if scope.contains_key(name) => {
                     result.insert(name.clone());
-                    if result.len() > 3 {
-                        return None;
-                    }
                 }
                 NirStmt::Let { .. } | NirStmt::Const { .. } => {}
                 NirStmt::If {
@@ -62,13 +75,15 @@ pub(in super::super::super::super) fn classify(
     depth: usize,
 ) -> Option<Option<Children>> {
     let mut candidates = writes(yes, no, &staged.local, depth)?;
-    if candidates.len() < 3 {
+    if candidates.len() < 2 || (candidates.len() == 2 && candidates.contains(owner.name())) {
         return Some(None);
     }
+    // The Target already delegates the outward owner. Absence of a write
+    // retains that value; it never authorizes another entering binding.
+    candidates.remove(owner.name());
     if !transport::numeric(staged.local.get(owner.name())?)
         || staged.constants.contains(owner.name())
-        || !candidates.remove(owner.name())
-        || candidates.len() != 2
+        || !transport::private_field_arity(candidates.len())
     {
         return None;
     }
@@ -76,7 +91,7 @@ pub(in super::super::super::super) fn classify(
         if entering.contains_key(child)
             || !staged.defined.contains(child)
             || staged.constants.contains(child)
-            || !transport::numeric(staged.local.get(child)?)
+            || !transport::private_field_scalar(staged.local.get(child)?)
         {
             return None;
         }
@@ -97,7 +112,7 @@ pub(in super::super::super::super) fn prove(
     budget: &mut nested::Budget,
     depth: usize,
 ) -> Option<nested::Proof> {
-    if children.0.len() != 2 || suffix.len() > 16 {
+    if !transport::private_field_arity(children.0.len()) || suffix.len() > 16 {
         return None;
     }
     tree::preflight(yes, no, suffix, depth)?;

@@ -1,7 +1,7 @@
 use super::*;
 use crate::frontend::parse_nuis_module;
 
-fn source(ty: &str, selected: &str) -> String {
+pub(super) fn source(ty: &str, selected: &str) -> String {
     format!("mod cpu Main {{
         fn decide(v: bool) -> bool {{print(98);return v;}}
         fn relay(v: i64) -> i64 {{print(96);return v;}}
@@ -14,13 +14,13 @@ fn source(ty: &str, selected: &str) -> String {
         }} fn main() -> i64 {{return 0;}}
     }}")
 }
-fn rewrite(text: &str) -> (NirModule, BTreeSet<String>) {
+pub(super) fn rewrite(text: &str) -> (NirModule, BTreeSet<String>) {
     let mut module = parse_nuis_module(text).unwrap();
     let mut names = module.functions.iter().map(|f| f.name.clone()).collect();
     let generated = outline(&mut module, &mut names);
     (module, generated)
 }
-fn reject(text: &str) {
+pub(super) fn reject(text: &str) {
     let mut module = parse_nuis_module(text).unwrap();
     let before = module.clone();
     let mut names: BTreeSet<_> = module.functions.iter().map(|f| f.name.clone()).collect();
@@ -29,7 +29,7 @@ fn reject(text: &str) {
     assert_eq!(module, before);
     assert_eq!(names, before_names);
 }
-fn scope(ty: &str) -> Scope {
+pub(super) fn scope(ty: &str) -> Scope {
     Scope::from([
         ("local".into(), scalar_type("i64")),
         ("seed".into(), scalar_type("i64")),
@@ -41,7 +41,7 @@ fn scope(ty: &str) -> Scope {
         ("saved".into(), scalar_type("bool")),
     ])
 }
-fn stage(scope: &Scope) -> regions::Staging {
+pub(super) fn stage(scope: &Scope) -> regions::Staging {
     regions::Staging {
         local: scope.clone(),
         defined: BTreeSet::from(["a".into(), "b".into()]),
@@ -58,7 +58,7 @@ fn default_budget() -> nested::Budget {
         logical_edges: 32,
     }
 }
-fn let_var(name: &str, value: &str) -> NirStmt {
+pub(super) fn let_var(name: &str, value: &str) -> NirStmt {
     NirStmt::Let {
         name: name.into(),
         ty: None,
@@ -96,7 +96,7 @@ fn return_private_fields_rejects_entering_sealed_qualified_extra_writes_hidden_w
     for ty in ["f32", "f64"] {
         for selected in [
             "if saved {let local=relay(local);let a=small(a);let seed=local;}",
-            "let extra=seed;if saved {let local=relay(local);let a=small(a);let b=floating(b);let extra=seed;}",
+            "const extra:i64=seed;if saved {let local=relay(local);let a=small(a);let b=floating(b);let extra=seed;}",
             "if saved {let local=relay(local);let a=small(a);let b=floating(b);let saved=first;}",
             "const a:i32=int_seed;if saved {let local=relay(local);let a=small(a);let b=floating(b);}",
             "if saved {let local=relay(local);let a=small(a);const b:FLOAT=b;}",
@@ -142,6 +142,12 @@ fn return_private_fields_rejects_entering_sealed_qualified_extra_writes_hidden_w
                     "optional" => t.is_optional = true,
                     "generic" => t.generic_args.push(scalar_type("i32")),
                     other => *t = scalar_type(other),
+                }
+                if kind == "bool" && field != "local" {
+                    assert!(classify(&yes, &[], &Scope::new(), &stage(&bad), &owner, 0)
+                        .unwrap()
+                        .is_some());
+                    continue;
                 }
                 assert!(
                     classify(&yes, &[], &Scope::new(), &stage(&bad), &owner, 0).is_none(),

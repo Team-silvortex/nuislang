@@ -4,7 +4,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-private-fields-lexical-three-write-certificate",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_private_fields.rs",
-        required_patterns: &["struct Children(Vec<String>)", "candidates.len() < 3", "!candidates.remove(owner.name())", "candidates.len() != 2", "entering.contains_key(child)", "!staged.defined.contains(child)", "staged.constants.contains(child)", "!transport::numeric(staged.local.get(child)?)", "result.len() > 3"],
+        required_patterns: &["struct Children(Vec<String>)", "candidates.len() < 2", "candidates.len() == 2 && candidates.contains(owner.name())", "candidates.remove(owner.name());", "!transport::private_field_arity(candidates.len())", "entering.contains_key(child)", "!staged.defined.contains(child)", "staged.constants.contains(child)", "!transport::private_field_scalar(staged.local.get(child)?)", "*remaining = remaining.checked_sub(body.len())?"],
     },
     DevTensorDriftCheckSpec {
         id: "native-private-fields-unchanged-pair-authority",
@@ -24,7 +24,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-private-fields-typed-distinct-captures",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_transport_fields.rs",
-        required_patterns: &["children.len() != 2", "!numeric(scope.get(owner)?)", "!seen.insert(name.clone())", "!numeric(ty)", "format!(\"child_{index}\")", "captures.len() > 31", "scalar(ty).then", "SelectedValue::Region(yes.statements", "record::install", "\"__nuis_effect_fields_value\"", "\"__nuis_effect_call_fields\""],
+        required_patterns: &["!arity(children.len())", "!numeric(scope.get(owner)?)", "!seen.insert(name.clone())", "!child_scalar(ty)", "format!(\"child_{index}\")", "captures.len() > 31", "scalar(ty).then", "SelectedValue::Region(yes.statements", "record::install", "\"__nuis_effect_fields_value\"", "\"__nuis_effect_call_fields\""],
     },
     DevTensorDriftCheckSpec {
         id: "native-private-fields-shared-original-forest-and-versions",
@@ -84,7 +84,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-private-fields-aot-exact-layout-and-policy",
         path: "tools/nuisc/src/aot_application_effect_call_return_private_fields_tests.rs",
-        required_patterns: &["{owner:i64;child_0:i32;child_1:{ty}}", "result.ty == \"i64\"", "call_owned_struct", "&proof.parameters[0].node", "&proof.parameters[1].node", "fn width_safe_narrow", "depth >= 8", "yir_core::EdgeKind::Effect", "lacks dependency order", "Vec::<String>::new()", "canonical_i32_codec", "nonparticipating_coercions", "fptrunc", "ret double %1", "ret i64 %2"],
+        required_patterns: &["{owner:i64;child_0:i32;child_1:FLOAT}", "result.ty == \"i64\"", "call_owned_struct", "&proof.parameters[0].node", "&proof.parameters[1].node", "fn width_safe_narrow", "depth >= 8", "yir_core::EdgeKind::Effect", "lacks dependency order", "Vec::<String>::new()", "canonical_i32_codec", "nonparticipating_coercions", "fptrunc", "ret double %1", "ret i64 %2"],
     },
     DevTensorDriftCheckSpec {
         id: "native-private-fields-cli-eight-source-free-images",

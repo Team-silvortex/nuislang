@@ -18,6 +18,18 @@ mod return_float_i32;
 #[path = "dev_tensor_drift_data_native_private_fields.rs"]
 mod private_fields;
 
+#[path = "dev_tensor_drift_data_native_retained_private_fields.rs"]
+mod retained_private_fields;
+
+#[path = "dev_tensor_drift_data_native_numeric_field_vector.rs"]
+mod numeric_field_vector;
+
+#[path = "dev_tensor_drift_data_native_bool_field_vector.rs"]
+mod bool_field_vector;
+
+#[path = "dev_tensor_drift_data_native_two_bool_field_vector.rs"]
+mod two_bool_field_vector;
+
 #[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
 mod return_cross_float;
 
@@ -288,6 +300,10 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_i32_float::CHECKS,
         return_float_i32::CHECKS,
         private_fields::CHECKS,
+        retained_private_fields::CHECKS,
+        numeric_field_vector::CHECKS,
+        bool_field_vector::CHECKS,
+        two_bool_field_vector::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,
