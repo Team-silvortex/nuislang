@@ -9,12 +9,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-child-tail-in-fields-certificate",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_private_fields.rs",
-        required_patterns: &["fn tail_child(", "let mut written = writes(yes, no, scope, depth)?", "written.remove(owner.name())", "written.len() > 1", "!self.0.contains(name)", "Some(written.pop_first())"],
+        required_patterns: &["fn tail_children(", "let mut written = writes(yes, no, scope, depth)?", "written.remove(owner.name())", "written.len() > 4", "!self.0.contains(name)", "Some(written)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-child-tail-in-fields-dispatch",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_updates.rs",
-        required_patterns: &["pub(super) fn tail(", "tail_child(statements, &[], &staged.local, &owner, depth)?", "child.as_ref() != Some(&selected)", "&statements[index + 1..]", "&self.children", "mixed::stage_fields(", "append_owner_tail("],
+        required_patterns: &["pub(super) fn tail(", "tail_children(statements, &[], &staged.local, &owner, depth)?", "!selected.is_subset(&children)", "&statements[index + 1..]", "&self.children", "mixed::stage_fields(", "append_owner_tail("],
     },
     DevTensorDriftCheckSpec {
         id: "native-child-tail-in-fields-proof",

@@ -243,6 +243,15 @@ child fields remain read-only, and a source exit skips every tail condition.
 The subsequent [certified child-tail proof](../reference/nuis-native-certified-child-tail-selections-v1.md)
 permits one certified child to advance in nested common-tail choices, using
 the original certificate and field transport with a genuine stale-value witness.
+The subsequent [certified pair-tail proof](../reference/nuis-native-certified-pair-tail-selections-v1.md)
+adds two-child interaction under the same certificate and 32-input capture
+bound, with current-versus-stale second-update outcomes.
+The subsequent [certified triple-tail proof](../reference/nuis-native-certified-triple-tail-selections-v1.md)
+adds f64/bool/i32 current-value interaction under that same certificate and
+capture bound, without treating nonpoisonable helper markers as new traps.
+The subsequent [certified four-child tail proof](../reference/nuis-native-certified-quad-tail-selections-v1.md)
+adds f32 consumption of the newly updated i32 value under the same bounds,
+keeping raw field observations distinct from cancellation in final outcomes.
 Higher-arity live coverage, hidden roots, multiple field-arm exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of

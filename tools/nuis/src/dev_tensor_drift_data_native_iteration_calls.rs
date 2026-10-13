@@ -60,6 +60,15 @@ mod tail_in_fields;
 #[path = "dev_tensor_drift_data_native_child_tail_in_fields.rs"]
 mod child_tail_in_fields;
 
+#[path = "dev_tensor_drift_data_native_pair_tail_in_fields.rs"]
+mod pair_tail_in_fields;
+
+#[path = "dev_tensor_drift_data_native_triple_tail_in_fields.rs"]
+mod triple_tail_in_fields;
+
+#[path = "dev_tensor_drift_data_native_quad_tail_in_fields.rs"]
+mod quad_tail_in_fields;
+
 #[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
 mod return_cross_float;
 
@@ -344,6 +353,9 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         sibling_in_fields::CHECKS,
         tail_in_fields::CHECKS,
         child_tail_in_fields::CHECKS,
+        pair_tail_in_fields::CHECKS,
+        triple_tail_in_fields::CHECKS,
+        quad_tail_in_fields::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,

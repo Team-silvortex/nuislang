@@ -237,6 +237,12 @@ The [owner-only common-tail follow-up](docs/reference/nuis-native-nested-owner-t
 adds bounded nested choices to that tail, reading completed fields while updating only the original numeric owner and skipping all tail work on source exit.
 The [certified child-tail follow-up](docs/reference/nuis-native-certified-child-tail-selections-v1.md)
 also advances one certified child in nested tail choices, transporting its current value to later computation without rediscovering root write authority.
+The [certified pair-tail follow-up](docs/reference/nuis-native-certified-pair-tail-selections-v1.md)
+updates two certified children together: the second consumes the first's new value, while the original exit gate and single tail remain intact.
+The [certified triple-tail follow-up](docs/reference/nuis-native-certified-triple-tail-selections-v1.md)
+extends this to f64/bool/i32 current-value interaction, retaining empty leaves and the original 32-input limit without copying the tail.
+The [certified four-child tail follow-up](docs/reference/nuis-native-certified-quad-tail-selections-v1.md)
+adds a dependent f32 update from the newly updated i32 field, preserving raw IEEE words, empty leaves and the same input/certificate bounds.
 Higher-arity live coverage and generalized resource transport,
 hidden ordinary leaves and multiple field-arm exits remain separate; common
 guard/backend/effect authority is not widened.

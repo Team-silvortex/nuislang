@@ -181,7 +181,7 @@ fn return_tail_in_fields_rejects_sibling_exits_leaks_and_uncertified_writes_atom
         ),
         SOURCE.replace(
             "let ignored = after_work",
-            "if first { let d = true; let e = false; } let ignored = after_work",
+            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let c = wide_work(c, b, d, 1 / wide_rhs); let d = true; let e = false; } let ignored = after_work",
         ),
     ] {
         reject(&source);
@@ -312,11 +312,11 @@ fn return_tail_in_fields_confines_nested_writes_to_exact_unsealed_owner() {
         for (before, after) in [
             (
                 "let local = tail_yes_work(local, 1 / tail_yes);",
-                "let d = true; let e = false;",
+                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let c = wide_work(c, b, d, 1 / wide_rhs); let d = true; let e = false;",
             ),
             (
                 "let local = tail_yes_work(local, 1 / tail_yes);",
-                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs);",
+                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let c = wide_work(c, b, d, 1 / wide_rhs); let d = true; let e = false;",
             ),
             (
                 "let local = tail_yes_work(local, 1 / tail_yes);",

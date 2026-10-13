@@ -164,6 +164,12 @@ The [owner-only common-tail follow-up](reference/nuis-native-nested-owner-tail-s
 adds nested choices after that gate, retaining read-only child fields and the single original numeric owner.
 The [certified child-tail follow-up](reference/nuis-native-certified-child-tail-selections-v1.md)
 allows one child binding under that original certificate, with a real stale-value counterexample and preserved empty leaves.
+The [certified pair-tail follow-up](reference/nuis-native-certified-pair-tail-selections-v1.md)
+adds two-child current-value interaction under that certificate, without changing the capture bound or granting entering writes.
+The [certified triple-tail follow-up](reference/nuis-native-certified-triple-tail-selections-v1.md)
+adds a third current-value-dependent child update, with raw field observations and a separately unmasked stale-third-input result.
+The [certified four-child tail follow-up](reference/nuis-native-certified-quad-tail-selections-v1.md)
+adds f32 consumption of the new i32 value, with an unmasked fourth-input witness and separate raw-field/predecessor evidence for earlier dependencies.
 Higher-arity live coverage and generalized resource transport,
 other entering writes and multiple field-arm exits
 remain separate.

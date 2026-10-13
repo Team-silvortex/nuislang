@@ -39,20 +39,20 @@ mod multi_float_vector_tests;
 pub(in super::super::super::super) struct Children(Vec<String>);
 
 impl Children {
-    pub(in super::super::super::super) fn tail_child(
+    pub(in super::super::super::super) fn tail_children(
         &self,
         yes: &[NirStmt],
         no: &[NirStmt],
         scope: &Scope,
         owner: &Target<'_>,
         depth: usize,
-    ) -> Option<Option<String>> {
+    ) -> Option<BTreeSet<String>> {
         let mut written = writes(yes, no, scope, depth)?;
         written.remove(owner.name());
-        if written.len() > 1 || written.iter().any(|name| !self.0.contains(name)) {
+        if written.len() > 4 || written.iter().any(|name| !self.0.contains(name)) {
             return None;
         }
-        Some(written.pop_first())
+        Some(written)
     }
 }
 

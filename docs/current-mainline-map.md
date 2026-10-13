@@ -220,7 +220,13 @@ executes bounded choices in the non-exiting sibling arm too, using the same lexi
 The [owner-only common-tail follow-up](reference/nuis-native-nested-owner-tail-selections-v1.md)
 executes nested tail choices using completed current fields, with exact numeric-owner write authority and no tail copying or child writes.
 The [certified child-tail follow-up](reference/nuis-native-certified-child-tail-selections-v1.md)
-executes selected writes to one certified child too. Later owner computation consumes its current value; two distinct tail children remain separate.
+executes selected writes to one certified child too. Later owner computation consumes its current value; the pair-tail receipt follows that historical one-child boundary.
+The [certified pair-tail follow-up](reference/nuis-native-certified-pair-tail-selections-v1.md)
+executes two certified child writes, with the second using the first's current value. The triple-tail receipt follows that historical two-child boundary.
+The [certified triple-tail follow-up](reference/nuis-native-certified-triple-tail-selections-v1.md)
+executes f64/bool/i32 child updates under the same certificate and single tail. The four-child receipt follows that historical three-child boundary.
+The [certified four-child tail follow-up](reference/nuis-native-certified-quad-tail-selections-v1.md)
+executes f64/bool/i32/f32 current-value interaction without increasing captures or copying work. Five distinct tail children and multiple exits remain separate.
 Higher-arity live coverage and generalized resource transport, hidden
 ordinary leaves and multiple field-arm exits remain separate, without widening
 common guard/backend or effect authority.

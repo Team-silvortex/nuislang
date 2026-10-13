@@ -179,11 +179,11 @@ impl PrivateFields {
         depth: usize,
     ) -> Option<()> {
         let owner = Target(&self.owner);
-        // The original certificate limits the whole shared tail to one child.
+        // The original certificate limits the whole shared tail to four children.
         // Per-selection scans do not reset the source proof or grant new names.
-        let child = self
-            .children
-            .tail_child(statements, &[], &staged.local, &owner, depth)?;
+        let children =
+            self.children
+                .tail_children(statements, &[], &staged.local, &owner, depth)?;
         for (index, statement) in statements.iter().enumerate() {
             if let NirStmt::If {
                 condition,
@@ -191,11 +191,15 @@ impl PrivateFields {
                 else_body,
             } = statement
             {
-                if let Some(selected) =
-                    self.children
-                        .tail_child(then_body, else_body, &staged.local, &owner, depth)?
-                {
-                    if child.as_ref() != Some(&selected) {
+                let selected = self.children.tail_children(
+                    then_body,
+                    else_body,
+                    &staged.local,
+                    &owner,
+                    depth,
+                )?;
+                if !selected.is_empty() {
+                    if !selected.is_subset(&children) {
                         return None;
                     }
                     mixed::stage_fields(
