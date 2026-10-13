@@ -49,6 +49,36 @@ mod return_bool_field_vector;
 #[path = "effect_call_return_two_bool_field_vector.rs"]
 mod return_two_bool_field_vector;
 
+#[path = "effect_call_return_float_owner_field_vector.rs"]
+mod return_float_owner_field_vector;
+
+#[path = "effect_call_return_cross_width_field_vector.rs"]
+mod return_cross_width_field_vector;
+
+#[path = "effect_call_return_multi_float_field_vector.rs"]
+mod return_multi_float_field_vector;
+
+#[path = "effect_call_return_early_fields.rs"]
+mod return_early_fields;
+
+#[path = "effect_call_return_in_fields.rs"]
+mod return_in_fields;
+
+#[path = "effect_call_return_nested_in_fields.rs"]
+mod return_nested_in_fields;
+
+#[path = "effect_call_return_prefix_in_fields.rs"]
+mod return_prefix_in_fields;
+
+#[path = "effect_call_return_sibling_in_fields.rs"]
+mod return_sibling_in_fields;
+
+#[path = "effect_call_return_tail_in_fields.rs"]
+mod return_tail_in_fields;
+
+#[path = "effect_call_return_child_tail_in_fields.rs"]
+mod return_child_tail_in_fields;
+
 #[path = "effect_call_return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

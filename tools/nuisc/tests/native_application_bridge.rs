@@ -53,6 +53,36 @@ mod return_bool_field_vector;
 #[path = "native_application_bridge/return_two_bool_field_vector.rs"]
 mod return_two_bool_field_vector;
 
+#[path = "native_application_bridge/return_float_owner_field_vector.rs"]
+mod return_float_owner_field_vector;
+
+#[path = "native_application_bridge/return_cross_width_field_vector.rs"]
+mod return_cross_width_field_vector;
+
+#[path = "native_application_bridge/return_multi_float_field_vector.rs"]
+mod return_multi_float_field_vector;
+
+#[path = "native_application_bridge/return_early_fields.rs"]
+mod return_early_fields;
+
+#[path = "native_application_bridge/return_in_fields.rs"]
+mod return_in_fields;
+
+#[path = "native_application_bridge/return_nested_in_fields.rs"]
+mod return_nested_in_fields;
+
+#[path = "native_application_bridge/return_prefix_in_fields.rs"]
+mod return_prefix_in_fields;
+
+#[path = "native_application_bridge/return_sibling_in_fields.rs"]
+mod return_sibling_in_fields;
+
+#[path = "native_application_bridge/return_tail_in_fields.rs"]
+mod return_tail_in_fields;
+
+#[path = "native_application_bridge/return_child_tail_in_fields.rs"]
+mod return_child_tail_in_fields;
+
 #[path = "native_application_bridge/return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

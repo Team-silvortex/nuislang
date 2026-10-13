@@ -11,7 +11,8 @@ mod tree;
 mod sequences;
 
 pub(in super::super) use sequences::fields::{
-    classify as classify_fields, prove as continue_fields,
+    classify as classify_fields, prove as continue_fields, stage_selection as stage_fields,
+    stage_split as split_fields, Children as FieldChildren,
 };
 
 fn flat(body: &[NirStmt], limit: usize) -> bool {

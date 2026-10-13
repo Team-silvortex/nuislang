@@ -213,7 +213,37 @@ with current-value computation and poisoned short-circuit RHS checks.
 The subsequent [two-bool sibling proof](../reference/nuis-native-two-bool-field-vector-continuations-v1.md)
 adds independent boolean inputs and observed current-sibling computation,
 without modifying the production admission or field carrier.
-Higher-arity live coverage, hidden roots, mixed/single exits and
+The subsequent [floating-owner field-list proof](../reference/nuis-native-floating-owner-field-vector-continuations-v1.md)
+executes original-width owners with mixed children and real stale-source bit
+counterexamples hidden by NaN/zero results; cross-width lists remain separate.
+The subsequent [cross-width mixed field-list proof](../reference/nuis-native-cross-width-field-vector-continuations-v1.md)
+executes opposite owner/child widths with independently typed real data,
+same-width shared-model replay and unchanged field admission/transport.
+The subsequent [simultaneous float child-list proof](../reference/nuis-native-simultaneous-float-field-vector-continuations-v1.md)
+executes five private children including both float widths under one numeric
+owner, with unchanged shared implementation and independent current/stale data evidence.
+The subsequent [bounded mixed-field early-exit proof](../reference/nuis-native-early-mixed-field-exits-v1.md)
+adds a bool source return after one completed field join. The guarded flat
+continuation retains joined fields, and no exit flag is stored in the record.
+The subsequent [in-selection field-exit proof](../reference/nuis-native-in-selection-field-exits-v1.md)
+executes a bool source return before selected field work completes, in both
+polarities with completed prefix transport and a single guarded remainder.
+The subsequent [nested continuing-selection proof](../reference/nuis-native-nested-continuing-field-selections-v1.md)
+adds bounded nested selections after that one exit, using current/retained typed
+fields and one shared tail without resetting inherited source budgets.
+The subsequent [nested pre-exit proof](../reference/nuis-native-nested-pre-exit-field-selections-v1.md)
+adds bounded prefix field choices, with real current-float/peer changes reaching
+the exit predicate and no replay of earlier work.
+The subsequent [nested sibling proof](../reference/nuis-native-nested-sibling-field-selections-v1.md)
+adds bounded field choices in the non-exiting arm, retaining the source gate
+and the same owner/child certificate without widening shared-tail writes.
+The subsequent [owner-only common-tail proof](../reference/nuis-native-nested-owner-tail-selections-v1.md)
+adds nested tail choices under exact numeric-owner write authority. Completed
+child fields remain read-only, and a source exit skips every tail condition.
+The subsequent [certified child-tail proof](../reference/nuis-native-certified-child-tail-selections-v1.md)
+permits one certified child to advance in nested common-tail choices, using
+the original certificate and field transport with a genuine stale-value witness.
+Higher-arity live coverage, hidden roots, multiple field-arm exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.

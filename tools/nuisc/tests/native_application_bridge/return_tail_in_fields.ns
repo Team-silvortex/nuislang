@@ -1,0 +1,142 @@
+mod cpu Main {
+    struct State {
+        seed: i64, small_seed: i32, narrow_seed: f32, wide_seed: f64, bool_seed: bool, peer_seed: bool,
+        first: bool, second: bool, outer: i64, init: i64, cond: i64, small_rhs: i64, narrow_rhs: i64,
+        wide_rhs: i64, bool_rhs: i64, peer_rhs: i64, parent_rhs: i64, exit_guard: i64, nested: i64, prefix: i64, prefix_wide: i64, prefix_peer: i64, sibling: i64, sibling_small: i64, sibling_wide: i64, sibling_owner: i64, after: i64, answer: i64, tail_cond: i64, tail_yes: i64, tail_no: i64,
+        result: bool
+    }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(90); return value == (proof == 1); }
+    @noinline fn initialize(value: i64, proof: i64) -> i64 { print(87); return value; }
+    @noinline fn condition(value: bool, proof: i64) -> bool { print(92); return value == (proof == 1); }
+    @noinline fn small_work(value: i32, proof: i64) -> i32 {
+        print(94); const minus_one: i32 = i32_from_i64(-1); return minus_one - value;
+    }
+    @noinline fn narrow_work(value: f32, proof: i64) -> f32 { print(93); return -value; }
+    @noinline fn wide_work(value: f64, narrow: f32, flag: bool, proof: i64) -> f64 {
+        print(74); if (narrow < 0.0) != flag { return -value; } else { return value; }
+    }
+    @noinline fn bool_work(value: bool, proof: i64) -> bool { print(81); return value != true; }
+    @noinline fn peer_work(value: bool, proof: i64) -> bool { print(78); return value; }
+    @noinline fn parent_work(value: i64, small: i32, narrow: f32, wide: f64, flag: bool, peer: bool, proof: i64) -> i64 {
+        print(95);
+        if ((((small < i32_from_i64(0)) != (narrow < 0.0)) != (wide < 0.0)) != flag) != peer {
+            return -1 - value;
+        } else { return value; }
+    }
+    @noinline fn exit_work(value: i64, small: i32, narrow: f32, wide: f64, flag: bool, peer: bool, proof: i64) -> bool {
+        print(76); return (flag != peer) == (proof == 1);
+    }
+    @noinline fn prefix_work(flag: bool, proof: i64) -> bool { print(73); return flag == (proof == 1); }
+    @noinline fn prefix_wide_work(value: f64, narrow: f32, flag: bool, proof: i64) -> f64 {
+        print(72); if (narrow < 0.0) != flag { return -value; } else { return value; }
+    }
+    @noinline fn prefix_peer_work(value: bool, proof: i64) -> bool { print(77); return value != true; }
+    @noinline fn sibling_work(peer: bool, proof: i64) -> bool { print(69); return peer == (proof == 1); }
+    @noinline fn sibling_small_work(value: i32, proof: i64) -> i32 {
+        print(70); const minus_one: i32 = i32_from_i64(-1); return minus_one - value;
+    }
+    @noinline fn sibling_wide_work(value: f64, narrow: f32, flag: bool, proof: i64) -> f64 {
+        print(68); if (narrow < 0.0) != flag { return -value; } else { return value; }
+    }
+    @noinline fn sibling_owner_work(value: i64, small: i32, narrow: f32, wide: f64, flag: bool, peer: bool, proof: i64) -> i64 {
+        print(67);
+        if ((((small < i32_from_i64(0)) != (narrow < 0.0)) != (wide < 0.0)) != flag) != peer {
+            return -1 - value;
+        } else { return value; }
+    }
+    @noinline fn nested_work(flag: bool, proof: i64) -> bool { print(75); return flag == (proof == 1); }
+    @noinline fn tail_work(value: i64, small: i32, narrow: f32, wide: f64, flag: bool, peer: bool, proof: i64) -> bool {
+        print(66);
+        return (((((small < i32_from_i64(0)) != (narrow < 0.0)) != (wide < 0.0)) != flag) != peer) == (proof == 1);
+    }
+    @noinline fn tail_yes_work(value: i64, proof: i64) -> i64 { print(65); return -1 - value; }
+    @noinline fn tail_no_work(value: i64, small: i32, narrow: f32, wide: f64, flag: bool, peer: bool, proof: i64) -> i64 {
+        print(64);
+        if ((((small < i32_from_i64(0)) != (narrow < 0.0)) != (wide < 0.0)) != flag) != peer {
+            return -1 - value;
+        } else { return value; }
+    }
+    @noinline fn after_work(value: i64, small: i32, narrow: f32, wide: f64, flag: bool, peer: bool, proof: i64) -> i64 {
+        print(96); return value;
+    }
+    @noinline fn answer_work(value: i64, expected: i64, proof: i64) -> bool { print(97); return (value == expected) == (proof == 1); }
+    fn observe(
+        seed: i64, small_seed: i32, narrow_seed: f32, wide_seed: f64, bool_seed: bool, peer_seed: bool,
+        first: bool, second: bool, outer: i64, init: i64, cond: i64, small_rhs: i64, narrow_rhs: i64,
+        wide_rhs: i64, bool_rhs: i64, peer_rhs: i64, parent_rhs: i64, exit_guard: i64, nested: i64, prefix: i64, prefix_wide: i64, prefix_peer: i64, sibling: i64, sibling_small: i64, sibling_wide: i64, sibling_owner: i64, after: i64, answer: i64, tail_cond: i64, tail_yes: i64, tail_no: i64
+    ) -> bool {
+        print(99);
+        if choose(first, 1 / outer) {
+            let a = small_seed;
+            let b = narrow_seed;
+            let c = wide_seed;
+            let d = bool_seed;
+            let e = peer_seed;
+            let local = initialize(seed, 1 / init);
+            if condition(second, 1 / cond) {
+                let a = small_work(a, 1 / small_rhs);
+                let b = narrow_work(b, 1 / narrow_rhs);
+                if prefix_work(d, 1 / prefix) {
+                    let c = prefix_wide_work(c, b, d, 1 / prefix_wide);
+                } else {
+                    let e = prefix_peer_work(e, 1 / prefix_peer);
+                }
+                let d = bool_work(d, 1 / bool_rhs);
+                if exit_work(local, a, b, c, d, e, 1 / exit_guard) { return d && answer_work(local, seed, 1 / answer); }
+                if nested_work(d, 1 / nested) {
+                    let c = wide_work(c, b, d, 1 / wide_rhs);
+                    let e = e && peer_work(d, 1 / peer_rhs);
+                } else {
+                    let e = peer_work(d != true, 1 / peer_rhs);
+                }
+                let local = parent_work(local, a, b, c, d, e, 1 / parent_rhs);
+            } else {
+                if sibling_work(e, 1 / sibling) {
+                    let a = sibling_small_work(a, 1 / sibling_small);
+                    let d = bool_work(d, 1 / bool_rhs);
+                } else {
+                    let c = sibling_wide_work(c, b, d, 1 / sibling_wide);
+                }
+                let local = sibling_owner_work(local, a, b, c, d, e, 1 / sibling_owner);
+            }
+            let ignored = after_work(local, a, b, c, d, e, 1 / after);
+            if tail_work(local, a, b, c, d, e, 1 / tail_cond) {
+                if d { let local = tail_yes_work(local, 1 / tail_yes); }
+            } else {
+                let local = tail_no_work(local, a, b, c, d, e, 1 / tail_no);
+            }
+            let local = parent_work(local, a, b, c, d, e, 1 / parent_rhs);
+            return answer_work(local, seed, 1 / answer) || e;
+        } else { return answer_work(seed, seed, 1 / answer) && second; }
+        print(80); return false;
+    }
+    fn start(
+        seed: i64, small_seed: i32, narrow_seed: f32, wide_seed: f64, bool_seed: bool, peer_seed: bool,
+        first: bool, second: bool, outer: i64, init: i64, cond: i64, small_rhs: i64, narrow_rhs: i64,
+        wide_rhs: i64, bool_rhs: i64, peer_rhs: i64, parent_rhs: i64, exit_guard: i64, nested: i64, prefix: i64, prefix_wide: i64, prefix_peer: i64, sibling: i64, sibling_small: i64, sibling_wide: i64, sibling_owner: i64, after: i64, answer: i64, tail_cond: i64, tail_yes: i64, tail_no: i64
+    ) -> State {
+        let result = observe(
+            seed, small_seed, narrow_seed, wide_seed, bool_seed, peer_seed, first, second, outer, init, cond,
+            small_rhs, narrow_rhs, wide_rhs, bool_rhs, peer_rhs, parent_rhs, exit_guard, nested, prefix, prefix_wide, prefix_peer, sibling, sibling_small, sibling_wide, sibling_owner, after, answer, tail_cond, tail_yes, tail_no
+        );
+        print(79);
+        return State {
+            seed: seed, small_seed: small_seed, narrow_seed: narrow_seed, wide_seed: wide_seed, bool_seed: bool_seed,
+            peer_seed: peer_seed, first: first, second: second, outer: outer, init: init, cond: cond,
+            small_rhs: small_rhs, narrow_rhs: narrow_rhs, wide_rhs: wide_rhs, bool_rhs: bool_rhs, peer_rhs: peer_rhs,
+            parent_rhs: parent_rhs, exit_guard: exit_guard, nested: nested, prefix: prefix, prefix_wide: prefix_wide, prefix_peer: prefix_peer, sibling: sibling, sibling_small: sibling_small, sibling_wide: sibling_wide, sibling_owner: sibling_owner, after: after, answer: answer, tail_cond: tail_cond, tail_yes: tail_yes, tail_no: tail_no, result: result
+        };
+    }
+    fn step(
+        state: State, first: bool, second: bool, outer: i64, init: i64, cond: i64, small_rhs: i64, narrow_rhs: i64,
+        wide_rhs: i64, bool_rhs: i64, peer_rhs: i64, parent_rhs: i64, exit_guard: i64, nested: i64, prefix: i64, prefix_wide: i64, prefix_peer: i64, sibling: i64, sibling_small: i64, sibling_wide: i64, sibling_owner: i64, after: i64, answer: i64, tail_cond: i64, tail_yes: i64, tail_no: i64
+    ) -> State {
+        return start(
+            state.seed, state.small_seed, state.narrow_seed, state.wide_seed, state.bool_seed, state.peer_seed,
+            first, second, outer, init, cond, small_rhs, narrow_rhs, wide_rhs, bool_rhs, peer_rhs, parent_rhs,
+            exit_guard, nested, prefix, prefix_wide, prefix_peer, sibling, sibling_small, sibling_wide, sibling_owner, after, answer, tail_cond, tail_yes, tail_no
+        );
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

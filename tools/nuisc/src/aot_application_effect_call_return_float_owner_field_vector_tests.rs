@@ -1,0 +1,8 @@
+#[test]
+fn native_return_float_owner_field_vector_exact_layout_guarded_order_and_policy_vetoes() {
+    super::return_private_fields::check_owner_layout(
+        include_str!("../tests/native_application_bridge/return_float_owner_field_vector.ns"),
+        "{owner:FLOAT;child_0:i32;child_1:FLOAT;child_2:bool;child_3:bool}",
+        "FLOAT",
+    );
+}

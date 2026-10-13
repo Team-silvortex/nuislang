@@ -23,8 +23,38 @@ mod bool_vector_tests;
 #[path = "effectful_selections_return_two_bool_field_vector_tests.rs"]
 mod two_bool_vector_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_float_owner_field_vector_tests.rs"]
+mod float_owner_vector_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_cross_width_field_vector_tests.rs"]
+mod cross_width_vector_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_multi_float_field_vector_tests.rs"]
+mod multi_float_vector_tests;
+
 // This certificate is lexical write authority, not extra outward results.
 pub(in super::super::super::super) struct Children(Vec<String>);
+
+impl Children {
+    pub(in super::super::super::super) fn tail_child(
+        &self,
+        yes: &[NirStmt],
+        no: &[NirStmt],
+        scope: &Scope,
+        owner: &Target<'_>,
+        depth: usize,
+    ) -> Option<Option<String>> {
+        let mut written = writes(yes, no, scope, depth)?;
+        written.remove(owner.name());
+        if written.len() > 1 || written.iter().any(|name| !self.0.contains(name)) {
+            return None;
+        }
+        Some(written.pop_first())
+    }
+}
 
 fn writes(
     yes: &[NirStmt],
@@ -117,7 +147,7 @@ pub(in super::super::super::super) fn prove(
     }
     tree::preflight(yes, no, suffix, depth)?;
     let mut staged = stage_prefix(&[], scope, signatures, budget, depth, Some(owner))?;
-    selection(
+    stage_selection(
         condition,
         yes,
         no,
@@ -152,7 +182,7 @@ pub(in super::super::super::super) fn prove(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn selection(
+pub(in super::super::super::super) fn stage_selection(
     condition: &NirExpr,
     yes: &[NirStmt],
     no: &[NirStmt],
@@ -162,6 +192,57 @@ fn selection(
     children: &Children,
     signatures: &Signatures,
     budget: &mut nested::Budget,
+    depth: usize,
+) -> Option<()> {
+    isolated(yes, no, future, staged, owner, children, depth)?;
+    nested::consume_node(budget)?;
+    let (condition, inputs, calls) =
+        predicates::prove(condition, &staged.local, signatures, budget)?;
+    prepared(
+        condition, inputs, calls, yes, no, staged, owner, children, signatures, budget, depth,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in super::super::super::super) fn stage_split(
+    gate: &str,
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    future: &[NirStmt],
+    staged: &mut regions::Staging,
+    owner: &Target<'_>,
+    children: &Children,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+) -> Option<()> {
+    if staged.local.get(gate)? != &scalar_type("bool") {
+        return None;
+    }
+    isolated(yes, no, future, staged, owner, children, depth)?;
+    // The source selection/condition was charged and bound before splitting.
+    prepared(
+        predicates::Predicate::Scalar(NirExpr::Var(gate.into())),
+        BTreeSet::from([gate.into()]),
+        BTreeSet::new(),
+        yes,
+        no,
+        staged,
+        owner,
+        children,
+        signatures,
+        budget,
+        depth,
+    )
+}
+
+fn isolated(
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    future: &[NirStmt],
+    staged: &regions::Staging,
+    owner: &Target<'_>,
+    children: &Children,
     depth: usize,
 ) -> Option<()> {
     if depth >= 8
@@ -177,8 +258,24 @@ fn selection(
     let future = fresh_names(future, scope);
     tree::isolated(yes, scope, &future)?;
     tree::isolated(no, scope, &future)?;
-    nested::consume_node(budget)?;
-    let (condition, inputs, calls) = predicates::prove(condition, scope, signatures, budget)?;
+    Some(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn prepared(
+    condition: predicates::Predicate,
+    inputs: BTreeSet<String>,
+    calls: BTreeSet<String>,
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    staged: &mut regions::Staging,
+    owner: &Target<'_>,
+    children: &Children,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+) -> Option<()> {
+    let scope = &staged.local;
     let yes = body(yes, scope, owner, children, signatures, budget, depth + 1)?;
     let no = body(no, scope, owner, children, signatures, budget, depth + 1)?;
     let (plan, reads, effects) =
@@ -240,7 +337,7 @@ fn append_body(
                 condition,
                 then_body,
                 else_body,
-            } => selection(
+            } => stage_selection(
                 condition,
                 then_body,
                 else_body,

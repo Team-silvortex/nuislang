@@ -144,8 +144,28 @@ The [mixed bool field-list follow-up](reference/nuis-native-bool-field-vector-co
 adds exact private bools with current/retained logical values and unchanged numeric Target authority.
 The [two-bool sibling follow-up](reference/nuis-native-two-bool-field-vector-continuations-v1.md)
 adds independent current-sibling computation and stale-read counterexamples without new admission rules.
+The [floating-owner field-list follow-up](reference/nuis-native-floating-owner-field-vector-continuations-v1.md)
+adds original-width owner observations and actual equality-masked stale-source counterexamples through the same generic fields.
+The [cross-width mixed field-list follow-up](reference/nuis-native-cross-width-field-vector-continuations-v1.md)
+keeps owner/child bit widths independent through actual computation, retained state and source-free restoration.
+The [simultaneous float child-list follow-up](reference/nuis-native-simultaneous-float-field-vector-continuations-v1.md)
+executes independent f32/f64 private children in one six-field computation without new transport recipes or owner authority.
+The [bounded mixed-field early-exit follow-up](reference/nuis-native-early-mixed-field-exits-v1.md)
+adds a genuine bool return after a completed field join, while one guarded continuation retains current fields.
+The [in-selection field-exit follow-up](reference/nuis-native-in-selection-field-exits-v1.md)
+executes a single exit before the selected arm completes, retaining current prefix values and skipping unfinished work without field control flags.
+The [nested continuing-selection follow-up](reference/nuis-native-nested-continuing-field-selections-v1.md)
+adds a bounded nested remainder with current/retained typed fields and no shared-tail copying.
+The [nested pre-exit follow-up](reference/nuis-native-nested-pre-exit-field-selections-v1.md)
+adds bounded field choices before the same single exit, with genuine current-value exit decisions and preserved prefix work.
+The [nested sibling follow-up](reference/nuis-native-nested-sibling-field-selections-v1.md)
+adds current/retained updates in the other field arm, while poisoned source-exit checks stay behind the original arm gate.
+The [owner-only common-tail follow-up](reference/nuis-native-nested-owner-tail-selections-v1.md)
+adds nested choices after that gate, retaining read-only child fields and the single original numeric owner.
+The [certified child-tail follow-up](reference/nuis-native-certified-child-tail-selections-v1.md)
+allows one child binding under that original certificate, with a real stale-value counterexample and preserved empty leaves.
 Higher-arity live coverage and generalized resource transport,
-other entering writes and mixed/single exits
+other entering writes and multiple field-arm exits
 remain separate.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)

@@ -30,6 +30,36 @@ mod bool_field_vector;
 #[path = "dev_tensor_drift_data_native_two_bool_field_vector.rs"]
 mod two_bool_field_vector;
 
+#[path = "dev_tensor_drift_data_native_float_owner_field_vector.rs"]
+mod float_owner_field_vector;
+
+#[path = "dev_tensor_drift_data_native_cross_width_field_vector.rs"]
+mod cross_width_field_vector;
+
+#[path = "dev_tensor_drift_data_native_multi_float_field_vector.rs"]
+mod multi_float_field_vector;
+
+#[path = "dev_tensor_drift_data_native_early_fields.rs"]
+mod early_fields;
+
+#[path = "dev_tensor_drift_data_native_in_fields.rs"]
+mod in_fields;
+
+#[path = "dev_tensor_drift_data_native_nested_in_fields.rs"]
+mod nested_in_fields;
+
+#[path = "dev_tensor_drift_data_native_prefix_in_fields.rs"]
+mod prefix_in_fields;
+
+#[path = "dev_tensor_drift_data_native_sibling_in_fields.rs"]
+mod sibling_in_fields;
+
+#[path = "dev_tensor_drift_data_native_tail_in_fields.rs"]
+mod tail_in_fields;
+
+#[path = "dev_tensor_drift_data_native_child_tail_in_fields.rs"]
+mod child_tail_in_fields;
+
 #[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
 mod return_cross_float;
 
@@ -304,6 +334,16 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         numeric_field_vector::CHECKS,
         bool_field_vector::CHECKS,
         two_bool_field_vector::CHECKS,
+        float_owner_field_vector::CHECKS,
+        cross_width_field_vector::CHECKS,
+        multi_float_field_vector::CHECKS,
+        early_fields::CHECKS,
+        in_fields::CHECKS,
+        nested_in_fields::CHECKS,
+        prefix_in_fields::CHECKS,
+        sibling_in_fields::CHECKS,
+        tail_in_fields::CHECKS,
+        child_tail_in_fields::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,

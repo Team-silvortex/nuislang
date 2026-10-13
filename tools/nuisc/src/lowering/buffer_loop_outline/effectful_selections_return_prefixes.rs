@@ -7,6 +7,12 @@ mod tests;
 #[path = "effectful_selections_return_updates.rs"]
 mod updates;
 
+#[path = "effectful_selections_return_early_fields.rs"]
+mod early_fields;
+
+#[path = "effectful_selections_return_in_fields.rs"]
+mod in_fields;
+
 pub(super) fn prepare(
     condition: &NirExpr,
     yes: &[NirStmt],
@@ -176,6 +182,12 @@ pub(super) fn body(
     budget: &mut nested::Budget,
     depth: usize,
 ) -> Option<ReturnedValue> {
+    if in_fields::candidate(statements) {
+        return in_fields::prove(statements, scope, signatures, budget, depth);
+    }
+    if early_fields::candidate(statements) {
+        return early_fields::prove(statements, scope, signatures, budget, depth);
+    }
     let (value, prefix) = returned(statements)?;
     let regions::Staging {
         local,

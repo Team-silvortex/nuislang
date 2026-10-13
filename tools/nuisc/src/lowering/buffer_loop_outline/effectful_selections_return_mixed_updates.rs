@@ -19,7 +19,9 @@ mod float_tests;
 #[path = "effectful_selections_return_mixed_continuations.rs"]
 mod continuations;
 pub(super) use continuations::prove as continue_flat;
+pub(super) use continuations::stage_fields;
 pub(super) use continuations::{classify_fields, continue_fields};
+pub(super) use continuations::{split_fields, FieldChildren};
 
 // This token carries private write authority, never an additional outward result.
 pub(super) struct Child(String);

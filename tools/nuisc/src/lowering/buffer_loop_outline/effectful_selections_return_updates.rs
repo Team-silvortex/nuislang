@@ -82,6 +82,11 @@ mod float_i32_tests;
 #[path = "effectful_selections_return_retention_targets.rs"]
 mod retention_targets;
 
+#[path = "effectful_selections_return_owner_tail.rs"]
+mod owner_tail;
+
+pub(super) use owner_tail::append as append_owner_tail;
+
 // Only this owner delegates an already proven, unsealed prefix-owned scalar.
 pub(super) struct Target<'a>(&'a str);
 
@@ -99,6 +104,204 @@ impl Target<'_> {
     pub(super) fn name(&self) -> &str {
         self.0
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn private_field_stage(
+    condition: &NirExpr,
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    future: &[NirStmt],
+    entering: &Scope,
+    staged: &mut regions::Staging,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+) -> Option<String> {
+    let fields = private_field_certificate(yes, no, entering, staged, depth)?;
+    mixed::stage_fields(
+        condition,
+        yes,
+        no,
+        future,
+        staged,
+        &Target(&fields.owner),
+        &fields.children,
+        signatures,
+        budget,
+        depth,
+    )?;
+    Some(fields.owner)
+}
+
+pub(super) struct PrivateFields {
+    pub(super) owner: String,
+    children: mixed::FieldChildren,
+}
+
+pub(super) fn private_field_certificate(
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    entering: &Scope,
+    staged: &regions::Staging,
+    depth: usize,
+) -> Option<PrivateFields> {
+    let eligible = eligible(staged, None)
+        .into_iter()
+        .filter(|name| !entering.contains_key(name) && numeric_owner(&staged.local[name]))
+        .collect();
+    let mut remaining = 64;
+    let yes_target = target(yes, &eligible, &mut remaining, depth + 1)?;
+    let no_target = target(no, &eligible, &mut remaining, depth + 1)?;
+    let name = yes_target.as_ref().or(no_target.as_ref())?;
+    if yes_target.as_ref().is_some_and(|other| other != name)
+        || no_target.as_ref().is_some_and(|other| other != name)
+    {
+        return None;
+    }
+    let owner = Target(name);
+    let children = mixed::classify_fields(yes, no, entering, staged, &owner, depth)??;
+    Some(PrivateFields {
+        owner: name.clone(),
+        children,
+    })
+}
+
+impl PrivateFields {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn tail(
+        &self,
+        statements: &[NirStmt],
+        entering: &Scope,
+        staged: &mut regions::Staging,
+        signatures: &Signatures,
+        budget: &mut nested::Budget,
+        depth: usize,
+    ) -> Option<()> {
+        let owner = Target(&self.owner);
+        // The original certificate limits the whole shared tail to one child.
+        // Per-selection scans do not reset the source proof or grant new names.
+        let child = self
+            .children
+            .tail_child(statements, &[], &staged.local, &owner, depth)?;
+        for (index, statement) in statements.iter().enumerate() {
+            if let NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } = statement
+            {
+                if let Some(selected) =
+                    self.children
+                        .tail_child(then_body, else_body, &staged.local, &owner, depth)?
+                {
+                    if child.as_ref() != Some(&selected) {
+                        return None;
+                    }
+                    mixed::stage_fields(
+                        condition,
+                        then_body,
+                        else_body,
+                        &statements[index + 1..],
+                        staged,
+                        &owner,
+                        &self.children,
+                        signatures,
+                        budget,
+                        depth,
+                    )?;
+                    continue;
+                }
+            }
+            append_owner_tail(
+                statement,
+                entering,
+                staged,
+                &self.owner,
+                signatures,
+                budget,
+                depth,
+            )?;
+        }
+        Some(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn split(
+        &self,
+        gate: &str,
+        yes: &[NirStmt],
+        no: &[NirStmt],
+        future: &[NirStmt],
+        staged: &mut regions::Staging,
+        signatures: &Signatures,
+        budget: &mut nested::Budget,
+        depth: usize,
+    ) -> Option<()> {
+        mixed::split_fields(
+            gate,
+            yes,
+            no,
+            future,
+            staged,
+            &Target(&self.owner),
+            &self.children,
+            signatures,
+            budget,
+            depth,
+        )
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn append_owner(
+    statement: &NirStmt,
+    entering: &Scope,
+    staged: &mut regions::Staging,
+    owner: &str,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+) -> Option<()> {
+    if !numeric_owner(staged.local.get(owner)?)
+        || !matches!(statement, NirStmt::Let { .. } | NirStmt::Const { .. })
+    {
+        return None;
+    }
+    super::append_authorized(
+        statement,
+        entering,
+        staged,
+        signatures,
+        budget,
+        depth,
+        Some(&Target(owner)),
+    )
+}
+
+pub(super) fn continue_owner(
+    statements: &[NirStmt],
+    scope: &Scope,
+    owner: &str,
+    signatures: &Signatures,
+    budget: &mut nested::Budget,
+    depth: usize,
+) -> Option<regions::Staging> {
+    if !numeric_owner(scope.get(owner)?)
+        || statements
+            .iter()
+            .any(|s| !matches!(s, NirStmt::Let { .. } | NirStmt::Const { .. }))
+    {
+        return None;
+    }
+    super::stage_authorized(
+        statements,
+        scope,
+        signatures,
+        budget,
+        depth,
+        Some(&Target(owner)),
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
