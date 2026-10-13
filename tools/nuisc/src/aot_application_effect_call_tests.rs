@@ -84,6 +84,9 @@ mod return_triple_tail_in_fields;
 #[path = "aot_application_effect_call_return_quad_tail_in_fields_tests.rs"]
 mod return_quad_tail_in_fields;
 
+#[path = "aot_application_effect_call_return_quint_tail_in_fields_tests.rs"]
+mod return_quint_tail_in_fields;
+
 #[path = "aot_application_effect_call_return_float_ancestor_tests.rs"]
 mod return_float_ancestor;
 

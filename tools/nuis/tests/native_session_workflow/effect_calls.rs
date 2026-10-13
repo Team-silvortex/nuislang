@@ -88,6 +88,9 @@ mod return_triple_tail_in_fields;
 #[path = "effect_call_return_quad_tail_in_fields.rs"]
 mod return_quad_tail_in_fields;
 
+#[path = "effect_call_return_quint_tail_in_fields.rs"]
+mod return_quint_tail_in_fields;
+
 #[path = "effect_call_return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

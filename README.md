@@ -243,6 +243,8 @@ The [certified triple-tail follow-up](docs/reference/nuis-native-certified-tripl
 extends this to f64/bool/i32 current-value interaction, retaining empty leaves and the original 32-input limit without copying the tail.
 The [certified four-child tail follow-up](docs/reference/nuis-native-certified-quad-tail-selections-v1.md)
 adds a dependent f32 update from the newly updated i32 field, preserving raw IEEE words, empty leaves and the same input/certificate bounds.
+The [certified five-child tail follow-up](docs/reference/nuis-native-certified-quint-tail-selections-v1.md)
+adds a dependent peer-bool update from the new f32 value, with a final conjunction, independent authorized-capacity testing and unchanged captures.
 Higher-arity live coverage and generalized resource transport,
 hidden ordinary leaves and multiple field-arm exits remain separate; common
 guard/backend/effect authority is not widened.

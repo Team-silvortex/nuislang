@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-pair-tail-in-fields-certificate",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_private_fields.rs",
-        required_patterns: &["fn tail_children(", "Option<BTreeSet<String>>", "written.remove(owner.name())", "written.len() > 4", "!self.0.contains(name)", "Some(written)"],
+        required_patterns: &["fn tail_children(", "Option<BTreeSet<String>>", "written.remove(owner.name())", "written.len() > 5", "!self.0.contains(name)", "Some(written)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-pair-tail-in-fields-dispatch",
@@ -19,7 +19,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-pair-tail-in-fields-proof",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_pair_tail_in_fields_tests.rs",
-        required_patterns: &["records.len(), 7", "continuations.len(), 1", "certificate_and_bounded_children", "assert_eq!(module, before)", "assert_eq!(names, before_names)", "budget(33, 256, 32)", "budget(34, used - 1, 32)", "budget(34, 256, 2)", "budget(35, 256, 32)", "\"tail_pair_work\"", "let e = false; } let ignored = after_work"],
+        required_patterns: &["records.len(), 7", "continuations.len(), 1", "certificate_and_bounded_children", "assert_eq!(module, before)", "assert_eq!(names, before_names)", "budget(33, 256, 32)", "budget(34, used - 1, 32)", "budget(34, 256, 2)", "budget(35, 256, 32)", "\"tail_pair_work\"", "let e = false; let seed = local; } let ignored = after_work"],
     },
     DevTensorDriftCheckSpec {
         id: "native-pair-tail-in-fields-source",

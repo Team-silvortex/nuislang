@@ -174,7 +174,7 @@ fn return_sibling_in_fields_rejects_sibling_exits_leaks_and_uncertified_writes_a
         ),
         SOURCE.replace(
             "let ignored = after_work",
-            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let c = wide_work(c, b, d, 1 / wide_rhs); let d = true; let e = false; } let ignored = after_work",
+            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let c = wide_work(c, b, d, 1 / wide_rhs); let d = true; let e = false; let seed = local; } let ignored = after_work",
         ),
     ] {
         reject(&source);

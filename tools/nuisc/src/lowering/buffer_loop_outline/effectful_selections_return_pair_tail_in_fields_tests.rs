@@ -187,7 +187,7 @@ fn return_pair_tail_in_fields_rejects_sibling_exits_leaks_and_uncertified_writes
         ),
         SOURCE.replace(
             "let ignored = after_work",
-            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let d = true; let e = false; } let ignored = after_work",
+            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let d = true; let e = false; let seed = local; } let ignored = after_work",
         ),
     ] {
         reject(&source);
@@ -319,11 +319,11 @@ fn return_pair_tail_in_fields_confines_nested_writes_to_certificate_and_bounded_
         for (before, after) in [
             (
                 "let local = tail_yes_work(local, 1);",
-                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let d = true; let e = false;",
+                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let d = true; let e = false; let seed = local;",
             ),
             (
                 "let local = tail_yes_work(local, 1);",
-                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let e = false;",
+                "let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let e = false; let seed = local;",
             ),
             (
                 "let local = tail_yes_work(local, 1);",
@@ -362,7 +362,7 @@ fn return_pair_tail_in_fields_confines_nested_writes_to_certificate_and_bounded_
             crate::nir_verify::verify_nir_module(&module).unwrap();
         }
         for extra in [
-            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let e = false; } let ignored = after_work",
+            "if first { let a = small_work(a, 1 / small_rhs); let b = narrow_work(b, 1 / narrow_rhs); let e = false; let seed = local; } let ignored = after_work",
             "if first { let seed = local; } let ignored = after_work",
             "let c = wide_work(c, b, d, 1 / wide_rhs); let ignored = after_work",
         ] {

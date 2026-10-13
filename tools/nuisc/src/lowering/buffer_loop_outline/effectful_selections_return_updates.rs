@@ -179,7 +179,7 @@ impl PrivateFields {
         depth: usize,
     ) -> Option<()> {
         let owner = Target(&self.owner);
-        // The original certificate limits the whole shared tail to four children.
+        // The original certificate limits the whole shared tail to five children.
         // Per-selection scans do not reset the source proof or grant new names.
         let children =
             self.children

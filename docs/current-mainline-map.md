@@ -226,7 +226,9 @@ executes two certified child writes, with the second using the first's current v
 The [certified triple-tail follow-up](reference/nuis-native-certified-triple-tail-selections-v1.md)
 executes f64/bool/i32 child updates under the same certificate and single tail. The four-child receipt follows that historical three-child boundary.
 The [certified four-child tail follow-up](reference/nuis-native-certified-quad-tail-selections-v1.md)
-executes f64/bool/i32/f32 current-value interaction without increasing captures or copying work. Five distinct tail children and multiple exits remain separate.
+executes f64/bool/i32/f32 current-value interaction without increasing captures or copying work. The five-child receipt follows that historical four-child boundary.
+The [certified five-child tail follow-up](reference/nuis-native-certified-quint-tail-selections-v1.md)
+executes f64/bool/i32/f32/bool interaction under the same certificate, with independent six-authorized-child capacity checks. Next prove a second explicit source bool exit in the sibling arm; six-child live coverage, resources and deeper/general exits remain separate.
 Higher-arity live coverage and generalized resource transport, hidden
 ordinary leaves and multiple field-arm exits remain separate, without widening
 common guard/backend or effect authority.

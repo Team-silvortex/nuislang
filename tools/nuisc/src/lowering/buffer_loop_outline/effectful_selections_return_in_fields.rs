@@ -36,6 +36,10 @@ mod triple_tail_tests;
 #[path = "effectful_selections_return_quad_tail_in_fields_tests.rs"]
 mod quad_tail_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_quint_tail_in_fields_tests.rs"]
+mod quint_tail_tests;
+
 pub(super) fn candidate(body: &[NirStmt]) -> bool {
     body.iter().any(|s| {
         matches!(s, NirStmt::If { then_body, else_body, .. }

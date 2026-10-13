@@ -35,6 +35,10 @@ mod cross_width_vector_tests;
 #[path = "effectful_selections_return_multi_float_field_vector_tests.rs"]
 mod multi_float_vector_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_tail_child_bound_tests.rs"]
+mod tail_child_bound_tests;
+
 // This certificate is lexical write authority, not extra outward results.
 pub(in super::super::super::super) struct Children(Vec<String>);
 
@@ -49,7 +53,7 @@ impl Children {
     ) -> Option<BTreeSet<String>> {
         let mut written = writes(yes, no, scope, depth)?;
         written.remove(owner.name());
-        if written.len() > 4 || written.iter().any(|name| !self.0.contains(name)) {
+        if written.len() > 5 || written.iter().any(|name| !self.0.contains(name)) {
             return None;
         }
         Some(written)

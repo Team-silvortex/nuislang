@@ -92,6 +92,9 @@ mod return_triple_tail_in_fields;
 #[path = "native_application_bridge/return_quad_tail_in_fields.rs"]
 mod return_quad_tail_in_fields;
 
+#[path = "native_application_bridge/return_quint_tail_in_fields.rs"]
+mod return_quint_tail_in_fields;
+
 #[path = "native_application_bridge/return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 

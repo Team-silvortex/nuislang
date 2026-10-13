@@ -252,6 +252,9 @@ capture bound, without treating nonpoisonable helper markers as new traps.
 The subsequent [certified four-child tail proof](../reference/nuis-native-certified-quad-tail-selections-v1.md)
 adds f32 consumption of the newly updated i32 value under the same bounds,
 keeping raw field observations distinct from cancellation in final outcomes.
+The subsequent [certified five-child tail proof](../reference/nuis-native-certified-quint-tail-selections-v1.md)
+adds a peer-bool update from the current f32 value, with a final conjunction
+and private-module authorized-capacity checks. A second sibling-arm exit is next.
 Higher-arity live coverage, hidden roots, multiple field-arm exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of

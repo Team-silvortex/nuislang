@@ -170,6 +170,8 @@ The [certified triple-tail follow-up](reference/nuis-native-certified-triple-tai
 adds a third current-value-dependent child update, with raw field observations and a separately unmasked stale-third-input result.
 The [certified four-child tail follow-up](reference/nuis-native-certified-quad-tail-selections-v1.md)
 adds f32 consumption of the new i32 value, with an unmasked fourth-input witness and separate raw-field/predecessor evidence for earlier dependencies.
+The [certified five-child tail follow-up](reference/nuis-native-certified-quint-tail-selections-v1.md)
+closes the existing five-field dependency chain and distinguishes six authorized writes from entering-root violations without exposing certificate internals.
 Higher-arity live coverage and generalized resource transport,
 other entering writes and multiple field-arm exits
 remain separate.

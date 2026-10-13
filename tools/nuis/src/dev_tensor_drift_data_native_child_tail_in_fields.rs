@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-child-tail-in-fields-certificate",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_private_fields.rs",
-        required_patterns: &["fn tail_children(", "let mut written = writes(yes, no, scope, depth)?", "written.remove(owner.name())", "written.len() > 4", "!self.0.contains(name)", "Some(written)"],
+        required_patterns: &["fn tail_children(", "let mut written = writes(yes, no, scope, depth)?", "written.remove(owner.name())", "written.len() > 5", "!self.0.contains(name)", "Some(written)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-child-tail-in-fields-dispatch",
