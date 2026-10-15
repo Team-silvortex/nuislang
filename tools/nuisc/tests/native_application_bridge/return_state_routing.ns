@@ -1,0 +1,46 @@
+mod cpu Main {
+    struct State { result: bool, total: i64, marker: f64 }
+    @noinline fn advance(value: i64, proof: i64) -> i64 { print(5); return value + proof; }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(10); return value == (proof == 1); }
+    @noinline fn select(value: bool, proof: i64) -> bool { print(11); return value == (proof == 1); }
+    @noinline fn left(value: i64, proof: i64) -> i64 { print(20); return value + proof; }
+    @noinline fn right(value: i64, proof: i64) -> i64 { print(30); return value + proof - 1; }
+    @noinline fn unused(value: i64, proof: i64) -> i64 { print(31); return value + proof - 1; }
+    @noinline fn seal(value: bool, enabled: bool, proof: i64) -> bool { print(50); return value != (enabled == (proof == 1)); }
+    @noinline fn answer_work(value: i64, previous: bool, proof: i64) -> bool { print(40); return previous != ((value % 2 == 0) && (proof == 1)); }
+    fn observe(seed: i64, gate: bool, first: bool, flag: bool, root: i64, yes: i64, no: i64,
+        yes_choice: i64, no_choice: i64, answer: i64, extra: i64, sealing: i64) -> bool {
+        if choose(gate, 1 / root) {
+            let local = left(seed, 1 / yes);
+            const enabled: bool = true;
+            const input: bool = flag;
+            const sealed: bool = seal(input, enabled, 1 / sealing);
+            if select(first, 1 / yes_choice) {
+                const called: bool = answer_work(local, input, 1 / answer);
+                return called;
+            } else { return sealed; }
+        } else {
+            let local = right(seed, 1 / no);
+            const copied: bool = first;
+            if select(copied, 1 / no_choice) {
+                const on: bool = flag != true;
+                let ignored = unused(local, 1 / extra);
+                return on;
+            } else { const off: bool = flag; return off; }
+        }
+    }
+    fn start(seed: i64, gate: bool, first: bool, flag: bool, root: i64, yes: i64, no: i64,
+        yes_choice: i64, no_choice: i64, answer: i64, extra: i64, sealing: i64, marker: f64, advancing: i64) -> State {
+        let total = advance(seed, 1 / advancing);
+        let result = observe(total, gate != flag, first != (total % 2 == 0), flag, root, yes, no, yes_choice, no_choice, answer, extra, sealing);
+        return State { result: result, total: total, marker: marker };
+    }
+    fn step(state: State, seed: i64, gate: bool, first: bool, flag: bool, root: i64, yes: i64, no: i64,
+        yes_choice: i64, no_choice: i64, answer: i64, extra: i64, sealing: i64, marker: f64, advancing: i64) -> State {
+        let total = advance(state.total, 1 / advancing);
+        let result = observe(total, gate != state.result, first != (total % 2 == 0), state.result, root, yes, no, yes_choice, no_choice, answer, extra, sealing);
+        return State { result: result, total: total, marker: state.marker };
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

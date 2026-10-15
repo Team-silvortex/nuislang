@@ -621,3 +621,18 @@ mod return_plain_tree;
 
 #[path = "native_application_bridge/return_plain_const.rs"]
 mod return_plain_const;
+
+#[path = "native_application_bridge/return_stateful_bool.rs"]
+mod return_stateful_bool;
+
+#[path = "native_application_bridge/return_stateful_fields.rs"]
+mod return_stateful_fields;
+
+#[path = "native_application_bridge/return_state_routing.rs"]
+mod return_state_routing;
+
+#[path = "native_application_bridge/state_join.rs"]
+mod state_join;
+
+#[path = "native_application_bridge/state_skip.rs"]
+mod state_skip;

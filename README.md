@@ -257,6 +257,18 @@ The [ordinary complete bool-return-tree follow-up](docs/reference/nuis-native-pl
 uses the same typed leaf proof for call, variable and literal returns, preserving complete exits and ancestor-private captures rather than requiring a logical leaf.
 The [ordinary bool const staging follow-up](docs/reference/nuis-native-plain-bool-const-staging-v1.md)
 admits fresh bool constants from literals, names, comparisons and calls through the same predicate proof, retaining seals and selected-only effects without admitting numeric constants.
+The [sealed-binding preflight repair](docs/reference/nuis-native-sealed-binding-preflight-v1.md)
+vetoes ordinary as well as logical writes to already sealed destinations before any selection plan is installed, without blocking read-only captures or unrelated mutable updates.
+The [state-dependent bool session proof](docs/reference/nuis-native-stateful-bool-sessions-v1.md)
+composes those existing primitives with real previous-State reads, five-event native sequences and repeated identical inputs whose results change with the latest accepted state.
+The [typed state reconstruction proof](docs/reference/nuis-native-stateful-field-reconstruction-v1.md)
+computes a new i64 count before its dependent bool result and retains an untouched f64 marker, including raw native signed-zero/subnormal/NaN payload checks without new field-write authority.
+The [state-derived branch selection proof](docs/reference/nuis-native-state-derived-branch-selection-v1.md)
+routes identical complete event arguments through different work after prior-state changes, separately checking state-aware poisoned arguments and selected failures across native/source-free sessions.
+The [stateful continuing branch join proof](docs/reference/nuis-native-stateful-branch-joins-v1.md)
+now lets selected private work update an explicitly mutable local, then rejoins a common effectful tail whose current value feeds reconstructed State, without widening entering-state write authority.
+The [stateful skipped-arm retention proof](docs/reference/nuis-native-stateful-skipped-arm-retention-v1.md)
+checks that one-sided private work preserves the actual local when skipped, including negative/zero/nonzero witnesses and common-tail computation through source-free delivery.
 Higher-arity live coverage and generalized resource transport,
 hidden ordinary leaves, more than one exit per arm and deeper exits remain separate; common
 guard/backend/effect authority is not widened.

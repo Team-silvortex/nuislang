@@ -1,0 +1,34 @@
+mod cpu Main {
+    struct State { result: bool, total: i64, marker: f64 }
+    @noinline fn advance(value: i64, proof: i64) -> i64 { print(5); return value + proof; }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(10); return value == (proof == 1); }
+    @noinline fn left(value: i64, proof: i64) -> i64 { print(20); return value + proof; }
+    @noinline fn finish(value: i64, proof: i64) -> i64 { print(35); return value + 3 * proof; }
+    @noinline fn answer_work(value: i64, previous: bool, proof: i64) -> bool {
+        print(40); return previous != ((value % 2 == 0) && (proof == 1));
+    }
+    fn update(value: i64, gate: bool, root: i64, work: i64, tail: i64) -> i64 {
+        let mut current = value;
+        if choose(gate, 1 / root) {
+            let local = left(current, 1 / work);
+            current = local + 2;
+        }
+        return finish(current, 1 / tail);
+    }
+    fn start(seed: i64, gate: bool, flag: bool, root: i64, work: i64,
+        tail: i64, answer: i64, marker: f64, advancing: i64) -> State {
+        let advanced = advance(seed, 1 / advancing);
+        let total = update(advanced, gate != flag, root, work, tail);
+        let result = answer_work(total, flag, 1 / answer);
+        return State { result: result, total: total, marker: marker };
+    }
+    fn step(state: State, seed: i64, gate: bool, flag: bool, root: i64, work: i64,
+        tail: i64, answer: i64, marker: f64, advancing: i64) -> State {
+        let advanced = advance(state.total, 1 / advancing);
+        let total = update(advanced, gate != state.result, root, work, tail);
+        let result = answer_work(total, state.result, 1 / answer);
+        return State { result: result, total: total, marker: state.marker };
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

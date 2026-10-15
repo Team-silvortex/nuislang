@@ -74,7 +74,7 @@ pub(super) fn outline(module: &mut NirModule, names: &mut BTreeSet<String>) -> B
                 else_body,
             } = &stmt
             {
-                let plan = if regions::writes_logical_constants(then_body, else_body, &constants) {
+                let plan = if regions::writes_constants(then_body, else_body, &constants) {
                     None
                 } else {
                     nested::prepare(condition, then_body, else_body, &scope, &signatures, &pure)

@@ -2,14 +2,27 @@ use super::*;
 use std::os::unix::process::ExitStatusExt;
 use yir_lower_llvm::native_session::{emit_registered_with_literal_prints, LiteralPrintPolicy};
 
+#[derive(Clone)]
 pub(super) struct Row {
     pub input: Vec<i64>,
     pub state: Vec<i64>,
     pub trace: Vec<i64>,
 }
 
+#[allow(dead_code)]
 pub(super) struct Failure {
     pub accepted: Row,
+    pub input: Vec<i64>,
+    pub before_failure: Vec<i64>,
+}
+
+pub(super) struct Sequence {
+    // The first row opens the session; subsequent rows are accepted events.
+    pub rows: Vec<Row>,
+}
+
+pub(super) struct SequenceFailure {
+    pub accepted: Sequence,
     pub input: Vec<i64>,
     pub before_failure: Vec<i64>,
 }
@@ -49,25 +62,30 @@ fn accepted(row: &Row) -> Vec<i64> {
 
 fn driver(
     bridge: &NativeSessionBridge,
-    rows: &[(Row, Row)],
-    failures: &[Failure],
+    rows: &[Sequence],
+    failures: &[SequenceFailure],
     observer: &str,
 ) -> String {
-    let state_width = rows[0].0.state.len();
+    let state_width = rows[0].rows[0].state.len();
     let input_width = rows
         .iter()
-        .flat_map(|(a, b)| [&a.input, &b.input])
-        .chain(failures.iter().flat_map(|f| [&f.accepted.input, &f.input]))
+        .flat_map(|sequence| sequence.rows.iter().map(|row| &row.input))
+        .chain(failures.iter().flat_map(|f| {
+            f.accepted
+                .rows
+                .iter()
+                .map(|row| &row.input)
+                .chain(std::iter::once(&f.input))
+        }))
         .map(Vec::len)
         .max()
         .unwrap()
         + state_width;
     assert!(rows
         .iter()
-        .all(|(a, b)| a.state.len() == state_width && b.state.len() == state_width));
-    assert!(failures
-        .iter()
-        .all(|f| f.accepted.state.len() == state_width));
+        .all(|s| !s.rows.is_empty() && s.rows.iter().all(|r| r.state.len() == state_width)));
+    assert!(failures.iter().all(|f| !f.accepted.rows.is_empty()
+        && f.accepted.rows.iter().all(|r| r.state.len() == state_width)));
     let mut llvm = bridge.llvm_ir.replacen(
         "define i64 @nuis_yir_entry()",
         "define i64 @unused_native_entry()",
@@ -88,26 +106,35 @@ fn driver(
     }
     llvm.push_str("  ]\nreject:\n  call void @llvm.trap()\n  unreachable\nhealthy:\n");
     let mut id = 0;
-    for (open, event) in rows {
-        callback(&mut llvm, bridge, &open.input, state_width, 0, id);
-        id += 1;
-        callback(&mut llvm, bridge, &event.input, state_width, 1, id);
-        id += 1;
+    for sequence in rows {
+        for (index, row) in sequence.rows.iter().enumerate() {
+            callback(
+                &mut llvm,
+                bridge,
+                &row.input,
+                state_width,
+                usize::from(index != 0),
+                id,
+            );
+            id += 1;
+        }
         callback(&mut llvm, bridge, &[], state_width, 2, id);
         id += 1;
     }
     llvm.push_str("  ret i64 0\n");
     for (i, failure) in failures.iter().enumerate() {
         llvm.push_str(&format!("bad{i}:\n"));
-        callback(
-            &mut llvm,
-            bridge,
-            &failure.accepted.input,
-            state_width,
-            0,
-            id,
-        );
-        id += 1;
+        for (index, row) in failure.accepted.rows.iter().enumerate() {
+            callback(
+                &mut llvm,
+                bridge,
+                &row.input,
+                state_width,
+                usize::from(index != 0),
+                id,
+            );
+            id += 1;
+        }
         llvm.push_str("  call void @word_print(i64 -70001)\n");
         callback(&mut llvm, bridge, &failure.input, state_width, 1, id);
         id += 1;
@@ -117,7 +144,33 @@ fn driver(
     llvm
 }
 
+#[allow(dead_code)]
 pub(super) fn check(source: &str, rows: &[(Row, Row)], failures: &[Failure], observer: &str) {
+    let sequences = rows
+        .iter()
+        .map(|(a, b)| Sequence {
+            rows: vec![a.clone(), b.clone()],
+        })
+        .collect::<Vec<_>>();
+    let failures = failures
+        .iter()
+        .map(|f| SequenceFailure {
+            accepted: Sequence {
+                rows: vec![f.accepted.clone()],
+            },
+            input: f.input.clone(),
+            before_failure: f.before_failure.clone(),
+        })
+        .collect::<Vec<_>>();
+    check_sequences(source, &sequences, &failures, observer);
+}
+
+pub(super) fn check_sequences(
+    source: &str,
+    rows: &[Sequence],
+    failures: &[SequenceFailure],
+    observer: &str,
+) {
     let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     for reversed in [false, true] {
@@ -159,11 +212,12 @@ pub(super) fn check(source: &str, rows: &[(Row, Row)], failures: &[Failure], obs
                     "{}",
                     String::from_utf8_lossy(&run.stderr)
                 );
-                for (open, event) in rows {
-                    expected.extend(accepted(open));
-                    expected.extend(accepted(event));
+                for sequence in rows {
+                    for row in &sequence.rows {
+                        expected.extend(accepted(row));
+                    }
                     expected.extend([0, 91]);
-                    expected.extend(&event.state);
+                    expected.extend(&sequence.rows.last().unwrap().state);
                     expected.push(92);
                 }
             } else {
@@ -173,7 +227,9 @@ pub(super) fn check(source: &str, rows: &[(Row, Row)], failures: &[Failure], obs
                     run.status
                 );
                 let failure = &failures[mode - 1];
-                expected.extend(accepted(&failure.accepted));
+                for row in &failure.accepted.rows {
+                    expected.extend(accepted(row));
+                }
                 expected.push(-70001);
                 expected.extend(&failure.before_failure);
             }

@@ -11,13 +11,13 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-update-logical-bounded-known-constant-write-preflight",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_regions.rs",
-        required_patterns: &["pub(super) fn writes_logical_constants", "if constants.is_empty()", "yes.len() + no.len() > 64",
+        required_patterns: &["pub(super) fn writes_constants", "if constants.is_empty()", "yes.len() + no.len() > 64",
             "while let Some(statement) = pending.pop()", "visited + pending.len() + then_body.len() + else_body.len() > 64"],
     },
     DevTensorDriftCheckSpec {
         id: "native-update-logical-parent-and-installed-constant-seals",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections.rs",
-        required_patterns: &["let mut constants = BTreeSet::new()", "regions::writes_logical_constants(then_body, else_body, &constants)",
+        required_patterns: &["let mut constants = BTreeSet::new()", "regions::writes_constants(then_body, else_body, &constants)",
             "constants.insert(name.clone())", ".is_some_and(|(_, constant)| *constant)", "scope.insert(name, ty)"],
     },
     DevTensorDriftCheckSpec {
@@ -27,7 +27,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "update_logical_effectful_scalar_selections_capture_preceding_bool_versions_before_publication",
             "update_logical_effectful_scalar_selections_reject_constants_hidden_roots_other_targets_and_late_errors_atomically",
             "update_logical_effectful_scalar_selections_keep_exact_owned_types_and_shared_bounded_proofs", "assert_eq!(names, before_names)",
-            "budget.logical_edges", "writes_logical_constants"],
+            "budget.logical_edges", "writes_constants"],
     },
     DevTensorDriftCheckSpec {
         id: "native-update-logical-transitive-yir-order-five-types-policy-and-checkpoint-vetoes",

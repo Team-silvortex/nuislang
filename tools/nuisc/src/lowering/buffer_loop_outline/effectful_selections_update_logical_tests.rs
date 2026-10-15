@@ -341,8 +341,8 @@ fn update_logical_effectful_scalar_selections_keep_exact_owned_types_and_shared_
         );
     }
     let sealed = BTreeSet::from(["saved".into()]);
-    assert!(writes_logical_constants(&[statement.clone()], &[], &sealed));
-    assert!(!writes_logical_constants(
+    assert!(writes_constants(&[statement.clone()], &[], &sealed));
+    assert!(!writes_constants(
         &[statement.clone()],
         &[],
         &BTreeSet::new()
@@ -355,6 +355,6 @@ fn update_logical_effectful_scalar_selections_keep_exact_owned_types_and_shared_
             else_body: Vec::new(),
         };
     }
-    assert!(writes_logical_constants(&[deep], &[], &sealed));
-    assert!(writes_logical_constants(&vec![statement; 65], &[], &sealed));
+    assert!(writes_constants(&[deep], &[], &sealed));
+    assert!(writes_constants(&vec![statement; 65], &[], &sealed));
 }

@@ -16,6 +16,10 @@ mod update_tests;
 #[path = "effectful_selections_plain_bool_const_tests.rs"]
 mod plain_const_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_sealed_binding_tests.rs"]
+mod sealed_binding_tests;
+
 pub(super) enum Statement {
     Scalar(NirStmt),
     Logical(NirStmt, predicates::Predicate),
@@ -153,7 +157,7 @@ pub(super) fn stage(
     })
 }
 
-pub(super) fn writes_logical_constants(
+pub(super) fn writes_constants(
     yes: &[NirStmt],
     no: &[NirStmt],
     constants: &BTreeSet<String>,
@@ -172,16 +176,8 @@ pub(super) fn writes_logical_constants(
     while let Some(statement) = pending.pop() {
         visited += 1;
         match statement {
-            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. }
-                if constants.contains(name)
-                    && matches!(
-                        value,
-                        NirExpr::Binary {
-                            op: NirBinaryOp::And | NirBinaryOp::Or,
-                            ..
-                        }
-                    ) =>
-            {
+            // A sealed destination stays sealed regardless of its RHS syntax.
+            NirStmt::Let { name, .. } | NirStmt::Const { name, .. } if constants.contains(name) => {
                 return true
             }
             NirStmt::If {

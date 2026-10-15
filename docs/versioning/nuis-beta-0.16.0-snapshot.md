@@ -274,6 +274,24 @@ leaves, lexical staging and shared original budgets without new write authority.
 The subsequent [ordinary bool const staging proof](../reference/nuis-native-plain-bool-const-staging-v1.md)
 admits fresh ordinary bool initializers through that same predicate proof,
 retaining exact types, lexical seals, selected effects and original budgets.
+The subsequent [sealed-binding preflight repair](../reference/nuis-native-sealed-binding-preflight-v1.md)
+rejects ordinary as well as logical writes to sealed outer destinations before
+planning, without blocking read-only captures or unrelated mutable updates.
+The subsequent [state-dependent bool session proof](../reference/nuis-native-stateful-bool-sessions-v1.md)
+consumes the latest accepted bool state in source computation, checks repeated
+inputs and selected failures, and reuses the native/source-free delivery chain.
+The subsequent [typed state reconstruction proof](../reference/nuis-native-stateful-field-reconstruction-v1.md)
+combines dependent i64/bool state computation with bit-preserved untouched f64
+transport, keeping raw native and decimal CLI coverage distinct.
+The subsequent [state-derived branch selection proof](../reference/nuis-native-state-derived-branch-selection-v1.md)
+uses prior bool/current count gates with identical complete event arguments,
+separate state-aware poisoned arguments and selected-failure/source-free checks.
+The subsequent [stateful continuing branch join proof](../reference/nuis-native-stateful-branch-joins-v1.md)
+joins selected mutable-local work into a common effectful tail and reconstructs
+owned State, retaining exact types, read-only entering fields and original bounds.
+The subsequent [stateful skipped-arm retention proof](../reference/nuis-native-stateful-skipped-arm-retention-v1.md)
+checks one-sided private work, retained negative/zero/nonzero locals and common
+tails without introducing writes to entering State.
 Higher-arity live coverage, hidden roots, more than one exit per arm, deeper exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of

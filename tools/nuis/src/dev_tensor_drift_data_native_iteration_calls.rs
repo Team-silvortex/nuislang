@@ -90,6 +90,24 @@ mod plain_tree;
 #[path = "dev_tensor_drift_data_native_plain_const.rs"]
 mod plain_const;
 
+#[path = "dev_tensor_drift_data_native_sealed_binding.rs"]
+mod sealed_binding;
+
+#[path = "dev_tensor_drift_data_native_stateful_bool.rs"]
+mod stateful_bool;
+
+#[path = "dev_tensor_drift_data_native_stateful_fields.rs"]
+mod stateful_fields;
+
+#[path = "dev_tensor_drift_data_native_state_routing.rs"]
+mod state_routing;
+
+#[path = "dev_tensor_drift_data_native_state_join.rs"]
+mod state_join;
+
+#[path = "dev_tensor_drift_data_native_state_skip.rs"]
+mod state_skip;
+
 #[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
 mod return_cross_float;
 
@@ -384,6 +402,12 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         plain_prefix::CHECKS,
         plain_tree::CHECKS,
         plain_const::CHECKS,
+        sealed_binding::CHECKS,
+        stateful_bool::CHECKS,
+        stateful_fields::CHECKS,
+        state_routing::CHECKS,
+        state_join::CHECKS,
+        state_skip::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,

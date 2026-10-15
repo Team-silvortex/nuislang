@@ -184,6 +184,18 @@ The [ordinary complete bool-return-tree follow-up](reference/nuis-native-plain-b
 removes the separate tree logical-leaf gate under existing type, effect, scope and budget checks, with selected-only native and source-free delivery evidence.
 The [ordinary bool const staging follow-up](reference/nuis-native-plain-bool-const-staging-v1.md)
 removes the staged bool initializer syntax gate while preserving fresh names, exact bool types, seals and source budgets; non-bool const admission remains separate.
+The [sealed-binding preflight repair](reference/nuis-native-sealed-binding-preflight-v1.md)
+checks the destination rather than RHS syntax, retaining bounded traversal, atomic vetoes, read-only constant captures and unrelated mutable updates.
+The [state-dependent bool session proof](reference/nuis-native-stateful-bool-sessions-v1.md)
+checks actual latest-State consumption, repeated-input result witnesses and failure-before-publication through the existing lowering and source-free delivery chain.
+The [typed state reconstruction proof](reference/nuis-native-stateful-field-reconstruction-v1.md)
+combines dependent i64/bool results with bit-exact untouched floating fields; source-free CLI coverage keeps its separate decimal-input scope.
+The [state-derived branch selection proof](reference/nuis-native-state-derived-branch-selection-v1.md)
+checks prior-bool/current-count control flow, identical complete event arguments and separate state-aware poisoned arguments through native and source-free sessions.
+The [stateful continuing branch join proof](reference/nuis-native-stateful-branch-joins-v1.md)
+checks selected local updates followed by a once-only common tail, current-value bool/State reconstruction and common-tail traps after either arm.
+The [stateful skipped-arm retention proof](reference/nuis-native-stateful-skipped-arm-retention-v1.md)
+checks omitted-else and empty-then forms, real retained values instead of inactive zeros, poisoned work arguments and last publication through native/source-free sessions.
 Higher-arity live coverage and generalized resource transport,
 other entering writes, more than one exit per arm and deeper exits
 remain separate.

@@ -675,3 +675,18 @@ mod return_plain_tree;
 
 #[path = "effect_call_return_plain_const.rs"]
 mod return_plain_const;
+
+#[path = "effect_call_return_stateful_bool.rs"]
+mod return_stateful_bool;
+
+#[path = "effect_call_return_stateful_fields.rs"]
+mod return_stateful_fields;
+
+#[path = "effect_call_return_state_routing.rs"]
+mod return_state_routing;
+
+#[path = "effect_call_state_join.rs"]
+mod state_join;
+
+#[path = "effect_call_state_skip.rs"]
+mod state_skip;

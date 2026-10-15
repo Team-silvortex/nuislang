@@ -472,3 +472,18 @@ mod return_plain_tree;
 
 #[path = "aot_application_effect_call_return_plain_const_tests.rs"]
 mod return_plain_const;
+
+#[path = "aot_application_effect_call_return_stateful_bool_tests.rs"]
+mod return_stateful_bool;
+
+#[path = "aot_application_effect_call_return_stateful_fields_tests.rs"]
+mod return_stateful_fields;
+
+#[path = "aot_application_effect_call_return_state_routing_tests.rs"]
+mod return_state_routing;
+
+#[path = "aot_application_effect_call_state_join_tests.rs"]
+mod state_join;
+
+#[path = "aot_application_effect_call_state_skip_tests.rs"]
+mod state_skip;

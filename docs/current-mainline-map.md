@@ -240,7 +240,19 @@ uses the existing bool/effect proof without a logical-return syntax gate and rep
 The [ordinary complete bool-return-tree follow-up](reference/nuis-native-plain-bool-return-trees-v1.md)
 also admits call/literal/name leaves through the existing complete-tree proof, without exporting ancestor-private locals or admitting partial returns.
 The [ordinary bool const staging follow-up](reference/nuis-native-plain-bool-const-staging-v1.md)
-admits fresh literal/name/comparison/call bool initializers through the same predicate proof, with staged seals, lexical scopes and shared budgets unchanged. Next audit the outer sealed-binding preflight with ordinary as well as logical RHS writes before extending state-dependent bool computation. Current fixtures transport the previous state but do not consume it in their business computation. Non-bool constants, arbitrary deeper field-arm exits and new write authority remain separate.
+admits fresh literal/name/comparison/call bool initializers through the same predicate proof, with staged seals, lexical scopes and shared budgets unchanged.
+The [sealed-binding preflight repair](reference/nuis-native-sealed-binding-preflight-v1.md)
+closes the ordinary-RHS bypass for already sealed outer destinations, including constants installed by an earlier selection. Exact 64/65-node traversal bounds, atomic vetoes, read-only captures and unrelated mutable updates remain checked.
+The [state-dependent bool session proof](reference/nuis-native-stateful-bool-sessions-v1.md)
+reads the latest State.result through existing read-only lowering, staged bool constants and complete return trees. Five-event native sequences and two bounded 40-event CLI sessions distinguish latest/stale/ignored state and repeated identical inputs, with failure before publication and source-free delivery checks.
+The [typed state reconstruction proof](reference/nuis-native-stateful-field-reconstruction-v1.md)
+computes a new count from State.total before the bool result consumes it, and reconstructs State with the untouched f64 marker. Native/reference checks preserve signed-zero, subnormal and NaN payload words; CLI checks finite decimal round trips separately.
+The [state-derived branch selection proof](reference/nuis-native-state-derived-branch-selection-v1.md)
+now makes prior bool state and current count select real work. Identical complete event arguments and state-aware poisoned arguments are separate checks, followed by selected traps before publication and fresh/cache/two source-free identities.
+The [stateful continuing branch join proof](reference/nuis-native-stateful-branch-joins-v1.md)
+advances that complete-return boundary: either arm updates one explicitly mutable scalar through private work, then a common effectful tail consumes its selected current value before bool/State reconstruction.
+The [stateful skipped-arm retention proof](reference/nuis-native-stateful-skipped-arm-retention-v1.md)
+now checks the one-sided form through existing retained-leaf lowering: skipped work preserves the actual current scalar, not its guard's neutral zero. Negative/zero/nonzero raw-state witnesses, both source polarities and source-free delivery pass. Next compose two sequential state-driven optional updates whose second work consumes the first current-or-retained value. Generalized in-place field/root writes, resource ownership, non-bool staged constants, arbitrary deeper exits and global immutability remain separate.
 Higher-arity live coverage and generalized resource transport, hidden
 ordinary leaves, more than one exit per arm and deeper exits remain separate, without widening
 common guard/backend or effect authority.
