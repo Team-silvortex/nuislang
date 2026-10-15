@@ -133,7 +133,6 @@ fn return_prefix_logical_effectful_scalar_selections_reject_outer_writes_mixed_e
         "if gate { const local: bool = saved || first; let local = first; return saved && decide(first); } else { return saved; }",
         "if gate { const local: i64 = 1; return saved && decide(first); } else { return saved; }",
         "if gate { let local = first; return saved && boolean(local); } else { return saved; }",
-        "if gate { let local = decide(saved) && first; return local; } else { return saved; }",
     ] { reject(body); }
     for mutation in [
         "missing",

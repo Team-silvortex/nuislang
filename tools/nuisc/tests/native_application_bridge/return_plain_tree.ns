@@ -1,0 +1,36 @@
+mod cpu Main {
+    struct State { result: bool }
+    @noinline fn choose(value: bool, proof: i64) -> bool { print(10); return value == (proof == 1); }
+    @noinline fn select(value: bool, proof: i64) -> bool { print(11); return value == (proof == 1); }
+    @noinline fn left(value: i64, proof: i64) -> i64 { print(20); return value + proof; }
+    @noinline fn right(value: i64, proof: i64) -> i64 { print(30); return value + proof - 1; }
+    @noinline fn unused(value: i64, proof: i64) -> i64 { print(31); return value + proof - 1; }
+    @noinline fn answer_work(value: i64, proof: i64) -> bool { print(40); return (value == 9) && (proof == 1); }
+    fn observe(seed: i64, gate: bool, first: bool, flag: bool, root: i64, yes: i64, no: i64,
+        yes_choice: i64, no_choice: i64, answer: i64, extra: i64) -> bool {
+        if choose(gate, 1 / root) {
+            let local = left(seed, 1 / yes);
+            const sealed: bool = flag || false;
+            if select(first, 1 / yes_choice) {
+                return answer_work(local, 1 / answer);
+            } else { return sealed; }
+        } else {
+            let local = right(seed, 1 / no);
+            if select(first, 1 / no_choice) {
+                let ignored = unused(local, 1 / extra);
+                return true;
+            } else { return false; }
+        }
+    }
+    fn start(seed: i64, gate: bool, first: bool, flag: bool, root: i64, yes: i64, no: i64,
+        yes_choice: i64, no_choice: i64, answer: i64, extra: i64) -> State {
+        let result = observe(seed, gate, first, flag, root, yes, no, yes_choice, no_choice, answer, extra);
+        return State { result: result };
+    }
+    fn step(state: State, seed: i64, gate: bool, first: bool, flag: bool, root: i64, yes: i64, no: i64,
+        yes_choice: i64, no_choice: i64, answer: i64, extra: i64) -> State {
+        return start(seed, gate, first, flag, root, yes, no, yes_choice, no_choice, answer, extra);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

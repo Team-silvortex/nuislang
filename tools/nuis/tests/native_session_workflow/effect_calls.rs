@@ -91,6 +91,12 @@ mod return_quad_tail_in_fields;
 #[path = "effect_call_return_quint_tail_in_fields.rs"]
 mod return_quint_tail_in_fields;
 
+#[path = "effect_call_return_paired_in_fields.rs"]
+mod return_paired_in_fields;
+
+#[path = "effect_call_return_typed_exit_prefix.rs"]
+mod return_typed_exit_prefix;
+
 #[path = "effect_call_return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 
@@ -664,3 +670,8 @@ fn native_nested_effectful_scalar_selections_trap_on_selected_predicates_or_argu
         rejected_before_open(run);
     }
 }
+#[path = "effect_call_return_plain_tree.rs"]
+mod return_plain_tree;
+
+#[path = "effect_call_return_plain_const.rs"]
+mod return_plain_const;

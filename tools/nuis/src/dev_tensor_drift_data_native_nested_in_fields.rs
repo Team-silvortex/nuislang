@@ -4,7 +4,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-nested-in-fields-shape",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_in_fields.rs",
-        required_patterns: &["fn continuing(body: &[NirStmt]) -> bool", "early_fields::preflight(body, &mut remaining, depth)?", "continuing(then_body) && continuing(else_body)", "_ => false", "else_body.is_empty() && continuing(before) && continuing(after)", "continuing(&prefix[index + 1..])", "(Some(split), None) if continuing(else_body)", "(None, Some(split)) if continuing(then_body)"],
+        required_patterns: &["fn continuing(body: &[NirStmt]) -> bool", "early_fields::preflight(body, &mut remaining, depth)?", "continuing(then_body) && continuing(else_body)", "_ => false", "else_body.is_empty() && continuing(prefix) && continuing(before) && continuing(after)", "continuing(&prefix[index + 1..])", "(Some(split), None) if continuing(else_body)", "(None, Some(split)) if continuing(then_body)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-nested-in-fields-transport",

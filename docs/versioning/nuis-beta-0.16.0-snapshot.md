@@ -254,8 +254,27 @@ adds f32 consumption of the newly updated i32 value under the same bounds,
 keeping raw field observations distinct from cancellation in final outcomes.
 The subsequent [certified five-child tail proof](../reference/nuis-native-certified-quint-tail-selections-v1.md)
 adds a peer-bool update from the current f32 value, with a final conjunction
-and private-module authorized-capacity checks. A second sibling-arm exit is next.
-Higher-arity live coverage, hidden roots, multiple field-arm exits and
+and private-module authorized-capacity checks. The paired-exit receipt follows
+that historical one-exit boundary.
+The subsequent [paired source-arm exits proof](../reference/nuis-native-paired-field-arm-exits-v1.md)
+adds one direct bool exit in each arm, preserving actual selected prefixes,
+the original field certificate and one common continuing tail.
+The subsequent [returning exit-prefix proof](../reference/nuis-native-returning-exit-prefixes-v1.md)
+adds exit-local owner work and certified child selections, with bounded CPU
+execution evidence at its historical two-child boundary.
+The subsequent [typed returning-prefix proof](../reference/nuis-native-typed-returning-prefixes-v1.md)
+executes asymmetric five-child prefixes, observes current typed words and verifies
+fresh/cache/two source-free delivery without adding field authority.
+The subsequent [ordinary bool-prefix proof](../reference/nuis-native-plain-bool-prefix-returns-v1.md)
+removes the prefix entry's logical-suffix syntax gate while retaining exact bool
+types, impure-call admission, original bounds and inherited field authority.
+The subsequent [ordinary complete bool-return-tree proof](../reference/nuis-native-plain-bool-return-trees-v1.md)
+removes the separate logical-leaf syntax gate, reusing complete returns, typed
+leaves, lexical staging and shared original budgets without new write authority.
+The subsequent [ordinary bool const staging proof](../reference/nuis-native-plain-bool-const-staging-v1.md)
+admits fresh ordinary bool initializers through that same predicate proof,
+retaining exact types, lexical seals, selected effects and original budgets.
+Higher-arity live coverage, hidden roots, more than one exit per arm, deeper exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of
 the committed baseline.

@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-ancestor-source-ordered-stage-child-current-scope-private-capture-subtraction-and-complete-discovery",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_trees.rs",
-        required_patterns: &["body.last()", "statements.split_last()", "prefixes::stage(prefix, scope, signatures, budget, depth)", "&staged.local", "inputs.extend(child.returned.inputs.difference(&staged.defined).cloned())", "calls.extend(child.returned.calls)", "SelectedValue::StagedNested(staged.statements, plan)", "logical_return: child.logical_return", "if depth >= 8"],
+        required_patterns: &["body.last()", "statements.split_last()", "prefixes::stage(prefix, scope, signatures, budget, depth)", "&staged.local", "inputs.extend(child.inputs.difference(&staged.defined).cloned())", "calls.extend(child.calls)", "SelectedValue::StagedNested(staged.statements, plan)", "if depth >= 8"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-ancestor-common-guarded-stage-before-child-installer-original-returns",

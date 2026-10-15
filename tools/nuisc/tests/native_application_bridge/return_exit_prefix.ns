@@ -1,0 +1,63 @@
+mod cpu Main {
+    struct State { result: bool }
+    @noinline fn choose(value: bool) -> bool { print(10); return value; }
+    @noinline fn select(value: bool, proof: i64) -> bool { print(11); return value == (proof == 1); }
+    @noinline fn small(value: i32) -> i32 { print(12); return i32_from_i64(-1) - value; }
+    @noinline fn toggle(value: bool) -> bool { print(13); return value != true; }
+    @noinline fn exit_condition(value: bool, proof: i64) -> bool { print(14); return value == (proof == 1); }
+    @noinline fn exit_owner(value: i64, proof: i64) -> i64 { print(20); return value + 2; }
+    @noinline fn inner_condition(value: bool, proof: i64) -> bool { print(21); return value == (proof == 1); }
+    @noinline fn exit_small(value: i32, proof: i64) -> i32 { print(22); return i32_from_i64(-1) - value; }
+    @noinline fn exit_flag(value: bool, proof: i64) -> bool { print(23); return value != true; }
+    @noinline fn tail_owner(value: i64, proof: i64) -> i64 { print(25); return value + 1; }
+    @noinline fn tail_work(value: i64, proof: i64) -> i64 { print(26); return value; }
+    @noinline fn answer_work(value: i64, small: i32, flag: bool, proof: i64) -> bool {
+        print(28); return (small < i32_from_i64(0)) && flag && (value == 9);
+    }
+    fn observe(seed: i64, pick: bool, take: bool, inner: bool, branch: i64, gate: i64,
+        work: i64, choice: i64, child: i64, answer: i64, tail: i64) -> bool {
+        if choose(true) {
+            let a = i32_from_i64(seed);
+            let d = false;
+            let local = seed;
+            if select(pick, 1 / branch) {
+                let a = small(a);
+                let d = toggle(d);
+                if exit_condition(take, 1 / gate) {
+                    let local = exit_owner(local, 1 / work);
+                    if inner_condition(inner, 1 / choice) {
+                        let a = exit_small(a, 1 / child);
+                        let d = exit_flag(d, 1 / child);
+                    }
+                    return answer_work(local, a, d, 1 / answer);
+                }
+                let local = tail_owner(local, 1 / tail);
+            } else {
+                let d = toggle(d);
+                let a = small(a);
+                if exit_condition(take, 1 / gate) {
+                    let local = exit_owner(local, 1 / work);
+                    if inner_condition(inner, 1 / choice) {
+                        let a = exit_small(a, 1 / child);
+                        let d = exit_flag(d, 1 / child);
+                    }
+                    return answer_work(local, a, d, 1 / answer);
+                }
+                let local = tail_owner(local, 1 / tail);
+            }
+            let finished = tail_work(local, 1 / tail);
+            return answer_work(local, a, d, 1 / answer) && true;
+        } else { return false; }
+    }
+    fn start(seed: i64, pick: bool, take: bool, inner: bool, branch: i64, gate: i64,
+        work: i64, choice: i64, child: i64, answer: i64, tail: i64) -> State {
+        let result = observe(seed, pick, take, inner, branch, gate, work, choice, child, answer, tail);
+        return State { result: result };
+    }
+    fn step(state: State, seed: i64, pick: bool, take: bool, inner: bool, branch: i64,
+        gate: i64, work: i64, choice: i64, child: i64, answer: i64, tail: i64) -> State {
+        return start(seed, pick, take, inner, branch, gate, work, choice, child, answer, tail);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

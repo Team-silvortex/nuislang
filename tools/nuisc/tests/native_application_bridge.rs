@@ -95,6 +95,15 @@ mod return_quad_tail_in_fields;
 #[path = "native_application_bridge/return_quint_tail_in_fields.rs"]
 mod return_quint_tail_in_fields;
 
+#[path = "native_application_bridge/return_paired_in_fields.rs"]
+mod return_paired_in_fields;
+
+#[path = "native_application_bridge/return_exit_prefix.rs"]
+mod return_exit_prefix;
+
+#[path = "native_application_bridge/return_typed_exit_prefix.rs"]
+mod return_typed_exit_prefix;
+
 #[path = "native_application_bridge/return_i32_ancestor.rs"]
 mod return_i32_ancestor;
 
@@ -607,3 +616,8 @@ fn native_bridge_rejects_signature_layout_lane_and_initialization_drift() {
     let error = emit_registered(&effectful.yir, "counter").unwrap_err();
     assert!(error.contains("does not admit cpu.print"), "{error}");
 }
+#[path = "native_application_bridge/return_plain_tree.rs"]
+mod return_plain_tree;
+
+#[path = "native_application_bridge/return_plain_const.rs"]
+mod return_plain_const;

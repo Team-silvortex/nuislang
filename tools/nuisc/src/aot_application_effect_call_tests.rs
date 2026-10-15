@@ -87,6 +87,15 @@ mod return_quad_tail_in_fields;
 #[path = "aot_application_effect_call_return_quint_tail_in_fields_tests.rs"]
 mod return_quint_tail_in_fields;
 
+#[path = "aot_application_effect_call_return_paired_in_fields_tests.rs"]
+mod return_paired_in_fields;
+
+#[path = "aot_application_effect_call_return_exit_prefix_tests.rs"]
+mod return_exit_prefix;
+
+#[path = "aot_application_effect_call_return_typed_exit_prefix_tests.rs"]
+mod return_typed_exit_prefix;
+
 #[path = "aot_application_effect_call_return_float_ancestor_tests.rs"]
 mod return_float_ancestor;
 
@@ -458,3 +467,8 @@ fn native_nested_effectful_scalar_selections_keep_policy_order_and_checkpoint_ve
     let error = emit_for_packaging_mode(&module, &mode).unwrap_err();
     assert!(error.contains("lacks dependency order"), "{error}");
 }
+#[path = "aot_application_effect_call_return_plain_tree_tests.rs"]
+mod return_plain_tree;
+
+#[path = "aot_application_effect_call_return_plain_const_tests.rs"]
+mod return_plain_const;

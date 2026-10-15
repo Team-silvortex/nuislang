@@ -228,9 +228,21 @@ executes f64/bool/i32 child updates under the same certificate and single tail. 
 The [certified four-child tail follow-up](reference/nuis-native-certified-quad-tail-selections-v1.md)
 executes f64/bool/i32/f32 current-value interaction without increasing captures or copying work. The five-child receipt follows that historical four-child boundary.
 The [certified five-child tail follow-up](reference/nuis-native-certified-quint-tail-selections-v1.md)
-executes f64/bool/i32/f32/bool interaction under the same certificate, with independent six-authorized-child capacity checks. Next prove a second explicit source bool exit in the sibling arm; six-child live coverage, resources and deeper/general exits remain separate.
+executes f64/bool/i32/f32/bool interaction under the same certificate, with independent six-authorized-child capacity checks. The paired-exit receipt follows this historical one-exit boundary.
+The [paired source-arm exits follow-up](reference/nuis-native-paired-field-arm-exits-v1.md)
+executes one direct bool source exit in each arm with current selected prefixes and one shared continuing tail. The returning-prefix receipt follows this historical direct-return boundary.
+The [returning exit-prefix follow-up](reference/nuis-native-returning-exit-prefixes-v1.md)
+allows bounded continuing work inside the selected exit's returning branch under the original certificate. The typed-prefix receipt follows that historical two-child execution boundary.
+The [typed returning-prefix follow-up](reference/nuis-native-typed-returning-prefixes-v1.md)
+executes asymmetric five-child prefixes with raw IEEE/current-field observations and fresh/cache/two source-free delivery. The ordinary-prefix receipt follows that historical logical-suffix boundary.
+The [ordinary bool-prefix return follow-up](reference/nuis-native-plain-bool-prefix-returns-v1.md)
+uses the existing bool/effect proof without a logical-return syntax gate and replays wrapped/plain typed fixtures.
+The [ordinary complete bool-return-tree follow-up](reference/nuis-native-plain-bool-return-trees-v1.md)
+also admits call/literal/name leaves through the existing complete-tree proof, without exporting ancestor-private locals or admitting partial returns.
+The [ordinary bool const staging follow-up](reference/nuis-native-plain-bool-const-staging-v1.md)
+admits fresh literal/name/comparison/call bool initializers through the same predicate proof, with staged seals, lexical scopes and shared budgets unchanged. Next audit the outer sealed-binding preflight with ordinary as well as logical RHS writes before extending state-dependent bool computation. Current fixtures transport the previous state but do not consume it in their business computation. Non-bool constants, arbitrary deeper field-arm exits and new write authority remain separate.
 Higher-arity live coverage and generalized resource transport, hidden
-ordinary leaves and multiple field-arm exits remain separate, without widening
+ordinary leaves, more than one exit per arm and deeper exits remain separate, without widening
 common guard/backend or effect authority.
 Broader typed selected-return CLI proof and generalized effect transport remain
 separate. General rebinding, resource work and child-scope

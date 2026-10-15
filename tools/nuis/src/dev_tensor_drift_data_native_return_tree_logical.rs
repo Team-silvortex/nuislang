@@ -9,7 +9,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-tree-shared-original-budgets-complete-leaves-subtree-reads-and-global-discovery",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_trees.rs",
-        required_patterns: &["nodes: 64", "expressions: 256", "logical_edges: 32", "if depth >= 8", "nested::consume_node(budget)", "predicates::prove(condition, scope, signatures, budget)", "prefixes::body(statements, scope, signatures, budget, depth)", "let plan = plan(condition, yes.returned, no.returned, scope)", "!tree.logical_return", "tree.returned.calls.iter().any", "inputs.extend(", ".chain(&no.returned.inputs)"],
+        required_patterns: &["nodes: 64", "expressions: 256", "logical_edges: 32", "if depth >= 8", "nested::consume_node(budget)", "predicates::prove(condition, scope, signatures, budget)", "prefixes::body(statements, scope, signatures, budget, depth)", "let plan = plan(condition, yes, no, scope)", "tree.calls.iter().any", "inputs.extend(yes.inputs.iter().chain(&no.inputs).cloned())"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-tree-guarded-installer-and-real-original-exit",

@@ -4,7 +4,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-in-fields-shape",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_in_fields.rs",
-        required_patterns: &["early_fields::preflight(body, &mut remaining, depth)?", "(Some(split), None) if continuing(else_body)", "(None, Some(split)) if continuing(then_body)", "[NirStmt::Return(Some(value))]", "else_body.is_empty() && continuing(before) && continuing(after)", "continuing(&prefix[index + 1..])"],
+        required_patterns: &["early_fields::preflight(body, &mut remaining, depth)?", "(Some(split), None) if continuing(else_body)", "(None, Some(split)) if continuing(then_body)", "let (value, prefix) = returned(then_body)?", "else_body.is_empty() && continuing(prefix) && continuing(before) && continuing(after)", "continuing(&prefix[index + 1..])"],
     },
     DevTensorDriftCheckSpec {
         id: "native-in-fields-control",

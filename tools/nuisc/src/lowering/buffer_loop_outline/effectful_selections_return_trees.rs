@@ -8,10 +8,9 @@ mod tests;
 #[path = "effectful_selections_return_ancestor_tests.rs"]
 mod ancestor_tests;
 
-struct Tree {
-    returned: ReturnedValue,
-    logical_return: bool,
-}
+#[cfg(test)]
+#[path = "effectful_selections_return_plain_tree_tests.rs"]
+mod plain_tests;
 
 pub(super) fn prepare(
     condition: &NirExpr,
@@ -34,10 +33,10 @@ pub(super) fn prepare(
     };
     let tree = branch(condition, yes, no, scope, signatures, &mut budget, 0)?;
     // Discovery belongs to the whole tree, not each independently pure child.
-    if !tree.logical_return || !tree.returned.calls.iter().any(|name| !pure.contains(name)) {
+    if !tree.calls.iter().any(|name| !pure.contains(name)) {
         return None;
     }
-    let SelectedValue::Nested(plan) = tree.returned.value else {
+    let SelectedValue::Nested(plan) = tree.value else {
         return None;
     };
     Some(*plan)
@@ -52,7 +51,7 @@ fn branch(
     signatures: &Signatures,
     budget: &mut nested::Budget,
     depth: usize,
-) -> Option<Tree> {
+) -> Option<ReturnedValue> {
     if depth >= 8 {
         return None;
     }
@@ -61,23 +60,13 @@ fn branch(
         predicates::prove(condition, scope, signatures, budget)?;
     let yes = body(yes, scope, signatures, budget, depth + 1)?;
     let no = body(no, scope, signatures, budget, depth + 1)?;
-    let logical_return = yes.logical_return || no.logical_return;
-    inputs.extend(
-        yes.returned
-            .inputs
-            .iter()
-            .chain(&no.returned.inputs)
-            .cloned(),
-    );
-    calls.extend(yes.returned.calls.iter().chain(&no.returned.calls).cloned());
-    let plan = plan(condition, yes.returned, no.returned, scope)?;
-    Some(Tree {
-        returned: ReturnedValue {
-            value: SelectedValue::Nested(Box::new(plan)),
-            inputs,
-            calls,
-        },
-        logical_return,
+    inputs.extend(yes.inputs.iter().chain(&no.inputs).cloned());
+    calls.extend(yes.calls.iter().chain(&no.calls).cloned());
+    let plan = plan(condition, yes, no, scope)?;
+    Some(ReturnedValue {
+        value: SelectedValue::Nested(Box::new(plan)),
+        inputs,
+        calls,
     })
 }
 
@@ -87,7 +76,7 @@ fn body(
     signatures: &Signatures,
     budget: &mut nested::Budget,
     depth: usize,
-) -> Option<Tree> {
+) -> Option<ReturnedValue> {
     if let Some((
         NirStmt::If {
             condition,
@@ -107,35 +96,22 @@ fn body(
             budget,
             depth,
         )?;
-        let SelectedValue::Nested(plan) = child.returned.value else {
+        let SelectedValue::Nested(plan) = child.value else {
             unreachable!()
         };
         let mut inputs = staged.inputs;
-        inputs.extend(child.returned.inputs.difference(&staged.defined).cloned());
+        inputs.extend(child.inputs.difference(&staged.defined).cloned());
         let mut calls = staged.calls;
-        calls.extend(child.returned.calls);
-        return Some(Tree {
-            returned: ReturnedValue {
-                value: if staged.statements.is_empty() {
-                    SelectedValue::Nested(plan)
-                } else {
-                    SelectedValue::StagedNested(staged.statements, plan)
-                },
-                inputs,
-                calls,
+        calls.extend(child.calls);
+        return Some(ReturnedValue {
+            value: if staged.statements.is_empty() {
+                SelectedValue::Nested(plan)
+            } else {
+                SelectedValue::StagedNested(staged.statements, plan)
             },
-            logical_return: child.logical_return,
+            inputs,
+            calls,
         });
     }
-    let logical_return = matches!(
-        statements.last(),
-        Some(NirStmt::Return(Some(NirExpr::Binary {
-            op: NirBinaryOp::And | NirBinaryOp::Or,
-            ..
-        })))
-    );
-    Some(Tree {
-        returned: prefixes::body(statements, scope, signatures, budget, depth)?,
-        logical_return,
-    })
+    prefixes::body(statements, scope, signatures, budget, depth)
 }

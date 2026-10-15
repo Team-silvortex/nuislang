@@ -32,7 +32,7 @@ fn driver(
     bridge: &NativeSessionBridge,
     cases: &[Case],
     failure: bool,
-    observation: Option<(&str, &str)>,
+    observations: &[(&str, &str)],
     open_words: fn(&Case) -> Vec<i64>,
 ) -> String {
     let state_width = cases[0].state_words().len();
@@ -57,7 +57,7 @@ fn driver(
     // Observe the actual compiled callee argument, not an oracle-manufactured
     // value. Source computations, private joins and real traps remain intact.
     llvm.insert_str(insertion, OWNER_PROBE);
-    if let Some((callee, observer)) = observation {
+    for &(callee, observer) in observations {
         let start = aggregate_values::definition(&llvm, callee);
         let insertion = start + llvm[start..].find("{\n").unwrap() + 2;
         llvm.insert_str(insertion, observer);
@@ -182,11 +182,23 @@ pub(super) fn check(
     });
 }
 
+#[allow(dead_code)]
 pub(super) fn check_with_open_words(
     source: &str,
     cases: &[Case],
     failure: bool,
     observation: Option<(&str, &str)>,
+    open_words: fn(&Case) -> Vec<i64>,
+) {
+    let observations = observation.into_iter().collect::<Vec<_>>();
+    check_with_observations(source, cases, failure, &observations, open_words);
+}
+
+pub(super) fn check_with_observations(
+    source: &str,
+    cases: &[Case],
+    failure: bool,
+    observations: &[(&str, &str)],
     open_words: fn(&Case) -> Vec<i64>,
 ) {
     let project = Project::with_source(source);
@@ -203,7 +215,7 @@ pub(super) fn check_with_open_words(
         .unwrap();
         let bridge =
             emit_registered_with_literal_prints(&module, "counter", &policy, 0, 100).unwrap();
-        let llvm = driver(&bridge, cases, failure, observation, open_words);
+        let llvm = driver(&bridge, cases, failure, observations, open_words);
         let artifact = nuisc::aot::write_and_link_with_source(
             &project.0.join("main.ns"),
             &project.0.join(format!("out-{reversed}")),

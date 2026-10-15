@@ -4,6 +4,10 @@ use super::*;
 #[path = "effectful_selections_return_prefix_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_plain_prefix_tests.rs"]
+mod plain_tests;
+
 #[path = "effectful_selections_return_updates.rs"]
 mod updates;
 
@@ -21,21 +25,12 @@ pub(super) fn prepare(
     signatures: &Signatures,
     pure: &BTreeSet<String>,
 ) -> Option<Plan> {
-    let (yes_value, yes_prefix) = returned(yes)?;
-    let (no_value, no_prefix) = returned(no)?;
-    if (yes_prefix.is_empty() && no_prefix.is_empty())
-        || ![yes_value, no_value].iter().any(|value| {
-            matches!(
-                value,
-                NirExpr::Binary {
-                    op: NirBinaryOp::And | NirBinaryOp::Or,
-                    ..
-                }
-            )
-        })
-    {
+    let (_, yes_prefix) = returned(yes)?;
+    let (_, no_prefix) = returned(no)?;
+    if yes_prefix.is_empty() && no_prefix.is_empty() {
         return None;
     }
+    // Type and effect admission below do not require logical return syntax.
     let mut budget = nested::Budget {
         nodes: 64,
         expressions: 256,

@@ -12,6 +12,10 @@ mod logical_tests;
 #[path = "effectful_selections_update_logical_tests.rs"]
 mod update_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_plain_bool_const_tests.rs"]
+mod plain_const_tests;
+
 pub(super) enum Statement {
     Scalar(NirStmt),
     Logical(NirStmt, predicates::Predicate),
@@ -95,13 +99,14 @@ pub(super) fn stage(
         }
         // Capture the RHS version before installing its LHS. Each caller proves
         // which outer writes may be published; private staged names never escape.
-        let (inferred, reads, effects, statement) = if matches!(
-            value,
-            NirExpr::Binary {
-                op: NirBinaryOp::And | NirBinaryOp::Or,
-                ..
-            }
-        ) {
+        let (inferred, reads, effects, statement) = if constant
+            || matches!(
+                value,
+                NirExpr::Binary {
+                    op: NirBinaryOp::And | NirBinaryOp::Or,
+                    ..
+                }
+            ) {
             // Inspect the complete RHS against the preceding binding version.
             // Const roots stay fresh; existing let roots must be owned bools.
             if (constant && local.contains_key(name))
@@ -117,9 +122,6 @@ pub(super) fn stage(
                 Statement::Logical(statement.clone(), predicate),
             )
         } else {
-            if constant {
-                return None;
-            }
             let (inferred, reads, effects) = nested::inspect(value, &local, signatures, budget)?;
             (
                 inferred,

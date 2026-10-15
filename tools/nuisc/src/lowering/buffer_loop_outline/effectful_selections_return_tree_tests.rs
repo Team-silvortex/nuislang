@@ -128,7 +128,6 @@ fn return_tree_logical_effectful_scalar_selections_reject_partial_mixed_inherite
         "if gate { if first { const local: bool = saved || first; let local = first; return saved && decide(first); } else { return saved; } } else { return saved; }",
         "if gate { if first { print(96); return saved && decide(first); } else { return saved; } } else { return saved; }",
         "if gate { if first { return saved && boolean(first); } else { return saved; } } else { return saved; }",
-        "if gate { if decide(first) { return saved; } else { return first; } } else { return false; }",
     ] {
         reject_module(parse_nuis_module(&source(body)).unwrap());
     }

@@ -24,7 +24,15 @@ pub(super) fn reject_module(mut module: NirModule) {
     let before = module.clone();
     let mut names: BTreeSet<_> = module.functions.iter().map(|f| f.name.clone()).collect();
     let before_names = names.clone();
-    assert!(outline(&mut module, &mut names).is_empty());
+    assert!(
+        outline(&mut module, &mut names).is_empty(),
+        "unexpected outline for {:?}",
+        before
+            .functions
+            .iter()
+            .find(|f| f.name == "observe")
+            .map(|f| &f.body)
+    );
     assert_eq!(module, before);
     assert_eq!(names, before_names);
 }
@@ -148,7 +156,6 @@ fn return_update_logical_effectful_scalar_selections_reject_incoming_sealed_nonb
     for body in [
         "if gate { let local = saved; if first { let local = decide(first); } if first { if saved { let local = first; } return local && first; } else { return local; } } else { return saved; }",
         "if gate { let local = saved; if first { let local = first; } return local && first; } else { return saved; }",
-        "if gate { let local = saved; if decide(first) { let local = first; } return local; } else { return saved; }",
     ] { reject_module(parse_nuis_module(&source(body)).unwrap()); }
     assert!(parse_nuis_module(&source("if gate { let local = saved; if first { let local = decide(first); } return local && first; } else { return local; }")).is_err());
     let original = parse_nuis_module(&source("if gate { let local = saved; if decide(first) { let local = local || first; } return local && first; } else { return saved; }")).unwrap();

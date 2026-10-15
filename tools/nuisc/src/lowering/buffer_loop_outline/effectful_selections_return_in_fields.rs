@@ -1,5 +1,11 @@
 use super::*;
 
+#[path = "effectful_selections_return_paired_in_fields.rs"]
+mod paired;
+
+#[path = "effectful_selections_return_exit_prefix.rs"]
+mod exit_prefix;
+
 #[cfg(test)]
 #[path = "effectful_selections_return_in_fields_tests.rs"]
 mod tests;
@@ -40,6 +46,18 @@ mod quad_tail_tests;
 #[path = "effectful_selections_return_quint_tail_in_fields_tests.rs"]
 mod quint_tail_tests;
 
+#[cfg(test)]
+#[path = "effectful_selections_return_paired_in_fields_tests.rs"]
+mod paired_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_exit_prefix_tests.rs"]
+mod exit_prefix_tests;
+
+#[cfg(test)]
+#[path = "effectful_selections_return_typed_exit_prefix_tests.rs"]
+mod typed_exit_prefix_tests;
+
 pub(super) fn candidate(body: &[NirStmt]) -> bool {
     body.iter().any(|s| {
         matches!(s, NirStmt::If { then_body, else_body, .. }
@@ -56,7 +74,7 @@ fn flat(body: &[NirStmt]) -> bool {
 
 fn continuing(body: &[NirStmt]) -> bool {
     // Whole-source preflight bounds recursion before this shape check. Nested
-    // selections may continue, but cannot grant a second source exit.
+    // selections may continue, but cannot grant additional source exits.
     body.iter().all(|statement| match statement {
         NirStmt::Let { .. } | NirStmt::Const { .. } => true,
         NirStmt::If {
@@ -72,6 +90,7 @@ struct Exit<'a> {
     before: &'a [NirStmt],
     after: &'a [NirStmt],
     condition: &'a NirExpr,
+    prefix: &'a [NirStmt],
     value: &'a NirExpr,
 }
 
@@ -88,17 +107,17 @@ fn exit(body: &[NirStmt]) -> Option<Exit<'_>> {
     else {
         return None;
     };
-    let [NirStmt::Return(Some(value))] = then_body.as_slice() else {
-        return None;
-    };
+    let (value, prefix) = returned(then_body)?;
     let before = &body[..index];
     let after = &body[index + 1..];
-    (else_body.is_empty() && continuing(before) && continuing(after)).then_some(Exit {
-        before,
-        after,
-        condition,
-        value,
-    })
+    (else_body.is_empty() && continuing(prefix) && continuing(before) && continuing(after))
+        .then_some(Exit {
+            before,
+            after,
+            condition,
+            prefix,
+            value,
+        })
 }
 
 pub(super) fn prove(
@@ -122,14 +141,29 @@ pub(super) fn prove(
     else {
         return None;
     };
+    if !flat(&prefix[..index]) || !continuing(&prefix[index + 1..]) {
+        return None;
+    }
     let (selected, split, other) = match (exit(then_body), exit(else_body)) {
+        (Some(yes), Some(no)) => {
+            return paired::prove(
+                body,
+                &prefix[..index],
+                condition,
+                yes,
+                no,
+                &prefix[index + 1..],
+                result,
+                scope,
+                signatures,
+                budget,
+                depth,
+            );
+        }
         (Some(split), None) if continuing(else_body) => (true, split, else_body.as_slice()),
         (None, Some(split)) if continuing(then_body) => (false, split, then_body.as_slice()),
         _ => return None,
     };
-    if !flat(&prefix[..index]) || !continuing(&prefix[index + 1..]) {
-        return None;
-    }
     let mut staged = stage(&prefix[..index], scope, signatures, budget, depth)?;
     // Removing a proved control-only exit is for write classification only.
     // Original work is subsequently proved/charged from its original slices.
@@ -209,9 +243,7 @@ pub(super) fn prove(
         selected: true,
         params,
     };
-    nested::consume_node(budget)?;
-    let (early, early_reads, early_calls) =
-        predicates::prove(split.value, &staged.local, signatures, budget)?;
+    let early = exit_prefix::prove(&split, &fields, &staged.local, signatures, budget, depth)?;
     let mut tail = stage_authorized(&[], &staged.local, signatures, budget, depth + 1, None)?;
     let (yes, no) = if selected {
         (split.after, &[][..])
@@ -243,7 +275,7 @@ pub(super) fn prove(
         .extend(value_reads.difference(&tail.defined).cloned());
     tail.calls.extend(value_calls);
     let all_reads = exit_reads
-        .union(&early_reads)
+        .union(&early.inputs)
         .cloned()
         .chain(tail.inputs.iter().cloned())
         .collect::<BTreeSet<_>>();
@@ -251,15 +283,11 @@ pub(super) fn prove(
         .inputs
         .extend(all_reads.difference(&staged.defined).cloned());
     staged.calls.extend(exit_calls);
-    staged.calls.extend(early_calls.iter().cloned());
+    staged.calls.extend(early.calls.iter().cloned());
     staged.calls.extend(tail.calls.iter().cloned());
     let plan = super::super::plan(
         condition,
-        ReturnedValue {
-            value: SelectedValue::Predicate(early),
-            inputs: early_reads,
-            calls: early_calls,
-        },
+        early,
         ReturnedValue {
             value: SelectedValue::StagedPredicate(tail.statements, value),
             inputs: tail.inputs,

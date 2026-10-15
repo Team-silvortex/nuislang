@@ -72,6 +72,24 @@ mod quad_tail_in_fields;
 #[path = "dev_tensor_drift_data_native_quint_tail_in_fields.rs"]
 mod quint_tail_in_fields;
 
+#[path = "dev_tensor_drift_data_native_paired_in_fields.rs"]
+mod paired_in_fields;
+
+#[path = "dev_tensor_drift_data_native_exit_prefix.rs"]
+mod exit_prefix;
+
+#[path = "dev_tensor_drift_data_native_typed_exit_prefix.rs"]
+mod typed_exit_prefix;
+
+#[path = "dev_tensor_drift_data_native_plain_prefix.rs"]
+mod plain_prefix;
+
+#[path = "dev_tensor_drift_data_native_plain_tree.rs"]
+mod plain_tree;
+
+#[path = "dev_tensor_drift_data_native_plain_const.rs"]
+mod plain_const;
+
 #[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
 mod return_cross_float;
 
@@ -360,6 +378,12 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         triple_tail_in_fields::CHECKS,
         quad_tail_in_fields::CHECKS,
         quint_tail_in_fields::CHECKS,
+        paired_in_fields::CHECKS,
+        exit_prefix::CHECKS,
+        typed_exit_prefix::CHECKS,
+        plain_prefix::CHECKS,
+        plain_tree::CHECKS,
+        plain_const::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,

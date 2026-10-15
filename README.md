@@ -245,8 +245,20 @@ The [certified four-child tail follow-up](docs/reference/nuis-native-certified-q
 adds a dependent f32 update from the newly updated i32 field, preserving raw IEEE words, empty leaves and the same input/certificate bounds.
 The [certified five-child tail follow-up](docs/reference/nuis-native-certified-quint-tail-selections-v1.md)
 adds a dependent peer-bool update from the new f32 value, with a final conjunction, independent authorized-capacity testing and unchanged captures.
+The [paired source-arm exits follow-up](docs/reference/nuis-native-paired-field-arm-exits-v1.md)
+supports one direct bool exit in each field arm, using selected current prefix fields and one shared continuing tail under the original certificate.
+The [returning exit-prefix follow-up](docs/reference/nuis-native-returning-exit-prefixes-v1.md)
+allows bounded continuing computation inside a selected exit before its bool return, reusing the same field certificate rather than discovering deeper exits.
+The [typed returning-prefix follow-up](docs/reference/nuis-native-typed-returning-prefixes-v1.md)
+executes asymmetric i32/f32/f64/two-bool prefixes with raw current-value observations, then verifies fresh/cache and two source-free restores without widening that authority.
+The [ordinary bool-prefix return follow-up](docs/reference/nuis-native-plain-bool-prefix-returns-v1.md)
+removes the logical-suffix syntax requirement from the bounded prefix entry, keeping the same bool/effect proof and replaying both plain and wrapped source variants.
+The [ordinary complete bool-return-tree follow-up](docs/reference/nuis-native-plain-bool-return-trees-v1.md)
+uses the same typed leaf proof for call, variable and literal returns, preserving complete exits and ancestor-private captures rather than requiring a logical leaf.
+The [ordinary bool const staging follow-up](docs/reference/nuis-native-plain-bool-const-staging-v1.md)
+admits fresh bool constants from literals, names, comparisons and calls through the same predicate proof, retaining seals and selected-only effects without admitting numeric constants.
 Higher-arity live coverage and generalized resource transport,
-hidden ordinary leaves and multiple field-arm exits remain separate; common
+hidden ordinary leaves, more than one exit per arm and deeper exits remain separate; common
 guard/backend/effect authority is not widened.
 Native fresh/cache/source-free runs check selection polarities, poisoned inactive
 paths and selected-stage traps without exporting child-private bindings.

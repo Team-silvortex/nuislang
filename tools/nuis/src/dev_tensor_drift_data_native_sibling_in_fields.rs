@@ -4,7 +4,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-sibling-in-fields-shape",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/effectful_selections_return_in_fields.rs",
-        required_patterns: &["early_fields::preflight(body, &mut remaining, depth)?", ".position(|s| !continuing(std::slice::from_ref(s)))?", "else_body.is_empty() && continuing(before) && continuing(after)", "continuing(then_body) && continuing(else_body)", "_ => false", "(Some(split), None) if continuing(else_body)", "(None, Some(split)) if continuing(then_body)", "continuing(&prefix[index + 1..])"],
+        required_patterns: &["early_fields::preflight(body, &mut remaining, depth)?", ".position(|s| !continuing(std::slice::from_ref(s)))?", "else_body.is_empty() && continuing(prefix) && continuing(before) && continuing(after)", "continuing(then_body) && continuing(else_body)", "_ => false", "(Some(split), None) if continuing(else_body)", "(None, Some(split)) if continuing(then_body)", "continuing(&prefix[index + 1..])"],
     },
     DevTensorDriftCheckSpec {
         id: "native-sibling-in-fields-transport",

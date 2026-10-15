@@ -149,7 +149,6 @@ fn return_ancestor_logical_effectful_scalar_selections_reject_entering_writes_cr
         "if gate { let local = decide(saved); if first { return local && first; } } else { return saved; }",
         "if gate { let local = decide(saved); if first { return local && first; } else { let saved = first; } } else { return saved; }",
         "if gate { let local = saved; if first { return local && first; } else { return saved; } } else { return saved; }",
-        "if gate { let local = decide(saved) && first; if first { return local; } else { return saved; } } else { return saved; }",
     ] { reject_module(parse_nuis_module(&source(body)).unwrap()); }
     let original = parse_nuis_module(&source("if gate { let local = decide(saved); if first { return local && first; } else { return saved; } } else { return saved; }")).unwrap();
     for mutation in [

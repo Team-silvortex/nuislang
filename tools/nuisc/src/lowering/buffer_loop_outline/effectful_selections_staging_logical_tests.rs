@@ -181,7 +181,6 @@ fn staging_logical_effectful_scalar_selections_reject_hidden_roots_existing_writ
         "let local = (first && decide(saved)) == true; let saved = work(saved);",
         "let local = boolean(first && decide(saved)); let saved = work(saved);",
         "let first = first && decide(saved); let saved = work(saved);",
-        "const local: bool = first; let saved = work(saved);",
         "const local: bool = first && decide(saved); let local = second; let saved = work(saved);",
         "const local: bool = first && decide(saved); if local { let saved = work(saved); } let local = second; let saved = work(saved);",
         "let local = first && decide(saved); if local { let local = second; } let saved = work(saved);",

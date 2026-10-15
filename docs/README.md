@@ -172,8 +172,20 @@ The [certified four-child tail follow-up](reference/nuis-native-certified-quad-t
 adds f32 consumption of the new i32 value, with an unmasked fourth-input witness and separate raw-field/predecessor evidence for earlier dependencies.
 The [certified five-child tail follow-up](reference/nuis-native-certified-quint-tail-selections-v1.md)
 closes the existing five-field dependency chain and distinguishes six authorized writes from entering-root violations without exposing certificate internals.
+The [paired source-arm exits follow-up](reference/nuis-native-paired-field-arm-exits-v1.md)
+adds one direct bool exit in each arm, preserving current selected prefix fields and a single continuing tail without field-record control flags.
+The [returning exit-prefix follow-up](reference/nuis-native-returning-exit-prefixes-v1.md)
+adds exit-local owner work and certified child selections before the bool return; native two-child execution and five-child structural proof are separate scopes.
+The [typed returning-prefix follow-up](reference/nuis-native-typed-returning-prefixes-v1.md)
+advances that historical structural boundary to five-child native execution, six independent current-value witnesses and eight verified delivery images.
+The [ordinary bool-prefix return follow-up](reference/nuis-native-plain-bool-prefix-returns-v1.md)
+admits plain call/literal/name returns through the existing bounded prefix proof; wrapped and plain typed fixtures are checked independently without new write authority.
+The [ordinary complete bool-return-tree follow-up](reference/nuis-native-plain-bool-return-trees-v1.md)
+removes the separate tree logical-leaf gate under existing type, effect, scope and budget checks, with selected-only native and source-free delivery evidence.
+The [ordinary bool const staging follow-up](reference/nuis-native-plain-bool-const-staging-v1.md)
+removes the staged bool initializer syntax gate while preserving fresh names, exact bool types, seals and source budgets; non-bool const admission remains separate.
 Higher-arity live coverage and generalized resource transport,
-other entering writes and multiple field-arm exits
+other entering writes, more than one exit per arm and deeper exits
 remain separate.
 
 The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
