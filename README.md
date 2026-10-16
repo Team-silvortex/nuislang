@@ -269,6 +269,16 @@ The [stateful continuing branch join proof](docs/reference/nuis-native-stateful-
 now lets selected private work update an explicitly mutable local, then rejoins a common effectful tail whose current value feeds reconstructed State, without widening entering-state write authority.
 The [stateful skipped-arm retention proof](docs/reference/nuis-native-stateful-skipped-arm-retention-v1.md)
 checks that one-sided private work preserves the actual local when skipped, including negative/zero/nonzero witnesses and common-tail computation through source-free delivery.
+The [stateful sequential optional update proof](docs/reference/nuis-native-stateful-sequential-updates-v1.md)
+checks a second predicate and real callee consuming the first current-or-retained value, all four execute/skip combinations and source-free delivery without expanding entering-State write authority.
+The [bounded per-event loop proof](docs/reference/nuis-native-stateful-bounded-loops-v1.md)
+checks runtime zero/one/three-trip current-value carries, selected pure work, explicit reservation budgets and source-free delivery. Iteration I/O/effects remain a separate admission boundary.
+The [literal-print iteration-effect proof](docs/reference/nuis-native-stateful-loop-effects-v1.md)
+adds an isolated capability-specific call catalog and real selected source prints, preserving pure-value discovery, explicit backend grants, current-value carries and failure-before-publication checks. General iteration I/O remains separate.
+The [direct loop-statement proof](docs/reference/nuis-native-stateful-loop-statements-v1.md)
+adds literal prints directly in selected loop bodies and print-only loops, with explicit effect authority, shared cumulative reservations and the same source-free artifact checks.
+The [effectful loop-exit proof](docs/reference/nuis-native-stateful-loop-exits-v1.md)
+checks real break/continue suffix suppression, observed leading/trailing indices and last-State publication through native and source-free sessions without adding a special lowering path.
 Higher-arity live coverage and generalized resource transport,
 hidden ordinary leaves, more than one exit per arm and deeper exits remain separate; common
 guard/backend/effect authority is not widened.

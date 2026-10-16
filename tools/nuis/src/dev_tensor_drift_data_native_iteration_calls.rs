@@ -1,5 +1,11 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_state_loop_exits.rs"]
+mod state_loop_exits;
+
+#[path = "dev_tensor_drift_data_native_state_loop_statements.rs"]
+mod state_loop_statements;
+
 #[path = "dev_tensor_drift_data_native_return_i32_i64.rs"]
 mod return_i32_i64;
 
@@ -107,6 +113,15 @@ mod state_join;
 
 #[path = "dev_tensor_drift_data_native_state_skip.rs"]
 mod state_skip;
+
+#[path = "dev_tensor_drift_data_native_state_sequence.rs"]
+mod state_sequence;
+
+#[path = "dev_tensor_drift_data_native_state_loop.rs"]
+mod state_loop;
+
+#[path = "dev_tensor_drift_data_native_state_loop_effects.rs"]
+mod state_loop_effects;
 
 #[path = "dev_tensor_drift_data_native_return_cross_float.rs"]
 mod return_cross_float;
@@ -408,6 +423,11 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         state_routing::CHECKS,
         state_join::CHECKS,
         state_skip::CHECKS,
+        state_sequence::CHECKS,
+        state_loop::CHECKS,
+        state_loop_effects::CHECKS,
+        state_loop_statements::CHECKS,
+        state_loop_exits::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,
@@ -460,9 +480,9 @@ const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-iteration-call-completed-closure",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
-            "collect_profile(module, layouts, Some(layouts), &ScalarHelpers::new())",
+            "collect_profile(\n        module,\n        layouts,\n        Some(layouts),\n        &ScalarHelpers::new(),\n        Profile::Pure,\n    )",
             "typed_call_type",
-            "validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts)",
+            "validate_body(\n            functions[name.as_str()],\n            &admitted,\n            layouts,\n            loop_layouts,\n            profile,\n        )",
             "contains_calls",
         ],
     },

@@ -11,6 +11,7 @@ pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
         || contains_loop(body)
         || scalar_helpers::contains_calls(body)
         || control_values::has_aggregate_expressions(body)
+        || validation::contains_print(body)
         || sequences::carry_names(body)
             .iter()
             .any(|name| scope.get(name).is_some_and(|ty| ty != &scalar_type("i64")))
@@ -54,6 +55,7 @@ pub(in crate::lowering::buffer_loop_outline) fn outline_iteration(
     guarded: &mut BTreeSet<String>,
     control_catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
     structs: &mut Vec<NirStructDef>,
     break_controls: &mut BTreeMap<String, String>,
     continuation: Option<&BTreeSet<String>>,
@@ -69,6 +71,7 @@ pub(in crate::lowering::buffer_loop_outline) fn outline_iteration(
             guarded,
             control_catalog,
             layouts,
+            literal_prints,
             structs,
             break_controls,
             return_signal,
@@ -86,9 +89,11 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
     guarded: &mut BTreeSet<String>,
     control_catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
     break_controls: &mut BTreeMap<String, String>,
     preserve_entry_flow: bool,
     return_signals: &BTreeMap<String, returns::Signal>,
+    selected: Option<&BTreeSet<String>>,
 ) {
     // Exit recovery introduces bindings outside the loop. Reserve future source
     // locals too, not just the values visible at the loop's entry.
@@ -98,6 +103,7 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
     }
     for function in &mut module.functions {
         if !control_catalog.contains_key(&function.name)
+            || selected.is_some_and(|selected| !selected.contains(&function.name))
             || (preserve_entry_flow && function.name == "main")
         {
             continue;
@@ -113,6 +119,7 @@ pub(in crate::lowering::buffer_loop_outline) fn outline(
             guarded,
             control_catalog,
             layouts,
+            literal_prints,
             structs: &mut module.structs,
             break_controls,
             return_signal: return_signals.get(&function.name),
@@ -127,6 +134,7 @@ struct Builder<'a> {
     guarded: &'a mut BTreeSet<String>,
     control_catalog: &'a ScalarHelpers,
     layouts: &'a control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
     structs: &'a mut Vec<NirStructDef>,
     break_controls: &'a mut BTreeMap<String, String>,
     return_signal: Option<&'a returns::Signal>,
@@ -217,7 +225,11 @@ impl Builder<'_> {
         mutations.writable.insert(induction.clone());
         let mut inputs = BTreeSet::new();
         let mut discovered = Vec::new();
-        let types = validation::EffectTypes::Values(self.control_catalog, self.layouts);
+        let types = validation::EffectTypes::Values(
+            self.control_catalog,
+            self.layouts,
+            self.literal_prints,
+        );
         validate_effects(
             std::slice::from_ref(&step),
             &mut scope.clone(),

@@ -20,6 +20,7 @@ pub(super) fn validate(
     induction: &str,
     catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
 ) -> Option<()> {
     let mut locals = Locals {
         scope: scope.clone(),
@@ -34,7 +35,15 @@ pub(super) fn validate(
             .collect(),
         available: BTreeSet::from([induction.to_owned()]),
     };
-    block(body, &mut locals, updates, catalog, layouts, 0)
+    block(
+        body,
+        &mut locals,
+        updates,
+        catalog,
+        layouts,
+        literal_prints,
+        0,
+    )
 }
 
 fn block(
@@ -43,10 +52,13 @@ fn block(
     updates: &BTreeSet<String>,
     catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
     depth: usize,
 ) -> Option<()> {
     for stmt in body {
         match stmt {
+            NirStmt::Print(NirExpr::Int(_))
+                if literal_prints == validation::LiteralPrints::Allow => {}
             NirStmt::Let { name, ty, value } => {
                 let existing = locals.scope.get(name);
                 let own = existing.map(|_| name.as_str());
@@ -90,6 +102,7 @@ fn block(
                     updates,
                     catalog,
                     layouts,
+                    literal_prints,
                     depth + 1,
                 )?;
                 block(
@@ -98,6 +111,7 @@ fn block(
                     updates,
                     catalog,
                     layouts,
+                    literal_prints,
                     depth + 1,
                 )?;
                 // Only bindings that exist before the branch survive its join.
@@ -111,7 +125,16 @@ fn block(
                 );
             }
             NirStmt::While { condition, body } if depth < 32 => {
-                literal_loops::validate(condition, body, locals, updates, catalog, layouts, depth)?;
+                literal_loops::validate(
+                    condition,
+                    body,
+                    locals,
+                    updates,
+                    catalog,
+                    layouts,
+                    literal_prints,
+                    depth,
+                )?;
             }
             _ => return None,
         }

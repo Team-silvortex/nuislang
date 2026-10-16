@@ -143,7 +143,7 @@ pub(super) fn outline_effects(
                             break_controls,
                         );
                     }
-                    validation::EffectTypes::Values(catalog, layouts) => {
+                    validation::EffectTypes::Values(catalog, layouts, literal_prints) => {
                         let after = reads.as_mut().and_then(|reads| reads.after(position));
                         let boundary = control_loops::outline_iteration(
                             &condition,
@@ -154,6 +154,7 @@ pub(super) fn outline_effects(
                             guarded,
                             catalog,
                             layouts,
+                            literal_prints,
                             structs,
                             break_controls,
                             after.as_ref(),

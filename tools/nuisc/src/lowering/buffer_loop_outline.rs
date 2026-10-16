@@ -23,6 +23,8 @@ mod control_loops;
 mod control_values;
 #[path = "buffer_loop_outline/effectful_selections.rs"]
 mod effectful_selections;
+#[path = "buffer_loop_outline/iteration_effects.rs"]
+mod iteration_effects;
 #[path = "buffer_loop_outline/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]
@@ -186,12 +188,14 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
             );
         }
     }
+    let iteration_effects = iteration_effects::Plan::collect(module, &layouts, &control_catalog);
     for function in &mut module.functions {
         // Value admission excludes Buffer effects. A tail-step break may match
         // both shape parsers, but only one outliner may rewrite its source body.
-        if control_catalog
-            .get(&function.name)
-            .is_some_and(|helper| helper.may_loop)
+        if iteration_effects.contains(&function.name)
+            || control_catalog
+                .get(&function.name)
+                .is_some_and(|helper| helper.may_loop)
         {
             continue;
         }
@@ -219,9 +223,11 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &mut outlined.guarded_functions,
         &control_catalog,
         &layouts,
+        validation::LiteralPrints::Reject,
         &mut outlined.break_controls,
         preserve_entry_flow,
         &return_signals,
+        None,
     );
     let value_layouts = control_values::TypedLayouts::collect(module);
     scalar_control::outline(
@@ -233,6 +239,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &value_catalog,
         &value_layouts,
     );
+    iteration_effects.outline(module, &layouts, &mut names, &mut helpers, &mut outlined);
     let generated_helpers = helpers
         .iter()
         .map(|f| f.name.clone())

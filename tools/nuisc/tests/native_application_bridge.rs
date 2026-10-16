@@ -636,3 +636,18 @@ mod state_join;
 
 #[path = "native_application_bridge/state_skip.rs"]
 mod state_skip;
+
+#[path = "native_application_bridge/state_sequence.rs"]
+mod state_sequence;
+
+#[path = "native_application_bridge/state_loop.rs"]
+mod state_loop;
+
+#[path = "native_application_bridge/state_loop_effects.rs"]
+mod state_loop_effects;
+
+#[path = "native_application_bridge/state_loop_statements.rs"]
+mod state_loop_statements;
+
+#[path = "native_application_bridge/state_loop_exits.rs"]
+mod state_loop_exits;

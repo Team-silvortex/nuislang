@@ -27,7 +27,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries.rs",
         required_patterns: &[
             "NirStmt::While { condition, body } if depth < 32",
-            "literal_loops::validate(condition, body, locals, updates, catalog, layouts, depth)",
+            "literal_loops::validate(\n                    condition,\n                    body,\n                    locals,\n                    updates,\n                    catalog,\n                    layouts,\n                    literal_prints,\n                    depth,\n                )",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -53,7 +53,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-literal-loop-branch-outlining",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/branches.rs",
         required_patterns: &[
-            "validation::EffectTypes::Values(catalog, layouts)",
+            "validation::EffectTypes::Values(catalog, layouts, literal_prints)",
             "control_loops::outline_iteration(",
             "validation::EffectTypes::Buffer(catalog)",
         ],

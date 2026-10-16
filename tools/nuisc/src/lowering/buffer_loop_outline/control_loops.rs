@@ -70,10 +70,18 @@ pub(super) fn validate(
     loop_bindings: &BTreeSet<String>,
     catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
 ) -> Option<()> {
     let iteration = induction::parse(condition, body)?;
     if !iteration.leading || nested::present(body, scope) {
-        return sequences::validate(&iteration, scope, loop_bindings, catalog, layouts);
+        return sequences::validate(
+            &iteration,
+            scope,
+            loop_bindings,
+            catalog,
+            layouts,
+            literal_prints,
+        );
     }
     let prepared = &iteration.prepared;
     let tail = iteration.effects;

@@ -196,6 +196,16 @@ The [stateful continuing branch join proof](reference/nuis-native-stateful-branc
 checks selected local updates followed by a once-only common tail, current-value bool/State reconstruction and common-tail traps after either arm.
 The [stateful skipped-arm retention proof](reference/nuis-native-stateful-skipped-arm-retention-v1.md)
 checks omitted-else and empty-then forms, real retained values instead of inactive zeros, poisoned work arguments and last publication through native/source-free sessions.
+The [stateful sequential optional update proof](reference/nuis-native-stateful-sequential-updates-v1.md)
+checks current-version handoff into both the second predicate and actual callee, using a generic multi-callee probe with single-observer/paired-row compatibility replay.
+The [bounded per-event loop proof](reference/nuis-native-stateful-bounded-loops-v1.md)
+checks actual iteration arguments and current-value carries over zero/one/three runtime trips, budget preflight and source-free delivery without widening pure-helper admission.
+The [literal-print iteration-effect proof](reference/nuis-native-stateful-loop-effects-v1.md)
+adds real condition/selected-prefix/work prints through a separate call profile, with exact backend permissions, dependency order and unchanged pure-value discovery.
+The [direct loop-statement proof](reference/nuis-native-stateful-loop-statements-v1.md)
+adds actual print-only and state-carrying loop statements under explicit authority, with shared-budget failure prefixes and source-free delivery.
+The [effectful loop-exit proof](reference/nuis-native-stateful-loop-exits-v1.md)
+composes break/continue with actual prints and recovered indices through the same scoped lowering and native/source-free session boundaries.
 Higher-arity live coverage and generalized resource transport,
 other entering writes, more than one exit per arm and deeper exits
 remain separate.

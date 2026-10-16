@@ -6,7 +6,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
             "while let Some(name) = ready.pop_first()",
-            "validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts)",
+            "validate_body(\n            functions[name.as_str()],\n            &admitted,\n            layouts,\n            loop_layouts,\n            profile,\n        )",
             "candidates.remove(&name)",
             "if *count == 0",
             "&control_values::CarryLayouts::new(),",

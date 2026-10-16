@@ -142,6 +142,9 @@ task-card lineage, selected ready task card and drift are clean.
 
 ## Next Boundary
 
+The following [stateful sequential optional update proof](nuis-native-stateful-sequential-updates-v1.md)
+advances that boundary; the paragraph below retains this receipt's original task.
+
 This session has one optional update before the common tail. Next compose two
 sequential state-driven optional updates on the same owned local: the second
 work must consume the first current-or-retained value, not rediscover its

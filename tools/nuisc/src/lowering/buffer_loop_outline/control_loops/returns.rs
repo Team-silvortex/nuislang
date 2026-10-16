@@ -139,7 +139,7 @@ fn rewrite(
     })
 }
 
-fn contains_loop_return(body: &[NirStmt]) -> bool {
+pub(in crate::lowering::buffer_loop_outline) fn contains_loop_return(body: &[NirStmt]) -> bool {
     let mut pending = vec![(body, false)];
     while let Some((body, in_loop)) = pending.pop() {
         for stmt in body {

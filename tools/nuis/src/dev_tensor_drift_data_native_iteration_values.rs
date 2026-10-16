@@ -20,7 +20,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "enum EffectTypes",
             "EffectTypes::Buffer(catalog)",
-            "Self::Values(catalog, layouts)",
+            "Self::Values(catalog, layouts, _)",
             "control_values::value_type(value, scope, catalog, layouts)",
             "control_values::collect_inputs(value, inputs)",
         ],

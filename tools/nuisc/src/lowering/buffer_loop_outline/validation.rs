@@ -1,17 +1,46 @@
 use super::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum LiteralPrints {
+    Reject,
+    Allow,
+}
+
+pub(super) fn contains_print(body: &[NirStmt]) -> bool {
+    let mut pending = body.iter().collect::<Vec<_>>();
+    while let Some(stmt) = pending.pop() {
+        match stmt {
+            NirStmt::Print(_) => return true,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                pending.extend(then_body.iter().chain(else_body));
+            }
+            NirStmt::While { body, .. } => pending.extend(body),
+            _ => {}
+        }
+    }
+    false
+}
+
 // Share scoped outlining without granting Buffer effects to pure-value loops.
 #[derive(Clone, Copy)]
 pub(super) enum EffectTypes<'a> {
     Buffer(&'a ScalarHelpers),
-    Values(&'a ScalarHelpers, &'a control_values::CarryLayouts),
+    Values(
+        &'a ScalarHelpers,
+        &'a control_values::CarryLayouts,
+        LiteralPrints,
+    ),
 }
 
 impl<'a> EffectTypes<'a> {
     pub(super) fn layouts(self) -> Option<&'a control_values::CarryLayouts> {
         match self {
             Self::Buffer(_) => None,
-            Self::Values(_, layouts) => Some(layouts),
+            Self::Values(_, layouts, _) => Some(layouts),
         }
     }
 
@@ -23,7 +52,7 @@ impl<'a> EffectTypes<'a> {
     ) -> Option<NirTypeRef> {
         match self {
             Self::Buffer(catalog) => scalar_expr(value, scope, inputs, true, catalog),
-            Self::Values(catalog, layouts) => {
+            Self::Values(catalog, layouts, _) => {
                 let ty = control_values::value_type(value, scope, catalog, layouts)?;
                 control_values::collect_inputs(value, inputs);
                 Some(ty)
@@ -160,7 +189,7 @@ pub(super) fn validate_effects(
                 if let Some(existing) = locals.get(name) {
                     let supported = match types {
                         EffectTypes::Buffer(_) => inferred == scalar_type("i64"),
-                        EffectTypes::Values(_, layouts) => {
+                        EffectTypes::Values(_, layouts, _) => {
                             control_values::supported_type(&inferred, layouts)
                         }
                     };
@@ -175,6 +204,8 @@ pub(super) fn validate_effects(
                 }
                 locals.insert(name.clone(), inferred);
             }
+            NirStmt::Print(NirExpr::Int(_))
+                if matches!(types, EffectTypes::Values(_, _, LiteralPrints::Allow)) => {}
             NirStmt::Expr(NirExpr::StoreAt {
                 buffer,
                 index,

@@ -487,3 +487,18 @@ mod state_join;
 
 #[path = "aot_application_effect_call_state_skip_tests.rs"]
 mod state_skip;
+
+#[path = "aot_application_effect_call_state_sequence_tests.rs"]
+mod state_sequence;
+
+#[path = "aot_application_effect_call_state_loop_tests.rs"]
+mod state_loop;
+
+#[path = "aot_application_effect_call_state_loop_effects_tests.rs"]
+mod state_loop_effects;
+
+#[path = "aot_application_effect_call_state_loop_statements_tests.rs"]
+mod state_loop_statements;
+
+#[path = "aot_application_effect_call_state_loop_exits_tests.rs"]
+mod state_loop_exits;

@@ -7,6 +7,7 @@ pub(super) fn validate(
     updates: &BTreeSet<String>,
     catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
     depth: usize,
 ) -> Option<()> {
     let iteration = induction::parse(condition, body)?;
@@ -48,6 +49,7 @@ pub(super) fn validate(
         &child_updates,
         catalog,
         layouts,
+        literal_prints,
         depth + 1,
     )?;
     // Zero trips retain initialized entry values; child-local declarations never

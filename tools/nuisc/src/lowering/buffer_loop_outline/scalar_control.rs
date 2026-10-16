@@ -97,6 +97,8 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                 // Preserve the loop as a control boundary. Its admitted update
                 // changes existing value bindings, not the lexical type scope.
                 NirStmt::While { .. } => output.push(stmt),
+                // Only the separate iteration-effect profile admits these.
+                NirStmt::Print(NirExpr::Int(_)) => output.push(stmt),
                 NirStmt::If {
                     condition,
                     mut then_body,
@@ -309,6 +311,7 @@ fn collect_inputs(body: &[NirStmt], inputs: &mut BTreeSet<String>) {
             // Loop outlining keeps exits inside the driver boundary. They
             // carry no expression inputs, but may occur in a scalar branch.
             NirStmt::Break | NirStmt::Continue => {}
+            NirStmt::Print(NirExpr::Int(_)) => {}
             _ => unreachable!("normalized scalar body"),
         }
     }

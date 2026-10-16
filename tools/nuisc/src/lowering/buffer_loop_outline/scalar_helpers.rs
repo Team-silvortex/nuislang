@@ -4,11 +4,17 @@ use super::*;
 pub(super) struct ScalarHelper {
     params: Vec<NirTypeRef>,
     result: NirTypeRef,
-    dependencies: BTreeSet<String>,
+    pub(super) dependencies: BTreeSet<String>,
     pub(super) may_loop: bool,
 }
 
 pub(super) type ScalarHelpers = BTreeMap<String, ScalarHelper>;
+
+#[derive(Clone, Copy)]
+enum Profile {
+    Pure,
+    IterationLiteralPrints,
+}
 
 pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
     collect_profile(
@@ -16,6 +22,7 @@ pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
         &control_values::CarryLayouts::new(),
         None,
         &ScalarHelpers::new(),
+        Profile::Pure,
     )
 }
 
@@ -23,7 +30,28 @@ pub(super) fn collect_with_layouts(
     module: &NirModule,
     layouts: &control_values::CarryLayouts,
 ) -> ScalarHelpers {
-    collect_profile(module, layouts, Some(layouts), &ScalarHelpers::new())
+    collect_profile(
+        module,
+        layouts,
+        Some(layouts),
+        &ScalarHelpers::new(),
+        Profile::Pure,
+    )
+}
+
+// Shape/type admission only for the isolated iteration-effect outliner. This
+// table must never seed pure values, captures or speculative selection catalogs.
+pub(super) fn collect_iteration_calls(
+    module: &NirModule,
+    layouts: &control_values::CarryLayouts,
+) -> ScalarHelpers {
+    collect_profile(
+        module,
+        layouts,
+        Some(layouts),
+        &ScalarHelpers::new(),
+        Profile::IterationLiteralPrints,
+    )
 }
 
 pub(super) fn collect_typed_values(
@@ -32,7 +60,7 @@ pub(super) fn collect_typed_values(
     loop_catalog: &ScalarHelpers,
 ) -> ScalarHelpers {
     // Reuse proven loop helpers as dependencies, but admit no new loop bodies.
-    collect_profile(module, layouts, None, loop_catalog)
+    collect_profile(module, layouts, None, loop_catalog, Profile::Pure)
 }
 
 pub(super) fn collect_capture_values(
@@ -40,7 +68,7 @@ pub(super) fn collect_capture_values(
     layouts: &impl control_values::ValueLayouts,
 ) -> ScalarHelpers {
     // Completed pure-value calls, without provisional or loop-body authority.
-    collect_profile(module, layouts, None, &ScalarHelpers::new())
+    collect_profile(module, layouts, None, &ScalarHelpers::new(), Profile::Pure)
 }
 
 pub(super) fn control_roots(
@@ -88,6 +116,7 @@ fn collect_profile(
     layouts: &impl control_values::ValueLayouts,
     loop_layouts: Option<&control_values::CarryLayouts>,
     seeded: &ScalarHelpers,
+    profile: Profile,
 ) -> ScalarHelpers {
     let functions = module
         .functions
@@ -159,7 +188,15 @@ fn collect_profile(
     }
     let mut admitted = seeded.clone();
     while let Some(name) = ready.pop_first() {
-        if validate_body(functions[name.as_str()], &admitted, layouts, loop_layouts).is_none() {
+        if validate_body(
+            functions[name.as_str()],
+            &admitted,
+            layouts,
+            loop_layouts,
+            profile,
+        )
+        .is_none()
+        {
             continue;
         }
         let mut helper = candidates.remove(&name).expect("ready helper");
@@ -184,6 +221,7 @@ fn validate_body(
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
     loop_layouts: Option<&control_values::CarryLayouts>,
+    profile: Profile,
 ) -> Option<()> {
     let normalized = if let Some(loop_layouts) = loop_layouts {
         control_loops::returns::normalize(function, loop_layouts)?
@@ -203,6 +241,7 @@ fn validate_body(
         catalog,
         layouts,
         loop_layouts,
+        profile,
     )?
     .then_some(())
 }
@@ -226,6 +265,7 @@ pub(super) fn validate_control_body(
         catalog,
         layouts,
         Some(layouts),
+        Profile::Pure,
     )?
     .then_some(())
 }
@@ -239,6 +279,7 @@ fn validate_block(
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
     loop_layouts: Option<&control_values::CarryLayouts>,
+    profile: Profile,
 ) -> Option<bool> {
     let mut returned = false;
     for stmt in body {
@@ -291,6 +332,7 @@ fn validate_block(
                         catalog,
                         layouts,
                         loop_layouts,
+                        profile,
                     )
                 };
                 let then_returns = validate_arm(then_body)?;
@@ -305,6 +347,10 @@ fn validate_block(
                     loop_bindings,
                     catalog,
                     loop_layouts?,
+                    match profile {
+                        Profile::Pure => validation::LiteralPrints::Reject,
+                        Profile::IterationLiteralPrints => validation::LiteralPrints::Allow,
+                    },
                 )?;
             }
             NirStmt::Return(Some(value)) => {
@@ -313,6 +359,8 @@ fn validate_block(
                 }
                 returned = true;
             }
+            NirStmt::Print(NirExpr::Int(_))
+                if matches!(profile, Profile::IterationLiteralPrints) => {}
             _ => return None,
         }
     }

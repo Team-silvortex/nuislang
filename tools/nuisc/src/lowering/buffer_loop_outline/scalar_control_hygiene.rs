@@ -66,6 +66,7 @@ fn rename_block(
                 }
                 NirStmt::Return(Some(value)) | NirStmt::Expr(value) => rename_expr(value, &visible),
                 NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => {}
+                NirStmt::Print(NirExpr::Int(_)) => {}
                 _ => unreachable!("admitted normalized scalar body"),
             }
         }

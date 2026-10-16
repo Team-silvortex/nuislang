@@ -119,7 +119,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "mod private_event_budget",
             "project_for_source_with_limit(source, 100)",
             "helper_entry_limit: u64",
-            "literal_print_packaging_mode(\"counter\", sites, 0, helper_entry_limit)",
+            "project_for_source_with_limits(source, 0, helper_entry_limit)",
             "Explicit test grants do not change production source discovery or policy",
         ],
     },

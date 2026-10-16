@@ -216,6 +216,14 @@ fn project_for_source(source: &str) -> (Project, String) {
 }
 
 fn project_for_source_with_limit(source: &str, helper_entry_limit: u64) -> (Project, String) {
+    project_for_source_with_limits(source, 0, helper_entry_limit)
+}
+
+fn project_for_source_with_limits(
+    source: &str,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) -> (Project, String) {
     let project = Project::new(source);
     let manifest = project.0.join("nuis.toml");
     let text = fs::read_to_string(&manifest).unwrap().replace(
@@ -231,7 +239,8 @@ fn project_for_source_with_limit(source: &str, helper_entry_limit: u64) -> (Proj
         .filter(|node| matches!(node.op.instruction.as_str(), "print" | "guard_print"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let mode = literal_print_packaging_mode("counter", sites, 0, helper_entry_limit).unwrap();
+    let mode = literal_print_packaging_mode("counter", sites, loop_work_limit, helper_entry_limit)
+        .unwrap();
     fs::write(manifest, format!("{text}packaging_mode = \"{mode}\"\n")).unwrap();
     (project, mode)
 }
@@ -690,3 +699,12 @@ mod state_join;
 
 #[path = "effect_call_state_skip.rs"]
 mod state_skip;
+
+#[path = "effect_call_state_sequence.rs"]
+mod state_sequence;
+
+#[path = "effect_call_state_loop.rs"]
+mod state_loop;
+
+#[path = "effect_call_state_loop_exits.rs"]
+mod state_loop_exits;

@@ -292,6 +292,17 @@ owned State, retaining exact types, read-only entering fields and original bound
 The subsequent [stateful skipped-arm retention proof](../reference/nuis-native-stateful-skipped-arm-retention-v1.md)
 checks one-sided private work, retained negative/zero/nonzero locals and common
 tails without introducing writes to entering State.
+The subsequent [stateful sequential optional update proof](../reference/nuis-native-stateful-sequential-updates-v1.md)
+checks current values feeding a later predicate/callee and all four optional-work
+combinations, retaining original scalar authority and source budgets.
+The subsequent [bounded per-event loop proof](../reference/nuis-native-stateful-bounded-loops-v1.md)
+checks runtime current-value carries through selected pure work, explicit loop/helper budgets and source-free delivery. Iteration effects remain separate; pure admission is not widened.
+The subsequent [literal-print iteration-effect proof](../reference/nuis-native-stateful-loop-effects-v1.md)
+adds a separate bounded source-call profile, actual selected source effects, exact backend grants and dependency-order checks. It does not grant ordinary pure-value or general I/O authority.
+The subsequent [direct loop-statement proof](../reference/nuis-native-stateful-loop-statements-v1.md)
+adds explicit literal-effect admission in selected and print-only loops, shared cumulative reservations, last-publication checks and source-free artifact delivery without widening pure discovery.
+The subsequent [effectful loop-exit proof](../reference/nuis-native-stateful-loop-exits-v1.md)
+checks break/continue suffix suppression, actual recovered indices and selected failures through existing scoped lowering, native execution and source-free delivery. It does not grant return-in-loop effect authority.
 Higher-arity live coverage, hidden roots, more than one exit per arm, deeper exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of

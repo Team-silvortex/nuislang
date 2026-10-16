@@ -252,7 +252,17 @@ now makes prior bool state and current count select real work. Identical complet
 The [stateful continuing branch join proof](reference/nuis-native-stateful-branch-joins-v1.md)
 advances that complete-return boundary: either arm updates one explicitly mutable scalar through private work, then a common effectful tail consumes its selected current value before bool/State reconstruction.
 The [stateful skipped-arm retention proof](reference/nuis-native-stateful-skipped-arm-retention-v1.md)
-now checks the one-sided form through existing retained-leaf lowering: skipped work preserves the actual current scalar, not its guard's neutral zero. Negative/zero/nonzero raw-state witnesses, both source polarities and source-free delivery pass. Next compose two sequential state-driven optional updates whose second work consumes the first current-or-retained value. Generalized in-place field/root writes, resource ownership, non-bool staged constants, arbitrary deeper exits and global immutability remain separate.
+now checks the one-sided form through existing retained-leaf lowering: skipped work preserves the actual current scalar, not its guard's neutral zero. Negative/zero/nonzero raw-state witnesses, both source polarities and source-free delivery pass.
+The [stateful sequential optional update proof](reference/nuis-native-stateful-sequential-updates-v1.md)
+now makes the first selected/retained local feed both the second predicate and actual selected callee. All four execute/skip combinations and failure-before-publication/source-free checks pass; the generic probe supports multiple observed callees without production dispatch.
+The [bounded per-event loop proof](reference/nuis-native-stateful-bounded-loops-v1.md)
+checks dynamic zero/one/three-trip carries through selected pure work and actual per-iteration callee arguments, with explicit per-callback reservations, later-iteration traps and sixteen delivery images.
+The [literal-print iteration-effect proof](reference/nuis-native-stateful-loop-effects-v1.md)
+now preserves real condition/selected-prefix/work effects through an isolated typed call profile and explicit backend grants. The pure directory remains unchanged.
+The [direct loop-statement proof](reference/nuis-native-stateful-loop-statements-v1.md)
+now adds literal prints directly to selected loop bodies, including loops with no business carry. Two dynamic loops share callback-local reservations; the second is rejected before its first statement if the first consumed the budget.
+The [effectful loop-exit proof](reference/nuis-native-stateful-loop-exits-v1.md)
+checks actual break/continue suffix suppression, recovered leading/trailing indices, selected traps and source-free State handoff using the existing lowering path. Next compose child-loop exits under a continuing parent with shared reservations. General I/O, entering-State writes, resources, arbitrary deeper exits and global immutability remain separate.
 Higher-arity live coverage and generalized resource transport, hidden
 ordinary leaves, more than one exit per arm and deeper exits remain separate, without widening
 common guard/backend or effect authority.

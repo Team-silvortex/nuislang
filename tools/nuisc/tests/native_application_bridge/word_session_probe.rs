@@ -64,7 +64,7 @@ fn driver(
     bridge: &NativeSessionBridge,
     rows: &[Sequence],
     failures: &[SequenceFailure],
-    observer: &str,
+    observers: &[(&str, &str)],
 ) -> String {
     let state_width = rows[0].rows[0].state.len();
     let input_width = rows
@@ -91,10 +91,12 @@ fn driver(
         "define i64 @unused_native_entry()",
         1,
     );
-    let start = aggregate_values::definition(&llvm, "answer_work");
-    let at = start + llvm[start..].find("{\n").unwrap() + 2;
     // Observe real callee arguments without replacing any source computation.
-    llvm.insert_str(at, observer);
+    for (callee, observer) in observers {
+        let start = aggregate_values::definition(&llvm, callee);
+        let at = start + llvm[start..].find("{\n").unwrap() + 2;
+        llvm.insert_str(at, observer);
+    }
     llvm = llvm.replace("call void @nuis_debug_print_i64(", "call void @word_print(");
     if !llvm.contains("declare i32 @fflush(") {
         llvm.push_str("\ndeclare i32 @fflush(ptr)\n");
@@ -171,6 +173,26 @@ pub(super) fn check_sequences(
     failures: &[SequenceFailure],
     observer: &str,
 ) {
+    check_sequences_observed(source, rows, failures, &[("answer_work", observer)]);
+}
+
+pub(super) fn check_sequences_observed(
+    source: &str,
+    rows: &[Sequence],
+    failures: &[SequenceFailure],
+    observers: &[(&str, &str)],
+) {
+    check_sequences_with_limits(source, rows, failures, observers, 0, 100);
+}
+
+pub(super) fn check_sequences_with_limits(
+    source: &str,
+    rows: &[Sequence],
+    failures: &[SequenceFailure],
+    observers: &[(&str, &str)],
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) {
     let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     for reversed in [false, true] {
@@ -183,9 +205,17 @@ pub(super) fn check_sequences(
                 .map(|n| n.name.clone()),
         )
         .unwrap();
-        let bridge =
-            emit_registered_with_literal_prints(&module, "counter", &policy, 0, 100).unwrap();
-        let llvm = driver(&bridge, rows, failures, observer);
+        let bridge = emit_registered_with_literal_prints(
+            &module,
+            "counter",
+            &policy,
+            loop_work_limit,
+            helper_entry_limit,
+        )
+        .unwrap();
+        assert_eq!(bridge.loop_work_limit, loop_work_limit);
+        assert_eq!(bridge.helper_entry_limit, helper_entry_limit);
+        let llvm = driver(&bridge, rows, failures, observers);
         assert!(!llvm.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1("));
         assert!(!llvm.contains("call void @nuis_scheduler_owned_aggregate_drop_v1("));
         let artifact = nuisc::aot::write_and_link_with_source(

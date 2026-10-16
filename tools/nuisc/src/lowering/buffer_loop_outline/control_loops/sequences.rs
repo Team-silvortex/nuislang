@@ -34,6 +34,7 @@ pub(super) fn validate(
     loop_bindings: &BTreeSet<String>,
     catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
 ) -> Option<()> {
     let prepared = &iteration.prepared;
     // Reuse the strict single-step admission, including exact i64 and local
@@ -54,7 +55,9 @@ pub(super) fn validate(
         .filter(|name| scope.contains_key(name))
         .collect::<BTreeSet<_>>();
     let has_exits = control_flow::contains_exit(iteration.effects, false);
-    if (!has_temporaries && updates.is_empty() && !has_exits)
+    let has_prints = validation::contains_print(effects);
+    let print_work = has_prints && literal_prints == validation::LiteralPrints::Allow;
+    if (!has_temporaries && updates.is_empty() && !has_exits && !print_work)
         || updates.contains(&prepared.binding_name)
     {
         return None;
@@ -80,6 +83,7 @@ pub(super) fn validate(
         || speculation::block_has_checked_arithmetic(effects, &BTreeSet::new())
         || scalar_helpers::contains_calls(effects)
         || control_values::has_aggregate_expressions(effects)
+        || has_prints
     {
         return temporaries::validate(
             effects,
@@ -89,6 +93,7 @@ pub(super) fn validate(
             &prepared.binding_name,
             catalog,
             layouts,
+            literal_prints,
         );
     }
     validate_block(
