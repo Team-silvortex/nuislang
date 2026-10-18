@@ -3,6 +3,10 @@ use super::*;
 #[path = "literal_loops.rs"]
 mod literal_loops;
 
+#[cfg(test)]
+#[path = "word_temporaries_tests.rs"]
+mod word_tests;
+
 // This source profile uses scoped functions, not captured loop-metadata RHSs.
 // Keep definite initialization separate from the set of returned loop carries.
 #[derive(Clone)]
@@ -169,6 +173,23 @@ fn expression(
                 == scalar_type("i32"))
             .then(|| scalar_type("i64"))
         }
+        NirExpr::PackF32Word(_)
+        | NirExpr::UnpackF32Word(_)
+        | NirExpr::PackF64Word(_)
+        | NirExpr::UnpackF64Word(_) => {
+            let (inner, source, target) = match value {
+                NirExpr::PackF32Word(inner) => (inner, "f32", "i64"),
+                NirExpr::UnpackF32Word(inner) => (inner, "i64", "f32"),
+                NirExpr::PackF64Word(inner) => (inner, "f64", "i64"),
+                NirExpr::UnpackF64Word(inner) => (inner, "i64", "f64"),
+                _ => unreachable!(),
+            };
+            // Conversions retain source-order read readiness, including a
+            // binding's permitted self-read, rather than rechecking only type.
+            (expression(inner, locals, updates, own, catalog, layouts, depth + 1)?
+                == scalar_type(source))
+            .then(|| scalar_type(target))
+        }
         NirExpr::Var(name) => {
             if updates.contains(name) && !locals.available.contains(name) && own != Some(name) {
                 return None;
@@ -222,6 +243,7 @@ fn expression(
                 return None;
             }
             match op {
+                NirBinaryOp::Xor if left == scalar_type("i64") => Some(left),
                 NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
                     if left == scalar_type("f32") || left == scalar_type("f64") =>
                 {

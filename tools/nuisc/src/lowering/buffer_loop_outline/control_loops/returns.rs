@@ -30,8 +30,8 @@ pub(in crate::lowering::buffer_loop_outline) fn prepare(
         return Some(None);
     }
     catalog.get(&function.name)?;
-    let mut plan =
-        coalesced(function, layouts, catalog).or_else(|| rewrite(function, layouts, None))?;
+    let mut plan = coalesced(function, layouts, catalog)
+        .or_else(|| rewrite(function, layouts, None, validation::LiteralPrints::Reject))?;
     // A rejected outer rewrite must not discard the established inner-only
     // optimization. Each of these two bounded attempts starts from the same plan.
     for nested in [true, false] {
@@ -78,7 +78,33 @@ pub(in crate::lowering::buffer_loop_outline) fn normalize(
     if !contains_loop_return(&function.body) {
         return Some(None);
     }
-    rewrite(function, layouts, None).map(|plan| Some(plan.body))
+    rewrite(function, layouts, None, validation::LiteralPrints::Reject).map(|plan| Some(plan.body))
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn normalize_effects(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+) -> Option<Option<Vec<NirStmt>>> {
+    if !contains_loop_return(&function.body) {
+        return Some(None);
+    }
+    rewrite(function, layouts, None, validation::LiteralPrints::Allow).map(|plan| Some(plan.body))
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn prepare_effects(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+) -> Option<Option<Prepared>> {
+    if !contains_loop_return(&function.body) {
+        return Some(None);
+    }
+    catalog.get(&function.name)?;
+    // Keep independent storage: pure snapshot/coalescing optimizations have not
+    // proven that they preserve effect prefixes on every selected exit.
+    let plan = rewrite(function, layouts, None, validation::LiteralPrints::Allow)?;
+    scalar_helpers::validate_iteration_body(function, &plan.body, catalog, layouts)?;
+    Some(Some(plan))
 }
 
 #[cfg(test)]
@@ -99,7 +125,12 @@ fn coalesced(
     // particularly by granting a return expression an assignment's self-read.
     catalog.get(&function.name)?;
     let storage = storage::candidate(function, layouts, catalog)?;
-    let plan = rewrite(function, layouts, Some(storage))?;
+    let plan = rewrite(
+        function,
+        layouts,
+        Some(storage),
+        validation::LiteralPrints::Reject,
+    )?;
     scalar_helpers::validate_control_body(function, &plan.body, catalog, layouts)?;
     Some(plan)
 }
@@ -108,6 +139,7 @@ fn rewrite(
     function: &NirFunction,
     layouts: &control_values::CarryLayouts,
     storage: Option<String>,
+    literal_prints: validation::LiteralPrints,
 ) -> Option<Prepared> {
     let result = function.return_type.as_ref()?;
     if !control_values::supported_type(result, layouts) {
@@ -115,7 +147,7 @@ fn rewrite(
     }
     let mut names = function.params.iter().map(|p| p.name.clone()).collect();
     branches::collect_bindings(&function.body, &mut names);
-    reserve_references(&function.body, &mut names)?;
+    reserve_references(&function.body, &mut names, literal_prints)?;
     let independent = storage.is_none();
     let state = State {
         flag: branches::fresh_name("__nuis_return_pending", &mut names),
@@ -161,7 +193,11 @@ pub(in crate::lowering::buffer_loop_outline) fn contains_loop_return(body: &[Nir
     false
 }
 
-fn reserve_references(body: &[NirStmt], names: &mut BTreeSet<String>) -> Option<()> {
+fn reserve_references(
+    body: &[NirStmt],
+    names: &mut BTreeSet<String>,
+    literal_prints: validation::LiteralPrints,
+) -> Option<()> {
     // Never turn a malformed NIR free reference into an initialized private local.
     // This runs before value admission, so unsupported expressions fail closed.
     let mut blocks = vec![body];
@@ -185,6 +221,8 @@ fn reserve_references(body: &[NirStmt], names: &mut BTreeSet<String>) -> Option<
                     blocks.push(body);
                 }
                 NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => {}
+                NirStmt::Print(NirExpr::Int(_))
+                    if literal_prints == validation::LiteralPrints::Allow => {}
                 _ => return None,
             }
         }

@@ -1,5 +1,10 @@
 # Native Stateful Effectful Loop Exits V1
 
+Historical return-in-loop exclusions below describe this checkpoint. The later
+[effectful loop-return receipt](nuis-native-stateful-loop-returns-v1.md)
+advances that boundary through explicit literal-print typed transport and
+native/source-free proof, not general I/O or pure-function reclassification.
+
 This receipt advances the
 [direct loop-statement checkpoint](nuis-native-stateful-loop-statements-v1.md).
 The Git baseline remains beta-0.17.1, commit 99ebfcb2. It is a bounded CPU
@@ -157,6 +162,10 @@ remain clean with the same ready selected task card. Bounded acceptance does
 not mark the coordinate complete.
 
 ## Next Boundary
+
+The [child-local follow-up](nuis-native-stateful-loop-children-v1.md) now supplies
+this nested composition proof. The counts and baseline above remain this
+single-loop checkpoint's historical acceptance.
 
 Compose effectful child loops with their own break/continue under a continuing
 parent: child exits must stay local, recovered child indices must feed actual

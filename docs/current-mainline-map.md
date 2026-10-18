@@ -262,7 +262,19 @@ now preserves real condition/selected-prefix/work effects through an isolated ty
 The [direct loop-statement proof](reference/nuis-native-stateful-loop-statements-v1.md)
 now adds literal prints directly to selected loop bodies, including loops with no business carry. Two dynamic loops share callback-local reservations; the second is rejected before its first statement if the first consumed the budget.
 The [effectful loop-exit proof](reference/nuis-native-stateful-loop-exits-v1.md)
-checks actual break/continue suffix suppression, recovered leading/trailing indices, selected traps and source-free State handoff using the existing lowering path. Next compose child-loop exits under a continuing parent with shared reservations. General I/O, entering-State writes, resources, arbitrary deeper exits and global immutability remain separate.
+checks actual break/continue suffix suppression, recovered leading/trailing indices, selected traps and source-free State handoff using the existing lowering path.
+The [child-local loop-exit proof](reference/nuis-native-stateful-loop-children-v1.md)
+checks child break/continue isolation, actual recovered indices feeding parent work and later-child reservation failure after a completed parent suffix.
+The [selected-child invocation proof](reference/nuis-native-stateful-loop-selection-v1.md)
+checks current-State-derived child selection, inactive zero-divisor/oversized bounds, demand-only shared reservations and sixteen fresh/cache/two source-free delivery images. The following receipt advances its parent-exit boundary.
+The [parent-local loop-exit proof](reference/nuis-native-stateful-loop-parents-v1.md)
+checks completed child work before a leading parent break/continue, actual recovered parent indices, poisoned suffix suppression, later reached child reservations and source-free identity.
+The [effectful loop-return proof](reference/nuis-native-stateful-loop-returns-v1.md)
+replaces the blanket exclusion with explicit completed-profile admission, independent typed payload/signal transport and real nested returns. Selected payload failures retain completed effects without publishing State; entered full bounds and sixteen source-free images pass.
+The [typed loop-return follow-up](reference/nuis-native-stateful-loop-return-values-v1.md)
+repairs exact ordered word-operation admission and executes bool/f32/f64/mixed-record payloads through actual prior State, false/zero exit controls, raw NaN words and thirty-two source-free images.
+The [selected typed loop-return follow-up](reference/nuis-native-stateful-loop-return-selected-v1.md)
+now composes these returns with current-State-derived child selection, real fallible extent calls, inactive division-overflow controls, late parent progress and thirty-two further delivery images. Next check trailing-parent step placement and source-return timing. Independent return storage remains the baseline; effectful coalescing, general I/O, entering-State writes, resources and global immutability remain separate.
 Higher-arity live coverage and generalized resource transport, hidden
 ordinary leaves, more than one exit per arm and deeper exits remain separate, without widening
 common guard/backend or effect authority.

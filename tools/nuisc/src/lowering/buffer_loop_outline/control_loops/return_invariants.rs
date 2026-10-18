@@ -70,7 +70,7 @@ pub(super) fn rewrite(
     names.extend(scope.keys().cloned());
     names.extend(layouts.keys().cloned());
     branches::collect_bindings(body, &mut names);
-    reserve_references(body, &mut names)?;
+    reserve_references(body, &mut names, validation::LiteralPrints::Reject)?;
     Pass {
         signal,
         layouts: layouts.clone(),

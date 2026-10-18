@@ -1,0 +1,136 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-source-commits-child-work-before-parent-exit",
+        path: "tools/nuisc/tests/native_application_bridge/state_loop_parents.ns",
+        required_patterns: &[
+            "return value + 3 * child + 7 * outer",
+            "current = checkpoint(current, index, outer)",
+            "let settled = current % 2 == 0",
+            "if gate { print(25); break; }",
+            "print(26);",
+            "combine(current, index, outer, 1 / (outer - suffix))",
+            "return observe(current, outer)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-independent-source-control-and-reservations",
+        path: "tools/nuisc/tests/native_application_bridge/state_loop_parents_cases.rs",
+        required_patterns: &[
+            "current += 3 * index + 7 * outer",
+            "if self.input.gate ^ self.prior()",
+            "trace.push(25)",
+            "trace.push(26)",
+            "Decide after suffix arithmetic: earlier valid work may change selection",
+            "pub fn parent_sequence",
+            "pub const LOOP_LIMIT: u64 = 9",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-manual-indices-and-distinct-scope-authority",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects_parents_tests.rs",
+        required_patterns: &[
+            "iteration_effects_parents_admit_scoped_child_and_parent_exits_without_pure_leakage",
+            "iteration_effects_parents_manual_witnesses_observe_committed_child_and_recovered_parent",
+            "iteration_effects_parents_reject_terminal_suffixes_and_child_authority_leaks",
+            "outlined.break_controls.len(), 2",
+            "1 + usize::from(variant.leading)",
+            "if leading { 47 } else { 69 }",
+            "(false, 215, 182, 3, 9)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-live-published-state-and-budget-prefixes",
+        path: "tools/nuisc/tests/native_application_bridge/state_loop_parents.rs",
+        required_patterns: &[
+            "state_loop_parents_reference_skips_suffix_effects_and_retains_last_published_state",
+            "state_loop_parents_native_observes_recovered_index_and_selected_effect_prefixes",
+            "state_loop_parents_native_keep_child_work_and_reserve_only_reached_later_children",
+            "cases::CHECKPOINT_OBSERVER",
+            "for limit in [2, 5, 6, 9]",
+            "trace.last(), Some(&7)",
+            "assert!(!trace.contains(&21))",
+            "assert!(!trace.contains(&22))",
+            "ApplicationSessionPhase::Faulted",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-aot-exact-effect-authority-and-layout",
+        path: "tools/nuisc/src/aot_application_effect_call_state_loop_parents_tests.rs",
+        required_patterns: &[
+            "native_state_loop_parents_require_exact_grants_and_transitive_effect_order",
+            "bridge.loop_work_limit, 9",
+            "bridge.helper_entry_limit, 100",
+            "missing grant {site} was accepted",
+            "lacks dependency order",
+            "State{result:bool;total:i64;marker:f64}",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-source-free-child-commit-and-parent-control",
+        path: "tools/nuis/tests/native_session_workflow/effect_call_state_loop_parents.rs",
+        required_patterns: &[
+            "state_loop_parents_build_cache_and_two_source_free_restores_keep_control_effects",
+            "cases::parent_sequence(leading, true)",
+            "cases::parent_sequence(leading, false)",
+            "fresh.host_objects == cached.host_objects",
+            "fresh.envelope, cached.envelope",
+            "fresh.lifecycle, cached.lifecycle",
+            "restore changed input artifact",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-shared-exit-scopes-still-ignore-child-terminals",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_flow.rs",
+        required_patterns: &[
+            "A child loop owns its control scope and is normalized independently",
+            "A skipped suffix never evaluates its inputs",
+            "if !same_step(rewritten.last()?, step)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-shared-observed-leading-index-recovery",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/exits.rs",
+        required_patterns: &[
+            "if iteration.leading && recover_index",
+            "boundary.after.push(copy(induction, &advanced))",
+            "branches::collect_bindings(&effects, names)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-test-registration-keeps-effect-return-boundary",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects.rs",
+        required_patterns: &[
+            "iteration_effects_parents_tests.rs",
+            "mod parents_tests;",
+            "control_loops::returns::prepare_effects",
+            "catalog.contains_key(name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-six-field-lineage",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Stateful parent-local loop exits follow-up:",
+            "Previous selected-child checkpoint:",
+            "Previous selected-child task checkpoint:",
+            "Previous selected-child blocker checkpoint:",
+            "Previous selected-child action checkpoint:",
+            "Previous selected-child validation checkpoint:",
+            "Previous selected-child artifact checkpoint:",
+            "nuis-native-stateful-loop-parents-v1.md",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-parents-scoped-receipt",
+        path: "docs/reference/nuis-native-stateful-loop-parents-v1.md",
+        required_patterns: &[
+            "32000 healthy accepted callbacks",
+            "parent continue does not discard completed child work",
+            "not post-abort memory inspection",
+            "quoted no-op heredoc",
+            "active/99",
+        ],
+    },
+];

@@ -1,0 +1,126 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-demand-only-source",
+        path: "tools/nuisc/tests/native_application_bridge/state_loop_selected.ns",
+        required_patterns: &[
+            "let odd = current % 2 != 0",
+            "let selected = gate != odd",
+            "if selected {",
+            "let width = trips / root",
+            "while index < width",
+            "let proof = 1 / (root + 1)",
+            "combine(current, index, outer, 1 / (outer - suffix))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-independent-source-oracle",
+        path: "tools/nuisc/tests/native_application_bridge/state_loop_selected_cases.rs",
+        required_patterns: &[
+            "self.input.gate ^ self.prior() ^ (current % 2 != 0)",
+            "let width = self.input.trips / self.root",
+            "reserve(width, &mut remaining)",
+            "while index < width",
+            "pub fn unselected_sequence",
+            "gate: prior ^ (entering % 2 != 0)",
+            "!call.trace(false).contains(&6)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-manual-witnesses-and-authority",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects_selected_tests.rs",
+        required_patterns: &[
+            "iteration_effects_selected_children_guard_bound_math_and_share_reservations",
+            "iteration_effects_selected_children_manual_current_and_index_witnesses",
+            "iteration_effects_selected_children_preserve_branch_local_scope_and_parent_authority",
+            "[0, 339, i64::MIN]",
+            "(510, 487)",
+            "(770, 747)",
+            "assert_eq!(selections.len(), 4)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-live-state-traps-and-reservations",
+        path: "tools/nuisc/tests/native_application_bridge/state_loop_selected.rs",
+        required_patterns: &[
+            "state_loop_selected_reference_skips_suffix_effects_and_retains_last_published_state",
+            "state_loop_selected_native_observes_recovered_index_and_selected_effect_prefixes",
+            "state_loop_selected_native_reserves_only_selected_bounds_and_keeps_parent_progress",
+            "ApplicationSessionPhase::Faulted",
+            "for limit in [2, 5]",
+            "i64::MAX, 0",
+            "i64::MAX, 1",
+            "[5, 8, 6, 7]",
+            "trace.last(), Some(&7)",
+            "cases::COMBINE_OBSERVER",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-exact-effect-authority",
+        path: "tools/nuisc/src/aot_application_effect_call_state_loop_selected_tests.rs",
+        required_patterns: &[
+            "native_state_loop_selected_require_exact_grants_and_transitive_effect_order",
+            "missing grant {site} was accepted",
+            "lacks dependency order",
+            "State{result:bool;total:i64;marker:f64}",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-source-free-delivery",
+        path: "tools/nuis/tests/native_session_workflow/effect_call_state_loop_selected.rs",
+        required_patterns: &[
+            "state_loop_selected_build_cache_and_two_source_free_restores_keep_control_effects",
+            "fresh.host_objects == cached.host_objects",
+            "fresh.envelope, cached.envelope",
+            "fresh.lifecycle, cached.lifecycle",
+            "for _ in 0..2",
+            "restore changed input artifact",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-shared-guard-does-not-capture-rhs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/branches.rs",
+        required_patterns: &[
+            "Only existing values cross this boundary, never branch-local reads/math",
+            "NirExpr::Bool(selected)",
+            "validation::EffectTypes::Values(catalog, layouts, literal_prints)",
+            "control_loops::outline_iteration(",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-tests-registered-without-production-dispatch",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects.rs",
+        required_patterns: &[
+            "iteration_effects_selected_tests.rs",
+            "mod selected_tests;",
+            "validation::LiteralPrints::Allow",
+            "catalog.contains_key(name)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-six-field-lineage",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Stateful selected-child invocation follow-up:",
+            "Previous child-local checkpoint:",
+            "Previous child-local task checkpoint:",
+            "Previous child-local blocker checkpoint:",
+            "Previous child-local action checkpoint:",
+            "Previous child-local validation checkpoint:",
+            "Previous child-local artifact checkpoint:",
+            "nuis-native-stateful-loop-selection-v1.md",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-loop-selected-scoped-receipt",
+        path: "docs/reference/nuis-native-stateful-loop-selection-v1.md",
+        required_patterns: &[
+            "32000 healthy accepted callbacks",
+            "unselected child consumes no reservation",
+            "not post-abort memory inspection",
+            "quoted no-op heredoc",
+            "active/99",
+        ],
+    },
+];

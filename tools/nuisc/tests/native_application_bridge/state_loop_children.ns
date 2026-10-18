@@ -1,0 +1,60 @@
+mod cpu Main {
+    struct State { result: bool, total: i64, marker: f64 }
+    @noinline fn advance(value: i64, proof: i64) -> i64 { print(5); return value + proof; }
+    @noinline fn refine(value: i64, proof: i64, index: i64) -> i64 { return value * 2 + proof + index; }
+    @noinline fn combine(value: i64, child: i64, outer: i64, proof: i64) -> i64 { return value + 10 * child + 100 * outer + proof; }
+    @noinline fn observe(value: i64, index: i64) -> i64 { return value + 10 * index; }
+    @noinline fn finish(value: i64, proof: i64) -> i64 { print(35); return value + 3 * proof; }
+    @noinline fn answer_work(value: i64, previous: bool, proof: i64) -> bool {
+        print(40); return previous != ((value % 2 == 0) && (proof == 1));
+    }
+    @noinline fn walk(value: i64, trips: i64, gate: bool, root: i64, hole: i64, cut: i64, rounds: i64, suffix: i64) -> i64 {
+        let mut current = value;
+        let mut outer = 0;
+        while outer < rounds {
+            outer = outer + 1;
+            print(8);
+            current = current + outer;
+            let even = outer % 2 == 0;
+            let local_gate = gate != even;
+            let mut index = 0;
+            while index < trips {
+                let proof = 1 / root;
+                print(10);
+                current = current + proof;
+                if index == cut {
+                    print(11);
+                    if local_gate { print(12); break; }
+                    print(13);
+                    index = index + 1;
+                    continue;
+                }
+                print(19);
+                current = refine(current, 1 / (index - hole), index);
+                print(20);
+                index = index + 1;
+            }
+            print(21);
+            current = combine(current, index, outer, 1 / (outer - suffix));
+            print(22);
+        }
+        print(31);
+        return observe(current, outer);
+    }
+    fn start(seed: i64, gate: bool, flag: bool, trips: i64, root: i64, hole: i64, tail: i64, answer: i64, marker: f64, advancing: i64, cut: i64, rounds: i64, suffix: i64) -> State {
+        let advanced = advance(seed, 1 / advancing);
+        let current = walk(advanced, trips, gate != flag, root, hole, cut, rounds, suffix);
+        let total = finish(current, 1 / tail);
+        let result = answer_work(total, flag, 1 / answer);
+        return State { result: result, total: total, marker: marker };
+    }
+    fn step(state: State, seed: i64, gate: bool, flag: bool, trips: i64, root: i64, hole: i64, tail: i64, answer: i64, marker: f64, advancing: i64, cut: i64, rounds: i64, suffix: i64) -> State {
+        let advanced = advance(state.total, 1 / advancing);
+        let current = walk(advanced, trips, gate != state.result, root, hole, cut, rounds, suffix);
+        let total = finish(current, 1 / tail);
+        let result = answer_work(total, state.result, 1 / answer);
+        return State { result: result, total: total, marker: state.marker };
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

@@ -1,5 +1,10 @@
 # Native Stateful Literal-Print Iteration Effects V1
 
+Historical return-in-loop exclusions below describe this checkpoint. The later
+[effectful loop-return receipt](nuis-native-stateful-loop-returns-v1.md)
+advances that boundary through explicit literal-print typed transport and
+native/source-free proof, not general I/O or pure-function reclassification.
+
 This bounded CPU receipt follows the
 [pure carried-loop proof](nuis-native-stateful-bounded-loops-v1.md).
 The starting Git baseline remains beta-0.17.1, commit 99ebfcb2.

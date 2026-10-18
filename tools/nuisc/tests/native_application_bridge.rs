@@ -651,3 +651,21 @@ mod state_loop_statements;
 
 #[path = "native_application_bridge/state_loop_exits.rs"]
 mod state_loop_exits;
+
+#[path = "native_application_bridge/state_loop_children.rs"]
+mod state_loop_children;
+
+#[path = "native_application_bridge/state_loop_selected.rs"]
+mod state_loop_selected;
+
+#[path = "native_application_bridge/state_loop_parents.rs"]
+mod state_loop_parents;
+
+#[path = "native_application_bridge/state_loop_returns.rs"]
+mod state_loop_returns;
+
+#[path = "native_application_bridge/state_loop_return_values.rs"]
+mod state_loop_return_values;
+
+#[path = "native_application_bridge/state_loop_return_selected.rs"]
+mod state_loop_return_selected;

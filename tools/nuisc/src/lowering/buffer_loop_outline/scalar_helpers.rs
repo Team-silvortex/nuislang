@@ -16,6 +16,11 @@ enum Profile {
     IterationLiteralPrints,
 }
 
+#[path = "scalar_helpers/control_body.rs"]
+mod control_body;
+use control_body::validate_body;
+pub(super) use control_body::{validate_control_body, validate_iteration_body};
+
 pub(super) fn collect(module: &NirModule) -> ScalarHelpers {
     collect_profile(
         module,
@@ -214,60 +219,6 @@ fn collect_profile(
         }
     }
     admitted
-}
-
-fn validate_body(
-    function: &NirFunction,
-    catalog: &ScalarHelpers,
-    layouts: &impl control_values::ValueLayouts,
-    loop_layouts: Option<&control_values::CarryLayouts>,
-    profile: Profile,
-) -> Option<()> {
-    let normalized = if let Some(loop_layouts) = loop_layouts {
-        control_loops::returns::normalize(function, loop_layouts)?
-    } else {
-        None
-    };
-    let mut locals = function
-        .params
-        .iter()
-        .map(|p| (p.name.clone(), p.ty.clone()))
-        .collect::<Scope>();
-    validate_block(
-        normalized.as_deref().unwrap_or(&function.body),
-        &mut locals,
-        &mut BTreeSet::new(),
-        function.return_type.as_ref()?,
-        catalog,
-        layouts,
-        loop_layouts,
-        profile,
-    )?
-    .then_some(())
-}
-
-pub(super) fn validate_control_body(
-    function: &NirFunction,
-    body: &[NirStmt],
-    catalog: &ScalarHelpers,
-    layouts: &control_values::CarryLayouts,
-) -> Option<()> {
-    let mut locals = function
-        .params
-        .iter()
-        .map(|param| (param.name.clone(), param.ty.clone()))
-        .collect();
-    validate_block(
-        body,
-        &mut locals,
-        &mut BTreeSet::new(),
-        function.return_type.as_ref()?,
-        catalog,
-        layouts,
-        Some(layouts),
-        Profile::Pure,
-    )?
-    .then_some(())
 }
 
 // Branch scopes never export bindings; every path through the helper must return.

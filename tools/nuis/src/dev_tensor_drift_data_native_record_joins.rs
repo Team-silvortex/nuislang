@@ -218,7 +218,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "fn prepare(",
             "catalog.get(&function.name)?",
             "signal: Signal(state.flag)",
-            "reserve_references(&function.body, &mut names)?",
+            "reserve_references(&function.body, &mut names, literal_prints)?",
         ],
     },
     DevTensorDriftCheckSpec {

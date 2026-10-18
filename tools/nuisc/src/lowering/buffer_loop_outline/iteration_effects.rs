@@ -16,11 +16,7 @@ impl Plan {
         let candidates = module
             .functions
             .iter()
-            .filter(|f| {
-                !pure.contains_key(&f.name)
-                    && control_loops::contains_loop(&f.body)
-                    && !control_loops::returns::contains_loop_return(&f.body)
-            })
+            .filter(|f| !pure.contains_key(&f.name) && control_loops::contains_loop(&f.body))
             .map(|f| f.name.clone())
             .collect::<BTreeSet<_>>();
         if candidates.is_empty() {
@@ -30,35 +26,11 @@ impl Plan {
             };
         }
         let catalog = scalar_helpers::collect_iteration_calls(module, layouts);
-        // Return-in-loop normalization is not part of this effect capability.
-        // Also exclude callers of such roots, not just the roots themselves.
-        let mut excluded = module
-            .functions
-            .iter()
-            .filter(|f| {
-                !pure.contains_key(&f.name) && control_loops::returns::contains_loop_return(&f.body)
-            })
-            .map(|f| f.name.clone())
-            .collect::<BTreeSet<_>>();
-        if !excluded.is_empty() {
-            let mut callers = BTreeMap::<&str, Vec<&str>>::new();
-            for (name, helper) in &catalog {
-                for dependency in &helper.dependencies {
-                    callers.entry(dependency).or_default().push(name);
-                }
-            }
-            let mut pending = excluded.iter().cloned().collect::<Vec<_>>();
-            while let Some(name) = pending.pop() {
-                for caller in callers.get(name.as_str()).into_iter().flatten() {
-                    if excluded.insert((*caller).to_owned()) {
-                        pending.push((*caller).to_owned());
-                    }
-                }
-            }
-        }
+        // Completed dependency admission, including typed return normalization,
+        // releases callers. No provisional or pure-value authority is granted.
         let roots = candidates
             .into_iter()
-            .filter(|name| catalog.contains_key(name) && !excluded.contains(name))
+            .filter(|name| catalog.contains_key(name))
             .collect();
         Self { catalog, roots }
     }
@@ -90,6 +62,18 @@ impl Plan {
         // using a signature snapshot taken before their private helpers existed.
         let fresh = retained.difference(&outlined.functions).cloned().collect();
         outlined.functions.extend(retained);
+        let mut return_signals = BTreeMap::new();
+        for function in &mut module.functions {
+            if self.roots.contains(&function.name) {
+                if let Some(plan) =
+                    control_loops::returns::prepare_effects(function, layouts, &self.catalog)
+                        .expect("admitted effectful counted return flow")
+                {
+                    function.body = plan.body;
+                    return_signals.insert(function.name.clone(), plan.signal);
+                }
+            }
+        }
         control_loops::outline(
             module,
             names,
@@ -100,7 +84,7 @@ impl Plan {
             validation::LiteralPrints::Allow,
             &mut outlined.break_controls,
             false,
-            &BTreeMap::new(),
+            &return_signals,
             Some(&self.roots),
         );
         let layouts = control_values::TypedLayouts::collect(module);
@@ -123,3 +107,27 @@ mod tests;
 #[cfg(test)]
 #[path = "iteration_effects_exits_tests.rs"]
 mod exits_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_children_tests.rs"]
+mod children_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_selected_tests.rs"]
+mod selected_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_parents_tests.rs"]
+mod parents_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_returns_tests.rs"]
+mod returns_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_return_values_tests.rs"]
+mod return_values_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_return_selected_tests.rs"]
+mod return_selected_tests;

@@ -502,3 +502,21 @@ mod state_loop_statements;
 
 #[path = "aot_application_effect_call_state_loop_exits_tests.rs"]
 mod state_loop_exits;
+
+#[path = "aot_application_effect_call_state_loop_children_tests.rs"]
+mod state_loop_children;
+
+#[path = "aot_application_effect_call_state_loop_selected_tests.rs"]
+mod state_loop_selected;
+
+#[path = "aot_application_effect_call_state_loop_parents_tests.rs"]
+mod state_loop_parents;
+
+#[path = "aot_application_effect_call_state_loop_returns_tests.rs"]
+mod state_loop_returns;
+
+#[path = "aot_application_effect_call_state_loop_return_values_tests.rs"]
+mod state_loop_return_values;
+
+#[path = "aot_application_effect_call_state_loop_return_selected_tests.rs"]
+mod state_loop_return_selected;

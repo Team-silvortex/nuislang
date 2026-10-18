@@ -1,5 +1,10 @@
 # Native Stateful Direct Loop Statements V1
 
+Historical return-in-loop exclusions below describe this checkpoint. The later
+[effectful loop-return receipt](nuis-native-stateful-loop-returns-v1.md)
+advances that boundary through explicit literal-print typed transport and
+native/source-free proof, not general I/O or pure-function reclassification.
+
 This bounded CPU receipt advances the
 [iteration-call effects checkpoint](nuis-native-stateful-loop-effects-v1.md).
 The Git baseline remains beta-0.17.1, commit 99ebfcb2; this is a worktree

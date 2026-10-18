@@ -13,14 +13,15 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "while let Some(name) = ready.pop_first()",
         ],
     },
+    // The original blanket veto is now an explicit validated profile.
     DevTensorDriftCheckSpec {
         id: "native-state-loop-effects-private-plan-and-dependent-return-veto",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects.rs",
         required_patterns: &[
             "catalog: ScalarHelpers",
             "roots: BTreeSet<String>",
-            "contains_loop_return",
-            "!excluded.contains(name)",
+            "control_loops::returns::prepare_effects",
+            "catalog.contains_key(name)",
             "retained.difference(&outlined.functions)",
             "Some(&self.roots)",
             "scalar_control::outline",

@@ -1,5 +1,23 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_state_loop_return_selected.rs"]
+mod state_loop_return_selected;
+
+#[path = "dev_tensor_drift_data_native_state_loop_return_values.rs"]
+mod state_loop_return_values;
+
+#[path = "dev_tensor_drift_data_native_state_loop_returns.rs"]
+mod state_loop_returns;
+
+#[path = "dev_tensor_drift_data_native_state_loop_parents.rs"]
+mod state_loop_parents;
+
+#[path = "dev_tensor_drift_data_native_state_loop_selected.rs"]
+mod state_loop_selected;
+
+#[path = "dev_tensor_drift_data_native_state_loop_children.rs"]
+mod state_loop_children;
+
 #[path = "dev_tensor_drift_data_native_state_loop_exits.rs"]
 mod state_loop_exits;
 
@@ -428,6 +446,12 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         state_loop_effects::CHECKS,
         state_loop_statements::CHECKS,
         state_loop_exits::CHECKS,
+        state_loop_children::CHECKS,
+        state_loop_selected::CHECKS,
+        state_loop_parents::CHECKS,
+        state_loop_returns::CHECKS,
+        state_loop_return_values::CHECKS,
+        state_loop_return_selected::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,

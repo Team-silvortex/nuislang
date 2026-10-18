@@ -279,6 +279,18 @@ The [direct loop-statement proof](docs/reference/nuis-native-stateful-loop-state
 adds literal prints directly in selected loop bodies and print-only loops, with explicit effect authority, shared cumulative reservations and the same source-free artifact checks.
 The [effectful loop-exit proof](docs/reference/nuis-native-stateful-loop-exits-v1.md)
 checks real break/continue suffix suppression, observed leading/trailing indices and last-State publication through native and source-free sessions without adding a special lowering path.
+The [child-local loop-exit proof](docs/reference/nuis-native-stateful-loop-children-v1.md)
+checks nested child exits, current child/parent index handoff and cumulative callback reservations while the parent continues, using the same scoped lowering and source-free delivery path.
+The [selected-child invocation proof](docs/reference/nuis-native-stateful-loop-selection-v1.md)
+checks current-State-derived branch selection, demand-only bound math/reservations, actual child-to-parent values and source-free oversized/divide-by-zero inactive controls.
+The [parent-local loop-exit proof](docs/reference/nuis-native-stateful-loop-parents-v1.md)
+checks committed child work before a parent break/continue, recovered leading parent indices, skipped poisoned suffixes and later reached child reservations through real native and source-free sessions.
+The [effectful loop-return proof](docs/reference/nuis-native-stateful-loop-returns-v1.md)
+connects independent typed return storage/signals to nested source exits, preserving completed effects while skipping child/parent suffixes and later iterations. Four source variants pass selected traps, full reached-bound controls and sixteen source-free delivery images.
+The [typed loop-return follow-up](docs/reference/nuis-native-stateful-loop-return-values-v1.md)
+repairs ordered loop-word admission and executes bool/f32/f64/mixed-record payloads, actual false/zero returns and raw NaN words, with thirty-two source-free images.
+The [selected typed loop-return proof](docs/reference/nuis-native-stateful-loop-return-selected-v1.md)
+composes these exits with conditional children, real selected-only bound calls, inactive division-overflow controls and late-parent progress, through thirty-two further delivery images. Trailing-parent step placement and effectful coalescing remain separate.
 Higher-arity live coverage and generalized resource transport,
 hidden ordinary leaves, more than one exit per arm and deeper exits remain separate; common
 guard/backend/effect authority is not widened.

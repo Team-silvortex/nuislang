@@ -708,3 +708,21 @@ mod state_loop;
 
 #[path = "effect_call_state_loop_exits.rs"]
 mod state_loop_exits;
+
+#[path = "effect_call_state_loop_children.rs"]
+mod state_loop_children;
+
+#[path = "effect_call_state_loop_selected.rs"]
+mod state_loop_selected;
+
+#[path = "effect_call_state_loop_parents.rs"]
+mod state_loop_parents;
+
+#[path = "effect_call_state_loop_returns.rs"]
+mod state_loop_returns;
+
+#[path = "effect_call_state_loop_return_values.rs"]
+mod state_loop_return_values;
+
+#[path = "effect_call_state_loop_return_selected.rs"]
+mod state_loop_return_selected;

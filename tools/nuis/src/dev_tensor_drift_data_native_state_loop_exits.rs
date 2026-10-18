@@ -110,8 +110,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-state-loop-exits-return-in-loop-authority-remains-separate",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects.rs",
         required_patterns: &[
-            "!control_loops::returns::contains_loop_return(&f.body)",
-            "!excluded.contains(name)",
+            "control_loops::returns::prepare_effects",
+            "catalog.contains_key(name)",
             "validation::LiteralPrints::Allow",
             "iteration_effects_exits_tests.rs",
         ],

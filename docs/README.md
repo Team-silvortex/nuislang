@@ -206,6 +206,18 @@ The [direct loop-statement proof](reference/nuis-native-stateful-loop-statements
 adds actual print-only and state-carrying loop statements under explicit authority, with shared-budget failure prefixes and source-free delivery.
 The [effectful loop-exit proof](reference/nuis-native-stateful-loop-exits-v1.md)
 composes break/continue with actual prints and recovered indices through the same scoped lowering and native/source-free session boundaries.
+The [child-local loop-exit proof](reference/nuis-native-stateful-loop-children-v1.md)
+checks that nested child exits remain local, actual child indices feed continuing parent work, and later child invocations share the callback's remaining budget.
+The [selected-child invocation proof](reference/nuis-native-stateful-loop-selection-v1.md)
+checks that inactive children neither compute bounds nor reserve work, with current-value selection, selected failure prefixes and source-free identity.
+The [parent-local loop-exit proof](reference/nuis-native-stateful-loop-parents-v1.md)
+checks actual child results retained across parent break/continue, observed leading parent indices, skipped suffixes and cumulative later-child reservation through native/source-free delivery.
+The [effectful loop-return proof](reference/nuis-native-stateful-loop-returns-v1.md)
+checks explicit iteration-only return admission, selected payload evaluation before publication, nested parent escape, full reached-loop bounds and sixteen fresh/cache/two source-free images.
+The [typed loop-return follow-up](reference/nuis-native-stateful-loop-return-values-v1.md)
+repairs missing ordered pack/unpack/xor admission and checks actual bool/f32/f64/mixed-record returns, raw values and thirty-two fresh/cache/two source-free images.
+The [selected typed loop-return proof](reference/nuis-native-stateful-loop-return-selected-v1.md)
+checks real demand-only extent calls, inactive divide-by-zero/overflow bounds, late selected children and exact typed exits through thirty-two delivery images. Trailing-parent steps and effectful coalescing remain separate.
 Higher-arity live coverage and generalized resource transport,
 other entering writes, more than one exit per arm and deeper exits
 remain separate.

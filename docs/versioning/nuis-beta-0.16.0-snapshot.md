@@ -303,6 +303,18 @@ The subsequent [direct loop-statement proof](../reference/nuis-native-stateful-l
 adds explicit literal-effect admission in selected and print-only loops, shared cumulative reservations, last-publication checks and source-free artifact delivery without widening pure discovery.
 The subsequent [effectful loop-exit proof](../reference/nuis-native-stateful-loop-exits-v1.md)
 checks break/continue suffix suppression, actual recovered indices and selected failures through existing scoped lowering, native execution and source-free delivery. It does not grant return-in-loop effect authority.
+The subsequent [child-local loop-exit proof](../reference/nuis-native-stateful-loop-children-v1.md)
+checks nested child exits under a continuing parent, actual child/parent index computation, shared reservations and source-free artifact identity without adding a production special case.
+The subsequent [selected-child invocation proof](../reference/nuis-native-stateful-loop-selection-v1.md)
+checks current-value/prior-State selection, demand-only child reservations and fallible bound evaluation, cumulative early-break budgets and source-free artifact identity.
+The subsequent [parent-local loop-exit proof](../reference/nuis-native-stateful-loop-parents-v1.md)
+checks committed child values, independent child/parent exits, leading parent-index recovery, demand-only later reservations and sixteen fresh/cache/two source-free images.
+The subsequent [effectful loop-return proof](../reference/nuis-native-stateful-loop-returns-v1.md)
+uses explicit profile-aware typed payload/signal transport for nested source returns, completed effects, selected pre/post-callee traps, full reached-bound reservations and sixteen fresh/cache/two source-free images. Full bool/float/record payload execution remains a separate next proof.
+The subsequent [typed loop-return proof](../reference/nuis-native-stateful-loop-return-values-v1.md)
+repairs ordered word-operation admission and executes bool/f32/f64/mixed-record payloads, real false/zero exits, raw NaN words and thirty-two fresh/cache/two source-free images.
+The subsequent [selected typed loop-return proof](../reference/nuis-native-stateful-loop-return-selected-v1.md)
+composes conditional child invocation, demand-only real extent calls, inactive zero-divisor/overflow bounds, late parent progress and exact typed returns through thirty-two further delivery images. Trailing-parent steps remain separate.
 Higher-arity live coverage, hidden roots, more than one exit per arm, deeper exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of
