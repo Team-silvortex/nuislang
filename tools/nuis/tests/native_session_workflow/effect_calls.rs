@@ -726,3 +726,18 @@ mod state_loop_return_values;
 
 #[path = "effect_call_state_loop_return_selected.rs"]
 mod state_loop_return_selected;
+
+#[path = "effect_call_state_loop_return_parent_steps.rs"]
+mod state_loop_return_parent_steps;
+
+#[path = "effect_call_state_loop_return_parent_continue.rs"]
+mod state_loop_return_parent_continue;
+
+#[path = "effect_call_state_loop_return_parent_break.rs"]
+mod state_loop_return_parent_break;
+
+#[path = "effect_call_state_loop_return_parent_mixed.rs"]
+mod state_loop_return_parent_mixed;
+
+#[path = "effect_call_state_loop_return_shared.rs"]
+mod state_loop_return_shared;

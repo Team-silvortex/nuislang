@@ -4,6 +4,141 @@ This is the current cleanup policy and audit record, not an alpha-era deletion
 wishlist. Current compiler, Nustar and application behavior remains governed by
 the [mainline map](current-mainline-map.md) and the development tensor.
 
+## 2026-10-18 AOT Packer Modularization
+
+This follow-up keeps Git identity at `81dc1669` (beta-0.17.3) and preserves the
+existing dirty mainline work. It does not create a release or remove executable
+regressions in the name of tidiness.
+
+### Private Ownership Boundaries
+
+The largest remaining packaging frontdoor,
+[tools/yir-pack-aot/src/main.rs](../tools/yir-pack-aot/src/main.rs), shrinks from
+3,888 to 403 lines. Thirteen private modules now own host planning, backend
+artifact/descriptor generation, shader source/expression/texture normalization,
+inherited host compilation/frame support, CFFI validation and AppKit source.
+The largest extracted module is 676 lines. No replacement line exception is
+added; the repository now has 13 remaining historical exceptions, not zero.
+
+The CLI retains orchestration, validation order, profile dispatch and bundle
+publication. All thirteen extracted source bodies and the entrypoint bodies
+match their predecessors after visibility removal and Rust formatting.
+Dependencies use explicit imports and narrowly scoped visibility rather than a
+new public facade. Existing C/Objective-C compatibility generation is moved,
+not introduced; no new backend grant, ABI or CFFI signature is registered.
+The [tool reference](reference/yir-tools-reference.md) maps the new owners.
+
+Four new unit tests freeze seven generated-content fingerprints captured on the
+original monolith before extraction. They cover shader variants, kernel
+stage/graph artifacts, host sources/fabric plans and shader expressions.
+These are change-detection fingerprints, not cryptographic security claims,
+proof of byte-identical final linked binaries or new device-execution evidence.
+
+### Focused Acceptance
+
+The complete packager suite passes 28 tests: 25 units, two new CLI integrations
+and the existing headless session test. The CPU integration builds and runs an
+actual native executable, checks the existing bundle layout/manifest and
+observes `12\n` with exit zero. The other integration rejects malformed source
+and incomplete/invalid profiles before bundle publication. New subprocesses
+are bounded to 60 seconds and temporary project directories have scope cleanup.
+
+The original headless test initially hit the sandbox restriction on binding a
+local Unix socket, including before extraction. With local-socket permission,
+both the original and refactored test pass Finish/Drain against the existing
+mock provider; this is not physical GPU or external-network acceptance.
+
+This follow-up passes 87 distinct focused tests, seven new: 28 packager,
+24 repository-maintenance, two line-budget, six current example/host-path and
+27 tensor tests. It also passes packager all-target compilation without new
+warnings, workspace formatting, UTF-8, relative documentation links, locked
+metadata for 29 packages and 3,421 drift checks. The rebuilt ordinary CLI
+matches all six tensor fields and complete predecessor hashes; coverage and
+task lineage remain clean. Counts from the earlier 72-test organization audit
+and 256-test mixed-exit receipt are historical and are not added to this total.
+
+The active/99 coordinate remains
+`standard-library/ns-nova/persistent-application-session`. The next functional
+task is still an independent effect-prefix proof before typed return-snapshot
+coalescing. All six complete preceding values and their SHA-256 identities are
+retained, and recorded prior commands remain inert. No new Linux/Windows/GPU,
+full-workspace semantic, performance, formal-memory-safety or completed
+self-hosting acceptance is claimed. No Git commit, push or version bump is
+performed.
+
+## 2026-10-18 Organization Audit
+
+Git records the current series as beta-0.17, with committed patch
+`81dc1669` (beta-0.17.3). This maintenance does not create a release, discard
+uncommitted mainline work or change compiler semantics.
+
+### Navigation And Evidence
+
+The repository README, documentation index and mainline map had accumulated
+duplicated proof-by-proof narratives. Their new sizes are:
+
+| Router | Before | After |
+| --- | --- | --- |
+| Repository README | 972 lines | 251 lines |
+| Documentation index | 326 lines | 111 lines |
+| Current mainline map | 786 lines | 125 lines |
+
+The [native session proof index](reference/nuis-native-session-proof-index.md)
+retains all 184 focused reference targets from the former routers, including
+their section anchors. All 98 existing native documents remain reachable.
+Original receipts, source fixtures, regression registrations and historical
+acceptance counts stay in place. This removes duplicate navigation prose,
+not validation evidence.
+
+The [beta-0.17 snapshot](versioning/nuis-beta-0.17.0-snapshot.md) and
+[current checklist](versioning/nuis-beta-0.17.0-release-checklist.md) distinguish
+committed Git identity from uncommitted follow-ups. Five current indexes now
+agree on those entrypoints; beta-0.16 remains historical.
+
+Three source-only regressions enforce short routers (300 lines), native receipt
+reachability and consistent current-series routes. They do not impose that
+router cap on reference/history Markdown, which retains its 2000-line policy.
+
+### Source Budgets And Storage
+
+The line-budget table contained 56 legacy entries. Forty-two files no longer
+needed an exception and now use the standard source/test limits. Fourteen
+oversized files remain, with current exact ceilings. A new ratchet test rejects
+obsolete entries and requires budgets to decrease when files shrink.
+
+The remaining debt includes the 3,888-line AOT packaging frontdoor, 2,115-line
+shader/ns-nova contract tests and std CLI/network recipes. They remain explicit
+refactoring work, not unused modules to delete. Four existing Rust formatting
+discrepancies were fixed without changing behavior.
+
+The source/fixture checkout was about 43 MB; generated Cargo output was about
+5.1 GiB. Default safe cleanup selected 1,275,584 KiB of incremental/Python
+cache paths, reducing the measured root target footprint to about 4.4 GiB.
+Hardlinks can share storage, so selected sizes are not a claim of that much new
+filesystem free space. Root CLI/test binaries, libraries, locks, downloads,
+source and subprojects were preserved. No other repository or system cache was
+touched, and no blanket `cargo clean` was used.
+
+### Focused Acceptance
+
+This audit passes 72 distinct focused tests, four new: 23 maintenance tests,
+two line-budget tests, fourteen affected compiler units, six current example/
+host-path tests and 27 tensor tests. It also passes full-workspace Rust
+formatting, UTF-8, documentation links, locked metadata for 29 packages and
+3,416 drift checks. The ordinary CLI was rebuilt and matched all six tensor
+fields and complete predecessor hashes, with clean coverage and task lineage.
+
+The selected tensor coordinate remains
+`standard-library/ns-nova/persistent-application-session`, active/99.
+Its next functionality task remains the independent effect-prefix proof before
+typed return-snapshot coalescing. All six prior values/hashes and inert command
+history are retained; maintenance does not increase capability scores.
+
+The earlier mixed-exit receipt's 256-test/native/source-free acceptance remains
+that receipt's own evidence, not a fresh full native delivery run for this
+cleanup. No Linux/GPU/Windows rerun, performance, formal/global-memory-safety,
+completed self-hosting or whole-workspace semantic acceptance is claimed.
+
 ## 2026-09-24 Audit
 
 The cleanup is recorded in `05951bef` (`beta-0.15.0`). The

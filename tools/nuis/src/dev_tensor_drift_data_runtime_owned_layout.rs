@@ -43,11 +43,19 @@ pub(crate) const DEV_TENSOR_RUNTIME_OWNED_LAYOUT_DRIFT_CHECKS: &[DevTensorDriftC
     },
     DevTensorDriftCheckSpec {
         id: "yir-pack-aot-owned-aggregate-host-runtime",
-        path: "tools/yir-pack-aot/src/main.rs",
+        path: "tools/yir-pack-aot/src/host_compile.rs",
         required_patterns: &[
             "use nuis_runtime::append_c_shim_owned_blob_runtime",
             "host_text_runtime_source",
             "append_c_shim_owned_blob_runtime(&mut out)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "yir-pack-aot-owned-aggregate-window-runtime",
+        path: "tools/yir-pack-aot/src/host_objc.rs",
+        required_patterns: &[
+            "use nuis_runtime::append_c_shim_owned_blob_runtime",
+            "host_text_runtime_source",
             "append_c_shim_owned_blob_runtime(&mut owned_blob_runtime)",
             "const char *action_class",
             "const char *event_name",

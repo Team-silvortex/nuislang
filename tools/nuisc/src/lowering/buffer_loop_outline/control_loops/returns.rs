@@ -6,6 +6,9 @@ mod storage;
 #[path = "return_invariants.rs"]
 mod invariants;
 
+#[path = "return_effect_prefix.rs"]
+mod effect_prefix;
+
 pub(in crate::lowering::buffer_loop_outline) struct Signal(String);
 
 impl Signal {
@@ -88,7 +91,9 @@ pub(in crate::lowering::buffer_loop_outline) fn normalize_effects(
     if !contains_loop_return(&function.body) {
         return Some(None);
     }
-    rewrite(function, layouts, None, validation::LiteralPrints::Allow).map(|plan| Some(plan.body))
+    let plan = rewrite(function, layouts, None, validation::LiteralPrints::Allow)?;
+    effect_prefix::verify_independent(function, &plan, layouts)?;
+    Some(Some(plan.body))
 }
 
 pub(in crate::lowering::buffer_loop_outline) fn prepare_effects(
@@ -100,11 +105,40 @@ pub(in crate::lowering::buffer_loop_outline) fn prepare_effects(
         return Some(None);
     }
     catalog.get(&function.name)?;
-    // Keep independent storage: pure snapshot/coalescing optimizations have not
-    // proven that they preserve effect prefixes on every selected exit.
+    // A typed body check is not an effect-order proof. Certify the independent
+    // rewrite separately; coalesced storage needs a different certificate.
     let plan = rewrite(function, layouts, None, validation::LiteralPrints::Allow)?;
+    effect_prefix::verify_independent(function, &plan, layouts)?;
     scalar_helpers::validate_iteration_body(function, &plan.body, catalog, layouts)?;
+    let plan = coalesced_effects(function, layouts, catalog, &plan).unwrap_or(plan);
     Some(Some(plan))
+}
+
+fn coalesced_effects(
+    function: &NirFunction,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+    independent: &Prepared,
+) -> Option<Prepared> {
+    catalog.get(&function.name)?;
+    for storage in storage::candidate_effects(function, layouts, catalog)? {
+        // Each owned attempt starts from the original source and immutable
+        // independent baseline; a failed certificate publishes nothing.
+        let Some(plan) = rewrite(
+            function,
+            layouts,
+            Some(storage.clone()),
+            validation::LiteralPrints::Allow,
+        ) else {
+            continue;
+        };
+        if effect_prefix::verify_shared(function, independent, &plan, &storage, layouts, catalog)
+            .is_some()
+        {
+            return Some(plan);
+        }
+    }
+    None
 }
 
 #[cfg(test)]

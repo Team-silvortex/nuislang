@@ -669,3 +669,18 @@ mod state_loop_return_values;
 
 #[path = "native_application_bridge/state_loop_return_selected.rs"]
 mod state_loop_return_selected;
+
+#[path = "native_application_bridge/state_loop_return_parent_steps.rs"]
+mod state_loop_return_parent_steps;
+
+#[path = "native_application_bridge/state_loop_return_parent_continue.rs"]
+mod state_loop_return_parent_continue;
+
+#[path = "native_application_bridge/state_loop_return_parent_break.rs"]
+mod state_loop_return_parent_break;
+
+#[path = "native_application_bridge/state_loop_return_parent_mixed.rs"]
+mod state_loop_return_parent_mixed;
+
+#[path = "native_application_bridge/state_loop_return_shared.rs"]
+mod state_loop_return_shared;

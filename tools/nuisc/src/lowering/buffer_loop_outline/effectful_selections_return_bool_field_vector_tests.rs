@@ -66,8 +66,15 @@ fn return_bool_field_vector_accepts_logical_updates_retention_and_orders() {
         let (module, names) = rewrite(&two_flags);
         assert!(!names.is_empty());
         crate::nir_verify::verify_nir_module(&module).unwrap();
-        assert!(module.structs.iter().any(|s| s.name.starts_with("__nuis_effect_fields_value")
-            && s.fields.iter().filter(|f| f.ty==scalar_type("bool")).count()==2));
+        assert!(module
+            .structs
+            .iter()
+            .any(|s| s.name.starts_with("__nuis_effect_fields_value")
+                && s.fields
+                    .iter()
+                    .filter(|f| f.ty == scalar_type("bool"))
+                    .count()
+                    == 2));
     }
 }
 

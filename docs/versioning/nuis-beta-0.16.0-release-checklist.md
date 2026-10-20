@@ -1,5 +1,8 @@
 # Beta 0.16 Validation Checklist
 
+Historical checklist. Use the [versioning index](README.md) for the current
+operating checklist; this file retains the earlier line's proof gates.
+
 This is the operating checklist for the `beta-0.16.*` line anchored at
 `dff1bdbc` (`beta-0.16.0`, 2026-10-07). The version already exists in Git;
 using this checklist does not authorize a new version, commit or push.
@@ -126,7 +129,11 @@ target/debug/nuis dev-tensor --json
 - [ ] [Parent-local loop exits](../reference/nuis-native-stateful-loop-parents-v1.md): require real child checkpoint inputs before leading parent break/continue, recovered parent indices, suppressed poisoned suffixes, later reached reservations and sixteen fresh/cache/two source-free images. The effectful-return receipt advances its following return boundary; trailing-parent composition remains separate.
 - [ ] [Effectful loop returns](../reference/nuis-native-stateful-loop-returns-v1.md): require explicit iteration-only normalization/validation, independent typed payload/signal storage, completed selected effects, skipped child/parent suffixes and later invocations, pre/post-callee traps, full reached-bound budgets and sixteen fresh/cache/two source-free images. The typed-payload receipt advances its execution boundary; effectful snapshot/coalescing optimizations remain separate.
 - [ ] [Typed effectful loop returns](../reference/nuis-native-stateful-loop-return-values-v1.md): require exact ordered pack/unpack/xor readiness, type/depth/sibling negative controls, real bool/f32/f64/mixed-record returns from current State, false/zero/raw-NaN witnesses, selected unused-proof traps, reached-bound budgets and thirty-two fresh/cache/two source-free images. The following receipt advances selected child invocation/bounds.
-- [ ] [Selected typed loop returns](../reference/nuis-native-stateful-loop-return-selected-v1.md): require current-State-derived conditional child entry, real selected-only extent calls, inactive division-overflow/zero-divisor controls, late-parent progress, exact typed return words, full reached reservations, retained fault State and thirty-two delivery images. Trailing-parent steps and effectful coalescing remain separate.
+- [ ] [Selected typed loop returns](../reference/nuis-native-stateful-loop-return-selected-v1.md): require current-State-derived conditional child entry, real selected-only extent calls, inactive division-overflow/zero-divisor controls, late-parent progress, exact typed return words, full reached reservations, retained fault State and thirty-two delivery images. The following receipt advances trailing-parent steps.
+- [ ] [Trailing-parent typed loop returns](../reference/nuis-native-stateful-loop-return-parent-steps-v1.md): require canonical tail-step admission, missing/duplicate-step negative controls, observed parent indices 0/1, completed/skipped print-26 regions, two inactive parent rounds, exact typed returns, full reached reservations and sixteen fresh/cache/two source-free images.
+- [ ] [Parent-continue typed loop returns](../reference/nuis-native-stateful-loop-return-parent-continue-v1.md): require both parent/child step placements, 32 typed source variants, child/parent continue scope, skipped poisoned suffixes, late reached reservations, actual State and sixteen fresh/cache/two source-free images.
+- [ ] [Parent-break typed loop returns](../reference/nuis-native-stateful-loop-return-parent-break-v1.md): require independent ordinary parent-break control, 32 source variants, live fallback indices 0/1, reached unused fallback traps versus true return suppression, exact State, full reached reservations and sixteen fresh/cache/two source-free images. The mixed-exit follow-up now checks the same-function composition.
+- [ ] [Mixed-parent-exit typed loop returns](../reference/nuis-native-stateful-loop-return-parent-mixed-v1.md): require independent break/continue/return control in one function, fixed source-order and step witnesses, checkpoint indices 0/1 and 1/2, reached reservations, no failed-State publication and sixteen fresh/cache/two source-free images. Effect-prefix proof before snapshot coalescing remains separate.
 
 The focused command is a reproducer, not a full-frontend/workspace acceptance
 command. Count distinct tests once; native variants and duplicate reruns are not

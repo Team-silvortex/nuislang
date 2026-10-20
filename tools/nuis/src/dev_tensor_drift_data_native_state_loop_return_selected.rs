@@ -26,7 +26,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-state-loop-return-selected-independent-source-model",
         path: "tools/nuisc/tests/native_application_bridge/state_loop_return_selected_cases.rs",
         required_patterns: &[
-            "variant.source_from(SOURCE, \"width\")",
+            "source_from(variant, SOURCE)",
+            "variant.source_from(template, \"width\")",
             "A skipped invocation does not even divide its bound",
             "self.trips.checked_div(self.divisor)?",
             "reserve(width, &mut budget)",

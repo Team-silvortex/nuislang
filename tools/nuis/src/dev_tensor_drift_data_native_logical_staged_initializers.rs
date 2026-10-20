@@ -48,7 +48,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "native-logical-staged-initializers-mainline-and-boundaries",
-        path: "docs/current-mainline-map.md",
+        path: "docs/reference/nuis-native-session-proof-index.md",
         required_patterns: &["nuis-native-logical-staged-initializers-v1.md", "Ordinary", "print/call leaves and original scalar capture authority are not widened.", "further changing backedges and wide private captures"],
     },
 ];

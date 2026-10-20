@@ -87,9 +87,11 @@ fn return_numeric_field_vector_retains_authority_scope_types_and_atomic_rejectio
                     other => *t = scalar_type(other),
                 }
                 if qualifier == "bool" && n != "local" {
-                    assert!(classify(&yes, &[], &entering, &vector_stage(&bad), &owner, 0)
-                        .unwrap()
-                        .is_some());
+                    assert!(
+                        classify(&yes, &[], &entering, &vector_stage(&bad), &owner, 0)
+                            .unwrap()
+                            .is_some()
+                    );
                     continue;
                 }
                 assert!(

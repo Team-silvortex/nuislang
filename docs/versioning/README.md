@@ -12,40 +12,37 @@ below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead
 
 ### Current Line
 
-For the current `beta-0.16.*` line instead of historical backfill, start with:
+For the current `beta-0.17.*` line, start with:
 
-* [nuis-beta-0.16.0-snapshot.md](nuis-beta-0.16.0-snapshot.md)
-* [nuis-beta-0.16.0-release-checklist.md](nuis-beta-0.16.0-release-checklist.md)
+* [Beta-0.17 snapshot](nuis-beta-0.17.0-snapshot.md)
+* [Beta-0.17 validation checklist](nuis-beta-0.17.0-release-checklist.md)
 
-The current committed minor baseline is `dff1bdbc` (`beta-0.16.0`, 2026-10-07).
-The [previous patch](nuis-beta-0.15.9-patch.md) retains `585eb409`, and the
-[previous minor snapshot](nuis-beta-0.15.0-snapshot.md) retains `05951bef`
-(`beta-0.15.0`, 2026-09-24).
-Git remains authoritative for exact source revisions. Patch evidence does not
-certify every suite listed in the checklist, and historical results remain
-separate. Cargo package versions and protocol versions remain independent.
+Git records the minor entry at `ccc16af9` (`beta-0.17.0`, 2026-10-15)
+and the latest committed patch at this audit at `81dc1669`
+(`beta-0.17.3`, 2026-10-18). The snapshot separately identifies uncommitted
+follow-ups. Navigation updates do not create a release or certify later work.
 
-The earlier proofs include [leading return prints](../reference/nuis-native-return-print-prefixes-v1.md),
-[computed print arguments](../reference/nuis-native-computed-return-prints-v1.md),
-[interleaved scalar aliases](../reference/nuis-native-return-print-aliases-v1.md)
-and [staged initializers](../reference/nuis-native-staged-return-effects-v1.md),
-followed by [logical initializers](../reference/nuis-native-logical-staged-initializers-v1.md).
-Their acceptance receipts remain separate from the
-[preceding patch](nuis-beta-0.15.8-patch.md). The
-[continuing effect-region proof](../reference/nuis-native-continuing-effect-regions-v1.md)
-and [internal-exit follow-up](../reference/nuis-native-effect-region-exits-v1.md),
-including its [exit-only continuation extension](../reference/nuis-native-exit-only-regions-v1.md)
-and [paired scalar result joins](../reference/nuis-native-effect-result-joins-v1.md)
-with their [partial-exit extension](../reference/nuis-native-partial-effect-result-joins-v1.md)
-and [one-sided result extension](../reference/nuis-native-one-sided-effect-result-joins-v1.md),
-were developed after `585eb409` and are included in `dff1bdbc`; their separate
-receipts retain their original scope and dates.
+Detailed source/native/source-free boundaries live in the
+[native session proof index](../reference/nuis-native-session-proof-index.md).
+Each receipt retains its own counts and scope; use the live tensor for the next
+task. Cargo/protocol versions remain independent from project releases.
 
-The [join-capture optimization](../reference/nuis-native-effect-join-captures-v1.md)
-is worktree development after `dff1bdbc` (`beta-0.16.0`), with its own bounded
-CPU receipt, not a new release or measured-performance claim.
-The [equal-atom follow-up](../reference/nuis-native-equal-effect-result-joins-v1.md)
-extends that worktree proof with its own acceptance receipt.
+### Previous Minor Checkpoints
+
+The beta-0.16 entry remains `dff1bdbc` (`beta-0.16.0`, 2026-10-07):
+
+* [Beta-0.16 snapshot](nuis-beta-0.16.0-snapshot.md)
+* [Beta-0.16 validation checklist](nuis-beta-0.16.0-release-checklist.md)
+
+The preceding beta-0.15 minor entry remains `05951bef`
+(`beta-0.15.0`, 2026-09-24):
+
+* [Beta-0.15 snapshot](nuis-beta-0.15.0-snapshot.md)
+* [Beta-0.15 validation checklist](nuis-beta-0.15.0-release-checklist.md)
+* [Beta-0.15.9 patch](nuis-beta-0.15.9-patch.md), `585eb409`
+
+Their original acceptance and follow-up dates remain historical. No totals are
+renamed or summed into current acceptance.
 
 The [beta-0.15.7 patch](nuis-beta-0.15.7-patch.md) retains the typed-literal,
 fresh-publication and `active/86` checkpoint; subsequent worktree proofs have

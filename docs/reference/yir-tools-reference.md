@@ -608,6 +608,24 @@ cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale]
 This packages a small AOT artifact using LLVM/clang where possible and cooked or
 prerendered artifacts where necessary.
 
+The same entrypoint also accepts explicit `--headless` or
+`--native-session ID` profiles, under their existing registration and policy
+checks. The entrypoint owns argument handling, orchestration and publication;
+it delegates implementation details to private modules:
+
+| Responsibility | Implementation |
+| --- | --- |
+| Artifact emission and validation | [Backend artifacts](../../tools/yir-pack-aot/src/backend_artifacts.rs) and [descriptors](../../tools/yir-pack-aot/src/backend_descriptor.rs) |
+| Shader text generation | [Shader generator](../../tools/yir-pack-aot/src/shader_codegen.rs), with separate expression, normalization, syntax and texture helpers |
+| CFFI registry/signature checks | [Host FFI](../../tools/yir-pack-aot/src/host_ffi.rs) and the unchanged [stub generator](../../tools/yir-pack-aot/src/host_ffi_stub.rs) |
+| Host compatibility source/compilation | [Host compiler](../../tools/yir-pack-aot/src/host_compile.rs), [window source](../../tools/yir-pack-aot/src/host_objc.rs) and [shared text](../../tools/yir-pack-aot/src/host_source.rs) |
+| Frame support and fabric plan | [Frame support](../../tools/yir-pack-aot/src/host_frames.rs) and [host plan](../../tools/yir-pack-aot/src/host_plan.rs) |
+
+This organization does not add a backend, CFFI grant or new C/Objective-C shim.
+Existing compatibility templates remain isolated implementation details.
+Source fingerprints check refactor parity, not device execution or a guarantee
+that every emitted scaffold is a fully executable native backend artifact.
+
 ## Export frame
 
 [tools/yir-export-frame/src/main.rs](../../tools/yir-export-frame/src/main.rs)

@@ -12,8 +12,11 @@ fn return_two_bool_field_vector_cli_stale_sensitive_inputs() {
             let current = cases
                 .iter()
                 .find(|case| {
-                    case.first && case.second && case.small_seed == i32::MIN
-                        && !case.bool_seed && case.peer_seed
+                    case.first
+                        && case.second
+                        && case.small_seed == i32::MIN
+                        && !case.bool_seed
+                        && case.peer_seed
                         && case.float_seed == oracle::bits(ty, value)
                 })
                 .unwrap();

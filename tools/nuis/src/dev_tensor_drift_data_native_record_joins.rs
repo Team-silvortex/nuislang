@@ -426,7 +426,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "mutable && ty == *result && !scope.contains_key(name)",
             "_ => break",
             "writes.extend(sequences::carry_names(body))",
-            "candidates.into_iter().find(|name| writes.contains(name))",
+            "candidates.retain(|name| writes.contains(name))",
+            ".next()",
         ],
     },
     DevTensorDriftCheckSpec {

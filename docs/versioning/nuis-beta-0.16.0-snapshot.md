@@ -1,5 +1,9 @@
 # Beta 0.16 Snapshot
 
+Historical minor checkpoint. Use the [versioning index](README.md) for the
+current line; the original baseline and scoped follow-up receipts below retain
+their own dates and acceptance counts.
+
 This minor-line anchor records the existing Git commit `dff1bdbc`
 (`beta-0.16.0`, 2026-10-07). It is not another release, a compatibility freeze
 or a completed self-hosting announcement. Cargo package and protocol versions
@@ -314,7 +318,13 @@ uses explicit profile-aware typed payload/signal transport for nested source ret
 The subsequent [typed loop-return proof](../reference/nuis-native-stateful-loop-return-values-v1.md)
 repairs ordered word-operation admission and executes bool/f32/f64/mixed-record payloads, real false/zero exits, raw NaN words and thirty-two fresh/cache/two source-free images.
 The subsequent [selected typed loop-return proof](../reference/nuis-native-stateful-loop-return-selected-v1.md)
-composes conditional child invocation, demand-only real extent calls, inactive zero-divisor/overflow bounds, late parent progress and exact typed returns through thirty-two further delivery images. Trailing-parent steps remain separate.
+composes conditional child invocation, demand-only real extent calls, inactive zero-divisor/overflow bounds, late parent progress and exact typed returns through thirty-two further delivery images.
+The subsequent [trailing-parent typed return proof](../reference/nuis-native-stateful-loop-return-parent-steps-v1.md)
+checks exact observed parent indices, completed/skipped tail-step regions, selected typed returns, cumulative reservations and sixteen further delivery images without adding a production special case.
+The [parent-continue typed return proof](../reference/nuis-native-stateful-loop-return-parent-continue-v1.md)
+checks 32 source variants across both parent/child step placements, exact continuing/returning regions, later reached reservations, actual State and sixteen delivery images.
+The [parent-break typed return proof](../reference/nuis-native-stateful-loop-return-parent-break-v1.md)
+checks independent parent-break control, live fallback indices 0/1, unused post-break traps versus real false/zero returns, reached reservations and sixteen delivery images. The [mixed-parent-exit proof](../reference/nuis-native-stateful-loop-return-parent-mixed-v1.md) now composes both local exits beside selected typed child returns in one function, with exact source steps, source-order overlap, observed fallback indices 0/1 and 1/2, and sixteen further images. Effect-prefix preservation before effectful snapshot coalescing remains separate.
 Higher-arity live coverage, hidden roots, more than one exit per arm, deeper exits and
 generalized resource transport remain separate.
 These worktree receipts remain independent of

@@ -520,3 +520,15 @@ mod state_loop_return_values;
 
 #[path = "aot_application_effect_call_state_loop_return_selected_tests.rs"]
 mod state_loop_return_selected;
+
+#[path = "aot_application_effect_call_state_loop_return_parent_steps_tests.rs"]
+mod state_loop_return_parent_steps;
+
+#[path = "aot_application_effect_call_state_loop_return_parent_continue_tests.rs"]
+mod state_loop_return_parent_continue;
+
+#[path = "aot_application_effect_call_state_loop_return_parent_break_tests.rs"]
+mod state_loop_return_parent_break;
+
+#[path = "aot_application_effect_call_state_loop_return_parent_mixed_tests.rs"]
+mod state_loop_return_parent_mixed;

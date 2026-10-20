@@ -5,6 +5,13 @@ This file is the short map of what each top-level directory is for.
 Use it when you already know the project roughly, but need to re-orient
 quickly.
 
+The [repository README](../README.md), [documentation index](README.md) and
+[current mainline map](current-mainline-map.md) are short entry routers.
+Detailed native execution receipts are catalogued once in the
+[native session proof index](reference/nuis-native-session-proof-index.md);
+minor identities and historical acceptance belong in the
+[versioning index](versioning/README.md), not repeated entrypoint changelogs.
+
 ## Current Mainline Directories
 
 * [tools](../tools)

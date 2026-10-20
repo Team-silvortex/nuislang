@@ -13,8 +13,7 @@ mod record;
 mod fields;
 pub(super) use fields::{
     arity as private_field_arity, child_scalar as private_field_scalar, install as install_fields,
-    prepare as prepare_fields,
-    Selection as FieldsSelection,
+    prepare as prepare_fields, Selection as FieldsSelection,
 };
 
 pub(super) fn numeric(ty: &NirTypeRef) -> bool {

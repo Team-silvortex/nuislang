@@ -10,7 +10,10 @@ const INACTIVE: &str =
     "print(9); current = current + 2; choice = choice != true; narrow = -narrow; wide = -wide;";
 
 pub fn source(variant: Variant) -> String {
-    let source = variant.source_from(SOURCE, "width");
+    source_from(variant, SOURCE)
+}
+pub fn source_from(variant: Variant, template: &str) -> String {
+    let source = variant.source_from(template, "width");
     if !variant.mirrored {
         return source;
     }
@@ -102,7 +105,42 @@ impl Call {
     pub fn execute(
         self,
         observed: bool,
+        budget: Option<u64>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.execute_with_parent_step(observed, budget, true)
+    }
+    pub fn execute_with_parent_step(
+        self,
+        observed: bool,
+        budget: Option<u64>,
+        leading_parent: bool,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.execute_with_parent_flow(observed, budget, leading_parent, None)
+    }
+    pub fn execute_with_parent_flow(
+        self,
+        observed: bool,
+        budget: Option<u64>,
+        leading_parent: bool,
+        parent_continue: Option<i64>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.execute_with_parent_exits(
+            observed,
+            budget,
+            leading_parent,
+            parent_continue,
+            None,
+            None,
+        )
+    }
+    pub fn execute_with_parent_exits(
+        self,
+        observed: bool,
         mut budget: Option<u64>,
+        leading_parent: bool,
+        parent_continue: Option<i64>,
+        parent_break: Option<i64>,
+        fallback_divisor: Option<i64>,
     ) -> Result<(State, Vec<i64>), Vec<i64>> {
         let prior = self.prior();
         let mut current = State {
@@ -117,7 +155,9 @@ impl Call {
                 return None;
             }
             while outer < self.rounds {
-                outer += 1;
+                if leading_parent {
+                    outer += 1;
+                }
                 trace.push(8);
                 current = flip(current);
                 current.total += outer;
@@ -170,6 +210,19 @@ impl Call {
                     current = flip(current);
                     current.total += 2;
                 }
+                if parent_break == Some(outer) {
+                    trace.push(25);
+                    current.total += outer;
+                    break;
+                }
+                if parent_continue == Some(outer) {
+                    trace.push(25);
+                    current.total += outer;
+                    if !leading_parent {
+                        outer += 1;
+                    }
+                    continue;
+                }
                 trace.push(23);
                 if outer == self.parent {
                     trace.push(24);
@@ -181,8 +234,20 @@ impl Call {
                 trace.push(21);
                 current.total += 1 / self.after;
                 trace.push(22);
+                if !leading_parent {
+                    trace.push(26);
+                    outer += 1;
+                }
             }
             trace.push(31);
+            if let Some(divisor) = fallback_divisor {
+                if observed {
+                    trace.push(outer);
+                }
+                trace.push(33);
+                let _checked = 1i64.checked_div(divisor)?;
+                trace.push(32);
+            }
             Some(State {
                 total: prior.total + 1 - 7,
                 ..flip(prior)

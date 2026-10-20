@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{HostFfiScalarType, HostFfiSignature};
+use crate::host_ffi::{HostFfiScalarType, HostFfiSignature};
 
 pub(super) fn render_host_ffi_stubs(
     host_ffi_symbols: &BTreeMap<String, HostFfiSignature>,

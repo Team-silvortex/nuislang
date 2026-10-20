@@ -1,235 +1,26 @@
 # Documentation Index
 
-This directory separates present-tense implementation truth from phase history
-and longer-range design. If two documents disagree, prefer checked-in behavior,
-tests, the development tensor, and `docs/reference/` in that order.
+This directory separates implementation truth, scoped acceptance receipts,
+release history and future design. Prefer code/tests, the live development
+tensor and focused reference contracts when they disagree.
 
 ## Read This First
 
-Use this short route for the current `beta-0.16.*` repository, anchored at
-[`beta-0.16.0`](versioning/nuis-beta-0.16.0-snapshot.md) (`dff1bdbc`, 2026-10-07).
-The beta-0.15 snapshots and patches remain historical:
+The current series is `beta-0.17.*`, with committed patch `beta-0.17.3`
+(`81dc1669`). Uncommitted work and historical acceptance stay separate.
 
 1. [Current mainline map](current-mainline-map.md)
-2. [Beta-0.16 checkpoint](versioning/nuis-beta-0.16.0-snapshot.md)
-3. [Mainline dependency selection](reference/nuis-development-tensor-mainline.md)
-4. [Native scalar session bridge](reference/nuis-native-scalar-session-bridge-v1.md)
-5. [Stateful window contract](reference/nuis-yir-window-session-v3.md)
-6. [Cancellation and host retirement](reference/nuis-yir-application-cancellation-v1.md)
-7. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
-8. [Focused validation checklist](versioning/nuis-beta-0.16.0-release-checklist.md)
+2. [Current snapshot](versioning/nuis-beta-0.17.0-snapshot.md)
+3. [Focused validation checklist](versioning/nuis-beta-0.17.0-release-checklist.md)
+4. [Mainline dependency selection](reference/nuis-development-tensor-mainline.md)
+5. [Native session proof index](reference/nuis-native-session-proof-index.md)
+6. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)
+7. [Reference contracts](reference/README.md)
+8. [Versioning history](versioning/README.md)
 
-The [native loop snapshot proof](reference/nuis-native-scalar-loop-snapshots-v1.md)
-tracks post-loop boundaries and safe capture normalization without replacing the released patch history.
-The [artifact publication contract](reference/nuis-artifact-file-publication-v1.md)
-records the reproduced cache-overwrite `SIGKILL` class and fresh-file replacement.
-The [typed selected-return handoff](reference/nuis-native-typed-effect-returns-v1.md)
-separates exact scalar return evidence from native callback effect authority.
-The [explicit literal-print policy](reference/nuis-native-literal-print-policy-v1.md)
-checks bounded registered native effects without widening the default pure bridge;
-the [explicit build policy](reference/nuis-native-literal-print-build-policy-v1.md)
-now binds authorization through cache, standalone restoration and native launch.
-The [guarded scalar-call follow-up](reference/nuis-native-effectful-scalar-selection-v1.md)
-repairs source effect order and one-sided existing-scalar rebinding without
-granting effects or evaluating inactive arguments. Bounded nested updates also
-keep descendant predicates inside ancestor guards rather than hoisting them.
-Bounded sequential scalar leaves also preserve private staging, repeated binding
-versions and unused calls without exporting locals or relaxing effect grants.
-The unified bounded ordered-region walk replaces the original prefix, suffix and
-two-child production proofs while retaining their regression fixtures. Adjacent
-and longer sibling sequences, including final-child regions, preserve current
-merged values and private staging under shared work/capture/depth limits and
-single-target publication, with native source-free execution and trap evidence.
-Single-edge logical child predicates now preserve once-only owned-bool atom/
-literal and bounded computed nonlogical left gates, including calls, comparisons
-and checked arguments. Bounded direct logical children now form trees under one
-shared region edge/work/depth budget, with linear helper growth and complete
-guarded RHS subtrees. Fresh owned-bool let/const logical initializers now share
-that proof within selected scalar regions and prefix/middle/suffix stages,
-keeping private declarations, current versions and cross-stage constant seals.
-Existing owned-bool let roots now update private stage bindings or the sole
-published bool target, preserving read-before-write captures and constant seals.
-Single-statement child leaves now reuse the stage proof for an existing
-owned-bool target, with both-sided or retained outcomes. The
-[top-level logical-arm follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#top-level-logical-arms)
-now also admits single-statement existing-bool updates through that shared plan,
-including consecutive current merges and condition-only effects. Hidden logical
-leaves and generalized resource/exit transport remain separate. The
-[paired logical-return proof](reference/nuis-native-effectful-scalar-selection-v1.md#paired-logical-bool-returns)
-now also covers two-sided single owned-bool returns, keeping shared condition/
-value budgets, original exits and caller continuation. The
-[private return-prefix follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-logical-return-prefixes)
-reuses selected staging with isolated fresh scopes, current versions, constant
-seals and complete unused-call effects. The
-[complete return-tree follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#nested-logical-return-trees)
-now composes bounded all-return nested selections with guarded inner conditions,
-isolated private leaves and one shared original-work budget. The
-[private ancestor-staging follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-ancestor-staging)
-now retains fresh scalar work before terminal inner selections, with current
-private versions/seals and complete descendant captures. The
-[private bool-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#private-return-bool-updates)
-adds bounded consecutive paired/one-sided updates of prefix-owned bools, retaining
-current values without permitting incoming or sealed writes. The
-[nested private-update follow-up](reference/nuis-native-effectful-scalar-selection-v1.md#nested-private-return-bool-updates)
-adds nested terminal exports with bounded private child staging, seals and unused
-work, retaining actual current outcomes and shared original-work limits. The
-[ordered private-update follow-up](reference/nuis-native-private-ordered-return-updates-v1.md)
-adds source-ordered writes to the single authorized target in those prefixes,
-without treating permission as a source-defined version. The
-[retention-tail follow-up](reference/nuis-native-private-retention-return-updates-v1.md)
-discovers actual earlier writes when terminal selections only retain current
-values, keeping fresh declarations and no-write candidates separate from
-ownership. The [trailing-private-work follow-up](reference/nuis-native-private-trailing-return-updates-v1.md)
-also proves final private let/const work without resetting seals, dropping unused
-work or exporting the fresh binding. The [terminal-private-child follow-up](reference/nuis-native-private-terminal-child-return-updates-v1.md)
-adds terminal updates of one prefix-defined private child without exporting it
-instead of the ancestor. The [terminal mixed-update follow-up](reference/nuis-native-private-mixed-return-updates-v1.md)
-preserves both source orders of ancestor/private-child writes with one outward
-ancestor. The [flat mixed-continuation follow-up](reference/nuis-native-private-flat-mixed-continuations-v1.md)
-keeps later child reads in branch-current scopes with one outward ancestor and
-bounded nonrecursive recipe copying. The [nested branch-tree follow-up](reference/nuis-native-private-nested-mixed-continuations-v1.md)
-keeps branch-current nested gates and copies only flat suffix recipes at original
-leaves. The [sequential mixed-continuation follow-up](reference/nuis-native-private-sequential-mixed-continuations-v1.md)
-preserves both current bool versions with bounded private scalar transport and
-linear installation. The [nested sequential follow-up](reference/nuis-native-private-nested-sequential-mixed-continuations-v1.md)
-also composes branch-local sequences with whole-forest preflight and no tail
-copies. The [i32-pair follow-up](reference/nuis-native-private-i32-pair-continuations-v1.md)
-also preserves an exact signed private child. The [i64-pair follow-up](reference/nuis-native-private-i64-pair-continuations-v1.md)
-adds an exact private owned result for a full-width signed child. The [float-pair follow-up](reference/nuis-native-private-float-pair-continuations-v1.md)
-reuses that result contract for exact f32/f64 values and bit-preserving native joins.
-The [event-failure follow-up](reference/nuis-native-private-continuation-event-failure-v1.md)
-separates last-state publication, fatal native traps and recoverable cleanup.
-The [event-budget follow-up](reference/nuis-native-private-continuation-event-budget-v1.md)
-checks exact inclusive entry limits and unchanged last state at a rejected private
-publication continuation, including repeated event/close reset.
-The [i32-ancestor follow-up](reference/nuis-native-private-i32-ancestor-continuations-v1.md)
-adds one exact signed outward ancestor beside a private bool, retaining the
-surrounding bool-return contract and original single-target authority.
-The [i64-ancestor follow-up](reference/nuis-native-private-i64-ancestor-continuations-v1.md)
-preserves the full signed width in exact private owned fields and keeps one
-outward target inside the surrounding bool return.
-The [float-ancestor follow-up](reference/nuis-native-private-float-ancestor-continuations-v1.md)
-preserves exact f32/f64 outward fields beside a private bool, with raw native
-callee-bit and event-publication checks through cache and source-free images.
-The [dual-i64 follow-up](reference/nuis-native-private-dual-i64-continuations-v1.md)
-adds one exact i64 outward owner beside a private i64 child, with actual pair
-observations and cache/source-free event-publication proof.
-The [i64/float follow-up](reference/nuis-native-private-i64-float-continuations-v1.md)
-adds exact f32/f64 private fields beside one i64 outward owner, with raw IEEE
-pair observations and cache/source-free publication checks.
-The [float/i64 follow-up](reference/nuis-native-private-float-i64-continuations-v1.md)
-also carries a private i64 beside an exact f32/f64 outward owner, preserving
-actual IEEE bits, integer extrema and last accepted publication.
-The [same-width float follow-up](reference/nuis-native-private-same-float-continuations-v1.md)
-adds exact f32/f32 and f64/f64 private pairs with independent input and output words.
-The [cross-width float follow-up](reference/nuis-native-private-cross-float-continuations-v1.md)
-adds f32/f64 and f64/f32 private fields without numeric conversion or narrowing.
-The [i32/i64 follow-up](reference/nuis-native-private-i32-i64-continuations-v1.md)
-adds exact signed-width fields without reusing bool/i32 packing.
-The [i64/i32 reverse follow-up](reference/nuis-native-private-i64-i32-continuations-v1.md)
-retains a full i64 outward owner beside a private i32, using the same independent fields.
-The [same-width i32 follow-up](reference/nuis-native-private-i32-i32-continuations-v1.md)
-keeps both integer fields distinct through crossed extrema and source-free publication checks.
-The [i32/float follow-up](reference/nuis-native-private-i32-float-continuations-v1.md)
-adds exact f32/f64 children beside an i32 owner, separating raw IEEE and finite CLI proofs.
-The [float/i32 reverse follow-up](reference/nuis-native-private-float-i32-continuations-v1.md)
-adds exact floating owners beside i32 children, including current zero/negative-one updates.
-The [three-field continuation proof](reference/nuis-native-private-three-field-continuations-v1.md)
-adds two private numeric children under a separate lexical certificate and a field-driven carrier.
-The [retained-owner follow-up](reference/nuis-native-retained-owner-three-field-continuations-v1.md)
-preserves an already authorized owner through initial child-only selections.
-The [numeric field-list follow-up](reference/nuis-native-numeric-field-vector-continuations-v1.md)
-adds a bounded numeric list with actual four-field and third-input computation evidence.
-The [mixed bool field-list follow-up](reference/nuis-native-bool-field-vector-continuations-v1.md)
-adds exact private bools with current/retained logical values and unchanged numeric Target authority.
-The [two-bool sibling follow-up](reference/nuis-native-two-bool-field-vector-continuations-v1.md)
-adds independent current-sibling computation and stale-read counterexamples without new admission rules.
-The [floating-owner field-list follow-up](reference/nuis-native-floating-owner-field-vector-continuations-v1.md)
-adds original-width owner observations and actual equality-masked stale-source counterexamples through the same generic fields.
-The [cross-width mixed field-list follow-up](reference/nuis-native-cross-width-field-vector-continuations-v1.md)
-keeps owner/child bit widths independent through actual computation, retained state and source-free restoration.
-The [simultaneous float child-list follow-up](reference/nuis-native-simultaneous-float-field-vector-continuations-v1.md)
-executes independent f32/f64 private children in one six-field computation without new transport recipes or owner authority.
-The [bounded mixed-field early-exit follow-up](reference/nuis-native-early-mixed-field-exits-v1.md)
-adds a genuine bool return after a completed field join, while one guarded continuation retains current fields.
-The [in-selection field-exit follow-up](reference/nuis-native-in-selection-field-exits-v1.md)
-executes a single exit before the selected arm completes, retaining current prefix values and skipping unfinished work without field control flags.
-The [nested continuing-selection follow-up](reference/nuis-native-nested-continuing-field-selections-v1.md)
-adds a bounded nested remainder with current/retained typed fields and no shared-tail copying.
-The [nested pre-exit follow-up](reference/nuis-native-nested-pre-exit-field-selections-v1.md)
-adds bounded field choices before the same single exit, with genuine current-value exit decisions and preserved prefix work.
-The [nested sibling follow-up](reference/nuis-native-nested-sibling-field-selections-v1.md)
-adds current/retained updates in the other field arm, while poisoned source-exit checks stay behind the original arm gate.
-The [owner-only common-tail follow-up](reference/nuis-native-nested-owner-tail-selections-v1.md)
-adds nested choices after that gate, retaining read-only child fields and the single original numeric owner.
-The [certified child-tail follow-up](reference/nuis-native-certified-child-tail-selections-v1.md)
-allows one child binding under that original certificate, with a real stale-value counterexample and preserved empty leaves.
-The [certified pair-tail follow-up](reference/nuis-native-certified-pair-tail-selections-v1.md)
-adds two-child current-value interaction under that certificate, without changing the capture bound or granting entering writes.
-The [certified triple-tail follow-up](reference/nuis-native-certified-triple-tail-selections-v1.md)
-adds a third current-value-dependent child update, with raw field observations and a separately unmasked stale-third-input result.
-The [certified four-child tail follow-up](reference/nuis-native-certified-quad-tail-selections-v1.md)
-adds f32 consumption of the new i32 value, with an unmasked fourth-input witness and separate raw-field/predecessor evidence for earlier dependencies.
-The [certified five-child tail follow-up](reference/nuis-native-certified-quint-tail-selections-v1.md)
-closes the existing five-field dependency chain and distinguishes six authorized writes from entering-root violations without exposing certificate internals.
-The [paired source-arm exits follow-up](reference/nuis-native-paired-field-arm-exits-v1.md)
-adds one direct bool exit in each arm, preserving current selected prefix fields and a single continuing tail without field-record control flags.
-The [returning exit-prefix follow-up](reference/nuis-native-returning-exit-prefixes-v1.md)
-adds exit-local owner work and certified child selections before the bool return; native two-child execution and five-child structural proof are separate scopes.
-The [typed returning-prefix follow-up](reference/nuis-native-typed-returning-prefixes-v1.md)
-advances that historical structural boundary to five-child native execution, six independent current-value witnesses and eight verified delivery images.
-The [ordinary bool-prefix return follow-up](reference/nuis-native-plain-bool-prefix-returns-v1.md)
-admits plain call/literal/name returns through the existing bounded prefix proof; wrapped and plain typed fixtures are checked independently without new write authority.
-The [ordinary complete bool-return-tree follow-up](reference/nuis-native-plain-bool-return-trees-v1.md)
-removes the separate tree logical-leaf gate under existing type, effect, scope and budget checks, with selected-only native and source-free delivery evidence.
-The [ordinary bool const staging follow-up](reference/nuis-native-plain-bool-const-staging-v1.md)
-removes the staged bool initializer syntax gate while preserving fresh names, exact bool types, seals and source budgets; non-bool const admission remains separate.
-The [sealed-binding preflight repair](reference/nuis-native-sealed-binding-preflight-v1.md)
-checks the destination rather than RHS syntax, retaining bounded traversal, atomic vetoes, read-only constant captures and unrelated mutable updates.
-The [state-dependent bool session proof](reference/nuis-native-stateful-bool-sessions-v1.md)
-checks actual latest-State consumption, repeated-input result witnesses and failure-before-publication through the existing lowering and source-free delivery chain.
-The [typed state reconstruction proof](reference/nuis-native-stateful-field-reconstruction-v1.md)
-combines dependent i64/bool results with bit-exact untouched floating fields; source-free CLI coverage keeps its separate decimal-input scope.
-The [state-derived branch selection proof](reference/nuis-native-state-derived-branch-selection-v1.md)
-checks prior-bool/current-count control flow, identical complete event arguments and separate state-aware poisoned arguments through native and source-free sessions.
-The [stateful continuing branch join proof](reference/nuis-native-stateful-branch-joins-v1.md)
-checks selected local updates followed by a once-only common tail, current-value bool/State reconstruction and common-tail traps after either arm.
-The [stateful skipped-arm retention proof](reference/nuis-native-stateful-skipped-arm-retention-v1.md)
-checks omitted-else and empty-then forms, real retained values instead of inactive zeros, poisoned work arguments and last publication through native/source-free sessions.
-The [stateful sequential optional update proof](reference/nuis-native-stateful-sequential-updates-v1.md)
-checks current-version handoff into both the second predicate and actual callee, using a generic multi-callee probe with single-observer/paired-row compatibility replay.
-The [bounded per-event loop proof](reference/nuis-native-stateful-bounded-loops-v1.md)
-checks actual iteration arguments and current-value carries over zero/one/three runtime trips, budget preflight and source-free delivery without widening pure-helper admission.
-The [literal-print iteration-effect proof](reference/nuis-native-stateful-loop-effects-v1.md)
-adds real condition/selected-prefix/work prints through a separate call profile, with exact backend permissions, dependency order and unchanged pure-value discovery.
-The [direct loop-statement proof](reference/nuis-native-stateful-loop-statements-v1.md)
-adds actual print-only and state-carrying loop statements under explicit authority, with shared-budget failure prefixes and source-free delivery.
-The [effectful loop-exit proof](reference/nuis-native-stateful-loop-exits-v1.md)
-composes break/continue with actual prints and recovered indices through the same scoped lowering and native/source-free session boundaries.
-The [child-local loop-exit proof](reference/nuis-native-stateful-loop-children-v1.md)
-checks that nested child exits remain local, actual child indices feed continuing parent work, and later child invocations share the callback's remaining budget.
-The [selected-child invocation proof](reference/nuis-native-stateful-loop-selection-v1.md)
-checks that inactive children neither compute bounds nor reserve work, with current-value selection, selected failure prefixes and source-free identity.
-The [parent-local loop-exit proof](reference/nuis-native-stateful-loop-parents-v1.md)
-checks actual child results retained across parent break/continue, observed leading parent indices, skipped suffixes and cumulative later-child reservation through native/source-free delivery.
-The [effectful loop-return proof](reference/nuis-native-stateful-loop-returns-v1.md)
-checks explicit iteration-only return admission, selected payload evaluation before publication, nested parent escape, full reached-loop bounds and sixteen fresh/cache/two source-free images.
-The [typed loop-return follow-up](reference/nuis-native-stateful-loop-return-values-v1.md)
-repairs missing ordered pack/unpack/xor admission and checks actual bool/f32/f64/mixed-record returns, raw values and thirty-two fresh/cache/two source-free images.
-The [selected typed loop-return proof](reference/nuis-native-stateful-loop-return-selected-v1.md)
-checks real demand-only extent calls, inactive divide-by-zero/overflow bounds, late selected children and exact typed exits through thirty-two delivery images. Trailing-parent steps and effectful coalescing remain separate.
-Higher-arity live coverage and generalized resource transport,
-other entering writes, more than one exit per arm and deeper exits
-remain separate.
-
-The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
-still governs this line. The explicit scripted AppKit cancellation route does not imply
-general interactive/parent cancellation, provider/device retirement, a self-contained image
-or completed compiler self-hosting. Use the references below for each boundary.
-
-The [versioning index](versioning/README.md) routes older beta, alpha, and
-pre-alpha snapshots. Those files explain how the current shape emerged; they
-are not the default source for current capability claims.
+These entrypoints are routers, not proof-by-proof changelogs. New detailed
+evidence belongs in its focused receipt and proof index; do not append the same
+narrative to README, this index and the mainline map.
 
 ## Truth Layers
 

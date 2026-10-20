@@ -122,9 +122,16 @@ hierarchy/lineage status.
 | `validation_command` | `59251682c4f314022aa6ceff5b2e28e000b11bc36e27fed230b92652d7216b05` |
 | `expected_artifact` | `c7875fdfa16c550315c45d0aab762375a5662613e8485e78c5e428b2ee07f545` |
 
-The next bounded composition is a trailing parent with these selected typed
-child returns: verify exact step timing, parent progress, selected-only bounds
-and unchanged publication before expanding effectful snapshot/coalescing work.
+The [trailing-parent follow-up](nuis-native-stateful-loop-return-parent-steps-v1.md)
+now checks these selected typed child returns with exact parent indices, completed
+and skipped tail-step regions, shared reservations and sixteen delivery images.
+The [parent-continue follow-up](nuis-native-stateful-loop-return-parent-continue-v1.md)
+now checks both parent step placements, completed continues and later reached
+reservations. The [parent-break follow-up](nuis-native-stateful-loop-return-parent-break-v1.md)
+now checks independent local break and typed fallback. The
+[mixed-exit follow-up](nuis-native-stateful-loop-return-parent-mixed-v1.md)
+now composes break/continue beside these returns in one function. Effect-prefix
+proof before effectful snapshot coalescing remains separate.
 General I/O/resources, asynchronous capture, broader entering-State writes,
 global immutability, full heterogeneous closure and completed self-hosting remain
 separate. No new Linux/GPU/Windows run, full-workspace/strict-Clippy acceptance,

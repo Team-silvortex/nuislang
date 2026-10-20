@@ -15,6 +15,12 @@ This rule is enforced by:
 
 * [tools/nuisc/tests/file_line_limit.rs](../tools/nuisc/tests/file_line_limit.rs)
 
+The repository README, documentation index and current mainline map are short
+routers, capped separately at 300 lines by the source-only
+[hygiene tests](../scripts/tests/test_repository_hygiene.py). Detailed proof
+narratives belong in focused references, reached through the
+[native session proof index](reference/nuis-native-session-proof-index.md).
+
 ## Why This Exists
 
 The compiler and stdlib have accumulated a number of very large files. That
@@ -44,6 +50,14 @@ Important rule:
   recorded budget
 * if a file drops in size, its budget should be lowered with it
 * new files should not be added to the exception list casually
+
+The ratchet test requires each listed file to remain above its default limit
+and match its exact recorded ceiling. Remove an exception once it is no longer
+needed. The 2026-10-18 audit retired 42 obsolete entries, leaving 14 actual
+oversized files; this shrinks debt permissions, not the covered test surface.
+The subsequent AOT packer modularization removes its 3,888-line entrypoint
+exception as well, leaving 13 oversized files. All new packer modules use the
+default limits rather than receiving replacement exceptions.
 
 ## Practical Working Rule
 

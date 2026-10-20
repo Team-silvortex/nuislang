@@ -8,89 +8,25 @@ const MARKDOWN_MAX_LINES: usize = 2000;
 
 fn exception_budgets() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
-        ("crates/nuis-artifact/src/artifact.rs", 1801),
-        ("crates/nuis-runtime/src/executor.rs", 2282),
-        ("crates/nuis-runtime/src/loader.rs", 775),
-        ("crates/nuis-semantics/src/model.rs", 2720),
-        ("crates/yir-core/src/lib.rs", 3450),
-        ("crates/yir-domain-cpu/src/lib.rs", 3217),
-        ("crates/yir-domain-kernel/src/lib.rs", 1581),
-        ("crates/yir-domain-shader/src/lib.rs", 6445),
-        ("crates/yir-lower-contract/src/lib.rs", 2530),
-        ("crates/yir-lower-llvm/src/lib.rs", 600),
-        ("crates/yir-lower-llvm/src/tests.rs", 600),
         (
             "examples/projects/domains/net_session_recipe_demo/main.ns",
             1106,
         ),
-        (
-            "examples/projects/tooling/cli_compile_workflow_demo/main.ns",
-            638,
-        ),
-        (
-            "examples/projects/tooling/cli_project_build_report_demo/main.ns",
-            609,
-        ),
-        (
-            "examples/projects/tooling/cli_workflow_automation_demo/main.ns",
-            629,
-        ),
-        ("examples/projects/window_controls_demo/main.ns", 619),
         ("stdlib/std/cli_build_pipeline_recipe.ns", 1029),
         ("stdlib/std/cli_compile_workflow_recipe.ns", 1659),
         ("stdlib/std/cli_project_build_report_recipe.ns", 1032),
         ("stdlib/std/cli_workflow_automation_recipe.ns", 930),
         ("stdlib/std/net_session_recipe.ns", 1267),
-        ("stdlib/std/workflow_runtime.ns", 657),
-        ("tools/nsbdr/src/main.rs", 634),
-        ("tools/nsld/src/check.rs", 925),
-        ("tools/nsld/src/closure.rs", 616),
-        ("tools/nsld/src/display.rs", 1862),
-        ("tools/nsld/src/final_executable_emit.rs", 672),
-        ("tools/nsld/src/json.rs", 2220),
-        ("tools/nsld/src/json_container.rs", 639),
-        ("tools/nsld/src/main.rs", 633),
-        ("tools/nsld/src/main_cli_tests.rs", 867),
-        ("tools/nsld/src/main_container_verify_tests.rs", 710),
-        ("tools/nsld/src/main_tests.rs", 3695),
-        ("tools/nsld/src/object_image_dry_run.rs", 812),
-        ("tools/nsld/src/object_writer_input.rs", 682),
-        ("tools/nsld/src/reports.rs", 1109),
-        ("tools/nuis/src/main.rs", 3244),
-        (
-            "tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs",
-            815,
-        ),
-        ("tools/nuisc/src/frontend/tests_lambda_higher_order.rs", 946),
-        (
-            "tools/nuisc/src/frontend/tests_match_struct_bindings.rs",
-            973,
-        ),
-        ("tools/nuisc/src/frontend/tests_parse_annotations.rs", 1120),
         ("tools/nuisc/src/frontend/tests_try.rs", 1291),
-        ("tools/nuisc/src/frontend/tests_types_async_window.rs", 938),
-        (
-            "tools/nuisc/src/lowering/tests_async_network_runtime.rs",
-            657,
-        ),
-        ("tools/nuisc/src/lowering/tests_loop_flow.rs", 1555),
         ("tools/nuisc/src/lowering/tests_loop_post_flow.rs", 1143),
-        ("tools/nuisc/src/lowering/tests_loops_basic.rs", 626),
-        ("tools/nuisc/src/lowering/tests_recursion.rs", 850),
-        ("tools/nuisc/src/nir_verify/tests.rs", 1789),
-        (
-            "tools/nuisc/src/project/tests/packet_data_contracts.rs",
-            699,
-        ),
-        ("tools/nuisc/src/project/tests/planning_kernel.rs", 609),
+        ("tools/nuisc/src/nir_verify/tests.rs", 1787),
         (
             "tools/nuisc/src/project/tests/shader_nova_contracts.rs",
             2115,
         ),
         ("tools/nuisc/tests/glm_verify.rs", 1400),
-        ("tools/nuisc/tests/memory_compile.rs", 1786),
+        ("tools/nuisc/tests/memory_compile.rs", 1747),
         ("tools/nuisc/tests/network_compile.rs", 1446),
-        ("tools/yir-pack-aot/src/main.rs", 3910),
     ])
 }
 
@@ -122,6 +58,23 @@ fn visit_files(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) {
         } else if should_check(&path) {
             files.push(path);
         }
+    }
+}
+
+#[test]
+fn historical_line_exceptions_are_still_needed_and_tight() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (relative, budget) in exception_budgets() {
+        let path = root.join(relative);
+        let lines = line_count(&path);
+        assert!(
+            lines > default_limit_for(Path::new(relative)),
+            "{relative}: remove the obsolete exception after shrinking below the default limit"
+        );
+        assert_eq!(
+            lines, budget,
+            "{relative}: lower the exception budget when the file shrinks"
+        );
     }
 }
 

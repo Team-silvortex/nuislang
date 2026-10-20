@@ -131,3 +131,19 @@ mod return_values_tests;
 #[cfg(test)]
 #[path = "iteration_effects_return_selected_tests.rs"]
 mod return_selected_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_return_parent_steps_tests.rs"]
+mod return_parent_steps_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_return_parent_continue_tests.rs"]
+mod return_parent_continue_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_return_parent_break_tests.rs"]
+mod return_parent_break_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_return_parent_mixed_tests.rs"]
+mod return_parent_mixed_tests;

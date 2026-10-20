@@ -1,0 +1,76 @@
+mod cpu Main {
+    struct State { result: bool, total: i64, gain: f32, marker: f64 }
+    @noinline fn extent(trips: i64, divisor: i64) -> i64 { print(16); return trips / divisor; }
+    @noinline fn returned(flag: bool, total: i64, gain: f32, marker: f64, index: i64, outer: i64, proof: i64) -> State {
+        print(30);
+        let checked = 1 / proof;
+        return State { result: flag, total: total + 10 * index + 100 * outer + checked, gain: gain, marker: marker };
+    }
+    @noinline fn work(flag: bool, total: i64, gain: f32, marker: f64, gate: bool, trips: i64, cut: i64, rounds: i64, parent: i64, root: i64, hole: i64, divisor: i64, after: i64) -> State {
+        let mut current = total;
+        let mut choice = flag;
+        let mut narrow = gain;
+        let mut wide = marker;
+        let mut outer = 0;
+        while outer < rounds {
+            print(8);
+            current = current + outer;
+            choice = choice != true;
+            narrow = -narrow;
+            wide = -wide;
+            let odd = current % 2 != 0;
+            let selected = gate != odd;
+            let mut index = 0;
+            if selected {
+                print(6);
+                let width = extent(trips, divisor);
+                print(7);
+                while index < width {
+                    print(10);
+                    current = current + index + 1;
+                    choice = choice != true;
+                    narrow = -narrow;
+                    wide = -wide;
+                    if index == cut {
+                        print(11);
+                        if gate { print(12); return returned(choice, current, narrow, wide, index, outer, 1 / root); }
+                        print(13);
+                        index = index + 1;
+                        continue;
+                    }
+                    print(19);
+                    let proof = 1 / (index - hole);
+                    current = current + proof;
+                    print(20);
+                    index = index + 1;
+                }
+            } else { print(9); current = current + 2; choice = choice != true; narrow = -narrow; wide = -wide; }
+            print(23);
+            if outer == parent { print(24); return returned(choice, current, narrow, wide, index, outer, 1 / root); }
+            let check = 1 / after;
+            print(21);
+            current = current + check;
+            print(22);
+            print(26);
+            outer = outer + 1;
+        }
+        print(31);
+        return State { result: flag != true, total: total - 7, gain: -gain, marker: -marker };
+    }
+    fn start(flag: bool, total: i64, gain: f32, marker: f64, gate: bool, trips: i64, cut: i64, rounds: i64, parent: i64, root: i64, hole: i64, after: i64, tail: i64, divisor: i64) -> State {
+        print(5);
+        let value = work(flag, total + 1, gain, marker, gate != flag, trips, cut, rounds, parent, root, hole, divisor, after);
+        print(35);
+        let check = 1 / tail;
+        return State { result: value.result, total: value.total + check, gain: value.gain, marker: value.marker };
+    }
+    fn step(state: State, flag: bool, total: i64, gain: f32, marker: f64, gate: bool, trips: i64, cut: i64, rounds: i64, parent: i64, root: i64, hole: i64, after: i64, tail: i64, divisor: i64) -> State {
+        print(5);
+        let value = work(state.result, state.total + 1, state.gain, state.marker, gate != state.result, trips, cut, rounds, parent, root, hole, divisor, after);
+        print(35);
+        let check = 1 / tail;
+        return State { result: value.result, total: value.total + check, gain: value.gain, marker: value.marker };
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}
