@@ -62,6 +62,32 @@ The [bounded candidate-attempt proof](../reference/nuis-native-return-effect-sto
 tries later records after a failed certificate, retaining deterministic order and fallback.
 The [ordered reassignment proof](../reference/nuis-native-return-effect-storage-reassignment-v1.md)
 preserves initialization dominance, typed prefix writes and exact failure order.
+The [helper-call follow-up](../reference/nuis-native-return-effect-storage-helper-calls-v1.md)
+checks ordered arguments, aggregate results and selected prefix-call failures
+through the existing lowering, without expanding production call authority.
+The [reached-loop follow-up](../reference/nuis-native-return-effect-storage-loop-calls-v1.md)
+extends executable witnesses to real iteration and parent-exit updates, with
+semantic trace hooks and later-iteration failure boundaries.
+The [branch-selected follow-up](../reference/nuis-native-return-effect-storage-branch-calls-v1.md)
+checks distinct multi-field helper paths, poisoned unselected arguments and
+selected even/odd failures without new production authority.
+The [record-dependent bound follow-up](../reference/nuis-native-return-effect-storage-bound-calls-v1.md)
+uses completed selected records to determine actual reached child work,
+preserving full computed reservations and separate bound failure boundaries.
+The [sibling-bound follow-up](../reference/nuis-native-return-effect-storage-sibling-bounds-v1.md)
+checks one completed snapshot reused by sibling loops without merging their
+reservations or confusing child-local and parent/function exit targets.
+The [parent-preheader follow-up](../reference/nuis-native-return-effect-storage-preheader-bounds-v1.md)
+keeps the selected snapshot alive across parent backedges, with separate reached
+reservations, source-free delivery and no new production call authority.
+The [distinct-epoch follow-up](../reference/nuis-native-return-effect-storage-epoch-bounds-v1.md)
+checks simultaneous older/newer snapshot identities, changing child bounds,
+reached construction failures and separate full reservations across backedges.
+The [returned-snapshot follow-up](../reference/nuis-native-return-effect-storage-snapshot-returns-v1.md)
+checks complete older/newer payloads from selected inner-loop exits on first
+and later parent iterations, with unchanged call and storage authority.
+The [payload-call follow-up](../reference/nuis-native-return-effect-storage-payload-calls-v1.md)
+adds ordered effectful arguments and selected finalizer failures before return publication.
 General resource/I/O/asynchronous capture, broader entering-State
 writes, stable ABI, full heterogeneous closure and completed self-hosting remain
 separate.

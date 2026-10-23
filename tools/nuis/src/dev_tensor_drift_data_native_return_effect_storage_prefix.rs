@@ -40,7 +40,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "effect_return_storage_prefix_keeps_real_carry_reduction_and_ordered_effects",
             "compare_sources(true)", "maximum_carry_width(&shared) + 4",
-            "kind.trace(trace)",
+            "match kind.execute(call, false, None)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -59,7 +59,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/native_session_workflow/effect_call_state_loop_return_shared.rs",
         required_patterns: &[
             "shared_return_storage_prefix_fresh_cache_and_source_free_delivery_keeps_ordered_prints",
-            "delivery(cases::SourceKind::Prefix)", "kind.trace(call.trace(false))",
+            "delivery(cases::SourceKind::Prefix)", "kind.execute(*call, false, None).unwrap().1",
             "for restore in 0..2", "fresh.host_objects == cached.host_objects",
         ],
     },

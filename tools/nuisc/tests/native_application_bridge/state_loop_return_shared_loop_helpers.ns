@@ -1,0 +1,19 @@
+@noinline fn loop_seed(seed: State) -> State {
+    print(810);
+    return seed;
+}
+@noinline fn loop_delta(delta: i64, root: i64) -> i64 {
+    print(811);
+    return delta + 0 / root;
+}
+@noinline fn loop_gate(root: i64) -> i64 {
+    print(814);
+    return root;
+}
+@noinline fn loop_record(seed: State, delta: i64, root: i64) -> State {
+    print(812);
+    let checked = 0 / root;
+    print(813);
+    return State { result: seed.result, total: seed.total + delta + checked,
+        gain: seed.gain, marker: seed.marker };
+}

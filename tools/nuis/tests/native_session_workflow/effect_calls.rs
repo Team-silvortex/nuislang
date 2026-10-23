@@ -741,3 +741,6 @@ mod state_loop_return_parent_mixed;
 
 #[path = "effect_call_state_loop_return_shared.rs"]
 mod state_loop_return_shared;
+
+#[path = "effect_call_state_loop_sibling_bounds.rs"]
+mod state_loop_sibling_bounds;

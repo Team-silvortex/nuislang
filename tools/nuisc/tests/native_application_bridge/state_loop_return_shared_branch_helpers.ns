@@ -1,0 +1,41 @@
+@noinline fn branch_even_seed(seed: State) -> State {
+    print(910);
+    return seed;
+}
+@noinline fn branch_even_delta(delta: i64, root: i64) -> i64 {
+    print(911);
+    return delta + 0 / root;
+}
+@noinline fn branch_even_gate(root: i64) -> i64 {
+    print(914);
+    return root;
+}
+@noinline fn branch_even_record(seed: State, delta: i64, root: i64) -> State {
+    print(912);
+    let checked = 0 / root;
+    print(913);
+    let choice = seed.result;
+    return State { result: choice != true, total: seed.total + delta + checked,
+        gain: -seed.gain, marker: -seed.marker };
+}
+@noinline fn branch_odd_seed(seed: State) -> State {
+    print(920);
+    let choice = seed.result;
+    return State { result: choice != true, total: seed.total,
+        gain: -seed.gain, marker: seed.marker };
+}
+@noinline fn branch_odd_delta(delta: i64, root: i64) -> i64 {
+    print(921);
+    return delta + 0 / root;
+}
+@noinline fn branch_odd_gate(root: i64) -> i64 {
+    print(924);
+    return root;
+}
+@noinline fn branch_odd_record(seed: State, delta: i64, root: i64) -> State {
+    print(922);
+    let checked = 0 / root;
+    print(923);
+    return State { marker: -seed.marker, gain: seed.gain,
+        total: delta + seed.total + checked, result: seed.result };
+}

@@ -29,7 +29,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "effect_return_storage_reassignment_keeps_real_reduction_and_independent_values_effects",
             "compare_source_cases(cases::SourceKind::Reassigned)",
-            "maximum_carry_width(&shared) + 4", "kind.trace(trace)",
+            "maximum_carry_width(&shared) + 4", "match kind.execute(call, false, None)",
         ],
     },
     DevTensorDriftCheckSpec {

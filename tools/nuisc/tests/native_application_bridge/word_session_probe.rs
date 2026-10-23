@@ -97,6 +97,17 @@ fn driver(
         let at = start + llvm[start..].find("{\n").unwrap() + 2;
         llvm.insert_str(at, observer);
     }
+    // Explain a configured entry-budget trap without changing source stdout.
+    let entry_message = "native helper entry limit exhausted\n";
+    llvm = llvm.lines().map(|line| {
+        if line.ends_with(':') && line.contains("native_helper_entry_rejected") {
+            format!("{line}\n  %nuis_probe_entry_diagnostic = call i64 @write(i32 2, ptr @nuis_probe_entry_message, i64 {})", entry_message.len())
+        } else { line.to_owned() }
+    }).collect::<Vec<_>>().join("\n");
+    if !llvm.contains("declare i64 @write(") {
+        llvm.push_str("\ndeclare i64 @write(i32, ptr, i64)\n");
+    }
+    llvm.push_str(&format!("\n@nuis_probe_entry_message = private constant [{} x i8] c\"native helper entry limit exhausted\\0A\"\n", entry_message.len()));
     llvm = llvm.replace("call void @nuis_debug_print_i64(", "call void @word_print(");
     if !llvm.contains("declare i32 @fflush(") {
         llvm.push_str("\ndeclare i32 @fflush(ptr)\n");
@@ -239,8 +250,10 @@ pub(super) fn check_sequences_with_limits(
             if mode == 0 {
                 assert!(
                     run.status.success(),
-                    "{}",
-                    String::from_utf8_lossy(&run.stderr)
+                    "reversed={reversed} status={:?} stderr={} stdout_tail={}",
+                    run.status,
+                    String::from_utf8_lossy(&run.stderr),
+                    String::from_utf8_lossy(&run.stdout[run.stdout.len().saturating_sub(6000)..])
                 );
                 for sequence in rows {
                     for row in &sequence.rows {
@@ -270,5 +283,68 @@ pub(super) fn check_sequences_with_limits(
                 .collect::<Vec<_>>();
             assert_eq!(actual, expected, "reversed={reversed} mode={mode}");
         }
+    }
+}
+
+#[allow(dead_code)]
+pub(super) fn check_helper_entry_limit_rejection(
+    source: &str,
+    rows: &[Sequence],
+    observers: &[(&str, &str)],
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) {
+    let project = Project::with_source(source);
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    for reversed in [false, true] {
+        let module = typed_effect_returns::reordered(&compiled.yir, reversed);
+        let policy = LiteralPrintPolicy::new(
+            module
+                .nodes
+                .iter()
+                .filter(|n| matches!(n.op.instruction.as_str(), "print" | "guard_print"))
+                .map(|n| n.name.clone()),
+        )
+        .unwrap();
+        let bridge = emit_registered_with_literal_prints(
+            &module,
+            "counter",
+            &policy,
+            loop_work_limit,
+            helper_entry_limit,
+        )
+        .unwrap();
+        let llvm = driver(&bridge, rows, &[], observers);
+        let artifact = nuisc::aot::write_and_link_with_source(
+            &project.0.join("main.ns"),
+            &project.0.join(format!("entry-{reversed}")),
+            source,
+            nuisc::aot::AotCompileProgram {
+                ast: &compiled.ast,
+                nir: &compiled.nir,
+                yir: &module,
+                llvm_ir: Some(&llvm),
+            },
+            &nuisc::aot::host_cpu_build_target(),
+        )
+        .unwrap();
+        let mut command = Command::new(&artifact.binary_path);
+        command.env("NUIS_EXIT_PREFIX", "0");
+        let run = dynamic_loop_guard::run_command_bounded(command, &project.0);
+        assert!(matches!(run.status.signal(), Some(4 | 5)));
+        assert!(
+            String::from_utf8_lossy(&run.stderr).contains("native helper entry limit exhausted")
+        );
+        let actual = String::from_utf8(run.stdout)
+            .unwrap()
+            .lines()
+            .map(|line| line.parse::<i64>().unwrap())
+            .collect::<Vec<_>>();
+        // This witness has one callback: no status/state publication may precede rejection.
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].rows.len(), 1);
+        let trace = &rows[0].rows[0].trace;
+        assert!(actual.len() < trace.len());
+        assert!(trace.starts_with(&actual), "reversed={reversed}");
     }
 }

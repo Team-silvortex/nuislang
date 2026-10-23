@@ -1,0 +1,62 @@
+mod cpu Main {
+    struct State { result: bool, total: i64, gain: f32, marker: f64 }
+    @noinline fn extent(trips: i64, divisor: i64) -> i64 { print(16); return trips / divisor; }
+    @noinline fn advance(seed: State, delta: i64) -> State {
+        print(960);
+        return State { marker: -seed.marker, total: seed.total + delta,
+            gain: -seed.gain, result: seed.result != true };
+    }
+    @noinline fn work(seed: State, selected: bool, trips: i64, divisor: i64, mode: i64, root: i64, second: i64) -> State {
+        let mut carry = seed;
+        print(940);
+        let mut outer = 0;
+        while outer < 2 {
+            outer = outer + 1;
+            print(941);
+            if selected {
+                if mode % 2 == 0 { carry = advance(carry, outer + 0 / (1 - mode % 2)); }
+                else { carry = advance(carry, outer + 0 / (mode % 2)); }
+                let frozen = bound_seed(carry, trips, root);
+                let first_width = bound_extent(frozen, divisor, 1);
+                print(942);
+                let mut index = 0;
+                while index < first_width {
+                    index = index + 1;
+                    print(943);
+                    carry = advance(carry, index);
+                    if mode == 1 { return carry; }
+                    if mode == 2 { break; }
+                    if mode == 3 { continue; }
+                    print(944);
+                }
+                if mode == 4 { break; }
+                if mode == 5 { continue; }
+                let second_width = bound_extent(frozen, divisor + 0 / (second + 1), second);
+                print(945);
+                let mut sibling = 0;
+                while sibling < second_width {
+                    sibling = sibling + 1;
+                    print(946);
+                    carry = advance(carry, sibling + 10);
+                    if mode == 6 { return carry; }
+                    if mode == 7 { break; }
+                    if mode == 8 { continue; }
+                    print(947);
+                }
+            } else { print(948); carry = advance(carry, 1); }
+            if mode == 9 { return carry; }
+        }
+        print(949);
+        return carry;
+    }
+    fn start(flag: bool, total: i64, gain: f32, marker: f64, selected: bool, trips: i64, divisor: i64, mode: i64, root: i64, second: i64) -> State {
+        print(950);
+        return work(State { result: flag, total: total, gain: gain, marker: marker }, selected, trips, divisor, mode, root, second);
+    }
+    fn step(state: State, flag: bool, total: i64, gain: f32, marker: f64, selected: bool, trips: i64, divisor: i64, mode: i64, root: i64, second: i64) -> State {
+        print(951);
+        return work(state, selected, trips, divisor, mode, root, second);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

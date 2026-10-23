@@ -3,6 +3,15 @@ mod mixed;
 #[allow(unused_imports)]
 pub use mixed::*;
 
+#[path = "state_loop_return_shared_loop_calls.rs"]
+pub mod loop_calls;
+
+#[path = "state_loop_return_shared_branch_calls.rs"]
+pub mod branch_calls;
+
+#[path = "state_loop_return_shared_bound_calls.rs"]
+pub mod bound_calls;
+
 pub fn variants() -> Vec<Variant> {
     mixed::variants()
         .into_iter()
@@ -120,30 +129,132 @@ pub fn with_reassignments(source: String) -> String {
     source.replace("print(702);", "carry = State { result: carry.result, total: carry.total + 3, gain: -carry.gain, marker: -carry.marker }; print(703); carry = State { result: carry.result, total: carry.total - 3, gain: -carry.gain, marker: -carry.marker }; print(702);")
 }
 
+pub fn with_helper_calls(source: String) -> String {
+    let mut source = with_reassignments(source);
+    for (sign, delta) in [("+", 3), ("-", -3)] {
+        let old = format!("carry = State {{ result: carry.result, total: carry.total {sign} 3, gain: -carry.gain, marker: -carry.marker }};");
+        assert_eq!(source.matches(&old).count(), 1);
+        let (argument_root, callee_root) = if delta == 3 {
+            ("1", "1")
+        } else {
+            ("root + 7", "root + 8")
+        };
+        source = source.replace(&old, &format!("carry = prefix_record(prefix_seed(carry), prefix_delta({delta}, {argument_root}), prefix_gate({callee_root}));"));
+    }
+    assert_eq!(source.matches("    @noinline fn work(").count(), 1);
+    source.replace(
+        "    @noinline fn work(",
+        "
+    @noinline fn prefix_seed(seed: State) -> State { print(710); return seed; }
+    @noinline fn prefix_delta(delta: i64, root: i64) -> i64 {
+        print(711); return delta + 0 / root;
+    }
+    @noinline fn prefix_gate(root: i64) -> i64 { print(714); return root; }
+    @noinline fn prefix_record(seed: State, delta: i64, root: i64) -> State {
+        print(712); let check = 0 / root; print(713);
+        return State { result: seed.result, total: seed.total + delta + check,
+            gain: -seed.gain, marker: -seed.marker };
+    }
+    @noinline fn work(",
+    )
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceKind {
     Plain,
     Prefix,
     Candidates,
     Reassigned,
+    HelperCalls,
+    LoopHelperCalls,
+    BranchHelperCalls,
+    BranchBoundCalls,
 }
 
 impl SourceKind {
+    pub fn helper_entry_limit(self) -> u64 {
+        match self {
+            Self::BranchHelperCalls => 128,
+            Self::BranchBoundCalls => 160,
+            _ => 100,
+        }
+    }
+
     pub fn source(self, variant: Variant) -> String {
         match self {
             Self::Plain => source(variant),
             Self::Prefix => source_with_prefix(variant),
             Self::Candidates => source_with_alternatives(variant, 1),
             Self::Reassigned => with_reassignments(source_with_prefix(variant)),
+            Self::HelperCalls => with_helper_calls(source_with_prefix(variant)),
+            Self::LoopHelperCalls => loop_calls::source(variant),
+            Self::BranchHelperCalls => branch_calls::source(variant),
+            Self::BranchBoundCalls => bound_calls::source(variant),
         }
     }
 
     pub fn trace(self, trace: Vec<i64>) -> Vec<i64> {
+        assert!(
+            !matches!(
+                self,
+                Self::LoopHelperCalls | Self::BranchHelperCalls | Self::BranchBoundCalls
+            ),
+            "loop effects require semantic oracle hooks"
+        );
         let mut trace = with_prefix(trace, self != Self::Plain);
-        if self == Self::Reassigned {
+        if matches!(self, Self::Reassigned | Self::HelperCalls) {
             assert_eq!(&trace[..3], &[5, 701, 702]);
             trace.insert(2, 703);
         }
+        if self == Self::HelperCalls {
+            trace.splice(3..3, [710, 711, 714, 712, 713]);
+            trace.splice(2..2, [710, 711, 714, 712, 713]);
+        }
         trace
+    }
+
+    pub fn execute(
+        self,
+        call: Call,
+        observed: bool,
+        budget: Option<u64>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        if self == Self::LoopHelperCalls {
+            return loop_calls::execute(call, observed, budget);
+        }
+        if self == Self::BranchHelperCalls {
+            return branch_calls::execute(call, observed, budget);
+        }
+        if self == Self::BranchBoundCalls {
+            return bound_calls::execute(call, observed, budget);
+        }
+        call.execute(observed, budget)
+            .map(|(state, trace)| (state, self.trace(trace)))
+            .map_err(|trace| self.trace(trace))
+    }
+
+    pub fn sequences(self, variant: Variant) -> Vec<Vec<Call>> {
+        let mut rows = sequences(variant);
+        if matches!(
+            self,
+            Self::LoopHelperCalls | Self::BranchHelperCalls | Self::BranchBoundCalls
+        ) {
+            for (gain, marker) in [(8, 9), (10, 8)] {
+                let mut call = base(variant);
+                call.input.gain = gain;
+                call.input.marker = marker;
+                call.select_first(true);
+                rows.push(sequence(call));
+            }
+        }
+        if self == Self::BranchBoundCalls {
+            rows.push(sequence(bound_calls::state_dependent(variant)));
+            rows = rows.into_iter().map(bound_calls::sequence).collect();
+        }
+        rows
+    }
+
+    pub fn next(self, call: Call) -> State {
+        self.execute(call, false, None).unwrap().0
     }
 }

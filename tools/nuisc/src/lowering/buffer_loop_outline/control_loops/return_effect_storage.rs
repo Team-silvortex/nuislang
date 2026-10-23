@@ -20,6 +20,42 @@ mod candidates_tests;
 #[path = "return_effect_storage_reassignment_tests.rs"]
 mod reassignment_tests;
 
+#[cfg(test)]
+#[path = "return_effect_storage_helper_call_tests.rs"]
+mod helper_call_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_loop_call_tests.rs"]
+mod loop_call_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_branch_call_tests.rs"]
+mod branch_call_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_bound_call_tests.rs"]
+mod bound_call_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_sibling_bound_tests.rs"]
+mod sibling_bound_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_preheader_bound_tests.rs"]
+mod preheader_bound_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_epoch_bound_tests.rs"]
+mod epoch_bound_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_snapshot_return_tests.rs"]
+mod snapshot_return_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_payload_call_tests.rs"]
+mod payload_call_tests;
+
 // A distinct certificate: independent-prefix validity alone cannot authorize
 // overwriting a source binding. Both bodies must retain their own read sets.
 pub(in super::super) fn verify(

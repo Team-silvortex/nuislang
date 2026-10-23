@@ -1,0 +1,15 @@
+@noinline fn payload_first(value: i64) -> i64 {
+    print(970);
+    return value;
+}
+@noinline fn payload_second(value: i64) -> i64 {
+    print(971);
+    return value;
+}
+@noinline fn payload_finish(seed: State, first: i64, second: i64, root: i64) -> State {
+    print(972);
+    let checked = 0 / root;
+    print(973);
+    return State { marker: seed.marker, result: seed.result,
+        gain: seed.gain, total: seed.total + first + second + checked + 7 };
+}

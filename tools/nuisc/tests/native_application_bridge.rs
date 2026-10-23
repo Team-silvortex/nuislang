@@ -684,3 +684,6 @@ mod state_loop_return_parent_mixed;
 
 #[path = "native_application_bridge/state_loop_return_shared.rs"]
 mod state_loop_return_shared;
+
+#[path = "native_application_bridge/state_loop_sibling_bounds.rs"]
+mod state_loop_sibling_bounds;

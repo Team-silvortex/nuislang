@@ -49,7 +49,25 @@ now admits interleaved literal prints without moving them. The
 tries at most eight in declaration order, publishing only a fully certified plan.
 The [reassignment proof](reference/nuis-native-return-effect-storage-reassignment-v1.md)
 now admits ordered same-type prefix writes while retaining fresh initialization.
-Next validate record-returning effectful helper calls in those prefix writes.
+The [helper-call witnesses](reference/nuis-native-return-effect-storage-helper-calls-v1.md)
+exercise that existing route without new call authority. The
+[reached-loop witnesses](reference/nuis-native-return-effect-storage-loop-calls-v1.md)
+extend it to real iteration/parent-exit updates. The
+[branch-selected witnesses](reference/nuis-native-return-effect-storage-branch-calls-v1.md)
+cover multi-field updates and unselected poison. The
+[record-dependent bounds](reference/nuis-native-return-effect-storage-bound-calls-v1.md)
+consume completed results before reached-loop reservations. The
+[sibling-bound witnesses](reference/nuis-native-return-effect-storage-sibling-bounds-v1.md)
+reuse one snapshot with separate reservations and correctly targeted exits.
+The [parent-preheader witnesses](reference/nuis-native-return-effect-storage-preheader-bounds-v1.md)
+keep a selected snapshot alive across parent backedges with distinct reservations.
+The [distinct-epoch witnesses](reference/nuis-native-return-effect-storage-epoch-bounds-v1.md)
+keep older/newer snapshot identities and changing reached bounds distinct.
+The [returned-snapshot witnesses](reference/nuis-native-return-effect-storage-snapshot-returns-v1.md)
+check complete older/newer payload identity through selected inner-loop exits.
+The [payload-call witnesses](reference/nuis-native-return-effect-storage-payload-calls-v1.md)
+cover fallible effectful finalization with ordered arguments and complete publication.
+Next exercise effectful field-by-field payload construction with a failing later field.
 Keep checks/calls once-only and source-ordered,
 failure before pending/result publication, a separate pending signal and
 independent payload fallback for every unproved reduction.

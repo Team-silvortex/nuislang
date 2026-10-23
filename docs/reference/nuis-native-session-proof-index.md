@@ -21,6 +21,33 @@ The [bounded candidate-attempt proof](nuis-native-return-effect-storage-candidat
 can select a later independently certified carry after an earlier attempt fails.
 The [ordered reassignment proof](nuis-native-return-effect-storage-reassignment-v1.md)
 allows same-type prefix writes while retaining fresh-definition and effect-order checks.
+The [helper-call witnesses](nuis-native-return-effect-storage-helper-calls-v1.md)
+exercise ordered arguments, record results and selected prefix-call failures
+without widening the existing call catalog or storage certificate.
+The [reached-loop witnesses](nuis-native-return-effect-storage-loop-calls-v1.md)
+cover actual iteration/parent-exit updates, semantic oracle events and selected
+argument/callee failures after successful inner work.
+The [branch-selected witnesses](nuis-native-return-effect-storage-branch-calls-v1.md)
+cover distinct multi-field helper paths, unselected poisoned arguments and
+even/odd selected failures before callback publication.
+The [record-dependent bound witnesses](nuis-native-return-effect-storage-bound-calls-v1.md)
+consume completed selected records, compute reached bounds once and preserve
+reservation and argument/callee/arithmetic failure ordering.
+The [sibling-bound witnesses](nuis-native-return-effect-storage-sibling-bounds-v1.md)
+reuse a completed snapshot without recomputing live State, retain distinct
+reached reservations and distinguish child-local from parent/function exits.
+The [parent-preheader witnesses](nuis-native-return-effect-storage-preheader-bounds-v1.md)
+retain one selected immutable snapshot across parent backedges, without recomputation
+or deduplicating each reached child's full computed reservation.
+The [distinct-epoch witnesses](nuis-native-return-effect-storage-epoch-bounds-v1.md)
+keep simultaneous older/newer records distinct across backedges, including
+reached construction failures and independently reserved changing child bounds.
+The [returned-snapshot witnesses](nuis-native-return-effect-storage-snapshot-returns-v1.md)
+check complete older/newer record payloads on first-parent and post-backedge
+inner exits, preserving raw fields, full entered reservations and skipped work.
+The [payload-call witnesses](nuis-native-return-effect-storage-payload-calls-v1.md)
+check once-only ordered return arguments, selected finalizer failures, retained
+accepted State and source-free delivery after successful loop work.
 
 This index replaces duplicated proof narratives in the repository README,
 documentation index and mainline router. Original reference files, anchors,

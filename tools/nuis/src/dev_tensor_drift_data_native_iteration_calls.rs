@@ -1,5 +1,32 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_return_effect_storage_payload_calls.rs"]
+mod return_effect_storage_payload_calls;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_snapshot_returns.rs"]
+mod return_effect_storage_snapshot_returns;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_epoch_bounds.rs"]
+mod return_effect_storage_epoch_bounds;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_preheader_bounds.rs"]
+mod return_effect_storage_preheader_bounds;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_sibling_bounds.rs"]
+mod return_effect_storage_sibling_bounds;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_bound_calls.rs"]
+mod return_effect_storage_bound_calls;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_branch_calls.rs"]
+mod return_effect_storage_branch_calls;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_loop_calls.rs"]
+mod return_effect_storage_loop_calls;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_helper_calls.rs"]
+mod return_effect_storage_helper_calls;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_reassignment.rs"]
 mod return_effect_storage_reassignment;
 
@@ -488,6 +515,15 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_effect_storage_prefix::CHECKS,
         return_effect_storage_candidates::CHECKS,
         return_effect_storage_reassignment::CHECKS,
+        return_effect_storage_helper_calls::CHECKS,
+        return_effect_storage_loop_calls::CHECKS,
+        return_effect_storage_branch_calls::CHECKS,
+        return_effect_storage_bound_calls::CHECKS,
+        return_effect_storage_sibling_bounds::CHECKS,
+        return_effect_storage_preheader_bounds::CHECKS,
+        return_effect_storage_epoch_bounds::CHECKS,
+        return_effect_storage_snapshot_returns::CHECKS,
+        return_effect_storage_payload_calls::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,

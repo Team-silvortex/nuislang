@@ -60,8 +60,42 @@ impl Call {
     pub fn next(self) -> State {
         self.execute(false, None).unwrap().0
     }
+    pub fn execute_with_assignment_effects(
+        self,
+        observed: bool,
+        budget: Option<u64>,
+        assignment: &mut impl FnMut(i64, i64, &mut Vec<i64>) -> Option<()>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.inner.inner.inner.execute_with_assignment_effects(
+            observed,
+            budget,
+            self.variant.parent_leading,
+            Some(self.resume),
+            Some(self.skip),
+            Some(self.finish),
+            assignment,
+        )
+    }
     pub fn trace(self, observed: bool) -> Vec<i64> {
         self.execute(observed, None).unwrap().1
+    }
+    pub fn execute_with_hooks(
+        self,
+        observed: bool,
+        budget: Option<u64>,
+        assignment: &mut impl FnMut(i64, i64, &mut Vec<i64>) -> Option<()>,
+        bound: &mut impl FnMut(State, i64, &mut Vec<i64>) -> Option<i64>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.inner.inner.inner.execute_with_hooks(
+            observed,
+            budget,
+            self.variant.parent_leading,
+            Some(self.resume),
+            Some(self.skip),
+            Some(self.finish),
+            assignment,
+            bound,
+        )
     }
 }
 pub fn base(variant: Variant) -> Call {

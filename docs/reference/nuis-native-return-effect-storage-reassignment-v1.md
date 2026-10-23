@@ -73,6 +73,10 @@ Exact abort prefixes belong to the native probes, not buffered CLI stdout.
 
 ## Remaining Frontier
 
+The later [helper-call follow-up](nuis-native-return-effect-storage-helper-calls-v1.md)
+provides real witnesses for the next task below; this receipt retains its own
+historical scope and counts.
+
 The selected coordinate remains
 `standard-library/ns-nova/persistent-application-session`, active/99.
 Direct-expression prefix writes now have executable evidence. Next validate

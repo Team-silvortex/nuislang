@@ -1,7 +1,7 @@
 use super::tests::{cases, plans};
 use super::*;
 
-fn lowered(source: &str, independent: bool) -> yir_core::YirModule {
+pub(super) fn lowered(source: &str, independent: bool) -> yir_core::YirModule {
     let (mut module, layouts, _) = plans(source, "work");
     if independent {
         for function in &mut module.functions {
@@ -18,7 +18,7 @@ fn lowered(source: &str, independent: bool) -> yir_core::YirModule {
     yir
 }
 
-fn maximum_carry_width(module: &yir_core::YirModule) -> usize {
+pub(super) fn maximum_carry_width(module: &yir_core::YirModule) -> usize {
     module
         .nodes
         .iter()
@@ -39,6 +39,7 @@ fn invoked_source(call: cases::Call, kind: cases::SourceKind) -> String {
             0 | 4 => (word != 0).to_string(),
             2 => format!("{:?}", f32::from_bits(word as u32)),
             3 => format!("{:?}", f64::from_bits(word as u64)),
+            _ if word == i64::MIN => "(-9223372036854775807 - 1)".to_owned(),
             _ => word.to_string(),
         })
         .collect::<Vec<_>>()
@@ -90,15 +91,40 @@ fn effect_return_storage_reassignment_keeps_real_reduction_and_independent_value
     compare_source_cases(cases::SourceKind::Reassigned);
 }
 
+#[test]
+fn effect_return_storage_helper_calls_keep_real_reduction_and_ordered_argument_effects() {
+    compare_source_cases(cases::SourceKind::HelperCalls);
+}
+
+#[test]
+fn effect_return_storage_loop_helper_calls_keep_real_reduction_and_selected_exits() {
+    compare_source_cases(cases::SourceKind::LoopHelperCalls);
+}
+
+#[test]
+fn effect_return_storage_branch_helper_calls_keep_multifield_values_and_unselected_poison_inert() {
+    compare_source_cases(cases::SourceKind::BranchHelperCalls);
+}
+
+#[test]
+fn effect_return_storage_branch_bound_calls_use_completed_record_and_keep_real_carry_reduction() {
+    compare_source_cases(cases::SourceKind::BranchBoundCalls);
+}
+
 fn compare_source_cases(kind: cases::SourceKind) {
     for variant in cases::variants() {
         let mut failure = cases::base(variant);
         failure.root = 0;
-        for call in [
+        let mut calls = vec![
             cases::base(variant),
             cases::continued_then_break(variant),
             failure,
-        ] {
+        ];
+        if kind == cases::SourceKind::BranchBoundCalls {
+            calls.push(cases::bound_calls::state_dependent(variant));
+            calls.extend((0..4).map(|stage| cases::bound_calls::failure(variant, stage)));
+        }
+        for call in calls {
             let source = invoked_source(call, kind);
             let independent = lowered(&source, true);
             let shared = lowered(&source, false);
@@ -142,11 +168,12 @@ fn compare_source_cases(kind: cases::SourceKind) {
                 };
                 let actual = run(shared.clone());
                 assert_eq!(actual, run(independent.clone()));
-                match call.execute(false, None) {
+                match kind.execute(call, false, None) {
                     Ok((state, trace)) => {
                         assert_eq!(
                             actual,
-                            Ok((yir_core::Value::Int(state.total), kind.trace(trace)))
+                            Ok((yir_core::Value::Int(state.total), trace)),
+                            "{call:?}\n{source}"
                         )
                     }
                     Err(_) => assert!(actual.is_err()),

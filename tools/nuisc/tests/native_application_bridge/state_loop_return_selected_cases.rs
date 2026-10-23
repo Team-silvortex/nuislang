@@ -136,11 +136,59 @@ impl Call {
     pub fn execute_with_parent_exits(
         self,
         observed: bool,
+        budget: Option<u64>,
+        leading_parent: bool,
+        parent_continue: Option<i64>,
+        parent_break: Option<i64>,
+        fallback_divisor: Option<i64>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.execute_with_assignment_effects(
+            observed,
+            budget,
+            leading_parent,
+            parent_continue,
+            parent_break,
+            fallback_divisor,
+            &mut |_, _, _| Some(()),
+        )
+    }
+    pub fn execute_with_assignment_effects(
+        self,
+        observed: bool,
+        budget: Option<u64>,
+        leading_parent: bool,
+        parent_continue: Option<i64>,
+        parent_break: Option<i64>,
+        fallback_divisor: Option<i64>,
+        assignment: &mut impl FnMut(i64, i64, &mut Vec<i64>) -> Option<()>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.execute_with_hooks(
+            observed,
+            budget,
+            leading_parent,
+            parent_continue,
+            parent_break,
+            fallback_divisor,
+            assignment,
+            &mut |_, _, trace| {
+                if observed {
+                    trace.extend([self.trips, self.divisor]);
+                }
+                trace.push(16);
+                self.trips.checked_div(self.divisor)
+            },
+        )
+    }
+    pub fn execute_with_hooks(
+        self,
+        observed: bool,
         mut budget: Option<u64>,
         leading_parent: bool,
         parent_continue: Option<i64>,
         parent_break: Option<i64>,
         fallback_divisor: Option<i64>,
+        assignment: &mut impl FnMut(i64, i64, &mut Vec<i64>) -> Option<()>,
+        bound: &mut impl FnMut(State, i64, &mut Vec<i64>) -> Option<i64>,
     ) -> Result<(State, Vec<i64>), Vec<i64>> {
         let prior = self.prior();
         let mut current = State {
@@ -159,17 +207,14 @@ impl Call {
                     outer += 1;
                 }
                 trace.push(8);
+                assignment(8, outer, &mut trace)?;
                 current = flip(current);
                 current.total += outer;
                 let selected = gate ^ (current.total % 2 != 0);
                 let mut index = 0;
                 if selected {
                     trace.push(6);
-                    if observed {
-                        trace.extend([self.trips, self.divisor]);
-                    }
-                    trace.push(16);
-                    let width = self.trips.checked_div(self.divisor)?;
+                    let width = bound(current, outer, &mut trace)?;
                     trace.push(7);
                     if !reserve(width, &mut budget) {
                         return None;
@@ -179,6 +224,7 @@ impl Call {
                             index += 1;
                         }
                         trace.push(10);
+                        assignment(10, index, &mut trace)?;
                         current = flip(current);
                         current.total += index + 1;
                         if index == self.cut {
@@ -207,16 +253,19 @@ impl Call {
                     }
                 } else {
                     trace.push(9);
+                    assignment(9, outer, &mut trace)?;
                     current = flip(current);
                     current.total += 2;
                 }
                 if parent_break == Some(outer) {
                     trace.push(25);
+                    assignment(25, outer, &mut trace)?;
                     current.total += outer;
                     break;
                 }
                 if parent_continue == Some(outer) {
                     trace.push(25);
+                    assignment(25, outer, &mut trace)?;
                     current.total += outer;
                     if !leading_parent {
                         outer += 1;

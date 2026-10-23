@@ -1,0 +1,15 @@
+    @noinline fn bound_seed(seed: State, trips: i64, root: i64) -> State {
+        print(930);
+        let checked = 0 / root;
+        let parity = seed.total % 2;
+        let scale = 1 + parity * parity;
+        print(931);
+        return State { marker: seed.marker, result: seed.result,
+            total: trips / scale + checked, gain: seed.gain };
+    }
+    @noinline fn bound_extent(seed: State, divisor: i64, root: i64) -> i64 {
+        print(932);
+        let checked = 0 / root;
+        print(933);
+        return extent(seed.total + checked, divisor);
+    }

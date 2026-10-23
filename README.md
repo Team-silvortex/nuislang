@@ -94,6 +94,24 @@ The [candidate-attempt follow-up](docs/reference/nuis-native-return-effect-stora
 tries later records within a fixed proof budget when an earlier certificate fails.
 The [ordered reassignment proof](docs/reference/nuis-native-return-effect-storage-reassignment-v1.md)
 preserves typed prefix writes and failure-before-publication during storage reuse.
+Its [helper-call witnesses](docs/reference/nuis-native-return-effect-storage-helper-calls-v1.md)
+exercise ordered effectful arguments and record results through the existing lowering route.
+The [reached-loop witnesses](docs/reference/nuis-native-return-effect-storage-loop-calls-v1.md)
+extend that route to real updates before loop-local exits and later-iteration failures.
+The [branch-selected follow-up](docs/reference/nuis-native-return-effect-storage-branch-calls-v1.md)
+checks multi-field handoff and unselected poisoned arguments without new call authority.
+The [record-dependent bound follow-up](docs/reference/nuis-native-return-effect-storage-bound-calls-v1.md)
+checks completed records determining reached child work and reservation order.
+The [sibling-bound follow-up](docs/reference/nuis-native-return-effect-storage-sibling-bounds-v1.md)
+checks snapshot reuse with separate reservations and correctly targeted local exits.
+The [parent-preheader follow-up](docs/reference/nuis-native-return-effect-storage-preheader-bounds-v1.md)
+keeps a selected immutable snapshot alive across parent backedges without merging reservations.
+The [distinct-epoch follow-up](docs/reference/nuis-native-return-effect-storage-epoch-bounds-v1.md)
+checks separate live snapshot identities and changing reached bounds across those backedges.
+The [returned-snapshot follow-up](docs/reference/nuis-native-return-effect-storage-snapshot-returns-v1.md)
+checks complete older/newer payloads from selected inner-loop exits, including after a backedge.
+The [payload-call follow-up](docs/reference/nuis-native-return-effect-storage-payload-calls-v1.md)
+tracks ordered return arguments, finalization failures and complete state publication.
 
 Cancellation admission, host-scope retirement and provider/device retirement
 are separate facts. Rendering, control, ML and audio are ns-nova's engine
