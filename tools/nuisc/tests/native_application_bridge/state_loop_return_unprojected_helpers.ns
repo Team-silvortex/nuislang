@@ -1,0 +1,26 @@
+@noinline fn record_marker(value: f64, root: i64) -> f64 {
+    print(991);
+    let checked = 0 / root;
+    print(992);
+    return value;
+}
+@noinline fn record_result(value: bool) -> bool { print(993); return value; }
+@noinline fn record_gain(value: f32) -> f32 { print(994); return value; }
+@noinline fn record_total(value: i64, root: i64) -> i64 {
+    print(995);
+    let checked = 0 / root;
+    print(996);
+    return value + checked;
+}
+
+@noinline fn project_record(seed: State, delta: i64, root: i64, before: i64, after: i64) -> State {
+    print(986);
+    let checked = 0 / root;
+    print(987);
+    return State {
+        marker: record_marker(-seed.marker, before),
+        result: record_result(seed.result),
+        gain: record_gain(-seed.gain),
+        total: record_total(seed.total + delta + checked, after)
+    };
+}

@@ -3,6 +3,15 @@
 mod words;
 pub use words::State;
 
+#[path = "state_loop_return_projected_cases.rs"]
+mod projected;
+
+#[path = "state_loop_return_unprojected_cases.rs"]
+mod unprojected;
+
+#[path = "state_loop_return_conditional_cases.rs"]
+mod conditional;
+
 pub const LOOP_LIMIT: u64 = 18;
 pub const ENTRY_LIMIT: u64 = 192;
 pub const OBSERVER: &str =
@@ -16,6 +25,12 @@ pub struct Variant {
     pub two_epochs: bool,
     pub snapshot_returns: bool,
     pub payload_calls: bool,
+    pub field_payload: bool,
+    pub mixed_payload: bool,
+    pub projected_payload: bool,
+    pub unprojected_payload: bool,
+    pub conditional_payload: bool,
+    pub scalar_join_payload: bool,
 }
 
 pub fn variants() -> Vec<Variant> {
@@ -29,6 +44,12 @@ pub fn variants() -> Vec<Variant> {
                 two_epochs: false,
                 snapshot_returns: false,
                 payload_calls: false,
+                field_payload: false,
+                mixed_payload: false,
+                projected_payload: false,
+                unprojected_payload: false,
+                conditional_payload: false,
+                scalar_join_payload: false,
             })
         })
         .collect()
@@ -69,6 +90,56 @@ pub fn payload_call_variants() -> Vec<Variant> {
         .into_iter()
         .map(|variant| Variant {
             payload_calls: true,
+            ..variant
+        })
+        .collect()
+}
+
+pub fn field_payload_variants() -> Vec<Variant> {
+    payload_call_variants()
+        .into_iter()
+        .map(|variant| Variant {
+            field_payload: true,
+            ..variant
+        })
+        .collect()
+}
+
+pub fn mixed_payload_variants() -> Vec<Variant> {
+    field_payload_variants()
+        .into_iter()
+        .map(|variant| Variant {
+            mixed_payload: true,
+            ..variant
+        })
+        .collect()
+}
+
+pub fn projected_payload_variants() -> Vec<Variant> {
+    mixed_payload_variants()
+        .into_iter()
+        .map(|variant| Variant {
+            projected_payload: true,
+            ..variant
+        })
+        .collect()
+}
+
+pub fn payload_fault_modes(variant: Variant) -> std::ops::RangeInclusive<i64> {
+    12..=if variant.unprojected_payload {
+        35
+    } else if variant.projected_payload {
+        27
+    } else {
+        19
+    }
+}
+
+pub fn unprojected_payload_variants() -> Vec<Variant> {
+    projected_payload_variants()
+        .into_iter()
+        .map(|variant| Variant {
+            unprojected_payload: true,
             ..variant
         })
         .collect()
@@ -152,12 +223,16 @@ pub fn source(variant: Variant) -> String {
         }
     }
     if variant.payload_calls {
+        let helpers = include_str!("state_loop_return_payload_helpers.ns");
+        let helpers = if variant.field_payload {
+            // Keep the native print policy limited to the selected call closure.
+            helpers.split_once("@noinline fn payload_finish").unwrap().0
+        } else {
+            helpers
+        };
         source = source.replace(
             "    @noinline fn work(",
-            &format!(
-                "{}\n    @noinline fn work(",
-                include_str!("state_loop_return_payload_helpers.ns")
-            ),
+            &format!("{helpers}\n    @noinline fn work("),
         );
         for (early, late, fault, delayed, record) in
             [(1, 10, 12, 18, "recent"), (6, 11, 15, 19, "frozen")]
@@ -188,7 +263,82 @@ pub fn source(variant: Variant) -> String {
             ));
         }
     }
+    if variant.field_payload {
+        assert!(variant.payload_calls);
+        source = source.replace(
+            "    @noinline fn work(",
+            &format!(
+                "{}\n    @noinline fn work(",
+                include_str!("state_loop_return_field_helpers.ns")
+            ),
+        );
+        for record in ["recent", "frozen"] {
+            let old = format!("return payload_finish({record},");
+            assert_eq!(source.matches(&old).count(), 1);
+            source = source.replace(&old, &format!(
+                "return State {{ marker: field_marker({record}.marker), result: field_result({record}.result), gain: field_gain({record}.gain), total: field_total({record}.total,"
+            ));
+        }
+        for delayed in [18, 19] {
+            let old = format!("* (mode - {delayed}));");
+            assert_eq!(source.matches(&old).count(), 1);
+            source = source.replace(&old, &format!("* (mode - {delayed})) }};"));
+        }
+    }
+    if variant.mixed_payload {
+        assert!(variant.field_payload);
+        source = source.replace(
+            "    @noinline fn work(",
+            &format!(
+                "{}\n    @noinline fn work(",
+                include_str!("state_loop_return_mixed_helpers.ns")
+            ),
+        );
+        for (record, other) in [("recent", "frozen"), ("frozen", "recent")] {
+            let old = format!("return State {{ marker: field_marker({record}.marker), result: field_result({record}.result), gain: field_gain({record}.gain), total: field_total({record}.total,");
+            assert_eq!(source.matches(&old).count(), 1);
+            source = source.replace(&old, &format!(
+                "return State {{ marker: field_marker({other}.marker), result: field_result(carry.result != true), gain: field_gain({record}.gain), total: field_total(carry.total + frozen.total * 100 + recent.total * 10 + mixed_bias(carry.result),"
+            ));
+        }
+    }
+    if variant.projected_payload {
+        assert!(variant.mixed_payload);
+        source = projected::source(source);
+    }
+    if variant.unprojected_payload {
+        assert!(variant.projected_payload);
+        source = unprojected::source(source);
+    }
+    if variant.conditional_payload {
+        assert!(variant.unprojected_payload);
+        source = conditional::source(source);
+    }
+    if variant.scalar_join_payload {
+        assert!(variant.conditional_payload);
+        source = conditional::typed_source(source);
+    }
     source
+}
+
+pub fn conditional_payload_variants() -> Vec<Variant> {
+    unprojected_payload_variants()
+        .into_iter()
+        .map(|variant| Variant {
+            conditional_payload: true,
+            ..variant
+        })
+        .collect()
+}
+
+pub fn scalar_join_variants() -> Vec<Variant> {
+    conditional_payload_variants()
+        .into_iter()
+        .map(|variant| Variant {
+            scalar_join_payload: true,
+            ..variant
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -355,8 +505,48 @@ impl Call {
                                         && self.mode == if child == 0 { 10 } else { 11 })
                                     || (fault..=fault + 2).contains(&self.mode)
                                     || (outer == 2
-                                        && self.mode == if child == 0 { 18 } else { 19 });
+                                        && self.mode == if child == 0 { 18 } else { 19 })
+                                    || (self.variant.projected_payload
+                                        && projected::returning(self.mode, child, outer))
+                                    || (self.variant.unprojected_payload
+                                        && unprojected::returning(self.mode, child, outer));
                                 if returning {
+                                    if self.variant.conditional_payload {
+                                        return conditional::payload(
+                                            state, frozen, recent, self.mode, child, &mut trace,
+                                        );
+                                    }
+                                    if self.variant.unprojected_payload {
+                                        return unprojected::payload(
+                                            state, frozen, recent, self.mode, child, &mut trace,
+                                        );
+                                    }
+                                    if self.variant.projected_payload {
+                                        return projected::payload(
+                                            state, frozen, recent, self.mode, child, &mut trace,
+                                        );
+                                    }
+                                    if self.variant.field_payload {
+                                        trace.extend([980, 981, 982]);
+                                    }
+                                    let argument = if self.variant.mixed_payload {
+                                        trace.push(984);
+                                        State {
+                                            result: !state.result,
+                                            total: state.total
+                                                + frozen.total * 100
+                                                + recent.total * 10
+                                                + if state.result { 1000 } else { 2000 },
+                                            gain: argument.gain,
+                                            marker: if child == 0 {
+                                                frozen.marker
+                                            } else {
+                                                recent.marker
+                                            },
+                                        }
+                                    } else {
+                                        argument
+                                    };
                                     return payload(argument, self.mode, child, &mut trace);
                                 }
                             }
@@ -475,12 +665,12 @@ pub fn failures(variant: Variant) -> Vec<(Vec<Call>, Call)> {
         })
         .collect::<Vec<_>>();
     if variant.payload_calls {
-        for mode in 12..=19 {
+        for mode in payload_fault_modes(variant) {
             let prefix = prefix(variant, false);
             let mut call = base(variant);
             call.mode = mode;
             call.previous = Some(prefix.last().unwrap().next());
-            if mode >= 18 {
+            if matches!(mode, 18 | 19 | 24..=27 | 32..=35) {
                 call.trips = 5;
                 call.divisor = 2;
             }
@@ -559,7 +749,7 @@ pub fn healthy(variant: Variant) -> Vec<Vec<Call>> {
         }
     }
     if variant.payload_calls {
-        for mode in 12..=19 {
+        for mode in payload_fault_modes(variant) {
             let mut call = base(variant);
             call.mode = mode;
             call.selected = false;

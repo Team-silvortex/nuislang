@@ -1,0 +1,48 @@
+@noinline fn record_gate(choice: bool) -> bool {
+    print(997);
+    return choice;
+}
+@noinline fn record_rhs(root: i64) -> bool {
+    print(998);
+    let checked = 0 / root;
+    print(999);
+    return root + checked != 1;
+}
+@noinline fn record_marker(value: f64, root: i64, choice: bool) -> f64 {
+    print(991);
+    let selected_root: i64 = if choice { root } else { 0 };
+    if record_gate(choice) && record_rhs(selected_root) {
+        print(1000);
+    } else {
+        print(1001);
+    }
+    let checked = 0 / root;
+    print(992);
+    return value;
+}
+@noinline fn record_result(value: bool) -> bool { print(993); return value; }
+@noinline fn record_gain(value: f32) -> f32 { print(994); return value; }
+@noinline fn record_total(value: i64, root: i64, choice: bool) -> i64 {
+    print(995);
+    let selected_root: i64 = if choice { 0 } else { root };
+    if record_gate(choice) || record_rhs(selected_root) {
+        print(1002);
+    } else {
+        print(1003);
+    }
+    let checked = 0 / root;
+    print(996);
+    return value + checked;
+}
+
+@noinline fn project_record(seed: State, delta: i64, root: i64, before: i64, after: i64) -> State {
+    print(986);
+    let checked = 0 / root;
+    print(987);
+    return State {
+        marker: record_marker(-seed.marker, before, seed.result),
+        result: record_result(seed.result),
+        gain: record_gain(-seed.gain),
+        total: record_total(seed.total + delta + checked, after, seed.result)
+    };
+}

@@ -591,7 +591,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "native-session-nested-short-circuit",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested_conditions.rs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/logical_conditions.rs",
         required_patterns: &[
             "__nuis_scalar_predicate",
             "__nuis_predicate_gate",

@@ -58,7 +58,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "sibling_bounds_reference_preserves_snapshot_state_words_and_fault_retention",
             "sibling_bounds_native_keeps_frozen_record_and_exact_reached_failure_prefixes",
-            "sibling_bounds_native_entry_limit_160_still_rejects_long_callback",
+            "sibling_bounds_native_ready_updates_fit_160_but_entry_limit_100_still_rejects",
             "check_helper_entry_limit_rejection",
             "ApplicationSessionPhase::Faulted", "trace.contains(&943)", "!trace.contains(&946)",
             "session.completion_status().is_err()",

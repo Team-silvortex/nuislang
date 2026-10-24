@@ -56,6 +56,29 @@ mod snapshot_return_tests;
 #[path = "return_effect_storage_payload_call_tests.rs"]
 mod payload_call_tests;
 
+#[cfg(test)]
+#[path = "return_effect_storage_field_payload_tests.rs"]
+mod field_payload_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_mixed_payload_tests.rs"]
+mod mixed_payload_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_projected_payload_tests.rs"]
+mod projected_payload_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_unprojected_payload_tests.rs"]
+mod unprojected_payload_tests;
+
+#[cfg(test)]
+#[path = "return_effect_storage_conditional_payload_tests.rs"]
+mod conditional_payload_tests;
+#[cfg(test)]
+#[path = "return_effect_storage_scalar_join_tests.rs"]
+mod scalar_join_tests;
+
 // A distinct certificate: independent-prefix validity alone cannot authorize
 // overwriting a source binding. Both bodies must retain their own read sets.
 pub(in super::super) fn verify(

@@ -423,7 +423,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "conditional_root_values_keep_complete_rhs_binding_identity_and_idempotence",
             "conditional_root_values_preserve_selected_versions_nested_bindings_and_early_exits",
             "conditional_root_values_keep_kind_loop_nested_effect_and_work_vetoes_unchanged",
-            "conditional_root_values_retain_effectful_nested_return_speculation_rejection",
+            "conditional_root_values_keep_nested_effects_guarded_without_ready_join_authority",
             "conditional_root_values_keep_inferred_local_kinds_for_following_logical_edges",
             "usize::from(selected) + usize::from(second_selected)",
             "\"rebind\", \"changed\", \"branch\", \"return\"",

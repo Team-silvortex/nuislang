@@ -29,7 +29,7 @@ fn healthy(project: &Project, output: &Path, variant: cases::Variant) {
         }
     }
     if variant.payload_calls {
-        for mode in 12..=19 {
+        for mode in cases::payload_fault_modes(variant) {
             let mut call = cases::base(variant);
             call.mode = mode;
             call.selected = false;
@@ -150,6 +150,36 @@ fn snapshot_returns_fresh_cache_and_source_free_delivery_keep_complete_returned_
 #[test]
 fn payload_calls_fresh_cache_and_source_free_delivery_keep_ordered_return_failures() {
     delivery(cases::payload_call_variants()[0]);
+}
+
+#[test]
+fn field_payload_fresh_cache_and_source_free_delivery_preserve_complete_publication() {
+    delivery(cases::field_payload_variants()[0]);
+}
+
+#[test]
+fn mixed_payload_fresh_cache_and_source_free_delivery_preserve_all_return_origins() {
+    delivery(cases::mixed_payload_variants()[0]);
+}
+
+#[test]
+fn projected_payload_fresh_cache_and_source_free_delivery_preserve_each_call_occurrence() {
+    delivery(cases::projected_payload_variants()[0]);
+}
+
+#[test]
+fn unprojected_payload_fresh_cache_and_source_free_delivery_keep_discarded_field_effects() {
+    delivery(cases::unprojected_payload_variants()[0]);
+}
+
+#[test]
+fn conditional_payload_fresh_cache_and_source_free_delivery_preserve_lazy_fields() {
+    delivery(cases::conditional_payload_variants()[0]);
+}
+
+#[test]
+fn scalar_join_payload_fresh_cache_and_source_free_delivery_preserve_typed_values() {
+    delivery(cases::scalar_join_variants()[0]);
 }
 
 fn delivery(variant: cases::Variant) {

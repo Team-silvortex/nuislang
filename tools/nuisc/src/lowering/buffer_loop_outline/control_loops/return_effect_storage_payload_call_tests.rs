@@ -191,9 +191,13 @@ fn effect_return_storage_payload_calls_reject_reordering_duplication_bypass_and_
 
 #[test]
 fn effect_return_storage_payload_calls_match_independent_execution_and_carry_width() {
+    check_execution(cases::payload_call_variants());
+}
+
+pub(super) fn check_execution(variants: Vec<cases::Variant>) {
     use super::execution_tests::{lowered, maximum_carry_width};
     use super::sibling_bound_tests::run_entry;
-    for variant in cases::payload_call_variants() {
+    for variant in variants {
         let mut calls = (0..=11)
             .map(|mode| {
                 let mut call = cases::base(variant);
@@ -209,7 +213,7 @@ fn effect_return_storage_payload_calls_match_independent_execution_and_carry_wid
             call.input = call.previous.take().unwrap();
             call
         }));
-        for mode in 12..=19 {
+        for mode in cases::payload_fault_modes(variant) {
             let mut call = cases::base(variant);
             call.mode = mode;
             call.selected = false;

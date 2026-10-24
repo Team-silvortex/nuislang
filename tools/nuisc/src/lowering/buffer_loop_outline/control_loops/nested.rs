@@ -1,7 +1,6 @@
 use super::*;
 
-#[path = "nested_conditions.rs"]
-mod conditions;
+use super::super::logical_conditions as conditions;
 
 pub(super) fn present(body: &[NirStmt], scope: &Scope) -> bool {
     // Fallible arithmetic must execute in the selected iteration, never as a

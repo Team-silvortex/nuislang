@@ -112,6 +112,24 @@ The [returned-snapshot follow-up](docs/reference/nuis-native-return-effect-stora
 checks complete older/newer payloads from selected inner-loop exits, including after a backedge.
 The [payload-call follow-up](docs/reference/nuis-native-return-effect-storage-payload-calls-v1.md)
 tracks ordered return arguments, finalization failures and complete state publication.
+The [field-payload follow-up](docs/reference/nuis-native-return-effect-storage-field-payload-v1.md)
+checks source-ordered record construction when a later field fails after earlier effects.
+The [mixed-origin follow-up](docs/reference/nuis-native-return-effect-storage-mixed-payload-v1.md)
+repairs boolean field admission and checks original live self-reads alongside both snapshots.
+The [projected-call follow-up](docs/reference/nuis-native-return-effect-storage-projected-payload-v1.md)
+tracks direct fields of effectful record calls, once-only evaluation and argument/callee faults.
+The [unprojected-field follow-up](docs/reference/nuis-native-return-effect-storage-unprojected-payload-v1.md)
+tracks complete callee-field evaluation, including failures before and after the desired field.
+The [conditional-field follow-up](docs/reference/nuis-native-return-effect-storage-conditional-payload-v1.md)
+repairs speculative logical RHS work in scalar control using the shared short-circuit lowering.
+The [ready-value follow-up](docs/reference/nuis-native-return-ready-values-v1.md)
+brings the complete fixture within native admission, reducing 75 NIR functions to 63.
+The [typed scalar join follow-up](docs/reference/nuis-native-typed-scalar-joins-v1.md)
+adds inline ready-value declarations inside effectful record callees under the same bounds.
+The [guarded expression follow-up](docs/reference/nuis-native-guarded-scalar-joins-v1.md)
+keeps fallible pure branch values lazy in a compact native record-return application.
+The [computed predicate proof](docs/reference/nuis-native-computed-scalar-predicates-v1.md)
+extends that route to a once-evaluated fallible pure boolean condition.
 
 Cancellation admission, host-scope retirement and provider/device retirement
 are separate facts. Rendering, control, ML and audio are ns-nova's engine

@@ -1,0 +1,5 @@
+@noinline fn mixed_bias(flag: bool) -> i64 {
+    print(984);
+    if flag { return 1000; }
+    return 2000;
+}

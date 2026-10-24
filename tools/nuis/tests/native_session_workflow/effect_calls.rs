@@ -4,6 +4,12 @@
 ))]
 use super::*;
 
+#[path = "guarded_scalar_join.rs"]
+mod guarded_scalar_join;
+
+#[path = "computed_scalar_join.rs"]
+mod computed_scalar_join;
+
 #[path = "effect_call_return_dual_i64.rs"]
 mod return_dual_i64;
 

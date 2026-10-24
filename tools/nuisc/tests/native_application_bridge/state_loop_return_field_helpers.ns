@@ -1,0 +1,18 @@
+@noinline fn field_marker(value: f64) -> f64 {
+    print(980);
+    return value;
+}
+@noinline fn field_result(value: bool) -> bool {
+    print(981);
+    return value;
+}
+@noinline fn field_gain(value: f32) -> f32 {
+    print(982);
+    return value;
+}
+@noinline fn field_total(seed: i64, first: i64, second: i64, root: i64) -> i64 {
+    print(972);
+    let checked = 0 / root;
+    print(973);
+    return seed + first + second + checked + 7;
+}

@@ -1,0 +1,39 @@
+mod cpu Main {
+    struct State { total: i64 }
+    struct Packet { value: i64, unused: i64 }
+    @noinline fn decide(choice: bool, condition: i64) -> bool {
+        let proof = 1 / condition;
+        return choice == (proof != 0);
+    }
+    @noinline fn quotient(value: i64, divisor: i64) -> i64 { return value / divisor; }
+    @noinline fn packet(choice: bool, condition: i64, value: i64, yes: i64, no: i64, tail: i64) -> Packet {
+        print(81);
+        let selected: i64 = if decide(choice, condition) { quotient(value, yes) } else { value % no };
+        print(82);
+        return Packet { value: selected, unused: 1 / tail };
+    }
+    @noinline fn work(seed: State, selected: bool, trips: i64, choice: bool, condition: i64, value: i64, yes: i64, no: i64, tail: i64) -> State {
+        print(70);
+        let mut index = 0;
+        while index < trips {
+            index = index + 1;
+            print(71);
+            if selected {
+                return State { total: packet(choice, condition, seed.total + value + 0 / value, yes, no, tail).value };
+            }
+            print(72);
+        }
+        print(73);
+        return seed;
+    }
+    fn start(total: i64, selected: bool, trips: i64, choice: bool, condition: i64, value: i64, yes: i64, no: i64, tail: i64) -> State {
+        print(90);
+        return work(State { total: total }, selected, trips, choice, condition, value, yes, no, tail);
+    }
+    fn step(state: State, total: i64, selected: bool, trips: i64, choice: bool, condition: i64, value: i64, yes: i64, no: i64, tail: i64) -> State {
+        print(91);
+        return work(state, selected, trips, choice, condition, value, yes, no, tail);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

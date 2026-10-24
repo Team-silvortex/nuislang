@@ -88,6 +88,30 @@ checks complete older/newer payloads from selected inner-loop exits on first
 and later parent iterations, with unchanged call and storage authority.
 The [payload-call follow-up](../reference/nuis-native-return-effect-storage-payload-calls-v1.md)
 adds ordered effectful arguments and selected finalizer failures before return publication.
+The [field-payload follow-up](../reference/nuis-native-return-effect-storage-field-payload-v1.md)
+checks direct record construction with ordered field effects and late-field failure.
+The [mixed-origin follow-up](../reference/nuis-native-return-effect-storage-mixed-payload-v1.md)
+repairs boolean field admission and checks original live self-reads alongside both
+snapshot epochs without early field publication or higher execution budgets.
+The [projected-call follow-up](../reference/nuis-native-return-effect-storage-projected-payload-v1.md)
+tracks direct fields of effectful record-returning calls and argument/callee failures
+without adding a backend-specific lowering shortcut.
+The [unprojected-field follow-up](../reference/nuis-native-return-effect-storage-unprojected-payload-v1.md)
+tracks complete literal evaluation inside record callees, even after the desired
+field is computed.
+The [conditional-field follow-up](../reference/nuis-native-return-effect-storage-conditional-payload-v1.md)
+repairs eager logical RHS execution during scalar-control extraction, sharing
+the iteration guard implementation. The
+[ready-value follow-up](../reference/nuis-native-return-ready-values-v1.md) removes
+the temporary focused-fixture adapter and brings all four full variants within
+the unchanged 64-function profile. The
+[typed scalar join proof](../reference/nuis-native-typed-scalar-joins-v1.md) now
+normalizes fresh ready-value declarations before strict call admission. The
+[guarded expression follow-up](../reference/nuis-native-guarded-scalar-joins-v1.md)
+adds bounded non-logical pure arms. The
+[computed predicate follow-up](../reference/nuis-native-computed-scalar-predicates-v1.md)
+adds once-only non-logical pure gates; logical trees and effectful predicates/arms
+need further guarded-execution proof.
 General resource/I/O/asynchronous capture, broader entering-State
 writes, stable ABI, full heterogeneous closure and completed self-hosting remain
 separate.

@@ -29,7 +29,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "pub fn payload_call_variants", "pub payload_calls: bool",
             "fn payload(", "trace.extend([971, 972])", "total: state.total + 10",
-            "for mode in 12..=19", "call.previous = Some(prefix.last().unwrap().next())",
+            "for mode in payload_fault_modes(variant)", "call.previous = Some(prefix.last().unwrap().next())",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -47,7 +47,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/tests/native_session_workflow/effect_call_state_loop_sibling_bounds.rs",
         required_patterns: &[
             "payload_calls_fresh_cache_and_source_free_delivery_keep_ordered_return_failures",
-            "delivery(cases::payload_call_variants()[0])", "for mode in 12..=19",
+            "delivery(cases::payload_call_variants()[0])", "for mode in cases::payload_fault_modes(variant)",
             "for restore in 0..2", "for (prefix, bad) in cases::failures(variant)",
         ],
     },

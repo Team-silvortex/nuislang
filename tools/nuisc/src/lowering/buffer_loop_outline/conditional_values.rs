@@ -11,6 +11,47 @@ mod prefix_tests;
 #[path = "conditional_values_roots_tests.rs"]
 mod roots_tests;
 
+// Normalize source declarations before any return/region helpers are generated.
+// Their guarded value proof does not grant new scalar write or effect authority.
+pub(super) fn outline_declarations(
+    module: &mut NirModule,
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+    names: &mut BTreeSet<String>,
+) -> BTreeSet<String> {
+    let mut helpers = Vec::new();
+    let checked = BTreeSet::new();
+    for function in &mut module.functions {
+        if function.is_async
+            || !function.generic_params.is_empty()
+            || !function.where_bounds.is_empty()
+        {
+            continue;
+        }
+        let mut scope = function
+            .params
+            .iter()
+            .map(|p| (p.name.clone(), p.ty.clone()))
+            .collect::<Scope>();
+        let mut bindings = scope.keys().cloned().collect();
+        branches::collect_bindings(&function.body, &mut bindings);
+        Builder {
+            catalog,
+            layouts,
+            names,
+            checked: &checked,
+            helpers: &mut helpers,
+            bindings,
+            extract_selections: false,
+            predicate_returns: false,
+        }
+        .declarations(&mut function.body, &mut scope, 0);
+    }
+    let generated = helpers.iter().map(|f| f.name.clone()).collect();
+    module.functions.extend(helpers);
+    generated
+}
+
 // An effectful parent is not a pure helper, but its local value selection can
 // still use the same guarded scalar-control contract as a standalone function.
 pub(super) fn outline(
@@ -72,6 +113,72 @@ struct Selection {
 }
 
 impl<L: control_values::ValueLayouts> Builder<'_, L> {
+    fn declarations(&mut self, body: &mut [NirStmt], scope: &mut Scope, depth: usize) {
+        if depth >= 64 {
+            return;
+        }
+        for index in 0..body.len() {
+            let (before, suffix) = body.split_at_mut(index + 1);
+            let stmt = &mut before[index];
+            if let Some(join) = scalar_joins::declaration(stmt, scope, suffix)
+                .or_else(|| {
+                    scalar_joins::guarded_declaration(
+                        stmt,
+                        scope,
+                        suffix,
+                        self.catalog,
+                        self.layouts,
+                    )
+                })
+                .or_else(|| {
+                    scalar_joins::computed_declaration(
+                        stmt,
+                        scope,
+                        suffix,
+                        self.catalog,
+                        self.layouts,
+                    )
+                })
+            {
+                let name = join.name.to_owned();
+                let ty = join.ty.clone();
+                let yes = self
+                    .value(join.name, Some(join.ty), join.yes, false, scope)
+                    .expect("proved typed join arm");
+                let no = self
+                    .value(join.name, Some(join.ty), join.no, false, scope)
+                    .expect("proved typed join arm");
+                *stmt = self.extract(join.condition.clone(), yes, no, scope, false);
+                scope.insert(name, ty);
+                continue;
+            }
+            match stmt {
+                NirStmt::Let { name, ty, value } => {
+                    let ty = ty.clone().or_else(|| {
+                        control_values::value_type(value, scope, self.catalog, self.layouts)
+                    });
+                    scope.remove(name);
+                    if let Some(ty) = ty {
+                        scope.insert(name.clone(), ty);
+                    }
+                }
+                NirStmt::Const { name, ty, .. } => {
+                    scope.insert(name.clone(), ty.clone());
+                }
+                NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                } => {
+                    self.declarations(then_body, &mut scope.clone(), depth + 1);
+                    self.declarations(else_body, &mut scope.clone(), depth + 1);
+                }
+                // Iteration-local joins keep the loop outliner's own authority.
+                _ => {}
+            }
+        }
+    }
+
     fn block(&mut self, body: &mut [NirStmt], scope: &mut Scope, in_loop: bool) {
         for stmt in body {
             match stmt {

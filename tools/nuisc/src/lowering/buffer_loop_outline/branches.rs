@@ -57,6 +57,11 @@ pub(super) fn outline_effects(
                     if arm.is_empty() {
                         continue;
                     }
+                    if let Some(updates) = ready_values::updates(&arm, scope, &predicate, selected)
+                    {
+                        outlined.extend(updates);
+                        continue;
+                    }
                     let mut inputs = BTreeSet::from([predicate.clone()]);
                     inputs.extend(carries.iter().cloned());
                     validate_effects(

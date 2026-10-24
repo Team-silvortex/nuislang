@@ -149,36 +149,57 @@ fn bool_write_authority_requires_mutable_seeds_and_does_not_widen_buffer_effects
 
 #[test]
 fn bool_branch_transport_uses_canonical_words_without_new_loop_state() {
-    let mut module = parse_nuis_module(&source(
+    let text = source(
         "let flag = true; let other = false;
         if flag { let flag = false; let other = true; let total: i64 = total + index; }
         if other { let flag = true; }
         if flag { let checksum: i64 = checksum + index; }",
-    ))
-    .unwrap();
-    outline_buffer_loops(&mut module).unwrap();
-    let iteration = module
-        .functions
-        .iter()
-        .find(|f| f.name.starts_with("__nuis_scalar_iteration_"))
-        .unwrap();
-    assert!(!iteration
-        .params
-        .iter()
-        .any(|p| p.name == "flag" || p.name == "other"));
-    assert!(iteration.body.iter().any(|s| matches!(s, NirStmt::Let { ty: Some(ty), value: NirExpr::CastI64ToBool(_), .. } if ty == &scalar_type("bool"))));
-    for layout in &module.structs {
-        if layout.name.starts_with("__nuis_scalar_carries_") {
-            assert!(layout.fields.iter().all(|f| f.ty == scalar_type("i64")));
+    );
+    for ready in [false, true] {
+        let text = if ready {
+            text.clone()
+        } else {
+            text.replace(
+                "if other { let flag = true; }",
+                "if other { let flag = index < bound; }",
+            )
+        };
+        let mut module = parse_nuis_module(&text).unwrap();
+        outline_buffer_loops(&mut module).unwrap();
+        let iteration = module
+            .functions
+            .iter()
+            .find(|f| f.name.starts_with("__nuis_scalar_iteration_"))
+            .unwrap();
+        assert!(!iteration
+            .params
+            .iter()
+            .any(|p| p.name == "flag" || p.name == "other"));
+        assert!(iteration.body.iter().any(|s| matches!(s, NirStmt::Let { ty: Some(ty), value: NirExpr::CastI64ToBool(_), .. } if ty == &scalar_type("bool"))));
+        for layout in &module.structs {
+            if layout.name.starts_with("__nuis_scalar_carries_") {
+                assert!(layout.fields.iter().all(|f| f.ty == scalar_type("i64")));
+            }
+        }
+        let word_helper = module.functions.iter().any(|f| {
+            f.name.starts_with("__nuis_buffer_branch_")
+                && matches!(
+                    f.body.last(),
+                    Some(NirStmt::Return(Some(NirExpr::CastBoolToI64(_))))
+                )
+        });
+        assert_eq!(
+            word_helper, !ready,
+            "only the ready bool write elides transport"
+        );
+        if ready {
+            assert!(iteration.body.iter().any(|stmt| matches!(stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(then_body.as_slice(), [NirStmt::Let { name, value: NirExpr::Bool(true), .. }] if name == "flag")
+                    && matches!(else_body.as_slice(), [NirStmt::Let { name, value: NirExpr::Var(old), .. }] if name == "flag" && old == name)
+        )));
         }
     }
-    assert!(module.functions.iter().any(|f| {
-        f.name.starts_with("__nuis_buffer_branch_")
-            && matches!(
-                f.body.last(),
-                Some(NirStmt::Return(Some(NirExpr::CastBoolToI64(_))))
-            )
-    }));
 }
 
 #[test]

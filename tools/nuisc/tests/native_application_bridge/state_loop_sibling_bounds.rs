@@ -79,6 +79,80 @@ fn payload_calls_reference_preserves_last_state_after_ordered_return_failures() 
     check_reference(cases::payload_call_variants());
 }
 
+#[test]
+fn field_payload_reference_retains_previous_state_after_partial_record_evaluation() {
+    check_reference(cases::field_payload_variants());
+}
+
+#[test]
+fn mixed_payload_reference_preserves_live_and_snapshot_origins_before_publication() {
+    check_reference(cases::mixed_payload_variants());
+}
+
+#[test]
+fn projected_payload_reference_preserves_complete_state_after_argument_and_callee_faults() {
+    check_reference(cases::projected_payload_variants());
+}
+
+#[test]
+fn unprojected_payload_reference_retains_state_after_discarded_field_faults() {
+    check_reference(cases::unprojected_payload_variants());
+}
+
+#[test]
+fn conditional_payload_reference_preserves_lazy_fields_and_faulted_state() {
+    check_reference(cases::conditional_payload_variants());
+}
+
+#[test]
+fn conditional_payload_full_exit_stress_fits_unchanged_function_bound() {
+    check_function_bound(cases::conditional_payload_variants()[0]);
+}
+
+#[test]
+fn scalar_join_payload_full_exit_stress_fits_unchanged_function_bound() {
+    check_function_bound(cases::scalar_join_variants()[0]);
+}
+
+#[test]
+fn scalar_join_payload_reference_preserves_lazy_fields_and_faulted_state() {
+    check_reference(cases::scalar_join_variants());
+}
+
+#[test]
+fn scalar_join_payload_native_preserves_typed_selections_and_exact_fault_prefixes() {
+    check_native(cases::scalar_join_variants());
+}
+
+#[test]
+fn scalar_join_payload_native_keeps_complete_loop_reservations() {
+    check_return_reservations(cases::scalar_join_variants());
+}
+
+fn check_function_bound(variant: cases::Variant) {
+    use yir_lower_llvm::native_session::{emit_registered_with_literal_prints, LiteralPrintPolicy};
+    let project = Project::with_source(&cases::source(variant));
+    let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
+    let policy = LiteralPrintPolicy::new(
+        compiled
+            .yir
+            .nodes
+            .iter()
+            .filter(|n| matches!(n.op.instruction.as_str(), "print" | "guard_print"))
+            .map(|n| n.name.clone()),
+    )
+    .unwrap();
+    assert!(compiled.yir.functions.len() <= 64);
+    emit_registered_with_literal_prints(
+        &compiled.yir,
+        "counter",
+        &policy,
+        cases::LOOP_LIMIT,
+        cases::ENTRY_LIMIT,
+    )
+    .expect("full stress fixture fits without relaxing the native profile");
+}
+
 fn check_reference(variants: Vec<cases::Variant>) {
     for variant in variants {
         let project = Project::with_source(&cases::source(variant));
@@ -158,6 +232,31 @@ fn payload_calls_native_keeps_raw_words_and_exact_argument_and_callee_failure_pr
     check_native(cases::payload_call_variants());
 }
 
+#[test]
+fn field_payload_native_keeps_source_field_order_and_exact_failure_prefixes() {
+    check_native(cases::field_payload_variants());
+}
+
+#[test]
+fn mixed_payload_native_keeps_original_self_reads_and_exact_failure_prefixes() {
+    check_native(cases::mixed_payload_variants());
+}
+
+#[test]
+fn projected_payload_native_preserves_once_only_calls_raw_fields_and_fault_prefixes() {
+    check_native(cases::projected_payload_variants());
+}
+
+#[test]
+fn unprojected_payload_native_evaluates_every_callee_field_before_projection() {
+    check_native(cases::unprojected_payload_variants());
+}
+
+#[test]
+fn conditional_payload_native_keeps_short_circuit_order_and_exact_fault_prefixes() {
+    check_native(cases::conditional_payload_variants());
+}
+
 fn check_native(variants: Vec<cases::Variant>) {
     for variant in variants {
         let healthy = cases::healthy(variant)
@@ -202,6 +301,31 @@ fn snapshot_returns_native_reserves_full_entered_bounds_but_skips_later_work() {
 #[test]
 fn payload_calls_native_reserves_entered_bounds_before_any_return_expression_effects() {
     check_return_reservations(cases::payload_call_variants());
+}
+
+#[test]
+fn field_payload_native_reserves_entered_bounds_before_any_record_field_effects() {
+    check_return_reservations(cases::field_payload_variants());
+}
+
+#[test]
+fn mixed_payload_native_preserves_full_reservations_before_alias_sensitive_returns() {
+    check_return_reservations(cases::mixed_payload_variants());
+}
+
+#[test]
+fn projected_payload_native_reserves_entered_work_before_projected_calls() {
+    check_return_reservations(cases::projected_payload_variants());
+}
+
+#[test]
+fn unprojected_payload_native_reserves_entered_work_before_callee_fields() {
+    check_return_reservations(cases::unprojected_payload_variants());
+}
+
+#[test]
+fn conditional_payload_native_reserves_before_conditional_field_work() {
+    check_return_reservations(cases::conditional_payload_variants());
 }
 
 fn check_return_reservations(variants: Vec<cases::Variant>) {
@@ -405,15 +529,24 @@ fn sibling_bounds_native_charges_each_full_reached_bound_even_after_child_break(
 }
 
 #[test]
-fn sibling_bounds_native_entry_limit_160_still_rejects_long_callback() {
+fn sibling_bounds_native_ready_updates_fit_160_but_entry_limit_100_still_rejects() {
     let variant = cases::variants()[0];
     let mut call = cases::base(variant);
     call.input.total = 1;
-    probe::check_helper_entry_limit_rejection(
+    let rows = [sequence(vec![call])];
+    probe::check_sequences_with_limits(
         &cases::source(variant),
-        &[sequence(vec![call])],
+        &rows,
+        &[],
         &[("extent", cases::OBSERVER)],
         cases::LOOP_LIMIT,
         160,
+    );
+    probe::check_helper_entry_limit_rejection(
+        &cases::source(variant),
+        &rows,
+        &[("extent", cases::OBSERVER)],
+        cases::LOOP_LIMIT,
+        100,
     );
 }

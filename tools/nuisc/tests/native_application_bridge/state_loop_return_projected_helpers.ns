@@ -1,0 +1,16 @@
+@noinline fn project_marker_arg(value: i64) -> i64 { print(985); return value; }
+@noinline fn project_result_arg(value: i64) -> i64 { print(988); return value; }
+@noinline fn project_gain_arg(value: i64) -> i64 { print(989); return value; }
+@noinline fn project_total_arg(value: i64) -> i64 { print(990); return value; }
+
+@noinline fn project_record(seed: State, delta: i64, root: i64) -> State {
+    print(986);
+    let checked = 0 / root;
+    print(987);
+    return State {
+        marker: -seed.marker,
+        result: seed.result,
+        gain: -seed.gain,
+        total: seed.total + delta + checked
+    };
+}

@@ -8,6 +8,12 @@ use yir_core::{Value, YirModule};
 use yir_lower_llvm::native_session::{emit_registered, NativeSessionBridge, ScalarKind};
 use yir_runtime_host::ApplicationSession;
 
+#[path = "native_application_bridge/guarded_scalar_join.rs"]
+mod guarded_scalar_join;
+
+#[path = "native_application_bridge/computed_scalar_join.rs"]
+mod computed_scalar_join;
+
 #[path = "native_application_bridge/return_dual_i64.rs"]
 mod return_dual_i64;
 

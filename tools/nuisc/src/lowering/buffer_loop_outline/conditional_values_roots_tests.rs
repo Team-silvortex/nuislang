@@ -238,7 +238,7 @@ fn conditional_root_values_preserve_selected_versions_nested_bindings_and_early_
 }
 
 #[test]
-fn conditional_root_values_retain_effectful_nested_return_speculation_rejection() {
+fn conditional_root_values_keep_nested_effects_guarded_without_ready_join_authority() {
     for op in ["&&", "||"] {
         let original = source("return", op, false, 0, true);
         let selected = format!("print(99); return gate {op} helper(produce(divisor));");
@@ -332,13 +332,38 @@ fn conditional_root_values_retain_effectful_nested_return_speculation_rejection(
             );
         }
         let effectful = original.replace(&selected, &format!("print(99); if gate {{ if gate {{ print(88); return gate {op} helper(produce(divisor)); }} }} return false;"));
-        let error = crate::pipeline::compile_source(&effectful)
-            .err()
-            .expect("unproven branch-effect return must stay rejected");
-        assert!(
-            error.contains("conditional fallible return requires guarded helper lowering"),
-            "{error}"
-        );
+        let mut nir = crate::frontend::parse_nuis_module(&effectful).unwrap();
+        let before = nir.clone();
+        let layouts = control_values::TypedLayouts::collect(&nir);
+        let catalog = scalar_helpers::collect_capture_values(&nir, &layouts);
+        let mut names = nir.functions.iter().map(|f| f.name.clone()).collect();
+        assert!(outline_declarations(&mut nir, &catalog, &layouts, &mut names).is_empty());
+        assert_eq!(nir, before, "ready joins grant no nested-effect authority");
+        // This shape is already accepted without any ready declaration rewrite.
+        // Pin its actual selected effects and checked calls instead of rejection.
+        for (gate, divisor) in [(false, 0), (true, 2), (true, -2), (true, 0)] {
+            let effectful = source("return", op, gate, divisor, true)
+                .replace(&selected, &format!("print(99); if gate {{ if gate {{ print(88); return gate {op} helper(produce(divisor)); }} }} return false;"))
+                .replace("fn produce(", "@noinline fn produce(")
+                .replace("fn helper(", "@noinline fn helper(");
+            let rhs = gate && op == "&&";
+            let result = if gate && (op == "||" || divisor > 0) {
+                11
+            } else {
+                19
+            };
+            let prints = if gate {
+                vec![99, 88, result]
+            } else {
+                vec![99, result]
+            };
+            super::super::conditional_returns::tests::execute(
+                &effectful,
+                (!(rhs && divisor == 0)).then_some(result),
+                &prints,
+                usize::from(rhs),
+            );
+        }
     }
 }
 

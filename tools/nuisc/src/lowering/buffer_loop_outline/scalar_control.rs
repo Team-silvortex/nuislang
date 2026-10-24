@@ -129,6 +129,15 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                         }
                     };
                     let predicate = fresh_name("__nuis_scalar_condition", &mut self.bindings);
+                    // Admission proves types and calls, not eagerness. Preserve
+                    // logical RHS guards when materializing this condition.
+                    let condition = logical_conditions::predicate(
+                        condition,
+                        &scope,
+                        self.names,
+                        self.helpers,
+                        self.guarded,
+                    );
                     output.push(NirStmt::Let {
                         name: predicate.clone(),
                         ty: Some(scalar_type("bool")),

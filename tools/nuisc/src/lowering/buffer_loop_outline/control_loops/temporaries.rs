@@ -7,6 +7,10 @@ mod literal_loops;
 #[path = "word_temporaries_tests.rs"]
 mod word_tests;
 
+#[cfg(test)]
+#[path = "bool_projection_tests.rs"]
+mod bool_projection_tests;
+
 // This source profile uses scoped functions, not captured loop-metadata RHSs.
 // Keep definite initialization separate from the set of returned loop carries.
 #[derive(Clone)]
@@ -284,8 +288,11 @@ fn expression(
 }
 
 fn bool_atom(value: &NirExpr) -> bool {
-    matches!(
-        value,
-        NirExpr::Bool(_) | NirExpr::Var(_) | NirExpr::Call { .. }
-    )
+    match value {
+        // expression already checked the full projection's type, read readiness
+        // and call authority. A field does not introduce logical control flow.
+        NirExpr::FieldAccess { base, .. } => bool_atom(base),
+        NirExpr::Bool(_) | NirExpr::Var(_) | NirExpr::Call { .. } => true,
+        _ => false,
+    }
 }

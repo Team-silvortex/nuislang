@@ -86,8 +86,17 @@ cargo test -p nuis --test native_session_workflow --locked -j1 -- effect_calls::
 - [ ] Retain the [distinct-epoch witnesses](../reference/nuis-native-return-effect-storage-epoch-bounds-v1.md): simultaneous older/newer record identities, changing bounds, reached construction failures, separate full reservations and source-free delivery across backedges.
 - [ ] Retain the [returned-snapshot witnesses](../reference/nuis-native-return-effect-storage-snapshot-returns-v1.md): complete older/newer payload identity and raw fields on first/post-backedge inner exits, full entered reservations, skipped work and source-free delivery.
 - [ ] Retain the [payload-call witnesses](../reference/nuis-native-return-effect-storage-payload-calls-v1.md): ordered return arguments, selected finalizer failures, complete publication and source-free delivery; keep late-field construction as a separate gate.
+- [ ] Retain the [field-payload witnesses](../reference/nuis-native-return-effect-storage-field-payload-v1.md): source-ordered field effects, late-field faults, complete publication and source-free delivery.
+- [ ] Retain the [mixed-origin witnesses](../reference/nuis-native-return-effect-storage-mixed-payload-v1.md): boolean projection admission, original live self-reads and distinct snapshot epochs, complete publication and source-free delivery.
+- [ ] Retain the [projected-call witnesses](../reference/nuis-native-return-effect-storage-projected-payload-v1.md): once-only record and argument calls, selected failures, raw field identity, complete publication and source-free delivery.
+- [ ] Retain the [unprojected-field witnesses](../reference/nuis-native-return-effect-storage-unprojected-payload-v1.md): complete callee-field evaluation, discarded-field faults, transitive call authority, unchanged reservations and source-free delivery.
+- [ ] Retain the [conditional-field witnesses](../reference/nuis-native-return-effect-storage-conditional-payload-v1.md), [ready-value follow-up](../reference/nuis-native-return-ready-values-v1.md) and [typed scalar joins](../reference/nuis-native-typed-scalar-joins-v1.md): shared short-circuit lowering, all full-fixture exits, strict write admission and the unchanged 64/65 graph boundary; prove computed gates and non-atomic arms separately.
+
+- [ ] Retain the [guarded scalar expression proof](../reference/nuis-native-guarded-scalar-joins-v1.md): bounded pure non-logical arms, selected checks, skipped poison and source-free delivery; computed predicates and logical/effectful arms remain separate gates.
 
 ## Application And Backend Gates
+- [ ] Retain the [computed predicate proof](../reference/nuis-native-computed-scalar-predicates-v1.md): shared three-tree budget, one predicate evaluation, predicate-before-arm failures and source-free delivery; logical trees and effectful predicates remain separate gates.
+
 
 The [image showcase](../../examples/projects/domains/ns_nova_image_showcase/README.md)
 owns its actual Metal pixel/window/replay route.

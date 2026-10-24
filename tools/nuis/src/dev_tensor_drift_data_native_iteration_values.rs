@@ -37,7 +37,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "native-iteration-values-lazy-field-operands",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested_conditions.rs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/logical_conditions.rs",
         required_patterns: &[
             "NirExpr::StructLiteral",
             "NirExpr::FieldAccess",

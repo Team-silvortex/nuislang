@@ -9,10 +9,19 @@ pub(super) fn plans(
     source: &str,
     function: &str,
 ) -> (NirModule, control_values::CarryLayouts, ScalarHelpers) {
-    let module = parse_nuis_module(source).unwrap();
+    let mut module = parse_nuis_module(source).unwrap();
+    // Match the pipeline's source-declaration phase before strict call admission.
+    let values = control_values::TypedLayouts::collect(&module);
+    let pure = scalar_helpers::collect_capture_values(&module, &values);
+    let mut names = module.functions.iter().map(|f| f.name.clone()).collect();
+    conditional_values::outline_declarations(&mut module, &pure, &values, &mut names);
     let layouts = control_values::layouts(&module);
     let catalog = scalar_helpers::collect_iteration_calls(&module, &layouts);
-    assert!(catalog.contains_key(function));
+    assert!(
+        catalog.contains_key(function),
+        "helper {function} was not admitted; admitted helpers: {:?}",
+        catalog.keys().collect::<Vec<_>>()
+    );
     (module, layouts, catalog)
 }
 

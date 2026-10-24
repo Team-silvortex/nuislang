@@ -25,12 +25,18 @@ mod control_values;
 mod effectful_selections;
 #[path = "buffer_loop_outline/iteration_effects.rs"]
 mod iteration_effects;
+#[path = "buffer_loop_outline/logical_conditions.rs"]
+mod logical_conditions;
+#[path = "buffer_loop_outline/ready_values.rs"]
+mod ready_values;
 #[path = "buffer_loop_outline/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]
 mod scalar_control;
 #[path = "buffer_loop_outline/scalar_helpers.rs"]
 mod scalar_helpers;
+#[path = "buffer_loop_outline/scalar_joins.rs"]
+mod scalar_joins;
 use scalar_helpers::ScalarHelpers;
 #[path = "buffer_loop_outline/validation.rs"]
 mod validation;
@@ -90,6 +96,20 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
                 .map(|definition| definition.name.clone()),
         )
         .collect::<BTreeSet<_>>();
+    let declarations = conditional_values::outline_declarations(
+        module,
+        &value_catalog,
+        &value_layouts,
+        &mut names,
+    );
+    if !declarations.is_empty() {
+        crate::nir_verify::verify_nir_module(module)?;
+        catalog = scalar_helpers::collect(module);
+        control_catalog = scalar_helpers::collect_with_layouts(module, &layouts);
+        control_roots = scalar_helpers::control_roots(module, &layouts, &control_catalog);
+        value_catalog =
+            scalar_helpers::collect_typed_values(module, &value_layouts, &control_catalog);
+    }
     let effectful_selections = effectful_selections::outline(module, &mut names);
     if !effectful_selections.is_empty() {
         crate::nir_verify::verify_nir_module(module)?;
@@ -107,6 +127,7 @@ pub(super) fn outline_buffer_loops(module: &mut NirModule) -> Result<BufferLoopO
         &value_layouts,
         &mut names,
     );
+    selections.extend(declarations);
     if !selections.is_empty() {
         // Stored return signals introduce private typed result layouts.
         layouts = control_values::layouts(module);

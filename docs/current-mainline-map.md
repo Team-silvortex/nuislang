@@ -67,7 +67,28 @@ The [returned-snapshot witnesses](reference/nuis-native-return-effect-storage-sn
 check complete older/newer payload identity through selected inner-loop exits.
 The [payload-call witnesses](reference/nuis-native-return-effect-storage-payload-calls-v1.md)
 cover fallible effectful finalization with ordered arguments and complete publication.
-Next exercise effectful field-by-field payload construction with a failing later field.
+The [field-payload witnesses](reference/nuis-native-return-effect-storage-field-payload-v1.md)
+exercise source-ordered construction with earlier field effects and a failing later field.
+The [mixed-origin witnesses](reference/nuis-native-return-effect-storage-mixed-payload-v1.md)
+combine live-carry and older/newer snapshot fields, including a later read of the original
+boolean after an earlier field computes its inverse. Boolean field admission is repaired.
+The [projected-call witnesses](reference/nuis-native-return-effect-storage-projected-payload-v1.md)
+track effectful record-valued calls used directly as returned field projection bases,
+with once-only execution and separate argument/callee failure stages.
+The [unprojected-field witnesses](reference/nuis-native-return-effect-storage-unprojected-payload-v1.md)
+track effects and faults inside the callee's literal, before and after the desired field.
+The [conditional-field witnesses](reference/nuis-native-return-effect-storage-conditional-payload-v1.md)
+repair scalar-control short-circuit extraction and test skipped poisoned RHS work.
+The [ready-value follow-up](reference/nuis-native-return-ready-values-v1.md) reduces
+the representative full fixture from 75 to 63 NIR functions within the unchanged
+64-function profile. Native/reference and delivery tests now use the full fixture;
+the [typed scalar join follow-up](reference/nuis-native-typed-scalar-joins-v1.md)
+adds fresh ready-value declarations before strict call admission. The
+[guarded expression follow-up](reference/nuis-native-guarded-scalar-joins-v1.md)
+adds bounded non-logical pure arms. The
+[computed predicate proof](reference/nuis-native-computed-scalar-predicates-v1.md)
+adds once-evaluated non-logical pure gates. Logical trees and effectful gates/arms
+require further proof.
 Keep checks/calls once-only and source-ordered,
 failure before pending/result publication, a separate pending signal and
 independent payload fallback for every unproved reduction.

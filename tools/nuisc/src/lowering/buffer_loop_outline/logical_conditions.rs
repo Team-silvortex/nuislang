@@ -1,8 +1,8 @@
 use super::*;
 
-// Conditions in the scoped iteration are ordinary function expressions, not
-// loop-metadata predicates. Use guarded bool helpers so their RHS stays lazy.
-// One helper per logical edge gives linear growth without duplicating arm bodies.
+// Admitted conditions are ordinary function expressions, not loop-metadata
+// predicates. Share guarded bool helpers across iteration and scalar control.
+// Only a non-total RHS needs a helper; ready comparisons can use the value path.
 pub(super) fn outline(
     function: &mut NirFunction,
     names: &mut BTreeSet<String>,
@@ -33,7 +33,7 @@ pub(super) fn outline(
     }
 }
 
-fn predicate(
+pub(super) fn predicate(
     expr: NirExpr,
     scope: &Scope,
     names: &mut BTreeSet<String>,
@@ -78,6 +78,13 @@ fn predicate(
             _ => expr,
         };
     };
+    if ready_values::total_predicate(&rhs, scope) {
+        return NirExpr::Binary {
+            op,
+            lhs: Box::new(predicate(*lhs, scope, names, helpers, guarded)),
+            rhs,
+        };
+    }
     let disjunction = op == NirBinaryOp::Or;
     let mut inputs = BTreeSet::new();
     control_values::collect_inputs(&rhs, &mut inputs);

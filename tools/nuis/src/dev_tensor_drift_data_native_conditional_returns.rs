@@ -604,13 +604,13 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-conditional-return-fallthrough-retain-original-root-case-and-rejection-boundaries",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_roots_tests.rs",
         required_patterns: &[
-            "conditional_root_values_retain_effectful_nested_return_speculation_rejection",
+            "conditional_root_values_keep_nested_effects_guarded_without_ready_join_authority",
             "crate::pipeline::compile_source(&admitted).unwrap()",
             "yir_lower_llvm::emit_module(&compiled.yir).unwrap()",
             "let selected: bool = helper(produce(divisor));",
             "Stored signals admit the pure local predicate, not branch effects",
-            "unproven branch-effect return must stay rejected",
-            "conditional fallible return requires guarded helper lowering",
+            "ready joins grant no nested-effect authority",
+            "outline_declarations(&mut nir, &catalog, &layouts, &mut names).is_empty()",
         ],
     },
     DevTensorDriftCheckSpec {

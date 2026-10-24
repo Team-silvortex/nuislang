@@ -1,5 +1,29 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
+#[path = "dev_tensor_drift_data_native_typed_scalar_joins.rs"]
+mod typed_scalar_joins;
+
+#[path = "dev_tensor_drift_data_native_guarded_scalar_joins.rs"]
+mod guarded_scalar_joins;
+
+#[path = "dev_tensor_drift_data_native_computed_scalar_joins.rs"]
+mod computed_scalar_joins;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
+mod return_effect_storage_conditional_payload;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_unprojected_payload.rs"]
+mod return_effect_storage_unprojected_payload;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_projected_payload.rs"]
+mod return_effect_storage_projected_payload;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_mixed_payload.rs"]
+mod return_effect_storage_mixed_payload;
+
+#[path = "dev_tensor_drift_data_native_return_effect_storage_field_payload.rs"]
+mod return_effect_storage_field_payload;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_payload_calls.rs"]
 mod return_effect_storage_payload_calls;
 
@@ -524,6 +548,14 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         return_effect_storage_epoch_bounds::CHECKS,
         return_effect_storage_snapshot_returns::CHECKS,
         return_effect_storage_payload_calls::CHECKS,
+        return_effect_storage_field_payload::CHECKS,
+        return_effect_storage_mixed_payload::CHECKS,
+        return_effect_storage_projected_payload::CHECKS,
+        return_effect_storage_unprojected_payload::CHECKS,
+        typed_scalar_joins::CHECKS,
+        guarded_scalar_joins::CHECKS,
+        computed_scalar_joins::CHECKS,
+        return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,
         return_float_i64::CHECKS,
@@ -594,7 +626,7 @@ const CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "native-iteration-call-logical-arguments",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/nested_conditions.rs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/logical_conditions.rs",
         required_patterns: &[
             "control_values::value_type(value, &scope, catalog, layouts)",
             "Logical edges can also occur",

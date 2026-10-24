@@ -79,6 +79,10 @@ lifecycle and packaging identity checks remain in place.
 
 ## Remaining Frontier
 
+The [field-payload follow-up](nuis-native-return-effect-storage-field-payload-v1.md)
+now owns the late-field construction gate below; this historical receipt retains
+the narrower call-finalization boundary and its original validation scope.
+
 The coordinate stays `standard-library/ns-nova/persistent-application-session`,
 active/99. Next exercise field-by-field payload construction: successful
 effectful earlier fields followed by a failing later field, inside the returned

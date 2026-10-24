@@ -48,6 +48,29 @@ inner exits, preserving raw fields, full entered reservations and skipped work.
 The [payload-call witnesses](nuis-native-return-effect-storage-payload-calls-v1.md)
 check once-only ordered return arguments, selected finalizer failures, retained
 accepted State and source-free delivery after successful loop work.
+The [field-payload witnesses](nuis-native-return-effect-storage-field-payload-v1.md)
+exercise source field order, once-only construction and failure after earlier fields
+have emitted effects, before a complete returned State can be published.
+The [mixed-origin witnesses](nuis-native-return-effect-storage-mixed-payload-v1.md)
+repair boolean field admission and distinguish live/older/newer reads, including
+an original live self-read after another field computes the opposite boolean.
+The [projected-call witnesses](nuis-native-return-effect-storage-projected-payload-v1.md)
+cover direct fields of effectful record calls, distinct argument/callee fault stages
+and per-source-occurrence execution.
+The [unprojected-field witnesses](nuis-native-return-effect-storage-unprojected-payload-v1.md)
+track complete callee-field work, including discarded-field failures before and after
+the desired value and executable pruning/reordering/repetition controls.
+The [conditional-field witnesses](nuis-native-return-effect-storage-conditional-payload-v1.md)
+exercise all six lazy truth paths and retain exact selected fault prefixes; scalar
+control and scoped iterations now share logical RHS guard extraction.
+The [ready-value follow-up](nuis-native-return-ready-values-v1.md) removes redundant
+scalar-control helpers and tracks the complete fixture through native delivery.
+The [typed scalar joins](nuis-native-typed-scalar-joins-v1.md) extend the same full
+fixture to inline conditional declarations inside effectful record callees.
+The [guarded scalar joins](nuis-native-guarded-scalar-joins-v1.md) add bounded
+non-logical pure-expression arms, with selected checks and source-free delivery.
+The [computed predicate proof](nuis-native-computed-scalar-predicates-v1.md) adds
+once-only fallible pure conditions, native entry observations and guarded arms.
 
 This index replaces duplicated proof narratives in the repository README,
 documentation index and mainline router. Original reference files, anchors,
