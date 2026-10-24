@@ -128,8 +128,13 @@ The [typed scalar join follow-up](docs/reference/nuis-native-typed-scalar-joins-
 adds inline ready-value declarations inside effectful record callees under the same bounds.
 The [guarded expression follow-up](docs/reference/nuis-native-guarded-scalar-joins-v1.md)
 keeps fallible pure branch values lazy in a compact native record-return application.
-The [computed predicate proof](docs/reference/nuis-native-computed-scalar-predicates-v1.md)
-extends that route to a once-evaluated fallible pure boolean condition.
+The [computed predicate proof](docs/reference/nuis-native-computed-scalar-predicates-v1.md) extends that route to a once-evaluated fallible pure boolean condition.
+The [logical predicate proof](docs/reference/nuis-native-logical-scalar-predicates-v1.md) composes bounded `&&`/`||` trees while keeping skipped calls and value arms lazy.
+The [logical value proof](docs/reference/nuis-native-logical-scalar-values-v1.md)
+extends that same contract to either or both bool value arms.
+The [pure prefix proof](docs/reference/nuis-native-prefixed-scalar-joins-v1.md) keeps branch-local initialization ordered and lazy.
+The [nested prefix proof](docs/reference/nuis-native-nested-prefix-joins-v1.md) adds typed local selections without leaking child scopes.
+The [record prefix proof](docs/reference/nuis-native-record-prefix-joins-v1.md) and [discarded-record follow-up](docs/reference/nuis-native-discarded-record-prefix-v1.md) cover exact-layout joins and retained unused field work.
 
 Cancellation admission, host-scope retirement and provider/device retirement
 are separate facts. Rendering, control, ML and audio are ns-nova's engine

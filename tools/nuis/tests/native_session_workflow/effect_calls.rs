@@ -10,6 +10,24 @@ mod guarded_scalar_join;
 #[path = "computed_scalar_join.rs"]
 mod computed_scalar_join;
 
+#[path = "logical_scalar_join.rs"]
+mod logical_scalar_join;
+
+#[path = "logical_value_join.rs"]
+mod logical_value_join;
+
+#[path = "prefixed_scalar_join.rs"]
+mod prefixed_scalar_join;
+
+#[path = "nested_prefix_join.rs"]
+mod nested_prefix_join;
+
+#[path = "record_prefix_join.rs"]
+mod record_prefix_join;
+
+#[path = "discarded_record_prefix.rs"]
+mod discarded_record_prefix;
+
 #[path = "effect_call_return_dual_i64.rs"]
 mod return_dual_i64;
 

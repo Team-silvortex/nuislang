@@ -71,6 +71,12 @@ The [guarded scalar joins](nuis-native-guarded-scalar-joins-v1.md) add bounded
 non-logical pure-expression arms, with selected checks and source-free delivery.
 The [computed predicate proof](nuis-native-computed-scalar-predicates-v1.md) adds
 once-only fallible pure conditions, native entry observations and guarded arms.
+The [logical predicate proof](nuis-native-logical-scalar-predicates-v1.md) composes
+bounded short-circuit trees with selected RHS calls and source-free delivery.
+The [logical value proof](nuis-native-logical-scalar-values-v1.md) extends the shared budget and lazy execution contract to bool value arms.
+The [pure prefix proof](nuis-native-prefixed-scalar-joins-v1.md) adds fresh ordered let/const locals, unused checked initializers and original-scope capture filtering.
+The [nested prefix proof](nuis-native-nested-prefix-joins-v1.md) adds typed local selections, private child scopes and retained unused conditional work.
+The [record prefix proof](nuis-native-record-prefix-joins-v1.md) and [discarded-record follow-up](nuis-native-discarded-record-prefix-v1.md) cover exact-layout joins and retained unused field work.
 
 This index replaces duplicated proof narratives in the repository README,
 documentation index and mainline router. Original reference files, anchors,

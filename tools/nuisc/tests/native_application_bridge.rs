@@ -14,6 +14,24 @@ mod guarded_scalar_join;
 #[path = "native_application_bridge/computed_scalar_join.rs"]
 mod computed_scalar_join;
 
+#[path = "native_application_bridge/logical_scalar_join.rs"]
+mod logical_scalar_join;
+
+#[path = "native_application_bridge/logical_value_join.rs"]
+mod logical_value_join;
+
+#[path = "native_application_bridge/prefixed_scalar_join.rs"]
+mod prefixed_scalar_join;
+
+#[path = "native_application_bridge/nested_prefix_join.rs"]
+mod nested_prefix_join;
+
+#[path = "native_application_bridge/record_prefix_join.rs"]
+mod record_prefix_join;
+
+#[path = "native_application_bridge/discarded_record_prefix.rs"]
+mod discarded_record_prefix;
+
 #[path = "native_application_bridge/return_dual_i64.rs"]
 mod return_dual_i64;
 

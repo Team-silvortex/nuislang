@@ -87,8 +87,18 @@ adds fresh ready-value declarations before strict call admission. The
 [guarded expression follow-up](reference/nuis-native-guarded-scalar-joins-v1.md)
 adds bounded non-logical pure arms. The
 [computed predicate proof](reference/nuis-native-computed-scalar-predicates-v1.md)
-adds once-evaluated non-logical pure gates. Logical trees and effectful gates/arms
-require further proof.
+adds once-evaluated non-logical pure gates. The
+[logical predicate proof](reference/nuis-native-logical-scalar-predicates-v1.md)
+composes bounded short-circuit conditions. The
+[logical value proof](reference/nuis-native-logical-scalar-values-v1.md) adds
+bool value arms under the same shared budget. The
+[pure prefix proof](reference/nuis-native-prefixed-scalar-joins-v1.md) keeps
+branch-local let/const work ordered and guarded. The
+[nested prefix proof](reference/nuis-native-nested-prefix-joins-v1.md) adds bounded
+pure local selections. The [record prefix proof](reference/nuis-native-record-prefix-joins-v1.md)
+adds complete exact-layout record locals. The [discarded-record follow-up](reference/nuis-native-discarded-record-prefix-v1.md)
+retains pruned one-sided field work with bounded neutral synthesis and no exported
+erased identity. Outer record results and effectful gates/arms require further proof.
 Keep checks/calls once-only and source-ordered,
 failure before pending/result publication, a separate pending signal and
 independent payload fallback for every unproved reduction.

@@ -300,8 +300,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if inner.contains_key(name)",
             "!local_names.contains(name)",
             "inputs.retain(|name| !local_names.contains(name))",
-            "let mut preserved = locals.to_vec()",
-            "preserved.extend(selected.body)",
+            "Some(selected.with_prefix(locals.to_vec()))",
+            "locals.extend(self.body)",
         ],
     },
     DevTensorDriftCheckSpec {

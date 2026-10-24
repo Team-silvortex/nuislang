@@ -97,6 +97,18 @@ cargo test -p nuis --test native_session_workflow --locked -j1 -- effect_calls::
 ## Application And Backend Gates
 - [ ] Retain the [computed predicate proof](../reference/nuis-native-computed-scalar-predicates-v1.md): shared three-tree budget, one predicate evaluation, predicate-before-arm failures and source-free delivery; logical trees and effectful predicates remain separate gates.
 
+- [ ] Retain the [logical predicate proof](../reference/nuis-native-logical-scalar-predicates-v1.md): shared work/depth/edge bounds, once-only LHS, skipped RHS entry observations, last-State retention and source-free delivery; logical value arms, prefixes and effectful predicates remain separate gates.
+
+- [ ] Retain the [logical value proof](../reference/nuis-native-logical-scalar-values-v1.md): either/both bool arms, shared three-root budgets, nested RHS and whole-arm laziness, entry/fault-prefix observations and source-free delivery; pure prefixes and effectful predicates/arms remain separate gates.
+
+- [ ] Retain the [pure prefix proof](../reference/nuis-native-prefixed-scalar-joins-v1.md): ordered fresh let/const locals, shared all-root budgets, original-scope capture filtering, unused checked initializers and source-free delivery; nested control-flow prefixes and effects remain separate gates.
+
+- [ ] Retain the [nested prefix proof](../reference/nuis-native-nested-prefix-joins-v1.md): typed local selections, private child scopes, complete shared budgets, discarded fallible work and source-free delivery; record-valued joins and effects remain separate gates.
+
+- [ ] Retain the [record prefix proof](../reference/nuis-native-record-prefix-joins-v1.md): complete exact-layout local records, source-ordered field work, mixed bool/word checks and source-free delivery; pruned one-sided records and effects remain separate gates.
+
+- [ ] Retain the [discarded-record proof](../reference/nuis-native-discarded-record-prefix-v1.md): whole-declaration neutral-layout preflight, erased-name non-export, opposite field-order failures and source-free delivery; outer record results and effects remain separate gates.
+
 
 The [image showcase](../../examples/projects/domains/ns_nova_image_showcase/README.md)
 owns its actual Metal pixel/window/replay route.

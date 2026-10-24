@@ -1,0 +1,116 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-proof",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_joins_prefix.rs",
+        required_patterns: &[
+            "pub(in crate::lowering::buffer_loop_outline) fn declaration",
+            "then_body.len() > 32",
+            "else_body.len() > 32",
+            "computed_expression_roots(roots)",
+            "super::observed(name, suffix)",
+            "inner.contains_key(name)",
+            "name == destination",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-shared-factory",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values.rs",
+        required_patterns: &[
+            "scalar_joins::prefixed::declaration(",
+            "fn prefix_selection(",
+            "self.prefix_selection(locals, last, scope)",
+            "self.guard_selection(yes, scope, false)",
+            "self.guard_selection(no, scope, false)",
+            "inputs.retain(|name| !local_names.contains(name))",
+            "self.extract(condition, yes, no, scope, false)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-controls",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_joins_prefix_tests.rs",
+        required_patterns: &[
+            "prefixed_scalar_join_requires_completed_dependencies_before_any_mutation",
+            "prefixed_scalar_join_keeps_ordered_locals_inside_each_arm_without_exporting_them",
+            "prefixed_scalar_join_keeps_rebindings_forward_reads_effects_and_types_closed",
+            "prefixed_scalar_join_shares_all_source_roots_and_bounds_each_arm",
+            "prefixed_scalar_join_supports_all_scalar_results_and_keeps_unused_record_checks",
+            "assert_eq!(names, old_names)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-nuis-witness",
+        path: "tools/nuisc/tests/native_application_bridge/prefixed_scalar_join.ns",
+        required_patterns: &[
+            "let seed = prefix_seed(yes_prefix)",
+            "let seed = prefix_seed(no_prefix)",
+            "const prepared: i64 = prefix_step(seed, yes)",
+            "const prepared: i64 = prefix_step(seed, no)",
+            "let unused = 1 / (seed + 1)",
+            "unused: 1 / tail",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-independent-oracle",
+        path: "tools/nuisc/tests/native_application_bridge/prefixed_scalar_join_cases.rs",
+        required_patterns: &[
+            "trace.push(88)",
+            "trace.push(89)",
+            "checked_div(seed)",
+            "checked_div(seed.wrapping_add(1))",
+            "for divisor in [0, 2, -1]",
+            "values::failures()",
+            "pub fn native_failures()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-native-witness",
+        path: "tools/nuisc/tests/native_application_bridge/prefixed_scalar_join.rs",
+        required_patterns: &[
+            "prefixed_scalar_join_native_keeps_one_predicate_and_selected_fault_prefixes",
+            "prefixed_scalar_join_reference_preserves_predicate_counts_and_last_state",
+            "event.contains(\"cpu.call\")",
+            "calls(&event.events, callee)",
+            "cases::OBSERVERS",
+            "typed_effect_returns::reordered",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-delivery",
+        path: "tools/nuis/tests/native_session_workflow/prefixed_scalar_join.rs",
+        required_patterns: &[
+            "prefixed_scalar_join_fresh_cache_and_source_free_delivery_keep_selected_checks",
+            "compile_cache: hit",
+            "for i in 0..2",
+            "fresh.host_objects == cached.host_objects",
+            "trace.starts_with",
+            "fs::remove_dir_all(project.0.join(\".nuis\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-current-lineage",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Certified pure-prefix declaration witnesses:",
+            "Previous logical-value checkpoint:",
+            "Previous logical-value task checkpoint:",
+            "Previous logical-value blocker checkpoint:",
+            "Previous logical-value action checkpoint:",
+            "Previous logical-value validation checkpoint:",
+            "Previous logical-value artifact checkpoint:",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-prefixed-scalar-join-receipt",
+        path: "docs/reference/nuis-native-prefixed-scalar-joins-v1.md",
+        required_patterns: &[
+            "Pure Prefix Contract",
+            "4,096-work/64-depth/32-logical-edge",
+            "Six new prefix faults",
+            "markers 83-89",
+            "prefix_selection",
+            "active/99",
+        ],
+    },
+];

@@ -1,0 +1,20 @@
+mod cpu Main {
+    struct State { total: i64 }
+    @noinline fn work(state: State, outer: bool, inner: bool, divisor: i64) -> State {
+        print(70);
+        let picked: i64 = if outer {
+            let unused: i64 = if inner { 1 / divisor } else { 0 };
+            7
+        } else { 9 };
+        print(82);
+        return State { total: state.total + picked };
+    }
+    fn start(total: i64, outer: bool, inner: bool, divisor: i64) -> State {
+        return work(State { total: total }, outer, inner, divisor);
+    }
+    fn step(state: State, total: i64, outer: bool, inner: bool, divisor: i64) -> State {
+        return work(state, outer, inner, divisor);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

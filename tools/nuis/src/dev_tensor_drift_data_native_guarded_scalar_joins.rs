@@ -19,7 +19,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values.rs",
         required_patterns: &[
             "scalar_joins::guarded_declaration(",
-            "self.extract(join.condition.clone(), yes, no, scope, false)",
+            ".unwrap_or_else(|| join.condition.clone())",
+            "self.extract(condition, yes, no, scope, false)",
             "Branch calls, projections and arithmetic stay inside the helper.",
         ],
     },

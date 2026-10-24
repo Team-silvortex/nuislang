@@ -3,6 +3,10 @@
 This bounded CPU follow-up continues the [guarded expression proof](nuis-native-guarded-scalar-joins-v1.md)
 from Git beta-0.17.5 at c3e6a14f without changing the version.
 
+The [logical predicate follow-up](nuis-native-logical-scalar-predicates-v1.md)
+adds a separate short-circuit proof. This receipt retains its original non-logical
+boundary and validation results as historical evidence.
+
 ## Computed Predicate Contract
 
 [Scalar join analysis](../../tools/nuisc/src/lowering/buffer_loop_outline/scalar_joins.rs)

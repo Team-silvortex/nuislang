@@ -14,7 +14,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-typed-scalar-join-source-phase",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values.rs",
-        required_patterns: &["pub(super) fn outline_declarations", "fn declarations", "scalar_joins::declaration(stmt, scope, suffix)", "self.extract(join.condition.clone(), yes, no, scope, false)", "Iteration-local joins keep the loop outliner's own authority"],
+        required_patterns: &["pub(super) fn outline_declarations", "fn declarations", "scalar_joins::declaration(stmt, scope, suffix)", ".unwrap_or_else(|| join.condition.clone())", "self.extract(condition, yes, no, scope, false)", "Iteration-local joins keep the loop outliner's own authority"],
     },
     DevTensorDriftCheckSpec {
         id: "native-typed-scalar-join-pipeline",

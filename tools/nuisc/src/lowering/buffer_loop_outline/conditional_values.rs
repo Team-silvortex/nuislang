@@ -1,12 +1,23 @@
 use super::*;
 
+#[cfg(test)]
+#[path = "conditional_values_discarded_record_tests.rs"]
+mod discarded_record_tests;
 #[path = "conditional_values_logical.rs"]
 mod logical;
+#[path = "conditional_values_nested_prefix.rs"]
+mod nested_prefix;
+#[cfg(test)]
+#[path = "conditional_values_nested_prefix_tests.rs"]
+mod nested_prefix_tests;
 #[path = "conditional_values_prefix.rs"]
 pub(super) mod prefix;
 #[cfg(test)]
 #[path = "conditional_values_prefix_tests.rs"]
 mod prefix_tests;
+#[cfg(test)]
+#[path = "conditional_values_record_prefix_tests.rs"]
+mod record_prefix_tests;
 #[cfg(test)]
 #[path = "conditional_values_roots_tests.rs"]
 mod roots_tests;
@@ -112,6 +123,14 @@ struct Selection {
     inputs: BTreeSet<String>,
 }
 
+impl Selection {
+    fn with_prefix(mut self, mut locals: Vec<NirStmt>) -> Self {
+        locals.extend(self.body);
+        self.body = locals;
+        self
+    }
+}
+
 impl<L: control_values::ValueLayouts> Builder<'_, L> {
     fn declarations(&mut self, body: &mut [NirStmt], scope: &mut Scope, depth: usize) {
         if depth >= 64 {
@@ -139,17 +158,72 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
                         self.layouts,
                     )
                 })
+                .or_else(|| {
+                    scalar_joins::logical_declaration(
+                        stmt,
+                        scope,
+                        suffix,
+                        self.catalog,
+                        self.layouts,
+                    )
+                })
+                .or_else(|| {
+                    scalar_joins::logical_value_declaration(
+                        stmt,
+                        scope,
+                        suffix,
+                        self.catalog,
+                        self.layouts,
+                    )
+                })
             {
                 let name = join.name.to_owned();
                 let ty = join.ty.clone();
-                let yes = self
+                let mut yes = self
                     .value(join.name, Some(join.ty), join.yes, false, scope)
                     .expect("proved typed join arm");
-                let no = self
+                let mut no = self
                     .value(join.name, Some(join.ty), join.no, false, scope)
                     .expect("proved typed join arm");
-                *stmt = self.extract(join.condition.clone(), yes, no, scope, false);
+                // Normalize original bool roots only after the complete join
+                // proof. New helper calls stay inside their selected value arm.
+                for (arm, source) in [(&mut yes, join.yes), (&mut no, join.no)] {
+                    if let Some(value) = self.gated_condition(source, scope) {
+                        arm.body = vec![NirStmt::Return(Some(value))];
+                    }
+                }
+                let condition = self
+                    .gated_condition(join.condition, scope)
+                    .unwrap_or_else(|| join.condition.clone());
+                *stmt = self.extract(condition, yes, no, scope, false);
                 scope.insert(name, ty);
+                continue;
+            }
+            if let Some(join) =
+                scalar_joins::prefixed::declaration(stmt, scope, suffix, self.catalog, self.layouts)
+            {
+                let name = join.name.to_owned();
+                let ty = join.ty.clone();
+                let build = |body: &[NirStmt]| {
+                    let (last, locals) = body.split_last().expect("proved nonempty arm");
+                    self.prefix_selection(locals, last, scope)
+                        .expect("proved pure prefix")
+                };
+                let yes = build(join.yes);
+                let no = build(join.no);
+                let yes = self.guard_selection(yes, scope, false);
+                let no = self.guard_selection(no, scope, false);
+                let condition = self
+                    .gated_condition(join.condition, scope)
+                    .unwrap_or_else(|| join.condition.clone());
+                *stmt = self.extract(condition, yes, no, scope, false);
+                scope.insert(name, ty);
+                continue;
+            }
+            if self.nested_declaration(stmt, scope, suffix)
+                || self.record_declaration(stmt, scope, suffix)
+                || self.discarded_record_declaration(stmt, scope, suffix)
+            {
                 continue;
             }
             match stmt {
@@ -345,41 +419,7 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             }
             [NirStmt::Const { name, ty, value }] => self.value(name, Some(ty), value, true, scope),
             [locals @ .., last] if !locals.is_empty() && prefix::bounded(body) => {
-                let mut inner = scope.clone();
-                let mut local_names = BTreeSet::new();
-                let mut inputs = BTreeSet::new();
-                for stmt in locals {
-                    let (name, declared, value) = match stmt {
-                        NirStmt::Let { name, ty, value } => (name, ty.as_ref(), value),
-                        NirStmt::Const { name, ty, value } => (name, Some(ty), value),
-                        _ => return None,
-                    };
-                    // Intermediate work cannot mutate an outer carry or hide
-                    // an earlier local. Only the final selection may rebind.
-                    if inner.contains_key(name) {
-                        return None;
-                    }
-                    let value = self.value(name, declared, value, false, &inner)?;
-                    inputs.extend(value.inputs);
-                    local_names.insert(name.clone());
-                    inner.insert(name.clone(), value.ty);
-                }
-                let mut selected = match last {
-                    NirStmt::Let { name, ty, value } if !local_names.contains(name) => {
-                        self.value(name, ty.as_ref(), value, false, &inner)?
-                    }
-                    NirStmt::Const { name, ty, value } if !local_names.contains(name) => {
-                        self.value(name, Some(ty), value, true, &inner)?
-                    }
-                    _ => return None,
-                };
-                inputs.extend(selected.inputs);
-                inputs.retain(|name| !local_names.contains(name));
-                selected.inputs = inputs;
-                let mut preserved = locals.to_vec();
-                preserved.extend(selected.body);
-                selected.body = preserved;
-                Some(selected)
+                self.prefix_selection(locals, last, scope)
             }
             [NirStmt::If {
                 condition,
@@ -403,6 +443,46 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             }
             _ => None,
         }
+    }
+
+    fn prefix_selection(
+        &self,
+        locals: &[NirStmt],
+        last: &NirStmt,
+        scope: &Scope,
+    ) -> Option<Selection> {
+        let mut inner = scope.clone();
+        let mut local_names = BTreeSet::new();
+        let mut inputs = BTreeSet::new();
+        for stmt in locals {
+            let (name, declared, value) = match stmt {
+                NirStmt::Let { name, ty, value } => (name, ty.as_ref(), value),
+                NirStmt::Const { name, ty, value } => (name, Some(ty), value),
+                _ => return None,
+            };
+            // Intermediate work cannot mutate an outer carry or hide
+            // an earlier local. Only the final selection may rebind.
+            if inner.contains_key(name) {
+                return None;
+            }
+            let value = self.value(name, declared, value, false, &inner)?;
+            inputs.extend(value.inputs);
+            local_names.insert(name.clone());
+            inner.insert(name.clone(), value.ty);
+        }
+        let mut selected = match last {
+            NirStmt::Let { name, ty, value } if !local_names.contains(name) => {
+                self.value(name, ty.as_ref(), value, false, &inner)?
+            }
+            NirStmt::Const { name, ty, value } if !local_names.contains(name) => {
+                self.value(name, Some(ty), value, true, &inner)?
+            }
+            _ => return None,
+        };
+        inputs.extend(selected.inputs);
+        inputs.retain(|name| !local_names.contains(name));
+        selected.inputs = inputs;
+        Some(selected.with_prefix(locals.to_vec()))
     }
 
     fn value(

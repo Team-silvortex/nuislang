@@ -1,5 +1,11 @@
 use super::*;
 
+#[path = "scalar_joins_prefix.rs"]
+pub(super) mod prefixed;
+
+#[path = "scalar_joins_nested_prefix.rs"]
+pub(super) mod nested_prefix;
+
 pub(super) struct Declaration<'a> {
     pub name: &'a str,
     pub ty: &'a NirTypeRef,
@@ -69,6 +75,70 @@ pub(super) fn computed_declaration<'a>(
             (join.condition, 0, false),
             (join.yes, 0, false),
             (join.no, 0, false),
+        ])
+        || control_values::value_type(join.condition, scope, catalog, layouts)?
+            != scalar_type("bool")
+        || !scalar_arms(&join, scope, catalog, layouts)
+    {
+        return None;
+    }
+    Some(join)
+}
+
+// Only logical roots gain lazy edges; arguments and value arms keep their
+// non-logical contract. Prove all three original roots before extracting any.
+pub(super) fn logical_declaration<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> Option<Declaration<'a>> {
+    let join = shape(stmt, scope, suffix)?;
+    if !matches!(
+        join.condition,
+        NirExpr::Binary {
+            op: NirBinaryOp::And | NirBinaryOp::Or,
+            ..
+        }
+    ) || !conditional_values::prefix::computed_expression_roots(vec![
+        (join.condition, 0, true),
+        (join.yes, 0, false),
+        (join.no, 0, false),
+    ]) || control_values::value_type(join.condition, scope, catalog, layouts)?
+        != scalar_type("bool")
+        || !scalar_arms(&join, scope, catalog, layouts)
+    {
+        return None;
+    }
+    Some(join)
+}
+
+// Bool value roots can compose the same lazy contract without admitting hidden
+// logical arguments or granting authority to effectful branches or outer writes.
+pub(super) fn logical_value_declaration<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> Option<Declaration<'a>> {
+    let join = shape(stmt, scope, suffix)?;
+    let logical = |value: &NirExpr| {
+        matches!(
+            value,
+            NirExpr::Binary {
+                op: NirBinaryOp::And | NirBinaryOp::Or,
+                ..
+            }
+        )
+    };
+    if *join.ty != scalar_type("bool")
+        || !(logical(join.yes) || logical(join.no))
+        || !conditional_values::prefix::computed_expression_roots(vec![
+            (join.condition, 0, true),
+            (join.yes, 0, true),
+            (join.no, 0, true),
         ])
         || control_values::value_type(join.condition, scope, catalog, layouts)?
             != scalar_type("bool")
@@ -240,3 +310,11 @@ mod guarded_tests;
 #[cfg(test)]
 #[path = "scalar_joins_computed_tests.rs"]
 mod computed_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_logical_tests.rs"]
+mod logical_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_logical_values_tests.rs"]
+mod logical_values_tests;

@@ -9,6 +9,24 @@ mod guarded_scalar_joins;
 #[path = "dev_tensor_drift_data_native_computed_scalar_joins.rs"]
 mod computed_scalar_joins;
 
+#[path = "dev_tensor_drift_data_native_logical_scalar_joins.rs"]
+mod logical_scalar_joins;
+
+#[path = "dev_tensor_drift_data_native_logical_scalar_values.rs"]
+mod logical_scalar_values;
+
+#[path = "dev_tensor_drift_data_native_prefixed_scalar_joins.rs"]
+mod prefixed_scalar_joins;
+
+#[path = "dev_tensor_drift_data_native_nested_prefix_joins.rs"]
+mod nested_prefix_joins;
+
+#[path = "dev_tensor_drift_data_native_record_prefix_joins.rs"]
+mod record_prefix_joins;
+
+#[path = "dev_tensor_drift_data_native_discarded_record_prefix.rs"]
+mod discarded_record_prefix;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
 mod return_effect_storage_conditional_payload;
 
@@ -555,6 +573,12 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         typed_scalar_joins::CHECKS,
         guarded_scalar_joins::CHECKS,
         computed_scalar_joins::CHECKS,
+        logical_scalar_joins::CHECKS,
+        logical_scalar_values::CHECKS,
+        prefixed_scalar_joins::CHECKS,
+        nested_prefix_joins::CHECKS,
+        record_prefix_joins::CHECKS,
+        discarded_record_prefix::CHECKS,
         return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,

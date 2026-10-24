@@ -1,0 +1,83 @@
+mod cpu Main {
+    struct State { total: i64 }
+    struct Choice { value: i64, checksum: i64, tag: bool, unused: i64 }
+    struct Packet { value: i64, unused: i64 }
+    @noinline fn decide(choice: bool, condition: i64) -> bool {
+        let proof = 1 / condition;
+        return choice == (proof != 0);
+    }
+    @noinline fn yes_head(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn yes_tail(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn no_head(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn no_tail(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn prefix_seed(divisor: i64) -> i64 { return 1 / divisor; }
+    @noinline fn prefix_step(seed: i64, divisor: i64) -> i64 { return divisor + 0 / seed; }
+    @noinline fn nested_decide(choice: bool, divisor: i64) -> bool { return choice == (1 / divisor != 0); }
+    @noinline fn prefix_alt(divisor: i64) -> i64 { return 1 / divisor; }
+    @noinline fn record_word(value: i64, guard: i64) -> i64 { return value + 0 / guard; }
+    @noinline fn record_unused(guard: i64) -> i64 { return 1 / (guard + 1); }
+    @noinline fn record_seed(choice: Choice) -> i64 {
+        if choice.tag { return choice.value + choice.checksum - 1; }
+        return 0 - choice.value + choice.checksum - 1;
+    }
+    @noinline fn encode(bit: bool, value: i64) -> i64 {
+        if bit { return value; }
+        return 0;
+    }
+    @noinline fn packet(choice: bool, condition: i64, rhs: i64, other: i64, value: i64, yes: i64, no: i64, tail: i64, yes_prefix: i64, no_prefix: i64, inner: bool, inner_div: i64, record_guard: i64) -> Packet {
+        print(81);
+        let selected: bool = if decide(choice, condition) && true {
+            let chosen: Choice = if nested_decide(inner, inner_div) {
+                const temp: i64 = prefix_seed(yes_prefix);
+                Choice { value: record_word(temp, record_guard), checksum: record_guard, tag: true, unused: record_unused(record_guard) }
+            } else {
+                const temp: i64 = prefix_alt(yes_prefix);
+                Choice { unused: record_unused(record_guard), tag: false, checksum: record_guard, value: 0 - record_word(temp, record_guard) }
+            };
+            let seed = record_seed(chosen);
+            const prepared: i64 = prefix_step(seed, yes);
+            const head: bool = yes_head(prepared);
+            let unused = 1 / (seed + 1);
+            ((head && yes_tail(rhs)) || false) && (seed == (1 / yes_prefix + record_guard - 1))
+        } else {
+            let chosen: Choice = if nested_decide(inner, inner_div) {
+                const temp: i64 = prefix_seed(no_prefix);
+                Choice { value: record_word(temp, record_guard), checksum: record_guard, tag: true, unused: record_unused(record_guard) }
+            } else {
+                const temp: i64 = prefix_alt(no_prefix);
+                Choice { unused: record_unused(record_guard), tag: false, checksum: record_guard, value: 0 - record_word(temp, record_guard) }
+            };
+            let seed = record_seed(chosen);
+            const prepared: i64 = prefix_step(seed, no);
+            const head: bool = no_head(prepared);
+            let unused = 1 / (seed + 1);
+            ((head || no_tail(other)) && true) && (seed == (1 / no_prefix + record_guard - 1))
+        };
+        print(82);
+        return Packet { value: encode(selected, value), unused: 1 / tail };
+    }
+    @noinline fn work(seed: State, selected: bool, trips: i64, choice: bool, condition: i64, rhs: i64, other: i64, value: i64, yes: i64, no: i64, tail: i64, yes_prefix: i64, no_prefix: i64, inner: bool, inner_div: i64, record_guard: i64) -> State {
+        print(70);
+        let mut index = 0;
+        while index < trips {
+            index = index + 1;
+            print(71);
+            if selected {
+                return State { total: packet(choice, condition, rhs, other, seed.total + value + 0 / value, yes, no, tail, yes_prefix, no_prefix, inner, inner_div, record_guard).value };
+            }
+            print(72);
+        }
+        print(73);
+        return seed;
+    }
+    fn start(total: i64, selected: bool, trips: i64, choice: bool, condition: i64, rhs: i64, other: i64, value: i64, yes: i64, no: i64, tail: i64, yes_prefix: i64, no_prefix: i64, inner: bool, inner_div: i64, record_guard: i64) -> State {
+        print(90);
+        return work(State { total: total }, selected, trips, choice, condition, rhs, other, value, yes, no, tail, yes_prefix, no_prefix, inner, inner_div, record_guard);
+    }
+    fn step(state: State, total: i64, selected: bool, trips: i64, choice: bool, condition: i64, rhs: i64, other: i64, value: i64, yes: i64, no: i64, tail: i64, yes_prefix: i64, no_prefix: i64, inner: bool, inner_div: i64, record_guard: i64) -> State {
+        print(91);
+        return work(state, selected, trips, choice, condition, rhs, other, value, yes, no, tail, yes_prefix, no_prefix, inner, inner_div, record_guard);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

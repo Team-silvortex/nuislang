@@ -1,0 +1,125 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-source-proof",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_joins_nested_prefix.rs",
+        required_patterns: &[
+            "pub(in crate::lowering::buffer_loop_outline) fn declaration",
+            "let mut remaining = 128usize",
+            "body.len() > 32",
+            "if depth < 8",
+            "computed_expression_roots(roots)",
+            "blocked.contains(name)",
+            "inputs.retain(|name| !local_names.contains(name))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-discarded-work",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_joins_nested_prefix.rs",
+        required_patterns: &[
+            "fn local_pair",
+            "Cow::Owned(control_values::zero_value(ty, layouts))",
+            "Some((Join { condition, yes, no }, false))",
+            "Local::Condition(condition)",
+            "if export",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-shared-constructor",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_nested_prefix.rs",
+        required_patterns: &[
+            "fn nested_declaration",
+            "fn nested_arm",
+            "Local::Join { join, export }",
+            "self.extract(condition, yes, no, &inner, !*export)",
+            "__nuis_discarded_condition",
+            ".with_prefix(locals)",
+            "self.guard_selection(selected, scope, false)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-controls",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_nested_prefix_tests.rs",
+        required_patterns: &[
+            "nested_prefix_join_proves_completed_dependencies_before_allocating_any_helper",
+            "nested_prefix_join_keeps_child_scopes_private_and_is_order_independent_and_idempotent",
+            "nested_prefix_join_rejects_scope_leaks_partial_joins_effects_and_hidden_logic_atomically",
+            "nested_prefix_join_shares_statement_expression_edge_and_nesting_budgets",
+            "nested_prefix_join_preserves_unused_fallible_selections_and_all_scalar_types",
+            "nested_prefix_join_normalizes_logical_local_before_dependent_selection",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-nuis-witness",
+        path: "tools/nuisc/tests/native_application_bridge/nested_prefix_join.ns",
+        required_patterns: &[
+            "let seed: i64 = if nested_decide(inner, inner_div)",
+            "const temp: i64 = prefix_seed(yes_prefix)",
+            "const temp: i64 = prefix_alt(no_prefix)",
+            "let unused = 1 / (seed + 1)",
+            "unused: 1 / tail",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-independent-oracle",
+        path: "tools/nuisc/tests/native_application_bridge/nested_prefix_join_cases.rs",
+        required_patterns: &[
+            "ENTRY_MARKERS",
+            "trace.push(94)",
+            "if nested { 88 } else { 95 }",
+            "checked_div(self.inner_div)",
+            "prefix::native_failures()",
+            "inner: false",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-native-witness",
+        path: "tools/nuisc/tests/native_application_bridge/nested_prefix_join.rs",
+        required_patterns: &[
+            "nested_prefix_join_native_keeps_one_predicate_and_selected_fault_prefixes",
+            "nested_prefix_join_reference_preserves_predicate_counts_and_last_state",
+            "1 | 3 | 13",
+            "cases::ENTRY_MARKERS[index]",
+            "typed_effect_returns::reordered",
+            "nested_prefix_discarded_arm_and_condition_execute_natively_without_exporting_results",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-delivery",
+        path: "tools/nuis/tests/native_session_workflow/nested_prefix_join.rs",
+        required_patterns: &[
+            "nested_prefix_join_fresh_cache_and_source_free_delivery_keep_selected_checks",
+            "compile_cache: hit",
+            "for i in 0..2",
+            "fresh.host_objects == cached.host_objects",
+            "trace.starts_with",
+            "fs::remove_dir_all(project.0.join(\".nuis\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-current-lineage",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "Certified nested-prefix declaration witnesses:",
+            "Previous flat-prefix checkpoint:",
+            "Previous flat-prefix task checkpoint:",
+            "Previous flat-prefix blocker checkpoint:",
+            "Previous flat-prefix action checkpoint:",
+            "Previous flat-prefix validation checkpoint:",
+            "Previous flat-prefix artifact checkpoint:",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-nested-prefix-receipt",
+        path: "docs/reference/nuis-native-nested-prefix-joins-v1.md",
+        required_patterns: &[
+            "Nested Prefix Contract",
+            "Unused Conditional Work",
+            "Twenty-four core failures",
+            "twenty-eight failures total",
+            "markers 83-89 and 94-95",
+            "active/99",
+        ],
+    },
+];

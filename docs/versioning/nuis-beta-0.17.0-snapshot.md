@@ -110,8 +110,18 @@ normalizes fresh ready-value declarations before strict call admission. The
 [guarded expression follow-up](../reference/nuis-native-guarded-scalar-joins-v1.md)
 adds bounded non-logical pure arms. The
 [computed predicate follow-up](../reference/nuis-native-computed-scalar-predicates-v1.md)
-adds once-only non-logical pure gates; logical trees and effectful predicates/arms
-need further guarded-execution proof.
+adds once-only non-logical pure gates; the
+[logical predicate follow-up](../reference/nuis-native-logical-scalar-predicates-v1.md)
+adds bounded short-circuit trees with observed skipped RHS calls. The
+[logical value follow-up](../reference/nuis-native-logical-scalar-values-v1.md)
+adds bool value arms under the same shared budget. The
+[pure prefix follow-up](../reference/nuis-native-prefixed-scalar-joins-v1.md)
+adds ordered fresh branch-local initializers. The
+[nested prefix proof](../reference/nuis-native-nested-prefix-joins-v1.md) adds
+bounded pure local selections. The [record prefix proof](../reference/nuis-native-record-prefix-joins-v1.md)
+adds complete exact-layout record locals. The [discarded-record follow-up](../reference/nuis-native-discarded-record-prefix-v1.md)
+retains pruned one-sided field work with bounded neutral synthesis and no exported
+erased identity. Outer record results and effects need further guarded-execution proof.
 General resource/I/O/asynchronous capture, broader entering-State
 writes, stable ABI, full heterogeneous closure and completed self-hosting remain
 separate.
