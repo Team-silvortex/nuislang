@@ -16,15 +16,11 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.17.*`; the latest committed patch is
-`beta-0.17.3` (`81dc1669`, 2026-10-18).
-The minor series began at `ccc16af9` (`beta-0.17.0`, 2026-10-15).
-Git history is authoritative; Cargo package and protocol versions are independent.
-
-Use the [current snapshot](docs/versioning/nuis-beta-0.17.0-snapshot.md) and
-[validation checklist](docs/versioning/nuis-beta-0.17.0-release-checklist.md).
-The [versioning index](docs/versioning/README.md) keeps earlier checkpoints,
-including beta-0.16, as history rather than present-tense acceptance.
+The repository is on `beta-0.17.*`. Git history is authoritative; the dated
+[current snapshot](docs/versioning/nuis-beta-0.17.0-snapshot.md) records committed
+identity separately from worktree follow-ups. Cargo package and protocol versions
+are independent. Use the [validation checklist](docs/versioning/nuis-beta-0.17.0-release-checklist.md)
+for operating gates and the [versioning index](docs/versioning/README.md) for history.
 
 The mainline is **ns-nova application-led development**: grow one Nuis-owned
 interactive image application, fix the foundation gaps it exposes, measure
@@ -37,6 +33,31 @@ Start with the [current mainline map](docs/current-mainline-map.md),
 [documentation index](docs/README.md). Detailed source/native/source-free proofs
 live in the [native session proof index](docs/reference/nuis-native-session-proof-index.md),
 not in duplicated entrypoint changelogs.
+
+## Quick Start
+
+Run from the repository root with the Rust toolchain, the host LLVM/linker
+requirements for the selected profile, and any provider-specific prerequisites.
+Start with a host CLI route; GPU/window examples require their registered backend.
+
+```bash
+export CARGO_INCREMENTAL=0
+export CARGO_BUILD_JOBS=1
+cargo run -p nuis -- dev-tensor
+cargo run -p nuis -- workflow examples/projects/tooling/filesystem_io_report_demo
+cargo run -p nuis -- check examples/projects/tooling/filesystem_io_report_demo
+cargo run -p nuis -- build examples/projects/tooling/filesystem_io_report_demo target/nuis-readme/cli-report
+cargo run -p nuis -- run-artifact target/nuis-readme/cli-report
+```
+
+For a compiled Metal image application on a supported Apple Silicon host, follow
+the [image showcase instructions](examples/projects/domains/ns_nova_image_showcase/README.md)
+for `--export-frame`, `--window-session` and optional
+`--window-parent-session`. The launcher still supplies registered provider
+sessions and artifact sidecars; copying only the executable is not this route.
+
+Use `--json` on supported inspection/workflow surfaces for structured evidence.
+Do not treat inspection as execution: `run-artifact --json` does not run the app.
 
 ## Capability Snapshot
 
@@ -80,93 +101,25 @@ AppKit sessions. Its compiled host still embeds the YIR lifecycle runtime.
 The separate native-session profile executes bounded registered CPU callbacks;
 one profile's acceptance must not be attributed to the other.
 
-Current worktree evidence composes selected bool/f32/f64/mixed-record child
-returns with parent-local break/continue under both step placements. The
-[mixed-exit receipt](docs/reference/nuis-native-stateful-loop-return-parent-mixed-v1.md)
-records its own M2 CPU tests and sixteen delivery images, not a new release.
-The [effect-prefix certificate](docs/reference/nuis-native-return-effect-prefix-v1.md)
-checks the independent rewrite; a separate
-[record-storage certificate](docs/reference/nuis-native-return-effect-storage-v1.md)
-now permits bounded carry reuse with independent fallback and a separate pending signal.
-Its [initialization-prefix follow-up](docs/reference/nuis-native-return-effect-storage-prefix-v1.md)
-keeps interleaved literal prints ordered while discovering dominating records.
-The [candidate-attempt follow-up](docs/reference/nuis-native-return-effect-storage-candidates-v1.md)
-tries later records within a fixed proof budget when an earlier certificate fails.
-The [ordered reassignment proof](docs/reference/nuis-native-return-effect-storage-reassignment-v1.md)
-preserves typed prefix writes and failure-before-publication during storage reuse.
-Its [helper-call witnesses](docs/reference/nuis-native-return-effect-storage-helper-calls-v1.md)
-exercise ordered effectful arguments and record results through the existing lowering route.
-The [reached-loop witnesses](docs/reference/nuis-native-return-effect-storage-loop-calls-v1.md)
-extend that route to real updates before loop-local exits and later-iteration failures.
-The [branch-selected follow-up](docs/reference/nuis-native-return-effect-storage-branch-calls-v1.md)
-checks multi-field handoff and unselected poisoned arguments without new call authority.
-The [record-dependent bound follow-up](docs/reference/nuis-native-return-effect-storage-bound-calls-v1.md)
-checks completed records determining reached child work and reservation order.
-The [sibling-bound follow-up](docs/reference/nuis-native-return-effect-storage-sibling-bounds-v1.md)
-checks snapshot reuse with separate reservations and correctly targeted local exits.
-The [parent-preheader follow-up](docs/reference/nuis-native-return-effect-storage-preheader-bounds-v1.md)
-keeps a selected immutable snapshot alive across parent backedges without merging reservations.
-The [distinct-epoch follow-up](docs/reference/nuis-native-return-effect-storage-epoch-bounds-v1.md)
-checks separate live snapshot identities and changing reached bounds across those backedges.
-The [returned-snapshot follow-up](docs/reference/nuis-native-return-effect-storage-snapshot-returns-v1.md)
-checks complete older/newer payloads from selected inner-loop exits, including after a backedge.
-The [payload-call follow-up](docs/reference/nuis-native-return-effect-storage-payload-calls-v1.md)
-tracks ordered return arguments, finalization failures and complete state publication.
-The [field-payload follow-up](docs/reference/nuis-native-return-effect-storage-field-payload-v1.md)
-checks source-ordered record construction when a later field fails after earlier effects.
-The [mixed-origin follow-up](docs/reference/nuis-native-return-effect-storage-mixed-payload-v1.md)
-repairs boolean field admission and checks original live self-reads alongside both snapshots.
-The [projected-call follow-up](docs/reference/nuis-native-return-effect-storage-projected-payload-v1.md)
-tracks direct fields of effectful record calls, once-only evaluation and argument/callee faults.
-The [unprojected-field follow-up](docs/reference/nuis-native-return-effect-storage-unprojected-payload-v1.md)
-tracks complete callee-field evaluation, including failures before and after the desired field.
-The [conditional-field follow-up](docs/reference/nuis-native-return-effect-storage-conditional-payload-v1.md)
-repairs speculative logical RHS work in scalar control using the shared short-circuit lowering.
-The [ready-value follow-up](docs/reference/nuis-native-return-ready-values-v1.md)
-brings the complete fixture within native admission, reducing 75 NIR functions to 63.
-The [typed scalar join follow-up](docs/reference/nuis-native-typed-scalar-joins-v1.md)
-adds inline ready-value declarations inside effectful record callees under the same bounds.
-The [guarded expression follow-up](docs/reference/nuis-native-guarded-scalar-joins-v1.md)
-keeps fallible pure branch values lazy in a compact native record-return application.
-The [computed predicate proof](docs/reference/nuis-native-computed-scalar-predicates-v1.md) extends that route to a once-evaluated fallible pure boolean condition.
-The [logical predicate proof](docs/reference/nuis-native-logical-scalar-predicates-v1.md) composes bounded `&&`/`||` trees while keeping skipped calls and value arms lazy.
-The [logical value proof](docs/reference/nuis-native-logical-scalar-values-v1.md)
-extends that same contract to either or both bool value arms.
-The [pure](docs/reference/nuis-native-prefixed-scalar-joins-v1.md) and [nested prefix](docs/reference/nuis-native-nested-prefix-joins-v1.md) proofs keep local work ordered, lazy and scoped.
-The [record prefix proof](docs/reference/nuis-native-record-prefix-joins-v1.md), [discarded](docs/reference/nuis-native-discarded-record-prefix-v1.md), [outer-record](docs/reference/nuis-native-outer-record-prefix-v1.md) and [logical-field](docs/reference/nuis-native-logical-record-fields-v1.md) follow-ups extend owned-value selection.
-The [direct-return](docs/reference/nuis-native-direct-record-return-v1.md), [continuation-join](docs/reference/nuis-native-joined-record-return-v1.md), [local-return](docs/reference/nuis-native-local-record-return-v1.md), [value-alias](docs/reference/nuis-native-alias-record-return-v1.md) and [origin-join](docs/reference/nuis-native-origin-record-join-v1.md) proofs retain ordered effects and certified owned values; [computed prints](docs/reference/nuis-native-computed-iteration-print-v1.md) add exact-i64 pure values under a separate native grant; [carry epochs](docs/reference/nuis-native-carry-epoch-print-v1.md) permit bounded pre-update reads for one print.
+### Native CPU Progress
+
+| Area | Current Bounded Evidence | Remaining Boundary |
+| --- | --- | --- |
+| Returns and storage | [Independent effect order](docs/reference/nuis-native-return-effect-prefix-v1.md), [certified storage reuse](docs/reference/nuis-native-return-effect-storage-v1.md), and [owned-record origins](docs/reference/nuis-native-origin-record-join-v1.md). | Unproved reductions retain independent payload storage and a separate pending signal. |
+| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed owned-record fields](docs/reference/nuis-native-f64-field-epoch-print-v1.md). | Exact scalar fields at bounded print/argument positions; not compound argument or whole-record readiness or general I/O/resource capture. |
+| Nested iteration | The [child-epoch follow-up](docs/reference/nuis-native-child-epoch-print-v1.md) checks fresh ready child entries, skipped work and later-parent failures. | Worktree evidence at the dated audit, not automatically part of the committed release. |
+
+The [mainline map](docs/current-mainline-map.md) owns the next selected proof and
+its remaining acceptance boundary; the
+[proof index](docs/reference/nuis-native-session-proof-index.md) owns the complete
+source/native/source-free history and each receipt's exact acceptance limits.
 
 Cancellation admission, host-scope retirement and provider/device retirement
 are separate facts. Rendering, control, ML and audio are ns-nova's engine
 horizon, not four completed workflows. Independent Galaxies and Nustars share
 YIR/GLM/time contracts without engine-specific compiler cases.
 
-## Quick Start
-
-Run from the repository root with the Rust toolchain, the host LLVM/linker
-requirements for the selected profile, and any provider-specific prerequisites.
-Start with a host CLI route; GPU/window examples require their registered backend.
-
-```bash
-export CARGO_INCREMENTAL=0
-export CARGO_BUILD_JOBS=1
-cargo run -p nuis -- dev-tensor
-cargo run -p nuis -- workflow examples/projects/tooling/filesystem_io_report_demo
-cargo run -p nuis -- check examples/projects/tooling/filesystem_io_report_demo
-cargo run -p nuis -- build examples/projects/tooling/filesystem_io_report_demo target/nuis-readme/cli-report
-cargo run -p nuis -- run-artifact target/nuis-readme/cli-report
-```
-
-For a compiled Metal image application on a supported Apple Silicon host, follow
-the [image showcase instructions](examples/projects/domains/ns_nova_image_showcase/README.md)
-for `--export-frame`, `--window-session` and optional
-`--window-parent-session`. The launcher still supplies registered provider
-sessions and artifact sidecars; copying only the executable is not this route.
-
-Use `--json` on supported inspection/workflow surfaces for structured evidence.
-Do not treat inspection as execution: `run-artifact --json` does not run the app.
-
-### Native Artifact Closure
+## Native Artifact Closure
 
 The checked-in linker pressure route is:
 

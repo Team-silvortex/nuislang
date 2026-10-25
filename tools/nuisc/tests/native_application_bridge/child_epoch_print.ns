@@ -1,0 +1,40 @@
+mod cpu Main {
+    struct State { total: i64 }
+    @noinline fn observe(value: i64, divisor: i64) -> i64 { return value + 0 / divisor; }
+    @noinline fn finish(value: i64, divisor: i64) -> i64 { return value + 0 / divisor; }
+    @noinline fn work(seed: State, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64) -> State {
+        print(70);
+        let mut index = 0;
+        let mut current = seed.total;
+        while index < trips {
+            print(71);
+            print(current);
+            current = current + delta;
+            let mut local = current;
+            let mut child = 0;
+            while child < children {
+                print(72);
+                if selected { print(observe(local, divisor - index - child)); }
+                print(local);
+                local = local + delta;
+                print(local);
+                child = child + 1;
+            }
+            print(74);
+            current = local;
+            index = index + 1;
+        }
+        print(73);
+        return State { total: finish(current, tail) };
+    }
+    fn start(initial: i64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64) -> State {
+        print(90);
+        return work(State { total: initial }, selected, trips, children, delta, divisor, tail);
+    }
+    fn step(state: State, initial: i64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64) -> State {
+        print(91);
+        return work(state, selected, trips, children, delta, divisor, tail);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

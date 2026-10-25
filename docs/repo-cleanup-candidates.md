@@ -4,6 +4,71 @@ This is the current cleanup policy and audit record, not an alpha-era deletion
 wishlist. Current compiler, Nustar and application behavior remains governed by
 the [mainline map](current-mainline-map.md) and the development tensor.
 
+## 2026-10-25 Documentation Consolidation
+
+The Git baseline is `2db5c82c` (beta-0.17.8). This documentation-only maintenance
+preserves the pending child-epoch implementation and its separate acceptance
+receipt; it does not create a release, change compiler behavior or rerun that
+receipt's native/device suites.
+
+### Routing And Current Truth
+
+The [dated snapshot](versioning/nuis-beta-0.17.0-snapshot.md) owns exact committed
+patch identity. README and the other undated routers link there rather than
+copying a patch hash. The snapshot now distinguishes committed root-carry work
+from the child-epoch follow-up that was uncommitted at this audit.
+
+The mainline map owns current task selection, the operating checklist owns
+validation choices, and the proof index owns the full bounded native history.
+Repeated proof-by-proof narratives were replaced with scoped tables and links;
+historical receipts and minor-version records were not deleted or rewritten as
+fresh acceptance.
+
+| Entry | Before | After |
+| --- | --- | --- |
+| Repository README | 300 lines | 253 lines |
+| Documentation index | 111 lines | 114 lines |
+| Current mainline map | 203 lines | 130 lines |
+| Reference index | 263 lines | 162 lines |
+| Native proof index | 300 lines | 280 lines |
+| Beta-0.17 snapshot | 163 lines | 94 lines |
+| Beta-0.17 checklist | 144 lines | 111 lines |
+| Standard-library index | 193 lines | 85 lines |
+| Examples router | 95 lines | 49 lines |
+
+All 224 original proof-index targets, including section anchors, remain linked.
+The reference index separates contract families from scoped receipts. Standard
+library import policies now match the five package manifests: core/std/
+PixelMagic/WitSage use `project-auto`; ns-nova uses `manual-only`. Canonical
+project resolution locks/caches are distinguished from the planned resident RC
+collector. Examples start with current host CLI/application routes instead of
+the beta-0.3 phase anchor or supposed shipped executable bundles.
+
+Two source-only regressions protect dated snapshot ownership and manifest-backed
+import-policy documentation. Doc drift checks now guard those roles instead of
+pinning the obsolete beta-0.17.3 hash in current routers.
+
+### Validation Scope
+
+This pass passed 56 distinct structural checks: 26 maintenance tests, including
+two new regressions, one host-path check, two line-budget checks and 27 tensor
+checks. Repeated focused runs are counted once. The final maintenance run took
+18.170 seconds; tensor tests took 6.16 seconds and the ordinary CLI rebuild took
+8.87 seconds, without new warnings.
+
+Formatting, whitespace, UTF-8 across 5,780 source text files and locked offline
+metadata for 29 packages passed. A repository-wide scan of 412 Markdown files
+checked 5,819 local file targets without failures; all 224 original proof-index
+targets remain linked. These are local-path checks, not external URL or general
+Markdown-renderer certification.
+
+The actual rebuilt CLI reports all 3,780 drift checks and 25,626 required patterns
+matching, with clean coverage, hierarchy and task-card lineage. All six functional
+checkpoint values match both source and their pre-maintenance SHA-256 identities.
+The selected coordinate stays active/99 with the same next task. Documentation
+routing is not a new runtime or self-hosting milestone; native delivery, physical
+device execution, performance and whole-workspace semantic suites were not rerun.
+
 ## 2026-10-18 AOT Packer Modularization
 
 This follow-up keeps Git identity at `81dc1669` (beta-0.17.3) and preserves the
@@ -220,14 +285,14 @@ The cleaner defaults to dry-run and preflights every candidate before deletion.
 Tracked paths, non-ignored paths and paths through symlinks fail closed. Do not
 run it concurrently with builds or other writers.
 
-## Validation
+## Historical Cleanup Validation
 
 CI discovers the maintenance regressions under
 [scripts/tests](../scripts/tests). They cover dry-run behavior, explicit full
 cleanup, preservation of source/project state/external resources, tracked and
 symlinked-path refusal, and source-only checkouts with no generated outputs.
 
-This audit passed 72 focused CLI/tensor/workflow tests, six source-example
+The earlier cleanup audit passed 72 focused CLI/tensor/workflow tests, six source-example
 compilation tests and 20 maintenance tests. The rebuilt CLI reported 1,414
 passing drift checks with clean coverage and hierarchy validation. This is a
 focused cleanup regression result, not a claim that the entire test suite or

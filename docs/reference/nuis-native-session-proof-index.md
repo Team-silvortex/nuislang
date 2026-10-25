@@ -1,91 +1,83 @@
 # Native Session Proof Index
 
 This is a navigational catalog, not a cumulative acceptance receipt.
-The [mainline map](../current-mainline-map.md) chooses current work; each linked
-receipt owns its source limits, predecessor relationship and actual test scope.
-Earlier vetoes may be advanced by later bounded proofs. Do not infer arbitrary
-closure or add their test totals into one result.
+The [mainline map](../current-mainline-map.md) selects current work. Each receipt
+owns its original source limits, Git baseline, test commands and acceptance scope.
+Later bounded proofs may advance earlier vetoes; do not add their test totals.
 
-The current mixed-exit frontier is
-[parent steps](nuis-native-stateful-loop-return-parent-steps-v1.md),
-[parent continue](nuis-native-stateful-loop-return-parent-continue-v1.md),
-[parent break](nuis-native-stateful-loop-return-parent-break-v1.md) and
-[mixed local exits](nuis-native-stateful-loop-return-parent-mixed-v1.md).
-The [effect-prefix certificate](nuis-native-return-effect-prefix-v1.md) checks
-the independent return rewrite. The separate
-[record-storage certificate](nuis-native-return-effect-storage-v1.md) permits
-bounded reuse of an initialized loop carry, retaining independent fallback.
-Its [ordered initialization-prefix follow-up](nuis-native-return-effect-storage-prefix-v1.md)
-allows interleaved literal prints without moving effects or widening pure admission.
-The [bounded candidate-attempt proof](nuis-native-return-effect-storage-candidates-v1.md)
-can select a later independently certified carry after an earlier attempt fails.
-The [ordered reassignment proof](nuis-native-return-effect-storage-reassignment-v1.md)
-allows same-type prefix writes while retaining fresh-definition and effect-order checks.
-The [helper-call witnesses](nuis-native-return-effect-storage-helper-calls-v1.md)
-exercise ordered arguments, record results and selected prefix-call failures
-without widening the existing call catalog or storage certificate.
-The [reached-loop witnesses](nuis-native-return-effect-storage-loop-calls-v1.md)
-cover actual iteration/parent-exit updates, semantic oracle events and selected
-argument/callee failures after successful inner work.
-The [branch-selected witnesses](nuis-native-return-effect-storage-branch-calls-v1.md)
-cover distinct multi-field helper paths, unselected poisoned arguments and
-even/odd selected failures before callback publication.
-The [record-dependent bound witnesses](nuis-native-return-effect-storage-bound-calls-v1.md)
-consume completed selected records, compute reached bounds once and preserve
-reservation and argument/callee/arithmetic failure ordering.
-The [sibling-bound witnesses](nuis-native-return-effect-storage-sibling-bounds-v1.md)
-reuse a completed snapshot without recomputing live State, retain distinct
-reached reservations and distinguish child-local from parent/function exits.
-The [parent-preheader witnesses](nuis-native-return-effect-storage-preheader-bounds-v1.md)
-retain one selected immutable snapshot across parent backedges, without recomputation
-or deduplicating each reached child's full computed reservation.
-The [distinct-epoch witnesses](nuis-native-return-effect-storage-epoch-bounds-v1.md)
-keep simultaneous older/newer records distinct across backedges, including
-reached construction failures and independently reserved changing child bounds.
-The [returned-snapshot witnesses](nuis-native-return-effect-storage-snapshot-returns-v1.md)
-check complete older/newer record payloads on first-parent and post-backedge
-inner exits, preserving raw fields, full entered reservations and skipped work.
-The [payload-call witnesses](nuis-native-return-effect-storage-payload-calls-v1.md)
-check once-only ordered return arguments, selected finalizer failures, retained
-accepted State and source-free delivery after successful loop work.
-The [field-payload witnesses](nuis-native-return-effect-storage-field-payload-v1.md)
-exercise source field order, once-only construction and failure after earlier fields
-have emitted effects, before a complete returned State can be published.
-The [mixed-origin witnesses](nuis-native-return-effect-storage-mixed-payload-v1.md)
-repair boolean field admission and distinguish live/older/newer reads, including
-an original live self-read after another field computes the opposite boolean.
-The [projected-call witnesses](nuis-native-return-effect-storage-projected-payload-v1.md)
-cover direct fields of effectful record calls, distinct argument/callee fault stages
-and per-source-occurrence execution.
-The [unprojected-field witnesses](nuis-native-return-effect-storage-unprojected-payload-v1.md)
-track complete callee-field work, including discarded-field failures before and after
-the desired value and executable pruning/reordering/repetition controls.
-The [conditional-field witnesses](nuis-native-return-effect-storage-conditional-payload-v1.md)
-exercise all six lazy truth paths and retain exact selected fault prefixes; scalar
-control and scoped iterations now share logical RHS guard extraction.
-The [ready-value follow-up](nuis-native-return-ready-values-v1.md) removes redundant
-scalar-control helpers and tracks the complete fixture through native delivery.
-The [typed scalar joins](nuis-native-typed-scalar-joins-v1.md) extend the same full
-fixture to inline conditional declarations inside effectful record callees.
-The [guarded scalar joins](nuis-native-guarded-scalar-joins-v1.md) add bounded
-non-logical pure-expression arms, with selected checks and source-free delivery.
-The [computed predicate proof](nuis-native-computed-scalar-predicates-v1.md) adds
-once-only fallible pure conditions, native entry observations and guarded arms.
-The [logical predicate proof](nuis-native-logical-scalar-predicates-v1.md) composes
-bounded short-circuit trees with selected RHS calls and source-free delivery.
-The [logical value proof](nuis-native-logical-scalar-values-v1.md) extends the shared budget and lazy execution contract to bool value arms.
-The [pure](nuis-native-prefixed-scalar-joins-v1.md) and [nested prefix](nuis-native-nested-prefix-joins-v1.md) proofs keep local work ordered, lazy and scoped.
-The [record prefix proof](nuis-native-record-prefix-joins-v1.md), [discarded](nuis-native-discarded-record-prefix-v1.md), [outer-record](nuis-native-outer-record-prefix-v1.md) and [logical-field](nuis-native-logical-record-fields-v1.md) follow-ups extend owned-value selection.
-The [direct-return](nuis-native-direct-record-return-v1.md), [continuation-join](nuis-native-joined-record-return-v1.md), [local-return](nuis-native-local-record-return-v1.md), [value-alias](nuis-native-alias-record-return-v1.md) and [origin-join](nuis-native-origin-record-join-v1.md) proofs retain ordered effects and certified owned values; [computed prints](nuis-native-computed-iteration-print-v1.md) add exact-i64 pure values under a separate native grant; [carry epochs](nuis-native-carry-epoch-print-v1.md) permit bounded pre-update reads for one print.
+## Current Evidence
 
-This index replaces duplicated proof narratives in the repository README,
-documentation index and mainline router. Original reference files, anchors,
-source fixtures and regression registrations remain in place.
-It preserves the former routers' focused reference links, including the
-`nuis-native-logical-staged-initializers-v1.md` boundary:
+The [typed-f64 follow-up](nuis-native-f64-field-epoch-print-v1.md) is the latest
+bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.17.0-snapshot.md).
+It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md)
+and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
+[fresh child entries](nuis-native-child-epoch-print-v1.md) and
+[original i64 fields](nuis-native-field-epoch-print-v1.md), then
+[typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and
+[shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
+[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md). The latest proof
+adds exact f64 parameters with all 64 callee/State bits, not compound argument or
+whole-record readiness; the mainline map owns
+the next selected gate.
+
+Original reference files, anchors, fixtures and regression registrations remain
+available below. The backlog of further changing backedges and wide private captures
+is separate from this selected gate.
+
+The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializers-v1.md)
+retains its historical source-profile restriction:
 Ordinary print/call leaves and original scalar capture authority are not widened.
-The backlog of further changing backedges and wide private captures remains
-distinct from the selected return-snapshot frontier.
+Later explicit print grants apply only to their own admitted profiles.
+
+## Guarded Values And Print Epochs
+
+- [Native Typed Scalar Joins V1](nuis-native-typed-scalar-joins-v1.md)
+- [Native Guarded Scalar Joins V1](nuis-native-guarded-scalar-joins-v1.md)
+- [Native Computed Scalar Predicates V1](nuis-native-computed-scalar-predicates-v1.md)
+- [Native Logical Scalar Predicates V1](nuis-native-logical-scalar-predicates-v1.md)
+- [Native Logical Scalar Values V1](nuis-native-logical-scalar-values-v1.md)
+- [Native Prefixed Scalar Joins V1](nuis-native-prefixed-scalar-joins-v1.md)
+- [Native Nested Prefix Joins V1](nuis-native-nested-prefix-joins-v1.md)
+- [Native Record Prefix Joins V1](nuis-native-record-prefix-joins-v1.md)
+- [Native Discarded Record Prefix V1](nuis-native-discarded-record-prefix-v1.md)
+- [Native Outer Record Prefix V1](nuis-native-outer-record-prefix-v1.md)
+- [Native Logical Record Fields V1](nuis-native-logical-record-fields-v1.md)
+- [Native Direct Record Return V1](nuis-native-direct-record-return-v1.md)
+- [Native Joined Record Return V1](nuis-native-joined-record-return-v1.md)
+- [Native Local Record Return V1](nuis-native-local-record-return-v1.md)
+- [Native Alias Record Return V1](nuis-native-alias-record-return-v1.md)
+- [Native Origin Record Join V1](nuis-native-origin-record-join-v1.md)
+- [Native Computed Iteration Print V1](nuis-native-computed-iteration-print-v1.md)
+- [Native Carry Epoch Print V1](nuis-native-carry-epoch-print-v1.md)
+- [Native Child Epoch Print V1](nuis-native-child-epoch-print-v1.md)
+- [Native Field Epoch Print V1](nuis-native-field-epoch-print-v1.md)
+- [Native Bool Field Epoch Print V1](nuis-native-bool-field-epoch-print-v1.md)
+- [Native I32 Field Epoch Print V1](nuis-native-i32-field-epoch-print-v1.md)
+- [Native F32 Field Epoch Print V1](nuis-native-f32-field-epoch-print-v1.md)
+- [Native F64 Field Epoch Print V1](nuis-native-f64-field-epoch-print-v1.md)
+
+## Return Publication And Snapshot Storage
+
+- [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)
+- [Native Effectful Return Storage Sharing V1](nuis-native-return-effect-storage-v1.md)
+- [Native Return Storage Initialization Prefix V1](nuis-native-return-effect-storage-prefix-v1.md)
+- [Native Return Storage Candidate Attempts V1](nuis-native-return-effect-storage-candidates-v1.md)
+- [Native Return Storage Prefix Reassignment V1](nuis-native-return-effect-storage-reassignment-v1.md)
+- [Native Return Storage Helper-Call Prefix Writes V1](nuis-native-return-effect-storage-helper-calls-v1.md)
+- [Native Return Storage Reached-Loop Helper Assignments V1](nuis-native-return-effect-storage-loop-calls-v1.md)
+- [Native Return Storage Branch-Selected Helper Updates V1](nuis-native-return-effect-storage-branch-calls-v1.md)
+- [Native Return Storage Record-Dependent Child Bounds V1](nuis-native-return-effect-storage-bound-calls-v1.md)
+- [Native Return Storage Shared Sibling Bound Records V1](nuis-native-return-effect-storage-sibling-bounds-v1.md)
+- [Native Return Storage Parent-Preheader Bound Records V1](nuis-native-return-effect-storage-preheader-bounds-v1.md)
+- [Native Return Storage Distinct-Epoch Bound Records V1](nuis-native-return-effect-storage-epoch-bounds-v1.md)
+- [Native Return Storage Returned Snapshot Records V1](nuis-native-return-effect-storage-snapshot-returns-v1.md)
+- [Native Return Storage Effectful Payload Calls V1](nuis-native-return-effect-storage-payload-calls-v1.md)
+- [Native Return Storage Field Payload V1](nuis-native-return-effect-storage-field-payload-v1.md)
+- [Native Return Storage Mixed Payload V1](nuis-native-return-effect-storage-mixed-payload-v1.md)
+- [Native Return Storage Projected Payload V1](nuis-native-return-effect-storage-projected-payload-v1.md)
+- [Native Return Storage Unprojected Payload V1](nuis-native-return-effect-storage-unprojected-payload-v1.md)
+- [Native Return Storage Conditional Payload V1](nuis-native-return-effect-storage-conditional-payload-v1.md)
+- [Native Return Ready Values V1](nuis-native-return-ready-values-v1.md)
 
 ## Native Value And Capture Foundations
 

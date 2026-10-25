@@ -165,7 +165,7 @@ pub(crate) fn lower_cpu_scalar_equality_node(
                 get_f64(registers, &node.op.args[1]),
             ) {
                 let cmp = fresh_reg(next_reg);
-                body.push(format!("  {cmp} = fcmp one double {lhs}, {rhs}"));
+                body.push(format!("  {cmp} = fcmp une double {lhs}, {rhs}"));
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(
@@ -181,7 +181,7 @@ pub(crate) fn lower_cpu_scalar_equality_node(
                 get_f32(registers, &node.op.args[1]),
             ) {
                 let cmp = fresh_reg(next_reg);
-                body.push(format!("  {cmp} = fcmp one float {lhs}, {rhs}"));
+                body.push(format!("  {cmp} = fcmp une float {lhs}, {rhs}"));
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(

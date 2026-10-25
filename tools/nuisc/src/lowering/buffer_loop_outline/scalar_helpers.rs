@@ -340,6 +340,18 @@ pub(super) fn completed_pure_dependencies(value: &NirExpr, catalog: &ScalarHelpe
         .all(|name| catalog.get(name).is_some_and(|helper| helper.pure_value))
 }
 
+pub(super) fn pure_i64_parameter_type(
+    callee: &str,
+    index: usize,
+    catalog: &ScalarHelpers,
+) -> Option<NirTypeRef> {
+    let helper = catalog.get(callee)?;
+    if !helper.pure_value || helper.result != scalar_type("i64") {
+        return None;
+    }
+    helper.params.get(index).cloned()
+}
+
 pub(super) fn contains_calls(body: &[NirStmt]) -> bool {
     let mut calls = BTreeSet::new();
     collect_calls(body, &mut calls);

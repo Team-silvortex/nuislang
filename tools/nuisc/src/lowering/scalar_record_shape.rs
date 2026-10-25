@@ -4,7 +4,7 @@ use super::*;
 #[path = "scalar_record_shape_tests.rs"]
 mod tests;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub(super) struct Shape {
     pub ty: NirTypeRef,
     pub fields: Vec<(String, Shape)>,

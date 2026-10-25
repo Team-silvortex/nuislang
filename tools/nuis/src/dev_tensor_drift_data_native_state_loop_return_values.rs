@@ -7,7 +7,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "NirExpr::PackF32Word(inner) => (inner, \"f32\", \"i64\")",
             "NirExpr::UnpackF64Word(inner) => (inner, \"i64\", \"f64\")",
-            "expression(inner, locals, updates, own, catalog, layouts, depth + 1)?",
+            "(expression_with_fields(\n                inner,\n                locals,\n                updates,\n                own,\n                catalog,\n                layouts,\n                depth + 1,\n                field_reads,\n            )? == scalar_type(source))",
             "NirBinaryOp::Xor if left == scalar_type(\"i64\") => Some(left)",
             "word_temporaries_tests.rs",
         ],

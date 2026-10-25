@@ -1,24 +1,24 @@
 # Current Mainline Map
 
-This is the short reading map for current implementation, not a history catalog.
-When documents disagree, inspect the code/tests and current tensor evidence
-before changing a capability claim.
+This router connects current tasks, execution routes and their evidence.
+Use code/tests and the live development tensor to resolve implementation claims.
 
-## Fast Reading Order
+## Current Direction
 
 The current `beta-0.17.*` priority is ns-nova application-led development.
-Git records `beta-0.17.0` at `ccc16af9` and `beta-0.17.3` at `81dc1669`.
-Start with the [current snapshot](versioning/nuis-beta-0.17.0-snapshot.md),
-[current checklist](versioning/nuis-beta-0.17.0-release-checklist.md) and
-[native session proof index](reference/nuis-native-session-proof-index.md).
+Git history is authoritative; dated committed identity and worktree follow-ups
+are separated in the [snapshot](versioning/nuis-beta-0.17.0-snapshot.md).
+The [validation checklist](versioning/nuis-beta-0.17.0-release-checklist.md) gives
+operating gates; the [proof index](reference/nuis-native-session-proof-index.md)
+catalogues detailed native-session receipts without duplicating them here.
 
-The governing direction remains the
-[application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md).
+The [application-led agreement](versioning/nuis-beta-0.11-application-led-mainline.md)
+keeps rendering, control, ML and audio as engine goals. Foundation hardening,
+measured optimization and module-by-module compiler migration serve that goal.
 The [beta-0.10 migration entry](versioning/nuis-beta-0.10.0-self-hosting-entry.md)
-and [beta-0.6 foundation entry](versioning/nuis-beta-0.6.0-mainline-entry.md)
-retain their historical role. They are not new acceptance results.
+is a phase anchor, not completed self-hosting.
 
-## Start Here
+## Selected Prerequisite
 
 Run from the repository root:
 
@@ -26,116 +26,51 @@ Run from the repository root:
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- dev-tensor --json
 ```
 
-The current goal is `standard-library/ns-nova/interactive-image-workflow`.
+The goal is `standard-library/ns-nova/interactive-image-workflow`.
 Its selected prerequisite is
-`standard-library/ns-nova/persistent-application-session`, still active/99.
-Selection follows the [declared dependency plan](reference/nuis-development-tensor.mainline.toml),
-not the globally lowest percentage. Correctness regressions may interrupt it.
+`standard-library/ns-nova/persistent-application-session`, active/99 at this audit.
+The [declared dependency plan](reference/nuis-development-tensor.mainline.toml)
+selects that prerequisite, not the globally lowest percentage. Correctness
+regressions may interrupt it; documentation maintenance does not advance it.
 
-The latest [mixed-parent-exit receipt](reference/nuis-native-stateful-loop-return-parent-mixed-v1.md)
-checks ordinary parent break/continue and selected typed child returns in the
-same function: actual prior-State handoff, exact source steps, real false/zero
-returns, reached reservations and sixteen delivery images.
-This bounded CPU worktree acceptance is not a release, GPU acceptance or a
-completed native application.
+| Current Native CPU Scope | Read First |
+| --- | --- |
+| Ordered effectful returns and complete State publication | [Effect-prefix certificate](reference/nuis-native-return-effect-prefix-v1.md), [mixed loop exits](reference/nuis-native-stateful-loop-return-parent-mixed-v1.md). |
+| Bounded record storage reuse with independent fallback | [Storage certificate](reference/nuis-native-return-effect-storage-v1.md), [payload/field execution](reference/nuis-native-return-effect-storage-field-payload-v1.md). |
+| Guarded scalar/record joins and owned value provenance | [Logical fields](reference/nuis-native-logical-record-fields-v1.md), [two-arm origins](reference/nuis-native-origin-record-join-v1.md). |
+| Explicit pure-i64 print values and root entry reads | [Computed prints](reference/nuis-native-computed-iteration-print-v1.md), [root epochs](reference/nuis-native-carry-epoch-print-v1.md). |
+| Fresh child entry reads without ancestor-grant inheritance | [Child epochs](reference/nuis-native-child-epoch-print-v1.md), a separate worktree follow-up at the dated audit. |
+| Pre-update nested i64 fields without whole-record readiness | [Original-path field epochs](reference/nuis-native-field-epoch-print-v1.md), using the same root/child entry rules. |
+| Pre-update bool fields at exact pure-i64 helper arguments | [Typed bool arguments](reference/nuis-native-bool-field-epoch-print-v1.md), not ambient bool expression permission. |
+| Pre-update i32 fields with exact signed State words | [Shared typed arguments](reference/nuis-native-i32-field-epoch-print-v1.md), retaining bool and ordinary-read boundaries. |
+| Pre-update f32 fields with raw callee/State words | [IEEE field arguments](reference/nuis-native-f32-field-epoch-print-v1.md), separating raw payload proof from finite CLI delivery. |
+| Pre-update f64 fields with complete 64-bit words | [Full-width field arguments](reference/nuis-native-f64-field-epoch-print-v1.md), retaining high bits, low-bit distinctions and entry budgets. |
 
-The [effect-prefix certificate](reference/nuis-native-return-effect-prefix-v1.md)
-now checks selected work, exact steps and pending propagation in the independent
-return rewrite. The separate [storage-sharing proof](reference/nuis-native-return-effect-storage-v1.md)
-now removes a duplicate record payload for eligible initial loop carries.
-The [initialization-prefix follow-up](reference/nuis-native-return-effect-storage-prefix-v1.md)
-now admits interleaved literal prints without moving them. The
-[candidate-attempt proof](reference/nuis-native-return-effect-storage-candidates-v1.md)
-tries at most eight in declaration order, publishing only a fully certified plan.
-The [reassignment proof](reference/nuis-native-return-effect-storage-reassignment-v1.md)
-now admits ordered same-type prefix writes while retaining fresh initialization.
-The [helper-call witnesses](reference/nuis-native-return-effect-storage-helper-calls-v1.md)
-exercise that existing route without new call authority. The
-[reached-loop witnesses](reference/nuis-native-return-effect-storage-loop-calls-v1.md)
-extend it to real iteration/parent-exit updates. The
-[branch-selected witnesses](reference/nuis-native-return-effect-storage-branch-calls-v1.md)
-cover multi-field updates and unselected poison. The
-[record-dependent bounds](reference/nuis-native-return-effect-storage-bound-calls-v1.md)
-consume completed results before reached-loop reservations. The
-[sibling-bound witnesses](reference/nuis-native-return-effect-storage-sibling-bounds-v1.md)
-reuse one snapshot with separate reservations and correctly targeted exits.
-The [parent-preheader witnesses](reference/nuis-native-return-effect-storage-preheader-bounds-v1.md)
-keep a selected snapshot alive across parent backedges with distinct reservations.
-The [distinct-epoch witnesses](reference/nuis-native-return-effect-storage-epoch-bounds-v1.md)
-keep older/newer snapshot identities and changing reached bounds distinct.
-The [returned-snapshot witnesses](reference/nuis-native-return-effect-storage-snapshot-returns-v1.md)
-check complete older/newer payload identity through selected inner-loop exits.
-The [payload-call witnesses](reference/nuis-native-return-effect-storage-payload-calls-v1.md)
-cover fallible effectful finalization with ordered arguments and complete publication.
-The [field-payload witnesses](reference/nuis-native-return-effect-storage-field-payload-v1.md)
-exercise source-ordered construction with earlier field effects and a failing later field.
-The [mixed-origin witnesses](reference/nuis-native-return-effect-storage-mixed-payload-v1.md)
-combine live-carry and older/newer snapshot fields, including a later read of the original
-boolean after an earlier field computes its inverse. Boolean field admission is repaired.
-The [projected-call witnesses](reference/nuis-native-return-effect-storage-projected-payload-v1.md)
-track effectful record-valued calls used directly as returned field projection bases,
-with once-only execution and separate argument/callee failure stages.
-The [unprojected-field witnesses](reference/nuis-native-return-effect-storage-unprojected-payload-v1.md)
-track effects and faults inside the callee's literal, before and after the desired field.
-The [conditional-field witnesses](reference/nuis-native-return-effect-storage-conditional-payload-v1.md)
-repair scalar-control short-circuit extraction and test skipped poisoned RHS work.
-The [ready-value follow-up](reference/nuis-native-return-ready-values-v1.md) reduces
-the representative full fixture from 75 to 63 NIR functions within the unchanged
-64-function profile. Native/reference and delivery tests now use the full fixture;
-the [typed scalar join follow-up](reference/nuis-native-typed-scalar-joins-v1.md)
-adds fresh ready-value declarations before strict call admission. The
-[guarded expression follow-up](reference/nuis-native-guarded-scalar-joins-v1.md)
-adds bounded non-logical pure arms. The
-[computed predicate proof](reference/nuis-native-computed-scalar-predicates-v1.md)
-adds once-evaluated non-logical pure gates. The
-[logical predicate proof](reference/nuis-native-logical-scalar-predicates-v1.md)
-composes bounded short-circuit conditions. The
-[logical value proof](reference/nuis-native-logical-scalar-values-v1.md) adds
-bool value arms under the same shared budget. The
-[pure prefix proof](reference/nuis-native-prefixed-scalar-joins-v1.md) keeps
-branch-local let/const work ordered and guarded. The
-[nested prefix proof](reference/nuis-native-nested-prefix-joins-v1.md) adds bounded
-pure local selections. The [record prefix proof](reference/nuis-native-record-prefix-joins-v1.md)
-adds complete exact-layout record locals. The [discarded-record follow-up](reference/nuis-native-discarded-record-prefix-v1.md)
-retains pruned one-sided field work with bounded neutral synthesis and no exported
-erased identity. The [outer-record proof](reference/nuis-native-outer-record-prefix-v1.md)
-adds fresh exact-type record results. The [logical-field proof](reference/nuis-native-logical-record-fields-v1.md)
-adds typed lazy bool fields without moving them ahead of preceding field work.
-The [direct return proof](reference/nuis-native-direct-record-return-v1.md) adds whole-function
-scope/type/budget checks while retaining preceding scalar prints and pure work.
-The [continuation-join follow-up](reference/nuis-native-joined-record-return-v1.md) exports
-only a fresh, same-name, exact-type pure result to a later direct record return.
-The [local-return proof](reference/nuis-native-local-record-return-v1.md) certifies a fresh
-owned-record initializer returned by its binding, retaining intervening effects.
-The [value-alias follow-up](reference/nuis-native-alias-record-return-v1.md) propagates
-that certification through fresh exact-type let/const copies without reconstruction.
-The [origin-join proof](reference/nuis-native-origin-record-join-v1.md) certifies only
-common results whose two original pure arms independently retain proven origins.
-The [computed-print follow-up](reference/nuis-native-computed-iteration-print-v1.md)
-adds guarded exact-i64 pure values with a separate persisted native opt-in.
-The [carry-epoch proof](reference/nuis-native-carry-epoch-print-v1.md) adds one-print
-read authority for initialized exact-i64 entry carries before their update.
-Child epochs, record-field reads and general effectful gates/arms remain separate.
-Keep checks/calls once-only and source-ordered,
-failure before pending/result publication, a separate pending signal and
-independent payload fallback for every unproved reduction.
-The separate backlog of further changing backedges and wide private captures
-retains its own proof gates and does not replace the selected frontier.
+The next selected gate is **typed unary-float arguments from pre-update fields**,
+starting with f32/f64 sign negation inside a completed pure-i64 print value.
+It needs original-leaf/entry/type proof and raw sign-bit/fault controls; direct
+field permission does not imply compound arguments or whole-record readiness.
+General effects, resources, references and arbitrary
+outer writes remain outside these bounded CPU admissions.
 
-| Execution Route | Existing Evidence | Remaining Boundary |
+Keep checks/calls once-only and source-ordered, failure before result/pending
+publication, and independent fallback for every unproved storage reduction.
+The backlog of further changing backedges and wide private captures retains
+its own gates. Full history and numerical test results belong in receipts.
+
+## Execution Routes
+
+| Route | Existing Evidence | Remaining Boundary |
 | --- | --- | --- |
-| Embedded-YIR application | Nuis callbacks, real Metal image processing, explicit AppKit/headless session and replay/provider observations | Not all CPU callbacks execute through the native-session profile; provider and packaging gates remain explicit. |
-| Native CPU session | Bounded typed callbacks, current State, selected effects, loops/exits, cache and source-free restoration | Not arbitrary resource/I/O/asynchronous capture or general effectful snapshot coalescing. |
-| Nsld private image | Scoped Mach-O/ELF assembly and explicit admission/final-output selection | Not a self-contained heterogeneous application or full backend/PE parity. |
+| Embedded-YIR application | Nuis callbacks, real Metal image work, explicit AppKit/headless sessions and provider observations. | The host embeds the YIR lifecycle runtime; not every callback executes through native CPU lowering. |
+| Native CPU session | Bounded registered callbacks, current State, selected effects, loops/exits, cache and source-free restoration. | Not arbitrary resource/I/O/async capture or a complete native engine. |
+| Nsld private image | Scoped Mach-O/ELF assembly and explicit admission/final-output selection. | Not a self-contained heterogeneous application or full provider/PE parity. |
 
-Cancellation admission, host-scope retirement and provider/device retirement are
-distinct. Follow the [cancellation contract](reference/nuis-yir-application-cancellation-v1.md)
-and [provider drain](reference/nuis-yir-provider-session-drain-v1.md); neither a
-host acknowledgement nor a smoke report proves device completion.
-
-Use the proof index for source shape, exact budgets and test counts. Do not add
-totals from different receipts or turn a historical boundary into a current veto
-without checking its later follow-up.
+Do not transfer acceptance between these routes. Cancellation admission,
+host-scope retirement and provider/device retirement are distinct; use the
+[cancellation contract](reference/nuis-yir-application-cancellation-v1.md) and
+[provider drain](reference/nuis-yir-provider-session-drain-v1.md) for their owners.
+Neither a host acknowledgement nor a smoke report proves device completion.
 
 ## Current Truth By Layer
 

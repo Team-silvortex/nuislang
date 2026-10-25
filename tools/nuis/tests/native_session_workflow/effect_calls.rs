@@ -36,12 +36,24 @@ mod logical_record_fields;
 
 #[path = "alias_record_return.rs"]
 mod alias_record_return;
+#[path = "bool_field_epoch_print.rs"]
+mod bool_field_epoch_print;
 #[path = "carry_epoch_print.rs"]
 mod carry_epoch_print;
+#[path = "child_epoch_print.rs"]
+mod child_epoch_print;
 #[path = "computed_iteration_print.rs"]
 mod computed_iteration_print;
 #[path = "direct_record_return.rs"]
 mod direct_record_return;
+#[path = "f32_field_epoch_print.rs"]
+mod f32_field_epoch_print;
+#[path = "f64_field_epoch_print.rs"]
+mod f64_field_epoch_print;
+#[path = "field_epoch_print.rs"]
+mod field_epoch_print;
+#[path = "i32_field_epoch_print.rs"]
+mod i32_field_epoch_print;
 #[path = "joined_record_return.rs"]
 mod joined_record_return;
 #[path = "local_record_return.rs"]

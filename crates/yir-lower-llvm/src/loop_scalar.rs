@@ -127,7 +127,7 @@ pub(crate) fn emit_loop_compare(
         CpuLoopScalarKind::F32 => {
             let pred = match compare {
                 "eq" => "oeq",
-                "ne" => "one",
+                "ne" => "une",
                 "lt" => "olt",
                 "le" => "ole",
                 "gt" => "ogt",
@@ -139,7 +139,7 @@ pub(crate) fn emit_loop_compare(
         CpuLoopScalarKind::F64 => {
             let pred = match compare {
                 "eq" => "oeq",
-                "ne" => "one",
+                "ne" => "une",
                 "lt" => "olt",
                 "le" => "ole",
                 "gt" => "ogt",

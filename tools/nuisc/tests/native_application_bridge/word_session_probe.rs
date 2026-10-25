@@ -344,25 +344,71 @@ pub(super) fn check_helper_entry_limit_rejection(
     loop_work_limit: u64,
     helper_entry_limit: u64,
 ) {
+    check_entry_limit_rejection(
+        source,
+        rows,
+        observers,
+        loop_work_limit,
+        helper_entry_limit,
+        false,
+    );
+}
+
+#[allow(dead_code)]
+pub(super) fn check_i64_helper_entry_limit_rejection(
+    source: &str,
+    rows: &[Sequence],
+    observers: &[(&str, &str)],
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) {
+    check_entry_limit_rejection(
+        source,
+        rows,
+        observers,
+        loop_work_limit,
+        helper_entry_limit,
+        true,
+    );
+}
+
+fn check_entry_limit_rejection(
+    source: &str,
+    rows: &[Sequence],
+    observers: &[(&str, &str)],
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+    computed: bool,
+) {
     let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
     for reversed in [false, true] {
         let module = typed_effect_returns::reordered(&compiled.yir, reversed);
-        let policy = LiteralPrintPolicy::new(
-            module
-                .nodes
-                .iter()
-                .filter(|n| matches!(n.op.instruction.as_str(), "print" | "guard_print"))
-                .map(|n| n.name.clone()),
-        )
-        .unwrap();
-        let bridge = emit_registered_with_literal_prints(
-            &module,
-            "counter",
-            &policy,
-            loop_work_limit,
-            helper_entry_limit,
-        )
+        let sites = module
+            .nodes
+            .iter()
+            .filter(|n| matches!(n.op.instruction.as_str(), "print" | "guard_print"))
+            .map(|n| n.name.clone())
+            .collect::<Vec<_>>();
+        let bridge = if computed {
+            let policy = yir_lower_llvm::native_session::I64PrintPolicy::new(sites).unwrap();
+            yir_lower_llvm::native_session::emit_registered_with_i64_prints(
+                &module,
+                "counter",
+                &policy,
+                loop_work_limit,
+                helper_entry_limit,
+            )
+        } else {
+            let policy = LiteralPrintPolicy::new(sites).unwrap();
+            emit_registered_with_literal_prints(
+                &module,
+                "counter",
+                &policy,
+                loop_work_limit,
+                helper_entry_limit,
+            )
+        }
         .unwrap();
         let llvm = driver(&bridge, rows, &[], observers);
         let artifact = nuisc::aot::write_and_link_with_source(

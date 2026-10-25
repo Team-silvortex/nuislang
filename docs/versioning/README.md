@@ -17,10 +17,10 @@ For the current `beta-0.17.*` line, start with:
 * [Beta-0.17 snapshot](nuis-beta-0.17.0-snapshot.md)
 * [Beta-0.17 validation checklist](nuis-beta-0.17.0-release-checklist.md)
 
-Git records the minor entry at `ccc16af9` (`beta-0.17.0`, 2026-10-15)
-and the latest committed patch at this audit at `81dc1669`
-(`beta-0.17.3`, 2026-10-18). The snapshot separately identifies uncommitted
-follow-ups. Navigation updates do not create a release or certify later work.
+Git records the minor entry at `ccc16af9` (`beta-0.17.0`, 2026-10-15).
+The dated snapshot owns the committed patch table and distinguishes worktree
+follow-ups; Git history is authoritative after that audit. Navigation updates
+do not create a release or certify later work.
 
 Detailed source/native/source-free boundaries live in the
 [native session proof index](../reference/nuis-native-session-proof-index.md).

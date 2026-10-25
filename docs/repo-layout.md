@@ -51,9 +51,11 @@ Use this as the shortest repo-level split:
   - [nustar-packages](../nustar-packages)
   - [examples/projects](../examples/projects)
   - [examples/ns](../examples/ns)
+  - [stdlib/core](../stdlib/core)
   - [stdlib/std](../stdlib/std)
   - [stdlib/pixelmagic](../stdlib/pixelmagic)
   - [stdlib/witsage](../stdlib/witsage)
+  - [stdlib/ns-nova](../stdlib/ns-nova)
   - [docs/reference](reference)
 * experimental or softer-edged today
   - [examples/yir](../examples/yir)

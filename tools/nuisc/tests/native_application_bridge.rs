@@ -40,12 +40,26 @@ mod logical_record_fields;
 
 #[path = "native_application_bridge/alias_record_return.rs"]
 mod alias_record_return;
+#[path = "native_application_bridge/bool_field_epoch_print.rs"]
+mod bool_field_epoch_print;
 #[path = "native_application_bridge/carry_epoch_print.rs"]
 mod carry_epoch_print;
+#[path = "native_application_bridge/child_epoch_print.rs"]
+mod child_epoch_print;
 #[path = "native_application_bridge/computed_iteration_print.rs"]
 mod computed_iteration_print;
 #[path = "native_application_bridge/direct_record_return.rs"]
 mod direct_record_return;
+#[path = "native_application_bridge/f32_field_epoch_print.rs"]
+mod f32_field_epoch_print;
+#[path = "native_application_bridge/f64_field_epoch_print.rs"]
+mod f64_field_epoch_print;
+#[path = "native_application_bridge/field_epoch_print.rs"]
+mod field_epoch_print;
+#[path = "native_application_bridge/float_ieee_comparisons.rs"]
+mod float_ieee_comparisons;
+#[path = "native_application_bridge/i32_field_epoch_print.rs"]
+mod i32_field_epoch_print;
 #[path = "native_application_bridge/joined_record_return.rs"]
 mod joined_record_return;
 #[path = "native_application_bridge/local_record_return.rs"]

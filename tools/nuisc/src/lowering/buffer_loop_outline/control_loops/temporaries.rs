@@ -33,7 +33,7 @@ pub(super) fn validate(
     layouts: &control_values::CarryLayouts,
     literal_prints: validation::LiteralPrints,
 ) -> Option<()> {
-    let print_epoch = print_epoch::Epoch::enter(scope, writable, updates);
+    let print_epoch = print_epoch::Epoch::enter(scope, writable, updates, layouts);
     let mut locals = Locals {
         scope: scope.clone(),
         writable: writable
@@ -80,8 +80,16 @@ fn block(
                 if !reads.is_empty() {
                     view.to_mut().available.extend(reads);
                 }
-                if expression(value, &view, updates, None, catalog, layouts, 0)?
-                    != scalar_type("i64")
+                if expression_with_fields(
+                    value,
+                    &view,
+                    updates,
+                    None,
+                    catalog,
+                    layouts,
+                    0,
+                    Some(print_epoch),
+                )? != scalar_type("i64")
                 {
                     return None;
                 }
@@ -180,6 +188,19 @@ fn expression(
     layouts: &control_values::CarryLayouts,
     depth: usize,
 ) -> Option<NirTypeRef> {
+    expression_with_fields(value, locals, updates, own, catalog, layouts, depth, None)
+}
+
+fn expression_with_fields(
+    value: &NirExpr,
+    locals: &Locals,
+    updates: &BTreeSet<String>,
+    own: Option<&str>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::CarryLayouts,
+    depth: usize,
+    field_reads: Option<&print_epoch::Epoch>,
+) -> Option<NirTypeRef> {
     if depth > 64 {
         return None;
     }
@@ -188,16 +209,28 @@ fn expression(
         NirExpr::Bool(_) => Some(scalar_type("bool")),
         NirExpr::F32(_) => Some(scalar_type("f32")),
         NirExpr::F64(_) => Some(scalar_type("f64")),
-        NirExpr::CastI64ToI32(value) => {
-            (expression(value, locals, updates, own, catalog, layouts, depth + 1)?
-                == scalar_type("i64"))
-            .then(|| scalar_type("i32"))
-        }
-        NirExpr::CastI32ToI64(value) => {
-            (expression(value, locals, updates, own, catalog, layouts, depth + 1)?
-                == scalar_type("i32"))
-            .then(|| scalar_type("i64"))
-        }
+        NirExpr::CastI64ToI32(value) => (expression_with_fields(
+            value,
+            locals,
+            updates,
+            own,
+            catalog,
+            layouts,
+            depth + 1,
+            field_reads,
+        )? == scalar_type("i64"))
+        .then(|| scalar_type("i32")),
+        NirExpr::CastI32ToI64(value) => (expression_with_fields(
+            value,
+            locals,
+            updates,
+            own,
+            catalog,
+            layouts,
+            depth + 1,
+            field_reads,
+        )? == scalar_type("i32"))
+        .then(|| scalar_type("i64")),
         NirExpr::PackF32Word(_)
         | NirExpr::UnpackF32Word(_)
         | NirExpr::PackF64Word(_)
@@ -211,8 +244,16 @@ fn expression(
             };
             // Conversions retain source-order read readiness, including a
             // binding's permitted self-read, rather than rechecking only type.
-            (expression(inner, locals, updates, own, catalog, layouts, depth + 1)?
-                == scalar_type(source))
+            (expression_with_fields(
+                inner,
+                locals,
+                updates,
+                own,
+                catalog,
+                layouts,
+                depth + 1,
+                field_reads,
+            )? == scalar_type(source))
             .then(|| scalar_type(target))
         }
         NirExpr::Var(name) => {
@@ -228,7 +269,29 @@ fn expression(
         NirExpr::Call { callee, args } => {
             let types = args
                 .iter()
-                .map(|arg| expression(arg, locals, updates, own, catalog, layouts, depth + 1))
+                .enumerate()
+                .map(|(index, arg)| {
+                    // A typed argument grant never makes its record generally ready.
+                    if depth < 64 {
+                        if let Some(ty) = field_reads.and_then(|epoch| {
+                            let expected =
+                                scalar_helpers::pure_i64_parameter_type(callee, index, catalog)?;
+                            epoch.argument(arg, &locals.scope, layouts, &expected)
+                        }) {
+                            return Some(ty);
+                        }
+                    }
+                    expression_with_fields(
+                        arg,
+                        locals,
+                        updates,
+                        own,
+                        catalog,
+                        layouts,
+                        depth + 1,
+                        field_reads,
+                    )
+                })
                 .collect::<Option<Vec<_>>>()?;
             scalar_helpers::typed_call_type(callee, &types, catalog)
         }
@@ -245,8 +308,16 @@ fn expression(
             for (name, value) in fields {
                 let expected = &layout.iter().find(|(field, _)| field == name)?.1;
                 if !seen.insert(name)
-                    || expression(value, locals, updates, own, catalog, layouts, depth + 1)?
-                        != *expected
+                    || expression_with_fields(
+                        value,
+                        locals,
+                        updates,
+                        own,
+                        catalog,
+                        layouts,
+                        depth + 1,
+                        field_reads,
+                    )? != *expected
                 {
                     return None;
                 }
@@ -254,7 +325,21 @@ fn expression(
             Some(scalar_type(type_name))
         }
         NirExpr::FieldAccess { base, field } => {
-            let base = expression(base, locals, updates, own, catalog, layouts, depth + 1)?;
+            if let Some(ty) =
+                field_reads.and_then(|epoch| epoch.field(value, &locals.scope, layouts))
+            {
+                return Some(ty);
+            }
+            let base = expression_with_fields(
+                base,
+                locals,
+                updates,
+                own,
+                catalog,
+                layouts,
+                depth + 1,
+                field_reads,
+            )?;
             layouts
                 .get(&base.name)?
                 .iter()
@@ -262,8 +347,26 @@ fn expression(
                 .map(|(_, ty)| ty.clone())
         }
         NirExpr::Binary { op, lhs, rhs } => {
-            let left = expression(lhs, locals, updates, own, catalog, layouts, depth + 1)?;
-            let right = expression(rhs, locals, updates, own, catalog, layouts, depth + 1)?;
+            let left = expression_with_fields(
+                lhs,
+                locals,
+                updates,
+                own,
+                catalog,
+                layouts,
+                depth + 1,
+                field_reads,
+            )?;
+            let right = expression_with_fields(
+                rhs,
+                locals,
+                updates,
+                own,
+                catalog,
+                layouts,
+                depth + 1,
+                field_reads,
+            )?;
             if left != right {
                 return None;
             }

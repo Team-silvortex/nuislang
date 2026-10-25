@@ -17,12 +17,13 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-carry-epoch-print-local-read-lens",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/temporaries.rs",
         required_patterns: &[
-            "print_epoch::Epoch::enter(scope, writable, updates)",
+            "print_epoch::Epoch::enter(scope, writable, updates, layouts)",
             "iteration_prints::admit(value, &locals.scope, catalog, layouts)?",
             "print_epoch.reads(value, &locals.scope, &locals.available, updates)?",
             "std::borrow::Cow::Borrowed(&*locals)",
             "view.to_mut().available.extend(reads)",
-            "expression(value, &view, updates, None, catalog, layouts, 0)?",
+            "expression_with_fields(",
+            "Some(print_epoch)",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -30,7 +31,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/literal_loops.rs",
         required_patterns: &[
             "child.available.retain(|name| !changed.contains(name))",
-            "&print_epoch::Epoch::default()",
+            "print_epoch::Epoch::enter_child(",
+            "&locals.available",
             "locals.available.extend(changed)",
         ],
     },

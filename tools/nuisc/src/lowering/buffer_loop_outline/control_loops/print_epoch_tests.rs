@@ -1,6 +1,6 @@
 use super::*;
 
-fn scope() -> Scope {
+pub(super) fn scope() -> Scope {
     let mut reference = scalar_type("i64");
     reference.is_ref = true;
     Scope::from([
@@ -27,7 +27,12 @@ fn print_epoch_certifies_only_initialized_exact_i64_mutable_entry_carries() {
         "reference".into(),
         "future".into(),
     ]);
-    let epoch = Epoch::enter(&scope, &writable, &updates);
+    let epoch = Epoch::enter(
+        &scope,
+        &writable,
+        &updates,
+        &control_values::CarryLayouts::new(),
+    );
     assert_eq!(
         epoch.seeds,
         BTreeSet::from(["current".into(), "sibling".into()])
@@ -58,7 +63,12 @@ fn print_epoch_certifies_only_initialized_exact_i64_mutable_entry_carries() {
 fn print_epoch_lends_reads_only_to_one_print_without_mutating_availability() {
     let scope = scope();
     let updates = BTreeSet::from(["current".into(), "sibling".into()]);
-    let epoch = Epoch::enter(&scope, &updates, &updates);
+    let epoch = Epoch::enter(
+        &scope,
+        &updates,
+        &updates,
+        &control_values::CarryLayouts::new(),
+    );
     let mut locals = Locals {
         scope,
         writable: updates.clone(),

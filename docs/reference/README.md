@@ -1,263 +1,162 @@
-# Reference Docs
+# Reference Contracts And Evidence
 
-This folder is the current implementation-facing reference layer.
+This directory holds implementation contracts, versioned protocol material and
+scoped validation receipts. A receipt preserves what its own checkout tested; it
+does not make every statement here current forever. Use code/tests, the live
+tensor and later profile-specific follow-ups to resolve apparent contradictions.
 
-If you want to understand what is true in the repository today, this is usually
-the best documentation layer to read first after the top-level
-[README.md](../../README.md).
+## Read First
 
-If your immediate question is "what is `GLM` trying to be beyond the current
-task/pointer rules?", read:
+The current line is beta-0.17. Git identity belongs in the dated snapshot, not
+a copied patch number in every index.
 
-* [../glm-spec/glm-heterogeneous-flow-graph-positioning.md](../../docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
+| Question | Start With |
+| --- | --- |
+| What can I run and what remains open? | [Mainline map](../current-mainline-map.md) |
+| Which committed patch and worktree follow-up does this audit describe? | [Dated snapshot](../versioning/nuis-beta-0.17.0-snapshot.md) |
+| Which checks should I choose? | [Operating checklist](../versioning/nuis-beta-0.17.0-release-checklist.md) |
+| Where are scoped native CPU proofs? | [Proof catalog](nuis-native-session-proof-index.md) |
+| Which task is selected and why? | [Tensor selection](nuis-development-tensor-mainline.md) |
 
-For the current `beta-0.17.*` application-led line, start with:
+Native proof history is catalogued once in the proof index. A page's presence,
+a schema version or a successful inspection is not runtime/device acceptance.
+Each contract identifies its active profile; linked payload files are versioned
+examples and must not be selected merely because their filename looks newest.
 
-* [Mainline map](../current-mainline-map.md)
-* [Native session proof index](nuis-native-session-proof-index.md)
-* [Beta-0.17 checkpoint](../versioning/nuis-beta-0.17.0-snapshot.md)
-* [Beta-0.17 validation checklist](../versioning/nuis-beta-0.17.0-release-checklist.md)
-* [Equal-atom effect-result joins](nuis-native-equal-effect-result-joins-v1.md)
-* [Typed effect-region data snapshots](nuis-native-typed-effect-snapshots-v1.md)
-* [Floating literal negation and signed-zero bits](nuis-native-float-literal-negation-v1.md)
-* [Nonliteral floating sign negation and once-only bit transport](nuis-native-float-sign-negation-v1.md)
-* [Exact selected-region scalar return handoff](nuis-native-typed-effect-returns-v1.md)
-* [Explicit native callback literal-print policy](nuis-native-literal-print-policy-v1.md)
-* [Explicit literal-print build cache and launch policy](nuis-native-literal-print-build-policy-v1.md)
-* [Guarded effectful scalar selections, rebinding and source order](nuis-native-effectful-scalar-selection-v1.md)
-* [Native scalar session bridge](nuis-native-scalar-session-bridge-v1.md)
-* [Native value returns and private captures](nuis-native-scalar-value-returns-v1.md)
-* [Native loop snapshots and boundary proof](nuis-native-scalar-loop-snapshots-v1.md)
-* [Artifact file publication and native launch reliability](nuis-artifact-file-publication-v1.md)
-* [Window contract](nuis-yir-window-session-v3.md)
-* [Cancellation and host retirement](nuis-yir-application-cancellation-v1.md)
-* [Provider-owned session drain](nuis-yir-provider-session-drain-v1.md)
-* [Headless application scalar script](nuis-yir-application-scalar-script-v1.md)
-* [Parent outcome pump](nuis-yir-application-outcome-pump-v1.md)
-* [Application lifecycle manifest](nuis-ns-nova-application-lifecycle-v1.toml)
+## YIR And Binary Contracts
 
-Window API cancellation now has an explicit scripted AppKit trigger, not a device
-retirement guarantee or general parent policy. Older beta/alpha phase anchors remain in the
-[versioning index](../versioning/README.md), not the current quick-start route.
+- [Artifact File Publication](nuis-artifact-file-publication-v1.md)
+- [YIR Reference Overview](yir-reference.md)
+- [YIR LangRef](yir-langref.md)
+- [YIR Tools Reference](yir-tools-reference.md)
+- [Nuis Binary Format Protocol](nuis-binary-format-protocol.md)
+- [`nuis` Native Artifact Workflow](nuis-native-artifact-workflow.md)
 
-## Reading Order
+## Compiler Migration
 
-Start in this order:
+- [Nuis Self-Hosting Readiness](nuis-self-hosting-readiness.md)
+- [Nuis Bootstrap Language Subset](nuis-bootstrap-language-subset.md)
+- [Nuis Compiler Data Model](nuis-compiler-data-model.md)
+- [nuis-compiler-data-model-v11.toml](nuis-compiler-data-model-v11.toml)
+- [nuis-compiler-data-model-v10.toml](nuis-compiler-data-model-v10.toml)
+- [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md)
+- [nuis-compiler-candidate-structural-pagination-v1.toml](nuis-compiler-candidate-structural-pagination-v1.toml)
+- [Nuis Compiler Stage Transformation](nuis-compiler-stage-transformation.md)
+- [Nuis Compiler Candidate Production](nuis-compiler-candidate-production.md)
+- [Nuis Compiler Candidate Compile Capability](nuis-compiler-candidate-compile-capability.md)
+- [nuis-compiler-candidate-compile-capability-v1.toml](nuis-compiler-candidate-compile-capability-v1.toml)
+- [Nuis Compiler Candidate Direct Compile Capability](nuis-compiler-candidate-direct-compile-capability.md)
+- [nuis-compiler-candidate-direct-compile-capability-v2.toml](nuis-compiler-candidate-direct-compile-capability-v2.toml)
+- [Nuis Compiler Candidate Preselection](nuis-compiler-candidate-preselection.md)
+- [nuis-compiler-candidate-preselection-v1.toml](nuis-compiler-candidate-preselection-v1.toml)
+- [Nuis Compiler Candidate Successor](nuis-compiler-candidate-successor.md)
+- [nuis-compiler-candidate-successor-v1.toml](nuis-compiler-candidate-successor-v1.toml)
+- [Nuis Compiler Candidate Fresh-Source Capability](nuis-compiler-candidate-fresh-source-capability.md)
+- [nuis-compiler-candidate-fresh-source-capability-v1.toml](nuis-compiler-candidate-fresh-source-capability-v1.toml)
+- [Nuis Compiler Candidate to Nsld Materialization](nuis-compiler-candidate-nsld-materialization.md)
+- [nuis-compiler-candidate-nsld-input-v1.toml](nuis-compiler-candidate-nsld-input-v1.toml)
+- [nuis-compiler-candidate-nsld-materialization-v1.toml](nuis-compiler-candidate-nsld-materialization-v1.toml)
+- [Nuis Compiler Component Build](nuis-compiler-component-build.md)
+- [Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md)
+- [nuis-compiler-component-representation-differential-v1.toml](nuis-compiler-component-representation-differential-v1.toml)
+- [Nuis Compiler Component Reproducibility](nuis-compiler-component-reproducibility.md)
+- [nuis-compiler-component-reproducibility-v2.toml](nuis-compiler-component-reproducibility-v2.toml)
+- [Nuis Compiler Component Attestation](nuis-compiler-component-attestation.md)
+- [Nuis Compiler Component Replacement Authorization](nuis-compiler-component-replacement-authorization.md)
+- [nuis-compiler-component-active-state-v1.toml](nuis-compiler-component-active-state-v1.toml)
+- [nuis-compiler-component-transition-v2.toml](nuis-compiler-component-transition-v2.toml)
+- [Nuis Compiler Component Dispatch](nuis-compiler-component-dispatch.md)
+- [nuis-compiler-component-dispatch-v1.toml](nuis-compiler-component-dispatch-v1.toml)
+- [Nuis Compiler Component Compile Dispatch](nuis-compiler-component-compile-dispatch.md)
+- [nuis-compiler-component-compile-dispatch-v1.toml](nuis-compiler-component-compile-dispatch-v1.toml)
 
-* `YIR` foundation
-  - [nuis-development-tensor.md](nuis-development-tensor.md)
-  - [nuis-software-manufacturing-architecture.md](nuis-software-manufacturing-architecture.md)
-  - [source-text-encoding-contract.md](source-text-encoding-contract.md)
-  - [yir-reference.md](yir-reference.md)
-  - [yir-langref.md](yir-langref.md)
-  - [yir-tools-reference.md](yir-tools-reference.md)
-  - [nuis-binary-format-protocol.md](nuis-binary-format-protocol.md)
-  - [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
-  - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
-  - [galaxy-resolution-lock-contract.md](galaxy-resolution-lock-contract.md)
-  - [nuis-rc-cache-lifecycle.md](nuis-rc-cache-lifecycle.md)
-  - [galaxy-provider-trust-state-v1.toml](galaxy-provider-trust-state-v1.toml)
-  - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
-  - [nuis-data-provider-inventory-v1.toml](nuis-data-provider-inventory-v1.toml)
-  - [nuis-data-provider-conformance-v1.toml](nuis-data-provider-conformance-v1.toml)
-  - [nuis-ns-nova-application-lifecycle-v1.toml](nuis-ns-nova-application-lifecycle-v1.toml)
-  - [nuis-development-tensor-mainline.md](nuis-development-tensor-mainline.md)
-  - [nuis-development-tensor.mainline.toml](nuis-development-tensor.mainline.toml)
-  - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
-  - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
-  - [nsld-executable-finalizer-registry.md](nsld-executable-finalizer-registry.md)
-  - [nuis-packaging-lifecycle-responsibility-map.md](nuis-packaging-lifecycle-responsibility-map.md)
-  - [cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md)
-  - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
-  - [nsbdr-bundler-frontdoor.md](nsbdr-bundler-frontdoor.md)
-* `NIR` safety boundary
-  - [nuis-self-hosting-readiness.md](nuis-self-hosting-readiness.md)
-  - [nuis-bootstrap-language-subset.md](nuis-bootstrap-language-subset.md)
-  - [nuis-compiler-data-model.md](nuis-compiler-data-model.md)
-  - [nuis-compiler-data-model-v11.toml](nuis-compiler-data-model-v11.toml)
-  - [nuis-compiler-data-model-v10.toml](nuis-compiler-data-model-v10.toml)
-  - [nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md)
-  - [nuis-compiler-candidate-structural-pagination-v1.toml](nuis-compiler-candidate-structural-pagination-v1.toml)
-  - [nuis-compiler-stage-transformation.md](nuis-compiler-stage-transformation.md)
-  - [nuis-compiler-candidate-production.md](nuis-compiler-candidate-production.md)
-  - [nuis-compiler-candidate-compile-capability.md](nuis-compiler-candidate-compile-capability.md)
-  - [nuis-compiler-candidate-compile-capability-v1.toml](nuis-compiler-candidate-compile-capability-v1.toml)
-  - [nuis-compiler-candidate-direct-compile-capability.md](nuis-compiler-candidate-direct-compile-capability.md)
-  - [nuis-compiler-candidate-direct-compile-capability-v2.toml](nuis-compiler-candidate-direct-compile-capability-v2.toml)
-  - [nuis-compiler-candidate-preselection.md](nuis-compiler-candidate-preselection.md)
-  - [nuis-compiler-candidate-preselection-v1.toml](nuis-compiler-candidate-preselection-v1.toml)
-  - [nuis-compiler-candidate-successor.md](nuis-compiler-candidate-successor.md)
-  - [nuis-compiler-candidate-successor-v1.toml](nuis-compiler-candidate-successor-v1.toml)
-  - [nuis-compiler-candidate-fresh-source-capability.md](nuis-compiler-candidate-fresh-source-capability.md)
-  - [nuis-compiler-candidate-fresh-source-capability-v1.toml](nuis-compiler-candidate-fresh-source-capability-v1.toml)
-  - [nuis-compiler-candidate-nsld-materialization.md](nuis-compiler-candidate-nsld-materialization.md)
-  - [nuis-compiler-candidate-nsld-input-v1.toml](nuis-compiler-candidate-nsld-input-v1.toml)
-  - [nuis-compiler-candidate-nsld-materialization-v1.toml](nuis-compiler-candidate-nsld-materialization-v1.toml)
-  - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
-  - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
-  - [nuis-compiler-component-representation-differential-v1.toml](nuis-compiler-component-representation-differential-v1.toml)
-  - [nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md)
-  - [nuis-compiler-component-reproducibility-v2.toml](nuis-compiler-component-reproducibility-v2.toml)
-  - [nuis-compiler-component-attestation.md](nuis-compiler-component-attestation.md)
-  - [nuis-compiler-component-replacement-authorization.md](nuis-compiler-component-replacement-authorization.md)
-  - [nuis-compiler-component-active-state-v1.toml](nuis-compiler-component-active-state-v1.toml)
-  - [nuis-compiler-component-transition-v2.toml](nuis-compiler-component-transition-v2.toml)
-  - [nuis-compiler-component-dispatch.md](nuis-compiler-component-dispatch.md)
-  - [nuis-compiler-component-dispatch-v1.toml](nuis-compiler-component-dispatch-v1.toml)
-  - [nuis-compiler-component-compile-dispatch.md](nuis-compiler-component-compile-dispatch.md)
-  - [nuis-compiler-component-compile-dispatch-v1.toml](nuis-compiler-component-compile-dispatch-v1.toml)
-  - [nir-memory-model.md](nir-memory-model.md)
-  - [nir-optimization-contract.md](nir-optimization-contract.md)
-  - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
-  - [generic-diagnostic-ownership-contract.md](generic-diagnostic-ownership-contract.md)
-  - [host-read-bridge.md](host-read-bridge.md)
-  - [ffi-pointer-safety-boundary.md](ffi-pointer-safety-boundary.md)
-  - [std-mainline-layering-contract.md](std-mainline-layering-contract.md)
-  - [std-host-io-layering-contract.md](std-host-io-layering-contract.md)
-  - [std-data-window-fabric-layering-contract.md](std-data-window-fabric-layering-contract.md)
-  - [std-net-layering-contract.md](std-net-layering-contract.md)
-  - [std-shader-kernel-project-contract.md](std-shader-kernel-project-contract.md)
-  - [pixelmagic-mainline-contract.md](pixelmagic-mainline-contract.md)
-* task-facing current contract
-  - [cpu-task-contract.md](cpu-task-contract.md)
-  - [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
-  - [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
-  - [cpu-task-payload-matrix.md](cpu-task-payload-matrix.md)
-  - [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
-  - [std-task-layering-contract.md](std-task-layering-contract.md)
-* task-facing future edge
-  - [cpu-task-external-handle-contract.md](cpu-task-external-handle-contract.md)
-  - [cpu-task-external-handle-glm-sketch.md](cpu-task-external-handle-glm-sketch.md)
-  - [annotation-intrinsic-stdlib-sketch.md](annotation-intrinsic-stdlib-sketch.md)
-  - [nuis-launcher-container-linker-sketch.md](nuis-launcher-container-linker-sketch.md)
-  - [nuis-aot-lifecycle-loop-sketch.md](nuis-aot-lifecycle-loop-sketch.md)
-  - [nustar-abi-grain-sketch.md](nustar-abi-grain-sketch.md)
-  - [nuis-packaging-lifecycle-responsibility-map.md](nuis-packaging-lifecycle-responsibility-map.md)
-  - [trait-generic-monomorphization-sketch.md](trait-generic-monomorphization-sketch.md)
-  - [network-domain-contract.md](network-domain-contract.md)
-  - [network-runtime-host-validation.md](network-runtime-host-validation.md)
-  - [network-profile-contract.md](network-profile-contract.md)
-  - [yir-hot-sync-contraction-sketch.md](yir-hot-sync-contraction-sketch.md)
-  - [yir-global-clock-negotiation-sketch.md](yir-global-clock-negotiation-sketch.md)
+## Memory Tasks And Source Rules
 
-If your question is specifically “what command should I run next for this
-project?”, start with
-[yir-tools-reference.md](yir-tools-reference.md).
+- [Source Text Encoding Contract](source-text-encoding-contract.md)
+- [NIR Memory Model](nir-memory-model.md)
+- [NIR Optimization Contract](nir-optimization-contract.md)
+- [Control-Flow Lowering Contract](control-flow-lowering-contract.md)
+- [Generic Diagnostic Ownership Contract](generic-diagnostic-ownership-contract.md)
+- [FFI Pointer Safety Boundary](ffi-pointer-safety-boundary.md)
+- [CPU Task Contract](cpu-task-contract.md)
+- [CPU Task Memory Contract](cpu-task-memory-contract.md)
+- [CPU Task GLM Contract](cpu-task-glm-contract.md)
+- [CPU Task Payload Matrix](cpu-task-payload-matrix.md)
+- [CPU Task, Scheduler, and Clock Contract](cpu-task-scheduler-clock.md)
+- [CPU Task External Handle Contract](cpu-task-external-handle-contract.md)
 
-If your question is specifically “how do architecture, module, and function
-progress line up right now?”, start with
-[nuis-development-tensor.md](nuis-development-tensor.md).
+## Runtime And Provider Sessions
 
-If your question is specifically “what is the shortest real native binary
-closure route today?”, start with
-[nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md).
+- [Registered Window Sessions](nuis-yir-window-session-v3.md)
+- [Application Cancellation And Host Retirement](nuis-yir-application-cancellation-v1.md)
+- [Provider Session Drain](nuis-yir-provider-session-drain-v1.md)
+- [Headless Application Scalar Script](nuis-yir-application-scalar-script-v1.md)
+- [Application Outcome Pump](nuis-yir-application-outcome-pump-v1.md)
+- [nuis-ns-nova-application-lifecycle-v1.toml](nuis-ns-nova-application-lifecycle-v1.toml)
+- [nuis-data-provider-inventory-v1.toml](nuis-data-provider-inventory-v1.toml)
+- [nuis-data-provider-conformance-v1.toml](nuis-data-provider-conformance-v1.toml)
 
-If your question is specifically “what is the current independent linker
-frontdoor?”, start with
-[nsld-linker-frontdoor.md](nsld-linker-frontdoor.md).
+## Nustars Libraries And Toolchain
 
-If your question is specifically “what remains between the current Nsld
-container and a runnable Nuis-owned heterogeneous executable?”, start with
-[nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
+- [Toolchain Galaxy Core Boundary](toolchain-galaxy-core-boundary.md)
+- [Nustar Multi-Backend Artifact Contract](nustar-multi-backend-artifact-contract.md)
+- [Nsld Linker Frontdoor](nsld-linker-frontdoor.md)
+- [Nsld Binary Assembly Gap Map](nsld-binary-assembly-gap-map.md)
+- [Nsld Executable Finalizer Registry](nsld-executable-finalizer-registry.md)
+- [Nuis Packaging / Lifecycle Responsibility Map](nuis-packaging-lifecycle-responsibility-map.md)
+- [CFFI / Von Neumann Domain Contract](cffi-von-neumann-domain-contract.md)
+- [Nsdb YIR Debugger Frontdoor](nsdb-yir-debugger-frontdoor.md)
+- [Nsbdr Bundler Frontdoor](nsbdr-bundler-frontdoor.md)
+- [`std` Mainline Layering Contract](std-mainline-layering-contract.md)
+- [`std` Host I/O Layering Contract](std-host-io-layering-contract.md)
+- [`std` Data / Window / Fabric Layering Contract](std-data-window-fabric-layering-contract.md)
+- [`std` Net Layering Contract](std-net-layering-contract.md)
+- [Shader / Kernel Project-First Contract](std-shader-kernel-project-contract.md)
+- [`PixelMagic` Mainline Contract](pixelmagic-mainline-contract.md)
+- [`std` Task Layering Contract](std-task-layering-contract.md)
+- [Network Domain Contract](network-domain-contract.md)
+- [Network Runtime Host Validation](network-runtime-host-validation.md)
+- [Network Profile Contract](network-profile-contract.md)
 
-If your question is specifically “what is the current beta checkpoint and
-what wording is safe?”, start with
-[the beta-0.17 snapshot](../versioning/nuis-beta-0.17.0-snapshot.md).
-The [beta-0.6 entry](../versioning/nuis-beta-0.6.0-mainline-entry.md) remains
-historical foundation context.
+## Manufacturing And Development
 
-If your question is specifically “what is the active staged compiler migration
-boundary, and which preparation gates are closed?”, start with
-[nuis-self-hosting-readiness.md](nuis-self-hosting-readiness.md).
+- [nuislang](../../README.md)
+- [Nuis Development Tensor](nuis-development-tensor.md)
+- [Nuis Software Manufacturing Architecture](nuis-software-manufacturing-architecture.md)
+- [Galaxy Resolution Lock Contract](galaxy-resolution-lock-contract.md)
+- [Nuis-Rc Heap/Stack Cache Lifecycle](nuis-rc-cache-lifecycle.md)
+- [galaxy-provider-trust-state-v1.toml](galaxy-provider-trust-state-v1.toml)
+- [nuis-development-tensor.mainline.toml](nuis-development-tensor.mainline.toml)
+- [Host Read Bridge](host-read-bridge.md)
+- [`nuis` Frontdoor Surface Reference](nuis-frontdoor-surface-reference.md)
+- [Current Mainline Map](../../docs/current-mainline-map.md)
 
-If your question is specifically “how are stage0 and future stage1 compiler
-payloads identified without Rust layout coupling?”, start with
-[nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md).
+## Design And Historical Anchors
 
-If your question is specifically “how does a signed component transition select
-and execute exact compiler-image bytes without persisting their path?”, start
-with [nuis-compiler-component-dispatch.md](nuis-compiler-component-dispatch.md).
+- [GLM As Heterogeneous Flow-Graph Semantics](../../docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
+- [Versioning Notes](../versioning/README.md)
+- [CPU Task External Handle GLM Sketch](cpu-task-external-handle-glm-sketch.md)
+- [Annotation / Intrinsic Stdlib Sketch](annotation-intrinsic-stdlib-sketch.md)
+- [Nuis Launcher / Container / Linker Sketch](nuis-launcher-container-linker-sketch.md)
+- [Nuis AOT Lifecycle Loop Sketch](nuis-aot-lifecycle-loop-sketch.md)
+- [Nustar ABI Grain Sketch](nustar-abi-grain-sketch.md)
+- [Trait And Generic Monomorphization Sketch](trait-generic-monomorphization-sketch.md)
+- [YIR Hot Sync Contraction Sketch](yir-hot-sync-contraction-sketch.md)
+- [YIR Global Clock Negotiation Sketch](yir-global-clock-negotiation-sketch.md)
+- [`nuis` `beta-0.6.*` Mainline Entry](../versioning/nuis-beta-0.6.0-mainline-entry.md)
+- [`nuis` `alpha-0.20.*` Mainline Entry](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md)
+- [`nuis` `alpha-0.17.*` Mainline Entry](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
+- [`nuis` `alpha-0.10.*` Mainline Entry](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md)
+- [`nuis` `alpha-0.8.*` Mainline Entry](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
+- [Grammar And Frontend Notes](../../docs/grammar/README.md)
+- [Historical Docs](../../docs/historical/README.md)
 
-If your question is specifically “how does that selected image compile a real
-project without making runtime paths part of the request?”, start with
-[nuis-compiler-component-compile-dispatch.md](nuis-compiler-component-compile-dispatch.md).
+## Documentation Roles
 
-If your question is specifically “how can the production-bound Nuis stage1
-candidate drive the same request while its stage0 dependency remains explicit?”,
-start with
-[nuis-compiler-candidate-compile-capability.md](nuis-compiler-candidate-compile-capability.md).
+Use current semantic/tool contracts for implementation behavior, the proof index
+for bounded execution history and the versioning index for dated releases and
+roadmaps. Grammar, broader design and archived whitepapers retain their own
+layers; they are not substitutes for a current verifier or runtime contract.
 
-If your question is specifically “what can stage1 compile directly without a
-runtime stage0 provider?”, start with
-[nuis-compiler-candidate-direct-compile-capability.md](nuis-compiler-candidate-direct-compile-capability.md).
-
-If your question is specifically “how does stage0 attest one complete
-project-form compiler-component build?”, start with
-[nuis-compiler-component-build.md](nuis-compiler-component-build.md).
-
-If your question is specifically “how are stage0 and a candidate stage1
-compared without implicitly authorizing replacement?”, start with
-[nuis-compiler-component-differential.md](nuis-compiler-component-differential.md).
-
-If your question is specifically “how do two independent cache-bypassed clean
-candidate builds prove a stable compiler identity?”, start with
-[nuis-compiler-component-reproducibility.md](nuis-compiler-component-reproducibility.md).
-
-If your question is specifically “what did the alpha-0.20 closeout establish?”,
-read
-[../versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md).
-
-If your question is specifically “what did the alpha-0.17 registered
-heterogeneous worker execution target establish?”, read
-[../versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md).
-
-If your question is specifically “what did the alpha-0.10 executable artifact
-target establish?”, read
-[../versioning/nuis-alpha-0.10-mainline-entry.md](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md).
-
-If your question is specifically “what did the alpha-0.8 binary-linking
-convergence predecessor establish?”, read
-[../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md).
-
-If your question is specifically “how should Nuis treat the C world and the
-classic von-Neumann host stack?”, start with
-[cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md).
-
-If your question is specifically “how should Nuis debugging work above native
-LLDB-style shell debugging?”, start with
-[nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md).
-
-If your question is specifically “should linker/debugger capabilities be CLI
-commands or reusable galaxy-style toolchain APIs?”, start with
-[toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
-
-If your question is specifically “which `nuis` frontdoor fields should I read
-or consume right now?”, start with
-[nuis-frontdoor-surface-reference.md](nuis-frontdoor-surface-reference.md).
-
-Shortest rule:
-
-* use this README for the implementation-truth anchor set
-* use [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
-  for repo-level mainline routing
-* use the specific reference file directly once you know which truth layer you
-  need
-
-## Boundary
-
-Use this folder for:
-
-* current semantic behavior
-* current tool behavior
-* current workflow and packaging surfaces
-
-Do not treat this folder as:
-
-* the handwritten grammar source of truth
-* long-range architecture argument
-* historical archive
-
-For those, see:
-
-* [docs/grammar/README.md](../../docs/grammar/README.md)
-* [docs/historical/README.md](../../docs/historical/README.md)
+Keep entry routes short. Add a focused contract or receipt to its owning section
+rather than copying the full proof narrative into every README.

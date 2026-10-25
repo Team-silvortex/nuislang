@@ -54,6 +54,24 @@ mod computed_iteration_print;
 #[path = "dev_tensor_drift_data_native_carry_epoch_print.rs"]
 mod carry_epoch_print;
 
+#[path = "dev_tensor_drift_data_native_child_epoch_print.rs"]
+mod child_epoch_print;
+
+#[path = "dev_tensor_drift_data_native_field_epoch_print.rs"]
+mod field_epoch_print;
+
+#[path = "dev_tensor_drift_data_native_bool_field_epoch_print.rs"]
+mod bool_field_epoch_print;
+
+#[path = "dev_tensor_drift_data_native_i32_field_epoch_print.rs"]
+mod i32_field_epoch_print;
+
+#[path = "dev_tensor_drift_data_native_f32_field_epoch_print.rs"]
+mod f32_field_epoch_print;
+
+#[path = "dev_tensor_drift_data_native_f64_field_epoch_print.rs"]
+mod f64_field_epoch_print;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
 mod return_effect_storage_conditional_payload;
 
@@ -615,6 +633,12 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         origin_record_join::CHECKS,
         computed_iteration_print::CHECKS,
         carry_epoch_print::CHECKS,
+        child_epoch_print::CHECKS,
+        field_epoch_print::CHECKS,
+        bool_field_epoch_print::CHECKS,
+        i32_field_epoch_print::CHECKS,
+        f32_field_epoch_print::CHECKS,
+        f64_field_epoch_print::CHECKS,
         return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,

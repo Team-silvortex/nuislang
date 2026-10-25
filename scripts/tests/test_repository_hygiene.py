@@ -1,5 +1,6 @@
 """Keep source checkouts clean and their current entrypoints discoverable."""
 
+from datetime import date
 from pathlib import Path
 import os
 import re
@@ -87,6 +88,62 @@ class RepositoryHygiene(unittest.TestCase):
             if generated:
                 rejected.append(relative.as_posix())
         self.assertEqual(rejected, [], "generated outputs belong in ignored local build directories")
+
+    def test_patch_identity_is_dated_and_owned_by_snapshot(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        series = re.search(r"repository is on `([^`\s]+)\.\*`", readme)
+        self.assertIsNotNone(series)
+        snapshot = (ROOT / "docs/versioning" /
+                    ("nuis-" + series.group(1) + ".0-snapshot.md")).read_text(encoding="utf-8")
+        audit = re.search(r"^Audit date: (\d{4}-\d{2}-\d{2})\.", snapshot, re.MULTILINE)
+        release = re.search(
+            r"^\| Latest committed patch at this audit, ([^|]+) \| "
+            r"`([0-9a-f]{7,40})` \| (\d{4}-\d{2}-\d{2}) \|$",
+            snapshot, re.MULTILINE,
+        )
+        self.assertIsNotNone(audit, "the rolling minor snapshot needs a dated audit")
+        self.assertIsNotNone(release, "keep exact committed identity in the snapshot")
+        self.assertRegex(release.group(1).strip(),
+                         r"^" + re.escape(series.group(1)) + r"\.\d+$")
+        self.assertLessEqual(date.fromisoformat(release.group(3)),
+                             date.fromisoformat(audit.group(1)))
+        for relative in (*ENTRY_ROUTERS, "docs/reference/README.md", "docs/versioning/README.md"):
+            with self.subTest(path=relative):
+                text = (ROOT / relative).read_text(encoding="utf-8")
+                copied_patch = (r"(?is)latest committed (?:patch|release)[^\n]*\n?[^\n]*"
+                                r"`(?:alpha|beta|gamma|delta)-\d+\.\d+\.\d+`")
+                self.assertNotRegex(text, copied_patch,
+                                    "undated routers should link to the snapshot, not copy patch identity")
+                if relative in ENTRY_ROUTERS:
+                    self.assertNotRegex(text, r"`(?:alpha|beta|gamma|delta)-\d+\.\d+\.\d+`",
+                                        "short current routers should not repeat exact phase patches")
+
+    def test_stdlib_import_policy_docs_match_manifests(self):
+        root = ROOT / "stdlib"
+        index = re.search(r"^modules\s*=\s*\[([^\]]*)\]",
+                          (root / "index.toml").read_text(encoding="utf-8"), re.MULTILINE)
+        self.assertIsNotNone(index)
+        modules = re.findall(r'"([^"\\]+)"', re.sub(r"#.*", "", index.group(1)))
+        self.assertTrue(modules)
+        self.assertEqual(len(modules), len(set(modules)))
+        documented = {}
+        for line in (root / "README.md").read_text(encoding="utf-8").splitlines():
+            if not line.startswith("| ["):
+                continue
+            columns = [column.strip() for column in line.split("|")[1:-1]]
+            name = re.match(r"\[([^\]]+)\]\(", columns[0])
+            self.assertIsNotNone(name)
+            self.assertEqual(len(columns), 4)
+            self.assertNotIn(name.group(1), documented)
+            documented[name.group(1)] = columns[2].strip("`")
+        self.assertEqual(set(documented), set(modules))
+        for name in modules:
+            with self.subTest(package=name):
+                policy = re.search(r'^library_import_policy = "([^"]+)"$',
+                                   (root / name / "module.toml").read_text(encoding="utf-8"),
+                                   re.MULTILINE)
+                self.assertIsNotNone(policy)
+                self.assertEqual(documented[name], policy.group(1))
 
 
 if __name__ == "__main__":

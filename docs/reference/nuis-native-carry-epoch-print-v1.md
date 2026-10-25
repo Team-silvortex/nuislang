@@ -111,7 +111,10 @@ Their receipts remain historical evidence rather than new carry-epoch results.
 The coordinate remains `standard-library/ns-nova/persistent-application-session`,
 active/99. Next prove a fresh child-loop epoch for its own initialized exact-i64
 carry, without inheriting an unavailable ancestor's grant or leaking readiness
-to surrounding work. Keep the empty child certificate until that proof exists.
+to surrounding work. The later [child-epoch proof](nuis-native-child-epoch-print-v1.md)
+adds a fresh certificate from already-ready child entry values, without inheriting
+unavailable ancestor grants. At this checkpoint, keep the empty child certificate
+until that proof exists.
 Record-field pre-update reads, hidden logical print roots, general effects,
 I/O/async/resource capture, outer writes, stable ABI, full GPU/Linux parity and
 self-hosting remain separate gates.

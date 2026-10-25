@@ -6,8 +6,9 @@ tensor and focused reference contracts when they disagree.
 
 ## Read This First
 
-The current series is `beta-0.17.*`, with committed patch `beta-0.17.3`
-(`81dc1669`). Uncommitted work and historical acceptance stay separate.
+The current series is `beta-0.17.*`. The dated snapshot is the single entrypoint
+for committed patch identity; Git history is authoritative after that audit.
+Worktree follow-ups and historical acceptance stay separate.
 
 1. [Current mainline map](current-mainline-map.md)
 2. [Current snapshot](versioning/nuis-beta-0.17.0-snapshot.md)
@@ -34,7 +35,9 @@ narrative to README, this index and the mainline map.
 | [`fabric-spec/`](fabric-spec) | Data-fabric design material, including historical drafts |
 | [`historical/`](historical) | Explicitly archived whitepapers and predecessor material |
 
-Current reference material outranks broader design sketches when they differ.
+Reference contracts and scoped validation receipts share a directory, not one
+timeless status: a later receipt may advance an earlier profile's boundary.
+Current implementation contracts outrank broader design sketches when they differ.
 In particular, `fabric-spec/DFIR.md` is historical draft material rather than a
 current verifier contract.
 

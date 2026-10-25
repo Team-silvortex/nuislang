@@ -36,8 +36,15 @@ pub(super) fn validate(
             _ => return None,
         }
     }
-    // Keep the parent's unavailable siblings unavailable. Each child backedge
-    // then starts a fresh source-ordered write set, without gaining authority.
+    // Certify the child's already-ready entry values before resetting its writes.
+    // A parent's print-only read never made an unavailable ancestor ready.
+    let print_epoch = print_epoch::Epoch::enter_child(
+        &locals.scope,
+        &locals.writable,
+        &changed,
+        &locals.available,
+        layouts,
+    );
     let mut child = locals.clone();
     child.available.retain(|name| !changed.contains(name));
     child.available.insert(prepared.binding_name.clone());
@@ -50,8 +57,7 @@ pub(super) fn validate(
         catalog,
         layouts,
         literal_prints,
-        // Child epochs do not inherit an ancestor's pre-update read grant.
-        &print_epoch::Epoch::default(),
+        &print_epoch,
         depth + 1,
     )?;
     // Zero trips retain initialized entry values; child-local declarations never

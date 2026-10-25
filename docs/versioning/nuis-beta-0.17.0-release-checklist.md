@@ -1,144 +1,111 @@
 # Beta 0.17 Validation Checklist
 
-This is the operating checklist for the existing `beta-0.17.*` line.
-The [snapshot](nuis-beta-0.17.0-snapshot.md) distinguishes committed identity from
-uncommitted follow-ups. Checkboxes are recurring gates, not a claim that every
-suite passed at once. Git operations require their own user request.
+This is the operating checklist for the existing `beta-0.17.*` line. The
+[snapshot](nuis-beta-0.17.0-snapshot.md) separates dated committed identity from
+worktree follow-ups. Checkboxes are recurring gates, not a single all-green run.
+Git operations require their own user request.
 
-## Repository And Task Selection
+## Select The Scope
 
-- [ ] Read Git's current release and keep Cargo/protocol versions independent.
-- [ ] Keep README, documentation/reference/versioning indexes and the mainline map consistent.
-- [ ] Keep the three entry routers below 300 lines; use the proof index for detailed receipts.
-- [ ] Inspect live tensor selection, drift, coverage, hierarchy and task-card lineage.
-- [ ] Preserve complete predecessor values/hashes when accepting a tensor checkpoint.
-- [ ] Keep current regressions, intentional fixtures, locks and minor-version history.
-- [ ] Keep source/test/Markdown limits at 800/1000/2000 and ratchet legacy exceptions downward.
+- [ ] Read current Git history; keep Cargo and protocol versions independent.
+- [ ] Consult the live tensor's selected dependency, evidence, next action and validation command.
+- [ ] Identify whether the change affects source admission, native execution, artifact delivery, providers or documentation only.
+- [ ] Keep the three entry routers below 300 lines and source/test/reference limits at 800/1000/2000.
+- [ ] Preserve intentional regressions, package locks, historical snapshots and complete tensor predecessor lineage.
 
-## Source-Only Maintenance
+Detailed proof families belong in the [native session proof index](../reference/nuis-native-session-proof-index.md).
+Do not copy its entire chronology into this checklist or treat an old receipt's
+remaining boundary as a permanent veto after a later proof advances it.
 
-These checks do not require pre-existing build output or physical GPUs:
+## Documentation And Source Hygiene
+
+These checks need no physical GPU or pre-existing build artifacts:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -v
 python3 scripts/check-text-encoding.py
 bash scripts/check-doc-links.sh
-cargo metadata --locked --no-deps --format-version 1
+cargo metadata --offline --locked --no-deps --format-version 1
 cargo fmt --all -- --check
 git diff --check
 ```
 
-CI's [Build workflow](../../.github/workflows/build.yml) discovers maintenance
-tests, checks UTF-8 and links, fetches locked dependencies, runs the exact host-path
-test and builds the workspace. It is not the complete semantic/native/GPU suite.
+Offline metadata requires locally resolvable metadata; use CI's locked fetch
+step when dependency downloads are actually needed. The
+[Build workflow](../../.github/workflows/build.yml) separates source checks,
+dependency fetch, an exact host-path check and workspace build. Its green result
+is not the complete compiler semantic/native/GPU suite.
 
 ## Focused Compiler And Tensor Checks
 
-Run Cargo serially and reuse the workspace target directory:
+Reuse the workspace target directory and run Rust jobs/tests serially:
 
 ```sh
 export CARGO_INCREMENTAL=0
 export CARGO_BUILD_JOBS=1
 cargo test -p nuisc --test file_line_limit --locked -j1 -- --test-threads=1
-cargo test -p nuisc --test examples_mainline_compile --locked -j1 -- --test-threads=1
+bash scripts/check-host-absolute-paths.sh
 cargo test -p nuis --bin nuis --locked -j1 -- dev_tensor --test-threads=1
 cargo build -p nuis --bin nuis --locked -j1
 target/debug/nuis dev-tensor --json
 ```
 
-For source/native return changes, select the affected families in the
-[native session proof index](../reference/nuis-native-session-proof-index.md).
-The bounded mixed-exit checkpoint used:
+Documentation-only work uses these structural gates. It does not advance the
+functional tensor coordinate or turn old CPU/device results into a fresh run.
+After doc-guard changes, rebuild the ordinary CLI before comparing its status
+with source; a test binary is not the installed development frontdoor.
+
+## Native Session Changes
+
+Select the affected families from their receipts and the active task command.
+The latest scalar/typed-field-entry print route has focused entrypoints:
 
 ```sh
-cargo test -p nuisc --lib --locked -j1 -- iteration_effects control_loops scalar_helpers scalar_control state_loop --test-threads=1
-cargo test -p nuisc --test native_application_bridge --locked -j1 -- state_loop_return_parent_mixed:: --test-threads=1
-cargo test -p nuis --test native_session_workflow --locked -j1 -- effect_calls::state_loop_return_parent_mixed:: --test-threads=1
+cargo test -p nuisc --lib --locked -j1 -- print_epoch:: iteration_prints:: iteration_effects:: --test-threads=1
+cargo test -p nuisc --test native_application_bridge --locked -j1 -- f64_field_epoch_print:: f32_field_epoch_print:: i32_field_epoch_print:: bool_field_epoch_print:: field_epoch_print:: child_epoch_print:: carry_epoch_print:: computed_iteration_print:: typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries literal_print_policy:: literal_print_execution:: --test-threads=1
+cargo test -p nuis --test native_session_workflow --locked -j1 -- f64_field_epoch_print --test-threads=1 --nocapture
 ```
 
-The later [record-storage certificate](../reference/nuis-native-return-effect-storage-v1.md)
-adds its own reduction, source-authority and delivery checks:
+These are focused entrypoints, not a replacement for adjacent checks selected by
+the actual edit. The [typed-f64 receipt](../reference/nuis-native-f64-field-epoch-print-v1.md)
+owns the exact latest witness and bounds; earlier compiler/storage families
+retain their own commands.
 
-```sh
-cargo test -p nuisc --lib --locked -j1 -- effect_return_storage --test-threads=1
-cargo test -p nuisc --test native_application_bridge --locked -j1 -- state_loop_return_shared:: --test-threads=1 --nocapture
-cargo test -p nuis --test native_session_workflow --locked -j1 -- effect_calls::state_loop_return_shared:: --test-threads=1 --nocapture
-```
+- [ ] Preserve source scope, exact types, once-only selected calls and unselected poison suppression, including raw NIR where simplification could hide a defect.
+- [ ] Keep loop induction, local break/continue, function return and real false/zero payloads distinct.
+- [ ] Reserve complete reached work without evaluating skipped child bounds.
+- [ ] Check failure before result/pending/State publication and retain last accepted State.
+- [ ] Require independent effect-order certification before considering shared storage; retain fallback for unproved reductions.
+- [ ] Keep literal-v1 and explicit i64-v1 print grants separate; a matching signature or cache token is not pure source authority.
+- [ ] Keep one-print read lenses separate from real availability, assignments, conditions and reference/resource grants.
+- [ ] Check normal/reversed YIR, actual callee entries, flushed native fault prefixes and exact raw float words where relevant.
+- [ ] For delivery changes, require fresh/cache and two independent source-free images with unchanged binary/container and host-object identities.
+- [ ] Do not rebuild or replace the CLI executable while a delivery test is using it.
 
-- [ ] Preserve actual source effects, selected traps, original return authority and current State.
-- [ ] Check normal/reversed YIR storage, real callee arguments and exact float words where affected.
-- [ ] Keep local break/continue and real false/zero returns distinct.
-- [ ] Keep full reached-bound reservations without evaluating skipped child bounds.
-- [ ] Check failure before result/pending publication; do not infer post-abort native memory from a signal.
-- [ ] Require fresh/cache/two source-free restorations and unchanged artifact identity for delivery changes.
-- [ ] Require the independent return effect-prefix certificate and its mutation regressions.
-- [ ] Do not infer storage-sharing authority from that certificate; coalescing needs its own proof.
-- [ ] Validate both original and shared read sets, preserve fallback, and measure actual YIR carry reduction.
-- [ ] Keep the [initialization-prefix proof](../reference/nuis-native-return-effect-storage-prefix-v1.md) narrow: literal prints stay ordered, control-flow barriers remain, and initializer failure skips later prints.
-- [ ] Require the [candidate-attempt proof](../reference/nuis-native-return-effect-storage-candidates-v1.md): declaration order, at most eight attempts, independent per-candidate certification and exact fallback after exhaustion.
-- [ ] Require the [ordered reassignment proof](../reference/nuis-native-return-effect-storage-reassignment-v1.md): fresh definition, exact same-type writes, unchanged AST mutability checks and no later print/result after a failed write.
-- [ ] Retain the [helper-call witnesses](../reference/nuis-native-return-effect-storage-helper-calls-v1.md): once-only ordered arguments, completed aggregate handoff, argument/callee failure boundaries and source-free replay without new call authority.
-- [ ] Retain the [reached-loop witnesses](../reference/nuis-native-return-effect-storage-loop-calls-v1.md): real iteration/parent-exit updates, semantic rather than numeric oracle events, and later-iteration failure before callback publication.
-- [ ] Retain the [branch-selected witnesses](../reference/nuis-native-return-effect-storage-branch-calls-v1.md): distinct multi-field helper paths, no unselected poisoned arguments, mirrored semantic roles and selected even/odd failure before publication.
-- [ ] Retain the [record-dependent bound witnesses](../reference/nuis-native-return-effect-storage-bound-calls-v1.md): completed-State-dependent work, once-only reached evaluation, full computed reservations and argument/callee/division failure before child work or publication.
-- [ ] Retain the [sibling-bound witnesses](../reference/nuis-native-return-effect-storage-sibling-bounds-v1.md): one completed snapshot per selected parent iteration, separate full reached reservations, child-local versus parent/function exits, and reached/unreachable sibling argument/callee failures.
-- [ ] Retain the [parent-preheader witnesses](../reference/nuis-native-return-effect-storage-preheader-bounds-v1.md): selected once-only snapshot construction across parent backedges, distinct full reached reservations, actual State/fault retention and source-free delivery.
-- [ ] Retain the [distinct-epoch witnesses](../reference/nuis-native-return-effect-storage-epoch-bounds-v1.md): simultaneous older/newer record identities, changing bounds, reached construction failures, separate full reservations and source-free delivery across backedges.
-- [ ] Retain the [returned-snapshot witnesses](../reference/nuis-native-return-effect-storage-snapshot-returns-v1.md): complete older/newer payload identity and raw fields on first/post-backedge inner exits, full entered reservations, skipped work and source-free delivery.
-- [ ] Retain the [payload-call witnesses](../reference/nuis-native-return-effect-storage-payload-calls-v1.md): ordered return arguments, selected finalizer failures, complete publication and source-free delivery; keep late-field construction as a separate gate.
-- [ ] Retain the [field-payload witnesses](../reference/nuis-native-return-effect-storage-field-payload-v1.md): source-ordered field effects, late-field faults, complete publication and source-free delivery.
-- [ ] Retain the [mixed-origin witnesses](../reference/nuis-native-return-effect-storage-mixed-payload-v1.md): boolean projection admission, original live self-reads and distinct snapshot epochs, complete publication and source-free delivery.
-- [ ] Retain the [projected-call witnesses](../reference/nuis-native-return-effect-storage-projected-payload-v1.md): once-only record and argument calls, selected failures, raw field identity, complete publication and source-free delivery.
-- [ ] Retain the [unprojected-field witnesses](../reference/nuis-native-return-effect-storage-unprojected-payload-v1.md): complete callee-field evaluation, discarded-field faults, transitive call authority, unchanged reservations and source-free delivery.
-- [ ] Retain the [conditional-field witnesses](../reference/nuis-native-return-effect-storage-conditional-payload-v1.md), [ready-value follow-up](../reference/nuis-native-return-ready-values-v1.md) and [typed scalar joins](../reference/nuis-native-typed-scalar-joins-v1.md): shared short-circuit lowering, all full-fixture exits, strict write admission and the unchanged 64/65 graph boundary; prove computed gates and non-atomic arms separately.
+Storage, origin, short-circuit and print proofs compose only within their stated
+profiles. New field/value kinds require independent source permissions rather
+than widening scalar grants by analogy.
 
-- [ ] Retain the [guarded scalar expression proof](../reference/nuis-native-guarded-scalar-joins-v1.md): bounded pure non-logical arms, selected checks, skipped poison and source-free delivery; computed predicates and logical/effectful arms remain separate gates.
-
-## Application And Backend Gates
-- [ ] Retain the [computed predicate proof](../reference/nuis-native-computed-scalar-predicates-v1.md): shared three-tree budget, one predicate evaluation, predicate-before-arm failures and source-free delivery; logical trees and effectful predicates remain separate gates.
-
-- [ ] Retain the [logical predicate proof](../reference/nuis-native-logical-scalar-predicates-v1.md): shared work/depth/edge bounds, once-only LHS, skipped RHS entry observations, last-State retention and source-free delivery; logical value arms, prefixes and effectful predicates remain separate gates.
-
-- [ ] Retain the [logical value proof](../reference/nuis-native-logical-scalar-values-v1.md): either/both bool arms, shared three-root budgets, nested RHS and whole-arm laziness, entry/fault-prefix observations and source-free delivery; pure prefixes and effectful predicates/arms remain separate gates.
-
-- [ ] Retain the [pure prefix proof](../reference/nuis-native-prefixed-scalar-joins-v1.md): ordered fresh let/const locals, shared all-root budgets, original-scope capture filtering, unused checked initializers and source-free delivery; nested control-flow prefixes and effects remain separate gates.
-
-- [ ] Retain the [nested prefix proof](../reference/nuis-native-nested-prefix-joins-v1.md): typed local selections, private child scopes, complete shared budgets, discarded fallible work and source-free delivery; record-valued joins and effects remain separate gates.
-
-- [ ] Retain the [record prefix proof](../reference/nuis-native-record-prefix-joins-v1.md): complete exact-layout local records, source-ordered field work, mixed bool/word checks and source-free delivery; pruned one-sided records and effects remain separate gates.
-
-- [ ] Retain the [discarded-record proof](../reference/nuis-native-discarded-record-prefix-v1.md): whole-declaration neutral-layout preflight, erased-name non-export, opposite field-order failures and source-free delivery; outer record results and effects remain separate gates.
-
-- [ ] Retain the [outer-record proof](../reference/nuis-native-outer-record-prefix-v1.md): fresh exact-type record results, nested/discarded prefixes, source-ordered complete fields, retained neutral preflight and source-free delivery; inline logical bool fields and effects remain separate gates.
-
-- [ ] Retain the [logical-field proof](../reference/nuis-native-logical-record-fields-v1.md): typed bool roots, whole-tree budgets, source-positioned shared short-circuit helpers, unprojected bool failures and source-free delivery; direct return boundaries and effects remain separate gates.
-
-- [ ] Retain the [direct return proof](../reference/nuis-native-direct-record-return-v1.md): complete function return/scope/budget proof, unchanged preceding effects, lazy fields and stored effectful-record delivery; continuation joins and general effects remain separate gates.
-- [ ] Retain the [continuation-join proof](../reference/nuis-native-joined-record-return-v1.md): export only fresh same-name exact-type pure results; keep child scopes private, whole-function expression/neutral budgets, source order, faulted State and source-free delivery. Return-by-local-alias and general effects remain separate gates.
-- [ ] Retain the [local-return proof](../reference/nuis-native-local-record-return-v1.md): certify only completed fresh exact-type owned-record literals, observe their returned identity, retain intervening effects and unused-field fallibility, and reject unrelated origins, alias propagation and rebindings. General aliases/effects remain separate gates.
-- [ ] Retain the [value-alias proof](../reference/nuis-native-alias-record-return-v1.md): propagate only certified origins through fresh exact-type let/const copies; preserve raw-NIR execution, scope, construction order, shared budgets and source-free delivery. Joined-origin certification and general aliases/effects remain separate gates.
-- [ ] Retain the [origin-join proof](../reference/nuis-native-origin-record-join-v1.md): require two independently certified original arms; export only the fresh common result, reject synthetic defaults and unused-origin shortcuts, and preserve raw/native/source-free execution under unchanged budgets. The [computed-print follow-up](../reference/nuis-native-computed-iteration-print-v1.md) adds exact-i64 pure values with a distinct opt-in; the [carry-epoch proof](../reference/nuis-native-carry-epoch-print-v1.md) admits one-print exact-i64 entry reads, while child epochs and general effects remain separate gates.
-
+## Application And Backend Changes
 
 The [image showcase](../../examples/projects/domains/ns_nova_image_showcase/README.md)
-owns its actual Metal pixel/window/replay route.
-The [observable CLI regression](../../tools/nuis/tests/std_filesystem_smoke.rs)
-owns bounded host I/O programs; image or ML report text is not device evidence.
+owns real Metal pixel/window/replay evidence. The
+[observable CLI regression](../../tools/nuis/tests/std_filesystem_smoke.rs)
+owns bounded host I/O programs; image/ML report text alone is not device output.
 
-- [ ] Distinguish embedded-YIR execution from native CPU callbacks and private Nsld images.
+- [ ] Distinguish embedded-YIR application execution, native CPU callbacks and private Nsld images.
 - [ ] Keep cancellation admission, host-scope retirement and provider/device retirement separate.
-- [ ] Run Linux CUDA/Vulkan on appropriate hardware; absent hardware remains unverified.
-- [ ] Keep PE/COFF, wider provider parity and self-contained packaging gaps explicit.
-- [ ] Measure performance independently of reduced carry counts or passing smoke tests.
+- [ ] Run CUDA/Vulkan/Metal/CoreML gates on the appropriate hardware and provider profile; absent hardware is unverified.
+- [ ] Keep PE/COFF, provider parity, native-object emission and self-contained packaging gaps explicit.
+- [ ] Measure performance separately from reduced carry counts, fixture size or passing smoke tests.
 
 ## Storage And Acceptance
 
-Inspect `bash scripts/disk-clean-safe.sh --verbose` before `--apply`, with builds
-stopped. Default cleanup preserves root CLI/library/test binaries; broader
-`--build-binaries` or `--workspace` removal is an explicit choice.
-No option touches other repositories, subprojects, shared Cargo downloads or Docker.
+Inspect `bash scripts/disk-clean-safe.sh --verbose` with writers stopped before
+choosing `--apply`. Broader `--build-binaries` and `--workspace` removal are
+explicit choices; no option cleans other repositories or shared downloads.
 Prefer remote Linux infrastructure for Docker/CUDA-heavy work.
 
-Record exact executed commands and scope. A focused result does not certify
-full-workspace semantics, cross-platform/device parity, formal verification,
-global memory safety, completed self-hosting or a stable public ABI.
+Record exactly which commands ran and what they established. A focused result
+does not certify whole-workspace semantics, device parity, formal verification,
+global memory safety, completed self-hosting or stable public ABI.

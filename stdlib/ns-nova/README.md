@@ -65,9 +65,11 @@ See the [roadmap](../../docs/versioning/nuis-beta-0.11-application-led-mainline.
 and [separate acceptance coordinates](../../docs/reference/nuis-development-tensor-mainline.md).
 Bounded Metal output is established; engine maturity and compiler self-hosting
 are not inferred from that evidence.
+The [current snapshot](../../docs/versioning/nuis-beta-0.17.0-snapshot.md) and
+[native proof index](../../docs/reference/nuis-native-session-proof-index.md)
+separate current CPU prerequisites from the embedded-YIR image/window route.
 The [beta-0.12 snapshot](../../docs/versioning/nuis-beta-0.12.0-snapshot.md)
-records the persistent-session and cancellation checkpoint; current details
-remain in the referenced contracts and development tensor.
+remains the historical persistent-session/cancellation checkpoint.
 
 Current state:
 
@@ -145,8 +147,9 @@ Current source-asset status:
   `galaxy_imports = ["ns-nova:lib/app_runtime.ns"]`
 * duplicate `galaxy_imports` entries are rejected during manifest loading, so
   this opt-in should be listed at most once
-* that manifest currently lists `11` source modules
-* `nuis` smoke tests and `project-doctor` now both inspect that asset set
+* the manifest is the canonical source/library asset inventory; do not infer
+  import policy or executable maturity from a copied module count
+* `nuis` smoke tests and `project-doctor` inspect that declared asset set
 
 See metadata:
 
@@ -189,9 +192,9 @@ Current limitation:
 The machine-readable honesty boundary is
 [nuis-ns-nova-application-lifecycle-v1.toml](../../docs/reference/nuis-ns-nova-application-lifecycle-v1.toml).
 
-## First Executable Slice
+## Small Executable Slice
 
-The current shortest route is:
+For a smaller rendering/lifecycle slice, use:
 
 * [examples/projects/domains/ns_nova_showcase](../../examples/projects/domains/ns_nova_showcase)
 
@@ -234,7 +237,8 @@ The current migration split is:
 
 So the rule of thumb is:
 
-* read `examples/projects/domains/ns_nova_showcase` for the current shortest workflow
+* read `examples/projects/domains/ns_nova_image_showcase` for the current image-application goal
+* read `examples/projects/domains/ns_nova_showcase` for the smaller lifecycle slice
 * read `examples/projects/window_controls_demo` for the broad stress workflow
 * read `stdlib/ns-nova/*recipe.ns` for the pieces that have already become
   reusable source assets
