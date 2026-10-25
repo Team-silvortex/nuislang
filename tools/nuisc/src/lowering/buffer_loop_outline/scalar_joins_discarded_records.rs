@@ -10,8 +10,22 @@ pub(super) fn bounded(
     no: &[NirStmt],
     layouts: &impl control_values::ValueLayouts,
 ) -> bool {
+    blocks_bounded(vec![yes, no], layouts, true)
+}
+
+pub(super) fn function_bounded(
+    body: &[NirStmt],
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    blocks_bounded(vec![body], layouts, false)
+}
+
+fn blocks_bounded(
+    mut blocks: Vec<&[NirStmt]>,
+    layouts: &impl control_values::ValueLayouts,
+    require_result: bool,
+) -> bool {
     let mut remaining = 4096usize;
-    let mut blocks = vec![yes, no];
     while let Some(body) = blocks.pop() {
         for stmt in body {
             if let NirStmt::If {
@@ -26,10 +40,11 @@ pub(super) fn bounded(
                     _ => None,
                 };
                 if let Some(retained) = retained {
-                    let Some((_, ty, _)) = result(retained) else {
-                        return false;
-                    };
-                    if !layouts.scalar(&ty.name) && !neutral(ty, layouts, &mut remaining) {
+                    if let Some((_, ty, _)) = result(retained) {
+                        if !layouts.scalar(&ty.name) && !neutral(ty, layouts, &mut remaining) {
+                            return false;
+                        }
+                    } else if require_result {
                         return false;
                     }
                 }

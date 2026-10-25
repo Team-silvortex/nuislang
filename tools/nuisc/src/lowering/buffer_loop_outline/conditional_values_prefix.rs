@@ -67,10 +67,34 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_expression_roots(
     roots(pending, true)
 }
 
-fn roots(mut pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool {
+fn roots(pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool {
+    roots_with_fields(pending, computed_gate, |_, _| false)
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn computed_record_expression_roots(
+    pending: Vec<(&NirExpr, usize, bool)>,
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    roots_with_fields(pending, true, |record, field| {
+        layouts
+            .fields(record)
+            .and_then(|mut fields| fields.find(|(name, _)| *name == field))
+            .is_some_and(|(_, ty)| ty == scalar_type("bool"))
+    })
+}
+
+fn roots_with_fields(
+    pending: Vec<(&NirExpr, usize, bool)>,
+    computed_gate: bool,
+    bool_field: impl Fn(&str, &str) -> bool,
+) -> bool {
+    let mut pending = pending
+        .into_iter()
+        .map(|(expr, depth, logical)| (expr, depth, logical, true))
+        .collect::<Vec<_>>();
     let mut work = 4096usize;
     let mut logical_edges = 32usize;
-    while let Some((expr, depth, logical_root)) = pending.pop() {
+    while let Some((expr, depth, logical_root, record_root)) = pending.pop() {
         if depth >= 64 || work == 0 {
             return false;
         }
@@ -99,8 +123,8 @@ fn roots(mut pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool
                     logical_edges -= 1;
                 }
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, computed_gate),
-                    (rhs.as_ref(), depth + 1, computed_gate),
+                    (lhs.as_ref(), depth + 1, computed_gate, false),
+                    (rhs.as_ref(), depth + 1, computed_gate, false),
                 ]);
             }
             NirExpr::Binary { lhs, rhs, .. } => {
@@ -108,21 +132,30 @@ fn roots(mut pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool
                     return false;
                 }
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, false),
-                    (rhs.as_ref(), depth + 1, false),
+                    (lhs.as_ref(), depth + 1, false, false),
+                    (rhs.as_ref(), depth + 1, false, false),
                 ]);
             }
             NirExpr::Call { args, .. } => {
                 if pending.len() + args.len() > work {
                     return false;
                 }
-                pending.extend(args.iter().map(|arg| (arg, depth + 1, false)));
+                pending.extend(args.iter().map(|arg| (arg, depth + 1, false, false)));
             }
-            NirExpr::StructLiteral { fields, .. } => {
+            NirExpr::StructLiteral {
+                type_name, fields, ..
+            } => {
                 if pending.len() + fields.len() > work {
                     return false;
                 }
-                pending.extend(fields.iter().map(|(_, value)| (value, depth + 1, false)));
+                pending.extend(fields.iter().map(|(name, value)| {
+                    (
+                        value,
+                        depth + 1,
+                        record_root && bool_field(type_name, name),
+                        record_root,
+                    )
+                }));
             }
             NirExpr::FieldAccess { base, .. }
             | NirExpr::CastI64ToI32(base)
@@ -130,7 +163,9 @@ fn roots(mut pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool
             | NirExpr::PackF32Word(base)
             | NirExpr::UnpackF32Word(base)
             | NirExpr::PackF64Word(base)
-            | NirExpr::UnpackF64Word(base) => pending.push((base.as_ref(), depth + 1, false)),
+            | NirExpr::UnpackF64Word(base) => {
+                pending.push((base.as_ref(), depth + 1, false, false))
+            }
             _ => return false,
         }
     }

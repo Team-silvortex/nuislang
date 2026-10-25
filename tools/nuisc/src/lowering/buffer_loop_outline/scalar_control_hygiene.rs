@@ -64,9 +64,10 @@ fn rename_block(
                     rename_expr(condition, &visible);
                     pending.push((body, visible.clone()));
                 }
-                NirStmt::Return(Some(value)) | NirStmt::Expr(value) => rename_expr(value, &visible),
+                NirStmt::Return(Some(value)) | NirStmt::Expr(value) | NirStmt::Print(value) => {
+                    rename_expr(value, &visible)
+                }
                 NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => {}
-                NirStmt::Print(NirExpr::Int(_)) => {}
                 _ => unreachable!("admitted normalized scalar body"),
             }
         }

@@ -6,9 +6,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
             "enum Profile",
-            "IterationLiteralPrints",
+            "IterationPrints",
             "Profile::Pure",
-            "NirStmt::Print(NirExpr::Int(_))\n                if matches!(profile, Profile::IterationLiteralPrints)",
+            "NirStmt::Print(value) if matches!(profile, Profile::IterationPrints)",
             "pub(super) fn collect_iteration_calls",
             "while let Some(name) = ready.pop_first()",
         ],
@@ -48,8 +48,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-state-loop-effects-guarded-scalar-control-keeps-literals",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_control.rs",
         required_patterns: &[
-            "NirStmt::Print(NirExpr::Int(_)) => output.push(stmt)",
-            "NirStmt::Print(NirExpr::Int(_)) => {}",
+            "NirStmt::Print(_) => output.push(stmt)",
+            "| NirStmt::Print(value)",
             "self.guarded.insert(name.clone())",
         ],
     },
@@ -59,10 +59,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "iteration_effects_catalog_is_separate_and_retains_real_prints",
             "iteration_effects_unvalidated_dependencies_never_gain_provisional_authority",
-            "iteration_effects_reject_computed_prints_cycles_types_and_unscoped_effects",
+            "iteration_effects_reject_cycles_types_and_unscoped_effects",
             "gained pure authority",
             "discovery mutated source",
-            "print(value)",
+            "print(true)",
         ],
     },
     DevTensorDriftCheckSpec {

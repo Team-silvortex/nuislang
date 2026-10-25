@@ -28,6 +28,27 @@ mod record_prefix_join;
 #[path = "discarded_record_prefix.rs"]
 mod discarded_record_prefix;
 
+#[path = "outer_record_prefix.rs"]
+mod outer_record_prefix;
+
+#[path = "logical_record_fields.rs"]
+mod logical_record_fields;
+
+#[path = "alias_record_return.rs"]
+mod alias_record_return;
+#[path = "carry_epoch_print.rs"]
+mod carry_epoch_print;
+#[path = "computed_iteration_print.rs"]
+mod computed_iteration_print;
+#[path = "direct_record_return.rs"]
+mod direct_record_return;
+#[path = "joined_record_return.rs"]
+mod joined_record_return;
+#[path = "local_record_return.rs"]
+mod local_record_return;
+#[path = "origin_record_join.rs"]
+mod origin_record_join;
+
 #[path = "effect_call_return_dual_i64.rs"]
 mod return_dual_i64;
 
@@ -248,6 +269,23 @@ fn project_for_source_with_limits(
     loop_work_limit: u64,
     helper_entry_limit: u64,
 ) -> (Project, String) {
+    project_for_source_with_print_kind(source, loop_work_limit, helper_entry_limit, false)
+}
+
+fn project_for_source_with_i64_prints(
+    source: &str,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) -> (Project, String) {
+    project_for_source_with_print_kind(source, loop_work_limit, helper_entry_limit, true)
+}
+
+fn project_for_source_with_print_kind(
+    source: &str,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+    computed: bool,
+) -> (Project, String) {
     let project = Project::new(source);
     let manifest = project.0.join("nuis.toml");
     let text = fs::read_to_string(&manifest).unwrap().replace(
@@ -263,8 +301,17 @@ fn project_for_source_with_limits(
         .filter(|node| matches!(node.op.instruction.as_str(), "print" | "guard_print"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let mode = literal_print_packaging_mode("counter", sites, loop_work_limit, helper_entry_limit)
-        .unwrap();
+    let mode = if computed {
+        nuisc::aot::native_session::i64_print_packaging_mode(
+            "counter",
+            sites,
+            loop_work_limit,
+            helper_entry_limit,
+        )
+    } else {
+        literal_print_packaging_mode("counter", sites, loop_work_limit, helper_entry_limit)
+    }
+    .unwrap();
     fs::write(manifest, format!("{text}packaging_mode = \"{mode}\"\n")).unwrap();
     (project, mode)
 }

@@ -25,6 +25,8 @@ mod control_values;
 mod effectful_selections;
 #[path = "buffer_loop_outline/iteration_effects.rs"]
 mod iteration_effects;
+#[path = "buffer_loop_outline/iteration_prints.rs"]
+mod iteration_prints;
 #[path = "buffer_loop_outline/logical_conditions.rs"]
 mod logical_conditions;
 #[path = "buffer_loop_outline/ready_values.rs"]

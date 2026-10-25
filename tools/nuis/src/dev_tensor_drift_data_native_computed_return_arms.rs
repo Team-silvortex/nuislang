@@ -13,8 +13,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if depth >= 64 || work == 0",
             "!logical_root",
             "depth != 0",
-            "(lhs.as_ref(), depth + 1, false)",
-            "(rhs.as_ref(), depth + 1, false)",
+            "(lhs.as_ref(), depth + 1, false, false)",
+            "(rhs.as_ref(), depth + 1, false, false)",
         ],
     },
     DevTensorDriftCheckSpec {

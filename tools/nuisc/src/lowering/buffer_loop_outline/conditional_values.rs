@@ -1,23 +1,48 @@
 use super::*;
 
 #[cfg(test)]
+#[path = "conditional_values_alias_return_tests.rs"]
+mod alias_return_tests;
+#[cfg(test)]
 #[path = "conditional_values_discarded_record_tests.rs"]
 mod discarded_record_tests;
+#[cfg(test)]
+#[path = "conditional_values_joined_return_tests.rs"]
+mod joined_return_tests;
+#[cfg(test)]
+#[path = "conditional_values_local_return_tests.rs"]
+mod local_return_tests;
 #[path = "conditional_values_logical.rs"]
 mod logical;
+#[cfg(test)]
+#[path = "conditional_values_logical_field_tests.rs"]
+mod logical_field_tests;
 #[path = "conditional_values_nested_prefix.rs"]
 mod nested_prefix;
 #[cfg(test)]
 #[path = "conditional_values_nested_prefix_tests.rs"]
 mod nested_prefix_tests;
+#[cfg(test)]
+#[path = "conditional_values_origin_join_tests.rs"]
+mod origin_join_tests;
+#[cfg(test)]
+#[path = "conditional_values_outer_record_tests.rs"]
+mod outer_record_tests;
 #[path = "conditional_values_prefix.rs"]
 pub(super) mod prefix;
 #[cfg(test)]
 #[path = "conditional_values_prefix_tests.rs"]
 mod prefix_tests;
+#[path = "conditional_values_record_fields.rs"]
+mod record_fields;
 #[cfg(test)]
 #[path = "conditional_values_record_prefix_tests.rs"]
 mod record_prefix_tests;
+#[cfg(test)]
+#[path = "conditional_values_record_return_tests.rs"]
+mod record_return_tests;
+#[path = "conditional_values_record_returns.rs"]
+mod record_returns;
 #[cfg(test)]
 #[path = "conditional_values_roots_tests.rs"]
 mod roots_tests;
@@ -46,7 +71,7 @@ pub(super) fn outline_declarations(
             .collect::<Scope>();
         let mut bindings = scope.keys().cloned().collect();
         branches::collect_bindings(&function.body, &mut bindings);
-        Builder {
+        let mut builder = Builder {
             catalog,
             layouts,
             names,
@@ -55,8 +80,9 @@ pub(super) fn outline_declarations(
             bindings,
             extract_selections: false,
             predicate_returns: false,
-        }
-        .declarations(&mut function.body, &mut scope, 0);
+        };
+        builder.direct_record_returns(&mut function.body, &scope, function.return_type.as_ref());
+        builder.declarations(&mut function.body, &mut scope, 0);
     }
     let generated = helpers.iter().map(|f| f.name.clone()).collect();
     module.functions.extend(helpers);
@@ -223,6 +249,8 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             if self.nested_declaration(stmt, scope, suffix)
                 || self.record_declaration(stmt, scope, suffix)
                 || self.discarded_record_declaration(stmt, scope, suffix)
+                || self.outer_record_declaration(stmt, scope, suffix)
+                || self.logical_field_declaration(stmt, scope, suffix)
             {
                 continue;
             }

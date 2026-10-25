@@ -95,9 +95,8 @@ fn iteration_effects_catalog_is_separate_and_retains_real_prints() {
 }
 
 #[test]
-fn iteration_effects_reject_computed_prints_cycles_types_and_unscoped_effects() {
+fn iteration_effects_reject_cycles_types_and_unscoped_effects() {
     for replacement in [
-        "print(value); return value * 2 + proof + index;",
         "print(true); return value * 2 + proof + index;",
         "print(20); return refine(value, proof, index);",
         "print(20); return missing(value);",
@@ -114,10 +113,7 @@ fn iteration_effects_reject_computed_prints_cycles_types_and_unscoped_effects() 
             "{replacement}"
         );
     }
-    for replacement in [
-        "print(current); current = update(current, gate, root, hole, index);",
-        "return current; current = update(current, gate, root, hole, index);",
-    ] {
+    for replacement in ["return current; current = update(current, gate, root, hole, index);"] {
         let text = source().replace(
             "current = update(current, gate, root, hole, index);",
             replacement,
@@ -176,10 +172,8 @@ fn iteration_effects_direct_and_print_only_loops_keep_explicit_authority() {
 }
 
 #[test]
-fn iteration_effects_direct_statements_reject_nonliteral_and_foreign_effects() {
+fn iteration_effects_direct_statements_reject_wrong_types_and_foreign_effects() {
     for effect in [
-        "print(index);",
-        "print(1 + index);",
         "print(true);",
         "print(1.0);",
         "choose(true, 1);",

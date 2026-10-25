@@ -56,7 +56,7 @@ pub(super) fn validate(
         .collect::<BTreeSet<_>>();
     let has_exits = control_flow::contains_exit(iteration.effects, false);
     let has_prints = validation::contains_print(effects);
-    let print_work = has_prints && literal_prints == validation::LiteralPrints::Allow;
+    let print_work = has_prints && literal_prints != validation::LiteralPrints::Reject;
     if (!has_temporaries && updates.is_empty() && !has_exits && !print_work)
         || updates.contains(&prepared.binding_name)
     {

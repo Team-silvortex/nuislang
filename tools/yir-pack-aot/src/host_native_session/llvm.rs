@@ -31,7 +31,7 @@ pub(super) fn callbacks(bridge: &NativeSessionBridge, source: &str) -> String {
 pub(super) fn entry(bridge: &NativeSessionBridge, source: &str) -> String {
     format!(
         "{}{}\ndeclare ptr @{}()\ndeclare i32 @nuis_native_application_script_main(ptr, i64, ptr, i32, ptr)\n\ndefine i32 @main(i32 %argc, ptr %argv) {{\nentry:\n  %binding = call ptr @{}()\n  %status = call i32 @nuis_native_application_script_main(ptr @native_expected_yir, i64 {}, ptr %binding, i32 %argc, ptr %argv)\n  ret i32 %status\n}}\n",
-        bytes("native_expected_yir", source), literal_print_runtime(!bridge.literal_print_sites.is_empty()), getter(bridge), getter(bridge), source.len()
+        bytes("native_expected_yir", source), literal_print_runtime(!bridge.literal_print_sites.is_empty() || !bridge.i64_print_sites.is_empty()), getter(bridge), getter(bridge), source.len()
     )
 }
 

@@ -144,8 +144,8 @@ fn iteration_effects_return_parent_break_rejects_step_scope_and_effect_authority
             ("print(7);", "print(7); width = width + 1;"),
             ("print(7);", "print(7); rounds = rounds + 1;"),
             ("print(23);", "let escaped = width; print(23);"),
-            ("print(25);", "print(current);"),
-            ("print(32);", "print(finish);"),
+            ("print(25);", "print(true);"),
+            ("print(32);", "print(1.0);"),
             ("continue;", "continue; print(99);"),
         ] {
             let source = cases::source(variant);

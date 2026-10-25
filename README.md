@@ -132,9 +132,9 @@ The [computed predicate proof](docs/reference/nuis-native-computed-scalar-predic
 The [logical predicate proof](docs/reference/nuis-native-logical-scalar-predicates-v1.md) composes bounded `&&`/`||` trees while keeping skipped calls and value arms lazy.
 The [logical value proof](docs/reference/nuis-native-logical-scalar-values-v1.md)
 extends that same contract to either or both bool value arms.
-The [pure prefix proof](docs/reference/nuis-native-prefixed-scalar-joins-v1.md) keeps branch-local initialization ordered and lazy.
-The [nested prefix proof](docs/reference/nuis-native-nested-prefix-joins-v1.md) adds typed local selections without leaking child scopes.
-The [record prefix proof](docs/reference/nuis-native-record-prefix-joins-v1.md) and [discarded-record follow-up](docs/reference/nuis-native-discarded-record-prefix-v1.md) cover exact-layout joins and retained unused field work.
+The [pure](docs/reference/nuis-native-prefixed-scalar-joins-v1.md) and [nested prefix](docs/reference/nuis-native-nested-prefix-joins-v1.md) proofs keep local work ordered, lazy and scoped.
+The [record prefix proof](docs/reference/nuis-native-record-prefix-joins-v1.md), [discarded](docs/reference/nuis-native-discarded-record-prefix-v1.md), [outer-record](docs/reference/nuis-native-outer-record-prefix-v1.md) and [logical-field](docs/reference/nuis-native-logical-record-fields-v1.md) follow-ups extend owned-value selection.
+The [direct-return](docs/reference/nuis-native-direct-record-return-v1.md), [continuation-join](docs/reference/nuis-native-joined-record-return-v1.md), [local-return](docs/reference/nuis-native-local-record-return-v1.md), [value-alias](docs/reference/nuis-native-alias-record-return-v1.md) and [origin-join](docs/reference/nuis-native-origin-record-join-v1.md) proofs retain ordered effects and certified owned values; [computed prints](docs/reference/nuis-native-computed-iteration-print-v1.md) add exact-i64 pure values under a separate native grant; [carry epochs](docs/reference/nuis-native-carry-epoch-print-v1.md) permit bounded pre-update reads for one print.
 
 Cancellation admission, host-scope retirement and provider/device retirement
 are separate facts. Rendering, control, ML and audio are ns-nova's engine

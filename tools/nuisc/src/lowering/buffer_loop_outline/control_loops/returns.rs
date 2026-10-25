@@ -91,7 +91,7 @@ pub(in crate::lowering::buffer_loop_outline) fn normalize_effects(
     if !contains_loop_return(&function.body) {
         return Some(None);
     }
-    let plan = rewrite(function, layouts, None, validation::LiteralPrints::Allow)?;
+    let plan = rewrite(function, layouts, None, validation::LiteralPrints::Scalars)?;
     effect_prefix::verify_independent(function, &plan, layouts)?;
     Some(Some(plan.body))
 }
@@ -107,7 +107,7 @@ pub(in crate::lowering::buffer_loop_outline) fn prepare_effects(
     catalog.get(&function.name)?;
     // A typed body check is not an effect-order proof. Certify the independent
     // rewrite separately; coalesced storage needs a different certificate.
-    let plan = rewrite(function, layouts, None, validation::LiteralPrints::Allow)?;
+    let plan = rewrite(function, layouts, None, validation::LiteralPrints::Scalars)?;
     effect_prefix::verify_independent(function, &plan, layouts)?;
     scalar_helpers::validate_iteration_body(function, &plan.body, catalog, layouts)?;
     let plan = coalesced_effects(function, layouts, catalog, &plan).unwrap_or(plan);
@@ -128,7 +128,7 @@ fn coalesced_effects(
             function,
             layouts,
             Some(storage.clone()),
-            validation::LiteralPrints::Allow,
+            validation::LiteralPrints::Scalars,
         ) else {
             continue;
         };
@@ -257,6 +257,12 @@ fn reserve_references(
                 NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => {}
                 NirStmt::Print(NirExpr::Int(_))
                     if literal_prints == validation::LiteralPrints::Allow => {}
+                NirStmt::Print(value) if literal_prints == validation::LiteralPrints::Scalars => {
+                    if !conditional_values::prefix::expression(value) {
+                        return None;
+                    }
+                    values.push(value);
+                }
                 _ => return None,
             }
         }

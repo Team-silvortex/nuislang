@@ -34,7 +34,11 @@ pub(crate) fn build_application_bundle(
         command.args(["--native-session", id]);
         if let Some(policy) = crate::aot_native_session::build_policy(packaging_mode)? {
             command
-                .arg("--native-literal-print-policy")
+                .arg(if policy.is_i64() {
+                    "--native-i64-print-policy"
+                } else {
+                    "--native-literal-print-policy"
+                })
                 .arg(policy.token());
         }
     } else {

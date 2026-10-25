@@ -25,6 +25,20 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
     }
 
     fn logical_tree(&mut self, expression: &NirExpr, scope: &Scope) -> (NirExpr, bool) {
+        self.logical_tree_mode(expression, scope, false)
+    }
+
+    // Field callers have already proved the complete original record tree.
+    pub(super) fn field_logical_root(&mut self, expression: &NirExpr, scope: &Scope) -> NirExpr {
+        self.logical_tree_mode(expression, scope, true).0
+    }
+
+    fn logical_tree_mode(
+        &mut self,
+        expression: &NirExpr,
+        scope: &Scope,
+        force: bool,
+    ) -> (NirExpr, bool) {
         let NirExpr::Binary {
             op: op @ (NirBinaryOp::And | NirBinaryOp::Or),
             lhs,
@@ -34,10 +48,11 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             return (expression.clone(), false);
         };
         let original_rhs = [NirStmt::Return(Some((**rhs).clone()))];
-        let guarded = speculation::block_has_checked_arithmetic(&original_rhs, self.checked)
+        let guarded = force
+            || speculation::block_has_checked_arithmetic(&original_rhs, self.checked)
             || scalar_helpers::contains_calls(&original_rhs);
-        let (left, left_changed) = self.logical_tree(lhs, scope);
-        let (right, right_changed) = self.logical_tree(rhs, scope);
+        let (left, left_changed) = self.logical_tree_mode(lhs, scope, force);
+        let (right, right_changed) = self.logical_tree_mode(rhs, scope, force);
         if !guarded {
             // A total outer RHS does not excuse speculation in its nested LHS.
             return (

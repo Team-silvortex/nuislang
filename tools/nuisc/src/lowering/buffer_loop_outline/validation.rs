@@ -4,6 +4,7 @@ use super::*;
 pub(super) enum LiteralPrints {
     Reject,
     Allow,
+    Scalars,
 }
 
 pub(super) fn contains_print(body: &[NirStmt]) -> bool {
@@ -206,6 +207,15 @@ pub(super) fn validate_effects(
             }
             NirStmt::Print(NirExpr::Int(_))
                 if matches!(types, EffectTypes::Values(_, _, LiteralPrints::Allow)) => {}
+            NirStmt::Print(value)
+                if matches!(types, EffectTypes::Values(_, _, LiteralPrints::Scalars)) =>
+            {
+                let EffectTypes::Values(catalog, layouts, _) = types else {
+                    unreachable!()
+                };
+                iteration_prints::admit(value, locals, catalog, layouts)?;
+                control_values::collect_inputs(value, inputs);
+            }
             NirStmt::Expr(NirExpr::StoreAt {
                 buffer,
                 index,

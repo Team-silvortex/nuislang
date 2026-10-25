@@ -14,17 +14,19 @@ mod calls;
 mod emit;
 mod function;
 pub(crate) mod helper_entries;
+mod i64_prints;
 mod literal_prints;
 mod loop_work;
 pub(crate) mod loops;
 pub(crate) mod value_transport;
 
 pub use build_policy::{
-    LiteralPrintBuildPolicy, LITERAL_PRINT_BUILD_CONTRACT, MAX_BUILD_POLICY_SITE_BYTES,
-    MAX_BUILD_POLICY_TOKEN_BYTES,
+    LiteralPrintBuildPolicy, I64_PRINT_BUILD_CONTRACT, LITERAL_PRINT_BUILD_CONTRACT,
+    MAX_BUILD_POLICY_SITE_BYTES, MAX_BUILD_POLICY_TOKEN_BYTES,
 };
 pub use helper_entries::DEFAULT_HELPER_ENTRY_LIMIT;
 pub(crate) use helper_entries::HELPER_ENTRY_PARAMETER;
+pub use i64_prints::{emit_registered_with_i64_prints, I64PrintPolicy};
 pub use literal_prints::{LiteralPrintPolicy, MAX_LITERAL_PRINT_SITES};
 pub(crate) use loop_work::COUNTER_PARAMETER;
 pub use loop_work::DEFAULT_LOOP_WORK_LIMIT;
@@ -52,9 +54,15 @@ pub struct NativeSessionBridge {
     pub helper_entry_limit: u64,
     /// Explicitly checked static literal-print sites; empty for the default pure bridge.
     pub literal_print_sites: Vec<String>,
+    /// Separate explicit computed-i64 grants; legacy literal grants stay strict.
+    pub i64_print_sites: Vec<String>,
 }
 
 impl NativeSessionBridge {
+    pub fn max_prints_per_invocation(&self) -> u128 {
+        (self.literal_print_sites.len() + self.i64_print_sites.len()) as u128
+            * u128::from(self.helper_entry_limit)
+    }
     /// Conservative bound, not a promise about I/O time or rollback on traps.
     pub fn max_literal_prints_per_invocation(&self) -> u128 {
         self.literal_print_sites.len() as u128 * u128::from(self.helper_entry_limit)
@@ -128,7 +136,7 @@ fn emit_with_policy(
     policy: Option<&LiteralPrintPolicy>,
 ) -> Result<NativeSessionBridge, String> {
     let (selected, callbacks, state_layout) = admission::select(module, id, policy)?;
-    let literal_print_sites = policy
+    let print_sites = policy
         .map(|policy| {
             policy.selected_sites(
                 &selected
@@ -142,6 +150,11 @@ fn emit_with_policy(
         .transpose()?
         .unwrap_or_default();
     let state_fields = state_layout.fields().to_vec();
+    let (literal_print_sites, i64_print_sites) = if policy.is_some_and(|p| p.i64_values) {
+        (Vec::new(), print_sites)
+    } else {
+        (print_sites, Vec::new())
+    };
     let roots = callbacks
         .iter()
         .map(|callback| callback.function.as_str())
@@ -164,5 +177,6 @@ fn emit_with_policy(
         loop_work_limit,
         helper_entry_limit,
         literal_print_sites,
+        i64_print_sites,
     })
 }

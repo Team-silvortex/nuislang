@@ -32,6 +32,27 @@ mod record_prefix_join;
 #[path = "native_application_bridge/discarded_record_prefix.rs"]
 mod discarded_record_prefix;
 
+#[path = "native_application_bridge/outer_record_prefix.rs"]
+mod outer_record_prefix;
+
+#[path = "native_application_bridge/logical_record_fields.rs"]
+mod logical_record_fields;
+
+#[path = "native_application_bridge/alias_record_return.rs"]
+mod alias_record_return;
+#[path = "native_application_bridge/carry_epoch_print.rs"]
+mod carry_epoch_print;
+#[path = "native_application_bridge/computed_iteration_print.rs"]
+mod computed_iteration_print;
+#[path = "native_application_bridge/direct_record_return.rs"]
+mod direct_record_return;
+#[path = "native_application_bridge/joined_record_return.rs"]
+mod joined_record_return;
+#[path = "native_application_bridge/local_record_return.rs"]
+mod local_record_return;
+#[path = "native_application_bridge/origin_record_join.rs"]
+mod origin_record_join;
+
 #[path = "native_application_bridge/return_dual_i64.rs"]
 mod return_dual_i64;
 

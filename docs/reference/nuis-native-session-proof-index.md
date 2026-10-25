@@ -74,9 +74,9 @@ once-only fallible pure conditions, native entry observations and guarded arms.
 The [logical predicate proof](nuis-native-logical-scalar-predicates-v1.md) composes
 bounded short-circuit trees with selected RHS calls and source-free delivery.
 The [logical value proof](nuis-native-logical-scalar-values-v1.md) extends the shared budget and lazy execution contract to bool value arms.
-The [pure prefix proof](nuis-native-prefixed-scalar-joins-v1.md) adds fresh ordered let/const locals, unused checked initializers and original-scope capture filtering.
-The [nested prefix proof](nuis-native-nested-prefix-joins-v1.md) adds typed local selections, private child scopes and retained unused conditional work.
-The [record prefix proof](nuis-native-record-prefix-joins-v1.md) and [discarded-record follow-up](nuis-native-discarded-record-prefix-v1.md) cover exact-layout joins and retained unused field work.
+The [pure](nuis-native-prefixed-scalar-joins-v1.md) and [nested prefix](nuis-native-nested-prefix-joins-v1.md) proofs keep local work ordered, lazy and scoped.
+The [record prefix proof](nuis-native-record-prefix-joins-v1.md), [discarded](nuis-native-discarded-record-prefix-v1.md), [outer-record](nuis-native-outer-record-prefix-v1.md) and [logical-field](nuis-native-logical-record-fields-v1.md) follow-ups extend owned-value selection.
+The [direct-return](nuis-native-direct-record-return-v1.md), [continuation-join](nuis-native-joined-record-return-v1.md), [local-return](nuis-native-local-record-return-v1.md), [value-alias](nuis-native-alias-record-return-v1.md) and [origin-join](nuis-native-origin-record-join-v1.md) proofs retain ordered effects and certified owned values; [computed prints](nuis-native-computed-iteration-print-v1.md) add exact-i64 pure values under a separate native grant; [carry epochs](nuis-native-carry-epoch-print-v1.md) permit bounded pre-update reads for one print.
 
 This index replaces duplicated proof narratives in the repository README,
 documentation index and mainline router. Original reference files, anchors,

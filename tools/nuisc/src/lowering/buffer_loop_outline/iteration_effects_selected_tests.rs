@@ -86,7 +86,7 @@ fn iteration_effects_selected_children_preserve_branch_local_scope_and_parent_au
             "current = current + outer;",
             "current = refine(current, index, outer);",
         ),
-        ("print(13);", "print(index);"),
+        ("print(13);", "print(true);"),
     ] {
         let source = cases::SOURCE.replace(before, after);
         assert_ne!(source, cases::SOURCE);

@@ -94,7 +94,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-literal-print-build-linked-opt-in-i64-runtime",
         path: "tools/yir-pack-aot/src/host_native_session/llvm.rs",
         required_patterns: &[
-            "literal_print_runtime(!bridge.literal_print_sites.is_empty())",
+            "literal_print_runtime(!bridge.literal_print_sites.is_empty() || !bridge.i64_print_sites.is_empty())",
             "define void @nuis_debug_print_i64(i64 %value)",
             "@printf(ptr @native_literal_print_format, i64 %value)",
             "native_literal_print_host_runtime_is_opt_in_and_i64_only",

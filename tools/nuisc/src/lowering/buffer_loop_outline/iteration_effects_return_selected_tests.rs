@@ -110,8 +110,8 @@ fn iteration_effects_return_selected_rejects_scope_effect_and_step_authority_lea
             ("print(7);", "print(7); rounds = rounds + 1;"),
             ("print(7);", "print(7); outer = outer + 1;"),
             ("print(23);", "let escaped = width; print(23);"),
-            ("print(12);", "print(current);"),
-            ("print(16);", "print(trips);"),
+            ("print(12);", "print(true);"),
+            ("print(16);", "print(true);"),
             (
                 "return returned(choice, current, narrow, wide, index, outer, 1 / root);",
                 "return 1;",

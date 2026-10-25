@@ -3,6 +3,9 @@ use super::*;
 #[path = "literal_loops.rs"]
 mod literal_loops;
 
+#[path = "print_epoch.rs"]
+mod print_epoch;
+
 #[cfg(test)]
 #[path = "word_temporaries_tests.rs"]
 mod word_tests;
@@ -30,6 +33,7 @@ pub(super) fn validate(
     layouts: &control_values::CarryLayouts,
     literal_prints: validation::LiteralPrints,
 ) -> Option<()> {
+    let print_epoch = print_epoch::Epoch::enter(scope, writable, updates);
     let mut locals = Locals {
         scope: scope.clone(),
         writable: writable
@@ -50,6 +54,7 @@ pub(super) fn validate(
         catalog,
         layouts,
         literal_prints,
+        &print_epoch,
         0,
     )
 }
@@ -61,12 +66,26 @@ fn block(
     catalog: &ScalarHelpers,
     layouts: &control_values::CarryLayouts,
     literal_prints: validation::LiteralPrints,
+    print_epoch: &print_epoch::Epoch,
     depth: usize,
 ) -> Option<()> {
     for stmt in body {
         match stmt {
             NirStmt::Print(NirExpr::Int(_))
                 if literal_prints == validation::LiteralPrints::Allow => {}
+            NirStmt::Print(value) if literal_prints == validation::LiteralPrints::Scalars => {
+                iteration_prints::admit(value, &locals.scope, catalog, layouts)?;
+                let reads = print_epoch.reads(value, &locals.scope, &locals.available, updates)?;
+                let mut view = std::borrow::Cow::Borrowed(&*locals);
+                if !reads.is_empty() {
+                    view.to_mut().available.extend(reads);
+                }
+                if expression(value, &view, updates, None, catalog, layouts, 0)?
+                    != scalar_type("i64")
+                {
+                    return None;
+                }
+            }
             NirStmt::Let { name, ty, value } => {
                 let existing = locals.scope.get(name);
                 let own = existing.map(|_| name.as_str());
@@ -111,6 +130,7 @@ fn block(
                     catalog,
                     layouts,
                     literal_prints,
+                    print_epoch,
                     depth + 1,
                 )?;
                 block(
@@ -120,6 +140,7 @@ fn block(
                     catalog,
                     layouts,
                     literal_prints,
+                    print_epoch,
                     depth + 1,
                 )?;
                 // Only bindings that exist before the branch survive its join.

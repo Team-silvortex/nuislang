@@ -121,7 +121,24 @@ adds ordered fresh branch-local initializers. The
 bounded pure local selections. The [record prefix proof](../reference/nuis-native-record-prefix-joins-v1.md)
 adds complete exact-layout record locals. The [discarded-record follow-up](../reference/nuis-native-discarded-record-prefix-v1.md)
 retains pruned one-sided field work with bounded neutral synthesis and no exported
-erased identity. Outer record results and effects need further guarded-execution proof.
+erased identity. The [outer-record proof](../reference/nuis-native-outer-record-prefix-v1.md)
+adds fresh exact-type record results. The [logical-field proof](../reference/nuis-native-logical-record-fields-v1.md)
+adds typed lazy bool fields without moving them ahead of preceding field work.
+The [direct return proof](../reference/nuis-native-direct-record-return-v1.md) adds whole-function
+scope/type/budget checks while retaining preceding scalar prints and pure work.
+The [continuation-join follow-up](../reference/nuis-native-joined-record-return-v1.md) exports
+only a fresh, same-name, exact-type pure result to a later direct record return.
+The [local-return proof](../reference/nuis-native-local-record-return-v1.md) certifies a fresh
+owned-record initializer returned by its binding, retaining intervening effects.
+The [value-alias follow-up](../reference/nuis-native-alias-record-return-v1.md) propagates
+that certification through fresh exact-type let/const copies without reconstruction.
+The [origin-join proof](../reference/nuis-native-origin-record-join-v1.md) certifies only
+common results whose two original pure arms independently retain proven origins.
+The [computed-print follow-up](../reference/nuis-native-computed-iteration-print-v1.md)
+adds exact-i64 pure values under original guards and a distinct native grant.
+The [carry-epoch proof](../reference/nuis-native-carry-epoch-print-v1.md) admits
+initialized exact-i64 entry reads for one print, without exporting readiness.
+Child epochs, record-field reads and general effects retain independent gates.
 General resource/I/O/asynchronous capture, broader entering-State
 writes, stable ABI, full heterogeneous closure and completed self-hosting remain
 separate.

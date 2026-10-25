@@ -111,7 +111,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "iteration_effects_children_tests.rs",
             "mod children_tests;",
             "catalog.contains_key(name)",
-            "validation::LiteralPrints::Allow",
+            "validation::LiteralPrints::Scalars",
         ],
     },
     DevTensorDriftCheckSpec {

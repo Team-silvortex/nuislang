@@ -109,6 +109,16 @@ cargo test -p nuis --test native_session_workflow --locked -j1 -- effect_calls::
 
 - [ ] Retain the [discarded-record proof](../reference/nuis-native-discarded-record-prefix-v1.md): whole-declaration neutral-layout preflight, erased-name non-export, opposite field-order failures and source-free delivery; outer record results and effects remain separate gates.
 
+- [ ] Retain the [outer-record proof](../reference/nuis-native-outer-record-prefix-v1.md): fresh exact-type record results, nested/discarded prefixes, source-ordered complete fields, retained neutral preflight and source-free delivery; inline logical bool fields and effects remain separate gates.
+
+- [ ] Retain the [logical-field proof](../reference/nuis-native-logical-record-fields-v1.md): typed bool roots, whole-tree budgets, source-positioned shared short-circuit helpers, unprojected bool failures and source-free delivery; direct return boundaries and effects remain separate gates.
+
+- [ ] Retain the [direct return proof](../reference/nuis-native-direct-record-return-v1.md): complete function return/scope/budget proof, unchanged preceding effects, lazy fields and stored effectful-record delivery; continuation joins and general effects remain separate gates.
+- [ ] Retain the [continuation-join proof](../reference/nuis-native-joined-record-return-v1.md): export only fresh same-name exact-type pure results; keep child scopes private, whole-function expression/neutral budgets, source order, faulted State and source-free delivery. Return-by-local-alias and general effects remain separate gates.
+- [ ] Retain the [local-return proof](../reference/nuis-native-local-record-return-v1.md): certify only completed fresh exact-type owned-record literals, observe their returned identity, retain intervening effects and unused-field fallibility, and reject unrelated origins, alias propagation and rebindings. General aliases/effects remain separate gates.
+- [ ] Retain the [value-alias proof](../reference/nuis-native-alias-record-return-v1.md): propagate only certified origins through fresh exact-type let/const copies; preserve raw-NIR execution, scope, construction order, shared budgets and source-free delivery. Joined-origin certification and general aliases/effects remain separate gates.
+- [ ] Retain the [origin-join proof](../reference/nuis-native-origin-record-join-v1.md): require two independently certified original arms; export only the fresh common result, reject synthetic defaults and unused-origin shortcuts, and preserve raw/native/source-free execution under unchanged budgets. The [computed-print follow-up](../reference/nuis-native-computed-iteration-print-v1.md) adds exact-i64 pure values with a distinct opt-in; the [carry-epoch proof](../reference/nuis-native-carry-epoch-print-v1.md) admits one-print exact-i64 entry reads, while child epochs and general effects remain separate gates.
+
 
 The [image showcase](../../examples/projects/domains/ns_nova_image_showcase/README.md)
 owns its actual Metal pixel/window/replay route.

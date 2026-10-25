@@ -8,7 +8,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "fn discarded_record_declaration",
             "has_discarded_record(&plan, layouts).then_some(plan)",
             "discarded_records::bounded(then_body, else_body, layouts)",
-            "(!layouts.scalar(&ty.name) && kind != JoinKind::DiscardedRecords)",
+            "(!layouts.scalar(&ty.name) && !kind.discarded_records())",
             "Some((Join { condition, yes, no }, false))",
         ],
     },

@@ -97,7 +97,7 @@ fn iteration_effects_exits_reject_unstepped_continue_and_effects_after_terminal_
             "index = index + 1; print(99); continue;",
         ),
         ("print(12); break;", "break; print(12);"),
-        ("print(13);", "print(index);"),
+        ("print(13);", "print(true);"),
         ("print(12); break;", "trips = trips + 1; print(12); break;"),
     ] {
         assert!(cases::SOURCE.contains(from));

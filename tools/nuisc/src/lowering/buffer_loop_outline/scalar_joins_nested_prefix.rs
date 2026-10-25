@@ -3,12 +3,26 @@ use std::borrow::Cow;
 
 #[path = "scalar_joins_discarded_records.rs"]
 mod discarded_records;
+#[path = "scalar_joins_logical_fields.rs"]
+mod logical_fields;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(in crate::lowering::buffer_loop_outline) enum JoinKind {
     Scalars,
     Records,
     DiscardedRecords,
+    OuterRecords,
+    LogicalFields,
+    Continuation,
+}
+
+impl JoinKind {
+    fn discarded_records(self) -> bool {
+        matches!(
+            self,
+            Self::DiscardedRecords | Self::OuterRecords | Self::LogicalFields | Self::Continuation
+        )
+    }
 }
 
 pub(in crate::lowering::buffer_loop_outline) struct Join<'a> {
@@ -29,6 +43,31 @@ pub(in crate::lowering::buffer_loop_outline) enum Local<'a> {
     Binding { stmt: &'a NirStmt, ty: NirTypeRef },
     Join { join: Box<Join<'a>>, export: bool },
     Condition(&'a NirExpr),
+}
+
+// The caller first bounds the complete function, including all synthetic neutrals.
+pub(in crate::lowering::buffer_loop_outline) fn continuation_declaration<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> Option<Join<'a>> {
+    declaration_plan(
+        stmt,
+        scope,
+        suffix,
+        catalog,
+        layouts,
+        JoinKind::Continuation,
+    )
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn continuation_neutrals_bounded(
+    body: &[NirStmt],
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    discarded_records::function_bounded(body, layouts)
 }
 
 // Bound the complete original tree before building scopes, captures or helpers.
@@ -69,6 +108,41 @@ pub(in crate::lowering::buffer_loop_outline) fn discarded_record_declaration<'a>
         JoinKind::DiscardedRecords,
     )?;
     has_discarded_record(&plan, layouts).then_some(plan)
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn outer_record_declaration<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> Option<Join<'a>> {
+    declaration_plan(
+        stmt,
+        scope,
+        suffix,
+        catalog,
+        layouts,
+        JoinKind::OuterRecords,
+    )
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn logical_field_declaration<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> Option<Join<'a>> {
+    let plan = declaration_plan(
+        stmt,
+        scope,
+        suffix,
+        catalog,
+        layouts,
+        JoinKind::LogicalFields,
+    )?;
+    logical_fields::present(&plan).then_some(plan)
 }
 
 fn has_discarded_record(join: &Join<'_>, layouts: &impl control_values::ValueLayouts) -> bool {
@@ -114,16 +188,20 @@ fn declaration_plan<'a>(
     else {
         return None;
     };
-    if !syntax(condition, then_body, else_body) {
+    if !syntax(condition, then_body, else_body, kind, layouts) {
         return None;
     }
-    if kind == JoinKind::DiscardedRecords
-        && !discarded_records::bounded(then_body, else_body, layouts)
-    {
+    if kind.discarded_records() && !discarded_records::bounded(then_body, else_body, layouts) {
         return None;
     }
     let (name, ty, _) = result(then_body)?;
-    if !layouts.scalar(&ty.name) || !super::observed(name, suffix)? {
+    let result_supported = match kind {
+        JoinKind::Continuation => true,
+        JoinKind::LogicalFields => !layouts.scalar(&ty.name),
+        JoinKind::OuterRecords => !layouts.scalar(&ty.name),
+        _ => layouts.scalar(&ty.name),
+    };
+    if !result_supported || !super::observed(name, suffix)? {
         return None;
     }
     pair(
@@ -138,7 +216,17 @@ fn declaration_plan<'a>(
     )
 }
 
-fn syntax(condition: &NirExpr, yes: &[NirStmt], no: &[NirStmt]) -> bool {
+fn syntax(
+    condition: &NirExpr,
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    kind: JoinKind,
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    let require_nested = !matches!(
+        kind,
+        JoinKind::OuterRecords | JoinKind::LogicalFields | JoinKind::Continuation
+    );
     let mut roots = vec![(condition, 0, true)];
     let mut pending = vec![(yes, 0usize), (no, 0usize)];
     let mut remaining = 128usize;
@@ -172,7 +260,10 @@ fn syntax(condition: &NirExpr, yes: &[NirStmt], no: &[NirStmt]) -> bool {
             }
         }
     }
-    nested && conditional_values::prefix::computed_expression_roots(roots)
+    if matches!(kind, JoinKind::LogicalFields | JoinKind::Continuation) {
+        return conditional_values::prefix::computed_record_expression_roots(roots, layouts);
+    }
+    (!require_nested || nested) && conditional_values::prefix::computed_expression_roots(roots)
 }
 
 fn local_pair<'a>(
@@ -196,7 +287,7 @@ fn local_pair<'a>(
     let (name, ty, _) = result(body)?;
     if scope.contains_key(name)
         || blocked.contains(name)
-        || (!layouts.scalar(&ty.name) && kind != JoinKind::DiscardedRecords)
+        || (!layouts.scalar(&ty.name) && !kind.discarded_records())
         || !control_values::supported_type(ty, layouts)
         || control_values::value_type(condition, scope, catalog, layouts)? != scalar_type("bool")
     {

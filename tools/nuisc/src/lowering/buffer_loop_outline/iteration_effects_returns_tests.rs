@@ -46,9 +46,24 @@ fn iteration_effects_returns_use_explicit_profile_and_private_typed_signal() {
 }
 
 #[test]
-fn iteration_effects_returns_reject_unproven_dependencies_and_nonterminal_returns() {
+fn iteration_effects_returns_admit_ready_i64_prints_without_pure_reclassification() {
     for (old, new) in [
         ("print(12);", "print(current);"),
+        ("print(30);", "print(proof);"),
+    ] {
+        assert!(cases::SOURCE.contains(old));
+        let module = parse_nuis_module(&cases::SOURCE.replace(old, new)).unwrap();
+        let layouts = control_values::layouts(&module);
+        let pure = scalar_helpers::collect_with_layouts(&module, &layouts);
+        assert!(!pure.contains_key("walk"));
+        assert!(Plan::collect(&module, &layouts, &pure).contains("walk"));
+    }
+}
+
+#[test]
+fn iteration_effects_returns_reject_unproven_dependencies_and_nonterminal_returns() {
+    for (old, new) in [
+        ("print(12);", "print(1.0);"),
         ("print(12);", "print(true);"),
         (
             "return returned(current, index, outer, 1 / root);",
@@ -66,7 +81,7 @@ fn iteration_effects_returns_reject_unproven_dependencies_and_nonterminal_return
             "return returned(current, index, outer, 1 / root);",
             "return __nuis_return_value;",
         ),
-        ("print(30);", "print(proof);"),
+        ("print(30);", "print(true);"),
         ("1 / proof;", "returned(value, index, outer, proof);"),
     ] {
         let source = cases::SOURCE.replace(old, new);

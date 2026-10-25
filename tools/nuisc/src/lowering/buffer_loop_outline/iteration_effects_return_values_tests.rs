@@ -79,14 +79,14 @@ fn iteration_effects_return_values_oracle_observes_false_zero_raw_signs_and_curr
 fn iteration_effects_return_values_reject_computed_effects_and_mismatched_return_types() {
     for variant in cases::variants() {
         for (from, to) in [
-            ("print(12);", "print(current);"),
+            ("print(12);", "print(true);"),
             (
                 "return returned(choice, current, narrow, wide, index, outer, 1 / root);",
                 "return 1;",
             ),
             (
                 "let checked = 1 / proof;",
-                "print(proof); let checked = 1 / proof;",
+                "print(true); let checked = 1 / proof;",
             ),
         ] {
             let source = variant.source().replace(from, to);

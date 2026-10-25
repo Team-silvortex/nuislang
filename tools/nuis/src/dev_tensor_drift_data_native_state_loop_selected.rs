@@ -94,7 +94,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "iteration_effects_selected_tests.rs",
             "mod selected_tests;",
-            "validation::LiteralPrints::Allow",
+            "validation::LiteralPrints::Scalars",
             "catalog.contains_key(name)",
         ],
     },

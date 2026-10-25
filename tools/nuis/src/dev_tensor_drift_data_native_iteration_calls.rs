@@ -27,6 +27,33 @@ mod record_prefix_joins;
 #[path = "dev_tensor_drift_data_native_discarded_record_prefix.rs"]
 mod discarded_record_prefix;
 
+#[path = "dev_tensor_drift_data_native_outer_record_prefix.rs"]
+mod outer_record_prefix;
+
+#[path = "dev_tensor_drift_data_native_logical_record_fields.rs"]
+mod logical_record_fields;
+
+#[path = "dev_tensor_drift_data_native_direct_record_return.rs"]
+mod direct_record_return;
+
+#[path = "dev_tensor_drift_data_native_joined_record_return.rs"]
+mod joined_record_return;
+
+#[path = "dev_tensor_drift_data_native_local_record_return.rs"]
+mod local_record_return;
+
+#[path = "dev_tensor_drift_data_native_alias_record_return.rs"]
+mod alias_record_return;
+
+#[path = "dev_tensor_drift_data_native_origin_record_join.rs"]
+mod origin_record_join;
+
+#[path = "dev_tensor_drift_data_native_computed_iteration_print.rs"]
+mod computed_iteration_print;
+
+#[path = "dev_tensor_drift_data_native_carry_epoch_print.rs"]
+mod carry_epoch_print;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
 mod return_effect_storage_conditional_payload;
 
@@ -579,6 +606,15 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         nested_prefix_joins::CHECKS,
         record_prefix_joins::CHECKS,
         discarded_record_prefix::CHECKS,
+        outer_record_prefix::CHECKS,
+        logical_record_fields::CHECKS,
+        direct_record_return::CHECKS,
+        joined_record_return::CHECKS,
+        local_record_return::CHECKS,
+        alias_record_return::CHECKS,
+        origin_record_join::CHECKS,
+        computed_iteration_print::CHECKS,
+        carry_epoch_print::CHECKS,
         return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,

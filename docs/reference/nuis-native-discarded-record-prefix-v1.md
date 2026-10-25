@@ -121,6 +121,9 @@ bounded pure prefixes and exact common layouts. This checkpoint keeps that
 outer result scalar. Effectful prefixes, outer writes, resource/I/O/async captures,
 stable ABI, full GPU/Linux parity and self-hosting remain separate gates.
 
+The [outer-record follow-up](nuis-native-outer-record-prefix-v1.md) adds the separate
+aggregate-result proof. This checkpoint's scalar-outer-result tests stay historical.
+
 ## Reproduce
 
 ```sh

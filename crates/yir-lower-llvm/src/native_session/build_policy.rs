@@ -1,15 +1,16 @@
 use super::{
-    emit_registered_with_literal_prints, LiteralPrintPolicy, NativeSessionBridge,
-    MAX_LITERAL_PRINT_SITES,
+    emit_registered_with_i64_prints, emit_registered_with_literal_prints, I64PrintPolicy,
+    LiteralPrintPolicy, NativeSessionBridge, MAX_LITERAL_PRINT_SITES,
 };
 use yir_core::YirModule;
 
 pub const LITERAL_PRINT_BUILD_CONTRACT: &str = "nuis-native-literal-print-build-policy-v1";
+pub const I64_PRINT_BUILD_CONTRACT: &str = "nuis-native-i64-print-build-policy-v1";
 pub const MAX_BUILD_POLICY_SITE_BYTES: usize = 256;
 pub const MAX_BUILD_POLICY_TOKEN_BYTES: usize = 33_000;
 
 /// Portable producer identity, not a grant inferred from an artifact or its source.
-/// The canonical token is v1.<loop limit>.<entry limit>[.<hex UTF-8 site>...].
+/// Tokens start with v1 (literal) or i64-v1 (computed), followed by limits and sites.
 #[derive(Debug, Clone)]
 pub struct LiteralPrintBuildPolicy {
     prints: LiteralPrintPolicy,
@@ -18,6 +19,23 @@ pub struct LiteralPrintBuildPolicy {
 }
 
 impl LiteralPrintBuildPolicy {
+    pub fn new_i64<I, S>(
+        sites: I,
+        loop_work_limit: u64,
+        helper_entry_limit: u64,
+    ) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut policy = Self::new(sites, loop_work_limit, helper_entry_limit)?;
+        policy.prints.i64_values = true;
+        Ok(policy)
+    }
+
+    pub fn is_i64(&self) -> bool {
+        self.prints.i64_values
+    }
     pub fn new<I, S>(
         sites: I,
         loop_work_limit: u64,
@@ -43,7 +61,11 @@ impl LiteralPrintBuildPolicy {
 
     pub fn token(&self) -> String {
         use std::fmt::Write;
-        let mut token = format!("v1.{}.{}", self.loop_work_limit, self.helper_entry_limit);
+        let version = if self.is_i64() { "i64-v1" } else { "v1" };
+        let mut token = format!(
+            "{version}.{}.{}",
+            self.loop_work_limit, self.helper_entry_limit
+        );
         for site in self.prints.sites() {
             token.push('.');
             for byte in site.as_bytes() {
@@ -58,7 +80,8 @@ impl LiteralPrintBuildPolicy {
             return Err("native build policy token exceeds its byte bound".to_owned());
         }
         let mut fields = token.split('.');
-        if fields.next() != Some("v1") {
+        let version = fields.next();
+        if !matches!(version, Some("v1" | "i64-v1")) {
             return Err("unsupported native build policy version".to_owned());
         }
         let mut limit = || {
@@ -92,7 +115,11 @@ impl LiteralPrintBuildPolicy {
                     .map_err(|_| "native build policy site is not UTF-8".to_owned())
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let policy = Self::new(sites, loop_work_limit, helper_entry_limit)?;
+        let policy = if version == Some("i64-v1") {
+            Self::new_i64(sites, loop_work_limit, helper_entry_limit)?
+        } else {
+            Self::new(sites, loop_work_limit, helper_entry_limit)?
+        };
         if policy.token() != token {
             return Err("native build policy token is not canonical".to_owned());
         }
@@ -100,6 +127,17 @@ impl LiteralPrintBuildPolicy {
     }
 
     pub fn emit(&self, module: &YirModule, id: &str) -> Result<NativeSessionBridge, String> {
+        if self.is_i64() {
+            return emit_registered_with_i64_prints(
+                module,
+                id,
+                &I64PrintPolicy {
+                    inner: self.prints.clone(),
+                },
+                self.loop_work_limit,
+                self.helper_entry_limit,
+            );
+        }
         emit_registered_with_literal_prints(
             module,
             id,
@@ -113,7 +151,12 @@ impl LiteralPrintBuildPolicy {
         vec![
             (
                 "native_session_policy_contract",
-                LITERAL_PRINT_BUILD_CONTRACT.to_owned(),
+                if self.is_i64() {
+                    I64_PRINT_BUILD_CONTRACT
+                } else {
+                    LITERAL_PRINT_BUILD_CONTRACT
+                }
+                .to_owned(),
             ),
             ("native_session_policy", self.token()),
             (
@@ -125,7 +168,11 @@ impl LiteralPrintBuildPolicy {
                 self.helper_entry_limit.to_string(),
             ),
             (
-                "native_session_literal_print_bound",
+                if self.is_i64() {
+                    "native_session_i64_print_bound"
+                } else {
+                    "native_session_literal_print_bound"
+                },
                 (self.prints.sites().count() as u128 * u128::from(self.helper_entry_limit))
                     .to_string(),
             ),
@@ -136,6 +183,35 @@ impl LiteralPrintBuildPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn i64_build_policy_has_distinct_canonical_identity_without_upgrading_v1() {
+        let policy = LiteralPrintBuildPolicy::new_i64(["z", "a"], 4, 64).unwrap();
+        let token = policy.token();
+        assert!(token.starts_with("i64-v1.4.64."));
+        assert!(LiteralPrintBuildPolicy::parse(&token).unwrap().is_i64());
+        assert_eq!(
+            LiteralPrintBuildPolicy::parse(&token).unwrap().token(),
+            token
+        );
+        let legacy = LiteralPrintBuildPolicy::new(["z", "a"], 4, 64).unwrap();
+        assert!(!legacy.is_i64());
+        assert!(legacy.token().starts_with("v1."));
+        assert_ne!(legacy.token(), token);
+        for bad in [
+            "i64-v1.04.64.61",
+            "i64-v1.4.64.7a.61",
+            "i64-v1.4.64.61.61",
+            "i64-v1.4.64.ff",
+            "i64-v2.4.64.61",
+        ] {
+            assert!(LiteralPrintBuildPolicy::parse(bad).is_err());
+        }
+        assert!(policy
+            .bundle_claims()
+            .iter()
+            .any(|(k, v)| *k == "native_session_i64_print_bound" && v == "128"));
+    }
 
     #[test]
     fn build_policy_token_is_sorted_bounded_utf8_and_exact() {

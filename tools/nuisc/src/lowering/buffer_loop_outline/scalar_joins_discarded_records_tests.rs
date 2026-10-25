@@ -85,6 +85,33 @@ fn discarded(ty: &str) -> NirStmt {
 }
 
 #[test]
+fn continuation_record_neutrals_share_the_whole_function_budget_with_return_branches() {
+    let layouts = flat(2047, false);
+    let returning = NirStmt::If {
+        condition: NirExpr::Bool(true),
+        then_body: vec![NirStmt::Return(Some(NirExpr::Var("input".into())))],
+        else_body: vec![],
+    };
+    assert!(function_bounded(
+        &[discarded("Wide"), returning.clone(), discarded("Wide")],
+        &layouts
+    ));
+    assert!(!function_bounded(
+        &[
+            discarded("Wide"),
+            returning,
+            discarded("Wide"),
+            discarded("Wide")
+        ],
+        &layouts
+    ));
+    assert!(!function_bounded(
+        &[discarded("Wide"), discarded("Wide")],
+        &flat(2048, false)
+    ));
+}
+
+#[test]
 fn discarded_record_neutrals_share_one_declaration_budget_without_narrowing_flat_layouts() {
     let layouts = flat(2047, false);
     assert!(bounded(

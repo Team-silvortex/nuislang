@@ -7,10 +7,13 @@ pub(super) fn validate_body(
     loop_layouts: Option<&control_values::CarryLayouts>,
     profile: Profile,
 ) -> Option<()> {
+    if matches!(profile, Profile::IterationPrints) && !iteration_prints::bounded(&function.body) {
+        return None;
+    }
     let normalized = if let Some(loop_layouts) = loop_layouts {
         match profile {
             Profile::Pure => control_loops::returns::normalize(function, loop_layouts)?,
-            Profile::IterationLiteralPrints => {
+            Profile::IterationPrints => {
                 control_loops::returns::normalize_effects(function, loop_layouts)?
             }
         }
@@ -55,7 +58,7 @@ pub(in crate::lowering::buffer_loop_outline) fn validate_iteration_body(
         catalog,
         layouts,
         Some(layouts),
-        Profile::IterationLiteralPrints,
+        Profile::IterationPrints,
     )
 }
 
@@ -67,6 +70,9 @@ fn validate_profile(
     loop_layouts: Option<&control_values::CarryLayouts>,
     profile: Profile,
 ) -> Option<()> {
+    if matches!(profile, Profile::IterationPrints) && !iteration_prints::bounded(body) {
+        return None;
+    }
     let mut locals = function
         .params
         .iter()

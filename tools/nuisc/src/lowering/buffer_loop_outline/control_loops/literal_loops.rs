@@ -50,6 +50,8 @@ pub(super) fn validate(
         catalog,
         layouts,
         literal_prints,
+        // Child epochs do not inherit an ancestor's pre-update read grant.
+        &print_epoch::Epoch::default(),
         depth + 1,
     )?;
     // Zero trips retain initialized entry values; child-local declarations never

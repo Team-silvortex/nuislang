@@ -128,6 +128,24 @@ fn iteration_effects_return_parent_mixed_oracle_keeps_break_continue_and_return_
 }
 
 #[test]
+fn iteration_effects_return_parent_mixed_admits_ready_i64_prints_for_each_variant() {
+    for variant in cases::variants() {
+        for (from, to) in [
+            ("print(25);", "print(current);"),
+            ("print(32);", "print(finish);"),
+        ] {
+            let source = cases::source(variant);
+            assert!(source.contains(from));
+            let module = parse_nuis_module(&source.replace(from, to)).unwrap();
+            let layouts = control_values::layouts(&module);
+            let pure = scalar_helpers::collect_with_layouts(&module, &layouts);
+            assert!(!pure.contains_key("work"));
+            assert!(Plan::collect(&module, &layouts, &pure).contains("work"));
+        }
+    }
+}
+
+#[test]
 fn iteration_effects_return_parent_mixed_rejects_step_scope_and_effect_authority_leaks() {
     for variant in cases::variants() {
         for (from, to) in [
@@ -136,8 +154,8 @@ fn iteration_effects_return_parent_mixed_rejects_step_scope_and_effect_authority
             ("print(7);", "print(7); width = width + 1;"),
             ("print(7);", "print(7); rounds = rounds + 1;"),
             ("print(23);", "let escaped = width; print(23);"),
-            ("print(25);", "print(current);"),
-            ("print(32);", "print(finish);"),
+            ("print(25);", "print(true);"),
+            ("print(32);", "print(1.0);"),
             ("continue;", "continue; print(99);"),
         ] {
             let source = cases::source(variant);

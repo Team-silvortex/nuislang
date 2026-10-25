@@ -105,8 +105,8 @@ fn iteration_effects_return_parent_continue_rejects_step_scope_and_effect_author
             ("print(7);", "print(7); rounds = rounds + 1;"),
             ("print(7);", "print(7); outer = outer + 1;"),
             ("print(23);", "let escaped = width; print(23);"),
-            ("print(25);", "print(current);"),
-            ("print(16);", "print(trips);"),
+            ("print(25);", "print(true);"),
+            ("print(16);", "print(true);"),
             ("continue;", "continue; print(99);"),
             (
                 "current = current + outer;\n                ",

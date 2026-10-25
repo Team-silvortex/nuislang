@@ -18,7 +18,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
             "Profile::Pure => validation::LiteralPrints::Reject",
-            "Profile::IterationLiteralPrints => validation::LiteralPrints::Allow",
+            "Profile::IterationPrints => validation::LiteralPrints::Scalars",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -26,7 +26,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/sequences.rs",
         required_patterns: &[
             "let has_prints = validation::contains_print(effects)",
-            "has_prints && literal_prints == validation::LiteralPrints::Allow",
+            "has_prints && literal_prints != validation::LiteralPrints::Reject",
             "!has_exits && !print_work",
             "|| has_prints",
         ],
@@ -55,7 +55,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-state-loop-statements-effect-plan-opt-in",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects.rs",
-        required_patterns: &["validation::LiteralPrints::Allow", "Some(&self.roots)"],
+        required_patterns: &["validation::LiteralPrints::Scalars", "Some(&self.roots)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-state-loop-statements-pure-route-opt-out",
@@ -67,7 +67,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects_tests.rs",
         required_patterns: &[
             "iteration_effects_direct_and_print_only_loops_keep_explicit_authority",
-            "iteration_effects_direct_statements_reject_nonliteral_and_foreign_effects",
+            "iteration_effects_direct_statements_reject_wrong_types_and_foreign_effects",
             "iteration_effects_direct_validation_does_not_grant_buffer_or_pure_authority",
             "validation::EffectTypes::Buffer(&catalog), false",
         ],

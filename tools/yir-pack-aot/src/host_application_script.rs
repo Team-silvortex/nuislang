@@ -27,10 +27,20 @@ pub fn parse_options(
             }
             yir_core::YirApplicationSession::validate_identifier(&id)?;
             native = Some(id);
-        } else if argument == "--native-literal-print-policy" && policy.is_none() {
-            policy = Some(LiteralPrintBuildPolicy::parse(&arguments.next().ok_or(
-                "--native-literal-print-policy requires a canonical policy token",
-            )?)?);
+        } else if matches!(
+            argument.as_str(),
+            "--native-literal-print-policy" | "--native-i64-print-policy"
+        ) && policy.is_none()
+        {
+            let parsed = LiteralPrintBuildPolicy::parse(
+                &arguments
+                    .next()
+                    .ok_or("--native-literal-print-policy requires a canonical policy token")?,
+            )?;
+            if parsed.is_i64() != (argument == "--native-i64-print-policy") {
+                return Err("native print policy option/token kind mismatch".to_owned());
+            }
+            policy = Some(parsed);
         } else if scale.is_none() && !argument.starts_with('-') {
             scale = Some(
                 argument
@@ -120,6 +130,35 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn computed_print_packaging_requires_matching_explicit_option_and_policy_kind() {
+        for (option, token, expected) in [
+            ("--native-i64-print-policy", "i64-v1.4.64.61", true),
+            ("--native-literal-print-policy", "v1.4.64.61", false),
+        ] {
+            let (_, _, profile) = parse_options(
+                ["--native-session", "counter", option, token]
+                    .into_iter()
+                    .map(str::to_owned),
+            )
+            .unwrap();
+            assert_eq!(profile.unwrap().policy.unwrap().is_i64(), expected);
+        }
+        for (option, token) in [
+            ("--native-i64-print-policy", "v1.4.64.61"),
+            ("--native-literal-print-policy", "i64-v1.4.64.61"),
+        ] {
+            let error = parse_options(
+                ["--native-session", "counter", option, token]
+                    .into_iter()
+                    .map(str::to_owned),
+            )
+            .err()
+            .unwrap();
+            assert!(error.contains("kind mismatch"), "{error}");
+        }
+    }
 
     #[test]
     fn headless_host_is_only_a_portable_process_entry() {

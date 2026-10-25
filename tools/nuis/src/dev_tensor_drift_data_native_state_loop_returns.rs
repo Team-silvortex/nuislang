@@ -6,7 +6,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers/control_body.rs",
         required_patterns: &[
             "Profile::Pure => control_loops::returns::normalize",
-            "Profile::IterationLiteralPrints",
+            "Profile::IterationPrints",
             "control_loops::returns::normalize_effects",
             "fn validate_iteration_body",
             "normalized.as_deref().unwrap_or(&function.body)",
@@ -18,7 +18,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "fn prepare_effects",
             "scalar_helpers::validate_iteration_body(function, &plan.body, catalog, layouts)?",
-            "rewrite(function, layouts, None, validation::LiteralPrints::Allow)",
+            "rewrite(function, layouts, None, validation::LiteralPrints::Scalars)",
             "literal_prints == validation::LiteralPrints::Allow",
             "output.push(binding(&self.value, self.result, value.clone()?))",
             "output.push(binding(&self.flag, &scalar_type(\"i64\"), NirExpr::Int(1)))",

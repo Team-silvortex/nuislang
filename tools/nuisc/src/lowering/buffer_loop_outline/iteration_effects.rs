@@ -81,7 +81,7 @@ impl Plan {
             &mut outlined.guarded_functions,
             &self.catalog,
             layouts,
-            validation::LiteralPrints::Allow,
+            validation::LiteralPrints::Scalars,
             &mut outlined.break_controls,
             false,
             &return_signals,

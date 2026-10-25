@@ -104,7 +104,7 @@ fn iteration_effects_children_cannot_write_parent_induction_or_headers() {
         "outer = outer + 1;",
         "rounds = rounds + 1;",
         "trips = trips + 1;",
-        "print(index);",
+        "print(true);",
         "index = index + 1; print(99); continue;",
     ] {
         let source = cases::SOURCE.replace(

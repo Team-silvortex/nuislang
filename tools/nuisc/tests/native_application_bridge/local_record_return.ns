@@ -1,0 +1,97 @@
+mod cpu Main {
+    struct State { total: i64 }
+    struct Leaf { value: i64, unused: i64 }
+    struct Record { leaf: Leaf, tag: bool, check: i64, spare: bool }
+    struct Packet { value: i64, unused: i64 }
+    @noinline fn discarded_decide(inner: bool, condition: i64) -> bool {
+        return inner == (1 / condition != 0);
+    }
+    @noinline fn discarded_first(divisor: i64) -> i64 { return 1 / divisor; }
+    @noinline fn discarded_last(divisor: i64) -> i64 { return 1 / divisor; }
+    @noinline fn outer_word(value: i64, guard: i64) -> i64 { return value + 0 / guard; }
+    @noinline fn outer_unused(guard: i64) -> i64 { return 1 / (guard + 1); }
+    @noinline fn outer_result(picked: Record, outer: bool, guard: i64) -> i64 {
+        if picked.check != guard { return 0; }
+        if picked.tag != outer { return 0; }
+        return picked.leaf.value;
+    }
+    @noinline fn field_head(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn field_tail(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn field_spare(divisor: i64) -> bool { return 1 / divisor != 0; }
+    @noinline fn return_prefix(value: i64, divisor: i64) -> i64 { return value + 0 / divisor; }
+    @noinline fn join_decide(outer: bool, divisor: i64) -> bool { return outer == (1 / divisor != 0); }
+    @noinline fn join_unused(divisor: i64) -> i64 { return 1 / divisor; }
+    @noinline fn local_after(divisor: i64) -> i64 { return 1 / divisor; }
+    @noinline fn returned_record(outer: bool, value: i64, record_guard: i64, head: i64, rhs: i64, spare: bool, spare_div: i64, prefix_div: i64, join_div: i64, join_tail: i64, post_div: i64) -> Record {
+        print(86);
+        let joined: Leaf = if join_decide(outer, join_div) {
+            let prepared: i64 = if spare { return_prefix(value, prefix_div) } else { return_prefix(value, prefix_div) };
+            Leaf { value: prepared, unused: join_unused(join_tail) }
+        } else {
+            const prepared: i64 = return_prefix(0 - value, prefix_div);
+            Leaf { unused: join_unused(join_tail + 1), value: 0 - prepared }
+        };
+        print(89);
+        if outer {
+            print(87);
+            const prepared: i64 = joined.value;
+            let completed: Record = Record { leaf: Leaf { value: outer_word(prepared, record_guard), unused: outer_unused(record_guard) }, tag: (field_head(head) && field_tail(rhs)) || false, check: record_guard, spare: spare && field_spare(spare_div) };
+            print(83);
+            const after: i64 = local_after(post_div);
+            print(84);
+            return completed;
+        }
+        print(88);
+        const prepared: i64 = joined.value;
+        const completed: Record = Record { spare: spare && field_spare(spare_div), tag: (field_head(head) || field_tail(rhs)) && true, check: record_guard, leaf: Leaf { unused: outer_unused(record_guard), value: 0 - outer_word(prepared, record_guard) } };
+        print(83);
+        const after: i64 = local_after(post_div);
+        print(84);
+        return completed;
+    }
+    @noinline fn packet(outer: bool, inner: bool, condition: i64, first: i64, last: i64, value: i64, tail: i64, record_guard: i64, head: i64, rhs: i64, spare: bool, spare_div: i64, prefix_div: i64, join_div: i64, join_tail: i64, post_div: i64) -> Packet {
+        print(81);
+        let prepared: i64 = if outer {
+            let unused: Record = if discarded_decide(inner, condition) {
+                const p: i64 = discarded_first(first);
+                Record { leaf: Leaf { value: p, unused: discarded_last(last) }, tag: true, check: value, spare: false }
+            } else { Record { leaf: Leaf { value: 0, unused: 0 }, tag: false, check: 0, spare: false } };
+            value
+        } else {
+            let unused: Record = if discarded_decide(inner, condition) {
+                Record { leaf: Leaf { value: 0, unused: 0 }, tag: false, check: 0, spare: false }
+            } else {
+                const p: i64 = discarded_last(last);
+                Record { spare: false, tag: false, check: value, leaf: Leaf { unused: p, value: discarded_first(first) } }
+            };
+            value
+        };
+        let picked: Record = returned_record(outer, prepared, record_guard, head, rhs, spare, spare_div, prefix_div, join_div, join_tail, post_div);
+        print(82);
+        return Packet { value: outer_result(picked, outer, record_guard), unused: 1 / tail };
+    }
+    @noinline fn work(seed: State, selected: bool, trips: i64, outer: bool, inner: bool, condition: i64, first: i64, last: i64, value: i64, tail: i64, record_guard: i64, head: i64, rhs: i64, spare: bool, spare_div: i64, prefix_div: i64, join_div: i64, join_tail: i64, post_div: i64) -> State {
+        print(70);
+        let mut index = 0;
+        while index < trips {
+            index = index + 1;
+            print(71);
+            if selected {
+                return State { total: packet(outer, inner, condition, first, last, seed.total + value + 0 / value, tail, record_guard, head, rhs, spare, spare_div, prefix_div, join_div, join_tail, post_div).value };
+            }
+            print(72);
+        }
+        print(73);
+        return seed;
+    }
+    fn start(total: i64, selected: bool, trips: i64, outer: bool, inner: bool, condition: i64, first: i64, last: i64, value: i64, tail: i64, record_guard: i64, head: i64, rhs: i64, spare: bool, spare_div: i64, prefix_div: i64, join_div: i64, join_tail: i64, post_div: i64) -> State {
+        print(90);
+        return work(State { total: total }, selected, trips, outer, inner, condition, first, last, value, tail, record_guard, head, rhs, spare, spare_div, prefix_div, join_div, join_tail, post_div);
+    }
+    fn step(state: State, total: i64, selected: bool, trips: i64, outer: bool, inner: bool, condition: i64, first: i64, last: i64, value: i64, tail: i64, record_guard: i64, head: i64, rhs: i64, spare: bool, spare_div: i64, prefix_div: i64, join_div: i64, join_tail: i64, post_div: i64) -> State {
+        print(91);
+        return work(state, selected, trips, outer, inner, condition, first, last, value, tail, record_guard, head, rhs, spare, spare_div, prefix_div, join_div, join_tail, post_div);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

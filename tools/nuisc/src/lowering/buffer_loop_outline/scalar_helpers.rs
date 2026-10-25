@@ -6,6 +6,7 @@ pub(super) struct ScalarHelper {
     result: NirTypeRef,
     pub(super) dependencies: BTreeSet<String>,
     pub(super) may_loop: bool,
+    pure_value: bool,
 }
 
 pub(super) type ScalarHelpers = BTreeMap<String, ScalarHelper>;
@@ -13,7 +14,7 @@ pub(super) type ScalarHelpers = BTreeMap<String, ScalarHelper>;
 #[derive(Clone, Copy)]
 enum Profile {
     Pure,
-    IterationLiteralPrints,
+    IterationPrints,
 }
 
 #[path = "scalar_helpers/control_body.rs"]
@@ -50,12 +51,13 @@ pub(super) fn collect_iteration_calls(
     module: &NirModule,
     layouts: &control_values::CarryLayouts,
 ) -> ScalarHelpers {
+    let pure = collect_with_layouts(module, layouts);
     collect_profile(
         module,
         layouts,
         Some(layouts),
-        &ScalarHelpers::new(),
-        Profile::IterationLiteralPrints,
+        &pure,
+        Profile::IterationPrints,
     )
 }
 
@@ -159,6 +161,7 @@ fn collect_profile(
                     result: function.return_type.clone().expect("scalar return"),
                     dependencies,
                     may_loop: control_loops::contains_loop(&function.body),
+                    pure_value: false,
                 },
             )
         })
@@ -205,6 +208,7 @@ fn collect_profile(
             continue;
         }
         let mut helper = candidates.remove(&name).expect("ready helper");
+        helper.pure_value = matches!(profile, Profile::Pure);
         helper.may_loop |= helper
             .dependencies
             .iter()
@@ -300,7 +304,7 @@ fn validate_block(
                     loop_layouts?,
                     match profile {
                         Profile::Pure => validation::LiteralPrints::Reject,
-                        Profile::IterationLiteralPrints => validation::LiteralPrints::Allow,
+                        Profile::IterationPrints => validation::LiteralPrints::Scalars,
                     },
                 )?;
             }
@@ -310,8 +314,9 @@ fn validate_block(
                 }
                 returned = true;
             }
-            NirStmt::Print(NirExpr::Int(_))
-                if matches!(profile, Profile::IterationLiteralPrints) => {}
+            NirStmt::Print(value) if matches!(profile, Profile::IterationPrints) => {
+                iteration_prints::admit(value, locals, catalog, layouts)?;
+            }
             _ => return None,
         }
     }
@@ -325,6 +330,14 @@ pub(super) fn typed_call_type(
 ) -> Option<NirTypeRef> {
     let helper = catalog.get(callee)?;
     (args == helper.params).then(|| helper.result.clone())
+}
+
+pub(super) fn completed_pure_dependencies(value: &NirExpr, catalog: &ScalarHelpers) -> bool {
+    let mut calls = BTreeSet::new();
+    collect_expr_calls(value, &mut calls);
+    calls
+        .iter()
+        .all(|name| catalog.get(name).is_some_and(|helper| helper.pure_value))
 }
 
 pub(super) fn contains_calls(body: &[NirStmt]) -> bool {
@@ -396,6 +409,7 @@ fn collect_calls(body: &[NirStmt], calls: &mut BTreeSet<String>) {
             match stmt {
                 NirStmt::Let { value, .. }
                 | NirStmt::Const { value, .. }
+                | NirStmt::Print(value)
                 | NirStmt::Expr(value)
                 | NirStmt::Return(Some(value)) => collect_expr_calls(value, calls),
                 NirStmt::If {

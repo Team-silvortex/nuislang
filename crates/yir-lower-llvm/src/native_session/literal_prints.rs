@@ -11,6 +11,7 @@ pub const MAX_LITERAL_PRINT_SITES: usize = 64;
 #[derive(Debug, Clone)]
 pub struct LiteralPrintPolicy {
     sites: BTreeSet<String>,
+    pub(super) i64_values: bool,
 }
 
 impl LiteralPrintPolicy {
@@ -35,7 +36,10 @@ impl LiteralPrintPolicy {
                 return Err("native literal print policy exceeds its static site bound".to_owned());
             }
         }
-        Ok(Self { sites: selected })
+        Ok(Self {
+            sites: selected,
+            i64_values: false,
+        })
     }
 
     pub(super) fn permit(
@@ -50,12 +54,14 @@ impl LiteralPrintPolicy {
             ("print", [value]) | ("guard_print", [_, value]) => value,
             _ => return Err("native literal print grant targets an unsupported effect".to_owned()),
         };
-        if !nodes.get(operand.as_str()).is_some_and(|value| {
-            value.op.module == "cpu"
-                && matches!(value.op.instruction.as_str(), "const" | "const_i64")
-                && value.op.args.len() == 1
-                && value.op.args[0].parse::<i64>().is_ok()
-        }) {
+        if !self.i64_values
+            && !nodes.get(operand.as_str()).is_some_and(|value| {
+                value.op.module == "cpu"
+                    && matches!(value.op.instruction.as_str(), "const" | "const_i64")
+                    && value.op.args.len() == 1
+                    && value.op.args[0].parse::<i64>().is_ok()
+            })
+        {
             return Err(format!(
                 "native literal print `{}` requires a direct i64 constant",
                 node.name

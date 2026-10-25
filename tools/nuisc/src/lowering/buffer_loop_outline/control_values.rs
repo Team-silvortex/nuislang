@@ -23,6 +23,27 @@ pub(super) fn supported_type(ty: &NirTypeRef, layouts: &impl ValueLayouts) -> bo
     ty == &scalar_type(&ty.name) && (layouts.scalar(&ty.name) || layouts.fields(&ty.name).is_some())
 }
 
+pub(super) fn has_logical_record_fields(value: &NirExpr) -> bool {
+    let mut records = vec![value];
+    while let Some(NirExpr::StructLiteral { fields, .. }) = records.pop() {
+        for (_, value) in fields {
+            if matches!(
+                value,
+                NirExpr::Binary {
+                    op: NirBinaryOp::And | NirBinaryOp::Or,
+                    ..
+                }
+            ) {
+                return true;
+            }
+            if matches!(value, NirExpr::StructLiteral { .. }) {
+                records.push(value);
+            }
+        }
+    }
+    false
+}
+
 pub(super) fn value_type(
     expr: &NirExpr,
     scope: &Scope,

@@ -57,8 +57,8 @@ pub use nuis_artifact::{
 mod tests;
 pub mod native_session {
     pub use crate::aot_native_session::{
-        build_policy, emit_for_packaging_mode, literal_print_packaging_mode, registration_id,
-        verify_checkpoint, verify_checkpoint_for_packaging_mode, PACKAGING_PREFIX,
-        POLICY_PACKAGING_PREFIX,
+        build_policy, emit_for_packaging_mode, i64_print_packaging_mode,
+        literal_print_packaging_mode, registration_id, verify_checkpoint,
+        verify_checkpoint_for_packaging_mode, PACKAGING_PREFIX, POLICY_PACKAGING_PREFIX,
     };
 }

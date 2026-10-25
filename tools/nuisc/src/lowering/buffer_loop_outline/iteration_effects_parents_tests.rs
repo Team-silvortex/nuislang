@@ -79,7 +79,7 @@ fn iteration_effects_parents_reject_terminal_suffixes_and_child_authority_leaks(
         ),
         ("print(26);", "rounds = rounds + 1; print(26);"),
         ("print(26);", "outer = outer + 1; print(26);"),
-        ("print(26);", "print(current);"),
+        ("print(26);", "print(true);"),
         ("print(23);", "let escaped = width; print(23);"),
     ] {
         assert!(cases::SOURCE.contains(before));

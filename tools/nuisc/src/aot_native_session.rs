@@ -4,6 +4,21 @@ use yir_lower_llvm::native_session::{LiteralPrintBuildPolicy, NativeSessionBridg
 pub const PACKAGING_PREFIX: &str = "native-session-aot-bundle:";
 pub const POLICY_PACKAGING_PREFIX: &str = "native-session-policy-aot-bundle:";
 
+pub fn i64_print_packaging_mode<I, S>(
+    id: &str,
+    sites: I,
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+) -> Result<String, String>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    yir_core::YirApplicationSession::validate_identifier(id)?;
+    let policy = LiteralPrintBuildPolicy::new_i64(sites, loop_work_limit, helper_entry_limit)?;
+    Ok(format!("{POLICY_PACKAGING_PREFIX}{}:{id}", policy.token()))
+}
+
 pub fn literal_print_packaging_mode<I, S>(
     id: &str,
     sites: I,
@@ -129,6 +144,7 @@ pub fn verify_checkpoint_for_packaging_mode(
                 "native_session_loop_work_limit"
                     | "native_session_helper_entry_limit"
                     | "native_session_literal_print_bound"
+                    | "native_session_i64_print_bound"
             )
     };
     for (key, _) in bundle.lines().filter_map(|line| line.split_once('=')) {
