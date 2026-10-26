@@ -7,18 +7,19 @@ Later bounded proofs may advance earlier vetoes; do not add their test totals.
 
 ## Current Evidence
 
-The [typed-f64 follow-up](nuis-native-f64-field-epoch-print-v1.md) is the latest
-bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.17.0-snapshot.md).
+The [helper call-argument follow-up](nuis-native-helper-call-argument-print-v1.md)
+is the latest bounded CPU worktree proof at the dated
+[snapshot](../versioning/nuis-beta-0.17.0-snapshot.md).
 It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md)
 and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [fresh child entries](nuis-native-child-epoch-print-v1.md) and
 [original i64 fields](nuis-native-field-epoch-print-v1.md), then
 [typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and
 [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
-[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md). The latest proof
-adds exact f64 parameters with all 64 callee/State bits, not compound argument or
-whole-record readiness; the mainline map owns
-the next selected gate.
+[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and
+[full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
+proof adds guarded pure auxiliary calls with exact scalar RHS captures.
+The map owns the next selected gate; whole-record readiness remains separate.
 
 Original reference files, anchors, fixtures and regression registrations remain
 available below. The backlog of further changing backedges and wide private captures
@@ -55,6 +56,13 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native I32 Field Epoch Print V1](nuis-native-i32-field-epoch-print-v1.md)
 - [Native F32 Field Epoch Print V1](nuis-native-f32-field-epoch-print-v1.md)
 - [Native F64 Field Epoch Print V1](nuis-native-f64-field-epoch-print-v1.md)
+- [Native Unary Float Field Epoch Print V1](nuis-native-unary-float-field-epoch-print-v1.md)
+- [Native Nested Unary Float Field Epoch Print V1](nuis-native-nested-unary-float-field-epoch-print-v1.md)
+- [Native Binary Float Field Epoch Print V1](nuis-native-binary-float-field-epoch-print-v1.md)
+- [Native Float Call Field Epoch Print V1](nuis-native-float-call-field-epoch-print-v1.md)
+- [Native Computed Call Argument Print V1](nuis-native-computed-call-argument-print-v1.md)
+- [Native Lazy Call Argument Print V1](nuis-native-lazy-call-argument-print-v1.md)
+- [Native Helper Call Argument Print V1](nuis-native-helper-call-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 

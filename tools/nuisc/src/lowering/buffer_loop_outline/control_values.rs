@@ -215,7 +215,7 @@ pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> 
     }
     match op {
         NirBinaryOp::Xor if lhs == scalar_type("i64") => Some(lhs),
-        NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
+        NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul | NirBinaryOp::Div
             if lhs == scalar_type("f32") || lhs == scalar_type("f64") =>
         {
             Some(lhs)

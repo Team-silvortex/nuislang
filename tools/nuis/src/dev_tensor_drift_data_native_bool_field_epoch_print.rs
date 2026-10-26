@@ -26,7 +26,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "if depth < 64",
             "scalar_helpers::pure_i64_parameter_type(callee, index, catalog)?",
-            "epoch.argument(arg, &locals.scope, layouts, &expected)",
+            ".argument(arg, &locals.scope, layouts, &expected)",
             "scalar_helpers::typed_call_type(callee, &types, catalog)",
             "expression_with_fields(value, locals, updates, own, catalog, layouts, depth, None)",
         ],

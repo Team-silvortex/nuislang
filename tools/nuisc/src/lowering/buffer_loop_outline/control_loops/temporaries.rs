@@ -267,6 +267,27 @@ fn expression_with_fields(
                 .cloned()
         }
         NirExpr::Call { callee, args } => {
+            if let Some(epoch) = field_reads {
+                if let Some((_, result)) = scalar_helpers::pure_float_signature(callee, catalog) {
+                    // A rejected plan must not regain epoch reads through generic fallback.
+                    if epoch
+                        .float_argument(
+                            value,
+                            &locals.scope,
+                            layouts,
+                            result,
+                            depth,
+                            catalog,
+                            |leaf, depth| {
+                                expression(leaf, locals, updates, own, catalog, layouts, depth)
+                            },
+                        )
+                        .is_none()
+                    {
+                        return expression(value, locals, updates, own, catalog, layouts, depth);
+                    }
+                }
+            }
             let types = args
                 .iter()
                 .enumerate()
@@ -276,7 +297,32 @@ fn expression_with_fields(
                         if let Some(ty) = field_reads.and_then(|epoch| {
                             let expected =
                                 scalar_helpers::pure_i64_parameter_type(callee, index, catalog)?;
-                            epoch.argument(arg, &locals.scope, layouts, &expected)
+                            epoch
+                                .argument(arg, &locals.scope, layouts, &expected)
+                                .or_else(|| {
+                                    epoch.unary_argument(
+                                        arg,
+                                        &locals.scope,
+                                        layouts,
+                                        &expected,
+                                        depth + 1,
+                                    )
+                                })
+                                .or_else(|| {
+                                    epoch.float_argument(
+                                        arg,
+                                        &locals.scope,
+                                        layouts,
+                                        &expected,
+                                        depth + 1,
+                                        catalog,
+                                        |leaf, depth| {
+                                            expression(
+                                                leaf, locals, updates, own, catalog, layouts, depth,
+                                            )
+                                        },
+                                    )
+                                })
                         }) {
                             return Some(ty);
                         }
@@ -372,7 +418,7 @@ fn expression_with_fields(
             }
             match op {
                 NirBinaryOp::Xor if left == scalar_type("i64") => Some(left),
-                NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul
+                NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul | NirBinaryOp::Div
                     if left == scalar_type("f32") || left == scalar_type("f64") =>
                 {
                     Some(left)

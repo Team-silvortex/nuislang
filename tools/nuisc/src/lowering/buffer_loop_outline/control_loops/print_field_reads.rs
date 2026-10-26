@@ -35,6 +35,16 @@ impl Fields {
         layouts: &control_values::CarryLayouts,
         expected: &NirTypeRef,
     ) -> Option<NirTypeRef> {
+        self.project_type(value, scope, layouts)
+            .filter(|ty| ty == expected)
+    }
+
+    pub(super) fn project_type(
+        &self,
+        value: &NirExpr,
+        scope: &Scope,
+        layouts: &control_values::CarryLayouts,
+    ) -> Option<NirTypeRef> {
         let mut value = value;
         let mut path = Vec::new();
         while let NirExpr::FieldAccess { base, field } = value {
@@ -59,7 +69,7 @@ impl Fields {
         for field in path.into_iter().rev() {
             leaf = &leaf.fields.iter().find(|(name, _)| name == field)?.1;
         }
-        (leaf.fields.is_empty() && leaf.ty == *expected).then(|| leaf.ty.clone())
+        leaf.fields.is_empty().then(|| leaf.ty.clone())
     }
 }
 

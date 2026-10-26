@@ -5,7 +5,7 @@ fn module() -> NirModule {
         struct Pair{small:f32,total:i64,wide:f64} struct Outer{inner:Pair}
         fn observe(value:f32,d:i64)->i64{if value<0.0{return -1+0/d;}if value==0.0{return 0/d;}if value!=value{return 2+0/d;}return 1+0/d;}
         fn wide(value:f64)->i64{return 0;}
-        fn narrow(value:f32)->f32{return value;}
+        fn narrow(value:f32)->f32{print(9);return value;}
         fn record(value:f32)->Pair{return Pair{small:value,total:0,wide:1.0};}
         fn whole(value:Outer)->i64{return value.inner.total;}
         fn impure(value:f32)->i64{print(9);return 0;}
@@ -208,7 +208,7 @@ fn f32_field_print_epoch_keeps_word_cast_record_and_ordinary_reads_closed() {
 }
 
 fn source(body: &str, selected: bool, divisor: i64) -> String {
-    format!("mod cpu Main{{struct Pair{{small:f32,total:i64}} struct Outer{{inner:Pair}} @noinline fn observe(value:f32,d:i64)->i64{{if value<0.0{{return -1+0/d;}}if value==0.0{{return 0/d;}}if value!=value{{return 2+0/d;}}return 1+0/d;}} @noinline fn walk(seed:f32,selected:bool,divisor:i64)->f32{{let mut index=0;let mut live=Outer{{inner:Pair{{small:seed,total:0}}}};while index<2{{{body}}}return live.inner.small;}}fn main()->f32{{return walk(1.5,{selected},{divisor});}}}}")
+    format!("mod cpu Main{{struct Pair{{small:f32,total:i64}} struct Outer{{inner:Pair}} @noinline fn observe(value:f32,d:i64)->i64{{if value<0.0{{return -1+0/d;}}if value==0.0{{return 0/d;}}if value!=value{{return 2+0/d;}}return 1+0/d;}} @noinline fn identity(value:f32)->f32{{print(9);return value;}} @noinline fn walk(seed:f32,selected:bool,divisor:i64)->f32{{let mut index=0;let mut live=Outer{{inner:Pair{{small:seed,total:0}}}};while index<2{{{body}}}return live.inner.small;}}fn main()->f32{{return walk(1.5,{selected},{divisor});}}}}")
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn f32_field_print_epoch_source_keeps_conditions_compounds_and_ancestors_closed(
         "print(observe(live.inner.small,1));let saved=live.inner.small;live=live;index=index+1;",
         "print(observe(live.inner.small,1));if live.inner.small<0.0{print(1);}live=live;index=index+1;",
         "let saved=observe(live.inner.small,1);live=live;index=index+1;",
-        "print(observe(-live.inner.small,1));live=live;index=index+1;",
+        "print(observe(identity(live.inner.small),1));live=live;index=index+1;",
         "let mut child=0;while child<1{print(observe(live.inner.small,1));live=live;child=child+1;}index=index+1;",
         "print(observe(live.inner.small,1));let mut child=0;while child<1{print(observe(live.inner.small,1));live=live;child=child+1;}index=index+1;",
     ] {

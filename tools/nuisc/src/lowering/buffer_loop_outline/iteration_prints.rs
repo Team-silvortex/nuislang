@@ -5,7 +5,7 @@ use super::*;
 mod tests;
 
 // One ordinary-root budget spans all prints, including child branches and loops.
-pub(super) fn bounded(body: &[NirStmt]) -> bool {
+pub(super) fn bounded(body: &[NirStmt], catalog: &ScalarHelpers) -> bool {
     let mut pending = vec![body];
     let mut roots = Vec::new();
     while let Some(body) = pending.pop() {
@@ -24,7 +24,7 @@ pub(super) fn bounded(body: &[NirStmt]) -> bool {
             }
         }
     }
-    conditional_values::prefix::computed_expression_roots(roots)
+    conditional_values::prefix::computed_call_expression_roots(roots, catalog)
 }
 
 pub(super) fn admit(
@@ -33,7 +33,7 @@ pub(super) fn admit(
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
 ) -> Option<()> {
-    if !conditional_values::prefix::expression(value)
+    if !conditional_values::prefix::computed_call_expression_roots(vec![(value, 0, false)], catalog)
         || !scalar_helpers::completed_pure_dependencies(value, catalog)
         || control_values::value_type(value, scope, catalog, layouts)? != scalar_type("i64")
     {

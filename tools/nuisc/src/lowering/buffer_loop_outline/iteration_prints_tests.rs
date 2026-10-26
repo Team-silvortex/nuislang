@@ -139,16 +139,19 @@ fn computed_iteration_prints_share_one_root_budget_across_branches_and_loops() {
             ],
         },
     ];
-    assert!(bounded(&body));
+    assert!(bounded(&body, &ScalarHelpers::new()));
     body.push(NirStmt::Print(NirExpr::Int(1)));
-    assert!(!bounded(&body));
+    assert!(!bounded(&body, &ScalarHelpers::new()));
     for (depth, expected) in [(63, true), (64, false)] {
         let value = (0..depth).fold(NirExpr::Int(1), |lhs, _| NirExpr::Binary {
             op: NirBinaryOp::Add,
             lhs: Box::new(lhs),
             rhs: Box::new(NirExpr::Int(1)),
         });
-        assert_eq!(bounded(&[NirStmt::Print(value)]), expected);
+        assert_eq!(
+            bounded(&[NirStmt::Print(value)], &ScalarHelpers::new()),
+            expected
+        );
     }
 }
 

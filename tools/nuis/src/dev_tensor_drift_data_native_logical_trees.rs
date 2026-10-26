@@ -13,7 +13,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "logical_edges -= 1",
             "(lhs.as_ref(), depth + 1, computed_gate, false)",
             "(rhs.as_ref(), depth + 1, computed_gate, false)",
-            "args.iter().map(|arg| (arg, depth + 1, false, false))",
+            "args.iter().enumerate().map(|(index, arg)|",
             "(lhs.as_ref(), depth + 1, false, false)",
             "(rhs.as_ref(), depth + 1, false, false)",
         ],

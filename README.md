@@ -106,7 +106,7 @@ one profile's acceptance must not be attributed to the other.
 | Area | Current Bounded Evidence | Remaining Boundary |
 | --- | --- | --- |
 | Returns and storage | [Independent effect order](docs/reference/nuis-native-return-effect-prefix-v1.md), [certified storage reuse](docs/reference/nuis-native-return-effect-storage-v1.md), and [owned-record origins](docs/reference/nuis-native-origin-record-join-v1.md). | Unproved reductions retain independent payload storage and a separate pending signal. |
-| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed owned-record fields](docs/reference/nuis-native-f64-field-epoch-print-v1.md). | Exact scalar fields at bounded print/argument positions; not compound argument or whole-record readiness or general I/O/resource capture. |
+| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed field/call arguments](docs/reference/nuis-native-helper-call-argument-print-v1.md). | Exact fields and guarded checked RHSs, including completed pure bool/i64 helper operands; not ambient readiness, whole-record captures, effects or I/O/resource capture. |
 | Nested iteration | The [child-epoch follow-up](docs/reference/nuis-native-child-epoch-print-v1.md) checks fresh ready child entries, skipped work and later-parent failures. | Worktree evidence at the dated audit, not automatically part of the committed release. |
 
 The [mainline map](docs/current-mainline-map.md) owns the next selected proof and

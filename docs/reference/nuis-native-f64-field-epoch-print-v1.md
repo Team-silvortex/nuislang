@@ -100,6 +100,8 @@ argument such as `observe(-record.value, divisor)` before update remains outside
 this grant. Next is a shared typed unary-float argument proof for f32/f64 sign
 negation, retaining the original leaf/entry/path, exact expected kind, raw sign
 bits, source ordering and scoped depth/work budget without ambient readiness.
+That separate [unary argument proof](nuis-native-unary-float-field-epoch-print-v1.md)
+now follows this checkpoint; it does not retroactively broaden the direct-field grant.
 Whole-record readiness, references/resources, general effects/I/O/async capture,
 outer writes, stable ABI, GPU/Linux parity and self-hosting remain separate gates.
 

@@ -1,0 +1,49 @@
+mod cpu Main {
+    struct State { total: f64 }
+    struct Pair { total: f64, tag: i64, flag: bool }
+    struct Outer { inner: Pair }
+    @noinline fn observe(value: f64, divisor: i64) -> i64 { if value < 0.0 { return -1 + 0 / divisor; } if value == 0.0 { return 0 / divisor; } if value != value { return 2 + 0 / divisor; } return 1 + 0 / divisor; }
+    @noinline fn identity(value: f64, guard: i64) -> f64 { let checked = 0 / guard; return value; }
+    @noinline fn scale(value: f64, factor: f64, guard: i64) -> f64 { let checked = 0 / guard; return value * factor; }
+    @noinline fn finish(value: f64, divisor: i64) -> f64 { let checked = 0 / divisor; return value; }
+    @noinline fn work(seed: State, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64) -> State {
+        print(70);
+        let mut index = 0;
+        let mut current = Outer { inner: Pair { total: seed.total, tag: 100, flag: true } };
+        while index < trips {
+            print(71);
+            print(observe(identity(-scale(identity(current.inner.total + ready, 1) - (-ready), ready, 1) / ready, 1), 1));
+            print(current.inner.tag);
+            current = Outer { inner: Pair { total: -current.inner.total, tag: current.inner.tag + delta, flag: true } };
+            let mut local = current;
+            let mut child = 0;
+            while child < children {
+                print(72);
+                let gate = divisor - index - child;
+                if selected { print(observe(identity(scale(identity(ready - local.inner.total, first), identity(local.inner.total + ready, second), 1) / identity(ready - local.inner.total, 1), 1), gate)); }
+                print(observe(identity(-(identity(local.inner.total - ready, 1) / ready), 1) + scale(local.inner.total, ready, 1), 1));
+                print(local.inner.tag);
+                local = Outer { inner: Pair { total: -local.inner.total, tag: local.inner.tag + delta * 2, flag: true } };
+                print(observe(identity(-(identity(local.inner.total - ready, 1) / ready), 1) + scale(local.inner.total, ready, 1), 1));
+                print(local.inner.tag);
+                child = child + 1;
+            }
+            print(74);
+            current = local;
+            index = index + 1;
+        }
+        print(73);
+        return State { total: finish(current.inner.total, tail) };
+    }
+    fn start(initial: f64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64) -> State {
+        print(90);
+        return work(State { total: initial }, selected, trips, children, delta, divisor, tail, ready, first, second);
+    }
+    fn step(state: State, initial: f64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64) -> State {
+        print(91);
+        return work(state, selected, trips, children, delta, divisor, tail, ready, first, second);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}
+

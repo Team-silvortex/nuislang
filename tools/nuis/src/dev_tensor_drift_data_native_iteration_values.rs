@@ -41,7 +41,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "NirExpr::StructLiteral",
             "NirExpr::FieldAccess",
-            "base: Box::new(predicate(*base, scope, names, helpers, guarded))",
+            "*base, scope, names, helpers, guarded, layouts,",
         ],
     },
     DevTensorDriftCheckSpec {

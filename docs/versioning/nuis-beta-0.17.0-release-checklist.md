@@ -62,12 +62,12 @@ The latest scalar/typed-field-entry print route has focused entrypoints:
 
 ```sh
 cargo test -p nuisc --lib --locked -j1 -- print_epoch:: iteration_prints:: iteration_effects:: --test-threads=1
-cargo test -p nuisc --test native_application_bridge --locked -j1 -- f64_field_epoch_print:: f32_field_epoch_print:: i32_field_epoch_print:: bool_field_epoch_print:: field_epoch_print:: child_epoch_print:: carry_epoch_print:: computed_iteration_print:: typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries literal_print_policy:: literal_print_execution:: --test-threads=1
-cargo test -p nuis --test native_session_workflow --locked -j1 -- f64_field_epoch_print --test-threads=1 --nocapture
+cargo test -p nuisc --test native_application_bridge --locked -j1 -- helper_call_argument_print_epoch:: lazy_call_argument_print_epoch:: computed_call_argument_print_epoch:: float_call_field_epoch_print:: binary_float_field_epoch_print:: division_admission:: division_execution:: unary_float_field_epoch_print:: f64_field_epoch_print:: f32_field_epoch_print:: i32_field_epoch_print:: bool_field_epoch_print:: field_epoch_print:: child_epoch_print:: carry_epoch_print:: computed_iteration_print:: typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries literal_print_policy:: literal_print_execution:: --test-threads=1
+cargo test -p nuis --test native_session_workflow --locked -j1 -- helper_call_argument_print_epoch --test-threads=1 --nocapture
 ```
 
 These are focused entrypoints, not a replacement for adjacent checks selected by
-the actual edit. The [typed-f64 receipt](../reference/nuis-native-f64-field-epoch-print-v1.md)
+the actual edit. The [helper call-argument receipt](../reference/nuis-native-helper-call-argument-print-v1.md)
 owns the exact latest witness and bounds; earlier compiler/storage families
 retain their own commands.
 

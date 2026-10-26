@@ -10,7 +10,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "shape.ty == scalar_type(&shape.ty.name)",
             "Shape::from_layouts(&entry.ty, layouts).as_ref() != Some(entry)",
             "path.into_iter().rev()",
-            "leaf.ty == *expected",
+            ".filter(|ty| ty == expected)",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -36,12 +36,16 @@ mod logical_record_fields;
 
 #[path = "alias_record_return.rs"]
 mod alias_record_return;
+#[path = "binary_float_field_epoch_print.rs"]
+mod binary_float_field_epoch_print;
 #[path = "bool_field_epoch_print.rs"]
 mod bool_field_epoch_print;
 #[path = "carry_epoch_print.rs"]
 mod carry_epoch_print;
 #[path = "child_epoch_print.rs"]
 mod child_epoch_print;
+#[path = "computed_call_argument_print_epoch.rs"]
+mod computed_call_argument_print_epoch;
 #[path = "computed_iteration_print.rs"]
 mod computed_iteration_print;
 #[path = "direct_record_return.rs"]
@@ -52,14 +56,22 @@ mod f32_field_epoch_print;
 mod f64_field_epoch_print;
 #[path = "field_epoch_print.rs"]
 mod field_epoch_print;
+#[path = "float_call_field_epoch_print.rs"]
+mod float_call_field_epoch_print;
+#[path = "helper_call_argument_print_epoch.rs"]
+mod helper_call_argument_print_epoch;
 #[path = "i32_field_epoch_print.rs"]
 mod i32_field_epoch_print;
 #[path = "joined_record_return.rs"]
 mod joined_record_return;
+#[path = "lazy_call_argument_print_epoch.rs"]
+mod lazy_call_argument_print_epoch;
 #[path = "local_record_return.rs"]
 mod local_record_return;
 #[path = "origin_record_join.rs"]
 mod origin_record_join;
+#[path = "unary_float_field_epoch_print.rs"]
+mod unary_float_field_epoch_print;
 
 #[path = "effect_call_return_dual_i64.rs"]
 mod return_dual_i64;

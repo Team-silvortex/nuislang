@@ -333,6 +333,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 get_f64(registers, &node.op.args[0]),
                 get_f64(registers, &node.op.args[1]),
             ) {
+                super::checked_float_division::check(&rhs, "double", body, next_reg);
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = fdiv double {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
@@ -343,6 +344,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 get_f32(registers, &node.op.args[0]),
                 get_f32(registers, &node.op.args[1]),
             ) {
+                super::checked_float_division::check(&rhs, "float", body, next_reg);
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = fdiv float {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
@@ -408,6 +410,7 @@ pub(crate) fn lower_cpu_scalar_node(
                     ));
                 return Ok(true);
             };
+            super::checked_float_division::check(&rhs, "float", body, next_reg);
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = fdiv float {lhs}, {rhs}"));
             registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
@@ -426,6 +429,7 @@ pub(crate) fn lower_cpu_scalar_node(
                     ));
                 return Ok(true);
             };
+            super::checked_float_division::check(&rhs, "double", body, next_reg);
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = fdiv double {lhs}, {rhs}"));
             registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));

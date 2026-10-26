@@ -3,6 +3,12 @@ use super::*;
 #[path = "print_field_reads.rs"]
 mod field_reads;
 
+#[path = "print_unary_float.rs"]
+mod unary_float;
+
+#[path = "print_binary_float.rs"]
+mod binary_float;
+
 // This certifies initialized entry names, not expression purity or write authority.
 // Its read extension lives only in one print validation and never updates Locals.
 #[derive(Default)]
@@ -86,6 +92,36 @@ impl Epoch {
         }
         self.fields.project(value, scope, layouts, expected)
     }
+
+    pub(super) fn unary_argument(
+        &self,
+        value: &NirExpr,
+        scope: &Scope,
+        layouts: &control_values::CarryLayouts,
+        expected: &NirTypeRef,
+        depth: usize,
+    ) -> Option<NirTypeRef> {
+        let leaf = unary_float::field_operand(value, expected, depth)?;
+        self.fields.project(leaf, scope, layouts, expected)
+    }
+
+    pub(super) fn float_argument(
+        &self,
+        value: &NirExpr,
+        scope: &Scope,
+        layouts: &control_values::CarryLayouts,
+        expected: &NirTypeRef,
+        depth: usize,
+        catalog: &ScalarHelpers,
+        mut ready: impl FnMut(&NirExpr, usize) -> Option<NirTypeRef>,
+    ) -> Option<NirTypeRef> {
+        binary_float::validate(value, expected, depth, catalog, |value, depth| {
+            self.fields
+                .project_type(value, scope, layouts)
+                .or_else(|| ready(value, depth))
+        })?;
+        Some(expected.clone())
+    }
 }
 
 #[cfg(test)]
@@ -110,3 +146,7 @@ mod field_tests;
 #[cfg(test)]
 #[path = "i32_field_print_epoch_tests.rs"]
 mod i32_field_tests;
+
+#[cfg(test)]
+#[path = "unary_float_print_epoch_tests.rs"]
+mod unary_float_tests;

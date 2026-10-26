@@ -45,11 +45,14 @@ regressions may interrupt it; documentation maintenance does not advance it.
 | Pre-update i32 fields with exact signed State words | [Shared typed arguments](reference/nuis-native-i32-field-epoch-print-v1.md), retaining bool and ordinary-read boundaries. |
 | Pre-update f32 fields with raw callee/State words | [IEEE field arguments](reference/nuis-native-f32-field-epoch-print-v1.md), separating raw payload proof from finite CLI delivery. |
 | Pre-update f64 fields with complete 64-bit words | [Full-width field arguments](reference/nuis-native-f64-field-epoch-print-v1.md), retaining high bits, low-bit distinctions and entry budgets. |
+| Pre-update f32/f64 field sign-negation chains at pure-i64 helper arguments | [Compositional unary arguments](reference/nuis-native-nested-unary-float-field-epoch-print-v1.md), retaining original-field proofs, cumulative depth and raw sign/payload controls. |
+| Same-kind float arithmetic over certified fields and ready leaves | [Binary argument plan](reference/nuis-native-binary-float-field-epoch-print-v1.md), including checked zero division and separate arithmetic/State evidence. |
 
-The next selected gate is **typed unary-float arguments from pre-update fields**,
-starting with f32/f64 sign negation inside a completed pure-i64 print value.
-It needs original-leaf/entry/type proof and raw sign-bit/fault controls; direct
-field permission does not imply compound arguments or whole-record readiness.
+The [helper call-argument follow-up](reference/nuis-native-helper-call-argument-print-v1.md)
+adds completed pure bool/i64 helper operands inside guarded RHSs with exact
+scalar captures. The next selected gate is **logical bool arguments of auxiliary
+helpers** inside that lazy scope, without opening ordinary call roots, whole
+records or eager checked work.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

@@ -68,25 +68,48 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_expression_roots(
 }
 
 fn roots(pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool {
-    roots_with_fields(pending, computed_gate, |_, _| false)
+    roots_with_fields(pending, computed_gate, |_, _| false, |_, _| false)
+}
+
+// This opens typed argument shape only. The caller still proves reads and laziness.
+pub(in crate::lowering::buffer_loop_outline) fn computed_call_expression_roots(
+    pending: Vec<(&NirExpr, usize, bool)>,
+    catalog: &ScalarHelpers,
+) -> bool {
+    roots_with_fields(
+        pending,
+        true,
+        |_, _| false,
+        |callee, index| {
+            scalar_helpers::pure_float_signature(callee, catalog)
+                .and_then(|(params, _)| params.get(index))
+                == Some(&scalar_type("bool"))
+        },
+    )
 }
 
 pub(in crate::lowering::buffer_loop_outline) fn computed_record_expression_roots(
     pending: Vec<(&NirExpr, usize, bool)>,
     layouts: &impl control_values::ValueLayouts,
 ) -> bool {
-    roots_with_fields(pending, true, |record, field| {
-        layouts
-            .fields(record)
-            .and_then(|mut fields| fields.find(|(name, _)| *name == field))
-            .is_some_and(|(_, ty)| ty == scalar_type("bool"))
-    })
+    roots_with_fields(
+        pending,
+        true,
+        |record, field| {
+            layouts
+                .fields(record)
+                .and_then(|mut fields| fields.find(|(name, _)| *name == field))
+                .is_some_and(|(_, ty)| ty == scalar_type("bool"))
+        },
+        |_, _| false,
+    )
 }
 
 fn roots_with_fields(
     pending: Vec<(&NirExpr, usize, bool)>,
     computed_gate: bool,
     bool_field: impl Fn(&str, &str) -> bool,
+    logical_argument: impl Fn(&str, usize) -> bool,
 ) -> bool {
     let mut pending = pending
         .into_iter()
@@ -136,11 +159,15 @@ fn roots_with_fields(
                     (rhs.as_ref(), depth + 1, false, false),
                 ]);
             }
-            NirExpr::Call { args, .. } => {
+            NirExpr::Call { callee, args } => {
                 if pending.len() + args.len() > work {
                     return false;
                 }
-                pending.extend(args.iter().map(|arg| (arg, depth + 1, false, false)));
+                pending.extend(
+                    args.iter().enumerate().map(|(index, arg)| {
+                        (arg, depth + 1, logical_argument(callee, index), false)
+                    }),
+                );
             }
             NirExpr::StructLiteral {
                 type_name, fields, ..

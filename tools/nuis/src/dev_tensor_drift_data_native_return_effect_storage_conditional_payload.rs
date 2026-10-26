@@ -135,7 +135,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-return-effect-storage-ready-value-predicates",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/logical_conditions.rs",
-        required_patterns: &["ready_values::total_predicate(&rhs, scope)", "lhs: Box::new(predicate(*lhs, scope, names, helpers, guarded))"],
+        required_patterns: &["ready_values::total_predicate(&rhs, scope)", "*lhs, scope, names, helpers, guarded, layouts,"],
     },
     DevTensorDriftCheckSpec {
         id: "native-return-effect-storage-full-helper-budget",

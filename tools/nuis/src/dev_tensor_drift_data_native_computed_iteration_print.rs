@@ -6,7 +6,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_prints.rs",
         required_patterns: &[
             "pub(super) fn bounded",
-            "computed_expression_roots",
+            "computed_call_expression_roots",
             "pub(super) fn admit",
             "completed_pure_dependencies",
             "scalar_type(\"i64\")",
@@ -28,8 +28,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-computed-iteration-print-source-preflight",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers/control_body.rs",
         required_patterns: &[
-            "!iteration_prints::bounded(&function.body)",
-            "!iteration_prints::bounded(body)",
+            "!iteration_prints::bounded(&function.body, catalog)",
+            "!iteration_prints::bounded(body, catalog)",
             "Profile::IterationPrints",
         ],
     },

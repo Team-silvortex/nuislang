@@ -7,7 +7,9 @@ pub(super) fn validate_body(
     loop_layouts: Option<&control_values::CarryLayouts>,
     profile: Profile,
 ) -> Option<()> {
-    if matches!(profile, Profile::IterationPrints) && !iteration_prints::bounded(&function.body) {
+    if matches!(profile, Profile::IterationPrints)
+        && !iteration_prints::bounded(&function.body, catalog)
+    {
         return None;
     }
     let normalized = if let Some(loop_layouts) = loop_layouts {
@@ -70,7 +72,7 @@ fn validate_profile(
     loop_layouts: Option<&control_values::CarryLayouts>,
     profile: Profile,
 ) -> Option<()> {
-    if matches!(profile, Profile::IterationPrints) && !iteration_prints::bounded(body) {
+    if matches!(profile, Profile::IterationPrints) && !iteration_prints::bounded(body, catalog) {
         return None;
     }
     let mut locals = function

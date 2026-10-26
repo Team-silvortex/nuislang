@@ -125,7 +125,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "matches!(node.op.instruction.as_str(), \"div\" | \"rem\")",
             "native integer division/remainder",
-            "require_value(node, operand, CpuCallScalarKind::I64, registers)?",
+            "Some(LlvmValueRef::F32(_)), Some(LlvmValueRef::F32(_))",
+            "Some(LlvmValueRef::F64(_)), Some(LlvmValueRef::F64(_))",
+            "_ => CpuCallScalarKind::I64",
+            "require_value(node, operand, kind, registers)?",
         ],
     },
     DevTensorDriftCheckSpec {

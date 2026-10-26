@@ -17,6 +17,7 @@ mod call_lowering;
 mod call_parameters;
 mod call_return;
 mod cast_lowering;
+mod checked_float_division;
 mod data_ingress_lowering;
 mod effect_flow_loop_lowering;
 mod emit_utils;

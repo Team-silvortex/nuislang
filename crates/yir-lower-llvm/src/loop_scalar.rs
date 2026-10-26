@@ -160,6 +160,9 @@ pub(crate) fn emit_loop_numeric_op(
     lhs: &str,
     rhs: &str,
 ) -> Result<String, String> {
+    if op == "div" && kind != CpuLoopScalarKind::I64 {
+        super::checked_float_division::check(rhs, loop_scalar_llvm_type(kind), body, next_reg);
+    }
     let reg = fresh_reg(next_reg);
     match kind {
         CpuLoopScalarKind::I64 => {

@@ -19,7 +19,7 @@ pub(super) fn validate(
             require_value(node, &node.op.args[0], CpuCallScalarKind::Bool, registers)?;
         }
     }
-    // The generic opcodes also accept other kinds; this native slice is i64-only.
+    // Division requires a matching pair; remainder remains exactly i64.
     if matches!(node.op.instruction.as_str(), "div" | "rem") {
         let [left, right] = node.op.args.as_slice() else {
             return Err(format!(
@@ -27,8 +27,21 @@ pub(super) fn validate(
                 node.name
             ));
         };
+        let kind = match (
+            node.op.instruction.as_str(),
+            registers.get(left),
+            registers.get(right),
+        ) {
+            ("div", Some(LlvmValueRef::F32(_)), Some(LlvmValueRef::F32(_))) => {
+                CpuCallScalarKind::F32
+            }
+            ("div", Some(LlvmValueRef::F64(_)), Some(LlvmValueRef::F64(_))) => {
+                CpuCallScalarKind::F64
+            }
+            _ => CpuCallScalarKind::I64,
+        };
         for operand in [left, right] {
-            require_value(node, operand, CpuCallScalarKind::I64, registers)?;
+            require_value(node, operand, kind, registers)?;
         }
     }
     if matches!(

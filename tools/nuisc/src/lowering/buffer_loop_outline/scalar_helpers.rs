@@ -352,6 +352,41 @@ pub(super) fn pure_i64_parameter_type(
     helper.params.get(index).cloned()
 }
 
+pub(super) fn pure_float_parameters<'a>(
+    callee: &str,
+    result: &NirTypeRef,
+    catalog: &'a ScalarHelpers,
+) -> Option<&'a [NirTypeRef]> {
+    let (params, actual) = pure_scalar_signature(callee, catalog)?;
+    (matches!(result.name.as_str(), "f32" | "f64") && actual == result).then_some(params)
+}
+
+pub(super) fn pure_scalar_signature<'a>(
+    callee: &str,
+    catalog: &'a ScalarHelpers,
+) -> Option<(&'a [NirTypeRef], &'a NirTypeRef)> {
+    let helper = catalog.get(callee)?;
+    (helper.pure_value
+        && helper.result == scalar_type(&helper.result.name)
+        && matches!(
+            helper.result.name.as_str(),
+            "bool" | "i32" | "i64" | "f32" | "f64"
+        )
+        && helper.params.iter().all(|ty| {
+            ty == &scalar_type(&ty.name)
+                && matches!(ty.name.as_str(), "bool" | "i32" | "i64" | "f32" | "f64")
+        }))
+    .then_some((helper.params.as_slice(), &helper.result))
+}
+
+pub(super) fn pure_float_signature<'a>(
+    callee: &str,
+    catalog: &'a ScalarHelpers,
+) -> Option<(&'a [NirTypeRef], &'a NirTypeRef)> {
+    let result = &catalog.get(callee)?.result;
+    Some((pure_float_parameters(callee, result, catalog)?, result))
+}
+
 pub(super) fn contains_calls(body: &[NirStmt]) -> bool {
     let mut calls = BTreeSet::new();
     collect_calls(body, &mut calls);
