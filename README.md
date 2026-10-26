@@ -16,10 +16,10 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.17.*`. Git history is authoritative; the dated
-[current snapshot](docs/versioning/nuis-beta-0.17.0-snapshot.md) records committed
+The repository is on `beta-0.18.*`. Git history is authoritative; the dated
+[current snapshot](docs/versioning/nuis-beta-0.18.0-snapshot.md) records committed
 identity separately from worktree follow-ups. Cargo package and protocol versions
-are independent. Use the [validation checklist](docs/versioning/nuis-beta-0.17.0-release-checklist.md)
+are independent. Use the [validation checklist](docs/versioning/nuis-beta-0.18.0-release-checklist.md)
 for operating gates and the [versioning index](docs/versioning/README.md) for history.
 
 The mainline is **ns-nova application-led development**: grow one Nuis-owned
@@ -106,7 +106,7 @@ one profile's acceptance must not be attributed to the other.
 | Area | Current Bounded Evidence | Remaining Boundary |
 | --- | --- | --- |
 | Returns and storage | [Independent effect order](docs/reference/nuis-native-return-effect-prefix-v1.md), [certified storage reuse](docs/reference/nuis-native-return-effect-storage-v1.md), and [owned-record origins](docs/reference/nuis-native-origin-record-join-v1.md). | Unproved reductions retain independent payload storage and a separate pending signal. |
-| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed field/call arguments](docs/reference/nuis-native-helper-call-argument-print-v1.md). | Exact fields and guarded checked RHSs, including completed pure bool/i64 helper operands; not ambient readiness, whole-record captures, effects or I/O/resource capture. |
+| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed field/call arguments](docs/reference/nuis-native-logical-helper-argument-print-v1.md). | Exact fields and guarded checked RHSs, including logical bool parameters of completed pure bool/i64 helpers; not ambient readiness, whole-record captures, effects or I/O/resource capture. |
 | Nested iteration | The [child-epoch follow-up](docs/reference/nuis-native-child-epoch-print-v1.md) checks fresh ready child entries, skipped work and later-parent failures. | Worktree evidence at the dated audit, not automatically part of the committed release. |
 
 The [mainline map](docs/current-mainline-map.md) owns the next selected proof and
@@ -215,7 +215,7 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-The [current validation checklist](docs/versioning/nuis-beta-0.17.0-release-checklist.md)
+The [current validation checklist](docs/versioning/nuis-beta-0.18.0-release-checklist.md)
 separates existing CI coverage from focused native, migration and provider checks.
 The [beta-0.12 checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
 remains historical evidence, not a current acceptance result.

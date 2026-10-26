@@ -172,19 +172,15 @@ fn helper_call_argument_print_epoch_keeps_auxiliary_logical_argument_roots_close
     let module = helpers_module();
     let layouts = control_values::layouts(&module);
     let catalog = scalar_helpers::collect_iteration_calls(&module, &layouts);
-    let value = selector(binary(
-        NirBinaryOp::And,
-        projected("flag"),
-        call(
-            "all",
-            vec![
-                binary(NirBinaryOp::And, projected("flag"), positive()),
-                projected("tag"),
-                projected("total"),
-                projected("small"),
-                projected("wide"),
-            ],
-        ),
+    let value = selector(call(
+        "all",
+        vec![
+            binary(NirBinaryOp::And, projected("flag"), positive()),
+            projected("tag"),
+            projected("total"),
+            projected("small"),
+            projected("wide"),
+        ],
     ));
     assert!(!iteration_prints::bounded(
         &[NirStmt::Print(value.clone())],
@@ -316,3 +312,6 @@ fn helper_call_argument_print_epoch_source_keeps_skipped_calls_under_sign_wrappe
         }
     }
 }
+
+#[path = "logical_helper_argument_print_epoch_tests.rs"]
+mod logical_arguments;

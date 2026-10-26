@@ -60,6 +60,7 @@ mod field_epoch_print;
 mod float_call_field_epoch_print;
 #[path = "helper_call_argument_print_epoch.rs"]
 mod helper_call_argument_print_epoch;
+
 #[path = "i32_field_epoch_print.rs"]
 mod i32_field_epoch_print;
 #[path = "joined_record_return.rs"]
@@ -68,6 +69,8 @@ mod joined_record_return;
 mod lazy_call_argument_print_epoch;
 #[path = "local_record_return.rs"]
 mod local_record_return;
+#[path = "logical_helper_argument_print_epoch.rs"]
+mod logical_helper_argument_print_epoch;
 #[path = "origin_record_join.rs"]
 mod origin_record_join;
 #[path = "unary_float_field_epoch_print.rs"]

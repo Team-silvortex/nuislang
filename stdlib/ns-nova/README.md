@@ -65,7 +65,7 @@ See the [roadmap](../../docs/versioning/nuis-beta-0.11-application-led-mainline.
 and [separate acceptance coordinates](../../docs/reference/nuis-development-tensor-mainline.md).
 Bounded Metal output is established; engine maturity and compiler self-hosting
 are not inferred from that evidence.
-The [current snapshot](../../docs/versioning/nuis-beta-0.17.0-snapshot.md) and
+The [current snapshot](../../docs/versioning/nuis-beta-0.18.0-snapshot.md) and
 [native proof index](../../docs/reference/nuis-native-session-proof-index.md)
 separate current CPU prerequisites from the embedded-YIR image/window route.
 The [beta-0.12 snapshot](../../docs/versioning/nuis-beta-0.12.0-snapshot.md)

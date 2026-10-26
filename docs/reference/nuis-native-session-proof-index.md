@@ -7,9 +7,8 @@ Later bounded proofs may advance earlier vetoes; do not add their test totals.
 
 ## Current Evidence
 
-The [helper call-argument follow-up](nuis-native-helper-call-argument-print-v1.md)
-is the latest bounded CPU worktree proof at the dated
-[snapshot](../versioning/nuis-beta-0.17.0-snapshot.md).
+The [logical helper-argument follow-up](nuis-native-logical-helper-argument-print-v1.md)
+is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
 It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md)
 and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [fresh child entries](nuis-native-child-epoch-print-v1.md) and
@@ -63,6 +62,7 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native Computed Call Argument Print V1](nuis-native-computed-call-argument-print-v1.md)
 - [Native Lazy Call Argument Print V1](nuis-native-lazy-call-argument-print-v1.md)
 - [Native Helper Call Argument Print V1](nuis-native-helper-call-argument-print-v1.md)
+- [Native Logical Helper Argument Print V1](nuis-native-logical-helper-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 

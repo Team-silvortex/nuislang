@@ -14,8 +14,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "!logical_root",
             "(!computed_gate && depth != 0)",
             "!computed_gate",
-            "(lhs.as_ref(), depth + 1, false, false)",
-            "(rhs.as_ref(), depth + 1, false, false)",
+            "(lhs.as_ref(), depth + 1, false, false, lazy_rhs)",
+            "(rhs.as_ref(), depth + 1, false, false, lazy_rhs)",
         ],
     },
     DevTensorDriftCheckSpec {

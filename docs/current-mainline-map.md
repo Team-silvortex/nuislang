@@ -5,10 +5,10 @@ Use code/tests and the live development tensor to resolve implementation claims.
 
 ## Current Direction
 
-The current `beta-0.17.*` priority is ns-nova application-led development.
+The current `beta-0.18.*` priority is ns-nova application-led development.
 Git history is authoritative; dated committed identity and worktree follow-ups
-are separated in the [snapshot](versioning/nuis-beta-0.17.0-snapshot.md).
-The [validation checklist](versioning/nuis-beta-0.17.0-release-checklist.md) gives
+are separated in the [snapshot](versioning/nuis-beta-0.18.0-snapshot.md).
+The [validation checklist](versioning/nuis-beta-0.18.0-release-checklist.md) gives
 operating gates; the [proof index](reference/nuis-native-session-proof-index.md)
 catalogues detailed native-session receipts without duplicating them here.
 
@@ -48,11 +48,11 @@ regressions may interrupt it; documentation maintenance does not advance it.
 | Pre-update f32/f64 field sign-negation chains at pure-i64 helper arguments | [Compositional unary arguments](reference/nuis-native-nested-unary-float-field-epoch-print-v1.md), retaining original-field proofs, cumulative depth and raw sign/payload controls. |
 | Same-kind float arithmetic over certified fields and ready leaves | [Binary argument plan](reference/nuis-native-binary-float-field-epoch-print-v1.md), including checked zero division and separate arithmetic/State evidence. |
 
-The [helper call-argument follow-up](reference/nuis-native-helper-call-argument-print-v1.md)
-adds completed pure bool/i64 helper operands inside guarded RHSs with exact
-scalar captures. The next selected gate is **logical bool arguments of auxiliary
-helpers** inside that lazy scope, without opening ordinary call roots, whole
-records or eager checked work.
+The [logical helper-argument follow-up](reference/nuis-native-logical-helper-argument-print-v1.md)
+adds exact bool argument trees of completed pure bool/i64 helpers inside guarded
+RHSs. The next selected gate is **same-kind float comparisons** inside this
+call-argument profile, without opening ordinary call roots, whole records or
+eager checked work.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

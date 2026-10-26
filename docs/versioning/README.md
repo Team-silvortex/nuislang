@@ -12,12 +12,12 @@ below and the [repository cleanup policy](../repo-cleanup-candidates.md) instead
 
 ### Current Line
 
-For the current `beta-0.17.*` line, start with:
+For the current `beta-0.18.*` line, start with:
 
-* [Beta-0.17 snapshot](nuis-beta-0.17.0-snapshot.md)
-* [Beta-0.17 validation checklist](nuis-beta-0.17.0-release-checklist.md)
+* [Beta-0.18 snapshot](nuis-beta-0.18.0-snapshot.md)
+* [Beta-0.18 validation checklist](nuis-beta-0.18.0-release-checklist.md)
 
-Git records the minor entry at `ccc16af9` (`beta-0.17.0`, 2026-10-15).
+Git records the minor entry at `7f61e841` (`beta-0.18.0`, 2026-10-26).
 The dated snapshot owns the committed patch table and distinguishes worktree
 follow-ups; Git history is authoritative after that audit. Navigation updates
 do not create a release or certify later work.
@@ -28,6 +28,11 @@ Each receipt retains its own counts and scope; use the live tensor for the next
 task. Cargo/protocol versions remain independent from project releases.
 
 ### Previous Minor Checkpoints
+
+The beta-0.17 entry remains `ccc16af9` (`beta-0.17.0`, 2026-10-15):
+
+* [Beta-0.17 snapshot](nuis-beta-0.17.0-snapshot.md)
+* [Beta-0.17 validation checklist](nuis-beta-0.17.0-release-checklist.md)
 
 The beta-0.16 entry remains `dff1bdbc` (`beta-0.16.0`, 2026-10-07):
 

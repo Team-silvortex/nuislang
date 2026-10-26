@@ -97,6 +97,8 @@ The coordinate remains
 selected gate is scoped logical bool arguments of auxiliary helpers inside lazy
 RHSs. Shape permission must follow the completed signature and lazy subtree,
 without opening ordinary call roots, whole records or eager checked work.
+The later [scoped logical-argument follow-up](nuis-native-logical-helper-argument-print-v1.md)
+advances that bounded gate; this receipt retains its original results.
 Inline float comparisons, i32 arithmetic/return-helper grants, casts, resources,
 I/O/async capture, full native ns-nova, stable ABI, backend parity and self-hosting
 remain separate gates.

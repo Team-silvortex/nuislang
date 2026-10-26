@@ -97,6 +97,9 @@ mod lazy_call_argument_print;
 #[path = "dev_tensor_drift_data_native_helper_call_argument_print.rs"]
 mod helper_call_argument_print;
 
+#[path = "dev_tensor_drift_data_native_logical_helper_argument_print.rs"]
+mod logical_helper_argument_print;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
 mod return_effect_storage_conditional_payload;
 
@@ -671,6 +674,7 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         computed_call_argument_print::CHECKS,
         lazy_call_argument_print::CHECKS,
         helper_call_argument_print::CHECKS,
+        logical_helper_argument_print::CHECKS,
         return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,

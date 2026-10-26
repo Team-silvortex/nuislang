@@ -45,10 +45,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
             "computed_call_expression_roots",
-            "scalar_helpers::pure_float_signature(callee, catalog)",
+            "scalar_helpers::pure_scalar_signature(callee, catalog)",
             "params.get(index)",
             "Some(&scalar_type(\"bool\"))",
-            "roots_with_fields(pending, computed_gate, |_, _| false, |_, _| false)",
+            "roots_with_fields(pending, computed_gate, |_, _| false, |_, _, _| false)",
             "let mut logical_edges = 32usize",
         ],
     },

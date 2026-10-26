@@ -6,13 +6,13 @@ tensor and focused reference contracts when they disagree.
 
 ## Read This First
 
-The current series is `beta-0.17.*`. The dated snapshot is the single entrypoint
+The current series is `beta-0.18.*`. The dated snapshot is the single entrypoint
 for committed patch identity; Git history is authoritative after that audit.
 Worktree follow-ups and historical acceptance stay separate.
 
 1. [Current mainline map](current-mainline-map.md)
-2. [Current snapshot](versioning/nuis-beta-0.17.0-snapshot.md)
-3. [Focused validation checklist](versioning/nuis-beta-0.17.0-release-checklist.md)
+2. [Current snapshot](versioning/nuis-beta-0.18.0-snapshot.md)
+3. [Focused validation checklist](versioning/nuis-beta-0.18.0-release-checklist.md)
 4. [Mainline dependency selection](reference/nuis-development-tensor-mainline.md)
 5. [Native session proof index](reference/nuis-native-session-proof-index.md)
 6. [Runnable image application](../examples/projects/domains/ns_nova_image_showcase/README.md)

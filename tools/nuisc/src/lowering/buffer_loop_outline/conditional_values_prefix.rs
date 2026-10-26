@@ -68,7 +68,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_expression_roots(
 }
 
 fn roots(pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool {
-    roots_with_fields(pending, computed_gate, |_, _| false, |_, _| false)
+    roots_with_fields(pending, computed_gate, |_, _| false, |_, _, _| false)
 }
 
 // This opens typed argument shape only. The caller still proves reads and laziness.
@@ -80,8 +80,13 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_call_expression_roots(
         pending,
         true,
         |_, _| false,
-        |callee, index| {
-            scalar_helpers::pure_float_signature(callee, catalog)
+        |callee, index, lazy_rhs| {
+            // Auxiliary calls inherit argument shape only below an authorized RHS.
+            scalar_helpers::pure_scalar_signature(callee, catalog)
+                .filter(|(_, result)| {
+                    matches!(result.name.as_str(), "f32" | "f64")
+                        || (lazy_rhs && matches!(result.name.as_str(), "bool" | "i64"))
+                })
                 .and_then(|(params, _)| params.get(index))
                 == Some(&scalar_type("bool"))
         },
@@ -101,7 +106,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_record_expression_roots
                 .and_then(|mut fields| fields.find(|(name, _)| *name == field))
                 .is_some_and(|(_, ty)| ty == scalar_type("bool"))
         },
-        |_, _| false,
+        |_, _, _| false,
     )
 }
 
@@ -109,15 +114,15 @@ fn roots_with_fields(
     pending: Vec<(&NirExpr, usize, bool)>,
     computed_gate: bool,
     bool_field: impl Fn(&str, &str) -> bool,
-    logical_argument: impl Fn(&str, usize) -> bool,
+    logical_argument: impl Fn(&str, usize, bool) -> bool,
 ) -> bool {
     let mut pending = pending
         .into_iter()
-        .map(|(expr, depth, logical)| (expr, depth, logical, true))
+        .map(|(expr, depth, logical)| (expr, depth, logical, true, false))
         .collect::<Vec<_>>();
     let mut work = 4096usize;
     let mut logical_edges = 32usize;
-    while let Some((expr, depth, logical_root, record_root)) = pending.pop() {
+    while let Some((expr, depth, logical_root, record_root, lazy_rhs)) = pending.pop() {
         if depth >= 64 || work == 0 {
             return false;
         }
@@ -146,8 +151,8 @@ fn roots_with_fields(
                     logical_edges -= 1;
                 }
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, computed_gate, false),
-                    (rhs.as_ref(), depth + 1, computed_gate, false),
+                    (lhs.as_ref(), depth + 1, computed_gate, false, lazy_rhs),
+                    (rhs.as_ref(), depth + 1, computed_gate, false, true),
                 ]);
             }
             NirExpr::Binary { lhs, rhs, .. } => {
@@ -155,19 +160,23 @@ fn roots_with_fields(
                     return false;
                 }
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, false, false),
-                    (rhs.as_ref(), depth + 1, false, false),
+                    (lhs.as_ref(), depth + 1, false, false, lazy_rhs),
+                    (rhs.as_ref(), depth + 1, false, false, lazy_rhs),
                 ]);
             }
             NirExpr::Call { callee, args } => {
                 if pending.len() + args.len() > work {
                     return false;
                 }
-                pending.extend(
-                    args.iter().enumerate().map(|(index, arg)| {
-                        (arg, depth + 1, logical_argument(callee, index), false)
-                    }),
-                );
+                pending.extend(args.iter().enumerate().map(|(index, arg)| {
+                    (
+                        arg,
+                        depth + 1,
+                        logical_argument(callee, index, lazy_rhs),
+                        false,
+                        lazy_rhs,
+                    )
+                }));
             }
             NirExpr::StructLiteral {
                 type_name, fields, ..
@@ -181,6 +190,7 @@ fn roots_with_fields(
                         depth + 1,
                         record_root && bool_field(type_name, name),
                         record_root,
+                        lazy_rhs,
                     )
                 }));
             }
@@ -191,7 +201,7 @@ fn roots_with_fields(
             | NirExpr::UnpackF32Word(base)
             | NirExpr::PackF64Word(base)
             | NirExpr::UnpackF64Word(base) => {
-                pending.push((base.as_ref(), depth + 1, false, false))
+                pending.push((base.as_ref(), depth + 1, false, false, lazy_rhs))
             }
             _ => return false,
         }

@@ -66,6 +66,7 @@ mod float_call_field_epoch_print;
 mod float_ieee_comparisons;
 #[path = "native_application_bridge/helper_call_argument_print_epoch.rs"]
 mod helper_call_argument_print_epoch;
+
 #[path = "native_application_bridge/i32_field_epoch_print.rs"]
 mod i32_field_epoch_print;
 #[path = "native_application_bridge/joined_record_return.rs"]
@@ -74,6 +75,8 @@ mod joined_record_return;
 mod lazy_call_argument_print_epoch;
 #[path = "native_application_bridge/local_record_return.rs"]
 mod local_record_return;
+#[path = "native_application_bridge/logical_helper_argument_print_epoch.rs"]
+mod logical_helper_argument_print_epoch;
 #[path = "native_application_bridge/origin_record_join.rs"]
 mod origin_record_join;
 #[path = "native_application_bridge/unary_float_field_epoch_print.rs"]

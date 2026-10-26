@@ -7,14 +7,14 @@ tensor and later profile-specific follow-ups to resolve apparent contradictions.
 
 ## Read First
 
-The current line is beta-0.17. Git identity belongs in the dated snapshot, not
+The current line is beta-0.18. Git identity belongs in the dated snapshot, not
 a copied patch number in every index.
 
 | Question | Start With |
 | --- | --- |
 | What can I run and what remains open? | [Mainline map](../current-mainline-map.md) |
-| Which committed patch and worktree follow-up does this audit describe? | [Dated snapshot](../versioning/nuis-beta-0.17.0-snapshot.md) |
-| Which checks should I choose? | [Operating checklist](../versioning/nuis-beta-0.17.0-release-checklist.md) |
+| Which committed patch and worktree follow-up does this audit describe? | [Dated snapshot](../versioning/nuis-beta-0.18.0-snapshot.md) |
+| Which checks should I choose? | [Operating checklist](../versioning/nuis-beta-0.18.0-release-checklist.md) |
 | Where are scoped native CPU proofs? | [Proof catalog](nuis-native-session-proof-index.md) |
 | Which task is selected and why? | [Tensor selection](nuis-development-tensor-mainline.md) |
 
