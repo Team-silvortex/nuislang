@@ -7,8 +7,7 @@ Later bounded proofs may advance earlier vetoes; do not add their test totals.
 
 ## Current Evidence
 
-The [logical helper-argument follow-up](nuis-native-logical-helper-argument-print-v1.md)
-is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
+The [logical i32 parameter follow-up](nuis-native-logical-i32-call-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
 It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md)
 and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [fresh child entries](nuis-native-child-epoch-print-v1.md) and
@@ -17,9 +16,7 @@ and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
 [raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and
 [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
-proof adds guarded pure auxiliary calls with exact scalar RHS captures.
-The map owns the next selected gate; whole-record readiness remains separate.
-
+proof adds scoped logical i32 parameters with comparison-only results; the map owns the next gate.
 Original reference files, anchors, fixtures and regression registrations remain
 available below. The backlog of further changing backedges and wide private captures
 is separate from this selected gate.
@@ -63,6 +60,9 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native Lazy Call Argument Print V1](nuis-native-lazy-call-argument-print-v1.md)
 - [Native Helper Call Argument Print V1](nuis-native-helper-call-argument-print-v1.md)
 - [Native Logical Helper Argument Print V1](nuis-native-logical-helper-argument-print-v1.md)
+- [Native Float Compare Argument Print V1](nuis-native-float-compare-argument-print-v1.md)
+- [Native I32 Call Argument Print V1](nuis-native-i32-call-argument-print-v1.md)
+- [Native Logical I32 Call Argument Print V1](nuis-native-logical-i32-call-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 

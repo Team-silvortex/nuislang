@@ -9,7 +9,7 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.0 | `7f61e841` | 2026-10-26 |
+| Latest committed patch at this audit, beta-0.18.0 | `45a9f0c8` | 2026-10-26 |
 | Previous minor entry, beta-0.17.0 | `ccc16af9` | 2026-10-15 |
 
 Git remains authoritative after this audit. The
@@ -39,14 +39,32 @@ The [proof index](../reference/nuis-native-session-proof-index.md) owns the full
 source/native/source-free chain. Each receipt retains its exact types, original
 read permissions, budgets, Git baseline and executed validation.
 
-## Current Worktree Follow-Up
+## Committed Follow-Up
 
 The [logical auxiliary-argument proof](../reference/nuis-native-logical-helper-argument-print-v1.md)
-is a follow-up to `7f61e841`, not part of that committed entry. It permits logical
+is now committed in `45a9f0c8`, not part of that committed entry. It permits logical
 bool arguments at exact bool parameters of completed pure bool/i64 helpers only
 inside an already-authorized lazy RHS subtree. Ordinary prefixes/call roots,
 whole-record reads, transitive effects and unproved capture reductions stay closed.
 Its own receipt records selected execution and delivery validation separately.
+
+## Current Worktree Follow-Up
+
+The [float comparison argument proof](../reference/nuis-native-float-compare-argument-print-v1.md)
+is a worktree follow-up to `45a9f0c8`. It composes exact same-kind f32/f64
+comparisons inside the existing call-argument proof, preserving original read
+permissions, guarded operands and separate failure/State publication. Its own
+receipt owns executed validation rather than inheriting earlier totals.
+
+The [comparison-only i32 follow-up](../reference/nuis-native-i32-call-argument-print-v1.md)
+adds completed pure i32 helper results only in lazy RHS comparisons. Its provenance
+check prevents new argument/read authority from escaping through non-i32 consumers,
+arithmetic or casts; it is a further worktree proof, not a new committed release.
+
+The [logical i32 parameter follow-up](../reference/nuis-native-logical-i32-call-argument-print-v1.md)
+extends exact bool parameter shapes only inside that lazy scope. It retains the
+comparison-only result rule, scalar capture bounds and separate source/native/
+source-free delivery evidence; it is not a general argument-readiness grant.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

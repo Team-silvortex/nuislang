@@ -59,7 +59,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/print_binary_float.rs",
         required_patterns: &[
             "captures: BTreeSet<Vec<String>>",
-            "!right.total && right.captures.len() > 31",
+            "(!right.total || !right.ready_predicate)",
+            "right.captures.len() > 31",
             "left.captures.append(&mut right.captures)",
             "captures.append(&mut proof.captures)",
         ],

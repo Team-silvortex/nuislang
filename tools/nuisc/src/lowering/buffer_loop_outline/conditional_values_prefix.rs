@@ -85,7 +85,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_call_expression_roots(
             scalar_helpers::pure_scalar_signature(callee, catalog)
                 .filter(|(_, result)| {
                     matches!(result.name.as_str(), "f32" | "f64")
-                        || (lazy_rhs && matches!(result.name.as_str(), "bool" | "i64"))
+                        || (lazy_rhs && matches!(result.name.as_str(), "bool" | "i32" | "i64"))
                 })
                 .and_then(|(params, _)| params.get(index))
                 == Some(&scalar_type("bool"))

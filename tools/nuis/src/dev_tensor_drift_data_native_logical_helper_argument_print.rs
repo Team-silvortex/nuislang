@@ -6,7 +6,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
             "scalar_helpers::pure_scalar_signature(callee, catalog)",
-            "lazy_rhs && matches!(result.name.as_str(), \"bool\" | \"i64\")",
+            "lazy_rhs && matches!(result.name.as_str(), \"bool\" | \"i32\" | \"i64\")",
             "params.get(index)",
             "Some(&scalar_type(\"bool\"))",
         ],

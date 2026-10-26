@@ -71,6 +71,15 @@ mod lazy_call_argument_print_epoch;
 mod local_record_return;
 #[path = "logical_helper_argument_print_epoch.rs"]
 mod logical_helper_argument_print_epoch;
+
+#[path = "float_compare_argument_print_epoch.rs"]
+mod float_compare_argument_print_epoch;
+
+#[path = "i32_call_argument_print_epoch.rs"]
+mod i32_call_argument_print_epoch;
+
+#[path = "logical_i32_call_argument_print_epoch.rs"]
+mod logical_i32_call_argument_print_epoch;
 #[path = "origin_record_join.rs"]
 mod origin_record_join;
 #[path = "unary_float_field_epoch_print.rs"]

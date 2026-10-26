@@ -3,6 +3,9 @@ use super::*;
 struct Proof {
     ty: NirTypeRef,
     total: bool,
+    ready_atom: bool,
+    ready_predicate: bool,
+    comparison_only: bool,
     captures: BTreeSet<Vec<String>>,
 }
 
@@ -50,7 +53,7 @@ pub(super) fn validate(
                         let (params, result) =
                             scalar_helpers::pure_scalar_signature(callee, catalog)?;
                         if !matches!(result.name.as_str(), "f32" | "f64")
-                            && !(lazy_rhs && matches!(result.name.as_str(), "bool" | "i64"))
+                            && !(lazy_rhs && matches!(result.name.as_str(), "bool" | "i32" | "i64"))
                         {
                             return None;
                         }
@@ -118,6 +121,10 @@ pub(super) fn validate(
                             captures.insert(path);
                         }
                         proofs.push(Proof {
+                            ready_atom: !matches!(value, NirExpr::FieldAccess { .. }),
+                            ready_predicate: !matches!(value, NirExpr::FieldAccess { .. })
+                                && ty == scalar_type("bool"),
+                            comparison_only: false,
                             ty,
                             total: true,
                             captures,
@@ -133,13 +140,22 @@ pub(super) fn validate(
             }
             Step::Call(count, result) => {
                 let mut captures = BTreeSet::new();
+                let mut comparison_only = false;
                 for mut proof in proofs.drain(proofs.len().checked_sub(count)?..) {
+                    comparison_only |= proof.comparison_only;
                     captures.append(&mut proof.captures);
+                }
+                // A new i32 call result may flow through i32 calls, not escape as argument readiness.
+                if comparison_only && result != &scalar_type("i32") {
+                    return None;
                 }
                 // A pure call can fail even though capturing its scalar inputs is total.
                 proofs.push(Proof {
                     ty: result.clone(),
                     total: false,
+                    ready_atom: false,
+                    ready_predicate: false,
+                    comparison_only: result == &scalar_type("i32"),
                     captures,
                 });
             }
@@ -147,13 +163,29 @@ pub(super) fn validate(
                 if proofs.last()?.ty != expected {
                     return None;
                 }
+                proofs.last_mut()?.ready_atom = false;
+                proofs.last_mut()?.ready_predicate = false;
             }
             Step::Binary(op, lhs, rhs) => {
                 let mut right = proofs.pop()?;
                 let mut left = proofs.pop()?;
+                if (left.comparison_only || right.comparison_only)
+                    && !matches!(
+                        op,
+                        NirBinaryOp::Eq
+                            | NirBinaryOp::Ne
+                            | NirBinaryOp::Lt
+                            | NirBinaryOp::Le
+                            | NirBinaryOp::Gt
+                            | NirBinaryOp::Ge
+                    )
+                {
+                    return None;
+                }
                 match op {
                     NirBinaryOp::And | NirBinaryOp::Or
-                        if !right.total && right.captures.len() > 31 =>
+                        if (!right.total || !right.ready_predicate)
+                            && right.captures.len() > 31 =>
                     {
                         return None
                     }
@@ -164,29 +196,36 @@ pub(super) fn validate(
                     {
                         return None
                     }
+                    _ => {}
+                }
+                let total =
+                    left.total && right.total && !matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem);
+                // Non-trapping fields/arithmetic can still require a private RHS helper.
+                let ready_predicate = match op {
+                    NirBinaryOp::And | NirBinaryOp::Or => {
+                        left.ready_predicate && right.ready_predicate
+                    }
                     NirBinaryOp::Eq
                     | NirBinaryOp::Ne
                     | NirBinaryOp::Lt
                     | NirBinaryOp::Le
                     | NirBinaryOp::Gt
-                    | NirBinaryOp::Ge
-                        if matches!(left.ty.name.as_str(), "f32" | "f64") =>
-                    {
-                        return None
-                    }
-                    _ => {}
-                }
-                let total =
-                    left.total && right.total && !matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem);
+                    | NirBinaryOp::Ge => left.ready_atom && right.ready_atom,
+                    _ => false,
+                };
                 left.captures.append(&mut right.captures);
                 let ty = control_values::binary_type(op, left.ty, right.ty)?;
                 proofs.push(Proof {
                     ty,
                     total,
+                    ready_atom: false,
+                    ready_predicate,
+                    comparison_only: false,
                     captures: left.captures,
                 });
             }
         }
     }
-    (computed && proofs.len() == 1 && proofs[0].ty == *expected).then_some(())
+    (computed && proofs.len() == 1 && proofs[0].ty == *expected && !proofs[0].comparison_only)
+        .then_some(())
 }

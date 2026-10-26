@@ -1,0 +1,52 @@
+mod cpu Main {
+    struct State { total: f64 }
+    struct Pair { total: f64, tag: i64, flag: bool }
+    struct Outer { inner: Pair }
+    @noinline fn observe(value: f64, divisor: i64) -> i64 { if value < 0.0 { return -1 + 0 / divisor; } if value == 0.0 { return 0 / divisor; } if value != value { return 2 + 0 / divisor; } return 1 + 0 / divisor; }
+    @noinline fn quotient(value: i64, divisor: i64) -> i64 { return value / divisor; }
+    @noinline fn positive(value: i64, divisor: i64) -> bool { return quotient(value, divisor) > 0; }
+    @noinline fn accept(pick: bool, value: i64, divisor: i64) -> bool { let checked = quotient(value, divisor); return pick == (checked > 0); }
+    @noinline fn weight(pick: bool, value: i64, divisor: i64) -> i64 { let checked = quotient(value, divisor); if pick { return checked; } return 0; }
+    @noinline fn sample(value: f64, divisor: i64) -> f64 { let checked = 0 / divisor; return value; }
+    @noinline fn choose(value: f64, pick: bool, guard: i64) -> f64 { let checked = 0 / guard; if pick { return value; } return -value; }
+    @noinline fn finish(value: f64, divisor: i64) -> f64 { let checked = 0 / divisor; return value; }
+    @noinline fn work(seed: State, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64) -> State {
+        print(70);
+        let mut index = 0;
+        let mut current = Outer { inner: Pair { total: seed.total, tag: 100, flag: selected } };
+        while index < trips {
+            print(71);
+            print(observe(-choose(current.inner.total + ready, current.inner.flag && accept(sample(current.inner.total, first) == sample(ready, second), current.inner.tag, first), 1 + (current.inner.tag - current.inner.tag)), 1));
+            print(current.inner.tag);
+            current = Outer { inner: Pair { total: -current.inner.total, tag: current.inner.tag + delta, flag: selected == false } };
+            let mut local = current;
+            let mut child = 0;
+            while child < children {
+                print(72);
+                if selected { print(observe(-choose(ready - local.inner.total, local.inner.flag || accept((sample(ready, first) < local.inner.total) || ((local.inner.total <= sample(ready, second)) && (positive(quotient(local.inner.tag, first), second) || (local.inner.tag % (first - 2) > 0))), local.inner.tag, second), divisor - index - child), 1)); }
+                print(observe(-choose(local.inner.total - ready, local.inner.flag || positive(weight((local.inner.total > sample(ready, first)) || (sample(local.inner.total, second) >= ready) || (local.inner.tag % first > 0), local.inner.tag, second), second), 1 + 0 * local.inner.tag), 1));
+                print(local.inner.tag);
+                local = Outer { inner: Pair { total: -local.inner.total, tag: local.inner.tag + delta * 2, flag: selected } };
+                print(observe(-choose(local.inner.total - ready, local.inner.flag || positive(weight(sample(local.inner.total, first) != sample(ready, second), local.inner.tag, second), second), 1 + 0 * local.inner.tag), 1));
+                print(local.inner.tag);
+                child = child + 1;
+            }
+            print(74);
+            current = local;
+            index = index + 1;
+        }
+        print(73);
+        return State { total: finish(current.inner.total, tail) };
+    }
+    fn start(initial: f64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64) -> State {
+        print(90);
+        return work(State { total: initial }, selected, trips, children, delta, divisor, tail, ready, first, second);
+    }
+    fn step(state: State, initial: f64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64) -> State {
+        print(91);
+        return work(state, selected, trips, children, delta, divisor, tail, ready, first, second);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}
+

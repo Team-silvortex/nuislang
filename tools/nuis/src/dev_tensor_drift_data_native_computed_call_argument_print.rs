@@ -35,7 +35,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-computed-call-argument-lazy-boundary",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/print_binary_float.rs",
         required_patterns: &[
-            "!right.total && right.captures.len() > 31",
+            "(!right.total || !right.ready_predicate)",
+            "right.captures.len() > 31",
             "total: false",
             "!matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem)",
         ],

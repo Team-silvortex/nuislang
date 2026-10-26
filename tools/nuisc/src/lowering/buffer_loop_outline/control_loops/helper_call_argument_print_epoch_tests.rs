@@ -154,7 +154,7 @@ fn helper_call_argument_print_epoch_scopes_nested_calls_to_lazy_rhs_only() {
         binary(
             NirBinaryOp::Eq,
             call("narrow", vec![projected("tag")]),
-            projected("tag"),
+            projected("total"),
         ),
     ] {
         assert!(check(

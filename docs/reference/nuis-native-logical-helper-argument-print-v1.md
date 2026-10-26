@@ -86,6 +86,8 @@ The selected coordinate remains
 `standard-library/ns-nova/persistent-application-session`, active/99. The next
 gate is exact same-kind float comparisons in the existing guarded call-argument
 profile, with IEEE unordered/NaN/signed-zero and reached operand-fault evidence.
+The later [float comparison follow-up](nuis-native-float-compare-argument-print-v1.md)
+advances that scoped gate; these original results remain historical.
 I32 arithmetic/return-helper grants, casts, general resource/I/O/async capture,
 changing backedges, wide captures, full native engine/backend parity, stable ABI
 and compiler ownership transfer remain separate.

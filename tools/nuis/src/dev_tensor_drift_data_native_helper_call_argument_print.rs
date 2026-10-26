@@ -19,7 +19,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Step::Value(value, depth, false)",
             "Step::Value(value, depth, lazy_rhs)",
             "lazy_rhs || matches!(op, NirBinaryOp::And | NirBinaryOp::Or)",
-            "lazy_rhs && matches!(result.name.as_str(), \"bool\" | \"i64\")",
+            "lazy_rhs && matches!(result.name.as_str(), \"bool\" | \"i32\" | \"i64\")",
         ],
     },
     DevTensorDriftCheckSpec {

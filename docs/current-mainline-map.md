@@ -48,11 +48,11 @@ regressions may interrupt it; documentation maintenance does not advance it.
 | Pre-update f32/f64 field sign-negation chains at pure-i64 helper arguments | [Compositional unary arguments](reference/nuis-native-nested-unary-float-field-epoch-print-v1.md), retaining original-field proofs, cumulative depth and raw sign/payload controls. |
 | Same-kind float arithmetic over certified fields and ready leaves | [Binary argument plan](reference/nuis-native-binary-float-field-epoch-print-v1.md), including checked zero division and separate arithmetic/State evidence. |
 
-The [logical helper-argument follow-up](reference/nuis-native-logical-helper-argument-print-v1.md)
-adds exact bool argument trees of completed pure bool/i64 helpers inside guarded
-RHSs. The next selected gate is **same-kind float comparisons** inside this
-call-argument profile, without opening ordinary call roots, whole records or
-eager checked work.
+The [logical i32 parameter follow-up](reference/nuis-native-logical-i32-call-argument-print-v1.md)
+adds scoped exact bool argument trees while retaining comparison-only i32 results.
+The next gate is **computed bool equality/inequality operands**: evaluate both
+operands once in order while preserving their internal short-circuit trees, without
+opening ordinary roots, whole records, casts or arbitrary result consumers.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

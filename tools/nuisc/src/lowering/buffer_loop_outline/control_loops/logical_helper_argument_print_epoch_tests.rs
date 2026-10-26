@@ -268,3 +268,6 @@ fn logical_helper_argument_print_epoch_source_guards_nested_argument_calls() {
         }
     }
 }
+
+#[path = "float_compare_argument_print_epoch_tests.rs"]
+mod float_comparisons;
