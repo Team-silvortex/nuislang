@@ -31,7 +31,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "left.total &= right.total",
             "left.comparison_only = true",
             "left.captures.append(&mut right.captures)",
-            "if comparison_only && result != &scalar_type(\"i32\")",
+            "if proof.comparison_only && &proof.ty != result",
             "right.captures.len() > 31",
         ],
     },

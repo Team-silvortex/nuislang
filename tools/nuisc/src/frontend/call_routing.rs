@@ -13,8 +13,8 @@ use super::nova_builtins::{lower_nova_builtin_call, NovaBuiltinInput};
 use super::shader_builtins::{lower_shader_builtin_call, ShaderBuiltinInput};
 use super::task_builtins::{lower_task_builtin_call, TaskBuiltinInput};
 use super::{
-    i64_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts, ref_type, AstExpr,
-    FunctionSignature, NestedExprWithConstsInput, NirExpr, NirStructDef, NirTypeRef,
+    i32_type, i64_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts, ref_type,
+    AstExpr, FunctionSignature, NestedExprWithConstsInput, NirExpr, NirStructDef, NirTypeRef,
 };
 
 pub(super) struct RoutedCallLoweringInput<'a> {
@@ -142,6 +142,35 @@ pub(super) fn lower_routed_call_or_core_builtin(
     }
 
     let expr = match callee {
+        "i64_from_i32" => {
+            let [value] = args else {
+                return Err("i64_from_i32(...) expects exactly one argument".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("i64_from_i32(...) does not accept type arguments".to_owned());
+            }
+            let lowered = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+                expr: value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                expected: Some(&i32_type()),
+            })?;
+            let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                .ok_or_else(|| {
+                    "i64_from_i32(...) requires an explicit i32 input type".to_owned()
+                })?;
+            if lowered_ty != i32_type() {
+                return Err(format!(
+                    "i64_from_i32(...) expects `i32`, found `{}`",
+                    lowered_ty.render()
+                ));
+            }
+            NirExpr::CastI32ToI64(Box::new(lowered))
+        }
         "i32_from_i64" => {
             let [value] = args else {
                 return Err("i32_from_i64(...) expects exactly one argument".to_owned());

@@ -15,6 +15,8 @@ mod assignments_and_helpers;
 mod bool_xor;
 #[path = "tests_frontend_core/bytes_text.rs"]
 mod bytes_text;
+#[path = "tests_frontend_core/i32_widening.rs"]
+mod i32_widening;
 #[path = "tests_frontend_core/operator_overload.rs"]
 mod operator_overload;
 #[path = "tests_frontend_core/operator_precedence.rs"]
@@ -31,5 +33,7 @@ mod type_and_slice_typed;
 mod unary_and_project;
 #[path = "tests_frontend_core/unary_float_literals.rs"]
 mod unary_float_literals;
+#[path = "tests_frontend_core/unary_i32.rs"]
+mod unary_i32;
 #[path = "tests_frontend_core/visibility_const_destructure.rs"]
 mod visibility_const_destructure;

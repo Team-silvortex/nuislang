@@ -62,12 +62,12 @@ The latest scalar/typed-field-entry print route has focused entrypoints:
 
 ```sh
 cargo test -p nuisc --lib --locked -j1 -- print_epoch:: iteration_prints:: iteration_effects:: --test-threads=1
-cargo test -p nuisc --test native_application_bridge --locked -j1 -- i32_division_argument_print_epoch:: i32_arithmetic_argument_print_epoch:: bool_xor_argument_print_epoch:: bool_equality_argument_print_epoch:: logical_i32_call_argument_print_epoch:: i32_call_argument_print_epoch:: float_compare_argument_print_epoch:: logical_helper_argument_print_epoch:: helper_call_argument_print_epoch:: lazy_call_argument_print_epoch:: computed_call_argument_print_epoch:: float_call_field_epoch_print:: binary_float_field_epoch_print:: division_admission:: division_execution:: unary_float_field_epoch_print:: f64_field_epoch_print:: f32_field_epoch_print:: i32_field_epoch_print:: bool_field_epoch_print:: field_epoch_print:: child_epoch_print:: carry_epoch_print:: computed_iteration_print:: typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries literal_print_policy:: literal_print_execution:: --test-threads=1
-cargo test -p nuis --test native_session_workflow --locked -j1 -- i32_division_argument_print_epoch --test-threads=1 --nocapture
+cargo test -p nuisc --test native_application_bridge --locked -j1 -- i64_arithmetic_argument_print_epoch:: i32_widening_argument_print_epoch:: i32_negation_argument_print_epoch:: i32_literal_argument_print_epoch:: i32_division_argument_print_epoch:: i32_arithmetic_argument_print_epoch:: bool_xor_argument_print_epoch:: bool_equality_argument_print_epoch:: logical_i32_call_argument_print_epoch:: i32_call_argument_print_epoch:: float_compare_argument_print_epoch:: logical_helper_argument_print_epoch:: helper_call_argument_print_epoch:: lazy_call_argument_print_epoch:: computed_call_argument_print_epoch:: float_call_field_epoch_print:: binary_float_field_epoch_print:: division_admission:: division_execution:: unary_float_field_epoch_print:: f64_field_epoch_print:: f32_field_epoch_print:: i32_field_epoch_print:: bool_field_epoch_print:: field_epoch_print:: child_epoch_print:: carry_epoch_print:: computed_iteration_print:: typed_i32_scoped_record_carries typed_f32_scoped_record_carries typed_f64_scoped_record_carries literal_print_policy:: literal_print_execution:: --test-threads=1
+cargo test -p nuis --test native_session_workflow --locked -j1 -- i64_arithmetic_argument_print_epoch --test-threads=1 --nocapture
 ```
 
 These are focused entrypoints, not a replacement for adjacent checks selected by
-the actual edit. The [checked i32 Div/Rem argument receipt](../reference/nuis-native-i32-division-argument-print-v1.md)
+the actual edit. The [restricted i64 arithmetic argument receipt](../reference/nuis-native-i64-arithmetic-argument-print-v1.md)
 owns the exact latest witness and bounds; earlier compiler/storage families
 retain their own commands.
 

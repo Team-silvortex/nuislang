@@ -16,6 +16,9 @@ enum Step<'a> {
     Call(usize, &'a NirTypeRef),
     Sign(NirTypeRef),
     WrapI32,
+    LiteralI32,
+    NegI32,
+    WidenI32,
 }
 
 pub(super) fn validate(
@@ -41,6 +44,24 @@ pub(super) fn validate(
                 }
                 work -= 1;
                 match value {
+                    NirExpr::CastI32ToI64(operand) if lazy_rhs => {
+                        pending.push(Step::WidenI32);
+                        pending.push(Step::Value(operand, depth.checked_add(1)?, lazy_rhs));
+                        computed = true;
+                    }
+                    NirExpr::CastI64ToI32(word) if lazy_rhs && i32_literal(word) => {
+                        pending.push(Step::LiteralI32);
+                        pending.push(Step::Value(word, depth.checked_add(1)?, lazy_rhs));
+                        computed = true;
+                    }
+                    NirExpr::CastI64ToI32(word) if lazy_rhs && i32_neg_operand(word).is_some() => {
+                        let operand = i32_neg_operand(word)?;
+                        // Charge subtraction, its zero leaf and the operand's sign extension.
+                        work = work.checked_sub(3)?;
+                        pending.push(Step::NegI32);
+                        pending.push(Step::Value(operand, depth.checked_add(3)?, lazy_rhs));
+                        computed = true;
+                    }
                     NirExpr::CastI64ToI32(word) if lazy_rhs => {
                         let (left, right) = i32_operands(word)?;
                         // Charge the wide operation and both sign extensions, not just the wrap.
@@ -153,12 +174,12 @@ pub(super) fn validate(
                 let mut captures = BTreeSet::new();
                 let mut comparison_only = false;
                 for mut proof in proofs.drain(proofs.len().checked_sub(count)?..) {
+                    // Restricted values may cross a call only when its result keeps their kind.
+                    if proof.comparison_only && &proof.ty != result {
+                        return None;
+                    }
                     comparison_only |= proof.comparison_only;
                     captures.append(&mut proof.captures);
-                }
-                // A new i32 call result may flow through i32 calls, not escape as argument readiness.
-                if comparison_only && result != &scalar_type("i32") {
-                    return None;
                 }
                 // A pure call can fail even though capturing its scalar inputs is total.
                 proofs.push(Proof {
@@ -166,7 +187,7 @@ pub(super) fn validate(
                     total: false,
                     ready_atom: false,
                     ready_predicate: false,
-                    comparison_only: result == &scalar_type("i32"),
+                    comparison_only: comparison_only || result == &scalar_type("i32"),
                     captures,
                 });
             }
@@ -176,6 +197,35 @@ pub(super) fn validate(
                 }
                 proofs.last_mut()?.ready_atom = false;
                 proofs.last_mut()?.ready_predicate = false;
+            }
+            Step::WidenI32 => {
+                let proof = proofs.last_mut()?;
+                if proof.ty != scalar_type("i32") {
+                    return None;
+                }
+                proof.ty = scalar_type("i64");
+                proof.ready_atom = false;
+                proof.ready_predicate = false;
+                proof.comparison_only = true;
+            }
+            Step::NegI32 => {
+                let proof = proofs.last_mut()?;
+                if proof.ty != scalar_type("i32") {
+                    return None;
+                }
+                proof.ready_atom = false;
+                proof.ready_predicate = false;
+                proof.comparison_only = true;
+            }
+            Step::LiteralI32 => {
+                let proof = proofs.last_mut()?;
+                if proof.ty != scalar_type("i64") {
+                    return None;
+                }
+                proof.ty = scalar_type("i32");
+                proof.ready_atom = false;
+                proof.ready_predicate = false;
+                proof.comparison_only = true;
             }
             Step::WrapI32 => {
                 let mut right = proofs.pop()?;
@@ -198,6 +248,19 @@ pub(super) fn validate(
                     && matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem)
                     && left.ty == scalar_type("i32")
                     && right.ty == scalar_type("i32");
+                // Arithmetic composes the permission; only a comparison may consume it.
+                let restricted_i64 = lazy_rhs
+                    && (left.comparison_only || right.comparison_only)
+                    && left.ty == scalar_type("i64")
+                    && right.ty == scalar_type("i64")
+                    && matches!(
+                        op,
+                        NirBinaryOp::Add
+                            | NirBinaryOp::Sub
+                            | NirBinaryOp::Mul
+                            | NirBinaryOp::Div
+                            | NirBinaryOp::Rem
+                    );
                 if matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem)
                     && (left.ty == scalar_type("i32") || right.ty == scalar_type("i32"))
                     && !checked_i32
@@ -206,6 +269,7 @@ pub(super) fn validate(
                 }
                 if (left.comparison_only || right.comparison_only)
                     && !checked_i32
+                    && !restricted_i64
                     && !matches!(
                         op,
                         NirBinaryOp::Eq
@@ -249,7 +313,7 @@ pub(super) fn validate(
                     total,
                     ready_atom: false,
                     ready_predicate,
-                    comparison_only: checked_i32,
+                    comparison_only: checked_i32 || restricted_i64,
                     captures: left.captures,
                 });
             }
@@ -257,6 +321,40 @@ pub(super) fn validate(
     }
     (computed && proofs.len() == 1 && proofs[0].ty == *expected && !proofs[0].comparison_only)
         .then_some(())
+}
+
+fn i32_neg_operand(word: &NirExpr) -> Option<&NirExpr> {
+    let NirExpr::Binary {
+        op: NirBinaryOp::Sub,
+        lhs,
+        rhs,
+    } = word
+    else {
+        return None;
+    };
+    let (NirExpr::Int(0), NirExpr::CastI32ToI64(operand)) = (lhs.as_ref(), rhs.as_ref()) else {
+        return None;
+    };
+    Some(operand)
+}
+
+fn i32_literal(word: &NirExpr) -> bool {
+    let value = match word {
+        NirExpr::Int(value) => Some(*value),
+        // The front end represents a negative integer literal as 0 - magnitude.
+        NirExpr::Binary {
+            op: NirBinaryOp::Sub,
+            lhs,
+            rhs,
+        } => match (lhs.as_ref(), rhs.as_ref()) {
+            (NirExpr::Int(0), NirExpr::Int(magnitude)) if *magnitude >= 0 => {
+                magnitude.checked_neg()
+            }
+            _ => None,
+        },
+        _ => None,
+    };
+    value.is_some_and(|value| i32::try_from(value).is_ok())
 }
 
 fn i32_operands(word: &NirExpr) -> Option<(&NirExpr, &NirExpr)> {

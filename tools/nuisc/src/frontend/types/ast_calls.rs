@@ -60,6 +60,20 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
                 Some(ast_generic_named_type(callee, generic_args.to_vec()))
             }
         }
+        "i64_from_i32" if generic_args.is_empty() => {
+            let [value] = args else {
+                return None;
+            };
+            let inner = infer_ast_expr_type_inner(
+                value,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            (inner == ast_named_type("i32")).then(|| ast_named_type("i64"))
+        }
         "i32_from_i64" => {
             let [value] = args else {
                 return None;

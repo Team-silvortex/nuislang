@@ -16,8 +16,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "comparison_only: bool",
             "comparison_only |= proof.comparison_only",
-            "if comparison_only && result != &scalar_type(\"i32\")",
-            "comparison_only: result == &scalar_type(\"i32\")",
+            "if proof.comparison_only && &proof.ty != result",
+            "comparison_only: comparison_only || result == &scalar_type(\"i32\")",
             "left.comparison_only || right.comparison_only",
             "!proofs[0].comparison_only",
         ],

@@ -1,21 +1,17 @@
 # Native Session Proof Index
 
-This is a navigational catalog, not a cumulative acceptance receipt.
-The [mainline map](../current-mainline-map.md) selects current work; each receipt owns its original source limits, Git baseline, test commands and acceptance scope.
-Later bounded proofs may advance earlier vetoes; do not add their test totals.
+Navigational catalog only, not a cumulative acceptance receipt; the [mainline map](../current-mainline-map.md) selects current work.
+Each receipt owns its scope, baseline and validation. Later proofs may advance vetoes; never sum their totals.
 
 ## Current Evidence
 
-The [checked i32 Div/Rem follow-up](nuis-native-i32-division-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
-It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md)
-and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
-[fresh child entries](nuis-native-child-epoch-print-v1.md) and
-[original i64 fields](nuis-native-field-epoch-print-v1.md), then
-[typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and
-[shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
+The [restricted i64 arithmetic follow-up](nuis-native-i64-arithmetic-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
+It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md) and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
+[fresh child entries](nuis-native-child-epoch-print-v1.md) and [original i64 fields](nuis-native-field-epoch-print-v1.md), then
+[typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
 [raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and
 [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
-proof adds checked i32 Div/Rem comparison operands with exact reads and provenance; the map owns the next gate.
+proof adds restricted i64 arithmetic with wrapping/checked semantics; the map owns the next gate.
 Original reference files, anchors, fixtures and regression registrations remain
 available below. The backlog of further changing backedges and wide private captures
 is separate from this selected gate.
@@ -65,6 +61,10 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native Bool XOR Argument Print V1](nuis-native-bool-xor-argument-print-v1.md)
 - [Native I32 Arithmetic Argument Print V1](nuis-native-i32-arithmetic-argument-print-v1.md)
 - [Native I32 Division Argument Print V1](nuis-native-i32-division-argument-print-v1.md)
+- [Native I32 Literal Argument Print V1](nuis-native-i32-literal-argument-print-v1.md)
+- [Native I32 Negation Argument Print V1](nuis-native-i32-negation-argument-print-v1.md)
+- [Native I32 Widening Argument Print V1](nuis-native-i32-widening-argument-print-v1.md)
+- [Native I64 Arithmetic Argument Print V1](nuis-native-i64-arithmetic-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)

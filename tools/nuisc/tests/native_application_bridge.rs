@@ -782,3 +782,13 @@ mod i32_arithmetic_argument_print_epoch;
 
 #[path = "native_application_bridge/i32_division_argument_print_epoch.rs"]
 mod i32_division_argument_print_epoch;
+
+#[path = "native_application_bridge/i32_literal_argument_print_epoch.rs"]
+mod i32_literal_argument_print_epoch;
+
+#[path = "native_application_bridge/i32_negation_argument_print_epoch.rs"]
+mod i32_negation_argument_print_epoch;
+#[path = "native_application_bridge/i32_widening_argument_print_epoch.rs"]
+mod i32_widening_argument_print_epoch;
+#[path = "native_application_bridge/i64_arithmetic_argument_print_epoch.rs"]
+mod i64_arithmetic_argument_print_epoch;

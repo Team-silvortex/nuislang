@@ -673,8 +673,9 @@ pub(super) fn lower_if_pair(
             state.yir.edges.push(Edge {
                 kind: EdgeKind::Effect,
                 from: selected,
-                to: print_name,
+                to: print_name.clone(),
             });
+            chain_statement_effect(state, &print_name);
             Ok(LoweredIfOutcome::Printed)
         }
         (

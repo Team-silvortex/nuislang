@@ -26,8 +26,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/print_binary_float.rs",
         required_patterns: &[
             "comparison_only |= proof.comparison_only",
-            "if comparison_only && result != &scalar_type(\"i32\")",
-            "comparison_only: result == &scalar_type(\"i32\")",
+            "if proof.comparison_only && &proof.ty != result",
+            "comparison_only: comparison_only || result == &scalar_type(\"i32\")",
             "(!right.total || !right.ready_predicate)",
             "right.captures.len() > 31",
         ],

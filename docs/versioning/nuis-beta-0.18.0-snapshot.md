@@ -9,7 +9,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.1 | `c3320d9e` | 2026-10-26 |
+| Latest committed patch at this audit, beta-0.18.2 | `5bbd4de8` | 2026-10-28 |
+| Earlier patch, beta-0.18.1 | `c3320d9e` | 2026-10-26 |
 | Previous minor entry, beta-0.17.0 | `ccc16af9` | 2026-10-15 |
 
 Git remains authoritative after this audit. The
@@ -69,21 +70,24 @@ comparison-only result rule, scalar capture bounds and separate source/native/
 source-free delivery evidence; it is not a general argument-readiness grant.
 It is committed in `c3320d9e`, without rewriting its historical acceptance.
 
-## Current Worktree Follow-Up
+## Committed Comparison And Arithmetic
+
+The following four proofs are now included in `5bbd4de8`. Their receipts retain
+their original worktree baselines, scope and executed validation totals.
 
 The [bool equality argument proof](../reference/nuis-native-bool-equality-argument-print-v1.md)
 follows `c3320d9e`. It admits computed Eq/Ne operands only in the typed
 call-argument profile. Both operands execute in source order while internal
 AND/OR stays guarded; equality does not create lazy call/read authority.
 Exact types, original reads, i32 provenance and capture/work bounds remain gates.
-Its receipt owns current worktree validation, not the committed patch identity.
+Its receipt retains the original worktree validation, not a rewritten baseline.
 
 The [bool XOR follow-up](../reference/nuis-native-bool-xor-argument-print-v1.md)
 adds a real caret source operator for exact bool/i64 values, reusing existing YIR
 xor without loosening the legacy integer builtin. Its scoped parameter proof
 keeps eager source order, internal short-circuit guards, i32 provenance and
-unchanged budgets. This is another worktree proof, not source-owned parser parity
-or a new committed patch.
+unchanged budgets. This committed bounded proof does not establish source-owned
+parser parity or rewrite its original acceptance.
 
 The [i32 arithmetic follow-up](../reference/nuis-native-i32-arithmetic-argument-print-v1.md)
 admits only canonical wrapping Add/Sub/Mul in lazy comparison arguments. Its
@@ -94,8 +98,32 @@ budgets stay unchanged.
 The [checked i32 Div/Rem proof](../reference/nuis-native-i32-division-argument-print-v1.md)
 adds exact lazy comparison arguments, explicit zero/MIN/-1 checks, reference
 width preservation and matching-width strict native validation. It retains
-comparison-only provenance and all existing bounds. Exact inline i32 literal
-construction remains a separate next gate; this worktree does not bump the version.
+comparison-only provenance and all existing bounds.
+
+## Current Worktree Follow-Up
+
+The [exact i32 literal proof](../reference/nuis-native-i32-literal-argument-print-v1.md)
+adds only in-range literal constructors in authorized lazy comparison arguments,
+including the canonical negative form, with all child nodes charged to existing
+budgets. Arbitrary casts, out-of-range constructors and ordinary readiness stay
+closed.
+
+The [wrapping i32 negation proof](../reference/nuis-native-i32-negation-argument-print-v1.md)
+adds exact owned unary minus, MIN wrapping and generic/lambda parity, retaining
+once-only operands and comparison-only provenance. All four representation nodes
+share work accounting. Its unchanged-numeric control also exposed and repaired
+a missing statement-effect frontier in the two-print-arm if shortcut.
+
+The [signed i32 widening proof](../reference/nuis-native-i32-widening-argument-print-v1.md)
+adds the exact source builtin and lazy comparison permission, preserving signed
+values, child read authority and kind-preserving helper provenance. Full-width
+native words and source-free restores are separate from syntax support.
+
+The [restricted i64 arithmetic proof](../reference/nuis-native-i64-arithmetic-argument-print-v1.md)
+adds exact Add/Sub/Mul/Div/Rem composition without consuming comparison-only
+provenance. Wrapping arithmetic, checked zero/MIN/-1 faults, unchanged budgets
+and two additional native i64-overflow fault rows have independent controls.
+Comparison-scoped i64 XOR is the next gate; this worktree does not bump the version.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

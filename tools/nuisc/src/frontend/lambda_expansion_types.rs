@@ -369,6 +369,23 @@ pub(super) fn infer_local_binding_type(
         AstExpr::Call {
             callee,
             generic_args,
+            args,
+            ..
+        } if callee == "i64_from_i32" && generic_args.is_empty() => {
+            let [value] = args.as_slice() else {
+                return None;
+            };
+            (infer_local_binding_type(
+                value,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )? == named_type("i32"))
+            .then(|| named_type("i64"))
+        }
+        AstExpr::Call {
+            callee,
+            generic_args,
             ..
         } => module_function_table.get(callee).and_then(|function| {
             function.return_type.as_ref().map(|return_type| {

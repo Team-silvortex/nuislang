@@ -4,6 +4,12 @@ use super::*;
 mod arithmetic_arguments;
 #[path = "i32_division_argument_print_epoch_tests.rs"]
 mod division_arguments;
+#[path = "i32_literal_argument_print_epoch_tests.rs"]
+mod literal_arguments;
+#[path = "i32_negation_argument_print_epoch_tests.rs"]
+mod negation_arguments;
+#[path = "i32_widening_argument_print_epoch_tests.rs"]
+mod widening_arguments;
 
 fn i32_module() -> NirModule {
     let mut module = module();
@@ -83,7 +89,9 @@ fn i32_call_argument_print_epoch_keeps_new_results_comparison_only() {
         ),
         binary(
             NirBinaryOp::Eq,
-            NirExpr::CastI32ToI64(Box::new(narrow(projected("tag")))),
+            NirExpr::CastI32ToI64(Box::new(NirExpr::CastI32ToI64(Box::new(narrow(
+                projected("tag"),
+            ))))),
             projected("total"),
         ),
         binary(

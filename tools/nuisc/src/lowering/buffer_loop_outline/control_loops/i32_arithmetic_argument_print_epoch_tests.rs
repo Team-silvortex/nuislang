@@ -111,7 +111,7 @@ fn i32_arithmetic_argument_print_epoch_retains_comparison_only_provenance() {
         ),
         binary(
             NirBinaryOp::Eq,
-            NirExpr::CastI32ToI64(Box::new(value.clone())),
+            NirExpr::CastI32ToI64(Box::new(NirExpr::CastI32ToI64(Box::new(value.clone())))),
             projected("total"),
         ),
         binary(

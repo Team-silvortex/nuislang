@@ -1,0 +1,50 @@
+mod cpu Main {
+    struct State { total: f64 }
+    struct Pair { total: f64, tag: i64, flag: bool, code: i32 }
+    struct Outer { inner: Pair }
+    @noinline fn observe(value: f64, divisor: i64) -> i64 { if value < 0.0 { return -1 + 0 / divisor; } if value == 0.0 { return 0 / divisor; } if value != value { return 2 + 0 / divisor; } return 1 + 0 / divisor; }
+    @noinline fn checked32(value: i32, guard: i64) -> i32 { let checked = 0 / guard; return value; }
+    @noinline fn relay32(value: i32, guard: i64) -> i32 { return checked32(value, guard); }
+    @noinline fn checked64(value: i64, guard: i64) -> i64 { let checked = 0 / guard; return value; }
+    @noinline fn relay64(value: i64, guard: i64) -> i64 { return checked64(value + 4294967296, guard); }
+    @noinline fn choose(value: f64, pick: bool, guard: i64) -> f64 { let checked = 0 / guard; if pick { return value; } return -value; }
+    @noinline fn finish(value: f64, divisor: i64) -> f64 { let checked = 0 / divisor; return value; }
+    @noinline fn work(seed: State, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64, left: i32, right: i32) -> State {
+        print(70);
+        let mut index = 0;
+        let mut current = Outer { inner: Pair { total: seed.total, tag: 100, flag: selected, code: left } };
+        while index < trips {
+            print(71);
+            print(observe(-choose(current.inner.total + ready, current.inner.flag && (relay64(i64_from_i32(-(-(-(checked32(current.inner.code, first) / right + i32_from_i64(1))))), second) < i64_from_i32(i32_from_i64(0))), 1 + (current.inner.tag - current.inner.tag)), 1));
+            print(current.inner.tag);
+            current = Outer { inner: Pair { total: -current.inner.total, tag: current.inner.tag + delta, flag: selected == false, code: right } };
+            let mut local = current;
+            let mut child = 0;
+            while child < children {
+                print(72);
+                if selected { print(observe(-choose(ready - local.inner.total, local.inner.flag || ((-checked32(local.inner.code, first) <= i32_from_i64(2147483647)) && (relay32(right, second) >= left)), divisor - index - child), 1)); }
+                print(observe(-choose(local.inner.total - ready, local.inner.flag || ((checked32(local.inner.code, first) > left) || (relay64(i64_from_i32(-i32_from_i64(107)), second) == i64_from_i32(local.inner.code))), 1 + 0 * local.inner.tag), 1));
+                print(local.inner.tag);
+                local = Outer { inner: Pair { total: -local.inner.total, tag: local.inner.tag + delta * 2, flag: selected, code: left } };
+                print(observe(-choose(local.inner.total - ready, local.inner.flag || (relay64(i64_from_i32(-(checked32(local.inner.code, second) % right - i32_from_i64(-1))), first) != i64_from_i32(i32_from_i64(-2147483648))), 1 + 0 * local.inner.tag), 1));
+                print(local.inner.tag);
+                child = child + 1;
+            }
+            print(74);
+            current = local;
+            index = index + 1;
+        }
+        print(73);
+        return State { total: finish(current.inner.total, tail) };
+    }
+    fn start(initial: f64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64, left: i32, right: i32) -> State {
+        print(90);
+        return work(State { total: initial }, selected, trips, children, delta, divisor, tail, ready, first, second, left, right);
+    }
+    fn step(state: State, initial: f64, selected: bool, trips: i64, children: i64, delta: i64, divisor: i64, tail: i64, ready: f64, first: i64, second: i64, left: i32, right: i32) -> State {
+        print(91);
+        return work(state, selected, trips, children, delta, divisor, tail, ready, first, second, left, right);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

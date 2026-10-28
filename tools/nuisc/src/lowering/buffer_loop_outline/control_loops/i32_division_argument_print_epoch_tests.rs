@@ -94,7 +94,7 @@ fn i32_division_argument_print_epoch_keeps_results_comparison_only() {
             ),
             binary(
                 NirBinaryOp::Eq,
-                NirExpr::CastI32ToI64(Box::new(value.clone())),
+                NirExpr::CastI32ToI64(Box::new(NirExpr::CastI32ToI64(Box::new(value.clone())))),
                 projected("total"),
             ),
             binary(

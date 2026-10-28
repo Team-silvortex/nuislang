@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{AstExpr, AstUnaryOp, NirBinaryOp, NirExpr, NirStructDef, NirTypeRef};
 
 use super::{
-    bool_type, compatible_types, f32_type, f64_type, find_impl_method_signature,
+    bool_type, compatible_types, f32_type, f64_type, find_impl_method_signature, i32_type,
     infer_nir_expr_type, lower_nested_expr_with_async_and_consts, FunctionSignature,
     ModuleConstValue, NestedExprWithConstsInput,
 };
@@ -69,7 +69,14 @@ pub(super) fn lower_unary_expr_with_async(
             }
         }
         AstUnaryOp::Neg => {
-            if operand_ty.name == "i64" && !operand_ty.is_ref && !operand_ty.is_optional {
+            if operand_ty == i32_type() {
+                // Match wrapping i32 Add/Sub/Mul without evaluating the operand twice.
+                Ok(NirExpr::CastI64ToI32(Box::new(NirExpr::Binary {
+                    op: NirBinaryOp::Sub,
+                    lhs: Box::new(NirExpr::Int(0)),
+                    rhs: Box::new(NirExpr::CastI32ToI64(Box::new(lowered_operand))),
+                })))
+            } else if operand_ty.name == "i64" && !operand_ty.is_ref && !operand_ty.is_optional {
                 Ok(NirExpr::Binary {
                     op: NirBinaryOp::Sub,
                     lhs: Box::new(NirExpr::Int(0)),
@@ -197,12 +204,29 @@ fn builtin_unary_supported(op: AstUnaryOp, operand_ty: &NirTypeRef) -> bool {
         AstUnaryOp::Not => operand_ty.is_bool_scalar() || operand_ty.is_address_type(),
         AstUnaryOp::Neg => {
             (operand_ty.name == "i64" && !operand_ty.is_ref && !operand_ty.is_optional)
+                || operand_ty == &i32_type()
                 || operand_ty == &f32_type()
                 || operand_ty == &f64_type()
         }
         AstUnaryOp::Deref => {
             operand_ty.name == "Node" && operand_ty.is_ref && !operand_ty.is_optional
         }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn unary_i32_negation_exact_owned_builtin_profile() {
+    assert!(builtin_unary_supported(AstUnaryOp::Neg, &i32_type()));
+    for mutation in ["reference", "optional", "generic"] {
+        let mut invalid = i32_type();
+        match mutation {
+            "reference" => invalid.is_ref = true,
+            "optional" => invalid.is_optional = true,
+            "generic" => invalid.generic_args.push(bool_type()),
+            _ => unreachable!(),
+        }
+        assert!(!builtin_unary_supported(AstUnaryOp::Neg, &invalid));
     }
 }
 

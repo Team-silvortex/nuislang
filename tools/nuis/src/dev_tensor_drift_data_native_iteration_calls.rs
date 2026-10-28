@@ -121,6 +121,16 @@ mod i32_arithmetic_argument_print;
 #[path = "dev_tensor_drift_data_native_i32_division_argument_print.rs"]
 mod i32_division_argument_print;
 
+#[path = "dev_tensor_drift_data_native_i32_literal_argument_print.rs"]
+mod i32_literal_argument_print;
+
+#[path = "dev_tensor_drift_data_native_i32_negation_argument_print.rs"]
+mod i32_negation_argument_print;
+#[path = "dev_tensor_drift_data_native_i32_widening_argument_print.rs"]
+mod i32_widening_argument_print;
+#[path = "dev_tensor_drift_data_native_i64_arithmetic_argument_print.rs"]
+mod i64_arithmetic_argument_print;
+
 #[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
 mod return_effect_storage_conditional_payload;
 
@@ -703,6 +713,10 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         bool_xor_argument_print::CHECKS,
         i32_arithmetic_argument_print::CHECKS,
         i32_division_argument_print::CHECKS,
+        i32_literal_argument_print::CHECKS,
+        i32_negation_argument_print::CHECKS,
+        i32_widening_argument_print::CHECKS,
+        i64_arithmetic_argument_print::CHECKS,
         return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,

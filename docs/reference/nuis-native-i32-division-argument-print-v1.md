@@ -106,6 +106,10 @@ device/source-owned parser parity, a complete native engine or self-hosting.
 
 ## Remaining Frontier
 
+The subsequent [exact literal proof](nuis-native-i32-literal-argument-print-v1.md)
+owns that next gate and its separate evidence. The frontier below records this
+receipt's original boundary, not the current selected task.
+
 The coordinate remains `standard-library/ns-nova/persistent-application-session`,
 active/99. Next is a separately budgeted proof for exact inline i32 literal
 construction in these comparison arguments, without admitting arbitrary casts

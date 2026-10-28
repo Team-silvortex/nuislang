@@ -31,7 +31,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "Step::Binary(op, lazy_rhs)",
             "control_values::binary_type(op, left.ty, right.ty)?",
             "right.captures.len() > 31",
-            "if comparison_only && result != &scalar_type(\"i32\")",
+            "if proof.comparison_only && &proof.ty != result",
             "let right = lazy_rhs || matches!(op, NirBinaryOp::And | NirBinaryOp::Or)",
         ],
     },

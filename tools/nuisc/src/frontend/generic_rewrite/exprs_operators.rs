@@ -58,7 +58,8 @@ pub(super) fn builtin_unary_supported_ast(op: AstUnaryOp, operand_ty: &AstTypeRe
     match op {
         AstUnaryOp::Not => is_plain_scalar(operand_ty, "bool") || is_ref_type(operand_ty),
         AstUnaryOp::Neg => {
-            is_plain_scalar(operand_ty, "i64")
+            is_plain_scalar(operand_ty, "i32")
+                || is_plain_scalar(operand_ty, "i64")
                 || is_plain_scalar(operand_ty, "f32")
                 || is_plain_scalar(operand_ty, "f64")
         }
