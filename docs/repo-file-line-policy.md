@@ -59,6 +59,13 @@ The subsequent AOT packer modularization removes its 3,888-line entrypoint
 exception as well, leaving 13 oversized files. All new packer modules use the
 default limits rather than receiving replacement exceptions.
 
+The shader/ns-nova contract-suite split removes the 2,115-line test exception,
+leaving 12 historical exceptions. Its original test entrypoint is now a 163-line
+registration router, with private fixture/suite modules no larger than 486 lines.
+The original fully qualified test names remain available; no replacement
+exception or `include!`-based size workaround is added. See the
+[maintenance record](repo-cleanup-candidates.md#2026-10-28-shadernova-contract-suite-split).
+
 ## Practical Working Rule
 
 When a file approaches the limit:

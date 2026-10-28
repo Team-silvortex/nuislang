@@ -5,13 +5,12 @@ Each receipt owns its scope, baseline and validation. Later proofs may advance v
 
 ## Current Evidence
 
-The [restricted i64 arithmetic follow-up](nuis-native-i64-arithmetic-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
+The [restricted i64 XOR follow-up](nuis-native-i64-xor-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
 It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md) and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [fresh child entries](nuis-native-child-epoch-print-v1.md) and [original i64 fields](nuis-native-field-epoch-print-v1.md), then
 [typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
-[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and
-[full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
-proof adds restricted i64 arithmetic with wrapping/checked semantics; the map owns the next gate.
+[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
+proof adds restricted eager i64 XOR with exact ordering and provenance; the map owns the next gate.
 Original reference files, anchors, fixtures and regression registrations remain
 available below. The backlog of further changing backedges and wide private captures
 is separate from this selected gate.
@@ -65,6 +64,7 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native I32 Negation Argument Print V1](nuis-native-i32-negation-argument-print-v1.md)
 - [Native I32 Widening Argument Print V1](nuis-native-i32-widening-argument-print-v1.md)
 - [Native I64 Arithmetic Argument Print V1](nuis-native-i64-arithmetic-argument-print-v1.md)
+- [Native I64 XOR Argument Print V1](nuis-native-i64-xor-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)

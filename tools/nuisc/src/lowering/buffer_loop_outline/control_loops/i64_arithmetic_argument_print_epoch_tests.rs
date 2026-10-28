@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "i64_xor_argument_print_epoch_tests.rs"]
+mod xor;
+
 const ARITHMETIC: [(NirBinaryOp, &str); 5] = [
     (NirBinaryOp::Add, "+"),
     (NirBinaryOp::Sub, "-"),
@@ -71,7 +74,7 @@ fn i64_arithmetic_argument_print_epoch_rejects_kind_scope_and_effect_escapes() {
         )
         .is_none());
         assert!(check(
-            &compared(binary(NirBinaryOp::Xor, value, NirExpr::Int(1))),
+            &compared(binary(NirBinaryOp::Xor, value, projected("tag"))),
             &module,
             false,
             true

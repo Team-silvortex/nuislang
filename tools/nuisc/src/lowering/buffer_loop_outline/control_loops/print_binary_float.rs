@@ -260,6 +260,7 @@ pub(super) fn validate(
                             | NirBinaryOp::Mul
                             | NirBinaryOp::Div
                             | NirBinaryOp::Rem
+                            | NirBinaryOp::Xor
                     );
                 if matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem)
                     && (left.ty == scalar_type("i32") || right.ty == scalar_type("i32"))

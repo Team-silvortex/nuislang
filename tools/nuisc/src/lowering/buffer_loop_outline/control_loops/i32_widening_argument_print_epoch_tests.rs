@@ -88,15 +88,7 @@ fn i32_widening_argument_print_epoch_rejects_wrong_kinds_effects_and_narrowing()
         NirBinaryOp::Xor,
     ] {
         assert!(check(
-            &compared(binary(
-                op,
-                wide(projected("tag")),
-                if op == NirBinaryOp::Xor {
-                    projected("total")
-                } else {
-                    projected("tag")
-                }
-            )),
+            &compared(binary(op, wide(projected("tag")), projected("tag"))),
             &module,
             false,
             true

@@ -106,7 +106,7 @@ one profile's acceptance must not be attributed to the other.
 | Area | Current Bounded Evidence | Remaining Boundary |
 | --- | --- | --- |
 | Returns and storage | [Independent effect order](docs/reference/nuis-native-return-effect-prefix-v1.md), [certified storage reuse](docs/reference/nuis-native-return-effect-storage-v1.md), and [owned-record origins](docs/reference/nuis-native-origin-record-join-v1.md). | Unproved reductions retain independent payload storage and a separate pending signal. |
-| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed field/call arguments](docs/reference/nuis-native-i64-arithmetic-argument-print-v1.md). | Exact fields, eager bool operands, comparison-scoped i32 literals, wrapping arithmetic/negation, checked Div/Rem, explicit signed widening and restricted i64 arithmetic; not ambient readiness, whole-record captures, effects or I/O/resource capture. |
+| Print values | [Pure computed i64 values](docs/reference/nuis-native-computed-iteration-print-v1.md), [root entry reads](docs/reference/nuis-native-carry-epoch-print-v1.md) and [typed field/call arguments](docs/reference/nuis-native-i64-xor-argument-print-v1.md). | Exact fields, eager bool operands, comparison-scoped i32 literals, wrapping arithmetic/negation, checked Div/Rem, explicit signed widening, restricted i64 arithmetic and eager XOR; not ambient readiness, whole-record captures, effects or I/O/resource capture. |
 | Nested iteration | The [child-epoch follow-up](docs/reference/nuis-native-child-epoch-print-v1.md) checks fresh ready child entries, skipped work and later-parent failures. | Worktree evidence at the dated audit, not automatically part of the committed release. |
 
 The [mainline map](docs/current-mainline-map.md) owns the next selected proof and
@@ -211,6 +211,7 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test std_filesystem_
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --bin nuis dev_tensor -j 1 -- --test-threads=1
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test file_line_limit -j 1 -- --test-threads=1
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -v
+python3 scripts/check-workspace-architecture.py
 cargo fmt --all -- --check
 git diff --check
 ```
@@ -226,6 +227,11 @@ whole root build tree. Cleanup is workspace-only and refuses tracked or symlinke
 paths. See the [cleanup policy](docs/repo-cleanup-candidates.md); do not remove
 source, live regressions or unrelated project data. Generated example bundles
 are rebuilt from source, not shipped in the checkout.
+
+Dev/test incremental caching is opt-in; debug information and release settings
+are unchanged. Use `CARGO_INCREMENTAL=1` explicitly when faster repeated edits
+justify the extra storage. The [architecture/storage audit](docs/repo-architecture-audit.md)
+separates enforced domain boundaries from compiler/linker/debugger extraction debt.
 
 Use repository-relative paths and registered target/provider identities, not
 personal directories, private host addresses or a fixed macOS version. Prefer

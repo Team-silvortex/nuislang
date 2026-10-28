@@ -30,6 +30,8 @@ jobs:
         run: rustup toolchain install stable --profile minimal
       - name: Fetch locked dependencies
         run: cargo fetch --locked
+      - name: Check workspace architecture
+        run: python3 scripts/check-workspace-architecture.py
       - name: Check host path portability
         run: bash scripts/check-host-absolute-paths.sh
       - name: Build workspace

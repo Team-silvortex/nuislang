@@ -48,13 +48,13 @@ regressions may interrupt it; documentation maintenance does not advance it.
 | Pre-update f32/f64 field sign-negation chains at pure-i64 helper arguments | [Compositional unary arguments](reference/nuis-native-nested-unary-float-field-epoch-print-v1.md), retaining original-field proofs, cumulative depth and raw sign/payload controls. |
 | Same-kind float arithmetic over certified fields and ready leaves | [Binary argument plan](reference/nuis-native-binary-float-field-epoch-print-v1.md), including checked zero division and separate arithmetic/State evidence. |
 
-The [restricted i64 arithmetic follow-up](reference/nuis-native-i64-arithmetic-argument-print-v1.md)
-adds same-kind Add/Sub/Mul/Div/Rem directly over explicitly widened arguments.
-Wrapping/checked semantics, original reads, child readiness and comparison-only
-provenance remain required through arithmetic and pure helpers. Native faults
-separately exercise i64 MIN/-1 after valid i32 work. The next gate is
-**comparison-scoped i64 XOR**, including eager operand order and provenance;
-it does not follow automatically from arithmetic or grant ordinary readiness.
+The [restricted i64 XOR follow-up](reference/nuis-native-i64-xor-argument-print-v1.md)
+composes full-width XOR with signed widening, arithmetic and same-kind helpers.
+Both operands are eager in source order; only the enclosing AND/OR can skip
+the expression. Native probes distinguish entry order from reference completion
+events, including independent mask faults. Original epochs and comparison-only
+provenance remain gates. Next is a **source-local scalar temporary audit** for
+these expressions, not an assumption of missing support or ordinary readiness.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 
@@ -125,6 +125,7 @@ CFFI signature grant, parent cancellation route or device-retirement authority.
 - [Project examples](../examples/projects/README.md), [source examples](../examples/ns/README.md), [freshness audit](examples-freshness-audit.md)
 - [Std tooling](../stdlib/std/tooling/README.md), [filesystem](../stdlib/std/filesystem/README.md), [network](../stdlib/std/network/README.md)
 - [Repository layout](repo-layout.md) and [file-line policy](repo-file-line-policy.md)
+- [Architecture/storage audit](repo-architecture-audit.md) and [workspace boundary check](../scripts/check-workspace-architecture.py)
 - [Application-led design](versioning/nuis-beta-0.11-application-led-mainline.md) and [long-range OS roadmap](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
 
 Rendering, control, ML and audio are an engine horizon, not four completed

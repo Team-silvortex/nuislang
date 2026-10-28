@@ -873,3 +873,5 @@ mod i32_negation_argument_print_epoch;
 mod i32_widening_argument_print_epoch;
 #[path = "i64_arithmetic_argument_print_epoch.rs"]
 mod i64_arithmetic_argument_print_epoch;
+#[path = "i64_xor_argument_print_epoch.rs"]
+mod i64_xor_argument_print_epoch;

@@ -4,6 +4,108 @@ This is the current cleanup policy and audit record, not an alpha-era deletion
 wishlist. Current compiler, Nustar and application behavior remains governed by
 the [mainline map](current-mainline-map.md) and the development tensor.
 
+## 2026-10-28 Shader/Nova Contract Suite Split
+
+This follows the architecture/storage audit below at Git beta-0.18.3,
+`2c5b4796`. Pending functional work is preserved. No compiler/runtime production
+behavior, example source, ABI, provider registration or functional tensor field
+is changed by this test-organization maintenance.
+
+### Ownership And Compatibility
+
+[shader_nova_contracts.rs](../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+shrinks from 2,115 to 163 lines. It retains the original 28 `#[test]` entrypoints
+under `project::tests::shader_nova_contracts::`; thin forwarding functions keep
+fully qualified test names and existing filters stable.
+
+Seven private modules own shared fixtures (370 lines), packet contracts
+(343), async lowering (486), rendering (359), data links (357), reverse links
+(160) and ABI selection (41). Helpers and assertion bodies use `pub(super)` only
+inside the test module; no production/public facade or `include!` workaround is
+introduced. The line-ratchet exception is removed, reducing actual historical
+exceptions from 13 to 12 without weakening source/test limits.
+
+The move itself preserves all 42 complete function bodies: 14 helpers and 28
+tests. A byte-for-byte body comparison includes embedded Nuis/WGSL strings;
+signatures are checked after removing visibility and insignificant signature
+whitespace. The ordered pre-move body-hash aggregate is
+`a86493094921f0135fe755b0dd4a15c1b060a41e61f26030d9d191859a2e1e9d`.
+Three new source-only regressions protect registration forwarding, private suite
+ownership, once-only execution and retirement of the obsolete exception.
+
+### Separate Stale Assertion Repair
+
+The untouched pre-split suite passed 27 tests and failed one:
+`lowers_real_shader_packet_bridge_project_with_expected_bridge_shape`.
+The pure move reproduced exactly the same failure. The current
+[packet bridge example](../examples/projects/domains/shader_packet_bridge_demo/main.ns)
+uses direct `shader_profile_render` and a frame result, but the old test still
+required the earlier `pass_result`/`pass_ready` locals.
+
+Only that test body is intentionally revised after the preservation audit; the
+other 41 bodies stay byte-identical. The replacement checks actual uplink input,
+profile-render unit and packet identity, FrameReady stage, readiness observer,
+result extraction, downlink unit, presented frame and strict statement order.
+It does not skip the test, merely accept compilation, alter the example to fit
+old expectations or claim that the compiler had regressed.
+
+### Focused Acceptance
+
+268 distinct selected checks pass: 198 compiler project tests (including the
+original 28 shader/ns-nova entrypoints), 40 Python maintenance tests, 27 tensor
+tests, two file-budget tests and one exact host-path integration. The unchanged
+libtest listing confirms all 28 fully qualified names before and after the
+split. The two 27-pass/one-fail baseline runs above are recorded separately,
+not counted as successful acceptance or additional coverage.
+
+The actual locked offline workspace graph still reports 29 packages, six domain
+crates and 74 normal/build edges with no policy violations. Formatting,
+whitespace, UTF-8 validation of 5,921 selected source/document text files and
+6,183 local Markdown link occurrences pass. All 42 function signatures remain
+equivalent; exactly the separately documented assertion body differs.
+
+The ordinary CLI is rebuilt with incremental environment overrides removed.
+It reports 4,139/4,139 drift checks passing, clean coverage/manifest/milestone/
+hierarchy/task lineage, and the same ready active/99 coordinate. Source/runtime
+parity, complete predecessor values/hashes and inert historical command blocks
+are checked; the functional tensor source remains byte-identical.
+
+After all builds/tests stop, safe `--build-binaries` cleanup removes seven
+ignored outputs selected at 370,024 KiB. Root `target/` measures 4,559,404 KiB
+immediately before and 4,189,380 KiB immediately after, a 370,024 KiB reduction
+(about 361 MiB). All 12 retained root executables and all 40 pending source/doc
+files are byte-identical immediately across cleanup. Dependency libraries,
+package sources and other projects are retained. Filesystem free space is
+about 39 GiB; this is a capacity observation, not a claim that all free space
+was created by this cleanup.
+
+The functional tensor checkpoint and next task are retained byte-for-byte;
+new diagnostics do not advance active/99. Native application delivery, physical
+GPU/Linux/Windows execution, full-workspace semantics and self-hosting are not
+new acceptance claims here. No commit, push or version bump is performed.
+
+## 2026-10-28 Architecture And Storage Audit
+
+The [dated audit](repo-architecture-audit.md) records the current 29-package
+normal/build graph, generic transitive domain-boundary checks and explicit
+compiler/linker/debugger extraction debt. The 13 live line exceptions and
+concentrated tensor history are retained as staged organization work, not
+deleted to inflate a cleanup result.
+
+Safe build-binary cleanup selected 28 ignored outputs (1,404,064 KiB).
+The measured root target reduction was 1,162,736 KiB, about 1.11 GiB; all six
+root CLIs and 21 preceding dirty files were byte-identical immediately afterward.
+No other project, dependency source, Git history or shared system cache was
+removed. The larger concurrent filesystem free-space increase is not wholly
+attributed to this cleanup. Validation may recreate selected executables.
+
+Dev/test incremental caches now require explicit opt-in, while debug information
+and release settings stay unchanged. Architecture CI runs after toolchain setup
+and locked fetch; its source-only regression gate does not require Cargo.
+Functional tensor checkpoints and the pending XOR proof keep their complete
+values, hashes and original validation scope. Maintenance does not advance
+capability scores or create a release.
+
 ## 2026-10-25 Documentation Consolidation
 
 The Git baseline is `2db5c82c` (beta-0.17.8). This documentation-only maintenance

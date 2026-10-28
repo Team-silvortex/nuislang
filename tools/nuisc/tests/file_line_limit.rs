@@ -20,10 +20,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nuisc/src/frontend/tests_try.rs", 1291),
         ("tools/nuisc/src/lowering/tests_loop_post_flow.rs", 1143),
         ("tools/nuisc/src/nir_verify/tests.rs", 1787),
-        (
-            "tools/nuisc/src/project/tests/shader_nova_contracts.rs",
-            2115,
-        ),
         ("tools/nuisc/tests/glm_verify.rs", 1400),
         ("tools/nuisc/tests/memory_compile.rs", 1747),
         ("tools/nuisc/tests/network_compile.rs", 1446),

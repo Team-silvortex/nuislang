@@ -105,6 +105,10 @@ physical GPU/provider parity, a complete native engine or compiler self-hosting.
 
 ## Remaining Frontier
 
+The following frontier is historical. The later [restricted i64 XOR proof](nuis-native-i64-xor-argument-print-v1.md)
+advances only its exact eager composition rule; this receipt keeps its original
+source baseline, validation totals and permission boundaries.
+
 The coordinate remains `standard-library/ns-nova/persistent-application-session`,
 active/99. Next is comparison-scoped i64 XOR composition: prove eager operand
 ordering, exact kinds and inherited comparison-only provenance before admission.

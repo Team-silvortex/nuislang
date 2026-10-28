@@ -11,14 +11,19 @@ Local cached tests are not evidence that this path works.
 2. Run the [CI guard regressions](../../scripts/tests/test_ci_checks.py), UTF-8
    validation (including Python), and local Markdown-link validation.
 3. Install the stable Rust toolchain and run `cargo fetch --locked`.
-4. Run the exact `checked_in_docs_do_not_embed_host_absolute_paths` integration
+4. Run the [workspace architecture audit](../../scripts/check-workspace-architecture.py)
+   against locked offline metadata, without compiling. Its source-only regressions
+   use a fake Cargo entrypoint before toolchain installation.
+5. Run the exact `checked_in_docs_do_not_embed_host_absolute_paths` integration
    test, not every test binary in the compiler package.
-5. Run `cargo build --workspace --locked`.
+6. Run `cargo build --workspace --locked`.
 
 Build/test debug information and incremental compilation are disabled for this
-disposable CI profile; two Cargo jobs bound parallel resource use. This does not
-change local developer profiles or disable runtime checks. The workflow has a
-30-minute timeout and no allowed-failure steps.
+disposable CI profile; two Cargo jobs bound parallel resource use. Local dev/test
+incremental caching is now opt-in under the [storage policy](../repo-architecture-audit.md),
+while local debug information and release settings remain unchanged. No runtime
+checks are disabled. The workflow has a 30-minute timeout and no allowed-failure
+steps.
 
 The path guard uses `--locked`, not an unconditional `--offline`. CI explicitly
 fetches first; an intentional offline environment is valid only after its
@@ -39,6 +44,7 @@ python3 -m unittest discover -s scripts/tests -v
 python3 scripts/check-text-encoding.py
 bash scripts/check-doc-links.sh
 cargo fetch --locked
+python3 scripts/check-workspace-architecture.py
 bash scripts/check-host-absolute-paths.sh
 cargo build --workspace --locked
 ```

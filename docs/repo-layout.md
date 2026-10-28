@@ -5,6 +5,12 @@ This file is the short map of what each top-level directory is for.
 Use it when you already know the project roughly, but need to re-orient
 quickly.
 
+The [dated architecture and storage audit](repo-architecture-audit.md) records
+the actual normal/build dependency graph, enforced domain boundaries and remaining
+extraction debt. In particular, `tools/nuisc`, `tools/nsld` and `tools/nsdb` contain
+reusable libraries as well as frontdoors; directory names alone are not dependency
+boundaries.
+
 The [repository README](../README.md), [documentation index](README.md) and
 [current mainline map](current-mainline-map.md) are short entry routers.
 Detailed native execution receipts are catalogued once in the

@@ -9,7 +9,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.2 | `5bbd4de8` | 2026-10-28 |
+| Latest committed patch at this audit, beta-0.18.3 | `2c5b4796` | 2026-10-28 |
+| Earlier patch, beta-0.18.2 | `5bbd4de8` | 2026-10-28 |
 | Earlier patch, beta-0.18.1 | `c3320d9e` | 2026-10-26 |
 | Previous minor entry, beta-0.17.0 | `ccc16af9` | 2026-10-15 |
 
@@ -100,7 +101,10 @@ adds exact lazy comparison arguments, explicit zero/MIN/-1 checks, reference
 width preservation and matching-width strict native validation. It retains
 comparison-only provenance and all existing bounds.
 
-## Current Worktree Follow-Up
+## Committed Literal And Widening
+
+The following four proofs are included in `2c5b4796`. Their receipts keep their
+original worktree baselines, source scope and executed validation totals.
 
 The [exact i32 literal proof](../reference/nuis-native-i32-literal-argument-print-v1.md)
 adds only in-range literal constructors in authorized lazy comparison arguments,
@@ -123,7 +127,15 @@ The [restricted i64 arithmetic proof](../reference/nuis-native-i64-arithmetic-ar
 adds exact Add/Sub/Mul/Div/Rem composition without consuming comparison-only
 provenance. Wrapping arithmetic, checked zero/MIN/-1 faults, unchanged budgets
 and two additional native i64-overflow fault rows have independent controls.
-Comparison-scoped i64 XOR is the next gate; this worktree does not bump the version.
+
+## Current Worktree Follow-Up
+
+The [restricted i64 XOR proof](../reference/nuis-native-i64-xor-argument-print-v1.md)
+adds eager same-kind composition without consuming comparison-only provenance.
+It separates reference completion events from native entry observations and
+adds independent mask-fault paths in both operand positions. Original epochs,
+all budgets and ordinary-read vetoes remain unchanged. Source-local scalar
+temporary combinations are the next audit; this worktree does not bump the version.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance
