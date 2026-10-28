@@ -408,6 +408,12 @@ pub(super) fn infer_local_binding_type(
                 module_impls,
             )?;
             match op {
+                AstBinaryOp::Xor
+                    if lhs_ty == rhs_ty
+                        && (lhs_ty == named_type("bool") || lhs_ty == named_type("i64")) =>
+                {
+                    Some(lhs_ty)
+                }
                 AstBinaryOp::And
                 | AstBinaryOp::Or
                 | AstBinaryOp::Eq

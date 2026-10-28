@@ -17,7 +17,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "(expr, depth, logical, true, false)",
             "logical_argument(callee, index, lazy_rhs)",
-            "roots_with_fields(pending, computed_gate, |_, _| false, |_, _, _| false)",
+            "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
             "let mut logical_edges = 32usize",
         ],
     },

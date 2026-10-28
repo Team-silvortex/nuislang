@@ -405,6 +405,7 @@ pub enum AstUnaryOp {
 pub enum AstBinaryOp {
     And,
     Or,
+    Xor,
     Add,
     Sub,
     Mul,

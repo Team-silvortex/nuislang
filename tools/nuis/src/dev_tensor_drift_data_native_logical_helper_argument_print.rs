@@ -25,7 +25,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-logical-helper-argument-ordinary-closure",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
-            "roots_with_fields(pending, computed_gate, |_, _| false, |_, _, _| false)",
+            "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
             "record_root && bool_field(type_name, name)",
             "if !logical_root",
             "let mut logical_edges = 32usize",

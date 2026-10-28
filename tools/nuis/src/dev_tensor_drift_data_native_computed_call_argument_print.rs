@@ -49,7 +49,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "scalar_helpers::pure_scalar_signature(callee, catalog)",
             "params.get(index)",
             "Some(&scalar_type(\"bool\"))",
-            "roots_with_fields(pending, computed_gate, |_, _| false, |_, _, _| false)",
+            "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
             "let mut logical_edges = 32usize",
         ],
     },

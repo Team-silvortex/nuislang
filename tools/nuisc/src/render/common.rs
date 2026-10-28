@@ -152,6 +152,7 @@ pub(super) fn render_ast_binary_op(op: AstBinaryOp) -> &'static str {
     match op {
         AstBinaryOp::And => "&&",
         AstBinaryOp::Or => "||",
+        AstBinaryOp::Xor => "^",
         AstBinaryOp::Add => "+",
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",

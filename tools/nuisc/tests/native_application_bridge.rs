@@ -770,3 +770,15 @@ mod state_loop_return_shared;
 
 #[path = "native_application_bridge/state_loop_sibling_bounds.rs"]
 mod state_loop_sibling_bounds;
+
+#[path = "native_application_bridge/bool_equality_argument_print_epoch.rs"]
+mod bool_equality_argument_print_epoch;
+
+#[path = "native_application_bridge/bool_xor_argument_print_epoch.rs"]
+mod bool_xor_argument_print_epoch;
+
+#[path = "native_application_bridge/i32_arithmetic_argument_print_epoch.rs"]
+mod i32_arithmetic_argument_print_epoch;
+
+#[path = "native_application_bridge/i32_division_argument_print_epoch.rs"]
+mod i32_division_argument_print_epoch;

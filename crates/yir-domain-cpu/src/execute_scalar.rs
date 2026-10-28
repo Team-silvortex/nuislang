@@ -100,7 +100,9 @@ pub(crate) fn execute_cpu_scalar_node(
             state.expect_f64(&node.op.args[0])? * state.expect_f64(&node.op.args[1])?,
         )),
         "div" => {
-            if let (Ok(lhs), Ok(rhs)) = (
+            if has_i32_operand(node, state) {
+                checked_i32_div_rem(node, state, false)
+            } else if let (Ok(lhs), Ok(rhs)) = (
                 state.expect_int(&node.op.args[0]),
                 state.expect_int(&node.op.args[1]),
             ) {
@@ -127,16 +129,7 @@ pub(crate) fn execute_cpu_scalar_node(
                 Ok(Value::F64(lhs / rhs))
             }
         }
-        "div_i32" => {
-            let lhs = state.expect_i32(&node.op.args[0])?;
-            let rhs = state.expect_i32(&node.op.args[1])?;
-            if rhs == 0 {
-                return Err(format!("node `{}` divides by zero", node.name));
-            }
-            lhs.checked_div(rhs)
-                .map(Value::I32)
-                .ok_or_else(|| format!("node `{}` integer division overflow", node.name))
-        }
+        "div_i32" => checked_i32_div_rem(node, state, false),
         "div_f32" => {
             let lhs = state.expect_f32(&node.op.args[0])?;
             let rhs = state.expect_f32(&node.op.args[1])?;
@@ -154,6 +147,9 @@ pub(crate) fn execute_cpu_scalar_node(
             Ok(Value::F64(lhs / rhs))
         }
         "rem" => {
+            if has_i32_operand(node, state) {
+                return checked_i32_div_rem(node, state, true).map(Some);
+            }
             let lhs = state.expect_int(&node.op.args[0])?;
             let rhs = state.expect_int(&node.op.args[1])?;
             if rhs == 0 {
@@ -484,6 +480,36 @@ pub(crate) fn execute_cpu_scalar_node(
         _ => return Ok(None),
     };
     value.map(Some)
+}
+
+fn has_i32_operand(node: &Node, state: &ExecutionState) -> bool {
+    node.op
+        .args
+        .iter()
+        .take(2)
+        .any(|arg| matches!(state.expect_value(arg), Ok(Value::I32(_))))
+}
+
+fn checked_i32_div_rem(
+    node: &Node,
+    state: &ExecutionState,
+    remainder: bool,
+) -> Result<Value, String> {
+    // Do not widen generic i32 operations: their result and overflow stay i32.
+    let lhs = state.expect_i32(&node.op.args[0])?;
+    let rhs = state.expect_i32(&node.op.args[1])?;
+    let operation = if remainder { "remainder" } else { "division" };
+    if rhs == 0 {
+        return Err(format!("node `{}` integer {operation} by zero", node.name));
+    }
+    let result = if remainder {
+        lhs.checked_rem(rhs)
+    } else {
+        lhs.checked_div(rhs)
+    };
+    result
+        .map(Value::I32)
+        .ok_or_else(|| format!("node `{}` integer {operation} overflow", node.name))
 }
 
 fn expect_owned_tree_scalar_arg(

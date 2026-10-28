@@ -229,6 +229,7 @@ pub(super) fn binary_type(op: NirBinaryOp, lhs: NirTypeRef, rhs: NirTypeRef) -> 
         {
             Some(lhs)
         }
+        NirBinaryOp::Div | NirBinaryOp::Rem if lhs == scalar_type("i32") => Some(lhs),
         NirBinaryOp::Lt | NirBinaryOp::Le | NirBinaryOp::Gt | NirBinaryOp::Ge
             if lhs == scalar_type("i64")
                 || lhs == scalar_type("i32")

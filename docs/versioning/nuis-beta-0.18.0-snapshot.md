@@ -1,6 +1,6 @@
 # Beta 0.18 Snapshot
 
-Audit date: 2026-10-26. This minor-line anchor separates committed identity,
+Audit date: 2026-10-28. This minor-line anchor separates committed identity,
 worktree evidence and future gates. Cargo and protocol versions are independent;
 this document does not freeze compatibility or announce completed self-hosting.
 
@@ -9,7 +9,7 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.0 | `45a9f0c8` | 2026-10-26 |
+| Latest committed patch at this audit, beta-0.18.1 | `c3320d9e` | 2026-10-26 |
 | Previous minor entry, beta-0.17.0 | `ccc16af9` | 2026-10-15 |
 
 Git remains authoritative after this audit. The
@@ -48,10 +48,11 @@ inside an already-authorized lazy RHS subtree. Ordinary prefixes/call roots,
 whole-record reads, transitive effects and unproved capture reductions stay closed.
 Its own receipt records selected execution and delivery validation separately.
 
-## Current Worktree Follow-Up
+## Committed Argument Follow-Ups
 
 The [float comparison argument proof](../reference/nuis-native-float-compare-argument-print-v1.md)
-is a worktree follow-up to `45a9f0c8`. It composes exact same-kind f32/f64
+is now committed in `c3320d9e`, following its dated `45a9f0c8` worktree proof.
+It composes exact same-kind f32/f64
 comparisons inside the existing call-argument proof, preserving original read
 permissions, guarded operands and separate failure/State publication. Its own
 receipt owns executed validation rather than inheriting earlier totals.
@@ -59,12 +60,42 @@ receipt owns executed validation rather than inheriting earlier totals.
 The [comparison-only i32 follow-up](../reference/nuis-native-i32-call-argument-print-v1.md)
 adds completed pure i32 helper results only in lazy RHS comparisons. Its provenance
 check prevents new argument/read authority from escaping through non-i32 consumers,
-arithmetic or casts; it is a further worktree proof, not a new committed release.
+arithmetic or casts. It is also included in `c3320d9e`; its receipt retains the
+original source baseline and executed validation totals.
 
 The [logical i32 parameter follow-up](../reference/nuis-native-logical-i32-call-argument-print-v1.md)
 extends exact bool parameter shapes only inside that lazy scope. It retains the
 comparison-only result rule, scalar capture bounds and separate source/native/
 source-free delivery evidence; it is not a general argument-readiness grant.
+It is committed in `c3320d9e`, without rewriting its historical acceptance.
+
+## Current Worktree Follow-Up
+
+The [bool equality argument proof](../reference/nuis-native-bool-equality-argument-print-v1.md)
+follows `c3320d9e`. It admits computed Eq/Ne operands only in the typed
+call-argument profile. Both operands execute in source order while internal
+AND/OR stays guarded; equality does not create lazy call/read authority.
+Exact types, original reads, i32 provenance and capture/work bounds remain gates.
+Its receipt owns current worktree validation, not the committed patch identity.
+
+The [bool XOR follow-up](../reference/nuis-native-bool-xor-argument-print-v1.md)
+adds a real caret source operator for exact bool/i64 values, reusing existing YIR
+xor without loosening the legacy integer builtin. Its scoped parameter proof
+keeps eager source order, internal short-circuit guards, i32 provenance and
+unchanged budgets. This is another worktree proof, not source-owned parser parity
+or a new committed patch.
+
+The [i32 arithmetic follow-up](../reference/nuis-native-i32-arithmetic-argument-print-v1.md)
+admits only canonical wrapping Add/Sub/Mul in lazy comparison arguments. Its
+conversion nodes share work/depth accounting and its result remains comparison-only.
+Original reads, ordinary-profile vetoes, capture bounds and native execution
+budgets stay unchanged.
+
+The [checked i32 Div/Rem proof](../reference/nuis-native-i32-division-argument-print-v1.md)
+adds exact lazy comparison arguments, explicit zero/MIN/-1 checks, reference
+width preservation and matching-width strict native validation. It retains
+comparison-only provenance and all existing bounds. Exact inline i32 literal
+construction remains a separate next gate; this worktree does not bump the version.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

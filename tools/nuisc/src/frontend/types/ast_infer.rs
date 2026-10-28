@@ -12,7 +12,7 @@ use super::ast_patterns::{
 };
 use super::{ast_generic_named_type, ast_named_type, impl_lookup_types};
 use crate::frontend::validation_binding_env::instantiate_ast_struct_field_type;
-use crate::frontend::{lower_type_ref, render_field_access_path};
+use crate::frontend::{bool_type, i64_type, lower_type_ref, render_field_access_path};
 
 pub(crate) fn infer_ast_expr_type(
     expr: &AstExpr,
@@ -349,7 +349,7 @@ pub(crate) fn infer_ast_expr_type_inner(
             | AstBinaryOp::Le
             | AstBinaryOp::Gt
             | AstBinaryOp::Ge => Some(ast_named_type("bool")),
-            AstBinaryOp::And | AstBinaryOp::Or => {
+            AstBinaryOp::And | AstBinaryOp::Or | AstBinaryOp::Xor => {
                 let lhs_ty = infer_ast_expr_type_inner(
                     lhs,
                     env,
@@ -366,7 +366,11 @@ pub(crate) fn infer_ast_expr_type_inner(
                     function_return_types,
                     active_exprs,
                 )?;
-                if lower_type_ref(&lhs_ty).render() == lower_type_ref(&rhs_ty).render()
+                if *op == AstBinaryOp::Xor {
+                    let left = lower_type_ref(&lhs_ty);
+                    let right = lower_type_ref(&rhs_ty);
+                    (left == right && (left == bool_type() || left == i64_type())).then_some(lhs_ty)
+                } else if lower_type_ref(&lhs_ty).render() == lower_type_ref(&rhs_ty).render()
                     && lhs_ty.name == "bool"
                     && rhs_ty.name == "bool"
                 {

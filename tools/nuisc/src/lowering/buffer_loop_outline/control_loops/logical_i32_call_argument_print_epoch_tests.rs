@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "bool_equality_argument_print_epoch_tests.rs"]
+mod bool_equality;
+
 fn argument32(flag: NirExpr) -> NirExpr {
     call("choose32", vec![flag, narrow(projected("tag"))])
 }

@@ -5,6 +5,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-computed-logical-gates-shared-whole-root-budget-and-independent-modes",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
+            "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
+            "let eager_bool = computed_bool_operands",
+            "&& logical_root",
             "roots(pending, false)",
             "fn computed_logical_root",
             "computed_expression_roots(vec![(expr, 0, true)])",
@@ -14,8 +17,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "!logical_root",
             "(!computed_gate && depth != 0)",
             "!computed_gate",
-            "(lhs.as_ref(), depth + 1, false, false, lazy_rhs)",
-            "(rhs.as_ref(), depth + 1, false, false, lazy_rhs)",
+            "(lhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
+            "(rhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
         ],
     },
     DevTensorDriftCheckSpec {

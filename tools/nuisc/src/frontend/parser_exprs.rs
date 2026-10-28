@@ -80,12 +80,12 @@ impl Parser {
     }
 
     fn parse_comparison(&mut self) -> Result<AstExpr, String> {
-        let mut expr = self.parse_additive()?;
+        let mut expr = self.parse_xor()?;
         loop {
             if self.peek_symbol_pair('<', '=') {
                 self.expect_symbol('<')?;
                 self.expect_symbol('=')?;
-                let rhs = self.parse_additive()?;
+                let rhs = self.parse_xor()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Le,
                     lhs: Box::new(expr),
@@ -94,7 +94,7 @@ impl Parser {
             } else if self.peek_symbol_pair('>', '=') {
                 self.expect_symbol('>')?;
                 self.expect_symbol('=')?;
-                let rhs = self.parse_additive()?;
+                let rhs = self.parse_xor()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Ge,
                     lhs: Box::new(expr),
@@ -102,7 +102,7 @@ impl Parser {
                 };
             } else if self.peek_symbol('<') {
                 self.expect_symbol('<')?;
-                let rhs = self.parse_additive()?;
+                let rhs = self.parse_xor()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Lt,
                     lhs: Box::new(expr),
@@ -110,7 +110,7 @@ impl Parser {
                 };
             } else if self.peek_symbol('>') {
                 self.expect_symbol('>')?;
-                let rhs = self.parse_additive()?;
+                let rhs = self.parse_xor()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Gt,
                     lhs: Box::new(expr),
@@ -119,6 +119,20 @@ impl Parser {
             } else {
                 break;
             }
+        }
+        Ok(expr)
+    }
+
+    fn parse_xor(&mut self) -> Result<AstExpr, String> {
+        let mut expr = self.parse_additive()?;
+        while self.peek_symbol('^') {
+            self.expect_symbol('^')?;
+            let rhs = self.parse_additive()?;
+            expr = AstExpr::Binary {
+                op: AstBinaryOp::Xor,
+                lhs: Box::new(expr),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(expr)
     }

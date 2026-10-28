@@ -633,24 +633,32 @@ pub(super) fn lower_routed_call_or_core_builtin(
             let [lhs, rhs] = args else {
                 return Err("i64_xor(...) expects 2 args".to_owned());
             };
+            let left = lower_expr(
+                lhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let right = lower_expr(
+                rhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            if infer_nir_expr_type(&left, bindings, signatures, struct_table) != Some(i64_type())
+                || infer_nir_expr_type(&right, bindings, signatures, struct_table)
+                    != Some(i64_type())
+            {
+                return Err("i64_xor(...) expects exactly two plain i64 operands".to_owned());
+            }
             NirExpr::Binary {
                 op: nuis_semantics::model::NirBinaryOp::Xor,
-                lhs: Box::new(lower_expr(
-                    lhs,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&i64_type()),
-                )?),
-                rhs: Box::new(lower_expr(
-                    rhs,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&i64_type()),
-                )?),
+                lhs: Box::new(left),
+                rhs: Box::new(right),
             }
         }
         "cpu_present_frame" => {

@@ -19,7 +19,7 @@ pub(super) fn validate(
             require_value(node, &node.op.args[0], CpuCallScalarKind::Bool, registers)?;
         }
     }
-    // Division requires a matching pair; remainder remains exactly i64.
+    // Integer division/remainder retain their exact width; floats support division only.
     if matches!(node.op.instruction.as_str(), "div" | "rem") {
         let [left, right] = node.op.args.as_slice() else {
             return Err(format!(
@@ -32,6 +32,9 @@ pub(super) fn validate(
             registers.get(left),
             registers.get(right),
         ) {
+            ("div" | "rem", Some(LlvmValueRef::I32(_)), Some(LlvmValueRef::I32(_))) => {
+                CpuCallScalarKind::I32
+            }
             ("div", Some(LlvmValueRef::F32(_)), Some(LlvmValueRef::F32(_))) => {
                 CpuCallScalarKind::F32
             }
@@ -171,6 +174,64 @@ pub(super) fn validate(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_i32_division_requires_matching_native_widths() {
+        for instruction in ["div", "rem"] {
+            let node = Node {
+                name: "checked".into(),
+                resource: "cpu0".into(),
+                op: yir_core::Operation::parse(
+                    &format!("cpu.{instruction}"),
+                    vec!["left".into(), "right".into()],
+                )
+                .unwrap(),
+            };
+            for left in [
+                LlvmValueRef::I32("%left".into()),
+                LlvmValueRef::I64("%left".into()),
+                LlvmValueRef::F32("%left".into()),
+                LlvmValueRef::F64("%left".into()),
+            ] {
+                for right in [
+                    LlvmValueRef::I32("%right".into()),
+                    LlvmValueRef::I64("%right".into()),
+                    LlvmValueRef::F32("%right".into()),
+                    LlvmValueRef::F64("%right".into()),
+                ] {
+                    let expected = matches!(
+                        (&left, &right),
+                        (LlvmValueRef::I32(_), LlvmValueRef::I32(_))
+                            | (LlvmValueRef::I64(_), LlvmValueRef::I64(_))
+                    ) || (instruction == "div"
+                        && matches!(
+                            (&left, &right),
+                            (LlvmValueRef::F32(_), LlvmValueRef::F32(_))
+                                | (LlvmValueRef::F64(_), LlvmValueRef::F64(_))
+                        ));
+                    let registers =
+                        BTreeMap::from([("left".into(), left.clone()), ("right".into(), right)]);
+                    assert_eq!(
+                        validate(
+                            &node,
+                            &registers,
+                            &BTreeMap::new(),
+                            CpuCallScalarKind::I32,
+                            false
+                        )
+                        .is_ok(),
+                        expected,
+                        "{instruction} exact-kind expectation: {expected}"
+                    );
+                }
+            }
+        }
+    }
 }
 
 fn require_value(

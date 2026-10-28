@@ -30,7 +30,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 skip_block_comment(&mut chars)?;
             }
             '{' | '}' | '(' | ')' | '[' | ']' | ';' | ',' | '=' | '!' | '+' | '*' | '/' | '%'
-            | ':' | '.' | '<' | '>' | '?' | '@' | '|' | '&' => tokens.push(Token::Symbol(ch)),
+            | ':' | '.' | '<' | '>' | '?' | '@' | '|' | '&' | '^' => tokens.push(Token::Symbol(ch)),
             '-' => {
                 if chars.peek().copied() == Some('>') {
                     chars.next();

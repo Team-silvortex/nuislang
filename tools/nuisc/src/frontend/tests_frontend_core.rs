@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 #[path = "tests_frontend_core/assignments_and_helpers.rs"]
 mod assignments_and_helpers;
+#[path = "tests_frontend_core/bool_xor.rs"]
+mod bool_xor;
 #[path = "tests_frontend_core/bytes_text.rs"]
 mod bytes_text;
 #[path = "tests_frontend_core/operator_overload.rs"]

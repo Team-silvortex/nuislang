@@ -14,6 +14,8 @@ mod flow_async_tests;
 mod flow_reject_tests;
 mod flow_sync_tests;
 mod helper_guard_tests;
+#[path = "tests/i32_division_tests.rs"]
+mod i32_division_tests;
 mod loop_guard_tests;
 mod owned_cleanup_return_tests;
 mod owned_return_contract_tests;

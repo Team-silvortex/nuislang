@@ -1,5 +1,10 @@
 use super::*;
 
+#[path = "i32_arithmetic_argument_print_epoch_tests.rs"]
+mod arithmetic_arguments;
+#[path = "i32_division_argument_print_epoch_tests.rs"]
+mod division_arguments;
+
 fn i32_module() -> NirModule {
     let mut module = module();
     let extra = crate::frontend::parse_nuis_module(

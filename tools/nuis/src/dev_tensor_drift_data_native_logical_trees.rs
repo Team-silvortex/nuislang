@@ -5,6 +5,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-logical-trees-shared-edge-node-depth-and-leaf-permission-budget",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
+            "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
+            "let eager_bool = computed_bool_operands",
+            "&& logical_root",
             "let mut work = 4096usize",
             "let mut logical_edges = 32usize",
             "if depth >= 64 || work == 0",
@@ -14,8 +17,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "(lhs.as_ref(), depth + 1, computed_gate, false, lazy_rhs)",
             "(rhs.as_ref(), depth + 1, computed_gate, false, true)",
             "args.iter().enumerate().map(|(index, arg)|",
-            "(lhs.as_ref(), depth + 1, false, false, lazy_rhs)",
-            "(rhs.as_ref(), depth + 1, false, false, lazy_rhs)",
+            "(lhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
+            "(rhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
         ],
     },
     DevTensorDriftCheckSpec {

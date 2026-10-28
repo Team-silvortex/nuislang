@@ -91,7 +91,9 @@ The coordinate remains
 `standard-library/ns-nova/persistent-application-session`, active/99. Next is
 computed bool equality/inequality within this argument profile: both operands
 must execute once left-to-right while each operand's internal AND/OR remains
-guarded. Equality itself must not short-circuit the second operand. Original
+guarded. Equality itself must not short-circuit the second operand. The subsequent
+[bool equality proof](nuis-native-bool-equality-argument-print-v1.md) covers that
+scoped follow-up without changing this receipt's historical acceptance. Original
 reads, exact types, comparison-only i32 provenance and all budgets remain gates.
 Ordinary profiles, i32 arithmetic/casts, resources/I/O/async capture, changing
 backedges, wide private captures and full engine/backend parity stay separate.

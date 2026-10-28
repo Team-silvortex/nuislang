@@ -102,7 +102,7 @@ fn computed_call_argument_print_epoch_reuses_exact_integer_and_boolean_types() {
             projected("total"),
         ),
         (
-            binary(NirBinaryOp::Xor, projected("flag"), NirExpr::Bool(true)),
+            binary(NirBinaryOp::Xor, projected("flag"), NirExpr::Int(1)),
             projected("total"),
         ),
         (projected("total"), projected("total")),

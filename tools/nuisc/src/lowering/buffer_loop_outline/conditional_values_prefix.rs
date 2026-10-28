@@ -59,8 +59,8 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_logical_root(expr: &Nir
 }
 
 // Return trees share one budget across all roots, including duplicated suffixes.
-// Only direct logical children inherit permission; ordinary leaf expressions
-// cannot hide logical gates in arguments, comparisons or aggregate fields.
+// Only direct logical children inherit permission in ordinary profiles.
+// The typed call profile separately admits eager bool operands, not new reads.
 pub(in crate::lowering::buffer_loop_outline) fn computed_expression_roots(
     pending: Vec<(&NirExpr, usize, bool)>,
 ) -> bool {
@@ -68,7 +68,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_expression_roots(
 }
 
 fn roots(pending: Vec<(&NirExpr, usize, bool)>, computed_gate: bool) -> bool {
-    roots_with_fields(pending, computed_gate, |_, _| false, |_, _, _| false)
+    roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)
 }
 
 // This opens typed argument shape only. The caller still proves reads and laziness.
@@ -78,6 +78,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_call_expression_roots(
 ) -> bool {
     roots_with_fields(
         pending,
+        true,
         true,
         |_, _| false,
         |callee, index, lazy_rhs| {
@@ -100,6 +101,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_record_expression_roots
     roots_with_fields(
         pending,
         true,
+        false,
         |record, field| {
             layouts
                 .fields(record)
@@ -113,6 +115,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_record_expression_roots
 fn roots_with_fields(
     pending: Vec<(&NirExpr, usize, bool)>,
     computed_gate: bool,
+    computed_bool_operands: bool,
     bool_field: impl Fn(&str, &str) -> bool,
     logical_argument: impl Fn(&str, usize, bool) -> bool,
 ) -> bool {
@@ -155,13 +158,17 @@ fn roots_with_fields(
                     (rhs.as_ref(), depth + 1, computed_gate, false, true),
                 ]);
             }
-            NirExpr::Binary { lhs, rhs, .. } => {
+            NirExpr::Binary { op, lhs, rhs } => {
                 if pending.len() + 2 > work {
                     return false;
                 }
+                // Eager bool operators evaluate both operands without authorizing a lazy RHS.
+                let eager_bool = computed_bool_operands
+                    && logical_root
+                    && matches!(op, NirBinaryOp::Eq | NirBinaryOp::Ne | NirBinaryOp::Xor);
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, false, false, lazy_rhs),
-                    (rhs.as_ref(), depth + 1, false, false, lazy_rhs),
+                    (lhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs),
+                    (rhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs),
                 ]);
             }
             NirExpr::Call { callee, args } => {

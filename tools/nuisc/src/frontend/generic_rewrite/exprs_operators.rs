@@ -37,6 +37,7 @@ pub(super) fn builtin_binary_supported_ast(
     }
     match op {
         AstBinaryOp::And | AstBinaryOp::Or => is_plain_scalar(lhs_ty, "bool"),
+        AstBinaryOp::Xor => is_plain_scalar(lhs_ty, "bool") || is_plain_scalar(lhs_ty, "i64"),
         AstBinaryOp::Add
         | AstBinaryOp::Sub
         | AstBinaryOp::Mul

@@ -118,6 +118,7 @@ pub(super) fn lower_binary_expr_with_async(
             | AstBinaryOp::Rem
             | AstBinaryOp::And
             | AstBinaryOp::Or
+            | AstBinaryOp::Xor
     ) && (!compatible_types(&lhs_ty, &result_ty) || !compatible_types(&rhs_ty, &result_ty))
     {
         return Err(format!(
@@ -138,6 +139,7 @@ pub(super) fn lower_binary_expr_with_async(
         op: match op {
             AstBinaryOp::And => NirBinaryOp::And,
             AstBinaryOp::Or => NirBinaryOp::Or,
+            AstBinaryOp::Xor => NirBinaryOp::Xor,
             AstBinaryOp::Add => NirBinaryOp::Add,
             AstBinaryOp::Sub => NirBinaryOp::Sub,
             AstBinaryOp::Mul => NirBinaryOp::Mul,
@@ -226,6 +228,9 @@ fn builtin_binary_supported(op: AstBinaryOp, lhs_ty: &NirTypeRef, rhs_ty: &NirTy
     }
     match op {
         AstBinaryOp::And | AstBinaryOp::Or => lhs_ty.is_bool_scalar() && rhs_ty.is_bool_scalar(),
+        AstBinaryOp::Xor => {
+            lhs_ty == rhs_ty && (lhs_ty == &bool_type() || lhs_ty == &super::i64_type())
+        }
         AstBinaryOp::Add
         | AstBinaryOp::Sub
         | AstBinaryOp::Mul
@@ -248,6 +253,17 @@ fn binary_result_type(
     rhs: &NirTypeRef,
 ) -> Result<NirTypeRef, String> {
     match op {
+        AstBinaryOp::Xor => {
+            if lhs == rhs && (lhs == &bool_type() || lhs == &super::i64_type()) {
+                Ok(lhs.clone())
+            } else {
+                Err(format!(
+                    "binary `^` expects matching plain bool or i64 operands, found `{}` and `{}`",
+                    lhs.render(),
+                    rhs.render()
+                ))
+            }
+        }
         AstBinaryOp::And | AstBinaryOp::Or => {
             if !compatible_types(lhs, rhs) {
                 return Err(format!(
@@ -338,6 +354,7 @@ fn render_binary_op(op: AstBinaryOp) -> &'static str {
     match op {
         AstBinaryOp::And => "&&",
         AstBinaryOp::Or => "||",
+        AstBinaryOp::Xor => "^",
         AstBinaryOp::Add => "+",
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",

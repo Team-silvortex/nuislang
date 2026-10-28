@@ -1,13 +1,12 @@
 # Native Session Proof Index
 
 This is a navigational catalog, not a cumulative acceptance receipt.
-The [mainline map](../current-mainline-map.md) selects current work. Each receipt
-owns its original source limits, Git baseline, test commands and acceptance scope.
+The [mainline map](../current-mainline-map.md) selects current work; each receipt owns its original source limits, Git baseline, test commands and acceptance scope.
 Later bounded proofs may advance earlier vetoes; do not add their test totals.
 
 ## Current Evidence
 
-The [logical i32 parameter follow-up](nuis-native-logical-i32-call-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
+The [checked i32 Div/Rem follow-up](nuis-native-i32-division-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
 It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md)
 and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [fresh child entries](nuis-native-child-epoch-print-v1.md) and
@@ -16,7 +15,7 @@ and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
 [raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and
 [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
-proof adds scoped logical i32 parameters with comparison-only results; the map owns the next gate.
+proof adds checked i32 Div/Rem comparison operands with exact reads and provenance; the map owns the next gate.
 Original reference files, anchors, fixtures and regression registrations remain
 available below. The backlog of further changing backedges and wide private captures
 is separate from this selected gate.
@@ -27,7 +26,6 @@ Ordinary print/call leaves and original scalar capture authority are not widened
 Later explicit print grants apply only to their own admitted profiles.
 
 ## Guarded Values And Print Epochs
-
 - [Native Typed Scalar Joins V1](nuis-native-typed-scalar-joins-v1.md)
 - [Native Guarded Scalar Joins V1](nuis-native-guarded-scalar-joins-v1.md)
 - [Native Computed Scalar Predicates V1](nuis-native-computed-scalar-predicates-v1.md)
@@ -63,9 +61,12 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native Float Compare Argument Print V1](nuis-native-float-compare-argument-print-v1.md)
 - [Native I32 Call Argument Print V1](nuis-native-i32-call-argument-print-v1.md)
 - [Native Logical I32 Call Argument Print V1](nuis-native-logical-i32-call-argument-print-v1.md)
+- [Native Bool Equality Argument Print V1](nuis-native-bool-equality-argument-print-v1.md)
+- [Native Bool XOR Argument Print V1](nuis-native-bool-xor-argument-print-v1.md)
+- [Native I32 Arithmetic Argument Print V1](nuis-native-i32-arithmetic-argument-print-v1.md)
+- [Native I32 Division Argument Print V1](nuis-native-i32-division-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
-
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)
 - [Native Effectful Return Storage Sharing V1](nuis-native-return-effect-storage-v1.md)
 - [Native Return Storage Initialization Prefix V1](nuis-native-return-effect-storage-prefix-v1.md)
@@ -88,7 +89,6 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native Return Ready Values V1](nuis-native-return-ready-values-v1.md)
 
 ## Native Value And Capture Foundations
-
 - [floating literal negation repair](nuis-native-float-literal-negation-v1.md)
 - [nonliteral sign-negation follow-up](nuis-native-float-sign-negation-v1.md)
 - [static scalar callback bridge](nuis-native-scalar-session-bridge-v1.md)

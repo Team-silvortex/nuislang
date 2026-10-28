@@ -11,10 +11,11 @@ struct Proof {
 
 enum Step<'a> {
     Value(&'a NirExpr, usize, bool),
-    Binary(NirBinaryOp, &'a NirExpr, &'a NirExpr),
+    Binary(NirBinaryOp, bool),
     Exact(&'a NirTypeRef),
     Call(usize, &'a NirTypeRef),
     Sign(NirTypeRef),
+    WrapI32,
 }
 
 pub(super) fn validate(
@@ -40,9 +41,19 @@ pub(super) fn validate(
                 }
                 work -= 1;
                 match value {
+                    NirExpr::CastI64ToI32(word) if lazy_rhs => {
+                        let (left, right) = i32_operands(word)?;
+                        // Charge the wide operation and both sign extensions, not just the wrap.
+                        work = work.checked_sub(3)?;
+                        let child = depth.checked_add(3)?;
+                        pending.push(Step::WrapI32);
+                        pending.push(Step::Value(right, child, lazy_rhs));
+                        pending.push(Step::Value(left, child, lazy_rhs));
+                        computed = true;
+                    }
                     NirExpr::Binary { op, lhs, rhs } => {
                         let child = depth.checked_add(1)?;
-                        pending.push(Step::Binary(*op, lhs, rhs));
+                        pending.push(Step::Binary(*op, lazy_rhs));
                         // LIFO traversal preserves left-before-right checking.
                         let right = lazy_rhs || matches!(op, NirBinaryOp::And | NirBinaryOp::Or);
                         pending.push(Step::Value(rhs, child, right));
@@ -166,10 +177,35 @@ pub(super) fn validate(
                 proofs.last_mut()?.ready_atom = false;
                 proofs.last_mut()?.ready_predicate = false;
             }
-            Step::Binary(op, lhs, rhs) => {
+            Step::WrapI32 => {
                 let mut right = proofs.pop()?;
                 let mut left = proofs.pop()?;
+                if left.ty != scalar_type("i32") || right.ty != scalar_type("i32") {
+                    return None;
+                }
+                // Two i32 operands cannot overflow i64 under Add/Sub/Mul; the final wrap is total.
+                left.total &= right.total;
+                left.ready_atom = false;
+                left.ready_predicate = false;
+                left.comparison_only = true;
+                left.captures.append(&mut right.captures);
+                proofs.push(left);
+            }
+            Step::Binary(op, lazy_rhs) => {
+                let mut right = proofs.pop()?;
+                let mut left = proofs.pop()?;
+                let checked_i32 = lazy_rhs
+                    && matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem)
+                    && left.ty == scalar_type("i32")
+                    && right.ty == scalar_type("i32");
+                if matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem)
+                    && (left.ty == scalar_type("i32") || right.ty == scalar_type("i32"))
+                    && !checked_i32
+                {
+                    return None;
+                }
                 if (left.comparison_only || right.comparison_only)
+                    && !checked_i32
                     && !matches!(
                         op,
                         NirBinaryOp::Eq
@@ -186,13 +222,6 @@ pub(super) fn validate(
                     NirBinaryOp::And | NirBinaryOp::Or
                         if (!right.total || !right.ready_predicate)
                             && right.captures.len() > 31 =>
-                    {
-                        return None
-                    }
-                    NirBinaryOp::Xor if left.ty == scalar_type("bool") => return None,
-                    NirBinaryOp::Eq | NirBinaryOp::Ne
-                        if left.ty == scalar_type("bool")
-                            && (!bool_atom(lhs) || !bool_atom(rhs)) =>
                     {
                         return None
                     }
@@ -220,7 +249,7 @@ pub(super) fn validate(
                     total,
                     ready_atom: false,
                     ready_predicate,
-                    comparison_only: false,
+                    comparison_only: checked_i32,
                     captures: left.captures,
                 });
             }
@@ -228,4 +257,20 @@ pub(super) fn validate(
     }
     (computed && proofs.len() == 1 && proofs[0].ty == *expected && !proofs[0].comparison_only)
         .then_some(())
+}
+
+fn i32_operands(word: &NirExpr) -> Option<(&NirExpr, &NirExpr)> {
+    let NirExpr::Binary {
+        op: NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul,
+        lhs,
+        rhs,
+    } = word
+    else {
+        return None;
+    };
+    let (NirExpr::CastI32ToI64(left), NirExpr::CastI32ToI64(right)) = (lhs.as_ref(), rhs.as_ref())
+    else {
+        return None;
+    };
+    Some((left, right))
 }

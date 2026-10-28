@@ -21,6 +21,91 @@ fn node(name: &str, instruction: &str, args: &[&str]) -> Node {
 }
 
 #[test]
+fn checked_i32_division_and_remainder_preserve_width_and_signed_results() {
+    for (left, right) in [
+        (7, 3),
+        (-7, 3),
+        (7, -3),
+        (-7, -3),
+        (i32::MIN, 1),
+        (i32::MAX, -1),
+    ] {
+        for (instruction, expected) in [
+            ("cpu.div", left / right),
+            ("cpu.div_i32", left / right),
+            ("cpu.rem", left % right),
+        ] {
+            let mut state = ExecutionState::default();
+            state.bind_value("left", Value::I32(left));
+            state.bind_value("right", Value::I32(right));
+            assert_eq!(
+                CpuMod
+                    .execute(
+                        &node("result", instruction, &["left", "right"]),
+                        &resource(),
+                        &mut state
+                    )
+                    .unwrap(),
+                Value::I32(expected),
+                "{left} {instruction} {right}"
+            );
+        }
+    }
+}
+
+#[test]
+fn checked_i32_division_and_remainder_reject_zero_and_overflow_without_mutation() {
+    for instruction in ["cpu.div", "cpu.div_i32", "cpu.rem"] {
+        for (left, right, message) in [(7, 0, "zero"), (i32::MIN, -1, "overflow")] {
+            let mut state = ExecutionState::default();
+            state.bind_value("left", Value::I32(left));
+            state.bind_value("right", Value::I32(right));
+            state.bind_value("canary", Value::Int(91));
+            let before = format!("{state:?}");
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                CpuMod.execute(
+                    &node("result", instruction, &["left", "right"]),
+                    &resource(),
+                    &mut state,
+                )
+            }));
+            assert!(result.unwrap().unwrap_err().contains(message));
+            assert_eq!(format!("{state:?}"), before);
+        }
+    }
+}
+
+#[test]
+fn checked_i32_division_and_remainder_do_not_coerce_mixed_kinds() {
+    for instruction in ["cpu.div", "cpu.div_i32", "cpu.rem"] {
+        for other in [
+            Value::Int(3),
+            Value::Bool(true),
+            Value::F32(3.0),
+            Value::F64(3.0),
+        ] {
+            for reverse in [false, true] {
+                let mut state = ExecutionState::default();
+                let (left, right) = if reverse {
+                    (other.clone(), Value::I32(7))
+                } else {
+                    (Value::I32(7), other.clone())
+                };
+                state.bind_value("left", left);
+                state.bind_value("right", right);
+                assert!(CpuMod
+                    .execute(
+                        &node("result", instruction, &["left", "right"]),
+                        &resource(),
+                        &mut state
+                    )
+                    .is_err());
+            }
+        }
+    }
+}
+
+#[test]
 fn f32_word_codec_preserves_bits_without_numeric_conversion() {
     let pack = node("packed", "cpu.pack_f32_word", &["input"]);
     let unpack = node("unpacked", "cpu.unpack_f32_word", &["word"]);
