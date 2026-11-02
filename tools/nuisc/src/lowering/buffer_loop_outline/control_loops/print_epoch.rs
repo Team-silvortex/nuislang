@@ -18,6 +18,18 @@ pub(super) struct Epoch {
 }
 
 impl Epoch {
+    pub(super) fn initializer_pair(
+        &self,
+        body: &[NirStmt],
+        definition: usize,
+        scope: &Scope,
+        layouts: &control_values::CarryLayouts,
+        catalog: &ScalarHelpers,
+        ready: impl FnMut(&NirExpr, usize) -> Option<NirTypeRef>,
+    ) -> Option<usize> {
+        binary_float::admit_epoch_pair(body, definition, self, scope, layouts, catalog, ready)
+    }
+
     pub(super) fn enter_child(
         scope: &Scope,
         writable: &BTreeSet<String>,

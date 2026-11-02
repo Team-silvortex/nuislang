@@ -6,7 +6,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/print_binary_float.rs",
         required_patterns: &[
             "control_values::binary_type(op, left.ty, right.ty)?",
-            "proofs[0].ty == *expected",
+            "proof.ty == *expected",
             "pending.push(Step::Value(rhs, child, right))",
             "pending.push(Step::Value(lhs, child, lazy_rhs))",
         ],

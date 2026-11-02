@@ -9,7 +9,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.3 | `2c5b4796` | 2026-10-28 |
+| Latest committed patch at this audit, beta-0.18.4 | `ceaa2caa` | 2026-10-28 |
+| Earlier patch, beta-0.18.3 | `2c5b4796` | 2026-10-28 |
 | Earlier patch, beta-0.18.2 | `5bbd4de8` | 2026-10-28 |
 | Earlier patch, beta-0.18.1 | `c3320d9e` | 2026-10-26 |
 | Previous minor entry, beta-0.17.0 | `ccc16af9` | 2026-10-15 |
@@ -128,14 +129,31 @@ adds exact Add/Sub/Mul/Div/Rem composition without consuming comparison-only
 provenance. Wrapping arithmetic, checked zero/MIN/-1 faults, unchanged budgets
 and two additional native i64-overflow fault rows have independent controls.
 
-## Current Worktree Follow-Up
+## Committed XOR And Maintenance
 
 The [restricted i64 XOR proof](../reference/nuis-native-i64-xor-argument-print-v1.md)
 adds eager same-kind composition without consuming comparison-only provenance.
 It separates reference completion events from native entry observations and
 adds independent mask-fault paths in both operand positions. Original epochs,
-all budgets and ordinary-read vetoes remain unchanged. Source-local scalar
-temporary combinations are the next audit; this worktree does not bump the version.
+all budgets and ordinary-read vetoes remain unchanged. It is now included in
+`ceaa2caa`, alongside the architecture/storage audit and shader/ns-nova suite
+split; their original dated acceptance records remain separate.
+
+## Current Worktree Follow-Up
+
+The [source-local scalar audit](../reference/nuis-native-local-scalar-argument-print-v1.md)
+confirms ready parameter/updated-field/branch-local composition through source,
+native/reference execution and source-free delivery. It adds regression evidence,
+not a production permission. Print-only original epochs still cannot initialize
+ordinary locals. The subsequent
+[epoch-local plan](../reference/nuis-native-epoch-local-plan-v1.md) is now a private
+analysis-only certificate for one definition/observer pair with original fields,
+source positions and shared bounds. It does not change ordinary admission.
+The subsequent [root-owned execution route](../reference/nuis-native-epoch-local-argument-print-v1.md)
+now connects one proven pair to source admission and existing normalization,
+with native/reference and source-free delivery checks. It retains ordinary
+readiness and branch/child refusals. Fresh child-owned epoch pairs are the next
+gate. This worktree does not bump the version.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Clone)]
 struct Proof {
     ty: NirTypeRef,
     total: bool,
@@ -7,6 +8,27 @@ struct Proof {
     ready_predicate: bool,
     comparison_only: bool,
     captures: BTreeSet<Vec<String>>,
+}
+
+#[path = "print_epoch_local_plan.rs"]
+mod epoch_local_plan;
+
+pub(super) fn admit_epoch_pair(
+    body: &[NirStmt],
+    definition: usize,
+    epoch: &Epoch,
+    scope: &Scope,
+    layouts: &control_values::CarryLayouts,
+    catalog: &ScalarHelpers,
+    ready: impl FnMut(&NirExpr, usize) -> Option<NirTypeRef>,
+) -> Option<usize> {
+    epoch_local_plan::admit_source(body, definition, epoch, scope, layouts, catalog, ready)
+}
+
+struct Binding<'a> {
+    name: &'a str,
+    proof: &'a Proof,
+    uses: usize,
 }
 
 enum Step<'a> {
@@ -32,17 +54,30 @@ pub(super) fn validate(
     {
         return None;
     }
-    let mut pending = vec![Step::Value(value, depth, false)];
-    let mut proofs: Vec<Proof> = Vec::new();
     let mut work = 4096usize;
+    let proof = prove(value, depth, false, &mut work, catalog, None, &mut leaf)?;
+    (proof.ty == *expected && !proof.comparison_only).then_some(())
+}
+
+fn prove(
+    value: &NirExpr,
+    depth: usize,
+    restricted_context: bool,
+    work: &mut usize,
+    catalog: &ScalarHelpers,
+    mut binding: Option<&mut Binding<'_>>,
+    mut leaf: impl FnMut(&NirExpr, usize) -> Option<NirTypeRef>,
+) -> Option<Proof> {
+    let mut pending = vec![Step::Value(value, depth, restricted_context)];
+    let mut proofs: Vec<Proof> = Vec::new();
     let mut computed = false;
     while let Some(step) = pending.pop() {
         match step {
             Step::Value(value, depth, lazy_rhs) => {
-                if depth > 64 || work == 0 {
+                if depth > 64 || *work == 0 {
                     return None;
                 }
-                work -= 1;
+                *work -= 1;
                 match value {
                     NirExpr::CastI32ToI64(operand) if lazy_rhs => {
                         pending.push(Step::WidenI32);
@@ -57,7 +92,7 @@ pub(super) fn validate(
                     NirExpr::CastI64ToI32(word) if lazy_rhs && i32_neg_operand(word).is_some() => {
                         let operand = i32_neg_operand(word)?;
                         // Charge subtraction, its zero leaf and the operand's sign extension.
-                        work = work.checked_sub(3)?;
+                        *work = work.checked_sub(3)?;
                         pending.push(Step::NegI32);
                         pending.push(Step::Value(operand, depth.checked_add(3)?, lazy_rhs));
                         computed = true;
@@ -65,7 +100,7 @@ pub(super) fn validate(
                     NirExpr::CastI64ToI32(word) if lazy_rhs => {
                         let (left, right) = i32_operands(word)?;
                         // Charge the wide operation and both sign extensions, not just the wrap.
-                        work = work.checked_sub(3)?;
+                        *work = work.checked_sub(3)?;
                         let child = depth.checked_add(3)?;
                         pending.push(Step::WrapI32);
                         pending.push(Step::Value(right, child, lazy_rhs));
@@ -109,9 +144,26 @@ pub(super) fn validate(
                             "f64"
                         });
                         let operand = unary_float::operand(value, &ty)?;
-                        work = work.checked_sub(3)?;
+                        *work = work.checked_sub(3)?;
                         pending.push(Step::Sign(ty));
                         pending.push(Step::Value(operand, depth.checked_add(3)?, lazy_rhs));
+                    }
+                    NirExpr::Var(name)
+                        if binding.as_ref().is_some_and(|binding| binding.name == name) =>
+                    {
+                        let binding = binding.as_deref_mut()?;
+                        if !lazy_rhs || binding.uses != 0 {
+                            return None;
+                        }
+                        binding.uses += 1;
+                        let mut proof = binding.proof.clone();
+                        // Reading the already-computed word is total, not its initializer.
+                        proof.total = true;
+                        proof.ready_atom = false;
+                        proof.ready_predicate = false;
+                        proof.comparison_only = true;
+                        proof.captures.insert(vec![name.clone()]);
+                        proofs.push(proof);
                     }
                     NirExpr::Int(_)
                     | NirExpr::Bool(_)
@@ -132,7 +184,7 @@ pub(super) fn validate(
                             if end > 64 {
                                 return None;
                             }
-                            work = work.checked_sub(1)?;
+                            *work = work.checked_sub(1)?;
                             base = parent;
                         }
                         if matches!(value, NirExpr::FieldAccess { .. })
@@ -320,8 +372,10 @@ pub(super) fn validate(
             }
         }
     }
-    (computed && proofs.len() == 1 && proofs[0].ty == *expected && !proofs[0].comparison_only)
-        .then_some(())
+    if !computed || proofs.len() != 1 {
+        return None;
+    }
+    proofs.pop()
 }
 
 fn i32_neg_operand(word: &NirExpr) -> Option<&NirExpr> {

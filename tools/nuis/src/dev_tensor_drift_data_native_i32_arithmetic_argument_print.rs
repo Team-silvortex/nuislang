@@ -19,7 +19,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "let child = depth.checked_add(3)?",
             "pending.push(Step::Value(right, child, lazy_rhs))",
             "pending.push(Step::Value(left, child, lazy_rhs))",
-            "depth > 64 || work == 0",
+            "depth > 64 || *work == 0",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -17,7 +17,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "struct Proof",
             "total: bool",
             "control_values::binary_type(op, left.ty, right.ty)?",
-            "proofs[0].ty == *expected",
+            "proof.ty == *expected",
             "let mut work = 4096usize",
         ],
     },

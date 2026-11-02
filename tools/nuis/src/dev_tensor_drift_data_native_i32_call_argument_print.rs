@@ -19,7 +19,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if proof.comparison_only && &proof.ty != result",
             "comparison_only: comparison_only || result == &scalar_type(\"i32\")",
             "left.comparison_only || right.comparison_only",
-            "!proofs[0].comparison_only",
+            "!proof.comparison_only",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -28,7 +28,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "(!right.total || !right.ready_predicate)",
             "right.captures.len() > 31",
-            "depth > 64 || work == 0",
+            "depth > 64 || *work == 0",
             "let mut work = 4096usize",
             "control_values::binary_type(op, left.ty, right.ty)?",
         ],

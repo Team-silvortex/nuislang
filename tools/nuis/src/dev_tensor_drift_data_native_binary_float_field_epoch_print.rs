@@ -8,7 +8,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "expected != &scalar_type(&expected.name)", "NirBinaryOp::Div",
             "let mut work = 4096usize", "pending.push(Step::Value(rhs, child, right))",
             "pending.push(Step::Value(lhs, child, lazy_rhs))", "unary_float::operand(value, &ty)?",
-            "depth.checked_add(3)?", "proofs[0].ty == *expected",
+            "depth.checked_add(3)?", "proof.ty == *expected",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -14,6 +14,14 @@ mod word_tests;
 #[path = "bool_projection_tests.rs"]
 mod bool_projection_tests;
 
+#[cfg(test)]
+#[path = "local_scalar_argument_print_tests.rs"]
+mod local_scalar_argument_print_tests;
+
+#[cfg(test)]
+#[path = "epoch_local_argument_print_tests.rs"]
+mod epoch_local_argument_print_tests;
+
 // This source profile uses scoped functions, not captured loop-metadata RHSs.
 // Keep definite initialization separate from the set of returned loop carries.
 #[derive(Clone)]
@@ -69,7 +77,12 @@ fn block(
     print_epoch: &print_epoch::Epoch,
     depth: usize,
 ) -> Option<()> {
-    for stmt in body {
+    let mut certified_consumer = None;
+    for (position, stmt) in body.iter().enumerate() {
+        if certified_consumer == Some(position) {
+            certified_consumer = None;
+            continue;
+        }
         match stmt {
             NirStmt::Print(NirExpr::Int(_))
                 if literal_prints == validation::LiteralPrints::Allow => {}
@@ -97,7 +110,25 @@ fn block(
             NirStmt::Let { name, ty, value } => {
                 let existing = locals.scope.get(name);
                 let own = existing.map(|_| name.as_str());
-                let inferred = expression(value, locals, updates, own, catalog, layouts, 0)?;
+                let inferred = match expression(value, locals, updates, own, catalog, layouts, 0) {
+                    Some(ty) => ty,
+                    None if depth == 0 && literal_prints == validation::LiteralPrints::Scalars => {
+                        // The root owner passes its whole entry block and freshly created
+                        // epoch. Do not lend the certificate to branch or child scopes.
+                        certified_consumer = Some(print_epoch.initializer_pair(
+                            body,
+                            position,
+                            &locals.scope,
+                            layouts,
+                            catalog,
+                            |leaf, depth| {
+                                expression(leaf, locals, updates, None, catalog, layouts, depth)
+                            },
+                        )?);
+                        continue;
+                    }
+                    None => return None,
+                };
                 if ty.as_ref().is_some_and(|ty| ty != &inferred) {
                     return None;
                 }

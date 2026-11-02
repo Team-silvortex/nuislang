@@ -1,0 +1,42 @@
+mod cpu Main {
+    struct State { total: f64 }
+    struct Pair { total: f64, code: i32, flag: bool }
+    @noinline fn checked64(value: i64, guard: i64) -> i64 { let checked = 0 / guard; return value; }
+    @noinline fn choose(value: f64, pick: bool) -> f64 { if pick { return value; } return -value; }
+    @noinline fn observe(value: f64) -> i64 { if value < 0.0 { return -1; } if value == 0.0 { return 0; } if value != value { return 2; } return 1; }
+    @noinline fn finish(value: f64, guard: i64) -> f64 { let checked = 0 / guard; return value; }
+    @noinline fn work(seed: State, selected: bool, trips: i64, left: i32, right: i32, mask: i64, initial_guard: i64, lazy_guard: i64, ready_guard: i64, tail_guard: i64) -> State {
+        print(70);
+        let mut index = 0;
+        let mut current = Pair { total: seed.total, code: left, flag: selected };
+        while index < trips {
+            print(71);
+            let parameter_word = checked64((i64_from_i32(left) + 4294967296) ^ mask, initial_guard);
+            print(parameter_word);
+            print(observe(choose(current.total, current.flag && (checked64(i64_from_i32(current.code) ^ parameter_word, lazy_guard) != 0))));
+            current = Pair { total: -current.total, code: right, flag: selected };
+            let ready_word = checked64((i64_from_i32(current.code) + 4294967296) ^ parameter_word, ready_guard);
+            print(ready_word);
+            if selected {
+                let branch_word = ready_word + 1;
+                print(branch_word);
+            } else {
+                let branch_word = ready_word - 1;
+                print(branch_word);
+            }
+            index = index + 1;
+        }
+        print(73);
+        return State { total: finish(current.total, tail_guard) };
+    }
+    fn start(initial: f64, selected: bool, trips: i64, left: i32, right: i32, mask: i64, initial_guard: i64, lazy_guard: i64, ready_guard: i64, tail_guard: i64) -> State {
+        print(90);
+        return work(State { total: initial }, selected, trips, left, right, mask, initial_guard, lazy_guard, ready_guard, tail_guard);
+    }
+    fn step(state: State, initial: f64, selected: bool, trips: i64, left: i32, right: i32, mask: i64, initial_guard: i64, lazy_guard: i64, ready_guard: i64, tail_guard: i64) -> State {
+        print(91);
+        return work(state, selected, trips, left, right, mask, initial_guard, lazy_guard, ready_guard, tail_guard);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

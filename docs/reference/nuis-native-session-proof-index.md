@@ -5,20 +5,17 @@ Each receipt owns its scope, baseline and validation. Later proofs may advance v
 
 ## Current Evidence
 
-The [restricted i64 XOR follow-up](nuis-native-i64-xor-argument-print-v1.md) is the latest bounded CPU worktree proof at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
+The [local scalar audit](nuis-native-local-scalar-argument-print-v1.md) follows [restricted i64 XOR](nuis-native-i64-xor-argument-print-v1.md) at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md).
 It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md) and [root carry reads](nuis-native-carry-epoch-print-v1.md), then
 [fresh child entries](nuis-native-child-epoch-print-v1.md) and [original i64 fields](nuis-native-field-epoch-print-v1.md), then
 [typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and
-[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md). The latest
-proof adds restricted eager i64 XOR with exact ordering and provenance; the map owns the next gate.
-Original reference files, anchors, fixtures and regression registrations remain
-available below. The backlog of further changing backedges and wide private captures
-is separate from this selected gate.
+[raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md).
+The [epoch-local plan](nuis-native-epoch-local-plan-v1.md) now feeds a separate [root-owned execution proof](nuis-native-epoch-local-argument-print-v1.md); the map owns the next gate.
+Original reference files, anchors, fixtures and regressions remain below; further changing backedges and wide private captures are separate.
 
 The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializers-v1.md)
 retains its historical source-profile restriction:
-Ordinary print/call leaves and original scalar capture authority are not widened.
-Later explicit print grants apply only to their own admitted profiles.
+Ordinary print/call leaves and original scalar capture authority are not widened; later explicit print grants apply only to their own admitted profiles.
 
 ## Guarded Values And Print Epochs
 - [Native Typed Scalar Joins V1](nuis-native-typed-scalar-joins-v1.md)
@@ -65,6 +62,9 @@ Later explicit print grants apply only to their own admitted profiles.
 - [Native I32 Widening Argument Print V1](nuis-native-i32-widening-argument-print-v1.md)
 - [Native I64 Arithmetic Argument Print V1](nuis-native-i64-arithmetic-argument-print-v1.md)
 - [Native I64 XOR Argument Print V1](nuis-native-i64-xor-argument-print-v1.md)
+- [Native Local Scalar Argument Print V1](nuis-native-local-scalar-argument-print-v1.md)
+- [Native Epoch-Local Initializer Plan V1](nuis-native-epoch-local-plan-v1.md)
+- [Native Epoch-Local Argument Print V1](nuis-native-epoch-local-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)

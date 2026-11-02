@@ -16,7 +16,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-helper-call-argument-rhs-context",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/print_binary_float.rs",
         required_patterns: &[
-            "Step::Value(value, depth, false)",
+            "prove(value, depth, false, &mut work, catalog, None, &mut leaf)",
             "Step::Value(value, depth, lazy_rhs)",
             "lazy_rhs || matches!(op, NirBinaryOp::And | NirBinaryOp::Or)",
             "lazy_rhs && matches!(result.name.as_str(), \"bool\" | \"i32\" | \"i64\")",

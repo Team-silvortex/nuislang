@@ -124,6 +124,10 @@ captures and full backend/engine parity retain separate gates.
 
 ## Reproduce
 
+The subsequent [local scalar audit](nuis-native-local-scalar-argument-print-v1.md)
+records existing ready-local support and the next permission boundary separately;
+it does not rewrite this receipt's historical validation or original next audit.
+
 ```sh
 env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- i64_xor_argument_print_epoch --test-threads=1
 env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- i64_xor_argument_print_epoch --test-threads=1

@@ -53,8 +53,16 @@ composes full-width XOR with signed widening, arithmetic and same-kind helpers.
 Both operands are eager in source order; only the enclosing AND/OR can skip
 the expression. Native probes distinguish entry order from reference completion
 events, including independent mask faults. Original epochs and comparison-only
-provenance remain gates. Next is a **source-local scalar temporary audit** for
-these expressions, not an assumption of missing support or ordinary readiness.
+provenance remain gates. The [source-local scalar audit](reference/nuis-native-local-scalar-argument-print-v1.md)
+confirms existing ready-local composition through native execution and delivery;
+it does not lend print-only epoch reads to ordinary initializers. The
+[epoch-local initializer plan](reference/nuis-native-epoch-local-plan-v1.md)
+analyzes one borrowed definition/observer pair with original field identity,
+statement position, comparison-only provenance and shared bounds. The
+[root-owned source route](reference/nuis-native-epoch-local-argument-print-v1.md)
+now admits that pair through existing normalization and native/source-free
+execution without publishing ordinary readiness. Next is **fresh child-owned
+epoch pairs**, not branch reuse of an ancestor's print grant.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 
