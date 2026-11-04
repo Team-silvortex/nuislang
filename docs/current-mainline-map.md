@@ -61,8 +61,31 @@ analyzes one borrowed definition/observer pair with original field identity,
 statement position, comparison-only provenance and shared bounds. The
 [root-owned source route](reference/nuis-native-epoch-local-argument-print-v1.md)
 now admits that pair through existing normalization and native/source-free
-execution without publishing ordinary readiness. Next is **fresh child-owned
-epoch pairs**, not branch reuse of an ancestor's print grant.
+execution without publishing ordinary readiness. The
+[child-owned route](reference/nuis-native-child-epoch-local-argument-print-v1.md)
+now binds a fresh ready child entry to its own complete block, without lending
+its owner to ordinary branches or unready descendants. The
+[repeated-parent witness](reference/nuis-native-parent-reentry-argument-print-v1.md)
+now verifies zero/dynamic parent trips, child reseeding across parent backedges
+and later-parent faults through native execution and source-free restoration.
+The [later-child witness](reference/nuis-native-child-progress-argument-print-v1.md)
+now reaches faults after completed siblings in later parents, retaining exact
+output prefixes and the last accepted callback State through native execution
+and source-free delivery. The [parent-bound witness](reference/nuis-native-parent-bound-argument-print-v1.md)
+now verifies zero/positive/zero/resumed child counts, fresh entries and an exact
+12-unit success/11-unit work rejection boundary. The
+[fallible-bound witness](reference/nuis-native-fallible-bound-argument-print-v1.md)
+adds producer failures even for would-be zero-child parents and distinguishes
+source faults from child-reservation rejection. The
+[state-bound witness](reference/nuis-native-state-bound-argument-print-v1.md)
+connects ready floating-point comparisons to bound production, using changed
+parent carries and the last accepted State rather than stale entry values.
+The [early-break witness](reference/nuis-native-state-break-argument-print-v1.md)
+now preserves completed State, skipped suffixes and observed indices under those
+bounds. Generated control prologues retain exact normalization provenance;
+source lookalikes and branch grants remain rejected, and exits do not refund work.
+Next is **state-dependent child bounds with continue**, retaining its single
+required step, effect order, carried values and reservation accounting.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

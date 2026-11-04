@@ -54,10 +54,14 @@ pub(super) fn admit_source(
     catalog: &ScalarHelpers,
     ready: impl FnMut(&NirExpr, usize) -> Option<NirTypeRef>,
 ) -> Option<usize> {
-    let NirStmt::Let { value, .. } = body.get(definition)? else { return None; };
+    let NirStmt::Let { value, .. } = body.get(definition)? else {
+        return None;
+    };
     // Initializers are eager ordinary-shape roots, not a new source of logical
     // roots outside the function-wide print budget.
-    if !conditional_values::prefix::expression(value) { return None; }
+    if !conditional_values::prefix::expression(value) {
+        return None;
+    }
     let certificate = plan(body, definition, epoch, scope, layouts, catalog, ready)?;
     if !certificate.matches(body, definition, epoch, scope, layouts, catalog) {
         return None;

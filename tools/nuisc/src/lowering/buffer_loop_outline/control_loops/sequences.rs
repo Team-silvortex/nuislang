@@ -87,6 +87,7 @@ pub(super) fn validate(
     {
         return temporaries::validate(
             effects,
+            normalized.as_ref(),
             scope,
             loop_bindings,
             &mutable,

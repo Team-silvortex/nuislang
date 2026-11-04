@@ -4,6 +4,21 @@ pub(super) struct Normalized {
     pub running: String,
     pub breaking: Option<String>,
     pub effects: Vec<NirStmt>,
+    entry_prologue: Vec<NirStmt>,
+}
+
+impl Normalized {
+    pub(super) fn entry_blocks<'a>(
+        &'a self,
+        body: &[NirStmt],
+    ) -> Option<(&'a [NirStmt], &'a [NirStmt])> {
+        // Authority belongs to this normalization, never a copied body or a
+        // source declaration that merely resembles a generated control flag.
+        if !std::ptr::eq(body, self.effects.as_slice()) || !body.starts_with(&self.entry_prologue) {
+            return None;
+        }
+        Some(self.effects.split_at(self.entry_prologue.len()))
+    }
 }
 
 // Continue returns to the driver's unit step; break suppresses that step entirely.
@@ -75,13 +90,17 @@ fn normalize_with_step(
         bounded,
     )?;
     body.insert(0, set_flag(&flag, running_value));
+    let mut prologue_len = 1;
     if let Some(breaking) = breaking.as_ref().filter(|name| *name != &flag) {
         body.insert(0, set_flag(breaking, 0));
+        prologue_len += 1;
     }
+    let entry_prologue = body[..prologue_len].to_vec();
     Some(Some(Normalized {
         running: flag,
         breaking,
         effects: body,
+        entry_prologue,
     }))
 }
 

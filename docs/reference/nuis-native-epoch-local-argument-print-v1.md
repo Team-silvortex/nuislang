@@ -1,6 +1,8 @@
 # Native Epoch-Local Argument Print V1
 
-Audit date: 2026-10-28. Git baseline: beta-0.18.4, `ceaa2caa`.
+Audit date: 2026-11-04. Checkout baseline: `dc87ec43` (`fixed license`,
+also retaining the preceding implementation). Latest version-label commit:
+beta-0.18.4, `ceaa2caa`.
 This worktree connects the [borrowed initializer plan](nuis-native-epoch-local-plan-v1.md)
 to source admission. That earlier analysis-only receipt retains its original
 scope, executed totals and predecessor hashes. No release is created here.
@@ -81,9 +83,31 @@ flushed trap prefix; the CLI only checks any output its trapping child flushed.
 
 ## Validation
 
-Validation in progress. New controls cover source pair admission/refusals,
-identity mismatches, native/reference execution, entry exhaustion, matrix oracle
-and actual CLI delivery. Earlier receipts and repeated runs are not summed.
+The final source state passed 304 distinct selected tests/checks:
+
+| Selected Set | Passed |
+| --- | ---: |
+| Compiler temporaries/epoch/iteration-print/effect library regressions | 216 |
+| Epoch-local, ready-local, i64 XOR and i64 arithmetic native controls | 17 |
+| f32/f64 fresh/cache/two source-free delivery matrix | 1 |
+| Python CI-script regressions | 40 |
+| Repository file budgets | 2 |
+| Host-absolute-path policy | 1 |
+| Development tensor tests | 27 |
+
+Nine controls are new relative to the preceding plan receipt: two source tests,
+one owner-context identity test, five native/reference controls and one CLI
+matrix. The seven preceding plan tests remain; the source-admission assertion
+is intentionally advanced without granting ordinary local availability. Earlier
+receipts, raw matrix rows and repeated runs are not added to the 304 total.
+
+Structural validation also passed: 5,997 UTF-8 text files, 4,677 local Markdown
+links, offline locked metadata, formatting and whitespace checks. The workspace
+architecture remains 29 packages, six domains and 74 normal/build edges. The
+proof index stays at 300 lines; the iteration-check registry is 778 lines. The
+rebuilt ordinary CLI report matches all six source fields and complete
+predecessor hashes; all 4,164 drift checks passed. Coverage, hierarchy and task
+lineage are clean, and the selected coordinate remains active/99.
 
 This is bounded native host CPU execution, not GPU/provider parity, stable ABI,
 arbitrary resource/I/O/async capture, whole-engine completion or self-hosting.
@@ -96,11 +120,15 @@ entry from an ordinary branch reusing its parent's epoch, require a ready entry
 source and reject ancestor-grant inheritance before new child admission. Wider
 prefixes, multiple definitions/uses and arbitrary escapes retain separate gates.
 
+The subsequent [child-owned receipt](nuis-native-child-epoch-local-argument-print-v1.md)
+advances that child-entry gate separately; this dated root receipt retains its
+original acceptance scope and counts.
+
 ## Reproduce
 
 ```sh
-env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- epoch_local_argument_print epoch_local_plan --test-threads=1
-env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- epoch_local_argument_print --test-threads=1
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --lib --locked -j1 -- temporaries:: print_epoch:: iteration_prints:: iteration_effects:: --test-threads=1
+env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuisc --test native_application_bridge --locked -j1 -- epoch_local_argument_print:: local_scalar_argument_print:: i64_xor_argument_print_epoch:: i64_arithmetic_argument_print_epoch:: --test-threads=1
 env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p nuis --test native_session_workflow --locked -j1 -- epoch_local_argument_print --test-threads=1 --nocapture
 ```
 

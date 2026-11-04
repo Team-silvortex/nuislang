@@ -50,8 +50,9 @@ pub(super) fn validate(
     child.available.insert(prepared.binding_name.clone());
     let mut child_updates = updates.clone();
     child_updates.extend(changed.iter().cloned());
-    block(
+    epoch_block_owner::validate_entry(
         effects,
+        normalized.as_ref(),
         &mut child,
         &child_updates,
         catalog,

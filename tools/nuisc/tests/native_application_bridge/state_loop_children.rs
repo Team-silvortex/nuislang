@@ -220,6 +220,16 @@ fn state_loop_children_native_share_outer_and_selected_child_reservations() {
                     })
                     .collect(),
             };
+            let rejections = inputs
+                .iter()
+                .map(|input| {
+                    if input.rounds > 65536 || input.trips > 65536 {
+                        probe::LoopRejection::Induction
+                    } else {
+                        probe::LoopRejection::Work
+                    }
+                })
+                .collect::<Vec<_>>();
             let failures = inputs
                 .into_iter()
                 .map(|input| {
@@ -245,13 +255,14 @@ fn state_loop_children_native_share_outer_and_selected_child_reservations() {
                     }
                 })
                 .collect::<Vec<_>>();
-            probe::check_sequences_with_limits(
+            probe::check_sequences_with_loop_rejections(
                 &variant.source(),
                 &healthy,
                 &failures,
                 &observers(),
                 limit,
                 100,
+                &rejections,
             );
         }
     }

@@ -786,6 +786,8 @@ mod i32_division_argument_print_epoch;
 #[path = "native_application_bridge/i32_literal_argument_print_epoch.rs"]
 mod i32_literal_argument_print_epoch;
 
+#[path = "native_application_bridge/child_epoch_local_argument_print.rs"]
+mod child_epoch_local_argument_print;
 #[path = "native_application_bridge/epoch_local_argument_print.rs"]
 mod epoch_local_argument_print;
 #[path = "native_application_bridge/i32_negation_argument_print_epoch.rs"]
@@ -798,3 +800,5 @@ mod i64_arithmetic_argument_print_epoch;
 mod i64_xor_argument_print_epoch;
 #[path = "native_application_bridge/local_scalar_argument_print.rs"]
 mod local_scalar_argument_print;
+#[path = "native_application_bridge/parent_reentry_argument_print.rs"]
+mod parent_reentry_argument_print;

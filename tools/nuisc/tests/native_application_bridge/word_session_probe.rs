@@ -27,6 +27,20 @@ pub(super) struct SequenceFailure {
     pub before_failure: Vec<i64>,
 }
 
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+pub(super) enum LoopRejection {
+    Work,
+    Induction,
+}
+
+#[derive(Clone, Copy)]
+enum FailureDiagnostic<'a> {
+    PrefixOnly,
+    Source,
+    Loop(&'a [LoopRejection]),
+}
+
 fn callback(
     llvm: &mut String,
     bridge: &NativeSessionBridge,
@@ -97,17 +111,25 @@ fn driver(
         let at = start + llvm[start..].find("{\n").unwrap() + 2;
         llvm.insert_str(at, observer);
     }
-    // Explain a configured entry-budget trap without changing source stdout.
+    // Distinguish configured budget traps without changing source stdout.
     let entry_message = "native helper entry limit exhausted\n";
-    llvm = llvm.lines().map(|line| {
+    let work_message = "native loop work limit exhausted\n";
+    let induction_message = "native loop induction rejected\n";
+    llvm = llvm.lines().enumerate().map(|(index, line)| {
         if line.ends_with(':') && line.contains("native_helper_entry_rejected") {
             format!("{line}\n  %nuis_probe_entry_diagnostic = call i64 @write(i32 2, ptr @nuis_probe_entry_message, i64 {})", entry_message.len())
+        } else if line.ends_with(':') && line.contains("native_loop_work_rejected") {
+            format!("{line}\n  %nuis_probe_work_diagnostic_{index} = call i64 @write(i32 2, ptr @nuis_probe_work_message, i64 {})", work_message.len())
+        } else if line.ends_with(':') && line.contains("native_loop_rejected") {
+            format!("{line}\n  %nuis_probe_induction_diagnostic_{index} = call i64 @write(i32 2, ptr @nuis_probe_induction_message, i64 {})", induction_message.len())
         } else { line.to_owned() }
     }).collect::<Vec<_>>().join("\n");
     if !llvm.contains("declare i64 @write(") {
         llvm.push_str("\ndeclare i64 @write(i32, ptr, i64)\n");
     }
     llvm.push_str(&format!("\n@nuis_probe_entry_message = private constant [{} x i8] c\"native helper entry limit exhausted\\0A\"\n", entry_message.len()));
+    llvm.push_str(&format!("\n@nuis_probe_work_message = private constant [{} x i8] c\"native loop work limit exhausted\\0A\"\n", work_message.len()));
+    llvm.push_str(&format!("\n@nuis_probe_induction_message = private constant [{} x i8] c\"native loop induction rejected\\0A\"\n", induction_message.len()));
     llvm = llvm.replace("call void @nuis_debug_print_i64(", "call void @word_print(");
     if !llvm.contains("declare i32 @fflush(") {
         llvm.push_str("\ndeclare i32 @fflush(ptr)\n");
@@ -212,6 +234,32 @@ pub(super) fn check_sequences_with_limits(
         loop_work_limit,
         helper_entry_limit,
         false,
+        // Legacy literal-print suites mix source and reservation failures;
+        // their contract is an exact prefix, not a source-only diagnostic.
+        FailureDiagnostic::PrefixOnly,
+    );
+}
+
+#[allow(dead_code)]
+pub(super) fn check_sequences_with_loop_rejections(
+    source: &str,
+    rows: &[Sequence],
+    failures: &[SequenceFailure],
+    observers: &[(&str, &str)],
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+    expected: &[LoopRejection],
+) {
+    assert_eq!(failures.len(), expected.len());
+    check_sequences_print_policy(
+        source,
+        rows,
+        failures,
+        observers,
+        loop_work_limit,
+        helper_entry_limit,
+        false,
+        FailureDiagnostic::Loop(expected),
     );
 }
 
@@ -232,6 +280,7 @@ pub(super) fn check_sequences_with_i64_prints(
         loop_work_limit,
         helper_entry_limit,
         true,
+        FailureDiagnostic::Source,
     );
 }
 
@@ -243,6 +292,7 @@ fn check_sequences_print_policy(
     loop_work_limit: u64,
     helper_entry_limit: u64,
     computed: bool,
+    diagnostic: FailureDiagnostic<'_>,
 ) {
     let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
@@ -320,6 +370,23 @@ fn check_sequences_print_policy(
                     run.status
                 );
                 let failure = &failures[mode - 1];
+                let stderr = String::from_utf8_lossy(&run.stderr);
+                if !matches!(diagnostic, FailureDiagnostic::PrefixOnly) {
+                    assert!(
+                        !stderr.contains("native helper entry limit exhausted"),
+                        "{stderr}"
+                    );
+                    assert_eq!(
+                        stderr.contains("native loop work limit exhausted"),
+                        matches!(diagnostic, FailureDiagnostic::Loop(kinds) if matches!(kinds[mode - 1], LoopRejection::Work)),
+                        "mode={mode} reversed={reversed} work_limit={loop_work_limit}: {stderr}"
+                    );
+                    assert_eq!(
+                        stderr.contains("native loop induction rejected"),
+                        matches!(diagnostic, FailureDiagnostic::Loop(kinds) if matches!(kinds[mode - 1], LoopRejection::Induction)),
+                        "mode={mode} reversed={reversed} work_limit={loop_work_limit}: {stderr}"
+                    );
+                }
                 for row in &failure.accepted.rows {
                     expected.extend(accepted(row));
                 }
@@ -344,13 +411,14 @@ pub(super) fn check_helper_entry_limit_rejection(
     loop_work_limit: u64,
     helper_entry_limit: u64,
 ) {
-    check_entry_limit_rejection(
+    check_budget_limit_rejection(
         source,
         rows,
         observers,
         loop_work_limit,
         helper_entry_limit,
         false,
+        None,
     );
 }
 
@@ -362,23 +430,45 @@ pub(super) fn check_i64_helper_entry_limit_rejection(
     loop_work_limit: u64,
     helper_entry_limit: u64,
 ) {
-    check_entry_limit_rejection(
+    check_budget_limit_rejection(
         source,
         rows,
         observers,
         loop_work_limit,
         helper_entry_limit,
         true,
+        None,
     );
 }
 
-fn check_entry_limit_rejection(
+#[allow(dead_code)]
+pub(super) fn check_i64_loop_work_limit_rejection(
+    source: &str,
+    rows: &[Sequence],
+    observers: &[(&str, &str)],
+    loop_work_limit: u64,
+    helper_entry_limit: u64,
+    expected_prefix: &[i64],
+) {
+    check_budget_limit_rejection(
+        source,
+        rows,
+        observers,
+        loop_work_limit,
+        helper_entry_limit,
+        true,
+        Some(expected_prefix),
+    );
+}
+
+fn check_budget_limit_rejection(
     source: &str,
     rows: &[Sequence],
     observers: &[(&str, &str)],
     loop_work_limit: u64,
     helper_entry_limit: u64,
     computed: bool,
+    expected_work_prefix: Option<&[i64]>,
 ) {
     let project = Project::with_source(source);
     let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
@@ -428,9 +518,12 @@ fn check_entry_limit_rejection(
         command.env("NUIS_EXIT_PREFIX", "0");
         let run = dynamic_loop_guard::run_command_bounded(command, &project.0);
         assert!(matches!(run.status.signal(), Some(4 | 5)));
-        assert!(
-            String::from_utf8_lossy(&run.stderr).contains("native helper entry limit exhausted")
-        );
+        let diagnostic = if expected_work_prefix.is_some() {
+            "native loop work limit exhausted"
+        } else {
+            "native helper entry limit exhausted"
+        };
+        assert!(String::from_utf8_lossy(&run.stderr).contains(diagnostic));
         let actual = String::from_utf8(run.stdout)
             .unwrap()
             .lines()
@@ -442,5 +535,8 @@ fn check_entry_limit_rejection(
         let trace = &rows[0].rows[0].trace;
         assert!(actual.len() < trace.len());
         assert!(trace.starts_with(&actual), "reversed={reversed}");
+        if let Some(prefix) = expected_work_prefix {
+            assert_eq!(actual, prefix, "reversed={reversed}");
+        }
     }
 }

@@ -471,7 +471,7 @@ fn epoch_local_plan_never_publishes_ordinary_availability_or_admission() {
         })
         .is_some()
     );
-    assert!(block(
+    assert!(epoch_block_owner::validate(
         &body,
         &mut locals,
         &changed(),
@@ -485,6 +485,22 @@ fn epoch_local_plan_never_publishes_ordinary_availability_or_admission() {
     assert_eq!(locals.scope, scope);
     assert_eq!(locals.writable, changed());
     assert!(locals.available.is_empty());
+    for mode in [
+        validation::LiteralPrints::Allow,
+        validation::LiteralPrints::Reject,
+    ] {
+        assert!(epoch_block_owner::validate(
+            &body,
+            &mut locals.clone(),
+            &changed(),
+            &catalog,
+            &layouts,
+            mode,
+            &epoch,
+            0,
+        )
+        .is_none());
+    }
     assert!(expression(
         &var("word"),
         &locals,
@@ -496,6 +512,7 @@ fn epoch_local_plan_never_publishes_ordinary_availability_or_admission() {
     )
     .is_none());
     for (mode, depth) in [
+        (validation::LiteralPrints::Scalars, 0),
         (validation::LiteralPrints::Allow, 0),
         (validation::LiteralPrints::Reject, 0),
         (validation::LiteralPrints::Scalars, 1),
@@ -573,4 +590,67 @@ fn epoch_local_plan_bounds_whole_scope_nonuse_scan_without_panics() {
         ))
         .is_none()
     );
+}
+
+#[test]
+fn epoch_local_plan_normalized_entry_requires_original_generated_prologue() {
+    let module = module(false);
+    let layouts = control_values::layouts(&module);
+    let catalog = scalar_helpers::collect_iteration_calls(&module, &layouts);
+    let scope = scope("f64");
+    let updates = changed();
+    let epoch = Epoch::enter(&scope, &updates, &updates, &layouts);
+    let locals = Locals {
+        scope: scope.clone(),
+        writable: updates.clone(),
+        available: BTreeSet::new(),
+    };
+    let check = |body: &[NirStmt], flow: Option<&control_flow::Normalized>| {
+        epoch_block_owner::validate_entry(
+            body,
+            flow,
+            &mut locals.clone(),
+            &updates,
+            &catalog,
+            &layouts,
+            validation::LiteralPrints::Scalars,
+            &epoch,
+            0,
+        )
+        .is_some()
+    };
+    let pair = body("f64", initializer());
+    for mixed in [false, true] {
+        let mut source = pair.clone();
+        source.push(NirStmt::If {
+            condition: var("gate"),
+            then_body: vec![NirStmt::Break],
+            else_body: if mixed {
+                vec![NirStmt::Continue]
+            } else {
+                vec![]
+            },
+        });
+        let mut flow = control_flow::normalize_leading(&source, &scope)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            flow.entry_blocks(&flow.effects).unwrap().0.len(),
+            if mixed { 2 } else { 1 }
+        );
+        assert!(check(&flow.effects, Some(&flow)));
+        assert!(!check(&flow.effects, None));
+        assert!(!check(&flow.effects.clone(), Some(&flow)));
+        assert!(!check(&flow.effects[1..], Some(&flow)));
+        let mut forged = vec![flow.effects[0].clone()];
+        forged.extend(source.clone());
+        let forged = control_flow::normalize_leading(&forged, &scope)
+            .unwrap()
+            .unwrap();
+        assert!(!check(&forged.effects, Some(&forged)));
+        flow.effects[0] = NirStmt::Print(NirExpr::Int(71));
+        assert!(!check(&flow.effects, Some(&flow)));
+        flow.effects.clear();
+        assert!(!check(&flow.effects, Some(&flow)));
+    }
 }

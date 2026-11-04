@@ -25,6 +25,13 @@ fn epoch_local_argument_print_source_admits_root_pairs_without_erasing_definitio
         let source = source(kind);
         for reversed in [false, true] {
             assert!(admitted(&source, reversed));
+            let early =
+                source.replace("print(75);", "print(75); if selected { break; } print(79);");
+            assert!(admitted(&early, reversed));
+            assert!(!admitted(
+                &early.replace("print(71);", "let __nuis_buffer_break: i64 = 0; print(71);"),
+                reversed
+            ));
             assert!(admitted(
                 &source.replace("epoch_word: i64", "epoch_word"),
                 reversed
@@ -78,13 +85,16 @@ fn epoch_local_argument_print_source_keeps_unproved_uses_and_scopes_closed() {
                 assert!(!admitted(&bad, reversed));
             }
         }
-        let helper = "@noinline fn bool_word(value:bool)->i64{if value{return 1;}return 0;} fn main()";
+        let helper =
+            "@noinline fn bool_word(value:bool)->i64{if value{return 1;}return 0;} fn main()";
         let logical_initializer = source.replace("fn main()", helper).replace(
             "(i64_from_i32(current.code) + 4294967296) ^ mask",
             "i64_from_i32(current.code) ^ bool_word((initial_guard > 0) && (lazy_guard > 0))",
         );
         assert_ne!(logical_initializer, source);
         crate::frontend::parse_nuis_module(&logical_initializer).unwrap();
-        for reversed in [false, true] { assert!(!admitted(&logical_initializer, reversed)); }
+        for reversed in [false, true] {
+            assert!(!admitted(&logical_initializer, reversed));
+        }
     }
 }

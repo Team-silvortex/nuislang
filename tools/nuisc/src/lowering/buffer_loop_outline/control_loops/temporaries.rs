@@ -6,6 +6,9 @@ mod literal_loops;
 #[path = "print_epoch.rs"]
 mod print_epoch;
 
+#[path = "epoch_block_owner.rs"]
+mod epoch_block_owner;
+
 #[cfg(test)]
 #[path = "word_temporaries_tests.rs"]
 mod word_tests;
@@ -22,6 +25,14 @@ mod local_scalar_argument_print_tests;
 #[path = "epoch_local_argument_print_tests.rs"]
 mod epoch_local_argument_print_tests;
 
+#[cfg(test)]
+#[path = "child_epoch_local_argument_print_tests.rs"]
+mod child_epoch_local_argument_print_tests;
+
+#[cfg(test)]
+#[path = "parent_reentry_argument_print_tests.rs"]
+mod parent_reentry_argument_print_tests;
+
 // This source profile uses scoped functions, not captured loop-metadata RHSs.
 // Keep definite initialization separate from the set of returned loop carries.
 #[derive(Clone)]
@@ -33,6 +44,7 @@ struct Locals {
 
 pub(super) fn validate(
     body: &[NirStmt],
+    normalized: Option<&control_flow::Normalized>,
     scope: &Scope,
     writable: &BTreeSet<String>,
     updates: &BTreeSet<String>,
@@ -55,8 +67,9 @@ pub(super) fn validate(
             .collect(),
         available: BTreeSet::from([induction.to_owned()]),
     };
-    block(
+    epoch_block_owner::validate_entry(
         body,
+        normalized,
         &mut locals,
         updates,
         catalog,
@@ -75,6 +88,30 @@ fn block(
     layouts: &control_values::CarryLayouts,
     literal_prints: validation::LiteralPrints,
     print_epoch: &print_epoch::Epoch,
+    depth: usize,
+) -> Option<()> {
+    block_with_owner(
+        body,
+        locals,
+        updates,
+        catalog,
+        layouts,
+        literal_prints,
+        print_epoch,
+        None,
+        depth,
+    )
+}
+
+fn block_with_owner(
+    body: &[NirStmt],
+    locals: &mut Locals,
+    updates: &BTreeSet<String>,
+    catalog: &ScalarHelpers,
+    layouts: &control_values::CarryLayouts,
+    literal_prints: validation::LiteralPrints,
+    print_epoch: &print_epoch::Epoch,
+    owner: Option<&epoch_block_owner::Owner<'_>>,
     depth: usize,
 ) -> Option<()> {
     let mut certified_consumer = None;
@@ -112,9 +149,11 @@ fn block(
                 let own = existing.map(|_| name.as_str());
                 let inferred = match expression(value, locals, updates, own, catalog, layouts, 0) {
                     Some(ty) => ty,
-                    None if depth == 0 && literal_prints == validation::LiteralPrints::Scalars => {
-                        // The root owner passes its whole entry block and freshly created
-                        // epoch. Do not lend the certificate to branch or child scopes.
+                    None if literal_prints == validation::LiteralPrints::Scalars
+                        && owner.is_some_and(|owner| owner.matches(body, print_epoch)) =>
+                    {
+                        // Only an actual root/child entry owns this block and epoch.
+                        // Branches never receive that authority through recursion.
                         certified_consumer = Some(print_epoch.initializer_pair(
                             body,
                             position,
@@ -469,7 +508,10 @@ fn expression_with_fields(
                 | NirBinaryOp::Le
                 | NirBinaryOp::Gt
                 | NirBinaryOp::Ge
-                    if left == scalar_type("i64") || left == scalar_type("i32") =>
+                    if left == scalar_type("i64")
+                        || left == scalar_type("i32")
+                        || left == scalar_type("f32")
+                        || left == scalar_type("f64") =>
                 {
                     Some(scalar_type("bool"))
                 }

@@ -203,13 +203,24 @@ fn state_loop_exits_native_reserves_full_bound_before_an_early_break() {
                     }
                 })
                 .collect::<Vec<_>>();
-            probe::check_sequences_with_limits(
+            let rejections = failures
+                .iter()
+                .map(|failure| {
+                    if failure.input[3] > 65536 {
+                        probe::LoopRejection::Induction
+                    } else {
+                        probe::LoopRejection::Work
+                    }
+                })
+                .collect::<Vec<_>>();
+            probe::check_sequences_with_loop_rejections(
                 &variant.source(),
                 &healthy,
                 &failures,
                 &observers(),
                 limit,
                 100,
+                &rejections,
             );
         }
     }

@@ -105,13 +105,24 @@ fn image(project: &Project, output: &Path, binary: &[u8], mode: &str, kind: case
 
 #[test]
 fn epoch_local_argument_print_fresh_cache_and_source_free_delivery_preserve_initializers() {
+    delivery(
+        include_str!(
+            "../../../nuisc/tests/native_application_bridge/epoch_local_argument_print.ns"
+        ),
+        cases::LOOP_LIMIT,
+        cases::ENTRY_LIMIT,
+        "epoch_local_argument_print_delivery",
+    );
+}
+
+pub(super) fn delivery(template: &str, loop_limit: u64, entry_limit: u64, tag: &str) {
     for kind in cases::KINDS {
         let (project, mode) = project_for_source_with_i64_prints(
-            &cases::source(kind),
-            cases::LOOP_LIMIT,
-            cases::ENTRY_LIMIT,
+            &template.replace("f64", kind.ty()),
+            loop_limit,
+            entry_limit,
         );
-        eprintln!("epoch_local_argument_print_delivery {kind:?} fresh");
+        eprintln!("{tag} {kind:?} fresh");
         project.build(None);
         let output = project.0.join("build");
         let report =
@@ -120,7 +131,7 @@ fn epoch_local_argument_print_fresh_cache_and_source_free_delivery_preserve_init
         let artifact_path = output.join("nuis.compiled.artifact");
         let fresh = nuisc::aot::parse_nuis_compiled_artifact(&artifact_path).unwrap();
         image(&project, &output, &binary, &mode, kind);
-        eprintln!("epoch_local_argument_print_delivery {kind:?} cache");
+        eprintln!("{tag} {kind:?} cache");
         assert!(project.build(None).contains("compile_cache: hit"));
         let cached = nuisc::aot::parse_nuis_compiled_artifact(&artifact_path).unwrap();
         assert_eq!(fresh.binary_blob, cached.binary_blob);
@@ -139,7 +150,7 @@ fn epoch_local_argument_print_fresh_cache_and_source_free_delivery_preserve_init
         fs::remove_dir_all(project.0.join(".nuis")).unwrap();
         success(project.command("verify-artifact", &artifact, &[]));
         for i in 0..2 {
-            eprintln!("epoch_local_argument_print_delivery {kind:?} restore {i}");
+            eprintln!("{tag} {kind:?} restore {i}");
             let restored = project.0.join(format!("restored-{i}"));
             success(project.command(
                 "materialize-artifact",

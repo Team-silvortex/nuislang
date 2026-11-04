@@ -52,8 +52,14 @@ fn printed(events: &[String]) -> Vec<i64> {
         .collect()
 }
 
+const SOURCE: &str = include_str!("epoch_local_argument_print.ns");
+
 #[test]
 fn epoch_local_argument_print_native_preserves_eager_initializers_and_fault_prefixes() {
+    native_sequences(SOURCE, cases::LOOP_LIMIT, cases::ENTRY_LIMIT);
+}
+
+pub(super) fn native_sequences(template: &str, loop_limit: u64, entry_limit: u64) {
     for kind in cases::KINDS {
         let prefix = cases::prefix(kind);
         let previous = prefix.iter().fold(None, |previous, row| {
@@ -72,20 +78,24 @@ fn epoch_local_argument_print_native_preserves_eager_initializers_and_fault_pref
             .map(|rows| sequence(rows))
             .collect::<Vec<_>>();
         probe::check_sequences_with_i64_prints(
-            &cases::source(kind),
+            &template.replace("f64", kind.ty()),
             &rows,
             &failures,
             cases::OBSERVERS,
-            cases::LOOP_LIMIT,
-            cases::ENTRY_LIMIT,
+            loop_limit,
+            entry_limit,
         );
     }
 }
 
 #[test]
 fn epoch_local_argument_print_reference_preserves_counts_state_and_faulted_close() {
+    reference_sequences(SOURCE, 0);
+}
+
+pub(super) fn reference_sequences(template: &str, extra_entry_finishes: usize) {
     for kind in cases::KINDS {
-        let project = Project::with_source(&cases::source(kind));
+        let project = Project::with_source(&template.replace("f64", kind.ty()));
         let compiled = nuisc::pipeline::compile_project(&project.0).unwrap();
         let registry = yir_verify::default_registry();
         for reversed in [false, true] {
@@ -115,6 +125,14 @@ fn epoch_local_argument_print_reference_preserves_counts_state_and_faulted_close
                             .filter(|e| e.contains("cpu.call") && e.contains("] checked64("))
                             .count(),
                         expected_calls
+                    );
+                    assert_eq!(
+                        event
+                            .events
+                            .iter()
+                            .filter(|e| e.contains("cpu.call") && e.contains("] finish("))
+                            .count(),
+                        row.base.trips as usize + 1 + extra_entry_finishes
                     );
                     previous = next;
                 }
@@ -150,14 +168,18 @@ fn epoch_local_argument_print_reference_preserves_counts_state_and_faulted_close
 
 #[test]
 fn epoch_local_argument_print_native_keeps_entry_exhaustion_before_publication() {
+    entry_exhaustion(SOURCE, cases::LOOP_LIMIT);
+}
+
+pub(super) fn entry_exhaustion(template: &str, loop_limit: u64) {
     for kind in cases::KINDS {
         let mut row = cases::seed(kind);
         row.base.trips = 2;
         probe::check_i64_helper_entry_limit_rejection(
-            &cases::source(kind),
+            &template.replace("f64", kind.ty()),
             &[sequence(&[row])],
             cases::OBSERVERS,
-            cases::LOOP_LIMIT,
+            loop_limit,
             8,
         );
     }
@@ -190,8 +212,12 @@ fn epoch_local_argument_print_oracle_pins_zero_words_finite_cli_and_matrix_sizes
 
 #[test]
 fn epoch_local_argument_print_native_rejects_escape_duplicate_and_nonroot_scopes() {
+    reject_unproved_uses(SOURCE, cases::LOOP_LIMIT, cases::ENTRY_LIMIT);
+}
+
+pub(super) fn reject_unproved_uses(template: &str, loop_limit: u64, entry_limit: u64) {
     for kind in cases::KINDS {
-        let source = cases::source(kind);
+        let source = template.replace("f64", kind.ty());
         for bad in [
             source.replace("print(74);", "print(epoch_word);"),
             source.replace(
@@ -228,8 +254,8 @@ fn epoch_local_argument_print_native_rejects_escape_duplicate_and_nonroot_scopes
                     &compiled.yir,
                     "counter",
                     &policy,
-                    cases::LOOP_LIMIT,
-                    cases::ENTRY_LIMIT
+                    loop_limit,
+                    entry_limit
                 )
                 .is_err()
             );

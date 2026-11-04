@@ -124,8 +124,16 @@ mod i32_division_argument_print;
 #[path = "dev_tensor_drift_data_native_i32_literal_argument_print.rs"]
 mod i32_literal_argument_print;
 
+#[path = "dev_tensor_drift_data_native_child_epoch_local_argument_print.rs"]
+mod child_epoch_local_argument_print;
+#[path = "dev_tensor_drift_data_native_child_progress_argument_print.rs"]
+mod child_progress_argument_print;
+#[path = "dev_tensor_drift_data_native_epoch_local_argument_print.rs"]
+mod epoch_local_argument_print;
 #[path = "dev_tensor_drift_data_native_epoch_local_plan.rs"]
 mod epoch_local_plan;
+#[path = "dev_tensor_drift_data_native_fallible_bound_argument_print.rs"]
+mod fallible_bound_argument_print;
 #[path = "dev_tensor_drift_data_native_i32_negation_argument_print.rs"]
 mod i32_negation_argument_print;
 #[path = "dev_tensor_drift_data_native_i32_widening_argument_print.rs"]
@@ -136,6 +144,14 @@ mod i64_arithmetic_argument_print;
 mod i64_xor_argument_print;
 #[path = "dev_tensor_drift_data_native_local_scalar_argument_print.rs"]
 mod local_scalar_argument_print;
+#[path = "dev_tensor_drift_data_native_parent_bound_argument_print.rs"]
+mod parent_bound_argument_print;
+#[path = "dev_tensor_drift_data_native_parent_reentry_argument_print.rs"]
+mod parent_reentry_argument_print;
+#[path = "dev_tensor_drift_data_native_state_bound_argument_print.rs"]
+mod state_bound_argument_print;
+#[path = "dev_tensor_drift_data_native_state_break_argument_print.rs"]
+mod state_break_argument_print;
 
 #[path = "dev_tensor_drift_data_native_return_effect_storage_conditional_payload.rs"]
 mod return_effect_storage_conditional_payload;
@@ -726,6 +742,14 @@ pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec>
         i64_xor_argument_print::CHECKS,
         local_scalar_argument_print::CHECKS,
         epoch_local_plan::CHECKS,
+        epoch_local_argument_print::CHECKS,
+        child_epoch_local_argument_print::CHECKS,
+        parent_reentry_argument_print::CHECKS,
+        child_progress_argument_print::CHECKS,
+        parent_bound_argument_print::CHECKS,
+        fallible_bound_argument_print::CHECKS,
+        state_bound_argument_print::CHECKS,
+        state_break_argument_print::CHECKS,
         return_effect_storage_conditional_payload::CHECKS,
         return_cross_float::CHECKS,
         return_same_float::CHECKS,

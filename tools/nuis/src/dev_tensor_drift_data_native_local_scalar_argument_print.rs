@@ -29,7 +29,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "mod local_scalar_argument_print_tests;",
             "let inferred = match expression(value, locals, updates, own, catalog, layouts, 0)",
-            "None if depth == 0 && literal_prints == validation::LiteralPrints::Scalars",
+            "None if literal_prints == validation::LiteralPrints::Scalars",
+            "owner.is_some_and(|owner| owner.matches(body, print_epoch))",
             "certified_consumer = Some(print_epoch.initializer_pair(",
             "expression_with_fields(value, locals, updates, own, catalog, layouts, depth, None)",
         ],

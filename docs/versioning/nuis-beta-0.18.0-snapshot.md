@@ -152,8 +152,30 @@ source positions and shared bounds. It does not change ordinary admission.
 The subsequent [root-owned execution route](../reference/nuis-native-epoch-local-argument-print-v1.md)
 now connects one proven pair to source admission and existing normalization,
 with native/reference and source-free delivery checks. It retains ordinary
-readiness and branch/child refusals. Fresh child-owned epoch pairs are the next
-gate. This worktree does not bump the version.
+readiness and its dated branch/child refusals. The subsequent
+[child-owned route](../reference/nuis-native-child-epoch-local-argument-print-v1.md)
+binds a ready fresh child entry to its own effects block, not an inherited branch
+grant. Its outer identity update and actual child work share the existing
+budgets. The [repeated-parent witness](../reference/nuis-native-parent-reentry-argument-print-v1.md)
+now checks dynamic reentry, child reseeding, later-parent failures and source-free
+delivery without new lowering authority. Its explicit helper budget includes
+outlined YIR entries; low-budget rejection remains. The subsequent
+[later-child witness](../reference/nuis-native-child-progress-argument-print-v1.md)
+checks faults after completed siblings in later parents using ready induction
+values and shared native/delivery drivers. The
+[parent-bound witness](../reference/nuis-native-parent-bound-argument-print-v1.md)
+now checks skipped and resumed children, real bound-helper calls and exact work
+reservation before resumed body effects. The subsequent
+[fallible-bound witness](../reference/nuis-native-fallible-bound-argument-print-v1.md)
+covers reached zero-child producers and faults before child reservation. The
+[state-bound witness](../reference/nuis-native-state-bound-argument-print-v1.md)
+connects ready float comparisons to producers that consume changed parent State,
+with accepted-State/decoy and exact budget controls. The
+[early-break witness](../reference/nuis-native-state-break-argument-print-v1.md)
+now preserves post-update State, observed indices and skipped effects, separating
+completed from reserved work without refunds. Its generated control prologue
+is accepted only with exact normalization provenance, not by a name exemption.
+State-bounded continue is the next gate; no version is bumped.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance
