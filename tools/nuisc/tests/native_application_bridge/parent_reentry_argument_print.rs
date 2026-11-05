@@ -10,6 +10,20 @@ mod cases;
 mod probe;
 #[path = "state_break_argument_print.rs"]
 mod state_break_argument_print;
+#[path = "state_continue_argument_print.rs"]
+mod state_continue_argument_print;
+#[path = "state_division_exit_argument_print.rs"]
+mod state_division_exit_argument_print;
+#[path = "state_field_exit_argument_print.rs"]
+mod state_field_exit_argument_print;
+#[path = "state_grouped_argument_print.rs"]
+mod state_grouped_argument_print;
+#[path = "state_mixed_argument_print.rs"]
+mod state_mixed_argument_print;
+#[path = "state_predicate_argument_print.rs"]
+mod state_predicate_argument_print;
+#[path = "state_short_circuit_argument_print.rs"]
+mod state_short_circuit_argument_print;
 
 fn sequence(rows: &[cases::Case]) -> probe::Sequence {
     let mut previous = None;
@@ -38,6 +52,10 @@ fn values(row: cases::Case) -> Vec<Value> {
             0 => Value::F64(f64::from_bits(word as u64)),
             1 => Value::Bool(word != 0),
             3 | 4 => Value::I32(word as i32),
+            25 | 26 if row.division_exits().is_some() && row.kind() == cases::Kind::F32 => {
+                Value::F32(f32::from_bits(word as u32))
+            }
+            25 | 26 if row.division_exits().is_some() => Value::F64(f64::from_bits(word as u64)),
             _ => Value::Int(word),
         })
         .collect()
@@ -72,8 +90,18 @@ fn check_calls(row: cases::Case, previous: Option<i64>, events: &[String]) {
     assert_eq!(
         calls("] checked64("),
         children as usize * (1 + usize::from(row.child.base.selected))
+            + row.suffix_calls_from(previous)
     );
     assert_eq!(calls("] finish("), (children + row.parents + 1) as usize);
+    let (first, second) = row.predicate_calls_from(previous);
+    assert_eq!(calls("] continue_at("), first);
+    assert_eq!(calls("] break_at("), second);
+    let (confirm, fallback) = row.right_predicate_calls_from(previous);
+    assert_eq!(calls("] confirm_continue("), confirm);
+    assert_eq!(calls("] fallback_break("), fallback);
+    let grouped = row.grouped_calls_from(previous);
+    assert_eq!(calls("] rescue_continue("), grouped[4]);
+    assert_eq!(calls("] confirm_break("), grouped[5]);
     assert_eq!(
         calls("] child_count("),
         if matches!(
@@ -82,6 +110,13 @@ fn check_calls(row: cases::Case, previous: Option<i64>, events: &[String]) {
                 | cases::GuardClock::FallibleBound(_)
                 | cases::GuardClock::StateBound(_)
                 | cases::GuardClock::StateBreak(_, _)
+                | cases::GuardClock::StateContinue(_, _, _)
+                | cases::GuardClock::StateMixed { .. }
+                | cases::GuardClock::StatePredicate { .. }
+                | cases::GuardClock::StateShortCircuit { .. }
+                | cases::GuardClock::StateGrouped { .. }
+                | cases::GuardClock::StateFieldExit { .. }
+                | cases::GuardClock::StateDivisionExit { .. }
         ) {
             row.parents as usize
         } else {
@@ -97,31 +132,35 @@ fn parent_reentry_argument_print_native_preserves_eager_initializers_and_fault_p
 
 fn native_sequences(matrix: cases::Matrix) {
     for kind in cases::KINDS {
-        let prefix = (matrix.prefix)(kind);
-        let previous = prefix.iter().fold(None, |previous, row| {
-            Some(row.execute(previous, true).unwrap().0)
-        });
-        let failures = (matrix.failures)(kind)
-            .into_iter()
-            .map(|bad| probe::SequenceFailure {
-                accepted: sequence(&prefix),
-                input: bad.words(),
-                before_failure: bad.execute(previous, true).unwrap_err(),
-            })
-            .collect::<Vec<_>>();
-        let rows = (matrix.sequences)(kind)
-            .iter()
-            .map(|rows| sequence(rows))
-            .collect::<Vec<_>>();
-        probe::check_sequences_with_i64_prints(
-            &matrix.template.replace("f64", kind.ty()),
-            &rows,
-            &failures,
-            matrix.observers,
-            cases::LOOP_LIMIT,
-            cases::ENTRY_LIMIT,
-        );
+        native_sequences_for_kind(matrix, kind);
     }
+}
+
+fn native_sequences_for_kind(matrix: cases::Matrix, kind: cases::Kind) {
+    let prefix = (matrix.prefix)(kind);
+    let previous = prefix.iter().fold(None, |previous, row| {
+        Some(row.execute(previous, true).unwrap().0)
+    });
+    let failures = (matrix.failures)(kind)
+        .into_iter()
+        .map(|bad| probe::SequenceFailure {
+            accepted: sequence(&prefix),
+            input: bad.words(),
+            before_failure: bad.execute(previous, true).unwrap_err(),
+        })
+        .collect::<Vec<_>>();
+    let rows = (matrix.sequences)(kind)
+        .iter()
+        .map(|rows| sequence(rows))
+        .collect::<Vec<_>>();
+    probe::check_sequences_with_i64_prints(
+        &matrix.template.replace("f64", kind.ty()),
+        &rows,
+        &failures,
+        matrix.observers,
+        cases::LOOP_LIMIT,
+        cases::ENTRY_LIMIT,
+    );
 }
 
 #[test]

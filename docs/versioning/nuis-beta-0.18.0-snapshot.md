@@ -1,7 +1,8 @@
 # Beta 0.18 Snapshot
 
-Audit date: 2026-10-28. This minor-line anchor separates committed identity,
-worktree evidence and future gates. Cargo and protocol versions are independent;
+Audit date: 2026-11-04. Worktree follow-up: 2026-11-05. This minor-line anchor
+separates committed identity, worktree evidence and future gates.
+Cargo and protocol versions are independent;
 this document does not freeze compatibility or announce completed self-hosting.
 
 ## Committed Identity
@@ -9,7 +10,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.4 | `ceaa2caa` | 2026-10-28 |
+| Latest committed patch at this audit, beta-0.18.5 | `bbb00651` | 2026-11-04 |
+| Earlier patch, beta-0.18.4 | `ceaa2caa` | 2026-10-28 |
 | Earlier patch, beta-0.18.3 | `2c5b4796` | 2026-10-28 |
 | Earlier patch, beta-0.18.2 | `5bbd4de8` | 2026-10-28 |
 | Earlier patch, beta-0.18.1 | `c3320d9e` | 2026-10-26 |
@@ -141,6 +143,10 @@ split; their original dated acceptance records remain separate.
 
 ## Current Worktree Follow-Up
 
+The source-local through early-break checkpoints below are included in
+`bbb00651`. Uncommitted follow-ups span state-bounded continue through grouped exits;
+each earlier receipt retains its original baseline and validation history.
+
 The [source-local scalar audit](../reference/nuis-native-local-scalar-argument-print-v1.md)
 confirms ready parameter/updated-field/branch-local composition through source,
 native/reference execution and source-free delivery. It adds regression evidence,
@@ -175,7 +181,28 @@ with accepted-State/decoy and exact budget controls. The
 now preserves post-update State, observed indices and skipped effects, separating
 completed from reserved work without refunds. Its generated control prologue
 is accepted only with exact normalization provenance, not by a name exemption.
-State-bounded continue is the next gate; no version is bumped.
+The [continue witness](../reference/nuis-native-state-continue-argument-print-v1.md)
+now verifies a single step, skipped checked suffixes and full traversal under
+these bounds, using existing lowering. The
+[mixed-exit witness](../reference/nuis-native-state-mixed-argument-print-v1.md)
+now composes both guards, colliding/reversed priority, completed State and exact
+reserved work. The
+[checked-exit witness](../reference/nuis-native-state-predicate-argument-print-v1.md)
+adds independently observed fallible predicates, skipped checks and reversed
+fault priority without raising budgets. The
+[short-circuit witness](../reference/nuis-native-state-short-circuit-argument-print-v1.md)
+adds independent left/right calls, skipped RHS faults, confirmation vetoes and
+fallback-driven reservations. The
+[grouped-exit witness](../reference/nuis-native-state-grouped-argument-print-v1.md)
+checks nested trees, grouping-sensitive failures and skipped inner checks. The
+[updated-field witness](../reference/nuis-native-state-field-exit-argument-print-v1.md)
+now consumes post-update f32/f64 fields, with raw IEEE observations, accepted-State
+sequences and unchanged quotas. Total classifiers avoid unnecessary outlined entries;
+the equivalent branch form remains a checked quota rejection. The
+[checked-division witness](../reference/nuis-native-state-division-exit-argument-print-v1.md)
+now composes ready same-kind divisor parameters with those updated fields, preserving
+IEEE arithmetic, argument-before-callee faults and accepted State without increasing
+quotas. Fallible helper-produced operands are next; no version is bumped.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

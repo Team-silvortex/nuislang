@@ -1,0 +1,55 @@
+mod cpu Main {
+    struct State { total: f64 }
+    struct Pair { total: f64, code: i32, flag: bool }
+    @noinline fn checked64(value: i64, guard: i64) -> i64 { let checked = 0 / guard; return value; }
+    @noinline fn choose(value: f64, pick: bool) -> f64 { if pick { return value; } return -value; }
+    @noinline fn observe(value: f64) -> i64 { if value < 0.0 { return -1; } if value == 0.0 { return 0; } if value != value { return 2; } return 1; }
+    @noinline fn finish(value: f64, guard: i64) -> f64 { let checked = 0 / guard; return value; }
+    @noinline fn child_count(base: i64, round: i64, guard: i64, negative: bool) -> i64 { let checked = 0 / guard; if round % 2 == 0 { return 0; } if negative { return base + 1; } return base; }
+    @noinline fn continue_at(index: i64, target: i64, guard: i64) -> bool { let checked = 0 / guard; return index == target; }
+    @noinline fn break_at(index: i64, target: i64, guard: i64) -> bool { let checked = 0 / guard; return index == target; }
+    @noinline fn confirm_continue(index: i64, target: i64, guard: i64) -> bool { let checked = 0 / guard; return index == target; }
+    @noinline fn fallback_break(index: i64, target: i64, guard: i64) -> bool { let checked = 0 / guard; return index == target; }
+    @noinline fn work(seed: State, selected: bool, trips: i64, left: i32, right: i32, mask: i64, initial_guard: i64, lazy_guard: i64, ready_guard: i64, tail_guard: i64, parents: i64, bound_guard: i64, cut: i64, suffix_guard: i64, stop_at: i64, continue_guard: i64, break_guard: i64, permit: i64, confirm_guard: i64, fallback_at: i64, fallback_guard: i64) -> State {
+        print(70);
+        let mut outer = 0;
+        let mut total = seed.total;
+        while outer < parents {
+            total = finish(total, 1);
+            print(76);
+            let child_trips = child_count(trips, outer, bound_guard - outer, total < 0.0);
+            let mut current = Pair { total: total, code: left, flag: selected };
+            let mut child = 0;
+            while child < child_trips {
+                print(71);
+                let epoch_word: i64 = checked64((i64_from_i32(current.code) + 4294967296) ^ mask, initial_guard - (outer * 16 + child));
+                print(observe(choose(current.total, current.flag && (checked64(epoch_word, lazy_guard - (outer * 16 + child)) != 0))));
+                print(74);
+                current = Pair { total: finish(-current.total, ready_guard - (outer * 16 + child)), code: right, flag: selected };
+                print(75);
+                if continue_at(child, cut, continue_guard - (outer * 16 + child)) && confirm_continue(child, permit, confirm_guard - (outer * 16 + child)) { print(78); child = child + 1; continue; }
+                if break_at(child, stop_at, break_guard - (outer * 16 + child)) || fallback_break(child, fallback_at, fallback_guard - (outer * 16 + child)) { print(81); break; }
+                print(79);
+                print(checked64(0, suffix_guard - (outer * 16 + child)));
+                child = child + 1;
+            }
+            print(80);
+            print(child);
+            total = current.total;
+            print(77);
+            outer = outer + 1;
+        }
+        print(73);
+        return State { total: finish(total, tail_guard) };
+    }
+    fn start(initial: f64, selected: bool, trips: i64, left: i32, right: i32, mask: i64, initial_guard: i64, lazy_guard: i64, ready_guard: i64, tail_guard: i64, parents: i64, bound_guard: i64, cut: i64, suffix_guard: i64, stop_at: i64, continue_guard: i64, break_guard: i64, permit: i64, confirm_guard: i64, fallback_at: i64, fallback_guard: i64) -> State {
+        print(90);
+        return work(State { total: initial }, selected, trips, left, right, mask, initial_guard, lazy_guard, ready_guard, tail_guard, parents, bound_guard, cut, suffix_guard, stop_at, continue_guard, break_guard, permit, confirm_guard, fallback_at, fallback_guard);
+    }
+    fn step(state: State, initial: f64, selected: bool, trips: i64, left: i32, right: i32, mask: i64, initial_guard: i64, lazy_guard: i64, ready_guard: i64, tail_guard: i64, parents: i64, bound_guard: i64, cut: i64, suffix_guard: i64, stop_at: i64, continue_guard: i64, break_guard: i64, permit: i64, confirm_guard: i64, fallback_at: i64, fallback_guard: i64) -> State {
+        print(91);
+        return work(state, selected, trips, left, right, mask, initial_guard, lazy_guard, ready_guard, tail_guard, parents, bound_guard, cut, suffix_guard, stop_at, continue_guard, break_guard, permit, confirm_guard, fallback_at, fallback_guard);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

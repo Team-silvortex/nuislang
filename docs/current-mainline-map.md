@@ -84,8 +84,30 @@ The [early-break witness](reference/nuis-native-state-break-argument-print-v1.md
 now preserves completed State, skipped suffixes and observed indices under those
 bounds. Generated control prologues retain exact normalization provenance;
 source lookalikes and branch grants remain rejected, and exits do not refund work.
-Next is **state-dependent child bounds with continue**, retaining its single
-required step, effect order, carried values and reservation accounting.
+The [continue witness](reference/nuis-native-state-continue-argument-print-v1.md)
+now checks exactly one step, selected fallible suffixes and continued traversal,
+without new admission permissions or changes to work reservation.
+The [mixed-exit witness](reference/nuis-native-state-mixed-argument-print-v1.md)
+combines both paths, including colliding guards and reversed source order,
+without refunding reserved work or replacing accepted State with entry decoys.
+The [checked-exit witness](reference/nuis-native-state-predicate-argument-print-v1.md)
+now verifies reached/skipped boolean helper calls and their failure priority,
+including a reversed-source collision, without raising work or entry budgets.
+The [short-circuit witness](reference/nuis-native-state-short-circuit-argument-print-v1.md)
+now checks both fallible operands, skipped RHS faults, confirmation vetoes and
+fallback breaks, including their changed State-dependent reservations.
+The [grouped-exit witness](reference/nuis-native-state-grouped-argument-print-v1.md)
+checks nested conjunction/disjunctions and parentheses-only regrouping, including
+skipped inner faults and confirmation-driven work. The
+[updated-field witness](reference/nuis-native-state-field-exit-argument-print-v1.md)
+feeds post-update f32/f64 record fields into those predicates, retaining raw IEEE
+arguments, accepted State and unchanged work/entry limits. Total classifiers avoid
+extra outlined entries; equivalent branch classifiers retain explicit quota rejection.
+The [checked-division witness](reference/nuis-native-state-division-exit-argument-print-v1.md)
+now composes updated fields with ready same-kind divisors, checking rounded IEEE
+arguments, skipped zero-divisor faults and failure before confirmation entry.
+Next compose **fallible helper-produced operands at exit-helper arguments**, keeping
+producer order, arithmetic/predicate fault priority and accepted State distinct.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "state_division_exit_argument_print_tests.rs"]
+mod state_division_exits;
+
 fn admitted(source: &str, reversed: bool) -> bool {
     let mut module = crate::frontend::parse_nuis_module(source).unwrap();
     if reversed {
@@ -270,6 +273,411 @@ fn refuses(source: &str) {
             for reversed in [false, true] {
                 assert!(!admitted(&bad, reversed));
             }
+        }
+    }
+}
+
+#[test]
+fn state_continue_argument_print_accepts_one_step_and_selected_suffix() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_continue_argument_print.ns"
+    ));
+    accepts(source);
+    accepts(&source.replace("if child == cut {", "if child != cut {} else {"));
+}
+
+#[test]
+fn state_continue_argument_print_rejects_missing_duplicate_and_moved_steps() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_continue_argument_print.ns"
+    ));
+    refuses(source);
+    let step = "child = child + 1; continue;";
+    let exit = "if child == cut { print(78); child = child + 1; continue; }";
+    for bad in [
+        source.replace(step, "continue;"),
+        source.replace(step, "child = child + 2; continue;"),
+        source.replace(step, "child = child + 1; child = child + 1; continue;"),
+        source.replace(step, "child = child + 1; print(81); continue;"),
+        source.replace(step, "continue; child = child + 1;"),
+        source.replace(
+            "print(71);",
+            "let __nuis_buffer_continue: i64 = 1; print(71);",
+        ),
+        source
+            .replace(exit, "")
+            .replace("print(71);", &format!("{exit} print(71);")),
+        source
+            .replace("let child_trips =", "let mut child_trips =")
+            .replace("print(74);", "child_trips = child_trips + 1; print(74);"),
+    ] {
+        for kind in ["f32", "f64"] {
+            for reversed in [false, true] {
+                assert!(
+                    !admitted(&bad.replace("f64", kind), reversed),
+                    "unexpected admission: {bad}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn state_mixed_argument_print_accepts_ordered_and_mirrored_exit_guards() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_mixed_argument_print.ns"
+    ));
+    accepts(source);
+    accepts(
+        &source
+            .replace("if child == cut {", "if child != cut {} else {")
+            .replace("if child == stop_at {", "if child != stop_at {} else {"),
+    );
+    let first = "if child == cut { print(78); child = child + 1; continue; }";
+    let second = "if child == stop_at { print(81); break; }";
+    accepts(&source.replace(
+        &format!("{first}\n                {second}"),
+        &format!("{second}\n                {first}"),
+    ));
+}
+
+#[test]
+fn state_mixed_argument_print_rejects_missing_duplicate_and_moved_steps() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_mixed_argument_print.ns"
+    ));
+    refuses(source);
+    let step = "child = child + 1; continue;";
+    let exit = "if child == stop_at { print(81); break; }";
+    for bad in [
+        source.replace(step, "continue;"),
+        source.replace(step, "child = child + 2; continue;"),
+        source.replace(step, "child = child + 1; child = child + 1; continue;"),
+        source.replace(step, "child = child + 1; print(82); continue;"),
+        source.replace(step, "continue; child = child + 1;"),
+        source.replace(
+            "print(71);",
+            "let __nuis_buffer_continue: i64 = 1; print(71);",
+        ),
+        source.replace("print(71);", "let __nuis_buffer_break: i64 = 0; print(71);"),
+        source.replace("break;", "break; print(82);"),
+        source
+            .replace(exit, "")
+            .replace("print(71);", &format!("{exit} print(71);")),
+        source
+            .replace("let child_trips =", "let mut child_trips =")
+            .replace("print(74);", "child_trips = child_trips + 1; print(74);"),
+    ] {
+        for kind in ["f32", "f64"] {
+            for reversed in [false, true] {
+                assert!(
+                    !admitted(&bad.replace("f64", kind), reversed),
+                    "unexpected admission: {bad}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn state_predicate_argument_print_accepts_ordered_checked_exits() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_predicate_argument_print.ns"
+    ));
+    accepts(source);
+    let first = "if continue_at(child, cut, continue_guard - (outer * 16 + child)) { print(78); child = child + 1; continue; }";
+    let second =
+        "if break_at(child, stop_at, break_guard - (outer * 16 + child)) { print(81); break; }";
+    accepts(&source.replace(
+        &format!("{first}\n                {second}"),
+        &format!("{second}\n                {first}"),
+    ));
+}
+
+#[test]
+fn state_predicate_argument_print_keeps_step_type_and_scope_refusals() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_predicate_argument_print.ns"
+    ));
+    refuses(source);
+    let step = "child = child + 1; continue;";
+    for bad in [
+        source.replace(step, "continue;"),
+        source.replace(step, "child = child + 2; continue;"),
+        source.replace(step, "child = child + 1; child = child + 1; continue;"),
+        source.replace(step, "child = child + 1; print(82); continue;"),
+        source.replace("break;", "break; print(82);"),
+        source.replace(
+            "print(71);",
+            "let __nuis_buffer_continue: i64 = 1; print(71);",
+        ),
+        source
+            .replace("let child_trips =", "let mut child_trips =")
+            .replace("print(74);", "child_trips = child_trips + 1; print(74);"),
+    ] {
+        for kind in ["f32", "f64"] {
+            for reversed in [false, true] {
+                assert!(
+                    !admitted(&bad.replace("f64", kind), reversed),
+                    "unexpected admission: {bad}"
+                );
+            }
+        }
+    }
+    for kind in ["f32", "f64"] {
+        let typed = source.replace("f64", kind);
+        for (bad, diagnostic) in [
+            (
+                typed.replace("continue_at(child, cut,", "continue_at(current.total, cut,"),
+                "function `continue_at` argument 1 expects `i64`",
+            ),
+            (
+                typed.replace("break_at(child, stop_at,", "break_at(child, current.flag,"),
+                "function `break_at` argument 2 expects `i64`",
+            ),
+        ] {
+            assert!(crate::frontend::parse_nuis_module(&bad)
+                .unwrap_err()
+                .contains(diagnostic));
+        }
+    }
+}
+
+#[test]
+fn state_short_circuit_argument_print_accepts_ordered_checked_operands() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_short_circuit_argument_print.ns"
+    ));
+    accepts(source);
+    for (left, op, right) in [
+        (
+            "continue_at(child, cut, continue_guard - (outer * 16 + child))",
+            "&&",
+            "confirm_continue(child, permit, confirm_guard - (outer * 16 + child))",
+        ),
+        (
+            "break_at(child, stop_at, break_guard - (outer * 16 + child))",
+            "||",
+            "fallback_break(child, fallback_at, fallback_guard - (outer * 16 + child))",
+        ),
+    ] {
+        accepts(&source.replace(
+            &format!("{left} {op} {right}"),
+            &format!("{right} {op} {left}"),
+        ));
+    }
+}
+
+#[test]
+fn state_short_circuit_argument_print_keeps_step_type_and_scope_refusals() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_short_circuit_argument_print.ns"
+    ));
+    refuses(source);
+    let step = "child = child + 1; continue;";
+    for bad in [
+        source.replace(step, "continue;"),
+        source.replace(step, "child = child + 2; continue;"),
+        source.replace(step, "child = child + 1; child = child + 1; continue;"),
+        source.replace(step, "child = child + 1; print(82); continue;"),
+        source.replace("break;", "break; print(82);"),
+        source.replace(
+            "print(71);",
+            "let __nuis_buffer_continue: i64 = 1; print(71);",
+        ),
+        source
+            .replace("let child_trips =", "let mut child_trips =")
+            .replace("print(74);", "child_trips = child_trips + 1; print(74);"),
+    ] {
+        for kind in ["f32", "f64"] {
+            for reversed in [false, true] {
+                assert!(
+                    !admitted(&bad.replace("f64", kind), reversed),
+                    "unexpected admission: {bad}"
+                );
+            }
+        }
+    }
+    for kind in ["f32", "f64"] {
+        let typed = source.replace("f64", kind);
+        for (bad, diagnostic) in [
+            (
+                typed.replace(
+                    "confirm_continue(child, permit,",
+                    "confirm_continue(current.total, permit,",
+                ),
+                "function `confirm_continue` argument 1 expects `i64`",
+            ),
+            (
+                typed.replace(
+                    "fallback_break(child, fallback_at,",
+                    "fallback_break(child, current.flag,",
+                ),
+                "function `fallback_break` argument 2 expects `i64`",
+            ),
+        ] {
+            assert!(crate::frontend::parse_nuis_module(&bad)
+                .unwrap_err()
+                .contains(diagnostic));
+        }
+    }
+}
+
+#[test]
+fn state_grouped_argument_print_accepts_explicit_logical_groups() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_grouped_argument_print.ns"
+    ));
+    accepts(source);
+    for (normal, regrouped) in [
+        ("continue_at(child, cut, continue_guard - (outer * 16 + child)) && (confirm_continue(child, permit, confirm_guard - (outer * 16 + child)) || rescue_continue(child, rescue, rescue_guard - (outer * 16 + child)))", "(continue_at(child, cut, continue_guard - (outer * 16 + child)) && confirm_continue(child, permit, confirm_guard - (outer * 16 + child))) || rescue_continue(child, rescue, rescue_guard - (outer * 16 + child))"),
+        ("(break_at(child, stop_at, break_guard - (outer * 16 + child)) || fallback_break(child, fallback_at, fallback_guard - (outer * 16 + child))) && confirm_break(child, seal, seal_guard - (outer * 16 + child))", "break_at(child, stop_at, break_guard - (outer * 16 + child)) || (fallback_break(child, fallback_at, fallback_guard - (outer * 16 + child)) && confirm_break(child, seal, seal_guard - (outer * 16 + child)))"),
+    ] {
+        let changed = source.replace(normal, regrouped);
+        assert_ne!(changed, source);
+        accepts(&changed);
+    }
+}
+
+#[test]
+fn state_grouped_argument_print_keeps_step_type_and_scope_refusals() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_grouped_argument_print.ns"
+    ));
+    refuses(source);
+    let step = "child = child + 1; continue;";
+    for bad in [
+        source.replace(step, "continue;"),
+        source.replace(step, "child = child + 2; continue;"),
+        source.replace(step, "child = child + 1; child = child + 1; continue;"),
+        source.replace(step, "child = child + 1; print(82); continue;"),
+        source.replace("break;", "break; print(82);"),
+        source.replace(
+            "print(71);",
+            "let __nuis_buffer_continue: i64 = 1; print(71);",
+        ),
+        source
+            .replace("let child_trips =", "let mut child_trips =")
+            .replace("print(74);", "child_trips = child_trips + 1; print(74);"),
+    ] {
+        for kind in ["f32", "f64"] {
+            for reversed in [false, true] {
+                assert!(
+                    !admitted(&bad.replace("f64", kind), reversed),
+                    "unexpected admission: {bad}"
+                );
+            }
+        }
+    }
+    for kind in ["f32", "f64"] {
+        let typed = source.replace("f64", kind);
+        for (bad, diagnostic) in [
+            (
+                typed.replace(
+                    "rescue_continue(child, rescue,",
+                    "rescue_continue(current.total, rescue,",
+                ),
+                "function `rescue_continue` argument 1 expects `i64`",
+            ),
+            (
+                typed.replace(
+                    "confirm_break(child, seal,",
+                    "confirm_break(child, current.flag,",
+                ),
+                "function `confirm_break` argument 2 expects `i64`",
+            ),
+        ] {
+            assert!(crate::frontend::parse_nuis_module(&bad)
+                .unwrap_err()
+                .contains(diagnostic));
+        }
+    }
+}
+
+#[test]
+fn state_field_exit_argument_print_accepts_updated_record_predicates() {
+    accepts(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_field_exit_argument_print.ns"
+    )));
+}
+
+#[test]
+fn state_field_exit_argument_print_keeps_type_and_epoch_refusals() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/native_application_bridge/state_field_exit_argument_print.ns"
+    ));
+    refuses(source);
+    let premature_exits = ["if continue_at(", "if (break_at("].map(|prefix| {
+        let exit = source
+            .lines()
+            .find(|line| line.trim_start().starts_with(prefix))
+            .unwrap()
+            .trim();
+        let without_exit = source.replace(exit, "");
+        without_exit.replace("print(74);", &format!("{exit} print(74);"))
+    });
+    for bad in [
+        source.replace("child = child + 1; continue;", "continue;"),
+        source.replace(
+            "child = child + 1; continue;",
+            "child = child + 2; continue;",
+        ),
+        source.replace(
+            "child = child + 1; continue;",
+            "child = child + 1; child = child + 1; continue;",
+        ),
+        source.replace(
+            "child = child + 1; continue;",
+            "child = child + 1; print(82); continue;",
+        ),
+        source.replace("break;", "break; print(82);"),
+        source.replace(
+            "print(71);",
+            "let __nuis_buffer_continue: i64 = 1; print(71);",
+        ),
+        source
+            .replace("let child_trips =", "let mut child_trips =")
+            .replace("print(74);", "child_trips = child_trips + 1; print(74);"),
+    ]
+    .into_iter()
+    .chain(premature_exits)
+    {
+        assert_ne!(bad, source);
+        for kind in ["f32", "f64"] {
+            for reversed in [false, true] {
+                assert!(
+                    !admitted(&bad.replace("f64", kind), reversed),
+                    "unexpected admission: {bad}"
+                );
+            }
+        }
+    }
+    for kind in ["f32", "f64"] {
+        let typed = source.replace("f64", kind);
+        for (name, bad_value) in [
+            ("confirm_continue", "current.flag"),
+            ("confirm_break", "current.code"),
+        ] {
+            let bad = typed.replace(
+                &format!("{name}(current.total,"),
+                &format!("{name}({bad_value},"),
+            );
+            assert_ne!(bad, typed);
+            assert!(crate::frontend::parse_nuis_module(&bad)
+                .unwrap_err()
+                .contains(&format!("function `{name}` argument 1 expects `{kind}`")));
         }
     }
 }

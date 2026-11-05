@@ -3,11 +3,8 @@
 Navigational catalog only, not a cumulative acceptance receipt; the [mainline map](../current-mainline-map.md) selects current work. Each receipt owns its scope, baseline and validation. Later proofs may advance vetoes; never sum their totals.
 
 ## Current Evidence
-
-The [local scalar audit](nuis-native-local-scalar-argument-print-v1.md) follows [restricted i64 XOR](nuis-native-i64-xor-argument-print-v1.md) at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md). It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md) and [root carry reads](nuis-native-carry-epoch-print-v1.md), then [fresh child entries](nuis-native-child-epoch-print-v1.md) and [original i64 fields](nuis-native-field-epoch-print-v1.md), then
-[typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and [raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md).
-The [epoch-local plan](nuis-native-epoch-local-plan-v1.md) feeds separate [root-owned](nuis-native-epoch-local-argument-print-v1.md) and [fresh child-owned](nuis-native-child-epoch-local-argument-print-v1.md) execution proofs; the map owns the next gate.
-Original reference files, anchors, fixtures and regressions remain below; further changing backedges and wide private captures are separate.
+The [local scalar audit](nuis-native-local-scalar-argument-print-v1.md) follows [restricted i64 XOR](nuis-native-i64-xor-argument-print-v1.md) at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md). It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md) and [root carry reads](nuis-native-carry-epoch-print-v1.md), then [fresh child entries](nuis-native-child-epoch-print-v1.md) and [original i64 fields](nuis-native-field-epoch-print-v1.md), then [typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and [raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md).
+The [epoch-local plan](nuis-native-epoch-local-plan-v1.md) feeds separate [root-owned](nuis-native-epoch-local-argument-print-v1.md) and [fresh child-owned](nuis-native-child-epoch-local-argument-print-v1.md) execution proofs; the map owns the next gate. Original reference files, anchors, fixtures and regressions remain below; further changing backedges and wide private captures are separate.
 
 The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializers-v1.md) retains its historical source-profile restriction: Ordinary print/call leaves and original scalar capture authority are not widened. Later explicit print grants apply only to their own admitted profiles.
 
@@ -66,6 +63,12 @@ The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializ
 - [Native Fallible Bound Argument Print V1](nuis-native-fallible-bound-argument-print-v1.md)
 - [Native State Bound Argument Print V1](nuis-native-state-bound-argument-print-v1.md)
 - [Native State Break Argument Print V1](nuis-native-state-break-argument-print-v1.md)
+- [Native State Continue Argument Print V1](nuis-native-state-continue-argument-print-v1.md)
+- [Native State Mixed Argument Print V1](nuis-native-state-mixed-argument-print-v1.md)
+- [Native State Predicate Argument Print V1](nuis-native-state-predicate-argument-print-v1.md)
+- [Native State Short-Circuit Argument Print V1](nuis-native-state-short-circuit-argument-print-v1.md); [Native State Grouped Argument Print V1](nuis-native-state-grouped-argument-print-v1.md)
+- [Native State Field Exit Argument Print V1](nuis-native-state-field-exit-argument-print-v1.md)
+- [Native State Division Exit Argument Print V1](nuis-native-state-division-exit-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)
@@ -296,5 +299,4 @@ The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializ
 ## Maintenance
 
 Add new evidence to its focused receipt and the appropriate section here. Keep the three top-level routers below 300 lines; reference/history Markdown
-retains its separate 2000-line policy. Pure navigation changes do not increase
-tensor progress, turn old results into fresh acceptance, or enable optimizations.
+retains its separate 2000-line policy. Pure navigation changes do not increase tensor progress, turn old results into fresh acceptance, or enable optimizations.

@@ -146,6 +146,59 @@ fn state_break_argument_print_fresh_cache_and_source_free_delivery_preserve_earl
     delivery(cases::STATE_BREAK, "state_break_argument_print_delivery");
 }
 
+#[test]
+fn state_continue_argument_print_fresh_cache_and_source_free_delivery_preserve_steps() {
+    delivery(
+        cases::STATE_CONTINUE,
+        "state_continue_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_mixed_argument_print_fresh_cache_and_source_free_delivery_preserve_exit_order() {
+    delivery(cases::STATE_MIXED, "state_mixed_argument_print_delivery");
+}
+
+#[test]
+fn state_predicate_argument_print_fresh_cache_and_source_free_delivery_preserve_checks() {
+    delivery(
+        cases::STATE_PREDICATE,
+        "state_predicate_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_short_circuit_argument_print_fresh_cache_and_source_free_delivery_preserve_lazy_rhs() {
+    delivery(
+        cases::STATE_SHORT_CIRCUIT,
+        "state_short_circuit_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_grouped_argument_print_fresh_cache_and_source_free_delivery_preserve_grouping() {
+    delivery(
+        cases::STATE_GROUPED,
+        "state_grouped_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_field_exit_argument_print_fresh_cache_and_source_free_delivery_use_updated_fields() {
+    delivery(
+        cases::STATE_FIELD_EXIT,
+        "state_field_exit_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_division_exit_argument_print_fresh_cache_and_source_free_delivery_preserve_quotients() {
+    delivery(
+        cases::STATE_DIVISION_EXIT,
+        "state_division_exit_argument_print_delivery",
+    );
+}
+
 fn delivery(matrix: cases::Matrix, tag: &str) {
     for kind in cases::KINDS {
         let (project, mode) = project_for_source_with_i64_prints(

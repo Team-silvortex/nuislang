@@ -33,7 +33,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-state-break-argument-print-index-model",
         path: "tools/nuisc/tests/native_application_bridge/parent_bound_argument_print_cases.rs",
         required_patterns: &[
-            "for child_index in 0..trips", "if child_index == cut",
+            "for child_index in 0..trips", "if let Some(cut) = case.break_cut()",
+            "decisions.map_or(child_index == cut, |(_, stopping)| stopping)",
             "observed_index = child_index;", "trace.push(78)", "trace.push(79)",
             "trace.extend([80, observed_index])", "observed_index = child_index + 1",
         ],

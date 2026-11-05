@@ -34,14 +34,29 @@ pub(super) fn execute(
         }
         if let GuardClock::FallibleBound(guard)
         | GuardClock::StateBound(guard)
-        | GuardClock::StateBreak(guard, _) = case.clock
+        | GuardClock::StateBreak(guard, _)
+        | GuardClock::StateContinue(guard, _, _)
+        | GuardClock::StateMixed { guard, .. }
+        | GuardClock::StatePredicate { guard, .. }
+        | GuardClock::StateShortCircuit { guard, .. }
+        | GuardClock::StateGrouped { guard, .. }
+        | GuardClock::StateFieldExit { guard, .. }
+        | GuardClock::StateDivisionExit { guard, .. } = case.clock
         {
             let remaining = guard - parent as i64;
             if native {
                 trace.push(remaining);
                 if matches!(
                     case.clock,
-                    GuardClock::StateBound(_) | GuardClock::StateBreak(_, _)
+                    GuardClock::StateBound(_)
+                        | GuardClock::StateBreak(_, _)
+                        | GuardClock::StateContinue(_, _, _)
+                        | GuardClock::StateMixed { .. }
+                        | GuardClock::StatePredicate { .. }
+                        | GuardClock::StateShortCircuit { .. }
+                        | GuardClock::StateGrouped { .. }
+                        | GuardClock::StateFieldExit { .. }
+                        | GuardClock::StateDivisionExit { .. }
                 ) {
                     trace.push(i64::from(super::state_bounds::negative(
                         case.kind(),
@@ -78,17 +93,99 @@ pub(super) fn execute(
                     return Err(trace);
                 }
             }
-            if let Some(cut) = case.break_cut() {
-                if child_index == cut {
-                    observed_index = child_index;
+            let decisions = if let Some((exits, divisors)) = case.division_exits() {
+                match super::state_division_exits::evaluate(
+                    exits,
+                    divisors,
+                    case.kind(),
+                    current,
+                    child_index,
+                    parent_guard + child_index,
+                    native,
+                    &mut trace,
+                ) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else if let Some(exits) = case.field_exits() {
+                match super::state_field_exits::evaluate(
+                    exits,
+                    case.kind(),
+                    current,
+                    child_index,
+                    parent_guard + child_index,
+                    native,
+                    &mut trace,
+                ) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else if let Some(exits) = case.grouped() {
+                match exits.evaluate(child_index, parent_guard + child_index, native, &mut trace) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else if let Some(exits) = case.short_circuit() {
+                match exits.evaluate(child_index, parent_guard + child_index, native, &mut trace) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else {
+                None
+            };
+            if let Some((first, _, _)) = case.predicate_guards() {
+                let guard = first - (parent_guard + child_index);
+                if native {
+                    trace.extend([603, child_index, case.continue_control().unwrap().0, guard]);
+                }
+                if guard == 0 {
+                    return Err(trace);
+                }
+            }
+            if let Some((cut, _)) = case.continue_control() {
+                if decisions.map_or(child_index == cut, |(continuing, _)| continuing) {
+                    observed_index = child_index + 1;
                     trace.push(78);
+                    continue;
+                }
+            }
+            if let Some((_, second, stop)) = case.predicate_guards() {
+                let guard = second - (parent_guard + child_index);
+                if native {
+                    trace.extend([604, child_index, stop, guard]);
+                }
+                if guard == 0 {
+                    return Err(trace);
+                }
+            }
+            if let Some(cut) = case.break_cut() {
+                if decisions.map_or(child_index == cut, |(_, stopping)| stopping) {
+                    observed_index = child_index;
+                    trace.push(if case.continue_control().is_some() {
+                        81
+                    } else {
+                        78
+                    });
                     break;
                 }
+                if case.continue_control().is_none() {
+                    trace.push(79);
+                }
+            }
+            if let Some((_, suffix_guard)) = case.continue_control() {
                 trace.push(79);
+                let guard = suffix_guard - (parent_guard + child_index);
+                if native {
+                    trace.extend([601, 0, guard]);
+                }
+                if guard == 0 {
+                    return Err(trace);
+                }
+                trace.push(0);
             }
             observed_index = child_index + 1;
         }
-        if case.break_cut().is_some() {
+        if case.break_cut().is_some() || case.continue_control().is_some() {
             trace.extend([80, observed_index]);
         }
         trace.push(77);
