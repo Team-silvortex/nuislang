@@ -18,10 +18,16 @@ mod state_division_exit_argument_print;
 mod state_field_exit_argument_print;
 #[path = "state_grouped_argument_print.rs"]
 mod state_grouped_argument_print;
+#[path = "state_helper_exit_argument_print.rs"]
+mod state_helper_exit_argument_print;
 #[path = "state_mixed_argument_print.rs"]
 mod state_mixed_argument_print;
+#[path = "state_parameter_exit_argument_print.rs"]
+mod state_parameter_exit_argument_print;
 #[path = "state_predicate_argument_print.rs"]
 mod state_predicate_argument_print;
+#[path = "state_record_parameter_exit_argument_print.rs"]
+mod state_record_parameter_exit_argument_print;
 #[path = "state_short_circuit_argument_print.rs"]
 mod state_short_circuit_argument_print;
 
@@ -92,7 +98,12 @@ fn check_calls(row: cases::Case, previous: Option<i64>, events: &[String]) {
         children as usize * (1 + usize::from(row.child.base.selected))
             + row.suffix_calls_from(previous)
     );
-    assert_eq!(calls("] finish("), (children + row.parents + 1) as usize);
+    let finish_calls = if row.parameter_faults().is_some() {
+        row.parents + 1
+    } else {
+        children + row.parents + 1
+    };
+    assert_eq!(calls("] finish("), finish_calls as usize);
     let (first, second) = row.predicate_calls_from(previous);
     assert_eq!(calls("] continue_at("), first);
     assert_eq!(calls("] break_at("), second);
@@ -102,6 +113,37 @@ fn check_calls(row: cases::Case, previous: Option<i64>, events: &[String]) {
     let grouped = row.grouped_calls_from(previous);
     assert_eq!(calls("] rescue_continue("), grouped[4]);
     assert_eq!(calls("] confirm_break("), grouped[5]);
+    let producers = if row.has_record_parameters() {
+        cases::state_record_parameters::call_counts(row, previous)
+    } else if row.helper_operands().is_some() {
+        cases::state_helper_exits::call_counts(row, previous)
+    } else {
+        [0; 4]
+    };
+    for (name, expected) in ["continue_lhs", "continue_rhs", "break_lhs", "break_rhs"]
+        .into_iter()
+        .zip(producers)
+    {
+        assert_eq!(calls(&format!("] {name}(")), expected);
+    }
+    let parameters = if row.has_record_parameters() {
+        cases::state_record_parameters::call_counts(row, previous)
+    } else if row.parameter_faults().is_some() {
+        cases::state_parameter_exits::call_counts(row, previous)
+    } else {
+        [0; 4]
+    };
+    for (name, expected) in [
+        "continue_mode_value",
+        "continue_guard_value",
+        "break_mode_value",
+        "break_guard_value",
+    ]
+    .into_iter()
+    .zip(parameters)
+    {
+        assert_eq!(calls(&format!("] {name}(")), expected);
+    }
     assert_eq!(
         calls("] child_count("),
         if matches!(
@@ -117,6 +159,9 @@ fn check_calls(row: cases::Case, previous: Option<i64>, events: &[String]) {
                 | cases::GuardClock::StateGrouped { .. }
                 | cases::GuardClock::StateFieldExit { .. }
                 | cases::GuardClock::StateDivisionExit { .. }
+                | cases::GuardClock::StateHelperExit { .. }
+                | cases::GuardClock::StateParameterExit { .. }
+                | cases::GuardClock::StateRecordParameterExit { .. }
         ) {
             row.parents as usize
         } else {

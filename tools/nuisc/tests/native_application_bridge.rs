@@ -802,3 +802,5 @@ mod i64_xor_argument_print_epoch;
 mod local_scalar_argument_print;
 #[path = "native_application_bridge/parent_reentry_argument_print.rs"]
 mod parent_reentry_argument_print;
+#[path = "native_application_bridge/state_control_exit_argument_print.rs"]
+mod state_control_exit_argument_print;

@@ -69,6 +69,10 @@ The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializ
 - [Native State Short-Circuit Argument Print V1](nuis-native-state-short-circuit-argument-print-v1.md); [Native State Grouped Argument Print V1](nuis-native-state-grouped-argument-print-v1.md)
 - [Native State Field Exit Argument Print V1](nuis-native-state-field-exit-argument-print-v1.md)
 - [Native State Division Exit Argument Print V1](nuis-native-state-division-exit-argument-print-v1.md)
+- [Native State Helper Exit Argument Print V1](nuis-native-state-helper-exit-argument-print-v1.md)
+- [Native State Parameter Exit Argument Print V1](nuis-native-state-parameter-exit-argument-print-v1.md)
+- [Native State Record Parameter Exit Argument Print V1](nuis-native-state-record-parameter-exit-argument-print-v1.md)
+- [Native State Control Exit Argument Print V1](nuis-native-state-control-exit-argument-print-v1.md)
 
 ## Return Publication And Snapshot Storage
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)

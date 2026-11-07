@@ -1,6 +1,9 @@
 use super::*;
 use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 
+#[path = "dev_tensor_native_argument_lineage_tests.rs"]
+mod native_argument_lineage;
+
 #[test]
 fn dev_tensor_state_field_exit_retains_complete_grouped_lineage() {
     use sha2::{Digest, Sha256};

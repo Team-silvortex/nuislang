@@ -1,0 +1,145 @@
+use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
+
+pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-source",
+        path: "tools/nuisc/tests/native_application_bridge/state_control_exit_argument_print.ns",
+        required_patterns: &[
+            "struct State { total: f64, control: i64 }",
+            "control = control + 0;",
+            "control: current.control + 1",
+            "permit ^ current.control",
+            "(seal_guard - (outer * 16 + child)) + current.control",
+            "let result_total = finish(total, tail_guard);",
+            "let control_check = 0 / control_tail_guard;",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-source-refusals",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/control_loops/state_control_exit_argument_print_tests.rs",
+        required_patterns: &[
+            "state_control_exit_argument_print_accepts_independently_ready_control_state",
+            "state_control_exit_argument_print_preserves_epoch_type_and_exit_refusals",
+            "SOURCE.replace(\"control = control + 0;\", \"\")",
+            "permit ^ current.flag",
+            "control: selected",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-model",
+        path: "tools/nuisc/tests/native_application_bridge/state_control_exit_argument_print_cases.rs",
+        required_patterns: &[
+            "pub type State = [i64; 2]",
+            "pub fn plan",
+            "pub fn execute",
+            "result.state[1].wrapping_add(1)",
+            "state[1].wrapping_add(1)",
+            "exits.flat.permit ^= control",
+            "words.extend([self.initial_control, self.control_tail_guard])",
+            "pub fn early_sequences",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-publication",
+        path: "tools/nuisc/tests/native_application_bridge/state_control_exit_argument_print.rs",
+        required_patterns: &[
+            "state_control_exit_native_publishes_both_words_and_fault_prefixes",
+            "state_control_exit_oracle_pins_persistent_updates_decoys_and_tail_order",
+            "first.completed, [0, 1, 0, 4]",
+            "next.state, [kind.last_state(), 12]",
+            "row.words()[35..]",
+            "trace.ends_with(&[73, 82])",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-decoys-and-quotas",
+        path: "tools/nuisc/tests/native_application_bridge/state_control_exit_argument_print.rs",
+        required_patterns: &[
+            "state_control_exit_native_distinguishes_event_control_decoy_from_accepted_state",
+            "state_control_exit_native_preserves_work_and_entry_limits_before_two_word_publication",
+            "State { total: state.total, control: initial_control }",
+            "check_i64_loop_work_limit_rejection",
+            "check_i64_helper_entry_limit_rejection",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-preflight",
+        path: "tools/nuisc/tests/native_application_bridge/state_control_exit_preflight.rs",
+        required_patterns: &[
+            "state_control_exit_preflight_rejects_shapes_and_noncanonical_words_without_writing_state",
+            "bridge.state_fields",
+            "[37, 39, 2]",
+            "store i64 %result0",
+            "expected.extend([91, 11, 22, 92])",
+            "words[0] = 1_i64 << 32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-reference-close",
+        path: "tools/nuisc/tests/native_application_bridge/state_control_exit_argument_print.rs",
+        required_patterns: &[
+            "state_control_exit_reference_retains_complete_state_after_rejection_and_faulted_close",
+            "state_control_exit_reference_close_failure_keeps_both_accepted_fields",
+            "rejected[35] = Value::Bool(false)",
+            "session.close(vec![]).unwrap_err(), error",
+            "state_words(session.state()), accepted",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-delivery",
+        path: "tools/nuis/tests/native_session_workflow/state_control_exit_argument_print.rs",
+        required_patterns: &[
+            "state_control_exit_fresh_cache_and_source_free_delivery_preserve_both_state_words",
+            "state_control_exit_early_break_delivery_counts_completed_not_reserved_updates",
+            "compile_cache: hit",
+            "for i in 0..2",
+            "materialize-artifact",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-registration",
+        path: "tools/nuis/src/dev_tensor_drift_data_native_argument_print_registration.rs",
+        required_patterns: &[
+            "mod state_control_exit_argument_print;",
+            "pub(super) const STATE_CONTROL_EXIT_ARGUMENT_PRINT",
+            "state_control_exit_argument_print::CHECKS",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-receipt",
+        path: "docs/reference/nuis-native-state-control-exit-argument-print-v1.md",
+        required_patterns: &[
+            "Persistent Control State",
+            "24 raw sequences",
+            "30 fault rows",
+            "408 artifact runs",
+            "Predecessor Lineage",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-checkpoint",
+        path: "tools/nuis/src/dev_tensor_data.rs",
+        required_patterns: &[
+            "State-bounded persistent-control witnesses:",
+            "Previous state-record-parameter checkpoint:",
+            "Previous state-record-parameter task checkpoint:",
+            "Previous state-record-parameter blocker checkpoint:",
+            "Previous state-record-parameter action checkpoint:",
+            "Previous state-record-parameter validation checkpoint:",
+            "Previous state-record-parameter artifact checkpoint:",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-state-control-exit-argument-print-lineage-regression",
+        path: "tools/nuis/src/dev_tensor_native_argument_lineage_tests.rs",
+        required_patterns: &[
+            "dev_tensor_state_control_exit_retains_complete_record_parameter_lineage",
+            "ad64c9caf53f604ba8a8dbc0c608976155bb9ec080eed2dfd18a575ece4793c8",
+            "d25af46d361764de5fc7af28c6845aa518e093ba9235142486ca22ada8edcac2",
+            "119d7ce1b42c1b708ed83461347837e026cfb1e77f5319ee92cc8c34c24c6268",
+            "209bb36dcde337306cfe2cc09c060f6dd6af69312bfe73c100da8cdac82ab0bf",
+            "331d8edb3c6992a2e8a66d583bc403d0b64bd3d15b43c8a4806791172cfb496c",
+            "e1b7e8714f40d6ecab0737acc3f0bb0243099c34e511cd40cb3101500747759d",
+        ],
+    },
+];

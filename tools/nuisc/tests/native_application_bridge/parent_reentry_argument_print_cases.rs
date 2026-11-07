@@ -27,6 +27,12 @@ pub use state_grouped::Exits as GroupedExits;
 pub mod state_division_exits;
 #[path = "state_field_exit_argument_print_cases.rs"]
 pub mod state_field_exits;
+#[path = "state_helper_exit_argument_print_cases.rs"]
+pub mod state_helper_exits;
+#[path = "state_parameter_exit_argument_print_cases.rs"]
+pub mod state_parameter_exits;
+#[path = "state_record_parameter_exit_argument_print_cases.rs"]
+pub mod state_record_parameters;
 pub use state_short_circuit::Exits as ShortCircuitExits;
 pub const LOOP_LIMIT: u64 = 12;
 // Includes outlined YIR entries, not just the source-level helper calls.
@@ -70,6 +76,29 @@ pub enum GuardClock {
         suffix_guard: i64,
         exits: GroupedExits,
         divisors: [i64; 2],
+    },
+    StateHelperExit {
+        guard: i64,
+        suffix_guard: i64,
+        exits: GroupedExits,
+        divisors: [i64; 2],
+        operand_guards: [i64; 4],
+    },
+    StateParameterExit {
+        guard: i64,
+        suffix_guard: i64,
+        exits: GroupedExits,
+        divisors: [i64; 2],
+        operand_guards: [i64; 4],
+        parameter_faults: [i64; 4],
+    },
+    StateRecordParameterExit {
+        guard: i64,
+        suffix_guard: i64,
+        exits: GroupedExits,
+        divisors: [i64; 2],
+        operand_guards: [i64; 4],
+        parameter_faults: [i64; 4],
     },
     StateGrouped {
         guard: i64,
@@ -233,6 +262,36 @@ pub const STATE_DIVISION_EXIT: Matrix = Matrix {
     observers: state_division_exits::OBSERVERS_F64,
 };
 
+pub const STATE_HELPER_EXIT: Matrix = Matrix {
+    template: include_str!("state_helper_exit_argument_print.ns"),
+    sequences: state_helper_exits::sequences,
+    cli_sequences: state_helper_exits::cli_sequences,
+    prefix: state_helper_exits::prefix,
+    failures: state_helper_exits::failures,
+    seed: state_helper_exits::seed,
+    observers: state_helper_exits::OBSERVERS_F64,
+};
+
+pub const STATE_PARAMETER_EXIT: Matrix = Matrix {
+    template: include_str!("state_parameter_exit_argument_print.ns"),
+    sequences: state_parameter_exits::sequences,
+    cli_sequences: state_parameter_exits::cli_sequences,
+    prefix: state_parameter_exits::prefix,
+    failures: state_parameter_exits::failures,
+    seed: state_parameter_exits::seed,
+    observers: state_parameter_exits::OBSERVERS_F64,
+};
+
+pub const STATE_RECORD_PARAMETER_EXIT: Matrix = Matrix {
+    template: include_str!("state_record_parameter_exit_argument_print.ns"),
+    sequences: state_record_parameters::sequences,
+    cli_sequences: state_record_parameters::cli_sequences,
+    prefix: state_record_parameters::prefix,
+    failures: state_record_parameters::failures,
+    seed: state_record_parameters::seed,
+    observers: state_record_parameters::OBSERVERS_F64,
+};
+
 #[derive(Clone, Copy, Debug)]
 pub struct Case {
     pub child: child::Case,
@@ -245,6 +304,9 @@ impl Case {
         self.child_counts_from(None)
     }
     pub fn child_counts_from(self, previous: Option<i64>) -> Vec<i64> {
+        if self.has_record_parameters() {
+            return state_record_parameters::plan(self, previous).requested;
+        }
         if self.division_exits().is_some() {
             return state_division_exits::plan(self, previous).requested;
         }
@@ -272,6 +334,9 @@ impl Case {
         (0..self.parents).map(|_| self.child.base.trips).collect()
     }
     pub fn completed_child_counts_from(self, previous: Option<i64>) -> Vec<i64> {
+        if self.has_record_parameters() {
+            return state_record_parameters::plan(self, previous).completed;
+        }
         if self.division_exits().is_some() {
             return state_division_exits::plan(self, previous).completed;
         }
@@ -288,7 +353,11 @@ impl Case {
     }
     pub fn break_cut(self) -> Option<i64> {
         match self.clock {
-            GuardClock::StateFieldExit { .. } | GuardClock::StateDivisionExit { .. } => Some(-1),
+            GuardClock::StateFieldExit { .. }
+            | GuardClock::StateDivisionExit { .. }
+            | GuardClock::StateHelperExit { .. }
+            | GuardClock::StateParameterExit { .. }
+            | GuardClock::StateRecordParameterExit { .. } => Some(-1),
             GuardClock::StateGrouped { exits, .. } => Some(exits.first_break()),
             GuardClock::StateShortCircuit { exits, .. } => Some(exits.first_break()),
             GuardClock::StateBreak(_, cut) => Some(cut),
@@ -303,7 +372,10 @@ impl Case {
     pub fn continue_control(self) -> Option<(i64, i64)> {
         match self.clock {
             GuardClock::StateFieldExit { suffix_guard, .. }
-            | GuardClock::StateDivisionExit { suffix_guard, .. } => Some((-1, suffix_guard)),
+            | GuardClock::StateDivisionExit { suffix_guard, .. }
+            | GuardClock::StateHelperExit { suffix_guard, .. }
+            | GuardClock::StateParameterExit { suffix_guard, .. }
+            | GuardClock::StateRecordParameterExit { suffix_guard, .. } => Some((-1, suffix_guard)),
             GuardClock::StateGrouped {
                 exits,
                 suffix_guard,
@@ -324,8 +396,43 @@ impl Case {
             _ => None,
         }
     }
+    pub fn has_record_parameters(self) -> bool {
+        matches!(self.clock, GuardClock::StateRecordParameterExit { .. })
+    }
+    pub fn parameter_faults(self) -> Option<[i64; 4]> {
+        if let GuardClock::StateParameterExit {
+            parameter_faults, ..
+        }
+        | GuardClock::StateRecordParameterExit {
+            parameter_faults, ..
+        } = self.clock
+        {
+            Some(parameter_faults)
+        } else {
+            None
+        }
+    }
+    pub fn helper_operands(self) -> Option<[i64; 4]> {
+        if let GuardClock::StateHelperExit { operand_guards, .. }
+        | GuardClock::StateParameterExit { operand_guards, .. }
+        | GuardClock::StateRecordParameterExit { operand_guards, .. } = self.clock
+        {
+            Some(operand_guards)
+        } else {
+            None
+        }
+    }
     pub fn division_exits(self) -> Option<(GroupedExits, [i64; 2])> {
         if let GuardClock::StateDivisionExit {
+            exits, divisors, ..
+        }
+        | GuardClock::StateHelperExit {
+            exits, divisors, ..
+        }
+        | GuardClock::StateParameterExit {
+            exits, divisors, ..
+        }
+        | GuardClock::StateRecordParameterExit {
             exits, divisors, ..
         } = self.clock
         {
@@ -383,6 +490,9 @@ impl Case {
         Some((predecessor, exits))
     }
     pub fn grouped_calls_from(self, previous: Option<i64>) -> [usize; 6] {
+        if self.has_record_parameters() {
+            return state_record_parameters::plan(self, previous).calls;
+        }
         if self.division_exits().is_some() {
             return state_division_exits::plan(self, previous).calls;
         }
@@ -473,6 +583,9 @@ impl Case {
         })
     }
     pub fn suffix_calls_from(self, previous: Option<i64>) -> usize {
+        if self.has_record_parameters() {
+            return state_record_parameters::plan(self, previous).suffixes;
+        }
         if self.division_exits().is_some() {
             return state_division_exits::plan(self, previous).suffixes;
         }
@@ -495,6 +608,19 @@ impl Case {
         self.child.kind()
     }
     pub fn words(self) -> Vec<i64> {
+        if self.has_record_parameters() {
+            return state_record_parameters::parameter(self).words();
+        }
+        if let Some(faults) = self.parameter_faults() {
+            let mut words = state_parameter_exits::helper(self).words();
+            words.extend(faults);
+            return words;
+        }
+        if let Some(guards) = self.helper_operands() {
+            let mut words = state_helper_exits::division(self).words();
+            words.extend(guards);
+            return words;
+        }
         if let Some((_, divisors)) = self.division_exits() {
             let mut words = state_division_exits::field(self).words();
             words.extend(divisors);
@@ -551,6 +677,29 @@ impl Case {
         words
     }
     pub fn args(self) -> String {
+        if self.has_record_parameters() {
+            return state_record_parameters::parameter(self).args();
+        }
+        if let Some(faults) = self.parameter_faults() {
+            return format!(
+                "{},{},{},{},{}",
+                state_parameter_exits::helper(self).args(),
+                faults[0],
+                faults[1],
+                faults[2],
+                faults[3]
+            );
+        }
+        if let Some(guards) = self.helper_operands() {
+            return format!(
+                "{},{},{},{},{}",
+                state_helper_exits::division(self).args(),
+                guards[0],
+                guards[1],
+                guards[2],
+                guards[3]
+            );
+        }
         if let Some((_, divisors)) = self.division_exits() {
             return format!(
                 "{},{},{}",
@@ -622,6 +771,9 @@ impl Case {
                 | GuardClock::StateGrouped { .. }
                 | GuardClock::StateFieldExit { .. }
                 | GuardClock::StateDivisionExit { .. }
+                | GuardClock::StateHelperExit { .. }
+                | GuardClock::StateParameterExit { .. }
+                | GuardClock::StateRecordParameterExit { .. }
         ) {
             return bounds::execute(self, previous, native);
         }

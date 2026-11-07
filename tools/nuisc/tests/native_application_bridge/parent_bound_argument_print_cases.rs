@@ -41,7 +41,10 @@ pub(super) fn execute(
         | GuardClock::StateShortCircuit { guard, .. }
         | GuardClock::StateGrouped { guard, .. }
         | GuardClock::StateFieldExit { guard, .. }
-        | GuardClock::StateDivisionExit { guard, .. } = case.clock
+        | GuardClock::StateDivisionExit { guard, .. }
+        | GuardClock::StateHelperExit { guard, .. }
+        | GuardClock::StateParameterExit { guard, .. }
+        | GuardClock::StateRecordParameterExit { guard, .. } = case.clock
         {
             let remaining = guard - parent as i64;
             if native {
@@ -57,6 +60,9 @@ pub(super) fn execute(
                         | GuardClock::StateGrouped { .. }
                         | GuardClock::StateFieldExit { .. }
                         | GuardClock::StateDivisionExit { .. }
+                        | GuardClock::StateHelperExit { .. }
+                        | GuardClock::StateParameterExit { .. }
+                        | GuardClock::StateRecordParameterExit { .. }
                 ) {
                     trace.push(i64::from(super::state_bounds::negative(
                         case.kind(),
@@ -93,7 +99,43 @@ pub(super) fn execute(
                     return Err(trace);
                 }
             }
-            let decisions = if let Some((exits, divisors)) = case.division_exits() {
+            let decisions = if case.has_record_parameters() {
+                match super::state_record_parameters::evaluate(
+                    case,
+                    current,
+                    child_index,
+                    parent_guard + child_index,
+                    native,
+                    &mut trace,
+                ) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else if case.parameter_faults().is_some() {
+                match super::state_parameter_exits::evaluate(
+                    case,
+                    current,
+                    child_index,
+                    parent_guard + child_index,
+                    native,
+                    &mut trace,
+                ) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else if case.helper_operands().is_some() {
+                match super::state_helper_exits::evaluate(
+                    case,
+                    current,
+                    child_index,
+                    parent_guard + child_index,
+                    native,
+                    &mut trace,
+                ) {
+                    Ok(decisions) => Some(decisions),
+                    Err(()) => return Err(trace),
+                }
+            } else if let Some((exits, divisors)) = case.division_exits() {
                 match super::state_division_exits::evaluate(
                     exits,
                     divisors,

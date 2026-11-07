@@ -199,6 +199,30 @@ fn state_division_exit_argument_print_fresh_cache_and_source_free_delivery_prese
     );
 }
 
+#[test]
+fn state_helper_exit_argument_print_fresh_cache_and_source_free_delivery_preserve_producers() {
+    delivery(
+        cases::STATE_HELPER_EXIT,
+        "state_helper_exit_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_parameter_exit_argument_print_fresh_cache_and_source_free_delivery_preserve_arguments() {
+    delivery(
+        cases::STATE_PARAMETER_EXIT,
+        "state_parameter_exit_argument_print_delivery",
+    );
+}
+
+#[test]
+fn state_record_parameter_exit_argument_print_fresh_cache_and_source_free_delivery_use_state() {
+    delivery(
+        cases::STATE_RECORD_PARAMETER_EXIT,
+        "state_record_parameter_exit_argument_print_delivery",
+    );
+}
+
 fn delivery(matrix: cases::Matrix, tag: &str) {
     for kind in cases::KINDS {
         let (project, mode) = project_for_source_with_i64_prints(

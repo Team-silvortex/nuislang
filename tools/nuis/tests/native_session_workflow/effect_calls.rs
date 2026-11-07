@@ -883,3 +883,5 @@ mod i64_xor_argument_print_epoch;
 mod local_scalar_argument_print;
 #[path = "parent_reentry_argument_print.rs"]
 mod parent_reentry_argument_print;
+#[path = "state_control_exit_argument_print.rs"]
+mod state_control_exit_argument_print;

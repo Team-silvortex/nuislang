@@ -1,7 +1,8 @@
 # Beta 0.18 Snapshot
 
-Audit date: 2026-11-04. Worktree follow-up: 2026-11-05. This minor-line anchor
-separates committed identity, worktree evidence and future gates.
+Audit date: 2026-11-05. Worktree follow-up: 2026-11-07. The preceding audit was
+2026-11-04. This minor-line anchor separates committed identity, worktree evidence
+and future gates.
 Cargo and protocol versions are independent;
 this document does not freeze compatibility or announce completed self-hosting.
 
@@ -10,7 +11,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.5 | `bbb00651` | 2026-11-04 |
+| Latest committed patch at this audit, beta-0.18.6 | `696d2bd7` | 2026-11-05 |
+| Earlier patch, beta-0.18.5 | `bbb00651` | 2026-11-04 |
 | Earlier patch, beta-0.18.4 | `ceaa2caa` | 2026-10-28 |
 | Earlier patch, beta-0.18.3 | `2c5b4796` | 2026-10-28 |
 | Earlier patch, beta-0.18.2 | `5bbd4de8` | 2026-10-28 |
@@ -144,8 +146,10 @@ split; their original dated acceptance records remain separate.
 ## Current Worktree Follow-Up
 
 The source-local through early-break checkpoints below are included in
-`bbb00651`. Uncommitted follow-ups span state-bounded continue through grouped exits;
-each earlier receipt retains its original baseline and validation history.
+`bbb00651`. State-bounded continue through checked-division checkpoints are now
+included in `696d2bd7`; each receipt retains its original baseline and validation
+history. The checked producer, later-parameter, record-parameter and persistent
+control-State witnesses remain worktree follow-ups.
 
 The [source-local scalar audit](../reference/nuis-native-local-scalar-argument-print-v1.md)
 confirms ready parameter/updated-field/branch-local composition through source,
@@ -202,7 +206,22 @@ the equivalent branch form remains a checked quota rejection. The
 [checked-division witness](../reference/nuis-native-state-division-exit-argument-print-v1.md)
 now composes ready same-kind divisor parameters with those updated fields, preserving
 IEEE arithmetic, argument-before-callee faults and accepted State without increasing
-quotas. Fallible helper-produced operands are next; no version is bumped.
+quotas. The [checked-producer witness](../reference/nuis-native-state-helper-exit-argument-print-v1.md)
+now distinguishes left/right helper entry, division and confirmation failures,
+including source-reversed collisions and returned-value controls. Existing per-site
+print authority remains explicit; quotas stay unchanged. The
+[later-parameter witness](../reference/nuis-native-state-parameter-exit-argument-print-v1.md)
+now checks quotient-before-mode-before-guard ordering, full-width returns and
+parameter-order collision controls. Its inline record-update check preserves the
+same fault without an extra wrapper entry. The
+[record-parameter witness](../reference/nuis-native-state-record-parameter-exit-argument-print-v1.md)
+now derives mode/guard values from updated fields and separates actual State reads
+from stale parent values, including generated/cancelled zero guards. The
+[persistent-control witness](../reference/nuis-native-state-control-exit-argument-print-v1.md)
+now retains both float and i64 fields across callbacks, with independent input
+preflight, dual-decoy and tail-fault controls plus early-break source-free delivery.
+Independently checked in-loop control updates are next; these worktree tasks
+create no version bump.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

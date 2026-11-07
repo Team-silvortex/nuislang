@@ -1,7 +1,15 @@
 use super::*;
 
+#[path = "state_control_exit_argument_print_tests.rs"]
+mod state_control_exit;
 #[path = "state_division_exit_argument_print_tests.rs"]
 mod state_division_exits;
+#[path = "state_helper_exit_argument_print_tests.rs"]
+mod state_helper_exits;
+#[path = "state_parameter_exit_argument_print_tests.rs"]
+mod state_parameter_exits;
+#[path = "state_record_parameter_exit_argument_print_tests.rs"]
+mod state_record_parameters;
 
 fn admitted(source: &str, reversed: bool) -> bool {
     let mut module = crate::frontend::parse_nuis_module(source).unwrap();

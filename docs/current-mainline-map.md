@@ -106,8 +106,20 @@ extra outlined entries; equivalent branch classifiers retain explicit quota reje
 The [checked-division witness](reference/nuis-native-state-division-exit-argument-print-v1.md)
 now composes updated fields with ready same-kind divisors, checking rounded IEEE
 arguments, skipped zero-divisor faults and failure before confirmation entry.
-Next compose **fallible helper-produced operands at exit-helper arguments**, keeping
-producer order, arithmetic/predicate fault priority and accepted State distinct.
+The [checked-producer witness](reference/nuis-native-state-helper-exit-argument-print-v1.md)
+now observes independent left/right helper entries, returned values and reversed-source
+fault priority without widening quotas or inheriting effect grants.
+The [later-parameter witness](reference/nuis-native-state-parameter-exit-argument-print-v1.md)
+now checks mode/guard producers after the quotient, including reordered parameter
+faults and full-width returned values, without changing admission or quotas.
+The [record-parameter witness](reference/nuis-native-state-record-parameter-exit-argument-print-v1.md)
+now derives those values from updated f32/f64 fields, distinguishing stale parent
+reads, derived-zero failures and accepted-State backedges at unchanged quotas.
+The [persistent-control witness](reference/nuis-native-state-control-exit-argument-print-v1.md)
+now publishes a float and i64 control together, preserving accepted fields through
+rejections/faults and source-free restoration without changing one-word predecessors.
+Next make **the in-loop control update independently fallible**, retaining ordered
+partial-work failure and complete State publication.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 
