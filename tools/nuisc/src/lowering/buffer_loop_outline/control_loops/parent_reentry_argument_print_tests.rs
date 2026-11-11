@@ -1,5 +1,13 @@
 use super::*;
 
+#[path = "state_branch_chain_exit_argument_print_tests.rs"]
+mod state_branch_chain_exit;
+#[path = "state_branch_control_exit_argument_print_tests.rs"]
+mod state_branch_control_exit;
+#[path = "state_branch_helper_exit_argument_print_tests.rs"]
+mod state_branch_helper_exit;
+#[path = "state_checked_control_exit_argument_print_tests.rs"]
+mod state_checked_control_exit;
 #[path = "state_control_exit_argument_print_tests.rs"]
 mod state_control_exit;
 #[path = "state_division_exit_argument_print_tests.rs"]
@@ -689,3 +697,12 @@ fn state_field_exit_argument_print_keeps_type_and_epoch_refusals() {
         }
     }
 }
+
+#[path = "state_return_gate_exit_argument_print_tests.rs"]
+mod state_return_gate_exit;
+
+#[path = "state_return_join_exit_argument_print_tests.rs"]
+mod state_return_join_exit;
+
+#[path = "state_return_prefix_exit_argument_print_tests.rs"]
+mod state_return_prefix_exit;

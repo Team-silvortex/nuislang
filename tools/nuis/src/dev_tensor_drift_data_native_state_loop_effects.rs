@@ -5,10 +5,10 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-state-loop-effects-isolated-literal-profile",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
+            "use control_block::validate_block;",
             "enum Profile",
             "IterationPrints",
             "Profile::Pure",
-            "NirStmt::Print(value) if matches!(profile, Profile::IterationPrints)",
             "pub(super) fn collect_iteration_calls",
             "while let Some(name) = ready.pop_first()",
         ],

@@ -740,7 +740,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "pure-value-record-rebinding-admission",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers/control_block.rs",
         required_patterns: &[
             "if let Some(previous) = locals.get(name)",
             "!matches!(stmt, NirStmt::Let { .. })",

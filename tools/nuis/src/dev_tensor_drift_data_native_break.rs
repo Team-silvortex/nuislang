@@ -237,12 +237,11 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-session-counted-value-transitive-boundaries",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
+            "use control_block::validate_block;",
             "&control_values::CarryLayouts::new(),",
             "control_loops::contains_loop(&function.body)",
             "helper.may_loop |= helper",
             ".any(|name| admitted[name].may_loop)",
-            "control_loops::validate(",
-            "loop_layouts?,",
         ],
     },
     DevTensorDriftCheckSpec {

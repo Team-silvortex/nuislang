@@ -1,8 +1,8 @@
 # Beta 0.18 Snapshot
 
-Audit date: 2026-11-05. Worktree follow-up: 2026-11-07. The preceding audit was
-2026-11-04. This minor-line anchor separates committed identity, worktree evidence
-and future gates.
+Audit date: 2026-11-07. Preceding audits were 2026-11-05 and 2026-11-04.
+This minor-line anchor separates committed identity, worktree evidence and future
+gates.
 Cargo and protocol versions are independent;
 this document does not freeze compatibility or announce completed self-hosting.
 
@@ -11,7 +11,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.6 | `696d2bd7` | 2026-11-05 |
+| Latest committed patch at this audit, beta-0.18.7 | `a270a99e` | 2026-11-07 |
+| Earlier patch, beta-0.18.6 | `696d2bd7` | 2026-11-05 |
 | Earlier patch, beta-0.18.5 | `bbb00651` | 2026-11-04 |
 | Earlier patch, beta-0.18.4 | `ceaa2caa` | 2026-10-28 |
 | Earlier patch, beta-0.18.3 | `2c5b4796` | 2026-10-28 |
@@ -149,7 +150,9 @@ The source-local through early-break checkpoints below are included in
 `bbb00651`. State-bounded continue through checked-division checkpoints are now
 included in `696d2bd7`; each receipt retains its original baseline and validation
 history. The checked producer, later-parameter, record-parameter and persistent
-control-State witnesses remain worktree follow-ups.
+control-State witnesses are now included in `a270a99e`, with their original dated
+receipts unchanged. Independently checked control updates are the new worktree
+follow-up.
 
 The [source-local scalar audit](../reference/nuis-native-local-scalar-argument-print-v1.md)
 confirms ready parameter/updated-field/branch-local composition through source,
@@ -220,8 +223,29 @@ from stale parent values, including generated/cancelled zero guards. The
 [persistent-control witness](../reference/nuis-native-state-control-exit-argument-print-v1.md)
 now retains both float and i64 fields across callbacks, with independent input
 preflight, dual-decoy and tail-fault controls plus early-break source-free delivery.
-Independently checked in-loop control updates are next; these worktree tasks
-create no version bump.
+The [checked-control witness](../reference/nuis-native-state-checked-control-exit-argument-print-v1.md)
+now checks control production after float checks, including reordered collisions,
+wide returned values, structured observations and unchanged work/entry limits.
+The [branch-control follow-up](../reference/nuis-native-state-branch-control-exit-argument-print-v1.md)
+adds State-dependent selected returns and skipped zero-guard controls. Its shorter
+workload retains the existing helper-entry ceiling; it does not optimize away
+branch accounting. The
+[branch-helper follow-up](../reference/nuis-native-state-branch-helper-exit-argument-print-v1.md)
+adds checked leaf calls with independent print-site grants and selected-only
+effects. The [ordered-chain follow-up](../reference/nuis-native-state-branch-chain-exit-argument-print-v1.md)
+passes the first tagged return to a second checked helper in the original branch.
+The [return-gate follow-up](../reference/nuis-native-state-return-gate-exit-argument-print-v1.md)
+suppresses the second call when its actual input return is zero, without skipping
+earlier checks or loosening effect grants. The
+[result-join follow-up](../reference/nuis-native-state-return-join-exit-argument-print-v1.md)
+now preserves fresh joined values through later ordered work, with production
+admission/outlining and hygiene fixes. Selected native/reference and source-free
+delivery checks pass. The
+[selected-prefix follow-up](../reference/nuis-native-state-return-prefix-exit-argument-print-v1.md)
+adds guarded local computations/checks with isolated arm scope. Selected native
+and source-free delivery checks pass, including poisoned unused prefixes.
+Explicitly authorized prefix print statements are the next gate.
+These worktree tasks create no version bump.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

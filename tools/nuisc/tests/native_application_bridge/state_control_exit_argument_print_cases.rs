@@ -140,6 +140,18 @@ impl Case {
         previous: Option<State>,
         native: bool,
     ) -> Result<(State, Vec<i64>), Vec<i64>> {
+        self.execute_control(
+            previous,
+            native,
+            |control, _, _| Ok(control.wrapping_add(1)),
+        )
+    }
+    pub fn execute_control(
+        self,
+        previous: Option<State>,
+        native: bool,
+        mut advance: impl FnMut(i64, i64, &mut Vec<i64>) -> Result<i64, ()>,
+    ) -> Result<(State, Vec<i64>), Vec<i64>> {
         let args = self.arguments;
         let mut state = previous.unwrap_or(self.initial());
         let mut trace = vec![if previous.is_some() { 91 } else { 90 }, 70];
@@ -185,8 +197,15 @@ impl Case {
                 child.base.guards[3] = 1;
                 match child.execute(Some(state[0]), native) {
                     Ok((total, child_trace)) => {
-                        trace.extend_from_slice(&child_trace[2..child_trace.len() - 1]);
-                        state = [total, state[1].wrapping_add(1)];
+                        // Control production follows the float check but precedes record completion.
+                        assert_eq!(child_trace[child_trace.len() - 2], 75);
+                        trace.extend_from_slice(&child_trace[2..child_trace.len() - 2]);
+                        let control = match advance(state[1], offset, &mut trace) {
+                            Ok(control) => control,
+                            Err(()) => return Err(trace),
+                        };
+                        trace.push(75);
+                        state = [total, control];
                         code = args.child.base.right;
                     }
                     Err(child_trace) => {

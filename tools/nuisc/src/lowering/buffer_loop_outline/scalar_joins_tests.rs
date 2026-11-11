@@ -18,7 +18,10 @@ fn source_join_normalization_is_idempotent_and_keeps_strict_write_admission() {
     )
     .unwrap();
     let layouts = control_values::layouts(&module);
-    assert!(!scalar_helpers::collect_iteration_calls(&module, &layouts).contains_key("choose"));
+    // The iteration profile now admits the paired source join directly, but
+    // its print still excludes it from the pure catalog before normalization.
+    assert!(scalar_helpers::collect_iteration_calls(&module, &layouts).contains_key("choose"));
+    assert!(!scalar_helpers::collect_with_layouts(&module, &layouts).contains_key("choose"));
     let values = control_values::TypedLayouts::collect(&module);
     let catalog = scalar_helpers::collect_capture_values(&module, &values);
     let mut names = module.functions.iter().map(|f| f.name.clone()).collect();

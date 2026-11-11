@@ -118,8 +118,29 @@ reads, derived-zero failures and accepted-State backedges at unchanged quotas.
 The [persistent-control witness](reference/nuis-native-state-control-exit-argument-print-v1.md)
 now publishes a float and i64 control together, preserving accepted fields through
 rejections/faults and source-free restoration without changing one-word predecessors.
-Next make **the in-loop control update independently fallible**, retaining ordered
-partial-work failure and complete State publication.
+The [checked-control witness](reference/nuis-native-state-checked-control-exit-argument-print-v1.md)
+now separates float-update checks from control production, retaining exact failure
+prefixes and complete accepted State without widening quotas.
+The [branch-control witness](reference/nuis-native-state-branch-control-exit-argument-print-v1.md)
+now selects checked returns using current i64 State, including wrapping branch
+changes and skipped zero guards. The
+[branch-helper witness](reference/nuis-native-state-branch-helper-exit-argument-print-v1.md)
+adds independently checked, explicitly authorized leaf effects inside those
+branches. The [ordered-chain witness](reference/nuis-native-state-branch-chain-exit-argument-print-v1.md)
+passes a tagged return into a second helper without reselecting the branch.
+The [return-gate witness](reference/nuis-native-state-return-gate-exit-argument-print-v1.md)
+now lets the actual first return suppress the second call, including poisoned
+skipped checks and full-width zero tests.
+The [result-join follow-up](reference/nuis-native-state-return-join-exit-argument-print-v1.md)
+now carries a selected result into later computation, prints and checks, fixing
+iteration admission and colliding branch-local identities in production lowering.
+Selected native/reference and source-free delivery checks pass.
+The [selected-prefix follow-up](reference/nuis-native-state-return-prefix-exit-argument-print-v1.md)
+adds straight typed local computations and checks inside guarded result arms.
+Selected native/reference and source-free delivery checks pass, including
+independently poisoned unused prefixes.
+Next **admit explicitly authorized i64 prints inside selected prefixes**,
+retaining lexical isolation, failure priority and complete publication.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

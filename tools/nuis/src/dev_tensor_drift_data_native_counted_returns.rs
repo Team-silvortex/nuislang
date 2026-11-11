@@ -19,9 +19,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-counted-return-admission",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
         required_patterns: &[
+            "use control_block::validate_block;",
             "mod control_body;",
             "use control_body::validate_body;",
-            "if returned",
         ],
     },
     DevTensorDriftCheckSpec {

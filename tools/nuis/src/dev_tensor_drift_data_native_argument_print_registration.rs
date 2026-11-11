@@ -26,8 +26,16 @@ mod parent_bound_argument_print;
 mod parent_reentry_argument_print;
 #[path = "dev_tensor_drift_data_native_state_bound_argument_print.rs"]
 mod state_bound_argument_print;
+#[path = "dev_tensor_drift_data_native_state_branch_chain_exit_argument_print.rs"]
+mod state_branch_chain_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_branch_control_exit_argument_print.rs"]
+mod state_branch_control_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_branch_helper_exit_argument_print.rs"]
+mod state_branch_helper_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_break_argument_print.rs"]
 mod state_break_argument_print;
+#[path = "dev_tensor_drift_data_native_state_checked_control_exit_argument_print.rs"]
+mod state_checked_control_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_continue_argument_print.rs"]
 mod state_continue_argument_print;
 #[path = "dev_tensor_drift_data_native_state_control_exit_argument_print.rs"]
@@ -48,6 +56,12 @@ mod state_parameter_exit_argument_print;
 mod state_predicate_argument_print;
 #[path = "dev_tensor_drift_data_native_state_record_parameter_exit_argument_print.rs"]
 mod state_record_parameter_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_gate_exit_argument_print.rs"]
+mod state_return_gate_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_join_exit_argument_print.rs"]
+mod state_return_join_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_prefix_exit_argument_print.rs"]
+mod state_return_prefix_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_short_circuit_argument_print.rs"]
 mod state_short_circuit_argument_print;
 
@@ -107,3 +121,24 @@ pub(super) const STATE_RECORD_PARAMETER_EXIT_ARGUMENT_PRINT: &[DevTensorDriftChe
 
 pub(super) const STATE_CONTROL_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
     state_control_exit_argument_print::CHECKS;
+
+pub(super) const STATE_CHECKED_CONTROL_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_checked_control_exit_argument_print::CHECKS;
+
+pub(super) const STATE_BRANCH_CONTROL_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_branch_control_exit_argument_print::CHECKS;
+
+pub(super) const STATE_BRANCH_HELPER_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_branch_helper_exit_argument_print::CHECKS;
+
+pub(super) const STATE_BRANCH_CHAIN_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_branch_chain_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_GATE_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_gate_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_JOIN_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_join_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_PREFIX_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_prefix_exit_argument_print::CHECKS;

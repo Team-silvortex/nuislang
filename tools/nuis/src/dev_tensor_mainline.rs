@@ -206,3 +206,7 @@ fn dependency_paths(plan: &MainlinePlan, root: &str) -> BTreeMap<String, Vec<Str
 #[cfg(test)]
 #[path = "dev_tensor_mainline_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "dev_tensor_mainline_checkpoint_tests.rs"]
+mod checkpoint_tests;

@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "scalar_joins_iteration.rs"]
+pub(super) mod iteration;
+
 #[path = "scalar_joins_prefix.rs"]
 pub(super) mod prefixed;
 

@@ -6,6 +6,12 @@ use super::*;
 
 #[path = "guarded_scalar_join.rs"]
 mod guarded_scalar_join;
+#[path = "state_branch_chain_exit_argument_print.rs"]
+mod state_branch_chain_exit_argument_print;
+#[path = "state_branch_control_exit_argument_print.rs"]
+mod state_branch_control_exit_argument_print;
+#[path = "state_branch_helper_exit_argument_print.rs"]
+mod state_branch_helper_exit_argument_print;
 
 #[path = "computed_scalar_join.rs"]
 mod computed_scalar_join;
@@ -883,5 +889,16 @@ mod i64_xor_argument_print_epoch;
 mod local_scalar_argument_print;
 #[path = "parent_reentry_argument_print.rs"]
 mod parent_reentry_argument_print;
+#[path = "state_checked_control_exit_argument_print.rs"]
+mod state_checked_control_exit_argument_print;
 #[path = "state_control_exit_argument_print.rs"]
 mod state_control_exit_argument_print;
+
+#[path = "state_return_gate_exit_argument_print.rs"]
+mod state_return_gate_exit_argument_print;
+
+#[path = "state_return_join_exit_argument_print.rs"]
+mod state_return_join_exit_argument_print;
+
+#[path = "state_return_prefix_exit_argument_print.rs"]
+mod state_return_prefix_exit_argument_print;

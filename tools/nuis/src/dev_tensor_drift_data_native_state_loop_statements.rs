@@ -15,7 +15,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "native-state-loop-statements-profile-authority-forwarding",
-        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers.rs",
+        path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_helpers/control_block.rs",
         required_patterns: &[
             "Profile::Pure => validation::LiteralPrints::Reject",
             "Profile::IterationPrints => validation::LiteralPrints::Scalars",

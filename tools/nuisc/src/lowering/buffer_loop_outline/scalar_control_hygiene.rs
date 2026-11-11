@@ -39,17 +39,7 @@ fn rename_block(
         for stmt in body {
             match stmt {
                 NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
-                    rename_expr(value, &visible);
-                    // Normalized loop writes update an existing binding. Only a
-                    // declaration creates an identity; its initializer sees the old scope.
-                    let replacement = visible.entry(name.clone()).or_insert_with(|| {
-                        if collisions.contains(name) {
-                            fresh_name("__nuis_scalar_local", reserved)
-                        } else {
-                            name.clone()
-                        }
-                    });
-                    *name = replacement.clone();
+                    rename_binding(name, value, &mut visible, collisions, reserved);
                 }
                 NirStmt::If {
                     condition,
@@ -57,6 +47,11 @@ fn rename_block(
                     else_body,
                 } => {
                     rename_expr(condition, &visible);
+                    // An admitted paired declaration creates one identity for
+                    // both arms and the suffix, not two arm-private identities.
+                    if rename_join(then_body, else_body, &mut visible, collisions, reserved) {
+                        continue;
+                    }
                     pending.push((else_body, visible.clone()));
                     pending.push((then_body, visible.clone()));
                 }
@@ -72,6 +67,82 @@ fn rename_block(
             }
         }
     }
+}
+
+fn rename_join(
+    then_body: &mut [NirStmt],
+    else_body: &mut [NirStmt],
+    visible: &mut BTreeMap<String, String>,
+    collisions: &BTreeSet<String>,
+    reserved: &mut BTreeSet<String>,
+) -> bool {
+    let [yes_prefix @ .., NirStmt::Let {
+        name,
+        ty: Some(ty),
+        value: yes,
+    }] = then_body
+    else {
+        return false;
+    };
+    let [no_prefix @ .., NirStmt::Let {
+        name: other,
+        ty: Some(other_ty),
+        value: no,
+    }] = else_body
+    else {
+        return false;
+    };
+    if name != other
+        || ty != other_ty
+        || visible.contains_key(name)
+        || yes_prefix
+            .iter()
+            .chain(no_prefix.iter())
+            .any(|s| !matches!(s, NirStmt::Let { .. } | NirStmt::Const { .. }))
+    {
+        return false;
+    }
+    for (prefix, result) in [(yes_prefix, yes), (no_prefix, no)] {
+        let mut inner = visible.clone();
+        for stmt in prefix {
+            let (name, value) = match stmt {
+                NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                    (name, value)
+                }
+                _ => unreachable!("validated straight prefix"),
+            };
+            rename_binding(name, value, &mut inner, collisions, reserved);
+        }
+        rename_expr(result, &inner);
+    }
+    let replacement = if collisions.contains(name) {
+        fresh_name("__nuis_scalar_local", reserved)
+    } else {
+        name.clone()
+    };
+    visible.insert(name.clone(), replacement.clone());
+    *name = replacement.clone();
+    *other = replacement;
+    true
+}
+
+fn rename_binding(
+    name: &mut String,
+    value: &mut NirExpr,
+    visible: &mut BTreeMap<String, String>,
+    collisions: &BTreeSet<String>,
+    reserved: &mut BTreeSet<String>,
+) {
+    rename_expr(value, visible);
+    // Loop writes retain identity; a fresh initializer sees the preceding scope.
+    let replacement = visible.entry(name.clone()).or_insert_with(|| {
+        if collisions.contains(name) {
+            fresh_name("__nuis_scalar_local", reserved)
+        } else {
+            name.clone()
+        }
+    });
+    *name = replacement.clone();
 }
 
 fn rename_expr(expr: &mut NirExpr, visible: &BTreeMap<String, String>) {

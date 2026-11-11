@@ -74,6 +74,38 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
         let mut output = Vec::new();
         let mut stmts = body.into_iter();
         while let Some(stmt) = stmts.next() {
+            if let Some(join) = scalar_joins::iteration::declaration(
+                &stmt,
+                &scope,
+                stmts.as_slice(),
+                self.catalog,
+                self.layouts,
+            ) {
+                let value = self.joined_value(&join, &scope);
+                scope.insert(join.name.to_owned(), join.ty.clone());
+                output.push(NirStmt::Let {
+                    name: join.name.to_owned(),
+                    ty: Some(join.ty.clone()),
+                    value,
+                });
+                continue;
+            }
+            if let Some(join) = scalar_joins::iteration::prefixed_declaration(
+                &stmt,
+                &scope,
+                stmts.as_slice(),
+                self.catalog,
+                self.layouts,
+            ) {
+                let value = self.prefixed_joined_value(&join, &scope);
+                scope.insert(join.name.to_owned(), join.ty.clone());
+                output.push(NirStmt::Let {
+                    name: join.name.to_owned(),
+                    ty: Some(join.ty.clone()),
+                    value,
+                });
+                continue;
+            }
             match stmt {
                 NirStmt::Let {
                     ref name,
@@ -193,6 +225,64 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             continuation.expect("validated fallthrough continuation"),
         )));
         output
+    }
+
+    fn joined_value(&mut self, join: &scalar_joins::Declaration<'_>, scope: &Scope) -> NirExpr {
+        self.joined_body(
+            join.ty,
+            join.condition,
+            vec![NirStmt::Return(Some(join.yes.clone()))],
+            vec![NirStmt::Return(Some(join.no.clone()))],
+            scope,
+        )
+    }
+
+    fn prefixed_joined_value(
+        &mut self,
+        join: &scalar_joins::prefixed::Declaration<'_>,
+        scope: &Scope,
+    ) -> NirExpr {
+        let returning = |source: &[NirStmt]| {
+            let mut body = source.to_vec();
+            let NirStmt::Let { value, .. } = body.pop().expect("admitted join destination") else {
+                unreachable!("admitted typed join destination");
+            };
+            body.push(NirStmt::Return(Some(value)));
+            body
+        };
+        self.joined_body(
+            join.ty,
+            join.condition,
+            returning(join.yes),
+            returning(join.no),
+            scope,
+        )
+    }
+
+    fn joined_body(
+        &mut self,
+        ty: &NirTypeRef,
+        condition: &NirExpr,
+        then_body: Vec<NirStmt>,
+        else_body: Vec<NirStmt>,
+        scope: &Scope,
+    ) -> NirExpr {
+        // Build a value-returning boundary before resuming the owner's suffix.
+        // The ordinary scalar control builder guards calls, rather than eagerly
+        // evaluating both operands and selecting after their effects occurred.
+        let owner_result = std::mem::replace(&mut self.result, ty.clone());
+        let body = self.block(
+            vec![NirStmt::If {
+                condition: condition.clone(),
+                then_body,
+                else_body,
+            }],
+            scope.clone(),
+            None,
+        );
+        let value = self.function("__nuis_scalar_value_join", body, scope, false);
+        self.result = owner_result;
+        value
     }
 
     fn function(
