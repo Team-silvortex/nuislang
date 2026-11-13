@@ -20,7 +20,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
             "ty == scalar_type(\"bool\")",
             "record_root && bool_field(type_name, name)",
-            "(lhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
+            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
             "logical_argument(callee, index, lazy_rhs)",
             "let mut work = 4096usize",
             "let mut logical_edges = 32usize",

@@ -1,0 +1,41 @@
+mod cpu Main {
+    struct State { total: f64, control: i64 }
+    @noinline fn left(value: bool, guard: i64) -> bool {
+        print(20); let checked = 0 / guard; print(21); return value;
+    }
+    @noinline fn right(value: bool, guard: i64) -> bool {
+        print(22); let checked = 0 / guard; print(23); return value;
+    }
+    @noinline fn advance(value: i64, outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        let joined: bool = if outer {
+            print(10);
+            let local: bool = (left_gate && left(left_value, left_guard)) == (right_gate || right(right_value, right_guard));
+            print(30); let checked = 0 / after_guard;
+            local
+        } else { print(11); false };
+        let delta: i64 = if joined { let selected = 1; selected } else { let selected = 2; selected };
+        return State { total: 0.0, control: value + delta };
+    }
+    @noinline fn work(seed: State, outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        let mut total = seed.total;
+        let mut control = seed.control;
+        let mut index = 0;
+        while index < 1 {
+            total = -(-total);
+            control = control + 0;
+            let next = advance(control, outer, left_gate, right_gate, left_value, right_value, left_guard, right_guard, after_guard);
+            total = next.total;
+            control = next.control;
+            index = index + 1;
+        }
+        return State { total: total, control: control };
+    }
+    fn start(outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        return work(State { total: 0.0, control: 0 }, outer, left_gate, right_gate, left_value, right_value, left_guard, right_guard, after_guard);
+    }
+    fn step(state: State, outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        return work(state, outer, left_gate, right_gate, left_value, right_value, left_guard, right_guard, after_guard);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

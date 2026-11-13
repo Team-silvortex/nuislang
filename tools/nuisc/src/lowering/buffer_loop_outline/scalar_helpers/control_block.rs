@@ -1,6 +1,6 @@
 use super::*;
 
-// Only a complete, fresh paired scalar result can leave a branch scope.
+// Only a complete, fresh paired value result can leave a branch scope.
 pub(super) fn validate_block(
     body: &[NirStmt],
     locals: &mut Scope,

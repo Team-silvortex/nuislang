@@ -15,9 +15,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-logical-helper-argument-context",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
-            "(expr, depth, logical, true, false)",
-            "(lhs.as_ref(), depth + 1, computed_gate, false, lazy_rhs)",
-            "(rhs.as_ref(), depth + 1, computed_gate, false, true)",
+            "root.value,\n                root.depth,\n                root.logical,\n                true,\n                false,\n                root.eager,",
+            "lhs.as_ref(),\n                        depth + 1,\n                        computed_gate,\n                        false,\n                        lazy_rhs,\n                        eager_root,",
+            "rhs.as_ref(),\n                        depth + 1,\n                        computed_gate,\n                        false,\n                        true,\n                        eager_root,",
             "logical_argument(callee, index, lazy_rhs)",
         ],
     },

@@ -6,6 +6,40 @@ mod discarded_records;
 #[path = "scalar_joins_logical_fields.rs"]
 mod logical_fields;
 
+// Guarded value arms can synthesize two neutral records. Charge the complete
+// prefix tree before inference/cloning, using the existing neutral cost rules.
+pub(super) fn guarded_records_bounded(
+    yes: &[NirStmt],
+    no: &[NirStmt],
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    let mut pending = vec![(yes, no)];
+    let mut remaining = 4096usize;
+    while let Some((yes, no)) = pending.pop() {
+        let Some((_, ty, _)) = result(yes) else {
+            return false;
+        };
+        if !layouts.scalar(&ty.name) {
+            for _ in 0..2 {
+                if !discarded_records::neutral(ty, layouts, &mut remaining) {
+                    return false;
+                }
+            }
+        }
+        for stmt in yes.iter().chain(no) {
+            if let NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } = stmt
+            {
+                pending.push((then_body, else_body));
+            }
+        }
+    }
+    true
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(in crate::lowering::buffer_loop_outline) enum JoinKind {
     Scalars,
@@ -227,43 +261,91 @@ fn syntax(
         kind,
         JoinKind::OuterRecords | JoinKind::LogicalFields | JoinKind::Continuation
     );
-    let mut roots = vec![(condition, 0, true)];
+    let Some((roots, nested)) = prefix_roots(condition, yes, no, false, true) else {
+        return false;
+    };
+    if matches!(kind, JoinKind::LogicalFields | JoinKind::Continuation) {
+        return conditional_values::prefix::computed_record_expression_roots(roots, layouts);
+    }
+    (!require_nested || nested) && conditional_values::prefix::computed_expression_roots(roots)
+}
+
+// Pure and iteration consumers share one whole-tree budget before type inference.
+pub(super) fn prefix_roots<'a>(
+    condition: &'a NirExpr,
+    yes: &'a [NirStmt],
+    no: &'a [NirStmt],
+    prints: bool,
+    logical_initializers: bool,
+) -> Option<(Vec<(&'a NirExpr, usize, bool)>, bool)> {
+    let (roots, nested) = collect_prefix_roots(condition, yes, no, prints, logical_initializers)?;
+    Some((
+        roots
+            .into_iter()
+            .map(|root| (root.value, root.depth, root.logical))
+            .collect(),
+        nested,
+    ))
+}
+
+pub(super) fn initializer_roots<'a>(
+    condition: &'a NirExpr,
+    yes: &'a [NirStmt],
+    no: &'a [NirStmt],
+) -> Option<Vec<conditional_values::prefix::Root<'a>>> {
+    collect_prefix_roots(condition, yes, no, true, true).map(|(roots, _)| roots)
+}
+
+fn collect_prefix_roots<'a>(
+    condition: &'a NirExpr,
+    yes: &'a [NirStmt],
+    no: &'a [NirStmt],
+    prints: bool,
+    logical_initializers: bool,
+) -> Option<(Vec<conditional_values::prefix::Root<'a>>, bool)> {
+    use conditional_values::prefix::Root;
+    let root = |value, logical, eager| Root {
+        value,
+        depth: 0,
+        logical,
+        eager,
+    };
+    let mut roots = vec![root(condition, true, false)];
     let mut pending = vec![(yes, 0usize), (no, 0usize)];
     let mut remaining = 128usize;
     let mut nested = false;
     while let Some((body, depth)) = pending.pop() {
         if body.len() > 32 {
-            return false;
+            return None;
         }
         for stmt in body {
             let Some(next) = remaining.checked_sub(1) else {
-                return false;
+                return None;
             };
             remaining = next;
             match stmt {
                 NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => {
-                    roots.push((value, 0, true))
+                    roots.push(root(value, logical_initializers, true))
                 }
+                // Initializer permission must not spill into statement operands.
+                NirStmt::Print(value) if prints => roots.push(root(value, false, false)),
                 NirStmt::If {
                     condition,
                     then_body,
                     else_body,
                 } if depth < 8 => {
                     nested = true;
-                    roots.push((condition, 0, true));
+                    roots.push(root(condition, true, false));
                     pending.extend([
                         (then_body.as_slice(), depth + 1),
                         (else_body.as_slice(), depth + 1),
                     ]);
                 }
-                _ => return false,
+                _ => return None,
             }
         }
     }
-    if matches!(kind, JoinKind::LogicalFields | JoinKind::Continuation) {
-        return conditional_values::prefix::computed_record_expression_roots(roots, layouts);
-    }
-    (!require_nested || nested) && conditional_values::prefix::computed_expression_roots(roots)
+    Some((roots, nested))
 }
 
 fn local_pair<'a>(

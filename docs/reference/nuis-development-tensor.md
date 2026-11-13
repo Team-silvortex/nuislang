@@ -1,8 +1,7 @@
 # Nuis Development Tensor
 
-This file defines the repository's lightweight development-progress model.
-It answers one narrow question: `how do we describe current system progress
-without flattening everything into one vague roadmap list?`
+This lightweight model describes current system progress without flattening
+everything into one vague roadmap list.
 
 ## Model
 
@@ -42,6 +41,9 @@ Each tensor cell carries:
 
 Short rule: `architecture tells where the work lives; module tells who owns it;
 function tells what capability is being matured`.
+
+For current scope boundaries and evidence limits, see the [scope audit](nuis-development-tensor-recalibration-2026-11-13.md).
+Evidence drift blocks task-card readiness; clean anchors do not rerun tests.
 
 ## Source Structure
 
@@ -224,7 +226,8 @@ have now closed, so the `beta-0.1-foundation-hardening` milestone reopens
 bootstrap selection with finer coordinates rather than downgrading those
 historical closures.
 
-The `beta-0.1` calibration baseline is:
+The following historical `beta-0.1` baseline includes later proof annotations.
+For the current 37-cell inventory and task selection, use the scope audit above.
 
 * `standard-library/std/concurrency-task-thread-lock`: `stable/100`, required;
   recursive selected-prefix lowering and the native cancel/unlock project close

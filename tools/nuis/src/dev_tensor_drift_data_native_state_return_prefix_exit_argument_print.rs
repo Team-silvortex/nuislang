@@ -98,9 +98,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/scalar_joins_iteration.rs",
         required_patterns: &[
             "fn prefixed_declaration",
-            "prefixed::declaration(stmt, scope, suffix, catalog, layouts)?",
-            "roots.push((value, 0, false))",
-            "computed_call_expression_roots(roots, catalog).then_some(join)",
+            "prefixed::declaration_with_prints(stmt, scope, suffix, catalog, layouts)?",
+            "nested_prefix::prefix_roots(join.condition, join.yes, join.no, true, true)",
+            "computed_record_call_expression_roots(roots, catalog, layouts)",
         ],
     },
     DevTensorDriftCheckSpec {

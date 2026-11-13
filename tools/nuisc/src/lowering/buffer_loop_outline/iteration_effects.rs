@@ -16,7 +16,15 @@ impl Plan {
         let candidates = module
             .functions
             .iter()
-            .filter(|f| !pure.contains_key(&f.name) && control_loops::contains_loop(&f.body))
+            .filter(|f| {
+                !pure.contains_key(&f.name)
+                    && (control_loops::contains_loop(&f.body)
+                        || (f
+                            .return_type
+                            .as_ref()
+                            .is_some_and(|ty| layouts.contains_key(&ty.name))
+                            && f.body.iter().any(|stmt| matches!(stmt, NirStmt::If { .. }))))
+            })
             .map(|f| f.name.clone())
             .collect::<BTreeSet<_>>();
         if candidates.is_empty() {
@@ -26,8 +34,10 @@ impl Plan {
             };
         }
         let catalog = scalar_helpers::collect_iteration_calls(module, layouts);
-        // Completed dependency admission, including typed return normalization,
-        // releases callers. No provisional or pure-value authority is granted.
+        // Direct conditional record helpers need the same guarded normalization as
+        // helpers reached through loops. Completed dependency admission, not
+        // the presence of a loop, grants this isolated effectful authority.
+        // Existing standalone scalar effect/print lowering keeps its own roots.
         let roots = candidates
             .into_iter()
             .filter(|name| catalog.contains_key(name))
@@ -62,9 +72,17 @@ impl Plan {
         // using a signature snapshot taken before their private helpers existed.
         let fresh = retained.difference(&outlined.functions).cloned().collect();
         outlined.functions.extend(retained);
+        // A direct conditional root owns scalar/record joins, not loop carries.
+        // Do not send its branch-local initializers through the loop builder.
+        let loop_roots = module
+            .functions
+            .iter()
+            .filter(|f| self.roots.contains(&f.name) && control_loops::contains_loop(&f.body))
+            .map(|f| f.name.clone())
+            .collect::<BTreeSet<_>>();
         let mut return_signals = BTreeMap::new();
         for function in &mut module.functions {
-            if self.roots.contains(&function.name) {
+            if loop_roots.contains(&function.name) {
                 if let Some(plan) =
                     control_loops::returns::prepare_effects(function, layouts, &self.catalog)
                         .expect("admitted effectful counted return flow")
@@ -85,7 +103,7 @@ impl Plan {
             &mut outlined.break_controls,
             false,
             &return_signals,
-            Some(&self.roots),
+            Some(&loop_roots),
         );
         let layouts = control_values::TypedLayouts::collect(module);
         scalar_control::outline(
@@ -147,3 +165,7 @@ mod return_parent_break_tests;
 #[cfg(test)]
 #[path = "iteration_effects_return_parent_mixed_tests.rs"]
 mod return_parent_mixed_tests;
+
+#[cfg(test)]
+#[path = "iteration_effects_direct_tests.rs"]
+mod direct_tests;

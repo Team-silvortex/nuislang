@@ -27,6 +27,9 @@ use crate::{
     dev_tensor_drift_data_runtime_vulkan::DEV_TENSOR_RUNTIME_VULKAN_DRIFT_CHECKS,
 };
 
+#[path = "dev_tensor_drift_data_recalibration.rs"]
+mod recalibration;
+
 pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
     DEV_TENSOR_CORE_DRIFT_CHECKS
         .iter()
@@ -54,4 +57,5 @@ pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTens
         .chain(DEV_TENSOR_RUNTIME_MUTEX_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS.iter())
+        .chain(recalibration::CHECKS.iter())
 }

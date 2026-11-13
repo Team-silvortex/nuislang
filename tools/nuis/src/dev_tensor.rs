@@ -118,7 +118,12 @@ pub(crate) struct DevTensorSummary {
     pub(crate) coverage_stale_count: usize,
 }
 
+#[cfg(test)]
 pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
+    dev_tensor_summary_with_drift(dev_tensor_drift_summary().status)
+}
+
+pub(crate) fn dev_tensor_summary_with_drift(drift_status: &str) -> DevTensorSummary {
     let coverage = dev_tensor_coverage_summary();
     let hierarchy = dev_tensor_hierarchy_summary();
     let mut architectures = BTreeSet::new();
@@ -156,7 +161,14 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .unwrap_or_else(|| "<none>".to_owned());
     let task_card_source = mainline.source;
-    let task_card_priority_reason = mainline.reason.clone();
+    let task_card_priority_reason = if drift_status == "clean" {
+        mainline.reason.clone()
+    } else {
+        format!(
+            "{}; task card blocked by evidence drift ({drift_status})",
+            mainline.reason
+        )
+    };
     let handoff_coordinate = task_card_coordinate.clone();
     let handoff_mode = "direct";
     let task_card_lineage = validate_dev_tensor_task_card_lineage(
@@ -168,7 +180,8 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     );
     let task_card_valid = coverage.status == "clean"
         && hierarchy.validation.status == "clean"
-        && task_card_lineage.status == "clean";
+        && task_card_lineage.status == "clean"
+        && drift_status == "clean";
     let task_card_ready = mainline.status == "ready" && task_cell.is_some() && task_card_valid;
     let handoff_reason = mainline.reason.clone();
     DevTensorSummary {

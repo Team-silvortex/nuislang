@@ -17,6 +17,28 @@ pub(in crate::lowering::buffer_loop_outline) fn declaration<'a>(
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
 ) -> Option<Declaration<'a>> {
+    plan(stmt, scope, suffix, catalog, layouts, false)
+}
+
+// Pure discovery never opts into statement effects, even with an effect catalog.
+pub(super) fn declaration_with_prints<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> Option<Declaration<'a>> {
+    plan(stmt, scope, suffix, catalog, layouts, true)
+}
+
+fn plan<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+    prints: bool,
+) -> Option<Declaration<'a>> {
     let NirStmt::If {
         condition,
         then_body,
@@ -25,11 +47,53 @@ pub(in crate::lowering::buffer_loop_outline) fn declaration<'a>(
     else {
         return None;
     };
-    if then_body.is_empty()
-        || else_body.is_empty()
-        || then_body.len() > 32
-        || else_body.len() > 32
-        || (then_body.len() == 1 && else_body.len() == 1)
+    let record_result = matches!(then_body.last(), Some(NirStmt::Let { ty: Some(ty), .. }) if !layouts.scalar(&ty.name));
+    if then_body.len() == 1 && else_body.len() == 1 && (!prints || !record_result) {
+        return None;
+    }
+    let bounded = if prints {
+        let roots = super::nested_prefix::initializer_roots(condition, then_body, else_body)?;
+        conditional_values::prefix::computed_initializer_expression_roots(roots, layouts)
+    } else {
+        let (roots, _) =
+            super::nested_prefix::prefix_roots(condition, then_body, else_body, false, true)?;
+        conditional_values::prefix::computed_expression_roots(roots)
+    };
+    if !bounded {
+        return None;
+    }
+    if prints && !super::nested_prefix::guarded_records_bounded(then_body, else_body, layouts) {
+        return None;
+    }
+    pair(
+        stmt,
+        scope,
+        suffix,
+        catalog,
+        layouts,
+        prints,
+        &BTreeSet::new(),
+    )
+}
+
+fn pair<'a>(
+    stmt: &'a NirStmt,
+    scope: &Scope,
+    suffix: &[NirStmt],
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+    prints: bool,
+    blocked: &BTreeSet<String>,
+) -> Option<Declaration<'a>> {
+    let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = stmt
+    else {
+        return None;
+    };
+    if then_body.is_empty() || else_body.is_empty() || then_body.len() > 32 || else_body.len() > 32
     {
         return None;
     }
@@ -50,24 +114,18 @@ pub(in crate::lowering::buffer_loop_outline) fn declaration<'a>(
     if name != other
         || ty != other_ty
         || scope.contains_key(name)
-        || !layouts.scalar(&ty.name)
+        || blocked.contains(name)
+        || (!prints && !layouts.scalar(&ty.name))
         || !control_values::supported_type(ty, layouts)
         || !super::observed(name, suffix)?
     {
         return None;
     }
-    let mut roots = vec![(condition, 0, true)];
-    for stmt in then_body.iter().chain(else_body) {
-        let value = match stmt {
-            NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => value,
-            _ => return None,
-        };
-        roots.push((value, 0, true));
-    }
-    if !conditional_values::prefix::computed_expression_roots(roots)
-        || control_values::value_type(condition, scope, catalog, layouts)? != scalar_type("bool")
-        || !arm(then_body, name, scope, catalog, layouts)
-        || !arm(else_body, name, scope, catalog, layouts)
+    let mut blocked = blocked.clone();
+    blocked.insert(name.clone());
+    if control_values::value_type(condition, scope, catalog, layouts)? != scalar_type("bool")
+        || !arm(then_body, name, scope, catalog, layouts, prints, &blocked)
+        || !arm(else_body, name, scope, catalog, layouts, prints, &blocked)
     {
         return None;
     }
@@ -86,15 +144,41 @@ fn arm(
     scope: &Scope,
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
+    prints: bool,
+    blocked: &BTreeSet<String>,
 ) -> bool {
     let mut inner = scope.clone();
     for (index, stmt) in body.iter().enumerate() {
+        if let NirStmt::Print(value) = stmt {
+            if !prints || iteration_prints::admit(value, &inner, catalog, layouts).is_none() {
+                return false;
+            }
+            continue;
+        }
+        if prints && matches!(stmt, NirStmt::If { .. }) {
+            let Some(join) = pair(
+                stmt,
+                &inner,
+                &body[index + 1..],
+                catalog,
+                layouts,
+                prints,
+                blocked,
+            ) else {
+                return false;
+            };
+            inner.insert(join.name.to_owned(), join.ty.clone());
+            continue;
+        }
         let (name, declared, value) = match stmt {
             NirStmt::Let { name, ty, value } => (name, ty.as_ref(), value),
             NirStmt::Const { name, ty, value } => (name, Some(ty), value),
             _ => return false,
         };
-        if inner.contains_key(name) || (index + 1 < body.len() && name == destination) {
+        if inner.contains_key(name)
+            || (index + 1 < body.len() && name == destination)
+            || (blocked.contains(name) && name != destination)
+        {
             return false;
         }
         let Some(ty) = control_values::value_type(value, &inner, catalog, layouts) else {

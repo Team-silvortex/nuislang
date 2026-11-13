@@ -1,6 +1,150 @@
 use super::*;
 
 #[test]
+fn dev_tensor_state_return_nested_exit_retains_complete_print_lineage() {
+    use sha2::{Digest, Sha256};
+    let cell = DEV_TENSOR_CELLS
+        .iter()
+        .find(|cell| {
+            cell.architecture == "standard-library"
+                && cell.module == "ns-nova"
+                && cell.function == "persistent-application-session"
+        })
+        .unwrap();
+    for (field, value, checkpoint, hash) in [
+        (
+            "evidence",
+            cell.evidence,
+            "Previous state-return-print-exit checkpoint",
+            "2a8999d4f2cce77acf6adbe12492e15f9d834a07c75df2a802109d1da25ae38f",
+        ),
+        (
+            "next_step",
+            cell.next_step,
+            "Previous state-return-print-exit task checkpoint",
+            "105e8cb26cbf416fc97e6547112d1fb8f910ecd040a504960995487a72d2f9f8",
+        ),
+        (
+            "blocker",
+            cell.blocker,
+            "Previous state-return-print-exit blocker checkpoint",
+            "e926ca4fea7a9f97466c58b8c06682ed4dd7759aeeba00d8ac7f3db8f367ccc5",
+        ),
+        (
+            "next_action",
+            cell.next_action,
+            "Previous state-return-print-exit action checkpoint",
+            "e1882cf69649fea94dde4f3394b939c075630d8ead24b79c9b8380ed7a79f737",
+        ),
+        (
+            "validation_command",
+            cell.validation_command,
+            "Previous state-return-print-exit validation checkpoint",
+            "7bc4d14d8a0f4a81e07a8200b03c9d82062d718e0f57a19588cb5a6273b74326",
+        ),
+        (
+            "expected_artifact",
+            cell.expected_artifact,
+            "Previous state-return-print-exit artifact checkpoint",
+            "f4bdeee321f5612ce949fe9a162ee1c8780aaca3e8b4d7d262585c85a45ff6f6",
+        ),
+    ] {
+        let marker = format!("{checkpoint}: SHA-256 {hash}\n");
+        let (_, predecessor) = value
+            .split_once(&marker)
+            .unwrap_or_else(|| panic!("missing {field} checkpoint"));
+        let predecessor = if field == "validation_command" {
+            let delimiter = "NUIS_STATE_RETURN_NESTED_EXIT_20261111_PRINT_HISTORY";
+            predecessor
+                .strip_prefix(&format!(": <<'{delimiter}'\n"))
+                .unwrap()
+                .split_once(&format!("\n{delimiter}"))
+                .unwrap()
+                .0
+        } else {
+            predecessor
+        };
+        assert_eq!(
+            format!("{:x}", Sha256::digest(predecessor.as_bytes())),
+            hash,
+            "changed complete {field} predecessor"
+        );
+    }
+}
+
+#[test]
+fn dev_tensor_state_return_print_exit_retains_complete_prefix_lineage() {
+    use sha2::{Digest, Sha256};
+    let cell = DEV_TENSOR_CELLS
+        .iter()
+        .find(|cell| {
+            cell.architecture == "standard-library"
+                && cell.module == "ns-nova"
+                && cell.function == "persistent-application-session"
+        })
+        .unwrap();
+    for (field, value, checkpoint, hash) in [
+        (
+            "evidence",
+            cell.evidence,
+            "Previous state-return-prefix-exit checkpoint",
+            "bf7a468a572a7c011d15ae294eeca3d646cc4069b307d5f1f908f3d606652aba",
+        ),
+        (
+            "next_step",
+            cell.next_step,
+            "Previous state-return-prefix-exit task checkpoint",
+            "4d8573be3d1ade4c9c689c10e0af1a3bb5b1ed9c04cea82ec9e959d80062ba61",
+        ),
+        (
+            "blocker",
+            cell.blocker,
+            "Previous state-return-prefix-exit blocker checkpoint",
+            "4cfd27a1a17b17cb8e4fc0ceb5e9e9e843ad6ee73908e3c7bc9e6aa3215d68ea",
+        ),
+        (
+            "next_action",
+            cell.next_action,
+            "Previous state-return-prefix-exit action checkpoint",
+            "581bd02a8cf51970b4820616f2c88f84643d994898fcc1f7a5c154a8ade3d04c",
+        ),
+        (
+            "validation_command",
+            cell.validation_command,
+            "Previous state-return-prefix-exit validation checkpoint",
+            "77738a36bc46acedd127683895539eeb9045f6256753ed3af2a16892065c58b4",
+        ),
+        (
+            "expected_artifact",
+            cell.expected_artifact,
+            "Previous state-return-prefix-exit artifact checkpoint",
+            "96b6ad707f1cca34a39a29c70c69d53d094a04f24a2803a0e25eb23603d0211e",
+        ),
+    ] {
+        let marker = format!("{checkpoint}: SHA-256 {hash}\n");
+        let (_, predecessor) = value
+            .split_once(&marker)
+            .unwrap_or_else(|| panic!("missing {field} checkpoint"));
+        let predecessor = if field == "validation_command" {
+            let delimiter = "NUIS_STATE_RETURN_PRINT_EXIT_20261111_PREFIX_HISTORY";
+            predecessor
+                .strip_prefix(&format!(": <<'{delimiter}'\n"))
+                .unwrap()
+                .split_once(&format!("\n{delimiter}"))
+                .unwrap()
+                .0
+        } else {
+            predecessor
+        };
+        assert_eq!(
+            format!("{:x}", Sha256::digest(predecessor.as_bytes())),
+            hash,
+            "changed complete {field} predecessor"
+        );
+    }
+}
+
+#[test]
 fn dev_tensor_state_return_prefix_exit_retains_complete_join_lineage() {
     use sha2::{Digest, Sha256};
     let cell = DEV_TENSOR_CELLS

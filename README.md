@@ -92,8 +92,9 @@ and the actual resident collector remain unimplemented. Existing caches are unch
 ## Current Mainline
 
 The application goal is `standard-library/ns-nova/interactive-image-workflow`.
-The selected prerequisite remains
-`standard-library/ns-nova/persistent-application-session`; consult
+The selected prerequisite is
+`compiler-toolchain/nuisc/native-resource-session-callbacks`; native frame dispatch
+and persistent application closure remain its dependent gates. Consult
 `nuis dev-tensor --json` for its live evidence, next action and validation command.
 
 The image showcase exercises real Metal image processing and explicit stateful

@@ -18,6 +18,10 @@ measured optimization and module-by-module compiler migration serve that goal.
 The [beta-0.10 migration entry](versioning/nuis-beta-0.10.0-self-hosting-entry.md)
 is a phase anchor, not completed self-hosting.
 
+The [direct effectful record-return follow-up](reference/nuis-native-direct-effectful-records-v1.md)
+removes the loop-wrapper requirement from the verified conditional helper path.
+It keeps pure discovery and backend effect grants separate.
+
 ## Selected Prerequisite
 
 Run from the repository root:
@@ -28,7 +32,12 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- dev-tensor --json
 
 The goal is `standard-library/ns-nova/interactive-image-workflow`.
 Its selected prerequisite is
-`standard-library/ns-nova/persistent-application-session`, active/99 at this audit.
+`compiler-toolchain/nuisc/native-resource-session-callbacks`, early/0 at the
+[2026-11-13 recalibration](reference/nuis-development-tensor-recalibration-2026-11-13.md).
+The dependency chain is resource callbacks -> native CPU frame dispatch ->
+`standard-library/ns-nova/persistent-application-session` (active/60) -> image workflow.
+The verified bounded scalar/record profile is separately stable/100, not a claim
+that all CPU lowering or the application is complete.
 The [declared dependency plan](reference/nuis-development-tensor.mainline.toml)
 selects that prerequisite, not the globally lowest percentage. Correctness
 regressions may interrupt it; documentation maintenance does not advance it.
@@ -139,8 +148,36 @@ The [selected-prefix follow-up](reference/nuis-native-state-return-prefix-exit-a
 adds straight typed local computations and checks inside guarded result arms.
 Selected native/reference and source-free delivery checks pass, including
 independently poisoned unused prefixes.
-Next **admit explicitly authorized i64 prints inside selected prefixes**,
-retaining lexical isolation, failure priority and complete publication.
+The [prefix-print follow-up](reference/nuis-native-state-return-print-exit-argument-print-v1.md)
+adds explicit i64 print statements and independent print-operand checks inside
+selected prefixes. Selected native/reference and source-free delivery checks pass, including
+independent unused print-operand poisons and precise failure prefixes.
+The [nested-prefix follow-up](reference/nuis-native-state-return-nested-exit-argument-print-v1.md)
+adds recursively scoped scalar result joins under shared whole-tree budgets.
+Selected native/reference and source-free delivery checks pass, including
+shared-budget boundaries and independently poisoned unused paths.
+The [record-prefix follow-up](reference/nuis-native-state-return-record-exit-argument-print-v1.md)
+adds exact owned record results and field consumers, with a shared synthetic
+record budget. Selected native/reference and source-free delivery checks pass,
+including reached failures in unprojected fields.
+The [logical-field follow-up](reference/nuis-native-state-return-logical-exit-argument-print-v1.md)
+admits short-circuit bool fields through shared guarded lowering. Selected
+native/reference checks and 160 fresh/cache/source-free program runs pass;
+constructor order and effects in unused fields retain regression coverage.
+The [local-initializer follow-up](reference/nuis-native-state-return-local-exit-argument-print-v1.md)
+admits fresh let/const bool short-circuit roots while keeping print operands
+separate. Selected native/reference and source-free delivery checks pass,
+including unused let/const effects; new and predecessor sources complete 320
+program runs together.
+The [eager-operand follow-up](reference/nuis-native-state-return-eager-exit-argument-print-v1.md)
+admits equality/inequality/XOR around local short-circuit subtrees without
+opening predicate, field or argument roots. Paired-effect native/reference
+checks pass through the state-loop route. New and preceding delivery sources
+complete 320 fresh/cache/source-free program runs.
+The direct-entry follow-up above closes that reproduced non-loop helper boundary.
+Those scalar proofs remain the regression baseline. The recalibrated next gate is
+**native resource-session callbacks**; further scalar combinations become blocking
+work only when a concrete application witness requires them.
 General effects, resources, references and arbitrary
 outer writes remain outside these bounded CPU admissions.
 

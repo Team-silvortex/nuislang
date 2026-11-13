@@ -6,7 +6,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
             "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
-            "let eager_bool = computed_bool_operands",
+            "let eager_bool = (computed_bool_operands || eager_root)",
+            "eager: false",
             "&& logical_root",
             "computed_expression_roots(pending)",
             "roots(pending, true)",
@@ -16,8 +17,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "if depth >= 64 || work == 0",
             "!logical_root",
             "depth != 0",
-            "(lhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
-            "(rhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs)",
+            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "rhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
         ],
     },
     DevTensorDriftCheckSpec {

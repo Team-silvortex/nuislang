@@ -1,5 +1,12 @@
 use super::*;
 
+pub(in crate::lowering::buffer_loop_outline) struct Root<'a> {
+    pub value: &'a NirExpr,
+    pub depth: usize,
+    pub logical: bool,
+    pub eager: bool,
+}
+
 // Bound source/derived pure prefixes before recursive kind inference or cloning.
 // This is not general multi-binding, effectful or outer-state branch lowering.
 pub(in crate::lowering::buffer_loop_outline) fn bounded(body: &[NirStmt]) -> bool {
@@ -76,11 +83,36 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_call_expression_roots(
     pending: Vec<(&NirExpr, usize, bool)>,
     catalog: &ScalarHelpers,
 ) -> bool {
+    call_roots(pending, catalog, |_, _| false)
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn computed_record_call_expression_roots(
+    pending: Vec<(&NirExpr, usize, bool)>,
+    catalog: &ScalarHelpers,
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    call_roots(pending, catalog, |record, field| {
+        boolean_field(layouts, record, field)
+    })
+}
+
+fn boolean_field(layouts: &impl control_values::ValueLayouts, record: &str, field: &str) -> bool {
+    layouts
+        .fields(record)
+        .and_then(|mut fields| fields.find(|(name, _)| *name == field))
+        .is_some_and(|(_, ty)| ty == scalar_type("bool"))
+}
+
+fn call_roots(
+    pending: Vec<(&NirExpr, usize, bool)>,
+    catalog: &ScalarHelpers,
+    bool_field: impl Fn(&str, &str) -> bool,
+) -> bool {
     roots_with_fields(
         pending,
         true,
         true,
-        |_, _| false,
+        bool_field,
         |callee, index, lazy_rhs| {
             // Auxiliary calls inherit argument shape only below an authorized RHS.
             scalar_helpers::pure_scalar_signature(callee, catalog)
@@ -102,12 +134,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_record_expression_roots
         pending,
         true,
         false,
-        |record, field| {
-            layouts
-                .fields(record)
-                .and_then(|mut fields| fields.find(|(name, _)| *name == field))
-                .is_some_and(|(_, ty)| ty == scalar_type("bool"))
-        },
+        |record, field| boolean_field(layouts, record, field),
         |_, _, _| false,
     )
 }
@@ -119,13 +146,59 @@ fn roots_with_fields(
     bool_field: impl Fn(&str, &str) -> bool,
     logical_argument: impl Fn(&str, usize, bool) -> bool,
 ) -> bool {
+    roots_with_permissions(
+        pending
+            .into_iter()
+            .map(|(value, depth, logical)| Root {
+                value,
+                depth,
+                logical,
+                eager: false,
+            })
+            .collect(),
+        computed_gate,
+        computed_bool_operands,
+        bool_field,
+        logical_argument,
+    )
+}
+
+pub(in crate::lowering::buffer_loop_outline) fn computed_initializer_expression_roots(
+    pending: Vec<Root<'_>>,
+    layouts: &impl control_values::ValueLayouts,
+) -> bool {
+    roots_with_permissions(
+        pending,
+        true,
+        false,
+        |record, field| boolean_field(layouts, record, field),
+        |_, _, _| false,
+    )
+}
+
+fn roots_with_permissions(
+    pending: Vec<Root<'_>>,
+    computed_gate: bool,
+    computed_bool_operands: bool,
+    bool_field: impl Fn(&str, &str) -> bool,
+    logical_argument: impl Fn(&str, usize, bool) -> bool,
+) -> bool {
     let mut pending = pending
         .into_iter()
-        .map(|(expr, depth, logical)| (expr, depth, logical, true, false))
+        .map(|root| {
+            (
+                root.value,
+                root.depth,
+                root.logical,
+                true,
+                false,
+                root.eager,
+            )
+        })
         .collect::<Vec<_>>();
     let mut work = 4096usize;
     let mut logical_edges = 32usize;
-    while let Some((expr, depth, logical_root, record_root, lazy_rhs)) = pending.pop() {
+    while let Some((expr, depth, logical_root, record_root, lazy_rhs, eager_root)) = pending.pop() {
         if depth >= 64 || work == 0 {
             return false;
         }
@@ -154,8 +227,22 @@ fn roots_with_fields(
                     logical_edges -= 1;
                 }
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, computed_gate, false, lazy_rhs),
-                    (rhs.as_ref(), depth + 1, computed_gate, false, true),
+                    (
+                        lhs.as_ref(),
+                        depth + 1,
+                        computed_gate,
+                        false,
+                        lazy_rhs,
+                        eager_root,
+                    ),
+                    (
+                        rhs.as_ref(),
+                        depth + 1,
+                        computed_gate,
+                        false,
+                        true,
+                        eager_root,
+                    ),
                 ]);
             }
             NirExpr::Binary { op, lhs, rhs } => {
@@ -163,12 +250,26 @@ fn roots_with_fields(
                     return false;
                 }
                 // Eager bool operators evaluate both operands without authorizing a lazy RHS.
-                let eager_bool = computed_bool_operands
+                let eager_bool = (computed_bool_operands || eager_root)
                     && logical_root
                     && matches!(op, NirBinaryOp::Eq | NirBinaryOp::Ne | NirBinaryOp::Xor);
                 pending.extend([
-                    (lhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs),
-                    (rhs.as_ref(), depth + 1, eager_bool, false, lazy_rhs),
+                    (
+                        lhs.as_ref(),
+                        depth + 1,
+                        eager_bool,
+                        false,
+                        lazy_rhs,
+                        eager_root && eager_bool,
+                    ),
+                    (
+                        rhs.as_ref(),
+                        depth + 1,
+                        eager_bool,
+                        false,
+                        lazy_rhs,
+                        eager_root && eager_bool,
+                    ),
                 ]);
             }
             NirExpr::Call { callee, args } => {
@@ -182,6 +283,7 @@ fn roots_with_fields(
                         logical_argument(callee, index, lazy_rhs),
                         false,
                         lazy_rhs,
+                        false,
                     )
                 }));
             }
@@ -198,6 +300,7 @@ fn roots_with_fields(
                         record_root && bool_field(type_name, name),
                         record_root,
                         lazy_rhs,
+                        false,
                     )
                 }));
             }
@@ -208,7 +311,7 @@ fn roots_with_fields(
             | NirExpr::UnpackF32Word(base)
             | NirExpr::PackF64Word(base)
             | NirExpr::UnpackF64Word(base) => {
-                pending.push((base.as_ref(), depth + 1, false, false, lazy_rhs))
+                pending.push((base.as_ref(), depth + 1, false, false, lazy_rhs, false))
             }
             _ => return false,
         }

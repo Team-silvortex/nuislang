@@ -56,12 +56,24 @@ mod state_parameter_exit_argument_print;
 mod state_predicate_argument_print;
 #[path = "dev_tensor_drift_data_native_state_record_parameter_exit_argument_print.rs"]
 mod state_record_parameter_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_eager_exit_argument_print.rs"]
+mod state_return_eager_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_return_gate_exit_argument_print.rs"]
 mod state_return_gate_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_return_join_exit_argument_print.rs"]
 mod state_return_join_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_local_exit_argument_print.rs"]
+mod state_return_local_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_logical_exit_argument_print.rs"]
+mod state_return_logical_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_nested_exit_argument_print.rs"]
+mod state_return_nested_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_return_prefix_exit_argument_print.rs"]
 mod state_return_prefix_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_print_exit_argument_print.rs"]
+mod state_return_print_exit_argument_print;
+#[path = "dev_tensor_drift_data_native_state_return_record_exit_argument_print.rs"]
+mod state_return_record_exit_argument_print;
 #[path = "dev_tensor_drift_data_native_state_short_circuit_argument_print.rs"]
 mod state_short_circuit_argument_print;
 
@@ -142,3 +154,27 @@ pub(super) const STATE_RETURN_JOIN_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpe
 
 pub(super) const STATE_RETURN_PREFIX_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
     state_return_prefix_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_PRINT_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_print_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_NESTED_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_nested_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_RECORD_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_record_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_LOGICAL_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_logical_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_LOCAL_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_local_exit_argument_print::CHECKS;
+
+pub(super) const STATE_RETURN_EAGER_EXIT_ARGUMENT_PRINT: &[DevTensorDriftCheckSpec] =
+    state_return_eager_exit_argument_print::CHECKS;
+
+#[path = "dev_tensor_drift_data_native_direct_effectful_records.rs"]
+mod direct_effectful_records;
+
+pub(super) const DIRECT_EFFECTFUL_RECORDS: &[DevTensorDriftCheckSpec] =
+    direct_effectful_records::CHECKS;

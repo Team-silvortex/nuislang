@@ -1,0 +1,69 @@
+mod cpu Main {
+    struct State { total: f64, control: i64 }
+    struct Payload { word: i64 }
+    struct Selected { payload: Payload, tag: i64, audit: i64 }
+
+    @noinline fn leaf(value: i64, guard: i64) -> i64 {
+        print(80); print(value);
+        let checked = 0 / guard;
+        print(81);
+        return value ^ 4294967296;
+    }
+
+    @noinline fn advance(value: i64, outer: bool, inner: bool, left_fault: i64, right_fault: i64, prefix_fault: i64, skip_fault: i64, post_fault: i64) -> Selected {
+        let joined: Selected = if outer {
+            let staged: Selected = if inner {
+                let local = leaf(value + 1, left_fault);
+                print(101); print(local);
+                Selected { payload: Payload { word: local }, tag: 34359738368, audit: 0 }
+            } else {
+                let local = leaf(value - 1, right_fault);
+                print(103); print(local);
+                Selected { payload: Payload { word: local }, tag: 68719476736, audit: 0 }
+            };
+            print(97); print(staged.payload.word);
+            let checked = 0 / prefix_fault;
+            print(98);
+            Selected { payload: Payload { word: staged.payload.word ^ staged.tag }, tag: 17179869184, audit: 0 }
+        } else {
+            let staged = value ^ 137438953472;
+            print(99); print(staged);
+            let checked = 0 / skip_fault;
+            print(100);
+            Selected { payload: Payload { word: staged }, tag: 0, audit: 0 }
+        };
+        print(95); print(joined.payload.word ^ joined.tag);
+        let checked = 0 / post_fault;
+        print(96);
+        return joined;
+    }
+
+    @noinline fn work(seed: State, outer: bool, inner: bool, trips: i64, left_fault: i64, right_fault: i64, prefix_fault: i64, skip_fault: i64, post_fault: i64) -> State {
+        print(70);
+        let mut total = seed.total;
+        let mut control = seed.control;
+        let mut index = 0;
+        while index < trips {
+            total = -(-total);
+            control = control + 0;
+            print(71);
+            let next = advance(control, outer, inner, left_fault - index, right_fault - index, prefix_fault - index, skip_fault - index, post_fault - index);
+            control = next.payload.word ^ next.tag;
+            total = -total;
+            print(72);
+            index = index + 1;
+        }
+        print(73);
+        return State { total: total, control: control };
+    }
+    fn start(initial: f64, initial_control: i64, outer: bool, inner: bool, trips: i64, left_fault: i64, right_fault: i64, prefix_fault: i64, skip_fault: i64, post_fault: i64) -> State {
+        print(90);
+        return work(State { total: initial, control: initial_control }, outer, inner, trips, left_fault, right_fault, prefix_fault, skip_fault, post_fault);
+    }
+    fn step(state: State, initial: f64, initial_control: i64, outer: bool, inner: bool, trips: i64, left_fault: i64, right_fault: i64, prefix_fault: i64, skip_fault: i64, post_fault: i64) -> State {
+        print(91);
+        return work(state, outer, inner, trips, left_fault, right_fault, prefix_fault, skip_fault, post_fault);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

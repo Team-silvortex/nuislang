@@ -4,6 +4,12 @@ use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 #[path = "dev_tensor_native_argument_lineage_tests.rs"]
 mod native_argument_lineage;
 
+#[path = "dev_tensor_native_record_lineage_tests.rs"]
+mod native_record_lineage;
+
+#[path = "dev_tensor_recalibration_tests.rs"]
+mod recalibration;
+
 #[test]
 fn dev_tensor_state_field_exit_retains_complete_grouped_lineage() {
     use sha2::{Digest, Sha256};
@@ -216,14 +222,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "standard-library/ns-nova/persistent-application-session"
+        "compiler-toolchain/nuisc/native-resource-session-callbacks"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("declared mainline goal"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "standard-library/ns-nova/persistent-application-session"
+        "compiler-toolchain/nuisc/native-resource-session-callbacks"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -264,7 +270,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "standard-library/ns-nova/persistent-application-session"
+        "compiler-toolchain/nuisc/native-resource-session-callbacks"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -653,7 +659,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: standard-library/ns-nova/persistent-application-session"
+        "weakest_bootstrap_task_card_common_ancestor_path: compiler-toolchain/nuisc/native-resource-session-callbacks"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("declared mainline goal"));

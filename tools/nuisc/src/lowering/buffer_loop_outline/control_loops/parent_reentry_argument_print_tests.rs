@@ -706,3 +706,20 @@ mod state_return_join_exit;
 
 #[path = "state_return_prefix_exit_argument_print_tests.rs"]
 mod state_return_prefix_exit;
+
+#[path = "state_return_print_exit_argument_print_tests.rs"]
+mod state_return_print_exit;
+
+#[path = "state_return_nested_exit_argument_print_tests.rs"]
+mod state_return_nested_exit;
+
+#[path = "state_return_record_exit_argument_print_tests.rs"]
+mod state_return_record_exit;
+
+#[path = "state_return_logical_exit_argument_print_tests.rs"]
+mod state_return_logical_exit;
+
+#[path = "state_return_eager_exit_argument_print_tests.rs"]
+mod state_return_eager_exit;
+#[path = "state_return_local_exit_argument_print_tests.rs"]
+mod state_return_local_exit;

@@ -31,7 +31,8 @@ pub(in crate::lowering::buffer_loop_outline) fn declaration<'a>(
 }
 
 // Reuse the shared prefix shape and sequential type proof with the completed
-// effect catalog. Initializers keep the iteration profile's non-logical shape.
+// effect catalog. Logical roots are limited to predicates, typed initializers
+// and exact bool fields; sequential type proof keeps new bindings out of scope.
 pub(in crate::lowering::buffer_loop_outline) fn prefixed_declaration<'a>(
     stmt: &'a NirStmt,
     scope: &Scope,
@@ -39,18 +40,36 @@ pub(in crate::lowering::buffer_loop_outline) fn prefixed_declaration<'a>(
     catalog: &ScalarHelpers,
     layouts: &impl control_values::ValueLayouts,
 ) -> Option<prefixed::Declaration<'a>> {
-    let join = prefixed::declaration(stmt, scope, suffix, catalog, layouts)?;
-    let mut roots = vec![(join.condition, 0, true)];
-    for stmt in join.yes.iter().chain(join.no) {
-        let value = match stmt {
-            NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => value,
-            _ => return None,
-        };
-        roots.push((value, 0, false));
-    }
-    conditional_values::prefix::computed_call_expression_roots(roots, catalog).then_some(join)
+    let join = prefixed::declaration_with_prints(stmt, scope, suffix, catalog, layouts)?;
+    let (roots, _) = nested_prefix::prefix_roots(join.condition, join.yes, join.no, true, true)?;
+    conditional_values::prefix::computed_record_call_expression_roots(roots, catalog, layouts)
+        .then_some(join)
 }
 
 #[cfg(test)]
 #[path = "scalar_joins_iteration_prefix_tests.rs"]
 mod prefix_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_iteration_print_tests.rs"]
+mod print_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_iteration_nested_tests.rs"]
+mod nested_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_iteration_record_tests.rs"]
+mod record_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_iteration_logical_record_tests.rs"]
+mod logical_record_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_iteration_logical_local_tests.rs"]
+mod logical_local_tests;
+
+#[cfg(test)]
+#[path = "scalar_joins_iteration_eager_local_tests.rs"]
+mod eager_local_tests;

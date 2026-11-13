@@ -17,7 +17,10 @@ pub(crate) mod helper_entries;
 mod i64_prints;
 mod literal_prints;
 mod loop_work;
+
 pub(crate) mod loops;
+#[cfg(test)]
+mod resource_boundary_tests;
 pub(crate) mod value_transport;
 
 pub use build_policy::{

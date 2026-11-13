@@ -1,6 +1,7 @@
 use crate::{
     dev_tensor::{
-        dev_tensor_coverage_summary, dev_tensor_drift_summary, dev_tensor_summary, DevTensorCell,
+        dev_tensor_coverage_summary, dev_tensor_drift_summary, dev_tensor_summary_with_drift,
+        DevTensorCell,
     },
     dev_tensor_data::DEV_TENSOR_CELLS,
     dev_tensor_hierarchy::{dev_tensor_hierarchy_summary, DevTensorHierarchyNode},
@@ -14,9 +15,9 @@ use crate::{
 };
 
 pub(crate) fn render_dev_tensor_json_impl() -> String {
-    let summary = dev_tensor_summary();
-    let coverage = dev_tensor_coverage_summary();
     let drift = dev_tensor_drift_summary();
+    let summary = dev_tensor_summary_with_drift(drift.status);
+    let coverage = dev_tensor_coverage_summary();
     let hierarchy = dev_tensor_hierarchy_summary();
     let cells = DEV_TENSOR_CELLS
         .iter()
@@ -351,9 +352,9 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
 }
 
 pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
-    let summary = dev_tensor_summary();
-    let coverage = dev_tensor_coverage_summary();
     let drift = dev_tensor_drift_summary();
+    let summary = dev_tensor_summary_with_drift(drift.status);
+    let coverage = dev_tensor_coverage_summary();
     let hierarchy = dev_tensor_hierarchy_summary();
     let mut lines = vec![
         "nuis development tensor".to_owned(),

@@ -272,10 +272,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS: &[DevTensorDriftCh
         id: "beta-0.18-committed-and-worktree-snapshot",
         path: "docs/versioning/nuis-beta-0.18.0-snapshot.md",
         required_patterns: &[
-            "Audit date: 2026-11-07",
+            "Audit date: 2026-11-11",
             "7f61e841",
             "c3320d9e",
-            "Latest committed patch at this audit, beta-0.18.7",
+            "Latest committed patch at this audit, beta-0.18.8",
+            "283c7c28",
             "a270a99e",
             "696d2bd7",
             "bbb00651",

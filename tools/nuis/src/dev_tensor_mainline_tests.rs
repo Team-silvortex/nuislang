@@ -242,7 +242,7 @@ fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() 
     );
     assert_eq!(
         selected.selected,
-        "standard-library/ns-nova/persistent-application-session"
+        "compiler-toolchain/nuisc/native-resource-session-callbacks"
     );
     assert!(selected
         .pending_goals
@@ -250,4 +250,58 @@ fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() 
         .any(|goal| goal.ends_with("compiler-component-ownership-transfer")));
     let readiness = include_str!("../../../docs/reference/nuis-self-hosting-readiness.toml");
     assert!(readiness.contains("stage0-to-stage1-migration"));
+}
+
+#[test]
+fn mainline_recalibration_advances_resources_frames_sessions_then_failure_safety() {
+    let source = include_str!("../../../docs/reference/nuis-development-tensor.mainline.toml");
+    let mut cells = crate::dev_tensor_data::DEV_TENSOR_CELLS.to_vec();
+    let path = select_from_source(source, &cells).unwrap().dependency_path;
+    assert_eq!(
+        path,
+        [
+            "standard-library/ns-nova/interactive-image-workflow",
+            "standard-library/ns-nova/persistent-application-session",
+            "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
+            "compiler-toolchain/nuisc/native-resource-session-callbacks",
+        ]
+    );
+    for (completed, next) in [
+        (
+            "native-resource-session-callbacks",
+            "native-cpu-frame-dispatch",
+        ),
+        (
+            "native-cpu-frame-dispatch",
+            "persistent-application-session",
+        ),
+        (
+            "persistent-application-session",
+            "lifecycle-failure-resource-safety",
+        ),
+        (
+            "lifecycle-failure-resource-safety",
+            "shader-resource-bindings",
+        ),
+        ("shader-resource-bindings", "interactive-image-workflow"),
+    ] {
+        let cell = cells.iter_mut().find(|c| c.function == completed).unwrap();
+        cell.status = "stable";
+        cell.progress = 100;
+        let selected = select_from_source(source, &cells).unwrap();
+        assert!(
+            selected.selected.ends_with(&format!("/{next}")),
+            "{selected:?}"
+        );
+    }
+    let scalar = cells
+        .iter_mut()
+        .find(|c| c.function == "native-scalar-record-session-profile")
+        .unwrap();
+    scalar.status = "active";
+    scalar.progress = 90;
+    assert_eq!(
+        select_from_source(source, &cells).unwrap().selected,
+        "compiler-toolchain/nuisc/native-scalar-record-session-profile"
+    );
 }

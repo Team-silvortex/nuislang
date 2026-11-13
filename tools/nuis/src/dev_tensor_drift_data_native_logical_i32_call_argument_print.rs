@@ -15,7 +15,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-logical-i32-call-argument-private-context",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
-            "(expr, depth, logical, true, false)",
+            "root.value,\n                root.depth,\n                root.logical,\n                true,\n                false,\n                root.eager,",
             "logical_argument(callee, index, lazy_rhs)",
             "roots_with_fields(pending, computed_gate, false, |_, _| false, |_, _, _| false)",
             "let mut logical_edges = 32usize",

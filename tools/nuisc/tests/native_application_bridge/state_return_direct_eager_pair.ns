@@ -1,0 +1,27 @@
+mod cpu Main {
+    struct State { total: f64, control: i64 }
+    @noinline fn left(value: bool, guard: i64) -> bool {
+        print(20); let checked = 0 / guard; print(21); return value;
+    }
+    @noinline fn right(value: bool, guard: i64) -> bool {
+        print(22); let checked = 0 / guard; print(23); return value;
+    }
+    @noinline fn work(value: i64, outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        let joined: bool = if outer {
+            print(10);
+            let local: bool = (left_gate && left(left_value, left_guard)) == (right_gate || right(right_value, right_guard));
+            print(30); let checked = 0 / after_guard;
+            local
+        } else { print(11); false };
+        let delta: i64 = if joined { let selected = 1; selected } else { let selected = 2; selected };
+        return State { total: 0.0, control: value + delta };
+    }
+    fn start(outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        return work(0, outer, left_gate, right_gate, left_value, right_value, left_guard, right_guard, after_guard);
+    }
+    fn step(state: State, outer: bool, left_gate: bool, right_gate: bool, left_value: bool, right_value: bool, left_guard: i64, right_guard: i64, after_guard: i64) -> State {
+        return work(state.control, outer, left_gate, right_gate, left_value, right_value, left_guard, right_guard, after_guard);
+    }
+    fn stop(state: State) -> State { return state; }
+    fn main() -> i64 { return 0; }
+}

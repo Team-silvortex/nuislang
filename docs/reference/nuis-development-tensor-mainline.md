@@ -46,7 +46,9 @@ Task-card source values are:
 * `mainline-plan-complete`: all declared goals and interrupts are closed, not
   every project capability and not the self-hosting programme.
 
-A ready card still requires clean coverage, hierarchy and lineage validation.
+A ready card still requires clean coverage, hierarchy, lineage and evidence-drift validation.
+Plan selection can be structurally ready while its task card is blocked by drift;
+neither state claims that runtime acceptance tests have just executed.
 A missing or invalid plan never silently falls back to another project area.
 An invalid hierarchy or coordinate inventory also prevents a complete card.
 The manifest uses a strict TOML subset: quoted ASCII protocol identifiers, string
@@ -72,7 +74,9 @@ finite compiler-module migration plan.
 
 | Coordinate Suffix | Current Triage | Evidence Needed To Close |
 | --- | --- | --- |
-| `ns-nova/persistent-application-session` | active/86 | Packaged CPU parent and one outcome handoff are verified. Pump/window cancellation arbitrates with Finish and acknowledges host-scope retirement; explicit scripted AppKit cancellation now consumes the ticket. Parent cancellation, provider/device retirement, multi-child routing and recovery remain open. |
+| `ns-nova/persistent-application-session` | active/60 | Bounded native scalar and embedded-YIR application evidence exists; complete native resource callbacks, frames and lifecycle acceptance remain open. |
+| `nuisc/native-scalar-record-session-profile` | stable/100 | Closed admitted scalar/value-record profile only, including direct-return and source-free delivery; not owned resources or arbitrary control. |
+| `nuisc/native-resource-session-callbacks` | early/0 | Registered native Buffer/Bytes ownership, invocation, failure cleanup and completion; rejection tests are a baseline, not closure. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -87,10 +91,22 @@ mandatory dependencies/goals of the declared mainline plan.
 
 The current goal is `standard-library/ns-nova/interactive-image-workflow`.
 Its first actionable prerequisite is
+`compiler-toolchain/nuisc/native-resource-session-callbacks`, followed by
+`compiler-toolchain/nuisc/native-cpu-frame-dispatch` and then
 `standard-library/ns-nova/persistent-application-session`. Shader resources and
 failure testing follow that prerequisite, rather than their lower scores
 prematurely displacing session work. A reopened shared std/runtime prerequisite
 can correctly take priority within the same dependency chain.
+
+The [2026-11-13 recalibration](nuis-development-tensor-recalibration-2026-11-13.md)
+reviews all coordinates and separates the bounded compiler profile from application
+closure. The change from active/99 to active/60 is a scope correction, not a loss of
+verified functionality. A scalar-profile regression reopens its dependents.
+
+## Historical Checkpoints
+
+The following dated development trail retains earlier scores and next actions.
+They are not the current task card; consult the live plan and recalibration above.
 
 The new [host cancellation boundary](nuis-yir-application-cancellation-v1.md)
 does not raise this coordinate's score or close resource safety. One cancellation

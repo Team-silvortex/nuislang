@@ -49,7 +49,7 @@ pub(super) fn collect_with_layouts(
     )
 }
 
-// Shape/type admission only for the isolated iteration-effect outliner. This
+// Shape/type admission only for the isolated effectful control outliner. This
 // table must never seed pure values, captures or speculative selection catalogs.
 pub(super) fn collect_iteration_calls(
     module: &NirModule,

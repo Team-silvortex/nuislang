@@ -76,6 +76,9 @@ fn rename_join(
     collisions: &BTreeSet<String>,
     reserved: &mut BTreeSet<String>,
 ) -> bool {
+    if !paired_prefixes(then_body, else_body) {
+        return false;
+    }
     let [yes_prefix @ .., NirStmt::Let {
         name,
         ty: Some(ty),
@@ -92,26 +95,30 @@ fn rename_join(
     else {
         return false;
     };
-    if name != other
-        || ty != other_ty
-        || visible.contains_key(name)
-        || yes_prefix
-            .iter()
-            .chain(no_prefix.iter())
-            .any(|s| !matches!(s, NirStmt::Let { .. } | NirStmt::Const { .. }))
-    {
+    if name != other || ty != other_ty || visible.contains_key(name) {
         return false;
     }
     for (prefix, result) in [(yes_prefix, yes), (no_prefix, no)] {
         let mut inner = visible.clone();
         for stmt in prefix {
-            let (name, value) = match stmt {
+            match stmt {
                 NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
-                    (name, value)
+                    rename_binding(name, value, &mut inner, collisions, reserved);
                 }
-                _ => unreachable!("validated straight prefix"),
-            };
-            rename_binding(name, value, &mut inner, collisions, reserved);
+                NirStmt::Print(value) => rename_expr(value, &inner),
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    rename_expr(condition, &inner);
+                    if !rename_join(then_body, else_body, &mut inner, collisions, reserved) {
+                        rename_block(then_body, &inner, collisions, reserved);
+                        rename_block(else_body, &inner, collisions, reserved);
+                    }
+                }
+                _ => unreachable!("validated paired prefix"),
+            }
         }
         rename_expr(result, &inner);
     }
@@ -123,6 +130,41 @@ fn rename_join(
     visible.insert(name.clone(), replacement.clone());
     *name = replacement.clone();
     *other = replacement;
+    true
+}
+
+fn paired_prefixes(yes: &[NirStmt], no: &[NirStmt]) -> bool {
+    let mut pending = vec![(yes, no)];
+    while let Some((yes, no)) = pending.pop() {
+        let [yes_prefix @ .., NirStmt::Let {
+            name, ty: Some(ty), ..
+        }] = yes
+        else {
+            return false;
+        };
+        let [no_prefix @ .., NirStmt::Let {
+            name: other,
+            ty: Some(other_ty),
+            ..
+        }] = no
+        else {
+            return false;
+        };
+        if name != other || ty != other_ty {
+            return false;
+        }
+        for stmt in yes_prefix.iter().chain(no_prefix) {
+            match stmt {
+                NirStmt::Let { .. } | NirStmt::Const { .. } | NirStmt::Print(_) => {}
+                NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                } => pending.push((then_body, else_body)),
+                _ => return false,
+            }
+        }
+    }
     true
 }
 

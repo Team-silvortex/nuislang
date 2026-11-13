@@ -902,3 +902,22 @@ mod state_return_join_exit_argument_print;
 
 #[path = "state_return_prefix_exit_argument_print.rs"]
 mod state_return_prefix_exit_argument_print;
+
+#[path = "state_return_print_exit_argument_print.rs"]
+mod state_return_print_exit_argument_print;
+
+#[path = "state_return_nested_exit_argument_print.rs"]
+mod state_return_nested_exit_argument_print;
+
+#[path = "state_return_record_exit_argument_print.rs"]
+mod state_return_record_exit_argument_print;
+
+#[path = "state_return_eager_exit_argument_print.rs"]
+mod state_return_eager_exit_argument_print;
+
+#[path = "state_return_direct_eager_pair.rs"]
+mod state_return_direct_eager_pair;
+#[path = "state_return_local_exit_argument_print.rs"]
+mod state_return_local_exit_argument_print;
+#[path = "state_return_logical_exit_argument_print.rs"]
+mod state_return_logical_exit_argument_print;

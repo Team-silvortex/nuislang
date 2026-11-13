@@ -33,7 +33,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "control_loops::returns::prepare_effects",
             "return_signals.insert(function.name.clone(), plan.signal)",
             "&return_signals",
-            "Some(&self.roots)",
+            "Some(&loop_roots)", "self.roots.contains(&f.name) && control_loops::contains_loop(&f.body)",
             "iteration_effects_returns_tests.rs",
         ],
     },

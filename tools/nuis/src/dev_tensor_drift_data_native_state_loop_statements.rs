@@ -55,7 +55,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-state-loop-statements-effect-plan-opt-in",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/iteration_effects.rs",
-        required_patterns: &["validation::LiteralPrints::Scalars", "Some(&self.roots)"],
+        required_patterns: &["validation::LiteralPrints::Scalars", "Some(&loop_roots)", "self.roots.contains(&f.name) && control_loops::contains_loop(&f.body)"],
     },
     DevTensorDriftCheckSpec {
         id: "native-state-loop-statements-pure-route-opt-out",

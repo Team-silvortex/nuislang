@@ -73,7 +73,7 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
     ) -> Vec<NirStmt> {
         let mut output = Vec::new();
         let mut stmts = body.into_iter();
-        while let Some(stmt) = stmts.next() {
+        while let Some(mut stmt) = stmts.next() {
             if let Some(join) = scalar_joins::iteration::declaration(
                 &stmt,
                 &scope,
@@ -109,20 +109,24 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             match stmt {
                 NirStmt::Let {
                     ref name,
-                    ref value,
+                    ref mut value,
                     ..
                 }
                 | NirStmt::Const {
                     ref name,
-                    ref value,
+                    ref mut value,
                     ..
                 } => {
                     let ty = control_values::value_type(value, &scope, self.catalog, self.layouts)
                         .expect("admitted scalar binding");
+                    self.logical_value(value, &scope);
                     scope.insert(name.clone(), ty);
                     output.push(stmt);
                 }
-                NirStmt::Return(_) => {
+                NirStmt::Return(ref mut value) => {
+                    if let Some(value) = value {
+                        self.logical_value(value, &scope);
+                    }
                     output.push(stmt);
                     return output;
                 }
@@ -225,6 +229,30 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
             continuation.expect("validated fallthrough continuation"),
         )));
         output
+    }
+
+    fn logical_value(&mut self, value: &mut NirExpr, scope: &Scope) {
+        if matches!(
+            value,
+            NirExpr::Binary {
+                op: NirBinaryOp::And
+                    | NirBinaryOp::Or
+                    | NirBinaryOp::Eq
+                    | NirBinaryOp::Ne
+                    | NirBinaryOp::Xor,
+                ..
+            }
+        ) || control_values::has_logical_record_fields(value)
+        {
+            // Lower before introducing the binding, at its original statement/field.
+            *value = logical_conditions::predicate(
+                value.clone(),
+                scope,
+                self.names,
+                self.helpers,
+                self.guarded,
+            );
+        }
     }
 
     fn joined_value(&mut self, join: &scalar_joins::Declaration<'_>, scope: &Scope) -> NirExpr {

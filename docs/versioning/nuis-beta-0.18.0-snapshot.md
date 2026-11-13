@@ -1,6 +1,6 @@
 # Beta 0.18 Snapshot
 
-Audit date: 2026-11-07. Preceding audits were 2026-11-05 and 2026-11-04.
+Audit date: 2026-11-11. Preceding audits were 2026-11-07, 2026-11-05 and 2026-11-04.
 This minor-line anchor separates committed identity, worktree evidence and future
 gates.
 Cargo and protocol versions are independent;
@@ -11,7 +11,8 @@ this document does not freeze compatibility or announce completed self-hosting.
 | Identity | Git Commit | Date |
 | --- | --- | --- |
 | Minor-series entry, beta-0.18.0 | `7f61e841` | 2026-10-26 |
-| Latest committed patch at this audit, beta-0.18.7 | `a270a99e` | 2026-11-07 |
+| Latest committed patch at this audit, beta-0.18.8 | `283c7c28` | 2026-11-11 |
+| Earlier patch, beta-0.18.7 | `a270a99e` | 2026-11-07 |
 | Earlier patch, beta-0.18.6 | `696d2bd7` | 2026-11-05 |
 | Earlier patch, beta-0.18.5 | `bbb00651` | 2026-11-04 |
 | Earlier patch, beta-0.18.4 | `ceaa2caa` | 2026-10-28 |
@@ -24,6 +25,22 @@ Git remains authoritative after this audit. The
 [beta-0.17 snapshot](nuis-beta-0.17.0-snapshot.md) retains its dated identity and
 original acceptance; later commits do not rewrite its historical worktree scope.
 The `.0` filenames identify the minor series, not every receipt's source patch.
+
+## Direct Entry Worktree Follow-Up
+
+The 2026-11-13 [direct effectful record-return proof](../reference/nuis-native-direct-effectful-records-v1.md)
+removes the reproduced loop-wrapper dependency without changing the committed
+version. Actual loops keep their separate carry/return normalization; direct
+conditionals reuse guarded scalar/record normalization and existing effect gates.
+The receipt owns native/reference and source-free delivery evidence.
+
+## Tensor Recalibration Follow-Up
+
+The [2026-11-13 scope audit](../reference/nuis-development-tensor-recalibration-2026-11-13.md)
+supersedes the older selected-task/score baseline below: the current leaf is native
+resource-session callbacks, followed by native frame dispatch and persistent session
+closure (active/60). The bounded scalar/record profile has its own stable/100 scope.
+No version bump, fresh remote-device claim or compiler ownership promotion follows.
 
 ## Direction And Baseline
 
@@ -244,8 +261,30 @@ delivery checks pass. The
 [selected-prefix follow-up](../reference/nuis-native-state-return-prefix-exit-argument-print-v1.md)
 adds guarded local computations/checks with isolated arm scope. Selected native
 and source-free delivery checks pass, including poisoned unused prefixes.
-Explicitly authorized prefix print statements are the next gate.
-These worktree tasks create no version bump.
+Those preceding worktree tasks are now included in `283c7c28`; their receipts
+retain their original audit baselines. The
+[prefix-print follow-up](../reference/nuis-native-state-return-print-exit-argument-print-v1.md)
+adds explicitly authorized i64 prints with independent operand checks; selected
+native/reference and source-free delivery checks pass. The
+[nested-prefix follow-up](../reference/nuis-native-state-return-nested-exit-argument-print-v1.md)
+adds recursive scalar joins under shared budgets; selected native/reference and
+source-free delivery checks pass. The
+[record-prefix follow-up](../reference/nuis-native-state-return-record-exit-argument-print-v1.md)
+adds owned record results and field consumers under a shared neutral budget;
+selected native/reference and source-free delivery checks pass. The
+[logical-field follow-up](../reference/nuis-native-state-return-logical-exit-argument-print-v1.md)
+admits short-circuit record fields; selected native/reference checks and 160
+fresh/cache/source-free program runs pass. The
+[local-initializer follow-up](../reference/nuis-native-state-return-local-exit-argument-print-v1.md)
+admits fresh let/const bool short-circuit roots; selected native/reference and
+delivery checks pass, with 320 program runs across the new and preceding
+sources. The
+[eager-operand follow-up](../reference/nuis-native-state-return-eager-exit-argument-print-v1.md)
+admits local equality/inequality/XOR subtrees with guarded RHS calls. Paired
+native/reference checks pass through the state-loop route; new and preceding
+delivery sources complete 320 program runs. The direct-entry follow-up above
+closes the subsequently reproduced non-loop aggregate-return gap. Direct caller
+composition remains a separate audit. These worktree follow-ups create no version bump.
 
 The live tensor owns the next actionable boundary and all six complete predecessor
 fields. Do not promote active/99 to stable/100 based on documentation maintenance

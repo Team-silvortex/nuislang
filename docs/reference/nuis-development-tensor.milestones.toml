@@ -145,5 +145,7 @@ coordinates = [
   "heterogeneous-runtime/shader/shader-resource-bindings",
   "standard-library/ns-nova/sustained-runtime-performance",
   "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
+  "compiler-toolchain/nuisc/native-scalar-record-session-profile",
+  "compiler-toolchain/nuisc/native-resource-session-callbacks",
   "compiler-toolchain/bootstrap/compiler-component-ownership-transfer",
 ]

@@ -55,7 +55,7 @@ fn blocks_bounded(
     true
 }
 
-fn neutral(
+pub(super) fn neutral(
     ty: &NirTypeRef,
     layouts: &impl control_values::ValueLayouts,
     remaining: &mut usize,

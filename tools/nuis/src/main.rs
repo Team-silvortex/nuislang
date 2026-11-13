@@ -277,8 +277,8 @@ fn run() -> Result<std::process::ExitCode, String> {
             println!("  indexed_nustar: {}", index.len());
             println!("  nustar_loading: lazy");
             println!("  external_projects: yalivia, vulpoya");
-            let dev_tensor = dev_tensor::dev_tensor_summary();
             let dev_tensor_drift = dev_tensor::dev_tensor_drift_summary();
+            let dev_tensor = dev_tensor::dev_tensor_summary_with_drift(dev_tensor_drift.status);
             println!("  dev_tensor_model: architecture-module-function-progress-tensor");
             println!(
                 "  dev_tensor_hierarchy_protocol: {}",

@@ -80,6 +80,14 @@ The [logical-staged-initializer checkpoint](nuis-native-logical-staged-initializ
 - [Native State Return Gate Exit Argument Print V1](nuis-native-state-return-gate-exit-argument-print-v1.md)
 - [Native State Return Join Exit Argument Print V1](nuis-native-state-return-join-exit-argument-print-v1.md)
 - [Native State Return Prefix Exit Argument Print V1](nuis-native-state-return-prefix-exit-argument-print-v1.md)
+- [Native State Return Print Exit Argument Print V1](nuis-native-state-return-print-exit-argument-print-v1.md)
+- [Native State Return Nested Exit Argument Print V1](nuis-native-state-return-nested-exit-argument-print-v1.md)
+- [Native State Return Record Exit Argument Print V1](nuis-native-state-return-record-exit-argument-print-v1.md)
+- [Native State Return Logical Exit Argument Print V1](nuis-native-state-return-logical-exit-argument-print-v1.md)
+- [Native State Return Local Exit Argument Print V1](nuis-native-state-return-local-exit-argument-print-v1.md)
+- [Native State Return Eager Exit Argument Print V1](nuis-native-state-return-eager-exit-argument-print-v1.md)
+
+- [Native Direct Effectful Record Returns V1](nuis-native-direct-effectful-records-v1.md)
 
 ## Return Publication And Snapshot Storage
 - [Native Return Effect-Prefix Certificate V1](nuis-native-return-effect-prefix-v1.md)

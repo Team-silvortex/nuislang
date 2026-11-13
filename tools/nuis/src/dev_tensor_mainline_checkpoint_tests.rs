@@ -65,8 +65,15 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert_eq!(selected.status, "ready");
     assert_eq!(
         selected.selected,
-        dev_tensor_coordinate_key(session.architecture, session.module, session.function)
+        "compiler-toolchain/nuisc/native-resource-session-callbacks"
     );
+    assert!(selected
+        .dependency_path
+        .contains(&dev_tensor_coordinate_key(
+            session.architecture,
+            session.module,
+            session.function
+        )));
     assert!(session.evidence.contains("108 differential combinations"));
     assert!(session.evidence.contains("5/6/12 and 6/6/12"));
     assert!(session.evidence.contains("48 guarded-return combinations"));

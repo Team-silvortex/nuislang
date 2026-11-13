@@ -97,7 +97,7 @@ fn iteration_value_join_rejects_incomplete_mismatched_or_preexisting_destination
             };
             match mutation {
                 "one-arm" => else_body.clear(),
-                "prefix" => then_body.insert(0, NirStmt::Print(NirExpr::Int(1))),
+                "prefix" => then_body.insert(0, NirStmt::Print(NirExpr::Bool(true))),
                 "constant" => {
                     let NirStmt::Let { name, ty, value } = else_body[0].clone() else {
                         panic!("let")

@@ -89,8 +89,11 @@ fn iteration_prefix_join_rejects_leaks_rebinding_forward_reads_and_unregistered_
             "let staged = leaf(left, divisor);",
             "let left = leaf(left, divisor);",
         ),
-        ("let checked = 0 / divisor;", "print(44);"),
-        ("let checked = 0 / divisor;", "let checked = gate && gate;"),
+        ("let checked = 0 / divisor;", "print(true);"),
+        (
+            "let checked = 0 / divisor;",
+            "let checked: i64 = gate && gate;",
+        ),
         ("leaf(left, divisor)", "missing(left, divisor)"),
         ("if gate {", "if divisor {"),
         ("let staged = right;", "let staged = false;"),
