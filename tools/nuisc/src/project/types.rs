@@ -9,6 +9,7 @@ pub struct NuisProjectManifest {
     pub packaging_mode: Option<String>,
     pub artifact_provider_metadata: Vec<String>,
     pub application_sessions: Vec<yir_core::YirApplicationSession>,
+    pub resource_sessions: Vec<yir_core::native_resource_session::ResourceSessionRegistration>,
     pub code_assets: Vec<String>,
     pub modules: Vec<String>,
     pub tests: Vec<String>,

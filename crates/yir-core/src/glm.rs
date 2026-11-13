@@ -305,6 +305,57 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 effect: GlmEffect::DomainMove,
             }
         }
+        _ if op.module == "cpu"
+            && matches!(
+                op.instruction.as_str(),
+                "guard_call_owned_struct_return" | "tail_call_owned_struct_return"
+            ) =>
+        {
+            let tail = op.instruction == "tail_call_owned_struct_return";
+            let mut accesses = Vec::new();
+            let call = if tail {
+                crate::guarded_owned_call::parse_tail(&op.args)
+            } else {
+                crate::guarded_owned_call::parse(&op.args)
+            };
+            if let Ok(call) = call {
+                if !tail {
+                    accesses.push(value_read(call.condition));
+                }
+                accesses.push(GlmAccess {
+                    input: call.inputs[0].clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Write,
+                });
+                accesses.extend(call.inputs[1..].iter().map(|input| value_read(input)));
+                // A guard only consumes its exiting edge; the unconditional
+                // tail consumes the surviving owners. Native admission checks
+                // the exact owner partition independently in both cases.
+                accesses.extend(
+                    call.transfers
+                        .iter()
+                        .chain(call.cleanup)
+                        .map(|input| GlmAccess {
+                            input: input.clone(),
+                            class: GlmValueClass::Res,
+                            mode: if tail {
+                                GlmUseMode::Own
+                            } else {
+                                GlmUseMode::Write
+                            },
+                        }),
+                );
+            }
+            GlmNodeProfile {
+                result_class: GlmValueClass::Val,
+                accesses,
+                effect: if tail {
+                    GlmEffect::DomainMove
+                } else {
+                    GlmEffect::None
+                },
+            }
+        }
         _ if op.module == "cpu" && op.instruction == "branch_call_owned_bytes" => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: {

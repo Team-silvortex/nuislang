@@ -28,11 +28,55 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
     let scalar = find("native-scalar-record-session-profile");
     assert_eq!((scalar.status, scalar.progress), ("stable", 100));
     let resource = find("native-resource-session-callbacks");
-    assert_eq!((resource.status, resource.progress), ("early", 0));
+    assert_eq!((resource.status, resource.progress), ("active", 95));
     assert!(!scalar.bootstrap_critical && !resource.bootstrap_critical);
     assert!(resource
         .expected_artifact
-        .contains("baseline gates, not implementation success"));
+        .contains("does not prove native frame integration"));
+    assert!(resource.evidence.contains("80 events"));
+    assert!(resource.evidence.contains("120 alternating events"));
+    assert!(resource.evidence.contains("checked Result<State, i64>"));
+    assert!(resource.evidence.contains("cleanup_bytes_v1"));
+    assert!(resource.evidence.contains("transfer_bytes_v1"));
+    assert!(resource.evidence.contains("three nested conditions"));
+    assert!(resource.evidence.contains("depth 8 and 32 functions"));
+    assert!(resource.evidence.contains("tail_call_owned_struct_return"));
+    assert!(resource.evidence.contains("one shared root continuation"));
+    assert!(resource.evidence.contains("nonempty else joins"));
+    assert!(resource.evidence.contains("six paired-arm paths"));
+    assert!(resource
+        .evidence
+        .contains("explicit i64 let/const scalar shadowing"));
+    assert!(resource
+        .evidence
+        .contains("before NIR merges declarations and assignments"));
+    assert!(resource.blocker.contains("rebinding captured values"));
+    assert!(resource.next_step.contains("scalar shadowing"));
+    assert!(resource.next_step.contains("root continuation"));
+    assert!(resource.evidence.contains("inferred and aliased i64"));
+    assert!(resource.evidence.contains("before optimization"));
+    assert!(resource.next_step.contains("call_owned_struct"));
+    assert!(resource
+        .blocker
+        .contains("ordinary call_owned_struct helper results"));
+    assert!(resource
+        .evidence
+        .contains("1..=16 i64 fields plus one owned Bytes"));
+    assert!(resource
+        .evidence
+        .contains("successfully closed RGBA8 State"));
+    assert_eq!(
+        (
+            find("native-cpu-frame-dispatch").status,
+            find("native-cpu-frame-dispatch").progress
+        ),
+        ("early", 10)
+    );
+    assert!(resource.blocker.contains("provider/device completion"));
+    assert!(resource
+        .evidence
+        .contains("binary-only launch with empty PATH"));
+    assert!(resource.next_step.contains("source-free"));
     assert!(scalar.blocker.contains("outside its admission"));
     assert_eq!(
         dev_tensor_summary().bootstrap_critical_average_progress,

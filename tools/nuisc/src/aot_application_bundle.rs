@@ -95,6 +95,7 @@ struct Profile {
     schema: &'static str,
     checkpoint: &'static str,
     native: bool,
+    yir_limit: usize,
     metadata: Vec<(&'static str, PathBuf)>,
 }
 
@@ -102,6 +103,16 @@ impl Profile {
     fn from_manifest(source: &str, path: &Path) -> Result<Self, String> {
         let mode = unique_value(source, "packaging_mode", path)?;
         let metadata = metadata_inputs(source, path)?;
+        if crate::aot_resource_session::registration_id(&mode)?.is_some() {
+            return Ok(Self {
+                prefix: "native_resource_session",
+                schema: "nuis-native-resource-session-build-inputs-v1",
+                checkpoint: "native-resource-llvm-v1",
+                native: true,
+                yir_limit: yir_core::native_resource_session::MAX_BINDING_SOURCE_BYTES as usize,
+                metadata,
+            });
+        }
         if crate::aot_native_session::registration_id(&mode)?.is_some() {
             let policy = crate::aot_native_session::build_policy(&mode)?.is_some();
             Ok(Self {
@@ -117,6 +128,7 @@ impl Profile {
                     "native-scalar-llvm-v1"
                 },
                 native: true,
+                yir_limit: yir_core::native_scalar_session::MAX_BINDING_SOURCE_BYTES as usize,
                 metadata,
             })
         } else if mode == "headless-aot-bundle" {
@@ -125,6 +137,7 @@ impl Profile {
                 schema: SCHEMA,
                 checkpoint: "verified-yir-v1",
                 native: false,
+                yir_limit: 32 * 1024 * 1024,
                 metadata,
             })
         } else {
@@ -140,11 +153,7 @@ impl Profile {
                     .then_some(("llvm_ir", "headless_llvm_hex", 32 * 1024 * 1024)),
             )
             .map(|(kind, key, limit)| {
-                let limit = if self.native && kind == "yir" {
-                    yir_core::native_scalar_session::MAX_BINDING_SOURCE_BYTES as usize
-                } else {
-                    limit
-                };
+                let limit = if kind == "yir" { self.yir_limit } else { limit };
                 (kind, key.replacen("headless", self.prefix, 1), limit)
             })
             .chain(self.metadata.iter().map(|(kind, _)| {

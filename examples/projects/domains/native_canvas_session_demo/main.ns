@@ -1,0 +1,24 @@
+/// CPU-only native pixel events; no renderer or provider is hidden in the host.
+mod cpu Main {
+  /// The caller supplies the complete initial canvas; open marks the first pixel.
+  fn canvas_open(pixels: ref Buffer, color: i64) -> Bytes {
+    store_at(pixels, 0, color);
+    return copy_bytes(pixels);
+  }
+
+  /// command = pixel_index * 4294967296 + unsigned 0xAABBGGRR color.
+  /// Invalid indices trap instead of wrapping into another pixel.
+  fn canvas_event(pixels: ref Buffer, command: i64) -> Bytes {
+    let index: i64 = command / 4294967296;
+    let color: i64 = command % 4294967296;
+    store_at(pixels, index, color);
+    return copy_bytes(pixels);
+  }
+
+  /// Closing preserves the last accepted complete canvas.
+  fn canvas_close(pixels: ref Buffer, reason: i64) -> Bytes {
+    return copy_bytes(pixels);
+  }
+
+  fn main() -> i64 { return 0; }
+}

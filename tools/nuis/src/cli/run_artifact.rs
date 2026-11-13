@@ -15,6 +15,14 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
     let mut reference = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--resource-session" if !native => {
+                native = true;
+                let id = args
+                    .next()
+                    .ok_or("--resource-session requires a registration ID")?;
+                yir_core::YirApplicationSession::validate_identifier(&id)?;
+                application_arguments.extend([arg, id]);
+            }
             "--native-session" if !native => {
                 native = true;
                 let id = args
@@ -23,7 +31,17 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
                 yir_core::YirApplicationSession::validate_identifier(&id)?;
                 application_arguments.extend(["--application-session".to_owned(), id]);
             }
-            "--application-session" | "--open-args" | "--event-args" | "--close-args" => {
+            "--application-session"
+            | "--open-args"
+            | "--event-args"
+            | "--close-args"
+            | "--buffer-words"
+            | "--open-arg"
+            | "--event-arg"
+            | "--close-arg"
+            | "--resource-frame"
+            | "--resource-frame-fields"
+            | "--resource-frame-output" => {
                 reference |= arg == "--application-session";
                 let value = args
                     .next()
@@ -149,7 +167,7 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
         return Err("--window-session cannot be combined with --json or --export-frame".to_owned());
     }
     let input = input.ok_or(
-        "usage: nuis run-artifact <artifact> [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]] | --application-session ID --open-args I64,... [--event-args I64,...] (--close-args I64,... | --cancel-after-events --drain-provider) | --native-session ID --open-args SCALARS [--event-args SCALARS] --close-args SCALARS]",
+        "usage: nuis run-artifact <artifact> [--json | --export-frame PATH | --window-session ID [--window-events CODEPOINTS] [--window-parent-session ID] [--window-cancel-after-events [--drain-provider]] | --application-session ID --open-args I64,... [--event-args I64,...] (--close-args I64,... | --cancel-after-events --drain-provider) | --native-session ID --open-args SCALARS [--event-args SCALARS] --close-args SCALARS | --resource-session ID --buffer-words I64,... --open-arg I64 [--event-arg I64] --close-arg I64 [(--resource-frame WIDTHxHEIGHT | --resource-frame-fields WIDTH_FIELD,HEIGHT_FIELD) --resource-frame-output PATH]]",
     )?;
     Ok(CommandKind::RunArtifact {
         input,
@@ -170,6 +188,62 @@ pub(super) fn parse(args: &mut impl Iterator<Item = String>) -> Result<CommandKi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resource_scripts_keep_a_separate_native_selector() {
+        let base = [
+            "build",
+            "--resource-session",
+            "bytes",
+            "--buffer-words",
+            "0,-1",
+            "--open-arg",
+            "1",
+            "--event-arg",
+            "2",
+            "--close-arg",
+            "3",
+        ];
+        let parse_args = |args: &[&str]| parse(&mut args.iter().map(|s| (*s).to_owned()));
+        match parse_args(&base).unwrap() {
+            CommandKind::RunArtifact {
+                native_session: Some(args),
+                application_session: None,
+                ..
+            } => assert_eq!(args, base[1..]),
+            _ => panic!("resource script must use native launch"),
+        }
+        let mut frame = base.to_vec();
+        frame.extend([
+            "--resource-frame",
+            "2x1",
+            "--resource-frame-output",
+            "out.ppm",
+        ]);
+        match parse_args(&frame).unwrap() {
+            CommandKind::RunArtifact {
+                native_session: Some(args),
+                frame_output: None,
+                ..
+            } => {
+                assert_eq!(args, frame[1..]);
+            }
+            _ => panic!("resource frame must not use embedded-YIR frame export"),
+        }
+        for extra in [
+            vec!["--native-session", "bytes"],
+            vec!["--resource-session", "other"],
+            vec!["--application-session", "bytes"],
+            vec!["--drain-provider"],
+            vec!["--cancel-after-events"],
+            vec!["--window-session", "window"],
+            vec!["--json"],
+        ] {
+            let mut args = base.to_vec();
+            args.extend(extra);
+            assert!(parse_args(&args).is_err());
+        }
+    }
 
     #[test]
     fn native_scripts_select_a_distinct_typed_profile() {

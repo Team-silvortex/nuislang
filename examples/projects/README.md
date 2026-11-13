@@ -78,6 +78,19 @@ These are the best current first-entry projects:
   stateful AppKit window, still using the embedded-YIR host runtime and providers
 * [tooling/filesystem_io_report_demo](tooling/filesystem_io_report_demo)
   small native host CLI with observable I/O; no GPU is needed for this route
+* [domains/native_canvas_session_demo](domains/native_canvas_session_demo)
+  bounded native CPU pixel callbacks and source-free final-state PPM export;
+  an explicit resource-session consumer, not the GPU/window showcase
+* [domains/native_mixed_canvas_session_demo](domains/native_mixed_canvas_session_demo)
+  Nuis-owned canvas dimensions, event count, cursor and pixel resource, with
+  native mixed-State publication and source-free image export
+* [domains/native_guarded_canvas_session_demo](domains/native_guarded_canvas_session_demo)
+  branch-local early Ok State returns, a heartbeat event that does not paint,
+  nested returns and paired then/else joins with shared continuation ownership, and
+  source-free final-frame delivery without speculative resource allocation
+* [domains/native_checked_canvas_session_demo](domains/native_checked_canvas_session_demo)
+  Nuis-side dimension validation and checked Result errors, with native complete
+  State publication only on success and source-free image export
 * [kernel_tensor_demo](kernel_tensor_demo)
   focused `cpu + data + kernel` project-pipeline companion
 * [tooling/native_artifact_closure_demo](tooling/native_artifact_closure_demo)

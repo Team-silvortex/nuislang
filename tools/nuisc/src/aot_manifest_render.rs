@@ -134,7 +134,7 @@ pub(crate) fn render_build_manifest_source(
     if let Some(project) = input.project {
         append_project_manifest_section(&mut out, project);
     }
-    if crate::aot_native_session::has_bound_inputs(input.packaging_mode) {
+    if crate::aot_session_profile::has_bound_inputs(input.packaging_mode) {
         crate::aot_application_bundle::append_sources(&mut out, &input.artifact_set.artifacts)?;
     }
 

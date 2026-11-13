@@ -150,6 +150,7 @@ fn scheduler_contract_nodes_validate_lane_and_clock_registration() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -192,6 +193,7 @@ fn scheduler_contract_nodes_reject_lane_defaults_outside_declared_set() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -247,6 +249,7 @@ fn scheduler_contract_nodes_reject_result_lane_outside_declared_set() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -314,6 +317,7 @@ fn scheduler_contract_nodes_reject_invalid_result_capability_label() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -405,6 +409,7 @@ fn scheduler_contract_nodes_reject_invalid_observer_role_variant_label() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -484,6 +489,7 @@ fn scheduler_contract_nodes_reject_invalid_summary_capability_label() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -575,6 +581,7 @@ fn scheduler_contract_nodes_reject_invalid_summary_class_label() {
         node_lanes: BTreeMap::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();

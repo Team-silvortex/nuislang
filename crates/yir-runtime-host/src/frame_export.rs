@@ -20,22 +20,27 @@ pub fn export_module_frame(source: &str, output: &Path) -> Result<(), String> {
     write_new_frame(output, || crate::render_module_to_ppm_bytes(source, 1))
 }
 
-fn write_new_frame(
+pub(crate) fn require_new_frame_path(output: &Path) -> Result<(), String> {
+    if output.as_os_str().is_empty() {
+        return Err("frame output path must not be empty".to_owned());
+    }
+    match fs::symlink_metadata(output) {
+        Ok(_) => Err(format!(
+            "frame output `{}` already exists",
+            output.display()
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("cannot inspect frame output: {error}")),
+    }
+}
+
+pub(crate) fn write_new_frame(
     output: &Path,
     render: impl FnOnce() -> Result<Vec<u8>, String>,
 ) -> Result<(), String> {
-    match fs::symlink_metadata(output) {
-        Ok(_) => {
-            return Err(format!(
-                "frame output `{}` already exists",
-                output.display()
-            ))
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(format!("cannot inspect frame output: {error}")),
-    }
-    // A rejected provider may terminate this process. Do not create any output
-    // until the complete lifecycle (including the IPC close acknowledgement) succeeds.
+    require_new_frame_path(output)?;
+    // Rendering may execute a lifecycle and fail or terminate. Create no output
+    // until the caller has produced complete, validated bytes.
     let bytes = render()?;
     let mut file = OpenOptions::new()
         .write(true)

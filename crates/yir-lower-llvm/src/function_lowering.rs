@@ -435,6 +435,24 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
+        if crate::guarded_owned_call::lower(
+            node,
+            body,
+            registers,
+            &state.buffer_lengths,
+            helper_signatures,
+            function_return_kind,
+            function_return_layout,
+            &mut next_reg,
+            &mut next_block,
+        )? {
+            if node.op.instruction == "tail_call_owned_struct_return" {
+                state.ends_with_terminal_return = true;
+                break;
+            }
+            continue;
+        }
+
         match lower_cpu_guard_return_node(
             node,
             body,

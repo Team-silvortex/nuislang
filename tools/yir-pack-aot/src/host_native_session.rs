@@ -47,7 +47,11 @@ pub(super) fn build(
     let binary = output.join(stem);
     fs::write(&callbacks, llvm::callbacks(&bridge, source)).map_err(|e| e.to_string())?;
     fs::write(&host, llvm::entry(&bridge, source)).map_err(|e| e.to_string())?;
-    fs::write(&shim, runtime_source()).map_err(|e| e.to_string())?;
+    fs::write(
+        &shim,
+        super::host_runtime_library::native_blob_runtime_source(),
+    )
+    .map_err(|e| e.to_string())?;
     let mut command = Command::new("clang");
     command
         .args([&callbacks, &host, &shim, &runtime])
@@ -82,14 +86,4 @@ pub(super) fn build(
         }
     }
     fs::write(output.join("bundle.txt"), manifest).map_err(|e| e.to_string())
-}
-
-fn runtime_source() -> String {
-    // Reuse the existing allocation ABI; this is not a new C application shim.
-    let mut source =
-        "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n"
-            .to_owned();
-    source.push_str(super::host_text_runtime::host_text_runtime_source());
-    nuis_runtime::append_c_shim_owned_blob_runtime(&mut source);
-    source
 }

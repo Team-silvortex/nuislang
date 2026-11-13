@@ -196,18 +196,14 @@ pub(crate) fn run_compile_resolved(
         let llvm_ir = if requested_packaging_mode == Some("headless-aot-bundle") {
             None
         } else if requested_packaging_mode
-            .map(crate::aot_native_session::registration_id)
+            .map(crate::aot_session_profile::is_native)
             .transpose()?
-            .flatten()
-            .is_some()
+            .unwrap_or(false)
         {
-            Some(
-                crate::aot_native_session::emit_for_packaging_mode(
-                    &checkpoint.yir,
-                    requested_packaging_mode.unwrap(),
-                )?
-                .llvm_ir,
-            )
+            Some(crate::aot_session_profile::packaging_llvm(
+                &checkpoint.yir,
+                requested_packaging_mode.unwrap(),
+            )?)
         } else {
             Some(
                 crate::nustar_codegen_registry::emit_module_with_loaded_nustar(
@@ -239,7 +235,7 @@ pub(crate) fn run_compile_resolved(
             .and_then(|manifest| {
                 if requested_packaging_mode.is_some_and(|mode| mode != manifest.packaging_mode)
                     || (requested_packaging_mode.is_none()
-                        && crate::aot_native_session::has_bound_inputs(&manifest.packaging_mode))
+                        && crate::aot_session_profile::has_bound_inputs(&manifest.packaging_mode))
                 {
                     return Err(
                         "cached AOT packaging does not match the requested host profile".to_owned(),

@@ -24,7 +24,7 @@ pub fn render_relocated_unpacked_build_manifest(
     binary_path: &Path,
 ) -> Result<String, String> {
     let source = &artifact.build_manifest_source;
-    let bound_inputs = if crate::aot_native_session::has_bound_inputs(&artifact.packaging_mode) {
+    let bound_inputs = if crate::aot_session_profile::has_bound_inputs(&artifact.packaging_mode) {
         crate::aot_application_bundle::restore_sources(source, output_dir, &artifact.binary_name)?
     } else {
         Vec::new()

@@ -90,6 +90,32 @@ to trust first when implementation and future direction are both present.
 * [.github](../.github)
   repository automation/workflow metadata
 
+## Native Resource Session Ownership
+
+The current application prerequisite crosses existing package boundaries; it is
+not a new engine-specific compiler module. Change the narrow owner below rather
+than importing a tool frontdoor into a shared contract crate.
+
+| Responsibility | Implementation Entry |
+| --- | --- |
+| Registration, State layouts and versioned owner trailers | [yir-core session contracts](../crates/yir-core/src/native_resource_session.rs), [call contract](../crates/yir-core/src/guarded_owned_call.rs) |
+| Registered lexical identities and post-semantic canonical type admission | [resource scalar bindings](../tools/nuisc/src/resource_session_bindings.rs), [resolved type gate](../tools/nuisc/src/resource_session_bindings/types.rs) |
+| Source branch outlining, shared continuations and captures | [nuisc outliner](../tools/nuisc/src/lowering/guarded_owned_returns.rs), [branch pairs](../tools/nuisc/src/lowering/guarded_owned_returns/branches.rs), [private continuation builder](../tools/nuisc/src/lowering/guarded_owned_returns/continuations.rs) |
+| Typed source function result boundary | [direct-call return boundary](../tools/nuisc/src/lowering/direct_calls/return_boundary.rs) |
+| Domain operation description and diagnostic behavior | [CPU control operations](../crates/yir-domain-cpu/src/describe_post_control.rs) |
+| Independent native admission and LLVM emission | [native resource lowering](../crates/yir-lower-llvm/src/native_resource_session.rs), [call emission](../crates/yir-lower-llvm/src/guarded_owned_call.rs) |
+| Host State transport, publication and teardown | [runtime session](../crates/yir-runtime-host/src/native_resource_session.rs) |
+| Project identity and artifact assembly | [project session registration](../tools/nuisc/src/project/application_sessions.rs), [pipeline boundary](../tools/nuisc/src/pipeline_resource_session.rs), [AOT boundary](../tools/nuisc/src/aot_resource_session.rs) |
+| Executable launch adapters | [nuis artifact adapter](../tools/nuis/src/artifact_runtime_native_session.rs), [packer adapter](../tools/yir-pack-aot/src/host_resource_session.rs) |
+| Semantic/native ownership regressions | [compiler resource suite](../tools/nuisc/tests/native_resource_session.rs) |
+| Cache, NSB relocation and binary-only execution | [artifact workflow suite](../tools/nuis/tests/native_resource_session_workflow.rs) |
+
+Start execution from the [resource example ladder](../examples/projects/domains/README.md#native-cpu-resource-sessions).
+Use the [proof index](reference/nuis-native-session-proof-index.md#resource-session-ladder)
+for scoped evidence and the [mainline map](current-mainline-map.md) for the next
+task. These native CPU callbacks remain separate from embedded-YIR window and
+provider/device sessions; directory proximity does not merge their admission.
+
 ## Reading Order By Goal
 
 If you want the current user-facing path:

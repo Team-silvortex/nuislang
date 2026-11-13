@@ -62,6 +62,7 @@ class DiskCleanup(unittest.TestCase):
             "examples/projects/nested/demo with spaces/.nuis/cache/object",
             "examples/bins/local-run/binary",
             "tools/yir-preview-macos/build/PreviewFrame",
+            "scripts/__pycache__/old.pyc",
             "scripts/tests/__pycache__/old.pyc",
         ]]
 
@@ -70,7 +71,7 @@ class DiskCleanup(unittest.TestCase):
         result = self.run_script("--verbose")
         self.assert_ok(result)
         self.assertIn("Dry-run only", result.stdout)
-        self.assertIn("Selected 8 workspace outputs", result.stdout)
+        self.assertIn("Selected 9 workspace outputs", result.stdout)
         self.assertIn("demo with spaces/.nuis/cache", result.stdout)
         self.assertTrue(all(path.exists() for path in paths))
 
@@ -160,6 +161,32 @@ class DiskCleanup(unittest.TestCase):
         result = self.run_script("--apply", "--build-binaries")
         self.assert_ok(result)
         self.assertIn("Selected 0 workspace outputs", result.stdout)
+
+    def test_maintenance_cache_is_not_exempt_from_safety_checks(self):
+        for unsafe in ["tracked", "symlink"]:
+            with self.subTest(unsafe=unsafe):
+                incremental = self.write("target/debug/incremental/keep")
+                cache = self.root / "scripts/__pycache__"
+                external = self.base / "external-python-cache"
+                external.mkdir(exist_ok=True)
+                sentinel = external / "keep.pyc"
+                sentinel.write_text("keep", encoding="utf-8")
+                if unsafe == "tracked":
+                    cached = self.write("scripts/__pycache__/keep.pyc")
+                    self.git("add", "-f", str(cached.relative_to(self.root)))
+                else:
+                    cache.symlink_to(external, target_is_directory=True)
+                try:
+                    result = self.run_script("--apply")
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f"refusing {unsafe}", result.stderr)
+                    self.assertTrue(incremental.exists() and sentinel.exists())
+                finally:
+                    if unsafe == "tracked":
+                        self.git("rm", "--cached", "-f", "scripts/__pycache__/keep.pyc")
+                        shutil.rmtree(cache)
+                    else:
+                        cache.unlink()
 
     def test_removed_global_options_fail_without_cleanup(self):
         paths = self.fixtures()

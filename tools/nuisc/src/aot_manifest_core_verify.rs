@@ -170,7 +170,7 @@ pub(crate) fn verify_manifest_artifacts(
             path,
         )?;
     }
-    if crate::aot_native_session::has_bound_inputs(&core.packaging_mode) {
+    if crate::aot_session_profile::has_bound_inputs(&core.packaging_mode) {
         crate::aot_application_bundle::verify_sources(source, path, &artifacts)?;
         let mut required = vec![
             ("application_bundle", "bundle.txt".to_owned()),
@@ -191,7 +191,7 @@ pub(crate) fn verify_manifest_artifacts(
             ),
             ("binary", core.artifact_binary_name.clone()),
         ];
-        if crate::aot_native_session::registration_id(&core.packaging_mode)?.is_some() {
+        if crate::aot_session_profile::is_native(&core.packaging_mode)? {
             required.push(("llvm_ir", format!("{}.ll", core.artifact_binary_name)));
         }
         for (kind, _) in crate::aot_application_bundle::metadata_inputs(source, path)? {
@@ -272,7 +272,7 @@ pub(crate) fn verify_manifest_artifacts(
             path.display()
         ));
     }
-    if crate::aot_native_session::has_bound_inputs(&core.packaging_mode) {
+    if crate::aot_session_profile::has_bound_inputs(&core.packaging_mode) {
         let binary = Path::new(&core.output_dir).join(&core.artifact_binary_name);
         let bytes = fs::read(&binary)
             .map_err(|error| format!("cannot read application binary: {error}"))?;

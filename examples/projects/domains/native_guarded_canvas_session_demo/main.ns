@@ -1,0 +1,83 @@
+/// Zero is a heartbeat: transfer the held snapshot without painting or advancing.
+mod cpu Main {
+  type Word = i64;
+  type Dimension = Word;
+  enum Result<T, E> { Ok(T), Err(E) }
+  struct Canvas {
+    width: i64, height: i64, events: i64, cursor: i64, pixels: Bytes,
+  }
+
+  fn canvas_open(pixels: ref Buffer, width: i64) -> Result<Canvas, i64> {
+    if width <= 0 { return Result.Err(1); }
+    if width > buffer_len(pixels) { return Result.Err(2); }
+    if buffer_len(pixels) % width != 0 { return Result.Err(3); }
+    return Result.Ok(Canvas {
+      width: width, height: buffer_len(pixels) / width,
+      events: 0, cursor: 0, pixels: copy_bytes(pixels),
+    });
+  }
+
+  fn canvas_event(pixels: ref Buffer, width: Dimension, height: Dimension,
+                  events: i64, cursor: i64, color: i64) -> Result<Canvas, i64> {
+    if color < 0 { return Result.Err(4); }
+    if color > 4294967295 { return Result.Err(4); }
+    if cursor < 0 { return Result.Err(5); }
+    if cursor >= buffer_len(pixels) { return Result.Err(5); }
+    if events == 9223372036854775807 { return Result.Err(6); }
+    let snapshot: Bytes = copy_bytes(pixels);
+    if color == 0 {
+      // The first heartbeat exits here; later ones rejoin the shared suffix.
+      if cursor == 0 {
+        return Result.Ok(Canvas {
+          width: width, height: height, events: events + 1,
+          cursor: cursor, pixels: move(snapshot),
+        });
+      }
+      // Local width counts words; the shared suffix still sees canvas width.
+      let width = width * height;
+      if bytes_len(snapshot) / 8 != width { return Result.Err(8); }
+    } else {
+      // Painting at cursor zero exits early; later pixels use the shared suffix.
+      if cursor == 0 {
+        drop_bytes(snapshot);
+        store_at(pixels, cursor, color);
+        return Result.Ok(Canvas {
+          width: width, height: height, events: events + 1,
+          cursor: (cursor + 1) % buffer_len(pixels), pixels: copy_bytes(pixels),
+        });
+      }
+      const width: Dimension = width * height;
+      if bytes_len(snapshot) / 8 != width { return Result.Err(8); }
+    }
+    if color != 0 {
+      let retained_words: i64 = bytes_len(snapshot) / 8;
+      drop_bytes(snapshot);
+      store_at(pixels, cursor, color);
+      return Result.Ok(Canvas {
+        width: width, height: height, events: events + 1,
+        cursor: (cursor + 1) % retained_words, pixels: copy_bytes(pixels),
+      });
+    }
+    return Result.Ok(Canvas {
+      width: width, height: height, events: events + 1,
+      cursor: cursor, pixels: move(snapshot),
+    });
+  }
+
+  fn canvas_close(pixels: ref Buffer, width: i64, height: i64,
+                  events: i64, cursor: i64, reason: i64) -> Result<Canvas, i64> {
+    if reason < 0 { return Result.Err(7); }
+    if reason == 0 {
+      return Result.Ok(Canvas {
+        width: width, height: height, events: events, cursor: cursor,
+        pixels: copy_bytes(pixels),
+      });
+    }
+    return Result.Ok(Canvas {
+      width: width, height: height, events: events, cursor: cursor,
+      pixels: copy_bytes(pixels),
+    });
+  }
+
+  fn main() -> i64 { return 0; }
+}

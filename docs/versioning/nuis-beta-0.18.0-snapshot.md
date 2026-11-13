@@ -42,6 +42,52 @@ resource-session callbacks, followed by native frame dispatch and persistent ses
 closure (active/60). The bounded scalar/record profile has its own stable/100 scope.
 No version bump, fresh remote-device claim or compiler ownership promotion follows.
 
+## Native Resource Callback Follow-Up
+
+The beta-0.18.9 worktree [Buffer/Bytes callback proof](../reference/nuis-native-resource-session-v1.md)
+adds separately registered synchronous native open/event/close library callbacks.
+The subsequent [artifact proof](../reference/nuis-native-resource-session-artifacts-v1.md)
+raises the resource coordinate to active/60 with project/YIR/NSB registration,
+export identity, cache and source-free launch. This does not change frame/session
+scores, claim recoverable native traps, or advance the release version.
+The [CPU canvas follow-up](../reference/nuis-native-resource-frame-export-v1.md)
+advances only the resource coordinate to active/65: Nuis-native pixel callbacks
+now feed final-state PPM export, including source-free launch. This remains a
+separate consumer, not native ns-nova window/GPU frame dispatch.
+The [mixed-State follow-up](../reference/nuis-native-mixed-resource-state-v1.md)
+advances that coordinate to active/75: Nuis now holds dimensions, event count,
+cursor and pixels in a bounded owned record, under a distinct static ABI.
+The [checked-State follow-up](../reference/nuis-native-checked-resource-state-v1.md)
+advances only that coordinate to active/80: Nuis validates dimensions and returns
+typed Result errors without publishing failed State, including source-free launch.
+The [guarded resource return follow-up](../reference/nuis-native-guarded-resource-return-v1.md)
+advances only that coordinate to active/85 with branch-local early Ok cleanup and
+non-speculative helper execution. Frame/session scores and release version stay unchanged.
+The [retained-Bytes follow-up](../reference/nuis-native-retained-bytes-return-v1.md)
+advances the resource coordinate to active/90 with taken-edge cleanup and retained
+continuation ownership. Selected-arm transfer of that same owner remains separate.
+The [transferred-Bytes follow-up](../reference/nuis-native-transferred-bytes-return-v1.md)
+advances the resource coordinate to active/95 with that selected-arm transfer,
+independent helper ownership proofs and failure cleanup. The
+[nested-return follow-up](../reference/nuis-native-nested-owned-return-v1.md)
+then admits nested terminal regions and retains active/95. Nonterminal outer
+joins remain open; frame/session scores and the release version stay unchanged.
+The [owned-continuation follow-up](../reference/nuis-native-owned-continuation-v1.md)
+then closes empty-else outer joins with a shared suffix and exact terminal ownership
+handoff. It retains active/95; nonempty else joins and captured rebinding remain open.
+The [paired-continuation follow-up](../reference/nuis-native-paired-owned-continuation-v1.md)
+then admits nonempty then/else joins, independently terminal arms and one shared
+suffix without changing the ABI or opcode set. Captured binding replacement
+remains rejected; active/95 and the dependent frame/session scores are unchanged.
+The [scalar-shadowing follow-up](../reference/nuis-native-resource-scalar-shadowing-v1.md)
+then distinguishes explicit i64 branch-local declarations from assignments before
+NIR, preserving outer captures in the shared suffix. Observable captured writes
+and resource rebinding remain rejected. It keeps active/95 with no version bump.
+The [inferred-shadowing follow-up](../reference/nuis-native-resource-inferred-shadowing-v1.md)
+adds inferred/chained/generic alias support using the shared semantic lowering
+and canonical i64 checks before optimization. Ordinary record helper calls in
+resource callbacks remain a separately reproduced native-admission gap.
+
 ## Direction And Baseline
 
 The governing line remains [ns-nova application-led development](nuis-beta-0.11-application-led-mainline.md):

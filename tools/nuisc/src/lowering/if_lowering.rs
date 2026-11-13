@@ -267,6 +267,10 @@ pub(super) fn lower_if_pair(
     }
 
     // The remaining shortcuts may materialize both branches before selecting.
+    if super::guarded_owned_returns::lower(&condition_name, then_body, else_body, state, bindings)?
+    {
+        return Ok(LoweredIfOutcome::Continued);
+    }
     for branch in [then_body, else_body] {
         if speculation::block_has_checked_arithmetic(branch, &state.checked_arithmetic_helpers) {
             return Err("conditional fallible return requires guarded helper lowering".to_owned());

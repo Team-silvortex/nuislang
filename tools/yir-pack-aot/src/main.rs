@@ -35,6 +35,7 @@ mod host_frames;
 mod host_native_session;
 mod host_objc;
 mod host_plan;
+mod host_resource_session;
 mod host_runtime_frame;
 mod host_runtime_library;
 mod host_source;
@@ -52,18 +53,31 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
     let input = args.next().ok_or_else(|| {
-        "usage: yir-pack-aot <module.yir> <output-dir> [frame-scale] [--headless | --native-session ID]".to_owned()
+        "usage: yir-pack-aot <module.yir> <output-dir> [frame-scale] [--headless | --native-session ID | --resource-session ID]".to_owned()
     })?;
     let output_dir = args.next().ok_or_else(|| {
-        "usage: yir-pack-aot <module.yir> <output-dir> [frame-scale] [--headless | --native-session ID]".to_owned()
+        "usage: yir-pack-aot <module.yir> <output-dir> [frame-scale] [--headless | --native-session ID | --resource-session ID]".to_owned()
     })?;
     let (frame_scale, headless, native) = host_application_script::parse_options(args)?;
 
     let source =
         fs::read_to_string(&input).map_err(|error| format!("failed to read `{input}`: {error}"))?;
-    let module = yir_syntax::parse_module(&source)?;
+    let module = if native.is_some() {
+        yir_syntax::parse_explicit_module(&source)?
+    } else {
+        yir_syntax::parse_module(&source)?
+    };
     verify_module(&module)?;
     if let Some(id) = native {
+        if id.resource {
+            return host_resource_session::build(
+                &module,
+                &source,
+                Path::new(&input),
+                Path::new(&output_dir),
+                &id.id,
+            );
+        }
         return host_native_session::build(
             &module,
             &source,

@@ -1,0 +1,47 @@
+/// Application errors are Result.Err codes, not native traps or accepted State.
+mod cpu Main {
+  enum Result<T, E> { Ok(T), Err(E) }
+
+  struct Canvas {
+    width: i64,
+    height: i64,
+    events: i64,
+    cursor: i64,
+    pixels: Bytes,
+  }
+
+  fn canvas_open(pixels: ref Buffer, width: i64) -> Result<Canvas, i64> {
+    if width <= 0 { return Result.Err(1); }
+    if width > buffer_len(pixels) { return Result.Err(2); }
+    if buffer_len(pixels) % width != 0 { return Result.Err(3); }
+    return Result.Ok(Canvas {
+      width: width, height: buffer_len(pixels) / width,
+      events: 0, cursor: 0, pixels: copy_bytes(pixels),
+    });
+  }
+
+  fn canvas_event(pixels: ref Buffer, width: i64, height: i64,
+                  events: i64, cursor: i64, color: i64) -> Result<Canvas, i64> {
+    if color < 0 { return Result.Err(4); }
+    if color > 4294967295 { return Result.Err(4); }
+    if cursor < 0 { return Result.Err(5); }
+    if cursor >= buffer_len(pixels) { return Result.Err(5); }
+    if events == 9223372036854775807 { return Result.Err(6); }
+    store_at(pixels, cursor, color);
+    return Result.Ok(Canvas {
+      width: width, height: height, events: events + 1,
+      cursor: (cursor + 1) % buffer_len(pixels), pixels: copy_bytes(pixels),
+    });
+  }
+
+  fn canvas_close(pixels: ref Buffer, width: i64, height: i64,
+                  events: i64, cursor: i64, reason: i64) -> Result<Canvas, i64> {
+    if reason < 0 { return Result.Err(7); }
+    return Result.Ok(Canvas {
+      width: width, height: height, events: events, cursor: cursor,
+      pixels: copy_bytes(pixels),
+    });
+  }
+
+  fn main() -> i64 { return 0; }
+}

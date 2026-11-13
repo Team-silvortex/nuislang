@@ -8,6 +8,7 @@ mod application_script;
 mod application_session;
 mod frame_export;
 mod native_application_session;
+pub mod native_resource_session;
 mod provider_application_session;
 mod provider_drain_observation;
 mod provider_result_stream;

@@ -27,6 +27,7 @@ mod facts;
 mod function_lowering;
 mod guard_host_call;
 mod guard_return_lowering;
+mod guarded_owned_call;
 mod loop_async_post_flow_payload;
 mod loop_async_post_flow_source;
 mod loop_carry_condition;
@@ -43,6 +44,7 @@ mod loop_scalar;
 mod memory_lowering;
 mod mutex_capability_lowering;
 mod mutex_scalar;
+pub mod native_resource_session;
 pub mod native_session;
 mod nustar_provider;
 mod owned_tree_call_args;
@@ -237,11 +239,21 @@ fn emit_module_with_checks(
         let params = call_parameters::collect(lane_nodes)?;
         let return_node = lane_nodes
             .iter()
-            .find(|node| node.op.instruction.starts_with("return_"))
+            .find(|node| {
+                node.op.instruction.starts_with("return_")
+                    || node.op.instruction == "tail_call_owned_struct_return"
+            })
             .ok_or_else(|| {
                 format!("helper lane `{function_name}` does not contain a typed cpu.return_*")
             })?;
-        let ret = if return_node.op.instruction == "return_owned_struct" {
+        let owned_struct_return = matches!(
+            return_node.op.instruction.as_str(),
+            "return_owned_struct" | "tail_call_owned_struct_return"
+        );
+        if return_node.op.instruction == "tail_call_owned_struct_return" {
+            yir_core::guarded_owned_call::parse_tail(&return_node.op.args)?;
+        }
+        let ret = if owned_struct_return {
             CpuCallScalarKind::I64
         } else {
             cpu_call_scalar_kind_for_instruction(&return_node.op.instruction).ok_or_else(|| {
@@ -271,7 +283,7 @@ fn emit_module_with_checks(
         } else {
             None
         };
-        let owned_struct_layout = if return_node.op.instruction == "return_owned_struct" {
+        let owned_struct_layout = if owned_struct_return {
             return_node
                 .op
                 .args
@@ -322,7 +334,7 @@ fn emit_module_with_checks(
                     })
                     .collect(),
                 ret,
-                owned_struct_return: return_node.op.instruction == "return_owned_struct",
+                owned_struct_return,
                 owned_struct_layout,
                 native_value_return,
                 owned_external_buffer_return,

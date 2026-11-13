@@ -358,7 +358,12 @@ pub(super) fn order_guarded_function_nodes(
         if let Some(previous) = &guard {
             edges.push((previous.clone(), node.name.clone()));
         }
-        if node.op.module == "cpu" && node.op.instruction == "guard_return" {
+        if node.op.module == "cpu"
+            && matches!(
+                node.op.instruction.as_str(),
+                "guard_return" | "guard_call_owned_struct_return"
+            )
+        {
             guard = Some(node.name.clone());
         }
     }

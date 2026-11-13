@@ -10,6 +10,7 @@ fn glm_module(nodes: Vec<Node>, edges: Vec<Edge>) -> YirModule {
         }],
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
         nodes,
         edges,
         node_lanes: BTreeMap::new(),

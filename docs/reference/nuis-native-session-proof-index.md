@@ -3,6 +3,36 @@
 Navigational catalog only, not a cumulative acceptance receipt; the [mainline map](../current-mainline-map.md) selects current work. Each receipt owns its scope, baseline and validation. Later proofs may advance vetoes; never sum their totals.
 
 ## Current Evidence
+### Resource Session Ladder
+
+The latest boundary is inferred resource shadowing below. Earlier receipts
+remain scoped historical evidence, not competing descriptions of the latest
+admission. Follow the [runnable example ladder](../../examples/projects/domains/README.md#native-cpu-resource-sessions)
+and [implementation owners](../repo-layout.md#native-resource-session-ownership)
+before reading the full history.
+
+| Receipt | Added Scope |
+| --- | --- |
+| [Buffer/Bytes session](nuis-native-resource-session-v1.md) | Separate bounded synchronous native callback contract. |
+| [Artifact registration](nuis-native-resource-session-artifacts-v1.md) | Project/YIR/export identity, cache, NSB relocation and binary-only launch. |
+| [CPU frame export](nuis-native-resource-frame-export-v1.md) | Final successfully closed pixel State as an image. |
+| [Mixed resource State](nuis-native-mixed-resource-state-v1.md) | Nuis-owned i64 dimensions/control plus one Bytes field, published together. |
+| [Checked resource State](nuis-native-checked-resource-state-v1.md) | Configuration validation and explicit Result errors without failed-State publication. |
+| [Guarded resource returns](nuis-native-guarded-resource-return-v1.md) | Selected straight-line early Ok arms and path-local cleanup. |
+| [Retained Bytes](nuis-native-retained-bytes-return-v1.md) | Taken-edge cleanup while the untaken path keeps incoming owners. |
+| [Transferred Bytes](nuis-native-transferred-bytes-return-v1.md) | Typed helper ownership handoff without copying the retained snapshot. |
+| [Nested owned returns](nuis-native-nested-owned-return-v1.md) | Bounded terminal nesting and independent per-level cleanup. |
+| [Shared owned continuation](nuis-native-owned-continuation-v1.md) | Empty-else nonterminal joins, one shared suffix and unchanged Result/failure forwarding. |
+| [Paired owned continuation](nuis-native-paired-owned-continuation-v1.md) | Nonempty then/else arms share the suffix while retaining independent early returns and cleanup. |
+| [Resource scalar shadowing](nuis-native-resource-scalar-shadowing-v1.md) | Explicit i64 local declarations retain lexical identities across early returns and shared continuations. |
+| [Inferred resource shadowing](nuis-native-resource-inferred-shadowing-v1.md) | Shared inference and alias resolution admit canonical i64 identities before optimization. |
+
+Record helpers within resource callbacks, captured writes, mutable resource carries, provider/device completion and
+native ns-nova windows remain separate. No row grants general resource loops,
+pure Nsld finalization or an all-Nuis host runtime.
+
+### Scalar And Record Baseline
+
 The [local scalar audit](nuis-native-local-scalar-argument-print-v1.md) follows [restricted i64 XOR](nuis-native-i64-xor-argument-print-v1.md) at the dated [snapshot](../versioning/nuis-beta-0.18.0-snapshot.md). It follows [computed i64 printing](nuis-native-computed-iteration-print-v1.md) and [root carry reads](nuis-native-carry-epoch-print-v1.md), then [fresh child entries](nuis-native-child-epoch-print-v1.md) and [original i64 fields](nuis-native-field-epoch-print-v1.md), then [typed bool arguments](nuis-native-bool-field-epoch-print-v1.md) and [shared i32 arguments](nuis-native-i32-field-epoch-print-v1.md) and [raw f32 arguments](nuis-native-f32-field-epoch-print-v1.md) and [full-width f64 arguments](nuis-native-f64-field-epoch-print-v1.md).
 The [epoch-local plan](nuis-native-epoch-local-plan-v1.md) feeds separate [root-owned](nuis-native-epoch-local-argument-print-v1.md) and [fresh child-owned](nuis-native-child-epoch-local-argument-print-v1.md) execution proofs; the map owns the next gate. Original reference files, anchors, fixtures and regressions remain below; further changing backedges and wide private captures are separate.
 

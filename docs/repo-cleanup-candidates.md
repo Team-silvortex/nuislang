@@ -4,6 +4,68 @@ This is the current cleanup policy and audit record, not an alpha-era deletion
 wishlist. Current compiler, Nustar and application behavior remains governed by
 the [mainline map](current-mainline-map.md) and the development tensor.
 
+## 2026-11-13 Resource Session Consolidation
+
+Git remains beta-0.18.9 at `c917aa3d`. The pending Buffer/Bytes and owned
+continuation implementation is retained; this pass reorganizes entrypoints and
+regeneratable storage, not compiler semantics or a release.
+
+### Navigation And Ownership
+
+The mainline map shrinks from 285 to 158 lines, removing repeated scalar-proof
+narratives rather than their evidence. README shrinks from 281 to 274 lines.
+The [native proof catalog](reference/nuis-native-session-proof-index.md)
+keeps every native receipt reachable and groups the ten resource checkpoints
+into a scope table. The tensor selection guide links that ladder instead of
+repeating its history. Dated receipts and their original validation limits stay
+intact; none is relabeled as new acceptance.
+
+The [resource owner map](repo-layout.md#native-resource-session-ownership)
+separates contracts, source outlining, native admission/emission, host transport,
+artifact identity and launch adapters. The
+[example ladder](../examples/projects/domains/README.md#native-cpu-resource-sessions)
+routes all four CPU canvas profiles. The latest
+[guarded canvas guide](../examples/projects/domains/native_guarded_canvas_session_demo/README.md)
+now documents commands, exact scalar/pixel results, heartbeat semantics, errors
+and unsupported joins. Two maintenance regressions keep the guides and module
+entrypoints discoverable.
+
+### Storage And Preservation
+
+The safe cleaner now includes both `scripts/__pycache__` and
+`scripts/tests/__pycache__`. Its tracked-path, ignore and symlink checks apply to
+both; a new regression exercises tracked and symlinked script-cache vetoes.
+No whole-workspace clean, dependency-source removal, Git pruning, global cache
+cleanup or sibling-project deletion is performed.
+
+After builds/tests stop, `--build-binaries --apply` removes 23 ignored outputs,
+selected at 876,460 KiB. Root `target/` measures 5,523,924 KiB immediately before
+and 4,647,548 KiB immediately after: a reduction of 876,376 KiB, about 856 MiB.
+The remaining 84 KiB is the two Python caches. These are measured directory
+changes, not a claim about the entire filesystem's free-space movement.
+Root CLIs and dependency libraries are retained; removed test executables can
+be relinked by Cargo. The subsequent cleanup dry run selects zero outputs.
+
+All 12 root CLI hashes match across cleanup. All 5,694 previously present
+non-Markdown files under crates/tools/stdlib/Nustar packages/subprojects/examples
+retain their hashes across this maintenance. Every complete tensor cell value
+is unchanged; the selected resource coordinate remains active/95 with nonempty
+else joins next. The 12 live historical line exceptions remain tight, not widened
+or deleted to improve a count.
+
+### Validation Scope
+
+52 focused tests pass: 43 maintenance regressions, six mainline source/example
+checks (including host-absolute-path policy), two file-budget checks and the
+shared-continuation artifact workflow. That workflow rechecks exact pixels and
+scalar State through cache reuse, source-free NSB relocation and binary-only
+execution. Architecture checks retain 29 packages, six domain crates and 74
+normal/build edges. UTF-8, local documentation links, shell syntax and diff
+whitespace checks pass; all 4562 tensor drift checks remain clean.
+
+No full-workspace, fresh remote hardware, performance, pure Nsld or all-Nuis
+runtime acceptance is claimed. No commit, push or version bump is performed.
+
 ## 2026-10-28 Shader/Nova Contract Suite Split
 
 This follows the architecture/storage audit below at Git beta-0.18.3,
@@ -359,8 +421,8 @@ shipping host-specific binaries beside source. The
 The former `examples/bins/` area now contains only a rebuild guide.
 
 Default cleanup removes example `.nuis/cache`, tool/crate-local `target`
-directories, incremental state, optional preview output and maintenance Python
-cache. It preserves other `.nuis` state, the root CLI binaries, libraries,
+directories, incremental state, optional preview output and both maintenance
+Python caches. It preserves other `.nuis` state, the root CLI binaries, libraries,
 package downloads and all subprojects.
 
 ## Cleanup Commands

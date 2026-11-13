@@ -27,7 +27,13 @@ pub(crate) fn lower_cpu_param_node(
     }
     if !matches!(
         node.op.instruction.as_str(),
-        "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64"
+        "param_bool"
+            | "param_i32"
+            | "param_i64"
+            | "param_f32"
+            | "param_f64"
+            | "param_buffer_ref"
+            | "param_owned_bytes"
     ) {
         return Ok(false);
     }
@@ -38,6 +44,22 @@ pub(crate) fn lower_cpu_param_node(
             node.name
         )
     })?;
+    if matches!(
+        node.op.instruction.as_str(),
+        "param_buffer_ref" | "param_owned_bytes"
+    ) {
+        if !matches!(
+            (node.op.instruction.as_str(), binding),
+            ("param_buffer_ref", LlvmValueRef::BorrowedBuffer { .. })
+                | ("param_owned_bytes", LlvmValueRef::OwnedBytes { .. })
+        ) {
+            return Err(format!(
+                "CPU resource parameter `{}` has a mismatched LLVM binding",
+                node.name
+            ));
+        }
+        return Ok(true);
+    }
     if matches!(node.op.instruction.as_str(), "param_f32" | "param_f64") {
         // Float parameters are already typed SSA bindings, not fallback integer returns.
         if !matches!(
@@ -60,6 +82,55 @@ pub(crate) fn lower_cpu_param_node(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resource_parameters_require_typed_bindings_without_scalar_pointer_coercion() {
+        for (instruction, binding) in [
+            (
+                "param_buffer_ref",
+                LlvmValueRef::BorrowedBuffer {
+                    ptr: "%p".to_owned(),
+                    len: "%n".to_owned(),
+                },
+            ),
+            (
+                "param_owned_bytes",
+                LlvmValueRef::OwnedBytes {
+                    blob: "%blob".to_owned(),
+                },
+            ),
+        ] {
+            let node = Node {
+                name: "resource".to_owned(),
+                resource: "cpu0".to_owned(),
+                op: yir_core::Operation::parse(&format!("cpu.{instruction}"), vec!["0".to_owned()])
+                    .unwrap(),
+            };
+            let mut body = Vec::new();
+            let mut next = 5;
+            let mut last = Some("%scalar".to_owned());
+            for registers in [
+                BTreeMap::new(),
+                BTreeMap::from([(node.name.clone(), LlvmValueRef::Ptr("%p".to_owned()))]),
+            ] {
+                assert!(
+                    lower_cpu_param_node(&node, &mut body, &registers, &mut next, &mut last)
+                        .is_err()
+                );
+            }
+            assert!(lower_cpu_param_node(
+                &node,
+                &mut body,
+                &BTreeMap::from([(node.name.clone(), binding)]),
+                &mut next,
+                &mut last
+            )
+            .unwrap());
+            assert!(body.is_empty());
+            assert_eq!(next, 5);
+            assert_eq!(last.as_deref(), Some("%scalar"));
+        }
+    }
 
     #[test]
     fn unbound_scalar_parameter_reports_context_without_panicking_or_mutating_ir() {

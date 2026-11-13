@@ -38,6 +38,21 @@ pub fn parse_explicit_module(input: &str) -> Result<YirModule, String> {
             Some("function-param") => parse_function_parameter(&mut module, &tokens, line_no)?,
             Some("function-result") => parse_function_result(&mut module, &tokens, line_no)?,
             Some("function-node") => parse_function_node(&mut module, &tokens, line_no)?,
+            Some("resource-session") => {
+                let fields = tokens[1..].iter().map(String::as_str).collect::<Vec<_>>();
+                let session =
+                    yir_core::native_resource_session::ResourceSessionRegistration::from_fields(
+                        &fields,
+                    )?;
+                if module.resource_sessions.len() >= 64
+                    || module.resource_sessions.iter().any(|r| r.id == session.id)
+                {
+                    return Err(format!(
+                        "line {line_no}: duplicate or excessive resource session registrations"
+                    ));
+                }
+                module.resource_sessions.push(session);
+            }
             Some("application-session") => {
                 let fields = tokens[1..].iter().map(String::as_str).collect::<Vec<_>>();
                 let session = yir_core::YirApplicationSession::from_fields(&fields)

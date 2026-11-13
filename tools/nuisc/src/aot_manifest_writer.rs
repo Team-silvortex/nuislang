@@ -58,7 +58,7 @@ pub fn write_build_manifest(
         &mut domain_build_units,
         required_code_assets,
     )?;
-    if crate::aot_native_session::has_bound_inputs(&written.packaging_mode) {
+    if crate::aot_session_profile::has_bound_inputs(&written.packaging_mode) {
         crate::aot_application_bundle::append_metadata_artifacts(
             context,
             &mut artifact_set.artifacts,

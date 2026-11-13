@@ -76,7 +76,7 @@ finite compiler-module migration plan.
 | --- | --- | --- |
 | `ns-nova/persistent-application-session` | active/60 | Bounded native scalar and embedded-YIR application evidence exists; complete native resource callbacks, frames and lifecycle acceptance remain open. |
 | `nuisc/native-scalar-record-session-profile` | stable/100 | Closed admitted scalar/value-record profile only, including direct-return and source-free delivery; not owned resources or arbitrary control. |
-| `nuisc/native-resource-session-callbacks` | early/0 | Registered native Buffer/Bytes ownership, invocation, failure cleanup and completion; rejection tests are a baseline, not closure. |
+| `nuisc/native-resource-session-callbacks` | active/95 | Checked Result callbacks preserve ownership across paired joins; explicit/inferred/aliased i64 shadows have lexical identities and source-free delivery. Record helper calls, captured writes, arbitrary layouts, windows and provider completion remain open. |
 | `application-session/lifecycle-failure-resource-safety` | early/0 | Scalar-state failed cleanup is tested, but cancellation, resize and in-flight close must still account for owned resource capabilities. |
 | `shader/shader-resource-bindings` | early/15 | Image and parameter bindings execute through registered, reflected resource contracts. |
 | `ns-nova/interactive-image-workflow` | early/0 | Load, zoom, parameter change, redraw and export operate in one Nuis-owned application. |
@@ -102,6 +102,17 @@ The [2026-11-13 recalibration](nuis-development-tensor-recalibration-2026-11-13.
 reviews all coordinates and separates the bounded compiler profile from application
 closure. The change from active/99 to active/60 is a scope correction, not a loss of
 verified functionality. A scalar-profile regression reopens its dependents.
+The [inferred resource-shadowing proof](nuis-native-resource-inferred-shadowing-v1.md) is the
+current resource boundary: checked mixed State, nested early returns and
+nonempty then/else joins retain ownership, lexical i64 capture identities, complete State publication and
+source-free delivery. The [resource proof ladder](nuis-native-session-proof-index.md#resource-session-ladder)
+owns earlier acceptance scopes. Scalar-record helper calls in resource callbacks remain next; interactive
+frame dispatch still retains early/10.
+
+Repository maintenance records its scope in the [hygiene log](../repo-cleanup-candidates.md).
+Reorganizing entrypoints or reclaiming build outputs does not advance any
+coordinate. Compare complete cell values and rerun drift checks; a clean drift
+result verifies evidence consistency, not fresh runtime or hardware acceptance.
 
 ## Historical Checkpoints
 

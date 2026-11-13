@@ -8,6 +8,7 @@ fn topological_order_keeps_descending_ready_node_priority() {
         resources: Vec::new(),
         functions: Vec::new(),
         application_sessions: Vec::new(),
+        resource_sessions: Vec::new(),
         nodes: vec![
             node("a", "cpu0", "cpu.const", &["1"]),
             node("b", "cpu0", "cpu.const", &["2"]),

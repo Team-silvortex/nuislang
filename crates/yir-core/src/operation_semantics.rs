@@ -400,6 +400,8 @@ impl Operation {
             | "guard_loop_print_continue"
             | "guard_print"
             | "guard_return"
+            | "guard_call_owned_struct_return"
+            | "tail_call_owned_struct_return"
             | "guard_drop_owned_bytes_return"
             | "branch_drop_owned_bytes_return"
             | "guard_host_call_return"

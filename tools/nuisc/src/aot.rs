@@ -62,3 +62,8 @@ pub mod native_session {
         verify_checkpoint_for_packaging_mode, PACKAGING_PREFIX, POLICY_PACKAGING_PREFIX,
     };
 }
+pub mod resource_session {
+    pub use crate::aot_resource_session::{
+        emit_for_packaging_mode, registration_id, verify_checkpoint, verify_frame_export_capability, PACKAGING_PREFIX,
+    };
+}

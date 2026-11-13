@@ -51,6 +51,8 @@ mod direct_calls;
 mod edge_helpers;
 #[path = "lowering/guard_ops.rs"]
 mod guard_ops;
+#[path = "lowering/guarded_owned_returns.rs"]
+mod guarded_owned_returns;
 #[path = "lowering/if_lowering.rs"]
 mod if_lowering;
 #[path = "lowering/kernel_exprs.rs"]

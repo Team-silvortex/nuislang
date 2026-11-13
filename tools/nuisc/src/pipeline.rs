@@ -38,6 +38,9 @@ use pipeline_units::{
     collect_loaded_nustar, validate_instantiated_units, validate_used_units_with_local_units,
 };
 pub use pipeline_yir_checkpoint::VerifiedYirArtifacts;
+#[path = "pipeline_resource_session.rs"]
+mod resource_session;
+pub use resource_session::compile_resource_session_source;
 
 pub struct PipelineArtifacts {
     pub ast: AstModule,
@@ -264,6 +267,13 @@ fn compile_project_plan_to_verified_yir(
         .application_sessions
         .iter()
         .flat_map(|session| [&session.open, &session.event, &session.close])
+        .chain(
+            project
+                .manifest
+                .resource_sessions
+                .iter()
+                .flat_map(|session| session.callbacks.iter()),
+        )
         .cloned()
         .collect();
     let mut artifacts =
@@ -457,7 +467,14 @@ fn prepare_project_nir(
         .filter(|module| module.path != project.entry_path)
         .map(|module| module.ast.clone())
         .collect::<Vec<_>>();
-    let nir = crate::frontend::lower_project_ast_to_nir(&ast, &helper_modules)?;
+    let resource_roots = project
+        .manifest
+        .resource_sessions
+        .iter()
+        .flat_map(|session| session.callbacks.iter().cloned())
+        .collect();
+    let normalized = crate::resource_session_bindings::normalize(&ast, &resource_roots);
+    let nir = normalized.lower(&helper_modules)?;
     Ok((ast, nir, local_units))
 }
 

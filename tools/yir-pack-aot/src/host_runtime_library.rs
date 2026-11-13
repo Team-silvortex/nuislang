@@ -1,5 +1,15 @@
 use std::{path::PathBuf, process::Command};
 
+pub(super) fn native_blob_runtime_source() -> String {
+    // Shared allocation ABI, independent of scalar/resource session admission.
+    let mut source =
+        "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n"
+            .to_owned();
+    source.push_str(super::host_text_runtime::host_text_runtime_source());
+    nuis_runtime::append_c_shim_owned_blob_runtime(&mut source);
+    source
+}
+
 pub(super) fn ensure_runtime_host_staticlib_built() -> Result<PathBuf, String> {
     let status = Command::new("cargo")
         .arg("build")

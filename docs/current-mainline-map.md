@@ -31,160 +31,51 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- dev-tensor --json
 ```
 
 The goal is `standard-library/ns-nova/interactive-image-workflow`.
-Its selected prerequisite is
-`compiler-toolchain/nuisc/native-resource-session-callbacks`, early/0 at the
-[2026-11-13 recalibration](reference/nuis-development-tensor-recalibration-2026-11-13.md).
-The dependency chain is resource callbacks -> native CPU frame dispatch ->
-`standard-library/ns-nova/persistent-application-session` (active/60) -> image workflow.
-The verified bounded scalar/record profile is separately stable/100, not a claim
-that all CPU lowering or the application is complete.
 The [declared dependency plan](reference/nuis-development-tensor.mainline.toml)
-selects that prerequisite, not the globally lowest percentage. Correctness
-regressions may interrupt it; documentation maintenance does not advance it.
+selects this chain, not the globally lowest percentage:
 
-| Current Native CPU Scope | Read First |
-| --- | --- |
-| Ordered effectful returns and complete State publication | [Effect-prefix certificate](reference/nuis-native-return-effect-prefix-v1.md), [mixed loop exits](reference/nuis-native-stateful-loop-return-parent-mixed-v1.md). |
-| Bounded record storage reuse with independent fallback | [Storage certificate](reference/nuis-native-return-effect-storage-v1.md), [payload/field execution](reference/nuis-native-return-effect-storage-field-payload-v1.md). |
-| Guarded scalar/record joins and owned value provenance | [Logical fields](reference/nuis-native-logical-record-fields-v1.md), [two-arm origins](reference/nuis-native-origin-record-join-v1.md). |
-| Explicit pure-i64 print values and root entry reads | [Computed prints](reference/nuis-native-computed-iteration-print-v1.md), [root epochs](reference/nuis-native-carry-epoch-print-v1.md). |
-| Fresh child entry reads without ancestor-grant inheritance | [Child epochs](reference/nuis-native-child-epoch-print-v1.md), a separate worktree follow-up at the dated audit. |
-| Pre-update nested i64 fields without whole-record readiness | [Original-path field epochs](reference/nuis-native-field-epoch-print-v1.md), using the same root/child entry rules. |
-| Pre-update bool fields at exact pure-i64 helper arguments | [Typed bool arguments](reference/nuis-native-bool-field-epoch-print-v1.md), not ambient bool expression permission. |
-| Pre-update i32 fields with exact signed State words | [Shared typed arguments](reference/nuis-native-i32-field-epoch-print-v1.md), retaining bool and ordinary-read boundaries. |
-| Pre-update f32 fields with raw callee/State words | [IEEE field arguments](reference/nuis-native-f32-field-epoch-print-v1.md), separating raw payload proof from finite CLI delivery. |
-| Pre-update f64 fields with complete 64-bit words | [Full-width field arguments](reference/nuis-native-f64-field-epoch-print-v1.md), retaining high bits, low-bit distinctions and entry budgets. |
-| Pre-update f32/f64 field sign-negation chains at pure-i64 helper arguments | [Compositional unary arguments](reference/nuis-native-nested-unary-float-field-epoch-print-v1.md), retaining original-field proofs, cumulative depth and raw sign/payload controls. |
-| Same-kind float arithmetic over certified fields and ready leaves | [Binary argument plan](reference/nuis-native-binary-float-field-epoch-print-v1.md), including checked zero division and separate arithmetic/State evidence. |
+```text
+native-resource-session-callbacks (active/95)
+  -> native CPU frame dispatch (early/10)
+  -> standard-library/ns-nova/persistent-application-session (active/60)
+  -> interactive-image-workflow
+```
 
-The [restricted i64 XOR follow-up](reference/nuis-native-i64-xor-argument-print-v1.md)
-composes full-width XOR with signed widening, arithmetic and same-kind helpers.
-Both operands are eager in source order; only the enclosing AND/OR can skip
-the expression. Native probes distinguish entry order from reference completion
-events, including independent mask faults. Original epochs and comparison-only
-provenance remain gates. The [source-local scalar audit](reference/nuis-native-local-scalar-argument-print-v1.md)
-confirms existing ready-local composition through native execution and delivery;
-it does not lend print-only epoch reads to ordinary initializers. The
-[epoch-local initializer plan](reference/nuis-native-epoch-local-plan-v1.md)
-analyzes one borrowed definition/observer pair with original field identity,
-statement position, comparison-only provenance and shared bounds. The
-[root-owned source route](reference/nuis-native-epoch-local-argument-print-v1.md)
-now admits that pair through existing normalization and native/source-free
-execution without publishing ordinary readiness. The
-[child-owned route](reference/nuis-native-child-epoch-local-argument-print-v1.md)
-now binds a fresh ready child entry to its own complete block, without lending
-its owner to ordinary branches or unready descendants. The
-[repeated-parent witness](reference/nuis-native-parent-reentry-argument-print-v1.md)
-now verifies zero/dynamic parent trips, child reseeding across parent backedges
-and later-parent faults through native execution and source-free restoration.
-The [later-child witness](reference/nuis-native-child-progress-argument-print-v1.md)
-now reaches faults after completed siblings in later parents, retaining exact
-output prefixes and the last accepted callback State through native execution
-and source-free delivery. The [parent-bound witness](reference/nuis-native-parent-bound-argument-print-v1.md)
-now verifies zero/positive/zero/resumed child counts, fresh entries and an exact
-12-unit success/11-unit work rejection boundary. The
-[fallible-bound witness](reference/nuis-native-fallible-bound-argument-print-v1.md)
-adds producer failures even for would-be zero-child parents and distinguishes
-source faults from child-reservation rejection. The
-[state-bound witness](reference/nuis-native-state-bound-argument-print-v1.md)
-connects ready floating-point comparisons to bound production, using changed
-parent carries and the last accepted State rather than stale entry values.
-The [early-break witness](reference/nuis-native-state-break-argument-print-v1.md)
-now preserves completed State, skipped suffixes and observed indices under those
-bounds. Generated control prologues retain exact normalization provenance;
-source lookalikes and branch grants remain rejected, and exits do not refund work.
-The [continue witness](reference/nuis-native-state-continue-argument-print-v1.md)
-now checks exactly one step, selected fallible suffixes and continued traversal,
-without new admission permissions or changes to work reservation.
-The [mixed-exit witness](reference/nuis-native-state-mixed-argument-print-v1.md)
-combines both paths, including colliding guards and reversed source order,
-without refunding reserved work or replacing accepted State with entry decoys.
-The [checked-exit witness](reference/nuis-native-state-predicate-argument-print-v1.md)
-now verifies reached/skipped boolean helper calls and their failure priority,
-including a reversed-source collision, without raising work or entry budgets.
-The [short-circuit witness](reference/nuis-native-state-short-circuit-argument-print-v1.md)
-now checks both fallible operands, skipped RHS faults, confirmation vetoes and
-fallback breaks, including their changed State-dependent reservations.
-The [grouped-exit witness](reference/nuis-native-state-grouped-argument-print-v1.md)
-checks nested conjunction/disjunctions and parentheses-only regrouping, including
-skipped inner faults and confirmation-driven work. The
-[updated-field witness](reference/nuis-native-state-field-exit-argument-print-v1.md)
-feeds post-update f32/f64 record fields into those predicates, retaining raw IEEE
-arguments, accepted State and unchanged work/entry limits. Total classifiers avoid
-extra outlined entries; equivalent branch classifiers retain explicit quota rejection.
-The [checked-division witness](reference/nuis-native-state-division-exit-argument-print-v1.md)
-now composes updated fields with ready same-kind divisors, checking rounded IEEE
-arguments, skipped zero-divisor faults and failure before confirmation entry.
-The [checked-producer witness](reference/nuis-native-state-helper-exit-argument-print-v1.md)
-now observes independent left/right helper entries, returned values and reversed-source
-fault priority without widening quotas or inheriting effect grants.
-The [later-parameter witness](reference/nuis-native-state-parameter-exit-argument-print-v1.md)
-now checks mode/guard producers after the quotient, including reordered parameter
-faults and full-width returned values, without changing admission or quotas.
-The [record-parameter witness](reference/nuis-native-state-record-parameter-exit-argument-print-v1.md)
-now derives those values from updated f32/f64 fields, distinguishing stale parent
-reads, derived-zero failures and accepted-State backedges at unchanged quotas.
-The [persistent-control witness](reference/nuis-native-state-control-exit-argument-print-v1.md)
-now publishes a float and i64 control together, preserving accepted fields through
-rejections/faults and source-free restoration without changing one-word predecessors.
-The [checked-control witness](reference/nuis-native-state-checked-control-exit-argument-print-v1.md)
-now separates float-update checks from control production, retaining exact failure
-prefixes and complete accepted State without widening quotas.
-The [branch-control witness](reference/nuis-native-state-branch-control-exit-argument-print-v1.md)
-now selects checked returns using current i64 State, including wrapping branch
-changes and skipped zero guards. The
-[branch-helper witness](reference/nuis-native-state-branch-helper-exit-argument-print-v1.md)
-adds independently checked, explicitly authorized leaf effects inside those
-branches. The [ordered-chain witness](reference/nuis-native-state-branch-chain-exit-argument-print-v1.md)
-passes a tagged return into a second helper without reselecting the branch.
-The [return-gate witness](reference/nuis-native-state-return-gate-exit-argument-print-v1.md)
-now lets the actual first return suppress the second call, including poisoned
-skipped checks and full-width zero tests.
-The [result-join follow-up](reference/nuis-native-state-return-join-exit-argument-print-v1.md)
-now carries a selected result into later computation, prints and checks, fixing
-iteration admission and colliding branch-local identities in production lowering.
-Selected native/reference and source-free delivery checks pass.
-The [selected-prefix follow-up](reference/nuis-native-state-return-prefix-exit-argument-print-v1.md)
-adds straight typed local computations and checks inside guarded result arms.
-Selected native/reference and source-free delivery checks pass, including
-independently poisoned unused prefixes.
-The [prefix-print follow-up](reference/nuis-native-state-return-print-exit-argument-print-v1.md)
-adds explicit i64 print statements and independent print-operand checks inside
-selected prefixes. Selected native/reference and source-free delivery checks pass, including
-independent unused print-operand poisons and precise failure prefixes.
-The [nested-prefix follow-up](reference/nuis-native-state-return-nested-exit-argument-print-v1.md)
-adds recursively scoped scalar result joins under shared whole-tree budgets.
-Selected native/reference and source-free delivery checks pass, including
-shared-budget boundaries and independently poisoned unused paths.
-The [record-prefix follow-up](reference/nuis-native-state-return-record-exit-argument-print-v1.md)
-adds exact owned record results and field consumers, with a shared synthetic
-record budget. Selected native/reference and source-free delivery checks pass,
-including reached failures in unprojected fields.
-The [logical-field follow-up](reference/nuis-native-state-return-logical-exit-argument-print-v1.md)
-admits short-circuit bool fields through shared guarded lowering. Selected
-native/reference checks and 160 fresh/cache/source-free program runs pass;
-constructor order and effects in unused fields retain regression coverage.
-The [local-initializer follow-up](reference/nuis-native-state-return-local-exit-argument-print-v1.md)
-admits fresh let/const bool short-circuit roots while keeping print operands
-separate. Selected native/reference and source-free delivery checks pass,
-including unused let/const effects; new and predecessor sources complete 320
-program runs together.
-The [eager-operand follow-up](reference/nuis-native-state-return-eager-exit-argument-print-v1.md)
-admits equality/inequality/XOR around local short-circuit subtrees without
-opening predicate, field or argument roots. Paired-effect native/reference
-checks pass through the state-loop route. New and preceding delivery sources
-complete 320 fresh/cache/source-free program runs.
-The direct-entry follow-up above closes that reproduced non-loop helper boundary.
-Those scalar proofs remain the regression baseline. The recalibrated next gate is
-**native resource-session callbacks**; further scalar combinations become blocking
-work only when a concrete application witness requires them.
-General effects, resources, references and arbitrary
-outer writes remain outside these bounded CPU admissions.
+The [2026-11-13 recalibration](reference/nuis-development-tensor-recalibration-2026-11-13.md)
+retains the preceding early/0 checkpoint. Current resource evidence is the
+[inferred resource-shadowing proof](reference/nuis-native-resource-inferred-shadowing-v1.md):
+fixed-extent synchronous Buffer/Bytes callbacks, flat i64-plus-Bytes State,
+checked errors and early owned returns execute natively. Both nonempty arms
+can rejoin one shared suffix after an untaken inner return, preserving ownership
+and once-only effects. Explicit, inferred and aliased i64 local declarations
+preserve lexical identities through shared semantic type resolution; true
+assignments remain distinct. Registration, cache, source-free NSB relocation,
+binary-only launch and final accepted CPU pixel export have scoped regressions.
 
-Keep checks/calls once-only and source-ordered, failure before result/pending
-publication, and independent fallback for every unproved storage reduction.
-The backlog of further changing backedges and wide private captures retains
-its own gates. Full history and numerical test results belong in receipts.
+**Next:** admit the reproduced `measure(width).value` scalar-record helper inside
+resource callbacks. Type resolution succeeds, but native admission still rejects
+`call_owned_struct`; reuse existing callee contracts without bypassing owner checks. Captured writes,
+resource-changing joins, general resource loops, broader layouts and provider/device
+completion remain separate. CPU export does not establish interactive frame dispatch.
+
+Use the [resource example ladder](../examples/projects/domains/README.md#native-cpu-resource-sessions)
+for runnable entrypoints and the [implementation owner map](repo-layout.md#native-resource-session-ownership)
+for changes across compiler, contracts, lowering, host and delivery boundaries.
+
+### Retained Scalar Baseline
+
+The bounded scalar/record session profile remains stable/100, not all CPU
+lowering or the whole application. Its
+[direct effectful-record checkpoint](reference/nuis-native-direct-effectful-records-v1.md)
+and [proof catalog](reference/nuis-native-session-proof-index.md) preserve the
+full return, loop, print and field-transport history. Further combinations only
+become selected work when a concrete application witness requires them. The
+backlog of further changing backedges and wide private captures retains its own gates.
+
+Keep effects once-only and source-ordered, failure before State publication,
+and independent storage fallback for unproved reductions. Correctness
+regressions may interrupt the selected feature. Documentation and storage
+maintenance do not advance functional tensor scores.
 
 ## Execution Routes
 
@@ -192,6 +83,7 @@ its own gates. Full history and numerical test results belong in receipts.
 | --- | --- | --- |
 | Embedded-YIR application | Nuis callbacks, real Metal image work, explicit AppKit/headless sessions and provider observations. | The host embeds the YIR lifecycle runtime; not every callback executes through native CPU lowering. |
 | Native CPU session | Bounded registered callbacks, current State, selected effects, loops/exits, cache and source-free restoration. | Not arbitrary resource/I/O/async capture or a complete native engine. |
+| Native resource session | Fixed-extent Buffer/Bytes and flat i64-plus-Bytes records, bounded ownership, exact registration/NSB/export checkpoints, source-free launch and State-driven CPU canvas export. | Not yet resource loops/helpers, arbitrary mixed layouts, native ns-nova windows or provider/device completion; not pure Nsld finalization. |
 | Nsld private image | Scoped Mach-O/ELF assembly and explicit admission/final-output selection. | Not a self-contained heterogeneous application or full provider/PE parity. |
 
 Do not transfer acceptance between these routes. Cancellation admission,
@@ -229,6 +121,10 @@ commands rather than reproducing their entire history in this router.
 | Simple file/image transform | [cli_pgm_invert_demo](../examples/projects/tooling/cli_pgm_invert_demo) | Checked small PGM input/output, not a general image-codec library. |
 | Current application goal | [ns_nova_image_showcase](../examples/projects/domains/ns_nova_image_showcase) | Real Metal processing, compiled export and explicit stateful AppKit window; embedded YIR host runtime remains. |
 | Small render/uniform route | [ns_nova_showcase](../examples/projects/domains/ns_nova_showcase) | Bounded frame loop, registered render resources and live/replay evidence. |
+| Native CPU canvas | [native_canvas_session_demo](../examples/projects/domains/native_canvas_session_demo) | Nuis pixel callbacks and final accepted RGBA8 State exported as PPM; source-free, CPU-only, no window/provider dispatch. |
+| Native mixed-State canvas | [native_mixed_canvas_session_demo](../examples/projects/domains/native_mixed_canvas_session_demo) | Nuis-owned dimensions, event count, cursor and pixels; complete State publication and source-free final image export. |
+| Native checked canvas | [native_checked_canvas_session_demo](../examples/projects/domains/native_checked_canvas_session_demo) | Nuis-side dimension checks and Result errors; no state/frame publication on rejection, including source-free execution. |
+| Native guarded canvas | [native_guarded_canvas_session_demo](../examples/projects/domains/native_guarded_canvas_session_demo/README.md) | Held Bytes across both arms' early returns and continuations; one shared suffix, no interactive window or GPU dispatch. |
 | Linker closure | [native_artifact_closure_demo](../examples/projects/tooling/native_artifact_closure_demo) | Inspect the selected finalizer and admission evidence; a planned image is not automatically runnable. |
 | Compiler component | [bootstrap_structural_projection_candidate](../examples/projects/tooling/bootstrap_structural_projection_candidate) | Bounded candidate proof, not general self-compilation or replacement authority. |
 | Linux device work | [CUDA bring-up](reference/linux-cuda-provider-bringup.md), [domain examples](../examples/projects/domains/README.md) | Run provider-specific gates on suitable hardware; absent hardware is unverified, not fallback success. |

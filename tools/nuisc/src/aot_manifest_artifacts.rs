@@ -59,7 +59,7 @@ pub(crate) fn prepare_build_manifest_artifacts(
             .as_ref()
             .ok_or_else(|| "native/window artifacts require a real LLVM checkpoint".to_owned())?;
         artifacts.push(("llvm_ir".to_owned(), PathBuf::from(llvm_ir_path)));
-        if crate::aot_native_session::registration_id(&written.packaging_mode)?.is_some() {
+        if crate::aot_session_profile::is_native(&written.packaging_mode)? {
             if written.stage_handoff.is_none() {
                 return Err("native session artifacts require a source-to-YIR handoff".to_owned());
             }

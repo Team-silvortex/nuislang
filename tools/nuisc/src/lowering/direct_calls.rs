@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "direct_calls/return_boundary.rs"]
+mod return_boundary;
+
 #[path = "direct_calls/aggregate_params.rs"]
 mod aggregate_params;
 #[path = "direct_calls/capture_params.rs"]
@@ -632,61 +635,8 @@ pub(super) fn lower_direct_call_helper_function(
         lowered?.ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
     let function_effect_anchor = state.last_effect_anchor.take();
     state.last_effect_anchor = saved_effect_anchor;
-    let return_name = format!("__fn_{}_return", function.name);
-    let owned_layout = function_owned_struct_layout(function, state);
-    let struct_return = owned_layout.is_some();
-    let return_kind = if struct_return {
-        None
-    } else {
-        Some(direct_call_return_kind(function).ok_or_else(|| {
-            format!(
-                "ordinary direct-call lowering does not support the return type in `{}`",
-                function.name
-            )
-        })?)
-    };
-    let (return_instruction, mut return_args) = if struct_return {
-        let mut args = vec![returned.clone()];
-        args.push(owned_layout.expect("owned return layout"));
-        ("return_owned_struct", args)
-    } else {
-        let instruction = match return_kind.expect("non-struct return kind") {
-            DirectCallScalarKind::Bool => "return_bool",
-            DirectCallScalarKind::I32 => "return_i32",
-            DirectCallScalarKind::I64 => "return_i64",
-            DirectCallScalarKind::F32 => "return_f32",
-            DirectCallScalarKind::F64 => "return_f64",
-            DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
-            DirectCallScalarKind::TraversalPointer => {
-                unreachable!("traversal refs cannot return")
-            }
-            DirectCallScalarKind::OwnedBytes => "return_owned_bytes",
-            DirectCallScalarKind::OwnedExternalBuffer => "return_owned_external_buffer",
-        };
-        (instruction, vec![returned.clone()])
-    };
-    if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
-        return_args.extend(owned_external_buffer_metadata_for_node(
-            state.yir, &returned,
-        )?);
-    }
-    state.yir.nodes.push(Node {
-        name: return_name.clone(),
-        resource: "cpu0".to_owned(),
-        op: Operation {
-            module: "cpu".to_owned(),
-            instruction: return_instruction.to_owned(),
-            args: return_args,
-        },
-    });
-    push_dep_edges(state, &returned, &return_name);
-    if let Some(effect) = function_effect_anchor {
-        crate::lowering::edge_helpers::push_effect_edge(state, &effect, &return_name);
-    }
-    if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
-        push_lifetime_edge(state, &returned, &return_name);
-    }
-    crate::lowering::edge_helpers::push_effect_edge(state, &returned, &return_name);
+    let (return_name, return_kind) =
+        return_boundary::emit(function, &returned, function_effect_anchor, state)?;
     control_boundaries::order_guarded_function_nodes(
         state,
         start_index,

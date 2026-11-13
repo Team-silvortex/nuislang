@@ -137,6 +137,13 @@ pub(in crate::lowering) fn lower_inline_stmts(
                 chain_nonpure_expr_stmt(expr, &lowered, state);
             }
             NirStmt::Return(value) => {
+                if let Some(value) = value {
+                    if let Some(tail) =
+                        crate::lowering::guarded_owned_returns::lower_tail(value, state, bindings)?
+                    {
+                        return Ok(Some(tail));
+                    }
+                }
                 let returned = match value {
                     Some(value) => {
                         let lowered = lower_expr(value, state, bindings)?;

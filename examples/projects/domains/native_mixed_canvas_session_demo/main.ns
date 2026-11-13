@@ -1,0 +1,36 @@
+/// A native mixed State: scalar control remains separate from the owned pixels.
+mod cpu Main {
+  struct Canvas {
+    width: i64,
+    height: i64,
+    events: i64,
+    cursor: i64,
+    pixels: Bytes,
+  }
+
+  fn canvas_open(pixels: ref Buffer, width: i64) -> Canvas {
+    return Canvas {
+      width: width, height: buffer_len(pixels) / width,
+      events: 0, cursor: 0, pixels: copy_bytes(pixels),
+    };
+  }
+
+  fn canvas_event(pixels: ref Buffer, width: i64, height: i64,
+                  events: i64, cursor: i64, color: i64) -> Canvas {
+    store_at(pixels, cursor, color);
+    return Canvas {
+      width: width, height: height, events: events + 1,
+      cursor: (cursor + 1) % (width * height), pixels: copy_bytes(pixels),
+    };
+  }
+
+  fn canvas_close(pixels: ref Buffer, width: i64, height: i64,
+                  events: i64, cursor: i64, reason: i64) -> Canvas {
+    return Canvas {
+      width: width, height: height, events: events, cursor: cursor,
+      pixels: copy_bytes(pixels),
+    };
+  }
+
+  fn main() -> i64 { return 0; }
+}

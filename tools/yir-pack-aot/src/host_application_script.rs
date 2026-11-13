@@ -6,6 +6,7 @@ pub const CONTRACT: &str = "nuis-yir-application-scalar-script-v1";
 pub struct NativePackagingProfile {
     pub id: String,
     pub policy: Option<LiteralPrintBuildPolicy>,
+    pub resource: bool,
 }
 
 pub fn parse_options(
@@ -15,10 +16,14 @@ pub fn parse_options(
     let mut headless = false;
     let mut native = None;
     let mut policy = None;
+    let mut resource = false;
     while let Some(argument) = arguments.next() {
         if argument == "--headless" && !headless {
             headless = true;
-        } else if argument == "--native-session" && native.is_none() {
+        } else if matches!(argument.as_str(), "--native-session" | "--resource-session")
+            && native.is_none()
+        {
+            resource = argument == "--resource-session";
             let id = arguments
                 .next()
                 .ok_or("--native-session requires a registration ID")?;
@@ -58,13 +63,17 @@ pub fn parse_options(
             "native session packaging cannot select a reference/window host profile".to_owned(),
         );
     }
-    if policy.is_some() && native.is_none() {
+    if policy.is_some() && (native.is_none() || resource) {
         return Err("native literal-print policy requires --native-session".to_owned());
     }
     Ok((
         scale.unwrap_or(8),
         headless,
-        native.map(|id| NativePackagingProfile { id, policy }),
+        native.map(|id| NativePackagingProfile {
+            id,
+            policy,
+            resource,
+        }),
     ))
 }
 
@@ -130,6 +139,27 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resource_packaging_excludes_scalar_grants_and_reference_profiles() {
+        let parse = |args: &[&str]| parse_options(args.iter().map(|s| (*s).to_owned()));
+        let (_, _, profile) = parse(&["--resource-session", "bytes"]).unwrap();
+        let profile = profile.unwrap();
+        assert!(profile.resource);
+        assert_eq!(profile.id, "bytes");
+        assert!(profile.policy.is_none());
+        for tail in [
+            vec!["--native-session", "bytes"],
+            vec!["--resource-session", "other"],
+            vec!["--headless"],
+            vec!["4"],
+            vec!["--native-literal-print-policy", "v1.4.64.61"],
+        ] {
+            let mut args = vec!["--resource-session", "bytes"];
+            args.extend(tail);
+            assert!(parse(&args).is_err());
+        }
+    }
 
     #[test]
     fn computed_print_packaging_requires_matching_explicit_option_and_policy_kind() {

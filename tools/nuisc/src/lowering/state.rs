@@ -58,6 +58,7 @@ pub(super) struct LoweringState<'a> {
     pub(super) struct_defs: BTreeMap<&'a str, &'a NirStructDef>,
     pub(super) enum_defs: BTreeMap<&'a str, &'a NirEnumDef>,
     pub(super) direct_call_functions: BTreeSet<String>,
+    pub(super) guarded_owned_helpers: BTreeMap<String, super::guarded_owned_returns::OwnerEdges>,
     pub(super) capture_plans: BTreeMap<String, direct_calls::CapturePlan>,
     pub(super) scoped_break_controls: BTreeMap<String, String>,
     pub(super) scoped_elided_record_seeds: BTreeMap<String, Vec<scoped_loop_lowering::RecordSeed>>,

@@ -77,6 +77,43 @@ fn aggregate_early_returns_pack_in_declared_field_order() {
 }
 
 #[test]
+fn inactive_variant_bytes_are_absent_but_runtime_allocations_stay_checked() {
+    let template = crate::call_lowering::parse_owned_struct_layout(
+        "__nuis_variant_union__Result{tag:i64;Result.Ok:Result.Ok{value:Packet{bytes:Bytes}};Result.Err:Result.Err{value:i64}}"
+    ).unwrap();
+    let err = LlvmValueRef::Struct(StructLlvmValueRef {
+        type_name: "Result.Err".to_owned(),
+        fields: vec![("value".to_owned(), LlvmValueRef::I64("17".to_owned()))],
+    });
+    let inactive =
+        crate::task_owned_payload::materialize_owned_variant_storage(&err, &template).unwrap();
+    let mut body = Vec::new();
+    assert!(crate::task_owned_payload::emit_owned_struct_return(
+        &inactive, &mut body, &mut 0
+    ));
+    let ir = body.join("\n");
+    assert!(
+        !ir.contains("@nuis_scheduler_owned_aggregate_set_blob_v1"),
+        "{ir}"
+    );
+    assert!(ir.contains("i64 1, i64 0)"));
+    let dynamic = StructLlvmValueRef {
+        type_name: "Packet".to_owned(),
+        fields: vec![(
+            "bytes".to_owned(),
+            LlvmValueRef::OwnedBytes {
+                blob: "%allocated".to_owned(),
+            },
+        )],
+    };
+    body.clear();
+    assert!(crate::task_owned_payload::emit_owned_struct_return(
+        &dynamic, &mut body, &mut 0
+    ));
+    assert!(body.join("\n").contains("i64 0, ptr %allocated)"));
+}
+
+#[test]
 fn declared_entry_result_wins_over_last_scheduled_scalar() {
     for reversed in [false, true] {
         let mut module = module_with_cpu0();

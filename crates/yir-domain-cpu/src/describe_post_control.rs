@@ -304,6 +304,23 @@ pub(super) fn describe_cpu_post_control_node(
 
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
+        "guard_call_owned_struct_return" | "tail_call_owned_struct_return" => {
+            let tail = node.op.instruction == "tail_call_owned_struct_return";
+            let call = if tail {
+                yir_core::guarded_owned_call::parse_tail(&node.op.args)?
+            } else {
+                yir_core::guarded_owned_call::parse(&node.op.args)?
+            };
+            let mut inputs = if tail {
+                vec![]
+            } else {
+                vec![call.condition.to_owned()]
+            };
+            inputs.extend_from_slice(call.inputs);
+            inputs.extend_from_slice(call.transfers);
+            inputs.extend_from_slice(call.cleanup);
+            Ok(InstructionSemantics::effect(inputs))
+        }
         "guard_return" => {
             if !(2..=3).contains(&node.op.args.len()) {
                 return Err(format!(

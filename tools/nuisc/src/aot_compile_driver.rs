@@ -90,16 +90,16 @@ fn write_and_link_impl(
         llvm_ir,
     } = program;
     let packaging_mode = select_packaging_mode(yir, requested_packaging_mode)?;
-    let native_id = crate::aot_native_session::registration_id(packaging_mode)?;
-    if native_id.is_some() {
+    let native = crate::aot_session_profile::is_native(packaging_mode)?;
+    if native {
         if source.is_none() || cpu_target.cross_compile {
             return Err(
                 "native session packaging requires source handoff and the current host target"
                     .to_owned(),
             );
         }
-        let bridge = crate::aot_native_session::emit_for_packaging_mode(yir, packaging_mode)?;
-        if llvm_ir != Some(bridge.llvm_ir.as_str()) {
+        let expected = crate::aot_session_profile::packaging_llvm(yir, packaging_mode)?;
+        if llvm_ir != Some(expected.as_str()) {
             return Err(
                 "native session packaging requires the selected registration LLVM checkpoint"
                     .to_owned(),
@@ -146,16 +146,14 @@ fn write_and_link_impl(
     if let Some(llvm_ir) = llvm_ir {
         fs::write(&ll_path, llvm_ir)
             .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-        if native_id.is_none() {
+        if !native {
             fs::write(&shim_path, render_c_shim_source(ast))
                 .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
         }
     }
 
     let (binary_path, host_objects) =
-        if matches!(packaging_mode, "window-aot-bundle" | "headless-aot-bundle")
-            || native_id.is_some()
-        {
+        if matches!(packaging_mode, "window-aot-bundle" | "headless-aot-bundle") || native {
             build_application_bundle(&yir_path, output_dir, cpu_target, packaging_mode)?;
             (exe_path.display().to_string(), Vec::new())
         } else {
@@ -259,7 +257,7 @@ fn native_host_objects(
 }
 
 fn is_supported_packaging_mode(packaging_mode: &str) -> bool {
-    crate::aot_native_session::registration_id(packaging_mode).is_ok_and(|id| id.is_some())
+    crate::aot_session_profile::is_native(packaging_mode).unwrap_or(false)
         || matches!(
             packaging_mode,
             "window-aot-bundle"
@@ -274,6 +272,10 @@ fn select_packaging_mode<'a>(
     requested: Option<&'a str>,
 ) -> Result<&'a str, String> {
     if let Some(mode) = requested {
+        if let Some(id) = crate::aot_resource_session::registration_id(mode)? {
+            yir_core::native_resource_session::registered(yir, id)?;
+            return Ok(mode);
+        }
         if let Some(id) = crate::aot_native_session::registration_id(mode)? {
             yir_core::registered_application_session(yir, id)?;
             return Ok(mode);

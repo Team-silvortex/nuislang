@@ -116,6 +116,7 @@ pub(super) fn loaded_project_fixture(
             packaging_mode: None,
             artifact_provider_metadata: vec![],
             application_sessions: Vec::new(),
+            resource_sessions: Vec::new(),
             code_assets: vec![],
             modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
             tests: vec![],

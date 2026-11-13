@@ -32,6 +32,83 @@ pub(super) fn parse_application_sessions(
     Ok(registrations.unwrap_or_default())
 }
 
+pub(super) fn parse_resource_sessions(
+    source: &str,
+) -> Result<Vec<yir_core::native_resource_session::ResourceSessionRegistration>, String> {
+    use yir_core::native_resource_session::{
+        ResourceSessionRegistration, CHECKED_CONTRACT, CONTRACT, MIXED_CONTRACT,
+    };
+    let mut result = None;
+    let mut offset = 0;
+    for raw in source.split_inclusive('\n') {
+        if raw
+            .split_once('=')
+            .is_some_and(|(key, _)| key.trim() == "resource_sessions")
+        {
+            if result.is_some() {
+                return Err("duplicate resource_sessions field".to_owned());
+            }
+            let values = parse_array(&source[offset + raw.find('=').unwrap() + 1..])
+                .map_err(|error| error.replace("application_sessions", "resource_sessions"))?;
+            let mut ids = BTreeSet::new();
+            let mut entries = Vec::new();
+            for value in values {
+                let mut words = value.split_whitespace();
+                let id = words.next().ok_or("empty resource session declaration")?;
+                let mut fields = BTreeMap::new();
+                for word in words {
+                    let (key, value) = word
+                        .split_once('=')
+                        .ok_or("malformed resource session field")?;
+                    if !matches!(
+                        key,
+                        "open" | "event" | "close" | "min" | "max" | "state" | "result"
+                    ) || fields.insert(key, value).is_some()
+                    {
+                        return Err("unknown or duplicate resource session field".to_owned());
+                    }
+                }
+                let get = |key| {
+                    fields
+                        .get(key)
+                        .copied()
+                        .ok_or_else(|| format!("resource session missing `{key}`"))
+                };
+                let mut declaration = vec![
+                    id,
+                    if fields.contains_key("result") {
+                        get("state")?;
+                        CHECKED_CONTRACT
+                    } else if fields.contains_key("state") {
+                        MIXED_CONTRACT
+                    } else {
+                        CONTRACT
+                    },
+                    get("open")?,
+                    get("event")?,
+                    get("close")?,
+                    get("min")?,
+                    get("max")?,
+                ];
+                if let Some(state) = fields.get("state") {
+                    declaration.push(state);
+                }
+                if let Some(result) = fields.get("result") {
+                    declaration.push(result);
+                }
+                let entry = ResourceSessionRegistration::from_fields(&declaration)?;
+                if !ids.insert(entry.id.clone()) {
+                    return Err("duplicate resource session ID".to_owned());
+                }
+                entries.push(entry);
+            }
+            result = Some(entries);
+        }
+        offset += raw.len();
+    }
+    Ok(result.unwrap_or_default())
+}
+
 fn parse_declaration(source: &str) -> Result<YirApplicationSession, String> {
     let mut tokens = source.split_whitespace();
     let id = tokens
@@ -120,6 +197,13 @@ pub(crate) fn register_project_application_sessions(
     module
         .application_sessions
         .clone_from(&project.manifest.application_sessions);
+    if !module.resource_sessions.is_empty() {
+        return Err("project resource sessions would replace existing bindings".to_owned());
+    }
+    module
+        .resource_sessions
+        .clone_from(&project.manifest.resource_sessions);
+    yir_core::native_resource_session::validate_registrations(module)?;
     yir_core::validate_application_sessions(module)
 }
 

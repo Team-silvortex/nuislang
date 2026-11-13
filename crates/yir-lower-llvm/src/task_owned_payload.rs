@@ -358,9 +358,18 @@ fn pack_value(
     if is_scalar(value) {
         if let LlvmValueRef::OwnedBytes { blob } = value {
             let stored = fresh_reg(&mut state.next_reg);
-            state.body.push(format!(
-                "  {stored} = call i64 @nuis_scheduler_owned_aggregate_set_blob_v1(ptr {data}, i64 {leaf_index}, ptr {blob})"
-            ));
+            if blob == "null" {
+                // Materialized inactive variants have no owner in this slot.
+                // Runtime null allocations use SSA values, and must still poison
+                // the aggregate through set_blob rather than become absent.
+                state.body.push(format!(
+                    "  {stored} = call i64 @nuis_scheduler_owned_aggregate_set_scalar_v1(ptr {data}, i64 {leaf_index}, i64 0)"
+                ));
+            } else {
+                state.body.push(format!(
+                    "  {stored} = call i64 @nuis_scheduler_owned_aggregate_set_blob_v1(ptr {data}, i64 {leaf_index}, ptr {blob})"
+                ));
+            }
             *leaf_index += 1;
             return Some(());
         }

@@ -52,6 +52,9 @@ pub(super) fn require_explicit_script(
 ) -> Result<(), String> {
     if let Some(manifest) = &doctor.manifest_path {
         let report = nuisc::aot::verify_build_manifest(manifest)?;
+        if nuisc::aot::resource_session::registration_id(&report.packaging_mode)?.is_some() {
+            return Err("native resource artifact requires --resource-session, --buffer-words, --open-arg and --close-arg".to_owned());
+        }
         if nuisc::aot::native_session::registration_id(&report.packaging_mode)?.is_some() {
             return Err("native application artifact requires --native-session, --open-args and --close-args".to_owned());
         }

@@ -110,6 +110,7 @@ pub fn verify_module_with_registry(
 
     verify_function_table(module, &nodes)?;
     yir_core::validate_application_sessions(module)?;
+    yir_core::native_resource_session::validate_registrations(module)?;
     let parameter_bindings = module
         .functions
         .iter()

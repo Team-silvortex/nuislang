@@ -4,6 +4,47 @@ This is a scope and dependency audit at the beta-0.18.8 Git baseline, with the
 existing uncommitted lowering work preserved. It is not a release, a fresh
 all-platform certification, or a rewrite of historical execution receipts.
 
+The subsequent [native Buffer/Bytes proof](nuis-native-resource-session-v1.md)
+first advanced the resource coordinate to active/35; the later
+[artifact proof](nuis-native-resource-session-artifacts-v1.md) advances it to active/60.
+The [CPU canvas follow-up](nuis-native-resource-frame-export-v1.md) then advances
+only that resource coordinate to active/65; frame dispatch remains early/10.
+The [mixed-State proof](nuis-native-mixed-resource-state-v1.md) subsequently advances
+the same coordinate to active/75 without promoting the dependent frame/window gates.
+The [checked-State proof](nuis-native-checked-resource-state-v1.md) advances it to
+active/80 for Nuis-owned validation and guarded Err, retaining the same dependent gates.
+The [guarded resource return proof](nuis-native-guarded-resource-return-v1.md)
+advances it to active/85 for branch-local early Ok and cleanup, without promoting
+the frame/window gates.
+The [retained-Bytes return proof](nuis-native-retained-bytes-return-v1.md) advances
+it to active/90 for taken-edge caller cleanup and surviving-path ownership, still
+without promoting the frame/window gates.
+The [transferred-Bytes return proof](nuis-native-transferred-bytes-return-v1.md)
+advances it to active/95 for selected-arm ownership transfer under independently
+verified helper contracts, retaining the same dependent gates.
+The [nested owned-return proof](nuis-native-nested-owned-return-v1.md) adds nested
+terminal regions while retaining active/95. Its next task is a nonterminal outer
+resource join; the dependent gates and other coordinate records remain unchanged.
+The [owned-continuation proof](nuis-native-owned-continuation-v1.md) subsequently
+closes empty-else outer joins through one shared suffix, retaining active/95 and
+the same dependent gates. Nonempty else joins are its next concrete task.
+The subsequent [paired-continuation proof](nuis-native-paired-owned-continuation-v1.md)
+closes that task without a new opcode or ABI: both arms retain independent early
+returns and share one suffix. Active/95 and the other coordinates remain unchanged;
+branch-local scalar capture identities are the next boundary.
+The [scalar-shadowing follow-up](nuis-native-resource-scalar-shadowing-v1.md)
+now preserves explicit i64 declaration identities before NIR, including nested
+branches and source-free project delivery. Inferred/aliased shadows remain next;
+active/95 and all other coordinates are unchanged.
+The [inferred-shadowing follow-up](nuis-native-resource-inferred-shadowing-v1.md)
+then resolves inferred/aliased declarations through shared semantics and checks
+canonical i64 identities before optimization. The reproduced next gap is an
+ordinary scalar-record helper inside a resource callback (`call_owned_struct`);
+active/95 and the dependent coordinates remain unchanged.
+The early/0 decision and
+4515-check receipt below remain this audit's historical baseline, not the latest
+implementation status.
+
 ## Decision
 
 The live inventory grows from 35 to 37 coordinates. All 35 previous coordinates

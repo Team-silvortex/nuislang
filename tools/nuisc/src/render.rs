@@ -373,6 +373,9 @@ pub fn render_nir(module: &NirModule) -> String {
 pub fn render_yir(module: &YirModule) -> String {
     let mut out = String::new();
     out.push_str(&format!("yir {}\n\n", module.version));
+    for registration in &module.resource_sessions {
+        out.push_str(&format!("resource-session {}\n", registration.canonical()));
+    }
     for session in &module.application_sessions {
         out.push_str(&format!(
             "application-session {} {} {} {} {} {}\n",

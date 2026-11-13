@@ -55,6 +55,39 @@ class RepositoryHygiene(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in missing), [],
                          "keep native receipts discoverable when shortening entrypoints")
 
+    def test_native_resource_examples_have_local_guides_and_one_ladder(self):
+        domains = ROOT / "examples/projects/domains"
+        ladder = local_markdown_targets("examples/projects/domains/README.md")
+        examples = sorted(domains.glob("native*canvas_session_demo"))
+        self.assertTrue(examples)
+        for example in examples:
+            with self.subTest(example=example.name):
+                guide = example / "README.md"
+                self.assertTrue(guide.is_file())
+                self.assertIn(guide.resolve(), ladder)
+                manifest = (example / "nuis.toml").read_text(encoding="utf-8")
+                self.assertIn('packaging_mode = "native-resource-session-aot-bundle:canvas"',
+                              manifest)
+                text = guide.read_text(encoding="utf-8")
+                self.assertIn("--resource-session canvas", text)
+                self.assertIn("--resource-frame-output", text)
+                self.assertIn("examples/projects/domains/" + example.name, text)
+
+    def test_resource_owner_map_keeps_contract_lowering_host_and_delivery_separate(self):
+        owners = local_markdown_targets("docs/repo-layout.md")
+        for relative in (
+            "crates/yir-core/src/native_resource_session.rs",
+            "tools/nuisc/src/lowering/guarded_owned_returns.rs",
+            "crates/yir-lower-llvm/src/native_resource_session.rs",
+            "crates/yir-runtime-host/src/native_resource_session.rs",
+            "tools/nuisc/src/aot_resource_session.rs",
+            "tools/nuisc/tests/native_resource_session.rs",
+            "tools/nuis/tests/native_resource_session_workflow.rs",
+        ):
+            with self.subTest(owner=relative):
+                self.assertTrue((ROOT / relative).is_file())
+                self.assertIn((ROOT / relative).resolve(), owners)
+
     def test_current_series_routers_agree_on_snapshot_and_checklist(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         series = re.search(r"repository is on `([^`\s]+)\.\*`", readme)

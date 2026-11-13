@@ -16,7 +16,7 @@ Dry-run by default. Stop builds and tests before applying cleanup.
 Only regeneratable outputs inside this Git workspace are eligible:
   - example .nuis/cache directories (other project state is retained)
   - tools/*/target, crates/*/target, example bundles and the optional preview build
-  - root debug/release incremental state and the maintenance Python cache
+  - root debug/release incremental state and both maintenance Python caches
   - --build-binaries: also remove hashed debug/release build/test executables;
     keep root CLI binaries, dependency libraries and Cargo registry downloads
   - --workspace: instead remove the complete root target directory
@@ -72,6 +72,7 @@ for path in "$ROOT_DIR"/tools/*/target "$ROOT_DIR"/crates/*/target; do
   add_candidate "$path"
 done
 add_candidate "$ROOT_DIR/tools/yir-preview-macos/build"
+add_candidate "$ROOT_DIR/scripts/__pycache__"
 add_candidate "$ROOT_DIR/scripts/tests/__pycache__"
 for path in "$ROOT_DIR"/examples/bins/*; do
   [ "${path##*/}" = README.md ] || add_candidate "$path"

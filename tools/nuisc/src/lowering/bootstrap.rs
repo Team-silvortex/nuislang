@@ -171,6 +171,8 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         }
     }
     let mut rewritten_module = rewrite_self_tail_recursive_functions(module);
+    let owned_return_arms =
+        super::guarded_owned_returns::outline(&mut rewritten_module, host_entries)?;
     let outlined = super::buffer_loop_outline::outline_buffer_loops(&mut rewritten_module)?;
     let module = &rewritten_module;
     super::nested_owned_returns::validate_selected_owned_pointer_transfers(module)?;
@@ -199,6 +201,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
     let owned_external_buffer_helper_order =
         owned_external_buffer_helper_lowering_order(module, &owned_external_buffer_return_helpers)?;
     let direct_call_functions = collect_recursive_direct_call_functions(module)
+        .union(&owned_return_arms.functions)
+        .cloned()
+        .collect::<BTreeSet<_>>()
         .union(&outlined.functions)
         .cloned()
         .collect::<BTreeSet<_>>()
@@ -287,6 +292,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
             .map(|definition| (definition.name.as_str(), definition))
             .collect(),
         direct_call_functions: direct_call_functions.clone(),
+        guarded_owned_helpers: owned_return_arms.owners.clone(),
         capture_plans: outlined.capture_plans.clone(),
         scoped_break_controls: outlined.break_controls.clone(),
         scoped_elided_record_seeds: outlined.elided_record_seeds.clone(),
@@ -324,7 +330,8 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
             function,
             &mut state,
             outlined.guarded_functions.contains(&function.name),
-            outlined.functions.contains(&function.name),
+            outlined.functions.contains(&function.name)
+                || owned_return_arms.functions.contains(&function.name),
         )?;
     }
 

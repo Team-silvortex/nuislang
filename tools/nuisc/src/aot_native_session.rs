@@ -76,12 +76,6 @@ pub fn registration_id(mode: &str) -> Result<Option<&str>, String> {
     Ok(Some(id))
 }
 
-pub(crate) fn has_bound_inputs(mode: &str) -> bool {
-    mode == "headless-aot-bundle"
-        || mode.starts_with(PACKAGING_PREFIX)
-        || mode.starts_with(POLICY_PACKAGING_PREFIX)
-}
-
 /// Validate claims against the admitted lowering, not mutable host capabilities.
 pub fn verify_checkpoint(
     module: &YirModule,
@@ -173,6 +167,7 @@ pub fn verify_checkpoint_for_packaging_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::aot_session_profile::has_bound_inputs;
 
     #[test]
     fn packaging_identity_is_explicit_bounded_and_utf8() {

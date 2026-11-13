@@ -197,6 +197,7 @@ dependencies = [
  "yir-domain-shader",
  "yir-runtime-host",
  "yir-syntax",
+ "yir-verify",
 ]
 
 [[package]]

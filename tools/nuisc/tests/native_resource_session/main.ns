@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn start(buffer: ref Buffer, delta: i64) -> Bytes {
+    store_at(buffer, 0, delta);
+    return copy_bytes(buffer);
+  }
+  fn step(buffer: ref Buffer, delta: i64) -> Bytes {
+    let value: i64 = load_at(buffer, 0) + delta;
+    store_at(buffer, 0, value);
+    return copy_bytes(buffer);
+  }
+  fn stop(buffer: ref Buffer, delta: i64) -> Bytes {
+    store_at(buffer, 0, load_at(buffer, 0) + delta);
+    return copy_bytes(buffer);
+  }
+  fn main() -> i64 { return 0; }
+}

@@ -30,7 +30,9 @@ pub(crate) fn build_application_bundle(
         .arg("--")
         .arg(yir_path)
         .arg(output_dir);
-    if let Some(id) = crate::aot_native_session::registration_id(packaging_mode)? {
+    if let Some(id) = crate::aot_resource_session::registration_id(packaging_mode)? {
+        command.args(["--resource-session", id]);
+    } else if let Some(id) = crate::aot_native_session::registration_id(packaging_mode)? {
         command.args(["--native-session", id]);
         if let Some(policy) = crate::aot_native_session::build_policy(packaging_mode)? {
             command

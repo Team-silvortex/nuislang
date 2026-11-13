@@ -1,6 +1,9 @@
 use super::*;
 use yir_core::{Operation, ResourceKind, StructValue, VariantUnionValue};
 
+#[path = "guarded_owned_call_tests.rs"]
+mod guarded_owned_call;
+
 fn cpu_resource() -> Resource {
     Resource {
         name: "cpu0".to_owned(),

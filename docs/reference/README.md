@@ -87,6 +87,8 @@ examples and must not be selected merely because their filename looks newest.
 
 ## Runtime And Provider Sessions
 
+- [Native CPU resource-session ladder](nuis-native-session-proof-index.md#resource-session-ladder)
+- [Resource-session implementation owners](../repo-layout.md#native-resource-session-ownership)
 - [Registered Window Sessions](nuis-yir-window-session-v3.md)
 - [Application Cancellation And Host Retirement](nuis-yir-application-cancellation-v1.md)
 - [Provider Session Drain](nuis-yir-provider-session-drain-v1.md)

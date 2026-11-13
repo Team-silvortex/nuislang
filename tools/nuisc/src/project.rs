@@ -190,6 +190,7 @@ mod tests {
                 packaging_mode: None,
                 artifact_provider_metadata: vec![],
                 application_sessions: Vec::new(),
+                resource_sessions: Vec::new(),
                 code_assets: vec![],
                 modules: vec![],
                 tests: vec![],

@@ -60,8 +60,8 @@ pub(super) fn verify(source: &str, path: &Path, inputs: &[(&str, Vec<u8>)]) -> R
         return Err("application checkpoint YIR is not canonical".to_owned());
     }
     let mode = unique_value(source, "packaging_mode", path)?;
-    if crate::aot_native_session::registration_id(&mode)?.is_some() {
-        crate::aot_native_session::verify_checkpoint_for_packaging_mode(
+    if crate::aot_session_profile::is_native(&mode)? {
+        crate::aot_session_profile::verify_checkpoint(
             &yir,
             &mode,
             text("llvm_ir")?,

@@ -35,6 +35,7 @@ pub(super) fn parse_project_manifest(
         packaging_mode,
         artifact_provider_metadata,
         application_sessions,
+        resource_sessions: super::application_sessions::parse_resource_sessions(source)?,
         code_assets,
         modules,
         tests,

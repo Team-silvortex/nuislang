@@ -253,6 +253,16 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
+            "tail_call_owned_struct_return" => {
+                Err("owned continuation returns require native function execution".to_owned())
+            }
+            "guard_call_owned_struct_return" => {
+                if state.expect_bool(&node.op.args[0])? {
+                    Err("guarded owned helper returns require native function execution".to_owned())
+                } else {
+                    Ok(Value::Unit)
+                }
+            }
             "guard_return" => {
                 let condition = state.expect_value(&node.op.args[0])?.clone();
                 let returned = state.expect_value(&node.op.args[1])?.clone();

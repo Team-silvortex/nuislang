@@ -1,7 +1,7 @@
 # Domain Project Companions
 
-This folder contains project-form companions for current non-CPU helper lanes
-such as `shader`, `kernel`, and `network`.
+This folder contains project-form companions for registered domains such as
+`shader`, `kernel`, and `network`, plus the native CPU resource-session ladder.
 
 This subtree is especially easy to let drift into “everything is important”.
 It is better read as a set of ladders than as one giant inventory.
@@ -12,6 +12,26 @@ Current role rule:
 * most deeper domain variants are companion-only compile coverage
 * `*_probe_demo` routes are validation-only
 * `*_experiment_*` routes are exploration-only
+
+## Native CPU Resource Sessions
+
+Choose the smallest profile that demonstrates the boundary you are changing.
+All four examples below are native CPU sessions, not GPU dispatch or interactive
+ns-nova windows. Host finalization still requires the Clang toolchain.
+
+| Example | Nuis-Owned State | Demonstrates |
+| --- | --- | --- |
+| [Basic canvas](native_canvas_session_demo/README.md) | Bytes pixels | Pixel updates and export after successful close. |
+| [Mixed canvas](native_mixed_canvas_session_demo/README.md) | i64 dimensions/control plus Bytes | Complete scalar/resource publication and State-driven extent. |
+| [Checked canvas](native_checked_canvas_session_demo/README.md) | Result of mixed State | Configuration errors without publishing failed State or images. |
+| [Guarded canvas](native_guarded_canvas_session_demo/README.md) | Result of mixed State with held snapshots | Both nonempty arms can return early or preserve ownership for one shared continuation. |
+
+Each guide has a repository-root command and expected output. The
+[artifact regression](../../../tools/nuis/tests/native_resource_session_workflow.rs)
+checks cache reuse, source-free NSB relocation and binary-only launch. The
+[proof catalog](../../../docs/reference/nuis-native-session-proof-index.md#resource-session-ladder)
+records precise ownership bounds; do not infer general resource loops or
+provider/device completion from the canvas examples.
 
 ## Shared Helpers
 

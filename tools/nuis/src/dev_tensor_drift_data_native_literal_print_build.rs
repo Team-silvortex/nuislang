@@ -55,7 +55,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "aot-host-v1:",
             "requested_packaging_mode.unwrap()",
-            "crate::aot_native_session::emit_for_packaging_mode",
+            "crate::aot_session_profile::packaging_llvm",
             "mode != manifest.packaging_mode",
             "cached AOT packaging does not match",
         ],
@@ -75,7 +75,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "pub struct NativePackagingProfile",
             "LiteralPrintBuildPolicy::parse",
-            "policy.is_some() && native.is_none()",
+            "policy.is_some() && (native.is_none() || resource)",
             "requires --native-session",
             "unsupported or duplicate packaging option",
         ],
@@ -117,7 +117,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/aot_application_checkpoint.rs",
         required_patterns: &[
             "application checkpoint YIR is not canonical",
-            "crate::aot_native_session::verify_checkpoint_for_packaging_mode",
+            "crate::aot_session_profile::verify_checkpoint",
             "text(\"llvm_ir\")?",
             "text(\"application_bundle\")?",
         ],
