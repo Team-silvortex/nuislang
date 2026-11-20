@@ -5,6 +5,12 @@ mod arguments;
 #[cfg(test)]
 #[path = "resource_condition_tests.rs"]
 mod condition_tests;
+#[path = "resource_record_literals.rs"]
+mod record_literals;
+pub(super) use record_literals::LocalRecords;
+#[cfg(test)]
+#[path = "resource_record_initializers_tests.rs"]
+mod record_tests;
 #[path = "resource_return_fields.rs"]
 mod return_fields;
 #[cfg(test)]
@@ -19,6 +25,29 @@ pub(super) fn return_layouts(
     eligible: &BTreeSet<String>,
 ) -> BTreeMap<String, MixedResourceLayout> {
     return_fields::collect(module, eligible)
+}
+
+pub(super) fn checked_error_arm(
+    body: &[NirStmt],
+    template: &NirFunction,
+    context: &OutlineContext,
+) -> bool {
+    let Some(ty) = template.return_type.as_ref() else {
+        return false;
+    };
+    let Some(outcome) = context
+        .return_layouts
+        .get(&ty.render())
+        .and_then(|l| l.outcome.as_ref())
+    else {
+        return false;
+    };
+    // Even without live Bytes, paired checked errors return owned Results, not a scalar
+    // select. Match registered identity rather than a conventional type name;
+    // callers keep ordinary early errors on their existing guard_return route.
+    matches!(body.last(), Some(NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields })))
+        if *type_name == outcome.err_variant && *type_args == ty.generic_args
+            && fields.len() == 1 && fields[0].0 == "value")
 }
 
 // Resource reads stay in owned regions, never in the pure scalar-helper ABI.
@@ -76,6 +105,22 @@ pub(super) fn split(
         _ => return Ok(None),
     };
     if !capture_scalar(ty) {
+        if let Some(prefix) =
+            record_literals::split(statement, ty, value, template, scope, live, context)
+        {
+            return Ok(Some(prefix));
+        }
+        if bounded(value).is_some()
+            && context.calls.is_record(ty)
+            && arguments::contains_argument_logic(value)
+            && helper_value_type(value, scope, live, &context.calls).as_ref() == Some(ty)
+        {
+            // Freeze only scalar arguments. The original nominal record binding
+            // is constructed once inside the selected continuation, not captured.
+            return Ok(Some(requeue_declaration(
+                statement, value, template, scope, live, context,
+            )));
+        }
         return Ok(return_fields::split_cleanup_binding(
             statement, template, remaining, scope, live, context,
         ));
@@ -90,16 +135,9 @@ pub(super) fn split(
         return Ok(None);
     }
     if logical_parts(value).is_none() && arguments::contains_logic(value) {
-        let (mut prefix, value) = arguments::extract(value, template, scope, live, context);
-        let mut declaration = statement.clone();
-        let (NirStmt::Let { value: target, .. } | NirStmt::Const { value: target, .. }) =
-            &mut declaration
-        else {
-            unreachable!()
-        };
-        *target = value;
-        prefix.push(declaration);
-        return Ok(Some(prefix));
+        return Ok(Some(requeue_declaration(
+            statement, value, template, scope, live, context,
+        )));
     }
     let Some((left, right, disjunction, inverted)) =
         logical_parts(value).filter(|_| needs_guard(value))
@@ -207,6 +245,26 @@ pub(super) fn split(
         then_body,
         else_body,
     }]))
+}
+
+fn requeue_declaration(
+    statement: &NirStmt,
+    value: &NirExpr,
+    template: &NirFunction,
+    scope: &[NirParam],
+    live: &BTreeSet<String>,
+    context: &mut OutlineContext,
+) -> Vec<NirStmt> {
+    let (mut prefix, value) = arguments::extract(value, template, scope, live, context);
+    let mut declaration = statement.clone();
+    let (NirStmt::Let { value: target, .. } | NirStmt::Const { value: target, .. }) =
+        &mut declaration
+    else {
+        unreachable!()
+    };
+    *target = value;
+    prefix.push(declaration);
+    prefix
 }
 
 fn identity_handoff(edges: &OwnerEdges, live: &BTreeSet<String>) -> bool {
@@ -318,7 +376,7 @@ fn bounded_tree(value: &NirExpr, owned_return: bool) -> Option<bool> {
                 work.push((buffer, depth + 1));
                 work.push((index, depth + 1));
             }
-            NirExpr::BytesLen(value) => {
+            NirExpr::BytesLen(value) | NirExpr::BufferLen(value) => {
                 reads = true;
                 work.push((value, depth + 1));
             }
@@ -381,6 +439,7 @@ fn needs_guard(value: &NirExpr) -> bool {
         match value {
             NirExpr::LoadAt { .. }
             | NirExpr::BytesLen(_)
+            | NirExpr::BufferLen(_)
             | NirExpr::Call { .. }
             | NirExpr::Binary {
                 op: NirBinaryOp::Div | NirBinaryOp::Rem,
@@ -442,18 +501,10 @@ fn leaf_kind(
                 Kind::I64
             })
         }
-        NirExpr::LoadAt { buffer, index } => {
-            let NirExpr::Var(name) = buffer.as_ref() else {
-                return None;
-            };
-            let param = scope.iter().find(|p| p.name == *name)?;
-            (param.ty.name == "Buffer"
-                && param.ty.is_ref
-                && !param.ty.is_optional
-                && param.ty.generic_args.is_empty()
-                && leaf_kind(index, scope, live, calls)? == Kind::I64)
-                .then_some(Kind::I64)
-        }
+        NirExpr::LoadAt { buffer, index } => (borrowed_buffer(buffer, scope)
+            && leaf_kind(index, scope, live, calls)? == Kind::I64)
+            .then_some(Kind::I64),
+        NirExpr::BufferLen(value) => borrowed_buffer(value, scope).then_some(Kind::I64),
         NirExpr::BytesLen(value) => {
             let NirExpr::Var(name) = value.as_ref() else {
                 return None;
@@ -497,6 +548,15 @@ fn leaf_kind(
         }
         _ => None,
     }
+}
+
+fn borrowed_buffer(value: &NirExpr, scope: &[NirParam]) -> bool {
+    let NirExpr::Var(name) = value else {
+        return false;
+    };
+    scope.iter().find(|p| p.name == *name).is_some_and(|p| {
+        p.ty.name == "Buffer" && p.ty.is_ref && !p.ty.is_optional && p.ty.generic_args.is_empty()
+    })
 }
 
 fn helper_value_type(

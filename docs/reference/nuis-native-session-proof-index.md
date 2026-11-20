@@ -7,7 +7,18 @@ Navigational catalog only, not a cumulative acceptance receipt; the [mainline ma
 
 The latest admitted scope is bounded resource short-circuit evaluation in scalar
 declarations, direct bool conditions, returned mixed-State i64 fields and checked
-Err codes. Inline `buffer_len` composition remains a separate boundary. Earlier receipts
+Err codes, including borrowed `buffer_len` composition and helper-returned
+value-record local initialization. Nested record literal locals now stage
+scalar leaves with bounded native value construction. Record-valued helper
+fields now execute once before ordered scalar projection. Previously bound record
+fields before later resource logic now use block-local type proof and scalar
+snapshots without record captures. Prior record fields after earlier lazy fields
+now share safe scalar projections. Local-record scalar operands inside bounded
+constructors now reuse that cache with exact type proof and selected-only reads.
+Standalone bool/i64 declarations and direct resource conditions now share that
+proof and snapshot planner. Conditions keep intact arms and registered checked-error
+dispatch even without held Bytes. Directly returned State fields using those
+operands remain a separate boundary. Earlier receipts
 remain scoped historical evidence, not competing descriptions of the latest
 admission. Follow the [runnable example ladder](../../examples/projects/domains/README.md#native-cpu-resource-sessions)
 and [implementation owners](../repo-layout.md#native-resource-session-ownership)

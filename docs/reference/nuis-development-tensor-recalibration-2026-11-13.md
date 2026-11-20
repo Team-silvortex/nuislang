@@ -100,8 +100,22 @@ The snapshot counts toward the original capture bound. Returned mixed-State
 fields now normalize through shared layout contracts and source-ordered snapshots,
 including terminal cleanup bindings. Direct checked Err code expressions now
 share this route, including zero/full-width codes and borrowed-only callbacks.
-Inline `buffer_len` composition is the next reproduced gap; this does not admit
-arbitrary expressions or relax pure-helper resource isolation.
+Borrowed `buffer_len` composition now shares exact `ref Buffer` admission with
+indexed reads and retains guarded scalar snapshots. Helper-returned value-record
+locals now share those snapshots while retaining exact nominal types and the
+independent native leaf/slot contract. Nested record literal locals now retain
+ordered scalar-leaf snapshots and native value-layout admission. Record-valued
+helper fields now execute once before immediate scalar projection. Previously
+bound record fields now admit block-local nominal proof before later resource logic.
+Rebindings and control-flow boundaries invalidate that proof. Prior record fields
+after earlier lazy fields now use shared safe scalar projections. Local-record
+scalar operands inside bounded constructors now share the same projection cache;
+standalone bool/i64 declarations now reuse that proof and snapshot planning.
+Direct resource conditions now reuse the same proof with intact arms and exact
+registered checked-error identity. Local-record operands in directly returned
+State fields are the next reproduced gap.
+This does not admit arbitrary
+expressions, record-valued resource captures or resource-bearing pure helpers.
 Active/95 and the other
 coordinates remain unchanged.
 The early/0 decision and

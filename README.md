@@ -139,12 +139,40 @@ Scalar fields of a directly returned mixed State now reuse that path too, with
 all fields staged in source order, including Bytes copies/moves and terminal cleanup.
 Direct checked `Err(...)` codes also reuse guarded i64 evaluation before owner
 cleanup, including callbacks that only borrow a Buffer and hold no Bytes.
+Borrowed `buffer_len` now composes with the same guarded expressions in scalar
+initializers, conditions, returned State fields and checked error codes. It
+retains exact `ref Buffer` admission and passes only scalar values to pure helpers.
+Pure helper results can now initialize typed, inferred or const-alias value-record
+locals with those guarded arguments, including nested record projections. Only
+scalar argument snapshots cross owned continuations; native record limits remain.
+Nested record literal locals now stage i64/bool leaves in source field order,
+keeping lazy subtrees selected-only. Native local value construction shares the
+existing value-layout bounds, without widening owned State or resource captures.
+Record-valued helper fields now execute once, then freeze all scalar leaves
+before later fields can branch. Nested projections use the same path; complete
+constructor typing and bounded shape expansion precede temporary allocation.
+Previously bound pure records and their nested projections can fill fields before
+later resource logic. A block-local type table proves availability separately
+from scalar capture parameters; rebinding and control-flow boundaries invalidate it.
+Late record fields also survive earlier short-circuit fields: only projections
+of completed pure records are saved early, with shared snapshots for repeated
+paths. Helper calls, resource reads and checked arithmetic retain source order.
+Local-record scalar fields can also participate in resource predicates inside
+those constructors, such as `prior.flags.valid && bytes_len(saved) == 48`.
+Exact i64/bool projections share snapshots with later record fields; lazy reads
+remain selected-only, including nested conditions and helper arguments.
+The same local-record proof now also supports standalone bool/i64 initializers,
+without wrapping them in a record constructor. Explicit, inferred and const-alias
+declarations retain lexical identity, eager operand order and existing owner cleanup.
+Direct resource `if` conditions now reuse the same proof and scalar snapshots,
+without an intermediate source declaration. Original arms and their shared suffix
+remain intact; registered error returns stay guarded even without held Bytes.
 
 Use the [resource example ladder](examples/projects/domains/README.md#native-cpu-resource-sessions)
 to choose the minimal Bytes, mixed-State, checked or guarded example. The
 [latest scoped proof](docs/reference/nuis-native-resource-short-circuit-v1.md)
 owns validation details; the [module map](docs/repo-layout.md#native-resource-session-ownership)
-owns implementation entrypoints. Inline `buffer_len` composition with resource short-circuit expressions,
+owns implementation entrypoints. Local-record operands in directly returned State fields,
 captured writes, broader resource layouts
 and provider/device completion remain open. CPU canvas
 export is not native ns-nova window integration or the GPU showcase.

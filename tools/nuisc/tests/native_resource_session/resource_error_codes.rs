@@ -187,17 +187,30 @@ fn direct_resource_error_codes_keep_registered_identity_without_held_bytes() {
 }
 
 #[test]
-fn returned_resource_buffer_length_composition_still_needs_a_separate_initializer() {
+fn returned_resource_buffer_length_composition_uses_guarded_initializers() {
     let source = source("let saved: Bytes = copy_bytes(pixels); return Result.Ok(Canvas { width: buffer_len(pixels) + word(mode >= 0 && bytes_len(saved) == 48), pixels: move(saved) });");
-    let error = nuisc::pipeline::compile_resource_session_source(
-        &source,
-        &registration(),
-        &Default::default(),
-    )
-    .err()
-    .expect("buffer_len is outside the admitted scalar vocabulary");
-    assert!(
-        error.contains("short-circuit RHS requires guarded lowering"),
-        "{error}"
-    );
+    let program = compile(&source);
+    let bridge = bridge(&program);
+    let library = native::Library::build(&source, &program, &bridge.llvm_ir);
+    for length in [1, 6, 17] {
+        let pixels = vec![9; length];
+        let (mut session, _) = NativeResourceSession::open(
+            &program.yir,
+            &registration(),
+            library.checked_binding(&program.yir, &bridge),
+            pixels.clone(),
+            3,
+        )
+        .unwrap();
+        for mode in [-1, 0].into_iter().cycle().take(120) {
+            session.event(mode).unwrap();
+            let expected = length as i64 + if mode >= 0 && length == 6 { 9 } else { 0 };
+            assert_eq!(session.scalar_state(), [expected]);
+            assert_eq!(session.state(), pixels);
+            assert_eq!(library.live_blobs(), 0);
+        }
+        session.close(0).unwrap();
+        session.completion_status().unwrap();
+        assert_eq!(library.live_blobs(), 0);
+    }
 }

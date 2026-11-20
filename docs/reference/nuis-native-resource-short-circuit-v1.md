@@ -425,6 +425,405 @@ closure bound and remains a negative project-build regression. The executable
 fixture uses codes 1, 4 and 7 across open/event/close, retaining the other ready
 errors and the unchanged closure budget.
 
+## Borrowed Buffer Length
+
+The same guarded scalar vocabulary now admits `buffer_len` on a lexical binding
+whose canonical type is exactly `ref Buffer`:
+
+```nuis
+let saved: Bytes = copy_bytes(pixels);
+return Result.Ok(Canvas {
+  width: buffer_len(pixels) + word(mode >= 0 && bytes_len(saved) == 48),
+  pixels: move(saved)
+});
+```
+
+Buffer length remains a word count; Bytes length remains a byte count. Length
+reads share the same borrowed-Buffer proof as indexed reads, count toward the
+original expression budget and stay inside the selected owned region. Eager
+operands become scalar snapshots in source order; lazy subtrees remain intact
+until branch outlining. No Buffer pointer enters a pure helper signature.
+Non-reference, optional, generic, unknown and computed Buffer operands remain
+rejected, including invalid operands hidden behind a constant false gate.
+Ready length expressions retain their ordinary route.
+
+The grant covers bool/i64 declarations, direct conditions, scalar fields of the
+registered returned State and checked Err codes. Source type/budget checks and
+independent native instruction arity/kind checks remain separate. It does not
+admit arbitrary aggregate locals, change extents, permit escaping resources or
+alter the ownership partition, capture/closure budgets or cleanup rules.
+
+[Length regressions](../../tools/nuisc/tests/native_resource_session/resource_buffer_lengths.rs)
+cover scalar/record helper composition, 120 events per declaration/truth-table
+case, borrowed-only and owner-retaining conditions, prior/later writes, explicit
+errors and failed Result allocation. The returned-field regression also runs
+over 1-, 6- and 17-word buffers.
+Native kind-mutation tests retain valid dependency edges so their rejection is
+independent of missing-node/arity failures. Twelve length-sensitive trap expressions
+are exercised as local i64 values, returned State fields and Err codes: skipped
+reads remain skipped, selected out-of-range indices and helper-body divisions
+trap, and mandatory eager operands are not skipped. The returned-field workflow
+also composes word/byte lengths with a skipped invalid index through cache, NSB
+relocation and empty-PATH standalone launch.
+
+## Helper-Returned Record Locals
+
+Completed pure helper results can now initialize a value-record local whose
+arguments contain guarded resource expressions:
+
+```nuis
+let saved: Bytes = copy_bytes(pixels);
+let local: Number = number(mode == 0 && buffer_len(pixels) == 6);
+return Result.Ok(Canvas { width: local.value, pixels: move(saved) });
+```
+
+The original expression must pass the shared work/depth/logical-edge budget.
+The source layout catalog must recognize the canonical declared record, and the
+completed pure-call proof must return that exact nominal type. A projection from
+a nested helper result uses the same proof; equal field shapes do not make two
+record names interchangeable. Hidden resources and recursive/unknown layouts
+remain outside the source catalog. Invalid unselected operands are still checked.
+
+Only scalar arguments become source-ordered snapshots. Lazy children reenter the
+existing owned-region pass intact; the original let/const declaration is then
+constructed once in its continuation. Its type and declaration kind are retained.
+Ready declarations keep their ordinary route. This does not add records to the
+resource capture list or admit record/resource helper parameters. When a later
+resource branch needs a result, project its fields into scalar locals first.
+
+Native value-call admission remains separate: completed helper parameters are
+i64/bool, record leaves remain i64/bool and the existing 64-slot limit still
+applies. The source catalog is not a native ABI grant. Private helper results
+remain allocation-free LLVM values; checked State/Result allocation and Bytes
+cleanup retain their existing contracts.
+
+[Source proofs](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_initializers_tests.rs)
+cover exact nominal types, preserved let/const bindings, ordered scalar snapshots,
+atomic rejection, whole-expression budgets and invalid hidden record layouts.
+[Native regressions](../../tools/nuisc/tests/native_resource_session/resource_record_initializers.rs)
+exercise nested records, explicit/inferred/const-alias declarations, multiple
+logical arguments, read-before-write snapshots, early returns, projected scalar
+continuations, errors and failed Result allocation. Borrowed-only callbacks with
+renamed State/Result types retain error identity and zero tracked blobs. Native
+slot tests accept 64 leaves and reject 65 even when only one field is projected.
+Thirty-six isolated record-initializer probes reuse the existing i64/length trap
+expressions. The nested validation record also has a cache/NSB/standalone workflow.
+
+## Record Literal Locals
+
+Nested value-record constructors can now initialize locals with guarded scalar
+fields, without a helper wrapper:
+
+```nuis
+let saved: Bytes = copy_bytes(pixels);
+let local: Flags = Flags { valid: mode == 0 && buffer_len(pixels) == 6 };
+return Result.Ok(Canvas { width: word(local.valid), pixels: move(saved) });
+```
+
+The [constructor normalizer](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_literals.rs)
+checks the whole original tree before allocating names. Canonical record names,
+exact field sets, nested literal identity and i64/bool leaf kinds must match the
+source layout catalog. Duplicate, missing, extra and unknown fields are rejected,
+as are hidden resources and invalid operands behind false gates. The original
+4096-node, depth-below-64 and 32-logical-edge budgets are shared across all fields.
+
+Every scalar leaf is staged in source field order, including mandatory eager
+reads and checked arithmetic. Nested literals retain their structure; lazy
+subtrees reenter the existing owned-region normalizer intact. The original
+let/const identity is preserved. This does not capture whole records across
+resource continuations. Record-valued helper fields use the additional once-only
+materialization and scalar projection proof described below.
+
+Independent [native admission](../../crates/yir-lower-llvm/src/native_resource_session/mixed_admission.rs)
+distinguishes local pure records from owned mixed State. Pure i64/bool trees reuse
+the shared 64-leaf and layout-depth limits. Mixed State still requires its exact
+registered i64 fields and one live Bytes owner; bool/nested fields do not widen
+that contract. This is local value construction, not a new external ABI.
+
+[Source proofs](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_literals_tests.rs)
+check atomic rejection, original-tree budgets, nominal identity, declaration
+preservation and field order. [Native regressions](../../tools/nuisc/tests/native_resource_session/resource_record_literals.rs)
+exercise four compositions across three declaration forms over 120 events each,
+nested projections, early returns, projected scalar continuations, independent
+registered names, errors and failed Result allocation. Forty isolated probes
+cover skipped/selected reads and traps, including mandatory earlier/later fields.
+The nested validation literal also has a cache/NSB/empty-PATH delivery witness.
+
+## Record-Valued Helper Fields
+
+Completed pure helper results can now fill record fields inside a local literal:
+
+```nuis
+let local: Envelope = Envelope {
+    packet: packet(0, mode == 0 && buffer_len(pixels) == 6, 0),
+    unused: mode < 3 && bytes_len(saved) > 0
+};
+```
+
+The complete constructor is proved before any temporary name is allocated. Each
+helper result must have the exact nominal field type; projected nested results
+use the existing completed pure-call proof. Ready helper fields are also staged
+when another field needs normalization, so their reads and traps cannot slide
+past later logical fields. Resource/helper parameters and native ABI grants are
+unchanged.
+
+A helper executes once into a typed local value. Its i64/bool leaves are then
+projected immediately into scalar snapshots; only those snapshots cross later
+resource continuations. The final literal reconstructs the same nominal shape.
+It does not invoke the helper again for each leaf or add whole records to the
+resource capture list. Original expression budgets remain, and a separate
+whole-constructor shape walk bounds reconstruction to 4096 nodes and depth below
+64, rejects non-i64/bool leaves and counts repeated type-DAG children separately.
+Existing native slot, function, capture and closure-depth checks still apply.
+
+[Source proofs](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_field_values_tests.rs)
+check one helper snapshot followed by exact typed projections, intact lazy
+children, declaration identity, atomic rejection, ready routes and complete
+expansion budgets. [Native regressions](../../tools/nuisc/tests/native_resource_session/resource_record_field_values.rs)
+run five compositions across three declaration forms over 120 events each, with
+one emitted helper call site rather than one per leaf. Multiple helper fields,
+later scalar continuations, early errors, failed Result allocation and borrowed-only
+callbacks with independent registered names retain State and owner checks.
+Forty new isolated probes cover selected/skipped operands and mandatory helper
+calls on either side of a lazy field, including a trap in an unprojected return
+field. A nested validation helper field also has cache/NSB/empty-PATH delivery.
+
+## Previously Bound Record Fields
+
+A record already materialized in the current block can now fill a literal field
+before later resource short-circuit logic:
+
+```nuis
+let prior: Packet = packet(0, true, 0);
+let local: Envelope = Envelope {
+    packet: prior,
+    unused: mode == 0 && buffer_len(pixels) == 6
+};
+```
+
+The owned-region walk keeps a block-local record type table separate from its
+scalar capture scope. Only completed declarations with exact pure nominal layouts
+are entered. Every rebinding first removes the old entry; nonrecord, unknown,
+reference, optional and generic types cannot retain stale proof. If/while boundaries
+clear the table. Outlined functions start with a fresh table, not their parent's
+record bindings. This is not record capture or a record phi contract.
+
+Direct names and nested record projections use this availability proof. The
+existing complete-constructor and snapshot-shape checks still precede allocation.
+Each local record field is materialized and projected to scalar leaves at its
+source position, before later fields branch. Prior Buffer reads are not repeated
+after intervening writes. Repeated fields can share the same completed source
+value without repeating its helper call.
+
+A prior record field after an earlier lazy field needs the separate liveness
+proof below: the record itself cannot enter scalar-only continuation parameters.
+Only safe completed projections may move, never eager computation or resource
+reads. Scalar captures, helper parameters and native ABI bounds are unchanged.
+
+[Source scope tests](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_local_fields_tests.rs)
+cover exact nominal projections, invalidation, malformed later fields and rejection
+before temporary names. [Native regressions](../../tools/nuisc/tests/native_resource_session/resource_record_local_fields.rs)
+cover six binding forms across three declarations, 120 events per form, repeated
+fields, scalar continuations, branch-local early returns, errors and failed
+allocation. Borrowed-only callbacks retain independent State/Result names.
+The local-field delivery witness follows cache hits, source-free NSB relocation
+and empty-PATH binary launch. Isolated probes distinguish skipped/selected later
+reads and arithmetic from mandatory earlier record initialization.
+
+## Late Record Field Liveness
+
+Previously bound pure records can now appear after a short-circuit field:
+
+```nuis
+let prior: Packet = packet(0, true, 0);
+let local: Envelope = Envelope {
+    unused: mode == 0 && buffer_len(pixels) == 6,
+    packet: prior
+};
+```
+
+After the complete constructor and expanded shape are proved, a separate planner
+walks fields in source order, including nested literal fields. It identifies
+existing record paths used after a guarded field. Only those completed i64/bool
+projections are frozen before constructor evaluation; the original initializer
+is not repeated. New helper calls, resource reads and checked arithmetic are
+never moved. Ordinary field staging still evaluates them at their source positions.
+
+A root/field-path cache shares repeated and overlapping scalar leaves. Rebuilt
+nominal fields use those snapshots directly, avoiding redundant alias captures.
+No record enters a resource continuation signature. The existing source tree,
+shape, helper graph, native slot and 33-input guard bounds remain unchanged.
+The repeated-wide-field regression accepts 29 leaves and rejects 30 under that
+guard bound, rather than expanding its ABI to accommodate snapshots.
+
+[Source proofs](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_liveness_tests.rs)
+check exact early projections, unmodified eager/lazy expressions, preserved
+declarations, overlapping paths, once-only calls and hygienic names. The existing
+atomic-rejection proof now also places malformed fields after a lazy field.
+[Native regressions](../../tools/nuisc/tests/native_resource_session/resource_record_liveness.rs)
+exercise six binding forms across three declarations over 120 events each,
+prior reads across later writes, nested and multiple lazy fields, repeated paths,
+scalar continuations, branch-local early returns, errors and failed allocation.
+Borrowed-only renamed callbacks retain their registered identities.
+
+Late-field trap probes distinguish selected/skipped reads and arithmetic from
+mandatory earlier record initialization. The late validation field also has a
+cache, source-free NSB relocation and empty-PATH binary delivery witness. The next
+section extends this record-valued-field grant to scalar operands inside predicates.
+
+## Local Record Scalar Operands
+
+Exact i64/bool fields of already initialized pure records can now participate in
+resource predicates inside bounded record literal initializers:
+
+```nuis
+let prior: Packet = packet(0, mode == 0, 0);
+let local: Envelope = Envelope {
+    unused: prior.flags.valid && bytes_len(saved) == 48,
+    packet: prior
+};
+```
+
+The block-local nominal table proves the complete variable-rooted field path.
+After bounding the original expression, admission substitutes type-only scalar
+witnesses into a separate proof tree and checks the whole constructor using the
+existing resource/helper/type rules. These witnesses are never emitted, evaluated
+or constant-folded. Missing fields, wrong kinds, unavailable locals, dead owners,
+unknown/effectful helpers and over-budget trees fail before allocating names.
+Rebindings and control-flow boundaries still invalidate local record availability.
+
+Only after complete proof does the liveness planner freeze the original completed
+scalar projections. The same root/field-path cache serves expressions and later
+record-valued fields, without duplicate alias captures. Negation, nested logic,
+comparisons, XOR, indexed reads and scalar helper arguments preserve their original
+syntax and evaluation order. Resource reads, new calls and checked arithmetic
+stay in their original positions; only already computed pure fields move.
+Original expression/shape budgets, native slots, helper limits, exact owners and
+the 33-input guard bound remain unchanged.
+
+[Source tests](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_operands_tests.rs)
+check nominal/type proof, shared snapshots, source preservation, eager/lazy call
+arguments, hygiene and atomic rejection.
+[Native tests](../../tools/nuisc/tests/native_resource_session/resource_record_operands.rs)
+exercise seven expressions across three declaration forms, 120 events each,
+completed reads across writes, AST preservation and YIR roundtrips. Repeated-field
+capture tests still accept 29 leaves and reject 30. Existing liveness error and
+borrowed-only tests now also consume these local scalar operands, preserving
+committed State, independent registration names and owner cleanup.
+
+Eighteen isolated probes cover skipped/selected reads and division, negation,
+nested conditions, XOR and helper arguments. Eager siblings and original record
+initializers remain mandatory even when a later resource operand is skipped.
+The project workflow checks the same predicate through cache reuse, source-free
+NSB relocation and standalone empty-PATH launch.
+
+The constructor grant does not imply whole-record resource captures or general
+lexical joins. The next section extends its operand proof to scalar declarations.
+
+## Local Record Scalar Initializers
+
+The same exact local-record projections now work in standalone bool/i64 declarations:
+
+```nuis
+let prior: Packet = packet(0, mode == 0, 0);
+let valid: bool = prior.flags.valid && bytes_len(saved) == 48;
+return Result.Ok(Canvas { width: word(valid), pixels: move(saved) });
+```
+
+The local availability table routes canonical bool/i64 declarations through
+complete expression admission. The original tree is bounded before type witnesses
+are substituted; both sides of every logical operator retain exact resource,
+owner and scalar-kind checks. After proof, the existing liveness planner saves
+only referenced, completed scalar fields, deduplicated by root/field path.
+The original let/const declaration, type, name and remaining expression are then
+requeued into the existing owned-region machinery. No call, read or checked
+arithmetic is moved into the pure projection prefix.
+
+Ready/pure declarations that do not need this normalization keep their prior
+route. If no local projections remain, the entry does not rewrite again or
+allocate names; the ordinary scalar outliner owns the requeued expression.
+Whole records do not enter resource captures. Later statements needing a record
+across a resource continuation still need explicit scalar projections before
+crossing that boundary. Original expression, helper, slot, owner and input bounds
+are unchanged.
+
+[Source proofs](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_scalar_initializers_tests.rs)
+check bool/i64 and let/const identity, shadow initializer references, shared typed
+projections, intact eager/lazy expressions, one-time rewriting and atomic rejection.
+Invalid kinds, unavailable paths, invalidated scopes, dead owners, unknown/effectful
+helpers and oversized source trees allocate no names.
+[Native regressions](../../tools/nuisc/tests/native_resource_session/resource_record_scalar_initializers.rs)
+exercise nine compositions across explicit, inferred and const-alias declarations
+over 120 events each, including nested helper projections and computed indices.
+Completed reads survive later Buffer writes; AST and YIR roundtrips remain intact.
+Branch-local bool shadows restore outer fallthrough state. Checked errors,
+injected Result allocation failures and independently named borrowed-only callbacks
+retain committed State and zero tracked blobs. Repeated paths still accept 29
+captured leaves and reject 30 under the existing 33-input guard bound.
+
+Thirty-four additional isolated probes cover standalone bool and i64 forms,
+including selected/skipped reads and division, negation, nested logic, XOR and
+helper arguments. Bool fixtures require a complete outer `word(...)` call;
+an i64 expression merely starting with that call is not a bool fixture.
+Mandatory eager operands and original initializers still run.
+Both declaration kinds have cache, source-free NSB relocation and empty-PATH
+binary launch witnesses. The next section extends the same proof to direct
+conditions, without an intermediate source declaration.
+
+## Local Record Conditions
+
+Exact scalar projections of already initialized local records can now appear
+directly in a resource `if` condition:
+
+```nuis
+let prior: Packet = packet(0, mode == 0, 0);
+if prior.flags.valid && bytes_len(saved) == 48 {
+    return Result.Ok(Canvas { width: width + 1, pixels: move(saved) });
+}
+return Result.Ok(Canvas { width: width, pixels: move(saved) });
+```
+
+The block-local availability table sends the condition through the same bounded
+exact-bool proof and completed-scalar projection planner as declarations. Only
+the condition is replaced. Both arms remain intact, with no changes to the
+pending suffix; the existing direct-condition route stages the bool and the
+owned-region pass controls execution. No-projection and ready/pure paths retain
+their old handling. Source budgets, owner checks and native ABI limits are not
+relaxed, and no whole record is captured.
+
+The native tests exposed an adjacent borrowed-only error path: an early registered
+Err constructor followed by another Err, with no held Bytes, could miss owned-arm
+outlining and reach scalar `select`. Both terminal error shapes now match the
+registered return layout, variant, type arguments and payload field before the
+early arm takes the owned-helper route. Ordinary early errors followed by a
+success path retain their existing `guard_return` lowering, without extra helpers.
+This is independent of conventional `Result`/`State` names; it does not add resource
+selection to the scalar ABI or bypass the native ownership proof.
+
+[Source tests](../../tools/nuisc/src/lowering/guarded_owned_returns/resource_record_condition_tests.rs)
+retain unchanged arms, source expressions, suffix and hygienic shared projections,
+including one-time rewriting and atomic type/scope/owner/budget rejection.
+[Native tests](../../tools/nuisc/tests/native_resource_session/resource_record_conditions.rs)
+cover eight compositions across three record binding forms over 120 events each,
+completed reads across later writes, AST/YIR roundtrips, both arms' local owners,
+early returns and shared fallthrough. Explicit errors and injected Result allocation
+failures preserve committed State and cleanup; borrowed-only renamed callbacks
+retain registered error identity. The original direct-condition rejection now
+executes 120 events.
+
+Generated temporaries count against the unchanged 33-input guard limit. The flat
+condition probe accepts 29 record leaves and rejects 30. The nested helper-argument
+probe needs an argument bool, a call-result scalar and the condition bool, so it
+accepts 27 leaves and rejects 28. Both maximum accepted cases assert exactly 33
+guard inputs; repeated record paths still share one snapshot.
+
+Eighteen added isolated probes cover selected/skipped reads, division, nested
+logic, negation, XOR and helper arguments. Mandatory eager siblings and original
+record initializers still execute. The direct-condition project witness retains
+cache reuse, source-free NSB relocation, empty-PATH launch and exact final pixels.
+Local-record operands in directly returned State fields remain the next reproduced
+gap; later whole-record use across a resource continuation is not granted here.
+
 ## Execution Evidence
 
 The [native regressions](../../tools/nuisc/tests/native_resource_session/boolean_short_circuit.rs)
@@ -780,12 +1179,328 @@ The rebuilt CLI reports 4650 drift checks, zero failures, clean coverage and cle
 hierarchy. The resource coordinate remains active/95; the other 36 complete cells
 retain hash
 `1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
-The next action follows the reproduced buffer-length composition rejection below.
+At that checkpoint the next action followed the reproduced buffer-length
+composition rejection; the length extension above supersedes that boundary.
 
 Documentation links (5194), UTF-8 validation (6328 files), scoped formatting and
 diff whitespace checks pass. Workspace architecture remains 29 packages, six
 domains and 74 normal/build edges. This is local native CPU evidence, not a
 full-workspace run, fresh Linux/GPU validation or a performance measurement.
+
+### Buffer Length Validation (2026-11-20)
+
+Local serial validation reused the existing target directory, with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 27 passed |
+| Complete native resource suite | 178 passed in 672.12 seconds, including 256 isolated selected/skipped trap probes |
+| Final focused length regressions | 6 passed in 31.67 seconds after strengthening extent and native-kind witnesses |
+| Native resource project workflow | 15 passed in 203.27 seconds, including length composition through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+The old length-composition rejection now runs 120 events at each of 1, 6 and
+17 words. Seven scalar compositions across three declaration forms retain
+120-event State/read-order/owner evidence; inline conditions cover borrowed-only
+and held-owner returns. Application errors preserve committed State, failed
+Result allocation remains separate, and completion leaves zero tracked blobs.
+
+Malformed arity and missing dependencies are rejected before native kind
+admission. The strengthened kind tests therefore retain valid dependency edges
+while replacing a Buffer input with an available i64 or Bytes value, then require
+the incompatible-input diagnostic. This is independent of source type checking.
+The focused rerun includes these strengthened tests; no implementation or ABI
+change was needed after the complete native run.
+
+The rebuilt CLI reports 4655 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95, and all other 36 complete cells
+retain hash
+`1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
+At that checkpoint the next action followed the reproduced helper-returned local
+record boundary; the record-initializer extension above supersedes it.
+
+Documentation links (5196), UTF-8 validation (6329 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. This is local native CPU evidence, not a
+full-workspace run, fresh Linux/GPU validation or a performance measurement.
+
+### Record Local Initializer Validation (2026-11-20)
+
+Local serial validation reused the existing target directory, with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 31 passed |
+| Complete native resource suite | 184 passed in 569.96 seconds, including 292 isolated selected/skipped trap probes |
+| Native resource project workflow | 16 passed in 192.91 seconds, including nested record initialization through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+Six record compositions across explicit, inferred and const-alias declarations
+retain 120-event State, read-order and owner evidence per form. Nested record
+projection, early returns and later scalar continuations preserve the original
+binding and once-only evaluation. Errors and failed Result allocation retain
+committed State and zero tracked blobs; borrowed-only callbacks with independent
+State/Result names retain their registered error identity.
+
+Independent native admission accepts 64 record leaves and rejects 65 even when
+only one leaf is projected. No record-valued resource capture, resource helper
+parameter or broader native ABI is granted. At that checkpoint the record-literal
+field rejection was the next reproduced boundary; the constructor extension above
+supersedes it without silently evaluating a short-circuit RHS.
+
+The rebuilt CLI reports 4661 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95, and all other 36 complete cells
+retain hash
+`1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
+
+Documentation links (5200), UTF-8 validation (6331 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. This is local native CPU evidence, not a
+full-workspace run, fresh Linux/GPU validation or a performance measurement.
+
+### Record Literal Validation (2026-11-20)
+
+Local serial validation reused the existing target directory, with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 34 passed |
+| LLVM lowerer library | 197 passed, 1 existing host-Clang opt-in test ignored |
+| Complete native resource suite | 189 passed in 614.43 seconds, including 332 isolated selected/skipped trap probes |
+| Native resource project workflow | 17 passed in 212.40 seconds, including nested literal initialization through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+The first minimal literal reached source lowering but failed native admission:
+the constructor checker still applied the mixed-State field rules to local bool
+records. Pure local construction now has its own bounded value-schema check,
+while exact owned State validation still precedes any owner consumption. The
+original reproducer and the complete suites above pass after that change.
+
+Native mutation checks cover unavailable/duplicate/malformed fields, hidden
+resources, layout delimiters, 64 versus 65 scalar leaves, total nested slot count
+and 64 versus 65 layout levels. Failed admission leaves values and owners intact.
+The extra eager-field probes prove that an unused earlier/later read or division
+is still evaluated even when its neighboring short-circuit field skips its RHS.
+Four constructor compositions across three declaration forms retain 120-event
+State and owner evidence per form; error and allocation-failure paths retain
+committed State and zero tracked blobs.
+
+The rebuilt CLI reports 4667 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95, and all other 36 complete cells
+retain hash
+`1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
+At that checkpoint the next action followed the record-valued helper field
+rejection; the once-only field-value extension above supersedes it.
+
+Documentation links (5206), UTF-8 validation (6334 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. This is local native CPU evidence, not a
+full-workspace run, fresh Linux/GPU validation or a performance measurement.
+
+### Record Helper Field Validation (2026-11-20)
+
+Local serial validation reused the existing target directory, with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 38 passed |
+| Complete native resource suite | 194 passed in 663.79 seconds, including 372 isolated selected/skipped trap probes |
+| Native resource project workflow | 18 passed in 209.36 seconds, including helper-valued fields through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+Five field compositions across three declaration forms retain 120-event State,
+read-order and owner evidence per form. Emitted LLVM has one helper call site
+rather than one per projected leaf. Multiple helper fields and later scalar
+continuations preserve early returns; application errors and failed Result
+allocation retain committed State and zero tracked blobs. Mandatory helper calls
+on either side of a lazy field still execute, including a trap in an otherwise
+unused helper return field.
+
+Whole-constructor proof precedes temporary allocation. Original expression
+budgets and independent native ABI bounds remain, with an additional complete
+snapshot-shape bound before expansion. No record-valued resource capture or
+resource helper parameter is granted. No LLVM backend implementation changed in
+this extension; the earlier LLVM library result is historical, not a fresh run.
+
+The rebuilt CLI reports 4672 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95, and all other 36 complete cells
+retain hash
+`1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
+At that checkpoint the next action was the prior-record field scope boundary;
+the block-local availability extension above supersedes it.
+
+Documentation links (5210), UTF-8 validation (6336 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. This is local native CPU evidence, not a
+full-workspace run, fresh Linux/GPU validation or a performance measurement.
+
+### Previously Bound Record Field Validation (2026-11-20)
+
+Local serial validation reused the existing target directory, with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 41 passed |
+| Complete native resource suite | 199 passed in 726.75 seconds, including 410 isolated selected/skipped trap probes |
+| Native resource project workflow | 19 passed in 225.33 seconds, including bound-record fields through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+The old prior-record rejection now executes 120 events. Six binding forms across
+three declarations retain completed reads across later Buffer writes, exact nested
+projections, State and zero tracked blobs. Repeated fields use one completed helper
+result; later scalar continuations and branch-local early returns preserve cleanup.
+Application errors and failed Result allocation never publish either half of State.
+Borrowed-only callbacks preserve independently registered State/Result identity.
+
+Thirty-eight added isolated probes retain selected-only later reads and arithmetic,
+while mandatory earlier record initialization still traps even when its later
+logical neighbor skips. Unit proofs invalidate old bindings and control-flow
+boundaries and reject malformed later fields before allocating names. At this
+checkpoint a prior record field after an earlier lazy field was still rejected;
+the liveness extension above supersedes that boundary without record captures.
+
+The rebuilt CLI reports 4678 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95, and all other 36 complete cells
+retain hash
+`1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
+The next action at that checkpoint was the earlier-lazy-field liveness boundary.
+
+Documentation links (5214), UTF-8 validation (6338 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. No LLVM backend or runtime implementation
+changed in this extension. This is local native CPU and source-free delivery
+evidence, not a full-workspace run, fresh Linux/GPU validation or a performance
+measurement.
+
+### Late Record Field Liveness Validation (2026-11-20)
+
+Local serial validation reused the existing target directory, with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 44 passed |
+| Complete native resource suite | 205 passed in 788.15 seconds, including 448 isolated selected/skipped trap probes |
+| Native resource project workflow | 20 passed in 237.51 seconds, including late record fields through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+The original earlier-lazy-field rejection now executes 120 events. Six binding
+forms across three declarations retain completed reads across later writes,
+exact nominal/nested projections, State and zero tracked blobs. Repeated and
+overlapping paths share scalar snapshots across nested and multiple lazy fields.
+Existing record helpers execute once; calls and resource/checked expressions are
+not hoisted with their completed projections. Early errors and failed Result
+allocation retain both halves of committed State and release every held owner.
+Independently named borrowed-only callbacks retain registered error identity.
+
+Thirty-eight added isolated probes exercise late record fields beside selected
+and skipped operands, while prior initialization remains mandatory. The repeated
+wide-field test accepts 29 captured leaves and rejects 30 under the unchanged
+33-input guard bound. No record capture, helper parameter or native ABI grant was
+added. At this checkpoint the next rejection was a local scalar record projection
+inside a resource predicate; the later operand grant above closes constructor uses.
+
+The rebuilt CLI reports 4684 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95, and all other 36 complete cells
+retain hash
+`1c20aca14f35c3fa8b5831de4e0a652e398c7320ee1e4bb9d73e57b5a938a6d3`.
+
+Documentation links (5219), UTF-8 validation (6341 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. No LLVM backend or runtime implementation
+changed in this extension. This is local native CPU and source-free delivery
+evidence, not a full-workspace run, fresh Linux/GPU validation or a performance
+measurement.
+
+### Local Record Operand Validation (2026-11-20)
+
+Local serial validation reused the existing target directory with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 47 passed |
+| Complete native resource suite | 208 passed in 814.31 seconds, including 466 isolated selected/skipped trap probes |
+| Native resource project workflow | 21 passed in 247.60 seconds, including local-record predicates through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+The original constructor-predicate rejection now executes 120 events. Seven
+compositions across three declaration forms retain exact values, completed reads
+across later writes, original AST, YIR roundtrips and zero tracked blobs. Shared
+projection snapshots preserve the 29-leaf acceptance/30-leaf rejection boundary.
+Branch-local checked errors and injected Result allocation failures preserve
+committed State and owner cleanup; renamed borrowed-only callbacks keep their
+registered identities. Eighteen added isolated probes retain selected-only reads
+and traps without skipping mandatory eager siblings or original initializers.
+
+The rebuilt CLI reports 4690 drift checks, zero failures, clean coverage and clean
+hierarchy. Resource callbacks remain active/95. All other 36 complete cells match
+the preceding CLI snapshot exactly. At this checkpoint the next gap was standalone
+bool/i64 declaration admission; the later scalar-initializer grant above closes it.
+
+Documentation links (5224), UTF-8 validation (6344 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. This extension changes constructor admission
+and scalar snapshot planning, not the LLVM backend, runtime or native ABI.
+This is local native CPU and source-free delivery evidence, not a full-workspace
+run, fresh Linux/GPU validation or a performance measurement.
+
+### Local Record Scalar Initializer Validation (2026-11-20)
+
+Local serial validation reused the existing target directory with incremental
+Cargo disabled and one build job:
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 50 passed |
+| Native resource suite excluding the isolated trap harness | 213 passed in the initial full-suite run |
+| Corrected isolated trap harness and fixture-classification regression | 2 passed in 432.66 seconds, including 500 isolated selected/skipped probes |
+| Native resource project workflow | 23 passed in 258.36 seconds, including both scalar declaration kinds through cache, source-free NSB relocation and empty-PATH launch |
+| Tensor and CLI regressions | 51 passed |
+| Repository line limits | 2 passed |
+
+The initial full native run reported 213 passing tests and one harness failure:
+`bool_operand_right_take` was misclassified because its i64 expression began
+with `word(...)` but had an eager arithmetic suffix. The child failed in fixture
+construction, before the event marker. The classifier now requires one complete
+outer call, with a regression for arithmetic suffixes and unmatched parentheses.
+The entire isolated harness was then rerun, including all 34 new scalar probes.
+The other 213 tests were not rerun after this test-only correction; this is not a
+claim of a single clean 215-test full-suite run.
+
+The prior standalone-declaration rejection now executes 120 events. Nine
+compositions across three declaration forms retain completed reads across later
+writes, exact values, declaration identity, original AST, YIR roundtrips and zero
+tracked blobs. Branch-local shadows, checked errors, failed Result allocation and
+independently named borrowed-only callbacks preserve cleanup and committed State.
+Shared projections retain the 29-leaf acceptance/30-leaf rejection boundary.
+
+The rebuilt CLI reports 4696 drift checks, zero failures, clean coverage and clean
+hierarchy. One old trap-routing evidence anchor was synchronized with the current
+multiline method chain. Resource callbacks remain active/95, and all other 36
+complete cells match the preceding CLI snapshot exactly. At this checkpoint the
+next task was the direct resource condition using a local-record scalar operand;
+the later condition grant above supersedes that negative test.
+
+Documentation links (5228), UTF-8 validation (6346 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges. This extension reuses exact scalar projection
+planning and the existing owned-region normalizer, without changing the LLVM
+backend, runtime or native ABI. This is local native CPU and source-free delivery
+evidence, not a full-workspace run, fresh Linux/GPU validation or a performance
+measurement.
 
 ## Remaining Boundaries
 
@@ -794,12 +1509,22 @@ Direct i64 initialization with guarded resource arguments is admitted above.
 Direct inline bool conditions are admitted through the same bounded path.
 Returned mixed-State i64 fields and their terminal cleanup bindings are admitted.
 Direct checked Err codes and their terminal cleanup bindings are admitted.
-The next reproduced gap is inline Buffer length composed with resource short-circuit arguments:
-`return Result.Ok(Canvas { width: buffer_len(pixels) + word(mode >= 0 && bytes_len(saved) == 48), pixels: move(saved) });`.
+Borrowed Buffer length now composes with the same expressions.
+Helper-returned record locals now admit typed scalar argument staging.
+Nested record literal locals now admit ordered scalar-leaf staging.
+Record-valued helper fields now admit once-only materialization and scalar projection.
+Previously bound record fields now admit block-local proof before later resource logic.
+Previously bound record fields after earlier logic now use shared safe scalar projections.
+Local-record scalar operands inside constructor predicates now share exact snapshots.
+Standalone bool/i64 initializers now share those snapshots and retain declaration identity.
+Direct resource conditions now reuse exact local-record projections with intact arms.
+The next reproduced gap is a directly returned State field using a local-record operand:
+`let prior: Packet = packet(0, mode == 0, 0); return Result.Ok(Canvas { width: word(prior.flags.valid && bytes_len(saved) == 48), pixels: move(saved) });`.
 It still rejects with `short-circuit RHS requires guarded lowering` instead of
 speculating reads. The nested/read-helper/logical-argument/wrapper grant applies
 to bool/i64 declarations, direct bool conditions and the bounded mixed-State fields
-and checked Err codes above, not arbitrary aggregate locals, additional resource
+and checked Err codes above, plus helper-returned and nested-literal record locals,
+not arbitrary record expressions or record-valued resource captures, additional resource
 primitives, loops or other callback profiles.
 Unsupported expressions retain
 `short-circuit RHS requires guarded lowering`; outer negation does not widen

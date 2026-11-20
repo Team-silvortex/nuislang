@@ -360,6 +360,38 @@ fn error_value(value: NirExpr) -> NirExpr {
 }
 
 #[test]
+fn resource_predicate_checked_error_arms_use_registered_identity_without_live_owners() {
+    for variant in 0..7 {
+        let (mut template, mut context, _, _) = error_fixture();
+        let mut value = error_value(NirExpr::Int(17));
+        let NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } = &mut value
+        else {
+            unreachable!()
+        };
+        match variant {
+            0 => {}
+            1 => *type_name = "Result.Err".into(),
+            2 => type_args.clear(),
+            3 => fields[0].0 = "other".into(),
+            4 => fields.push(fields[0].clone()),
+            5 => template.return_type = None,
+            6 => context.return_layouts.clear(),
+            _ => unreachable!(),
+        }
+        let body = vec![NirStmt::Return(Some(value))];
+        assert_eq!(
+            super::super::checked_error_arm(&body, &template, &context),
+            variant == 0
+        );
+        assert!(context.reserved.is_empty() && context.pending.is_empty());
+    }
+}
+
+#[test]
 fn resource_predicate_error_code_requeues_one_intact_i64_and_preserves_identity() {
     let (template, mut context, scope, live) = error_fixture();
     let code = binary(NirBinaryOp::Add, NirExpr::Int(17), lazy());

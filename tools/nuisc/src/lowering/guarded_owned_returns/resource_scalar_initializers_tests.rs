@@ -297,3 +297,180 @@ fn resource_predicate_i64_keeps_plain_scalar_initializers_on_the_existing_route(
     .is_none());
     assert!(context.reserved.is_empty());
 }
+
+#[test]
+fn resource_predicate_buffer_length_stages_in_order_without_walking_lazy_children() {
+    let (template, mut context, scope, live, mut value) = fixture();
+    let length = NirExpr::BufferLen(Box::new(NirExpr::Var("buffer".into())));
+    let NirExpr::Call { args, .. } = &mut value else {
+        unreachable!()
+    };
+    args[0] = length.clone();
+    args[1] = binary(
+        NirBinaryOp::And,
+        NirExpr::Var("flag".into()),
+        binary(NirBinaryOp::Gt, length, NirExpr::Int(0)),
+    );
+    let original_args = args.clone();
+    assert!(needs_guard(&args[1]));
+    let mut suffix = VecDeque::from(template.body.clone());
+    let original_suffix = suffix.clone();
+    let prefix = split(
+        &NirStmt::Let {
+            name: "choice".into(),
+            ty: Some(ty("i64")),
+            value,
+        },
+        &template,
+        &mut suffix,
+        &scope,
+        &live,
+        1,
+        &mut context,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(prefix.len(), 4);
+    for (index, statement) in prefix[..3].iter().enumerate() {
+        let NirStmt::Let {
+            ty: Some(ty),
+            value,
+            ..
+        } = statement
+        else {
+            unreachable!()
+        };
+        assert_eq!(value, &original_args[index]);
+        assert_eq!(ty.name, if index == 1 { "bool" } else { "i64" });
+    }
+    assert_eq!(suffix, original_suffix);
+    assert!(context.pending.is_empty() && context.outlines.owners.is_empty());
+}
+
+#[test]
+fn resource_predicate_buffer_length_rejects_nonborrowed_or_hidden_invalid_operands_atomically() {
+    let (template, _, scope, live, _) = fixture();
+    let buffer_ty = scope[0].ty.clone();
+    let mut variants = vec![
+        NirTypeRef {
+            is_ref: false,
+            ..buffer_ty.clone()
+        },
+        NirTypeRef {
+            is_optional: true,
+            ..buffer_ty.clone()
+        },
+        NirTypeRef {
+            generic_args: vec![ty("i64")],
+            ..buffer_ty.clone()
+        },
+        ty("Bytes"),
+        ty("i64"),
+        ty("bool"),
+    ]
+    .into_iter()
+    .map(|ty| {
+        let mut changed = scope.clone();
+        changed[0].ty = ty;
+        (changed, NirExpr::Var("buffer".into()))
+    })
+    .collect::<Vec<_>>();
+    for operand in [
+        NirExpr::Var("missing".into()),
+        NirExpr::Var("saved".into()),
+        NirExpr::Bool(false),
+        NirExpr::Int(0),
+        NirExpr::Call {
+            callee: "unknown".into(),
+            args: vec![],
+        },
+        binary(
+            NirBinaryOp::And,
+            NirExpr::Bool(false),
+            NirExpr::Var("missing".into()),
+        ),
+    ] {
+        variants.push((scope.clone(), operand));
+    }
+    for (scope, operand) in variants {
+        let (_, mut context, _, _, _) = fixture();
+        let value = binary(
+            NirBinaryOp::And,
+            NirExpr::Bool(false),
+            binary(
+                NirBinaryOp::Gt,
+                NirExpr::BufferLen(Box::new(operand)),
+                NirExpr::Int(0),
+            ),
+        );
+        let mut suffix = VecDeque::from(template.body.clone());
+        let original = suffix.clone();
+        assert!(split(
+            &NirStmt::Let {
+                name: "choice".into(),
+                ty: Some(ty("bool")),
+                value,
+            },
+            &template,
+            &mut suffix,
+            &scope,
+            &live,
+            1,
+            &mut context
+        )
+        .unwrap()
+        .is_none());
+        assert_eq!(suffix, original);
+        assert!(
+            context.reserved.is_empty()
+                && context.pending.is_empty()
+                && context.outlines.owners.is_empty()
+        );
+    }
+}
+
+#[test]
+fn resource_predicate_buffer_length_keeps_original_budgets_and_ready_route() {
+    let (template, mut context, scope, live, _) = fixture();
+    let length = NirExpr::BufferLen(Box::new(NirExpr::Var("buffer".into())));
+    assert!(admitted(&length, &scope, &live, &context.calls, Kind::I64));
+    assert!(!admitted(
+        &length,
+        &scope,
+        &live,
+        &context.calls,
+        Kind::Bool
+    ));
+    let mut deep = length.clone();
+    for _ in 0..64 {
+        deep = NirExpr::BufferLen(Box::new(deep));
+    }
+    let wide = NirExpr::Call {
+        callee: "combine".into(),
+        args: vec![length.clone(); 2048],
+    };
+    let mut edges = binary(NirBinaryOp::Gt, length.clone(), NirExpr::Int(0));
+    for _ in 0..33 {
+        edges = binary(NirBinaryOp::And, NirExpr::Bool(true), edges);
+    }
+    for over_budget in [deep, wide, edges] {
+        assert!(bounded(&over_budget).is_none());
+    }
+    let mut suffix = VecDeque::from(template.body.clone());
+    assert!(split(
+        &NirStmt::Let {
+            name: "choice".into(),
+            ty: Some(ty("i64")),
+            value: length,
+        },
+        &template,
+        &mut suffix,
+        &scope,
+        &live,
+        1,
+        &mut context
+    )
+    .unwrap()
+    .is_none());
+    assert!(context.reserved.is_empty());
+}

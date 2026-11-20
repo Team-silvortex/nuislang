@@ -51,7 +51,9 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
         .evidence
         .contains("before NIR merges declarations and assignments"));
     assert!(resource.blocker.contains("rebinding captured values"));
-    assert!(resource.next_step.contains("buffer_len composition"));
+    assert!(resource
+        .next_step
+        .contains("scalar projections of block-local records"));
     assert!(resource.next_step.contains("terminal cleanup"));
     assert!(resource.evidence.contains("inferred and aliased i64"));
     assert!(resource.evidence.contains("before optimization"));
@@ -102,9 +104,9 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
     assert!(resource
         .evidence
         .contains("Canonical boolean negation now crosses pure resource branch prefixes directly"));
-    assert!(resource.blocker.contains(
-        "buffer_len composition with resource short-circuit expressions remains outside"
-    ));
+    assert!(resource
+        .blocker
+        .contains("local-record operands in directly returned State fields remain outside"));
     assert!(resource
         .evidence
         .contains("Direct inline bool conditions now requeue one hygienic exact-bool snapshot"));
@@ -116,7 +118,34 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
     ));
     assert!(resource
         .next_action
-        .contains("reproduced buffer-length composition gap"));
+        .contains("reproduced returned-State local-record operand gap"));
+    assert!(resource.evidence.contains(
+        "Direct resource conditions now share the same exact local-record scalar projection proof"
+    ));
+    assert!(resource
+        .evidence
+        .contains("Standalone bool/i64 declarations now reuse the same complete expression proof"));
+    assert!(resource
+        .evidence
+        .contains("Local-record scalar operands now compose inside bounded record constructors"));
+    assert!(resource
+        .evidence
+        .contains("Previously bound record fields now survive earlier lazy fields"));
+    assert!(resource
+        .evidence
+        .contains("Previously bound record fields now use a block-local availability table"));
+    assert!(resource
+        .evidence
+        .contains("Record-valued helper fields now evaluate once into a local value"));
+    assert!(resource
+        .evidence
+        .contains("Nested record literal locals now stage every i64/bool leaf in source order"));
+    assert!(resource
+        .evidence
+        .contains("Helper-returned value-record locals now stage scalar arguments"));
+    assert!(resource
+        .evidence
+        .contains("Borrowed buffer_len now shares exact ref Buffer admission"));
     assert!(resource
         .evidence
         .contains("Direct checked Err i64 expressions now requeue one intact typed snapshot"));

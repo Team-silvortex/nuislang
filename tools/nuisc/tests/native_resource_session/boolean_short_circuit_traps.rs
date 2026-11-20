@@ -19,22 +19,88 @@ impl Drop for TemporaryRoot {
     }
 }
 
+fn bool_probe_operand(expression: &str) -> Option<&str> {
+    let operand = expression.strip_prefix("word(")?.strip_suffix(')')?;
+    let mut depth = 0usize;
+    // These fixed fixtures contain no strings: accept one complete outer call,
+    // not an eager arithmetic expression that merely begins with that call.
+    for byte in operand.bytes() {
+        match byte {
+            b'(' => depth += 1,
+            b')' => depth = depth.checked_sub(1)?,
+            _ => {}
+        }
+    }
+    (depth == 0).then_some(operand)
+}
+
+#[test]
+fn standalone_bool_probe_requires_one_complete_word_call() {
+    assert_eq!(
+        bool_probe_operand("word(a && choose(b).value)"),
+        Some("a && choose(b).value")
+    );
+    for expression in [
+        "word(a) + 100 / zero",
+        "word(a) + word(b)",
+        "word(a",
+        "word(a))",
+    ] {
+        assert!(bool_probe_operand(expression).is_none(), "{expression}");
+    }
+    assert_eq!(
+        super::resource_record_operands::TRAPS
+            .iter()
+            .filter(|(_, value, _)| bool_probe_operand(value).is_some())
+            .count(),
+        16
+    );
+}
+
 #[test]
 fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
     const CASE: &str = "NUIS_RESOURCE_BOOL_TRAP_CASE";
     if let Ok(case) = std::env::var(CASE) {
         let inline = case.strip_prefix("inline_");
         let returned = case.strip_prefix("field_");
+        let record_local = case.strip_prefix("record_");
+        let literal_local = case.strip_prefix("literal_");
+        let member_local = case.strip_prefix("member_");
+        let bound_local = case.strip_prefix("bound_");
+        let late_local = case.strip_prefix("late_");
+        let scalar_operand = case.strip_prefix("scalar_operand_");
+        let bool_operand = case.strip_prefix("bool_operand_");
+        let condition_operand = case.strip_prefix("condition_operand_");
+        let operand_local = case
+            .strip_prefix("operand_")
+            .or(scalar_operand)
+            .or(bool_operand)
+            .or(condition_operand);
         let error_return = case.strip_prefix("error_");
         let bare_error = error_return.and_then(|key| key.strip_prefix("bare_"));
         let key = inline
             .or(returned)
+            .or(record_local)
+            .or(literal_local)
+            .or(member_local)
+            .or(bound_local)
+            .or(late_local)
+            .or(operand_local)
             .or(bare_error)
             .or(error_return)
             .unwrap_or(&case);
         let integer = super::resource_i64_initializers::TRAPS
             .iter()
-            .find(|(name, _, _)| *name == key);
+            .chain(super::resource_buffer_lengths::TRAPS)
+            .find(|(name, _, _)| *name == key)
+            .filter(|_| operand_local.is_none())
+            .or_else(|| {
+                operand_local.and_then(|_| {
+                    super::resource_record_operands::TRAPS
+                        .iter()
+                        .find(|(name, _, _)| *name == key)
+                })
+            });
         let expression = match key {
             "and_skip" => "mode != 0 && choose(100 / mode > 1).value",
             "or_skip" => "mode == 0 || choose(100 / mode > 1).value",
@@ -150,7 +216,7 @@ fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
             "wrap_order_take" => "word(mode == 0 && load_at(pixels, 99) > 0) < load_at(pixels, 3)",
             "wrap_mandatory_div_take" => "(mode != 0 && bytes_len(saved) > 0) == divide(bytes_len(saved) - 48)",
             "wrap_mandatory_div_left_take" => "divide(bytes_len(saved) - 48) ^ (mode != 0 && bytes_len(saved) > 0)",
-            _ if integer.is_some() => "choice == 9",
+            _ if integer.is_some() || literal_local.is_some() || member_local.is_some() || bound_local.is_some() || late_local.is_some() => "choice == 9",
             _ => panic!("unknown child case"),
         };
         let source = helpers(&format!(
@@ -165,7 +231,86 @@ fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
           return Result.Ok(Canvas {{ width: width + 1, pixels: copy_bytes(pixels) }});
         "#
         ));
-        let source = if error_return.is_some() {
+        let source = if operand_local.is_some() {
+            let value = integer.unwrap().1;
+            let zero = match key {
+                "init_read_take" => "load_at(pixels, 99)",
+                "init_div_take" => "100 / mode",
+                _ => "mode",
+            };
+            let tail = if condition_operand.is_some() {
+                format!("let original: i64 = prior.zero; if ({value}) != 0 {{ return Result.Ok(Canvas {{ width: width + 10 + original, pixels: move(saved) }}); }} return Result.Ok(Canvas {{ width: width + 1 + original, pixels: move(saved) }});")
+            } else if bool_operand.is_some() {
+                let predicate = bool_probe_operand(value).expect("a complete outer word call");
+                format!("let original: i64 = prior.zero; let choice: bool = {predicate}; return Result.Ok(Canvas {{ width: width + 1 + word(choice) + original, pixels: move(saved) }});")
+            } else if scalar_operand.is_some() {
+                format!("let original: i64 = prior.zero; let choice: i64 = {value}; return Result.Ok(Canvas {{ width: width + 1 + choice + original, pixels: move(saved) }});")
+            } else {
+                format!("let local = ProbeEnvelope {{ after: {value}, inner: prior }}; return Result.Ok(Canvas {{ width: width + 1 + local.after + local.inner.zero, pixels: move(saved) }});")
+            };
+            helpers(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); let prior = ProbeInput {{ enabled: mode != 0, index: 99, zero: {zero} }}; {tail}"))
+                .replace("mod cpu Main {", "mod cpu Main { struct ProbeInput { enabled: bool, index: i64, zero: i64 } struct ProbeEnvelope { inner: ProbeInput, after: i64 }")
+        } else if bound_local.is_some() || late_local.is_some() {
+            let (prior, after) = if let Some((_, value, _)) = integer {
+                ("record_value(0)", *value)
+            } else {
+                (
+                    if key.contains("read") {
+                        "record_value(load_at(pixels, 99))"
+                    } else {
+                        "record_div(bytes_len(saved) - 48)"
+                    },
+                    "word(mode != 0 && bytes_len(saved) > 0)",
+                )
+            };
+            let fields = if late_local.is_some() {
+                format!("after: {after}, inner: prior")
+            } else {
+                format!("inner: prior, after: {after}")
+            };
+            helpers(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); let prior: ProbeNumber = {prior}; let local = ProbeEnvelope {{ {fields} }}; return Result.Ok(Canvas {{ width: width + 1 + local.inner.value + local.after, pixels: move(saved) }});"))
+                .replace("mod cpu Main {", "mod cpu Main { struct ProbeNumber { value: i64, hidden: i64 } struct ProbeEnvelope { inner: ProbeNumber, after: i64 } fn record_value(value: i64) -> ProbeNumber { return ProbeNumber { value: value, hidden: 0 }; } fn record_div(value: i64) -> ProbeNumber { return ProbeNumber { value: 0, hidden: 100 / value }; }")
+        } else if member_local.is_some() {
+            let value = if let Some((_, value, _)) = integer {
+                format!("ProbeEnvelope {{ inner: record_value({value}), after: 0 }}")
+            } else {
+                let eager = if key.contains("read") {
+                    "record_value(load_at(pixels, 99))"
+                } else {
+                    "record_div(bytes_len(saved) - 48)"
+                };
+                let lazy = "word(mode != 0 && bytes_len(saved) > 0)";
+                if key.contains("before") {
+                    format!("ProbeEnvelope {{ inner: {eager}, after: {lazy} }}")
+                } else {
+                    format!("ProbeEnvelope {{ after: {lazy}, inner: {eager} }}")
+                }
+            };
+            helpers(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); let local: ProbeEnvelope = {value}; return Result.Ok(Canvas {{ width: width + 1 + local.inner.value, pixels: move(saved) }});"))
+                .replace("mod cpu Main {", "mod cpu Main { struct ProbeNumber { value: i64, hidden: i64 } struct ProbeEnvelope { inner: ProbeNumber, after: i64 } fn record_value(value: i64) -> ProbeNumber { return ProbeNumber { value: value, hidden: 0 }; } fn record_div(value: i64) -> ProbeNumber { return ProbeNumber { value: 9, hidden: 100 / value }; }")
+        } else if literal_local.is_some() {
+            let value = if let Some((_, value, _)) = integer {
+                format!("ProbeFields {{ eager: 0, value: {value} }}")
+            } else {
+                let eager = if key.contains("read") {
+                    "load_at(pixels, 99)"
+                } else {
+                    "100 / mode"
+                };
+                let lazy = "word(mode != 0 && bytes_len(saved) > 0)";
+                if key.contains("before") {
+                    format!("ProbeFields {{ eager: {eager}, value: {lazy} }}")
+                } else {
+                    format!("ProbeFields {{ value: {lazy}, eager: {eager} }}")
+                }
+            };
+            helpers(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); let local: ProbeFields = {value}; return Result.Ok(Canvas {{ width: width + 1 + local.value, pixels: move(saved) }});"))
+                .replace("mod cpu Main {", "mod cpu Main { struct ProbeFields { value: i64, eager: i64 }")
+        } else if record_local.is_some() {
+            let (_, value, _) = integer.unwrap();
+            helpers(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); let local: ProbeNumber = record_value({value}); return Result.Ok(Canvas {{ width: width + 1 + local.value, pixels: move(saved) }});"))
+                .replace("mod cpu Main {", "mod cpu Main { struct ProbeNumber { value: i64 } fn record_value(value: i64) -> ProbeNumber { return ProbeNumber { value: value }; }")
+        } else if error_return.is_some() {
             let (_, value, _) = integer.unwrap();
             let prefix = if bare_error.is_some() {
                 ""
@@ -193,7 +338,14 @@ fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
             source
                 .replace(&format!("let decision: bool = {expression};"), "")
                 .replace("if decision {", &format!("if {condition} {{"))
-        } else if error_return.is_some() {
+        } else if error_return.is_some()
+            || record_local.is_some()
+            || literal_local.is_some()
+            || member_local.is_some()
+            || bound_local.is_some()
+            || late_local.is_some()
+            || operand_local.is_some()
+        {
             source
         } else if let Some((_, value, _)) = integer.filter(|_| returned.is_none()) {
             source.replace(
@@ -256,7 +408,14 @@ fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
         {
             assert_eq!(
                 session.state(),
-                if returned.is_some() {
+                if returned.is_some()
+                    || record_local.is_some()
+                    || literal_local.is_some()
+                    || member_local.is_some()
+                    || bound_local.is_some()
+                    || late_local.is_some()
+                    || operand_local.is_some()
+                {
                     [9; 6]
                 } else {
                     [3, 9, 9, 9, 9, 9]
@@ -394,6 +553,7 @@ fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
     .chain(
         super::resource_i64_initializers::TRAPS
             .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
             .map(|(name, _, _)| *name),
     )
     .chain(super::resource_conditions::TRAPS.iter().copied())
@@ -401,15 +561,87 @@ fn short_circuit_rhs_traps_only_when_selected_in_a_separate_process() {
     .chain(
         super::resource_i64_initializers::TRAPS
             .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
             .map(|(name, _, _)| format!("field_{name}")),
     )
     .chain(
         super::resource_i64_initializers::TRAPS
             .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
             .map(|(name, _, _)| format!("error_{name}")),
     )
     .chain(["error_bare_i64_and_skip", "error_bare_i64_and_take"].map(str::to_owned))
-    {
+    .chain(
+        super::resource_i64_initializers::TRAPS
+            .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
+            .map(|(name, _, _)| format!("record_{name}")),
+    )
+    .chain(
+        super::resource_i64_initializers::TRAPS
+            .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
+            .map(|(name, _, _)| format!("literal_{name}")),
+    )
+    .chain(
+        [
+            "literal_field_before_read_take",
+            "literal_field_after_read_take",
+            "literal_field_before_div_take",
+            "literal_field_after_div_take",
+        ]
+        .map(str::to_owned),
+    )
+    .chain(
+        super::resource_i64_initializers::TRAPS
+            .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
+            .map(|(name, _, _)| format!("member_{name}")),
+    )
+    .chain(
+        [
+            "member_field_before_read_take",
+            "member_field_after_read_take",
+            "member_field_before_div_take",
+            "member_field_after_div_take",
+        ]
+        .map(str::to_owned),
+    )
+    .chain(
+        super::resource_i64_initializers::TRAPS
+            .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
+            .map(|(name, _, _)| format!("bound_{name}")),
+    )
+    .chain(["bound_init_read_take", "bound_init_div_take"].map(str::to_owned))
+    .chain(
+        super::resource_i64_initializers::TRAPS
+            .iter()
+            .chain(super::resource_buffer_lengths::TRAPS)
+            .map(|(name, _, _)| format!("late_{name}")),
+    )
+    .chain(["late_init_read_take", "late_init_div_take"].map(str::to_owned))
+    .chain(
+        super::resource_record_operands::TRAPS
+            .iter()
+            .map(|(name, _, _)| format!("operand_{name}")),
+    )
+    .chain(
+        super::resource_record_operands::TRAPS
+            .iter()
+            .map(|(name, _, _)| format!("scalar_operand_{name}")),
+    )
+    .chain(
+        super::resource_record_operands::TRAPS
+            .iter()
+            .filter(|(_, value, _)| bool_probe_operand(value).is_some())
+            .map(|(name, _, _)| format!("bool_operand_{name}")),
+    )
+    .chain(
+        super::resource_record_operands::TRAPS
+            .iter()
+            .map(|(name, _, _)| format!("condition_operand_{name}")),
+    ) {
         let root = TemporaryRoot(
             std::env::temp_dir().join(format!("nuis-short-circuit-{}-{case}", std::process::id())),
         );

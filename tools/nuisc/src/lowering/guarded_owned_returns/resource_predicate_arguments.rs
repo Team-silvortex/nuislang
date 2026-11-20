@@ -22,9 +22,9 @@ fn contains_nested_logic(value: &NirExpr, require_argument: bool) -> bool {
                 pending.extend([(lhs.as_ref(), argument), (rhs.as_ref(), argument)]);
             }
             NirExpr::Call { args, .. } => pending.extend(args.iter().map(|arg| (arg, true))),
-            NirExpr::FieldAccess { base, .. } | NirExpr::BytesLen(base) => {
-                pending.push((base, argument))
-            }
+            NirExpr::FieldAccess { base, .. }
+            | NirExpr::BytesLen(base)
+            | NirExpr::BufferLen(base) => pending.push((base, argument)),
             NirExpr::LoadAt { buffer, index } => {
                 pending.extend([(buffer.as_ref(), argument), (index.as_ref(), argument)])
             }

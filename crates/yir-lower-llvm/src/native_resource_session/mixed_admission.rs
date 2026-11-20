@@ -15,7 +15,7 @@ pub(super) fn node(
     let result = match node.op.instruction.as_str() {
         "struct" => {
             let (name, args) = args.split_first().ok_or("missing mixed record name")?;
-            if args.is_empty() || args.len() > 17 {
+            if args.is_empty() || args.len() > yir_core::native_scalar_session::MAX_SCALAR_SLOTS {
                 return Err("mixed record exceeds field bound".to_owned());
             }
             let mut fields = Vec::new();
@@ -29,6 +29,7 @@ pub(super) fn node(
                 let kind = values.get(source).ok_or("unavailable mixed record field")?;
                 match kind {
                     Kind::I64 => {}
+                    Kind::Bool | Kind::Record(_, _) if kind.is_record_value() => {}
                     Kind::Bytes if bytes.is_none() && owners.contains(source) => {
                         bytes = Some(source.to_owned())
                     }
@@ -45,6 +46,11 @@ pub(super) fn node(
                 require_layout(name, &fields, layout)?;
                 owners.remove(&bytes);
                 owners.insert(node.name.clone());
+            } else {
+                // Local values are not owned State. Reuse the shared value-layout
+                // bounds without admitting resources or changing the callback ABI.
+                let encoded = value_schema(name, &fields)?;
+                crate::native_session::value_transport::NativeValueLayout::parse(&encoded)?;
             }
             Kind::Record(name.clone(), fields)
         }
@@ -86,6 +92,32 @@ pub(super) fn node(
     Ok(true)
 }
 
+fn value_schema(name: &str, fields: &[(String, Kind)]) -> Result<String, String> {
+    let checked_name = |value: &str| {
+        if value.contains(['{', '}', ':', ';']) {
+            Err("resource value record contains layout delimiters in a name".to_owned())
+        } else {
+            Ok(value.to_owned())
+        }
+    };
+    let mut encoded = format!("{}{{", checked_name(name)?);
+    for (index, (field, kind)) in fields.iter().enumerate() {
+        if index != 0 {
+            encoded.push(';');
+        }
+        encoded.push_str(&checked_name(field)?);
+        encoded.push(':');
+        match kind {
+            Kind::I64 => encoded.push_str("i64"),
+            Kind::Bool => encoded.push_str("bool"),
+            Kind::Record(nested, fields) => encoded.push_str(&value_schema(nested, fields)?),
+            _ => return Err("resource value record requires i64/bool leaves".into()),
+        }
+    }
+    encoded.push('}');
+    Ok(encoded)
+}
+
 pub(super) fn require_layout(
     name: &str,
     fields: &[(String, Kind)],
@@ -107,6 +139,103 @@ pub(super) fn require_layout(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn construct(fields: Vec<String>) -> Node {
+        Node {
+            name: "local".into(),
+            resource: "cpu".into(),
+            op: yir_core::Operation::parse("cpu.struct", fields).unwrap(),
+        }
+    }
+
+    #[test]
+    fn resource_record_literals_native_admission_shares_slot_and_depth_bounds() {
+        let layout = MixedResourceLayout::parse("Canvas{width:i64;pixels:Bytes}").unwrap();
+        for count in [0, 1, 17, 18, 64, 65] {
+            let mut values = BTreeMap::from([("flag".into(), Kind::Bool)]);
+            let mut owners = BTreeSet::from(["snapshot".into()]);
+            let args = std::iter::once("Flags".to_owned())
+                .chain((0..count).map(|i| format!("f{i}=flag")))
+                .collect();
+            assert_eq!(
+                node(&construct(args), &layout, &mut values, &mut owners).is_ok(),
+                (1..=64).contains(&count)
+            );
+            assert_eq!(owners, BTreeSet::from(["snapshot".into()]));
+        }
+        for depth in [1, 63, 64, 65] {
+            let mut nested = Kind::Bool;
+            for index in 1..depth {
+                nested = Kind::Record(format!("L{index}"), vec![("value".into(), nested)]);
+            }
+            let mut values = BTreeMap::from([("nested".into(), nested)]);
+            let result = node(
+                &construct(vec!["Root".into(), "child=nested".into()]),
+                &layout,
+                &mut values,
+                &mut BTreeSet::new(),
+            );
+            assert_eq!(result.is_ok(), depth <= 64, "depth={depth}");
+        }
+        let nested = Kind::Record(
+            "Pair".into(),
+            vec![("a".into(), Kind::I64), ("b".into(), Kind::Bool)],
+        );
+        let mut values = BTreeMap::from([("pair".into(), nested)]);
+        let args = std::iter::once("Wide".into())
+            .chain((0..33).map(|i| format!("f{i}=pair")))
+            .collect();
+        assert!(
+            node(&construct(args), &layout, &mut values, &mut BTreeSet::new())
+                .unwrap_err()
+                .contains("slot bounds")
+        );
+    }
+
+    #[test]
+    fn resource_record_literals_native_rejection_is_atomic_and_never_grants_owned_state() {
+        let layout = MixedResourceLayout::parse("Canvas{width:i64;pixels:Bytes}").unwrap();
+        let initial = BTreeMap::from([
+            ("flag".into(), Kind::Bool),
+            ("count".into(), Kind::I64),
+            ("snapshot".into(), Kind::Bytes),
+            ("buffer".into(), Kind::Buffer),
+            ("void".into(), Kind::Void),
+            (
+                "hidden".into(),
+                Kind::Record("Hidden".into(), vec![("bytes".into(), Kind::Bytes)]),
+            ),
+        ]);
+        for args in [
+            vec![],
+            vec!["Flags"],
+            vec!["Flags", "x=flag", "x=count"],
+            vec!["Flags", "x=future"],
+            vec!["Flags", "x=buffer"],
+            vec!["Flags", "x=void"],
+            vec!["Flags", "x=hidden"],
+            vec!["Flags", "malformed"],
+            vec!["Flags", "x:bad=flag"],
+            vec!["Flags{x", "x=flag"],
+            vec!["Canvas", "width=flag", "pixels=snapshot"],
+            vec!["Canvas", "width=count", "pixels=hidden"],
+        ] {
+            let mut values = initial.clone();
+            let mut owners = BTreeSet::from(["snapshot".into()]);
+            assert!(
+                node(
+                    &construct(args.iter().map(|s| (*s).into()).collect()),
+                    &layout,
+                    &mut values,
+                    &mut owners
+                )
+                .is_err(),
+                "{args:?}"
+            );
+            assert!(values == initial);
+            assert_eq!(owners, BTreeSet::from(["snapshot".into()]));
+        }
+    }
 
     #[test]
     fn nested_projection_rejects_resources_even_in_an_unselected_sibling() {

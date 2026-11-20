@@ -48,6 +48,9 @@ mod record_helpers;
 #[path = "native_resource_session/resource_argument_predicates.rs"]
 mod resource_argument_predicates;
 #[cfg(unix)]
+#[path = "native_resource_session/resource_buffer_lengths.rs"]
+mod resource_buffer_lengths;
+#[cfg(unix)]
 #[path = "native_resource_session/resource_conditions.rs"]
 mod resource_conditions;
 #[cfg(unix)]
@@ -62,6 +65,30 @@ mod resource_i64_initializers;
 #[cfg(unix)]
 #[path = "native_resource_session/resource_predicates.rs"]
 mod resource_predicates;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_conditions.rs"]
+mod resource_record_conditions;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_field_values.rs"]
+mod resource_record_field_values;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_initializers.rs"]
+mod resource_record_initializers;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_literals.rs"]
+mod resource_record_literals;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_liveness.rs"]
+mod resource_record_liveness;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_local_fields.rs"]
+mod resource_record_local_fields;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_operands.rs"]
+mod resource_record_operands;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_record_scalar_initializers.rs"]
+mod resource_record_scalar_initializers;
 #[cfg(unix)]
 #[path = "native_resource_session/resource_return_fields.rs"]
 mod resource_return_fields;

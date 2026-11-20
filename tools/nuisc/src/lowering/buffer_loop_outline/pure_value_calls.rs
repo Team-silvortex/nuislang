@@ -8,6 +8,18 @@ pub(in crate::lowering) struct PureValueCalls {
 }
 
 impl PureValueCalls {
+    pub(in crate::lowering) fn is_record(&self, ty: &NirTypeRef) -> bool {
+        ty == &scalar_type(&ty.name) && self.layouts.contains_key(&ty.name)
+    }
+
+    pub(in crate::lowering) fn record_fields(
+        &self,
+        ty: &NirTypeRef,
+    ) -> Option<&[(String, NirTypeRef)]> {
+        self.is_record(ty).then_some(())?;
+        self.layouts.get(&ty.name).map(Vec::as_slice)
+    }
+
     pub(in crate::lowering) fn collect(module: &NirModule) -> Self {
         let layouts = control_values::layouts(module);
         let catalog = scalar_helpers::collect_capture_values(module, &layouts);

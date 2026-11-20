@@ -111,7 +111,16 @@ fn outline_body(
         .map(|p| p.name.clone())
         .collect::<BTreeSet<_>>();
     let mut remaining = VecDeque::from(std::mem::take(&mut function.body));
+    let mut local_records = resource_predicates::LocalRecords::default();
     while let Some(mut statement) = remaining.pop_front() {
+        if let Some(replacement) =
+            local_records.split(&statement, &template, &scope, &live_bytes, context)
+        {
+            for statement in replacement.into_iter().rev() {
+                remaining.push_front(statement);
+            }
+            continue;
+        }
         if let Some(replacement) = resource_predicates::split(
             &statement,
             &template,
@@ -126,6 +135,7 @@ fn outline_body(
             }
             continue;
         }
+        local_records.advance(&statement, &context.calls);
         if let NirStmt::If {
             then_body,
             else_body,
@@ -168,6 +178,14 @@ fn outline_body(
                 && regions::terminal_return_arm(then_body, depth + 1)?
                 && (then_body.iter().any(allocates)
                     || !live_bytes.is_empty()
+                    || (resource_predicates::checked_error_arm(then_body, &template, context)
+                        && remaining.back().is_some_and(|tail| {
+                            resource_predicates::checked_error_arm(
+                                std::slice::from_ref(tail),
+                                &template,
+                                context,
+                            )
+                        }))
                     || matches!(then_body.last(), Some(NirStmt::Return(Some(NirExpr::Call { callee, .. }))) if context.outlines.owners.contains_key(callee))
                     || then_body.iter().any(|s| matches!(s, NirStmt::If { .. })))
             {

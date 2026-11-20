@@ -137,7 +137,22 @@ through that same declaration path, preserving both arms and the shared suffix.
 Returned mixed-State i64 fields now share ordered snapshots, including earlier
 Bytes copies/moves and terminal cleanup bindings. Direct checked Err code
 expressions now use the same guarded i64 path, including borrowed-only callbacks.
-Inline `buffer_len` composition remains the next reproduced boundary. Scalar
+Borrowed `buffer_len` now composes through that same path with exact `ref Buffer`
+admission. Helper-returned value-record locals now retain their nominal binding
+after ordered scalar argument snapshots. Nested record literal locals now stage
+their scalar leaves in source order with independent bounded native value admission.
+Record-valued helper fields now use once-only value materialization followed by
+scalar snapshots. Previously bound record fields before later resource logic now
+use a separate block-local type table and exact nominal projection proof. Rebinding
+and control-flow boundaries invalidate availability; record captures are unchanged.
+Prior record fields after earlier lazy fields now use shared safe scalar
+projections without hoisting calls, reads or arithmetic. Local-record scalar
+operands now compose inside bounded record constructors with the same snapshot
+cache and selected-only reads. Standalone bool/i64 declarations now reuse that
+proof while retaining declaration identity and one-time requeueing. Direct resource
+conditions now share exact scalar projections without rewriting either arm or the
+suffix; registered error returns stay guarded without held Bytes. Directly returned
+State fields using local-record operands are the next reproduced boundary. Scalar
 selection alone does not make eager evaluation safe.
 Capture/closure bounds and the active/95 score remain unchanged.
 Interactive frame dispatch retains early/10.

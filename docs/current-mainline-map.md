@@ -95,9 +95,45 @@ retain field order and exact Bytes transfer.
 Direct checked Err codes now use one typed snapshot before terminal cleanup.
 Owned continuations remain guarded even when they capture no Bytes; they are
 not candidates for eager pure-helper return selection.
-**Next:** admit borrowed `buffer_len` in the same scalar vocabulary, such as
+Borrowed `buffer_len` now participates in the same scalar vocabulary, such as
 `width: buffer_len(pixels) + word(mode >= 0 && bytes_len(saved) == 48)`.
-This shape still rejects with `short-circuit RHS requires guarded lowering`.
+Exact `ref Buffer` proof, original expression budgets and scalar snapshot order remain.
+Helper-returned value-record locals now stage their scalar arguments and retain
+the exact nominal binding, including nested projections and const aliases.
+Project record fields to scalar locals before crossing later resource continuations.
+Nested record literal locals now stage scalar leaves in source field order,
+including `let local: Flags = Flags { valid: mode == 0 && buffer_len(pixels) == 6 };`.
+Native local construction now distinguishes pure values from owned mixed State,
+while retaining the shared value-layout limits and exact State rules.
+Record-valued helper fields now execute once and immediately freeze scalar leaves,
+including projected nested results and multiple helper fields. Only scalar
+snapshots cross subsequent resource branches; reconstructed shapes are bounded.
+Previously bound records now use a separate block-local availability proof:
+`let prior: Packet = packet(0, true, 0); let local: Envelope = Envelope { packet: prior, unused: mode == 0 && buffer_len(pixels) == 6 };`.
+Exact nominal nested projections freeze scalar leaves before later resource branches.
+Rebindings and control-flow boundaries invalidate the local table, not the capture ABI.
+Scalar liveness now also handles a lazy field before an existing record field:
+`let local: Envelope = Envelope { unused: mode == 0 && buffer_len(pixels) == 6, packet: prior };`.
+Only completed record projections move before evaluation; repeated/overlapping
+paths share scalar snapshots. New calls, reads and checked arithmetic stay ordered.
+Local-record scalar operands now participate in constructor predicates:
+`let local: Envelope = Envelope { unused: prior.flags.valid && bytes_len(saved) == 48, packet: prior };`.
+The original tree is bounded before exact type-witness proof; witnesses are never
+emitted. Shared pure projections serve both predicates and later record fields,
+including nested paths, indices, helper arguments and comparison/XOR wrappers.
+Standalone scalar declarations now reuse that proof and snapshot planner:
+`let valid: bool = prior.flags.valid && bytes_len(saved) == 48;`.
+Bool/i64 declarations keep their original lexical identity; reads, calls and
+checked arithmetic remain inside the existing owned-region normalization.
+Unchanged or already rewritten declarations stay on the ordinary scalar route.
+Direct resource conditions now reuse that proof without an intermediate declaration:
+`if prior.flags.valid && bytes_len(saved) == 48 { return Result.Ok(Canvas { width: width + 1, pixels: move(saved) }); }`.
+Original arms and suffix remain intact. Checked-error arms use registered outcome
+identity even without held Bytes, rather than selecting owned Results as scalars.
+Generated temporaries remain inside the unchanged 33-input guard budget.
+**Next:** admit local-record operands in directly returned State fields:
+`return Result.Ok(Canvas { width: word(prior.flags.valid && bytes_len(saved) == 48), pixels: move(saved) });`.
+This return still rejects with `short-circuit RHS requires guarded lowering`.
 Preserve selected-only reads,
 borrow lifetimes, lexical identities, whole-state publication and native traps.
 Captured writes,

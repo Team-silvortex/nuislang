@@ -58,6 +58,55 @@ fn resource_logical_arguments_survive_cache_nsb_and_binary_only_launch() {
 }
 
 #[test]
+fn resource_record_initializers_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn decision(flag: bool) -> Validation { return Validation { extent: Validity { invalid: !flag } }; }")
+        .replace("let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+            "let validation: Validation = decision(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)); let valid: bool = !validation.extent.invalid;");
+    assert!(source.contains("let validation: Validation = decision(color >= 0 &&"));
+    delivery(&source);
+}
+
+#[test]
+fn resource_record_literals_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source().replace(
+        "let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+        "let validation: Validation = Validation { extent: Validity { invalid: !(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) } }; let valid: bool = !validation.extent.invalid;");
+    assert!(source.contains("let validation: Validation = Validation { extent: Validity"));
+    delivery(&source);
+}
+
+#[test]
+fn resource_record_helper_fields_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn status(flag: bool) -> Validity { return Validity { invalid: !flag }; }")
+        .replace("let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+            "let validation: Validation = Validation { extent: status(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) }; let valid: bool = !validation.extent.invalid;");
+    assert!(source.contains("let validation: Validation = Validation { extent: status("));
+    delivery(&source);
+}
+
+#[test]
+fn resource_record_local_fields_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { struct Check { extent: Validity, valid: bool }")
+        .replace("let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+            "let prior: Validation = Validation { extent: Validity { invalid: color < 0 } }; let checked = Check { extent: prior.extent, valid: color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0) }; let valid: bool = !checked.extent.invalid && checked.valid;");
+    assert!(source.contains("extent: prior.extent, valid: color >= 0 &&"));
+    delivery(&source);
+}
+
+#[test]
+fn resource_record_liveness_survives_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { struct Check { extent: Validity, valid: bool }")
+        .replace("let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+            "let prior: Validation = Validation { extent: Validity { invalid: color < 0 } }; let checked = Check { valid: color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0), extent: prior.extent }; let valid: bool = !checked.extent.invalid && checked.valid;");
+    assert!(source.contains("load_at(pixels, 99) > 0), extent: prior.extent"));
+    delivery(&source);
+}
+
+#[test]
 fn scalar_selection_survives_cache_nsb_and_binary_only_launch() {
     let source = nested_source()
         .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
@@ -69,12 +118,56 @@ fn scalar_selection_survives_cache_nsb_and_binary_only_launch() {
 }
 
 #[test]
+fn resource_record_operands_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { struct Check { extent: Validity, valid: bool }")
+        .replace("let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+            "let prior: Validation = Validation { extent: Validity { invalid: color < 0 } }; let checked = Check { valid: !prior.extent.invalid && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0), extent: prior.extent }; let valid: bool = !checked.extent.invalid && checked.valid;");
+    assert!(source.contains("valid: !prior.extent.invalid &&"));
+    delivery(&source);
+}
+
+#[test]
 fn wrapped_resource_predicates_survive_cache_nsb_and_binary_only_launch() {
     let source = nested_source().replace(
         "color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)",
         "((color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) == (width > 0)) ^ (height < 0)",
     );
     delivery(&source);
+}
+
+#[test]
+fn local_record_bool_initializer_survives_cache_nsb_and_binary_only_launch() {
+    delivery(&record_scalar_source(false));
+}
+
+#[test]
+fn local_record_i64_initializer_survives_cache_nsb_and_binary_only_launch() {
+    delivery(&record_scalar_source(true));
+}
+
+#[test]
+fn local_record_condition_survives_cache_nsb_and_binary_only_launch() {
+    let predicate = "!prior.extent.invalid && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)";
+    let source = record_scalar_source(false)
+        .replace(&format!("let valid: bool = {predicate};"), "")
+        .replace("if valid {", &format!("if {predicate} {{"));
+    assert!(source.contains(&format!("if {predicate} {{")));
+    delivery(&source);
+}
+
+fn record_scalar_source(integer: bool) -> String {
+    let predicate = "!prior.extent.invalid && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)";
+    let declaration = if integer {
+        format!("let code: i64 = word({predicate}); let valid: bool = code == 1;")
+    } else {
+        format!("let valid: bool = {predicate};")
+    };
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
+        .replace("let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);", &format!("let prior: Validation = Validation {{ extent: Validity {{ invalid: color < 0 }} }}; {declaration}"));
+    assert!(source.contains(&declaration));
+    source
 }
 
 #[test]
@@ -104,6 +197,15 @@ fn returned_resource_fields_survive_cache_nsb_and_binary_only_launch() {
         .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
         .replace("cursor: cursor, pixels: move(snapshot)", "cursor: cursor + word(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) - 1, pixels: move(snapshot)");
     assert!(source.contains("cursor: cursor + word"));
+    delivery(&source);
+}
+
+#[test]
+fn buffer_length_return_fields_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
+        .replace("cursor: cursor, pixels: move(snapshot)", "cursor: cursor + buffer_len(pixels) * word(color >= 0 && (bytes_len(snapshot) == buffer_len(pixels) * 8 || load_at(pixels, buffer_len(pixels)) > 0)) - width * height, pixels: move(snapshot)");
+    assert!(source.contains("cursor: cursor + buffer_len(pixels) * word"));
     delivery(&source);
 }
 
