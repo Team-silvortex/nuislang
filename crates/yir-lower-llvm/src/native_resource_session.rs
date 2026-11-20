@@ -21,7 +21,8 @@ pub fn emit_registered(
     registration: &ResourceSessionRegistration,
 ) -> Result<NativeResourceBridge, String> {
     let selected = admission::select(module, registration)?;
-    let mut llvm_ir = crate::emit_module(&selected)?;
+    let mut llvm_ir =
+        crate::emit_native_resource_module(&selected.module, &selected.value_helpers)?;
     if let Some(line) = llvm_ir
         .lines()
         .find(|line| line.contains("; deferred lowering"))

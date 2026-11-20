@@ -167,7 +167,7 @@ fn inferred_scalar_helpers_and_buffer_reads_are_not_recomputed() {
 }
 
 #[test]
-fn inferred_record_fields_resolve_without_granting_native_record_helper_calls() {
+fn inferred_record_fields_resolve_through_checked_native_record_helper_calls() {
     let source = source("")
         .replace(
             "let width = width + 10;",
@@ -181,18 +181,14 @@ fn inferred_record_fields_resolve_without_granting_native_record_helper_calls() 
         "#,
         );
     let program = compile_source(&source).unwrap();
-    let error =
-        yir_lower_llvm::native_resource_session::emit_registered(&program.yir, &registration())
-            .err()
-            .unwrap();
-    assert!(
-        error.contains("does not admit `call_owned_struct`"),
-        "{error}"
-    );
+    let bridge = bridge(&program);
+    assert!(bridge
+        .llvm_ir
+        .contains("define [1 x i64] @nuis_fn_measure("));
 }
 
 #[test]
-fn aliases_and_inference_do_not_grant_resource_or_non_i64_shadowing() {
+fn aliases_and_inference_do_not_grant_resource_or_mixed_kind_shadowing() {
     for (declaration, ty) in [
         ("let width = copy_bytes(pixels);", "Bytes"),
         ("const width: Hidden = copy_bytes(pixels);", "Bytes"),
@@ -208,7 +204,7 @@ fn aliases_and_inference_do_not_grant_resource_or_non_i64_shadowing() {
         .replace("mod cpu Main {", "mod cpu Main { type Hidden = Bytes;");
         let error = compile_source(&source).err().unwrap();
         assert!(
-            error.contains("requires resolved i64 on both sides"),
+            error.contains("requires matching resolved i64/bool kinds"),
             "{error}"
         );
         assert!(error.contains("outer=i64"), "{error}");

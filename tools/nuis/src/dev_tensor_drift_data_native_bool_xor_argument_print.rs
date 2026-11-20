@@ -18,7 +18,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_prefix.rs",
         required_patterns: &[
             "Eager bool operators evaluate both operands without authorizing a lazy RHS.",
-            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool || negation,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "negated_roots && logical_root && negated_predicate(expr).is_some()",
             "rhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
             "let mut logical_edges = 32usize",
         ],

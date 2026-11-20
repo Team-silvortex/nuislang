@@ -1,5 +1,63 @@
 use super::*;
 
+// Resource pure helpers reuse strict native typing without the scalar session's
+// work counters or the compatibility backend's implicit bool/integer conversions.
+pub(super) fn validate_resource_predicates(
+    node: &Node,
+    registers: &BTreeMap<String, LlvmValueRef>,
+) -> Result<(), String> {
+    let args = &node.op.args;
+    let is_bool = |name: &String| matches!(registers.get(name), Some(LlvmValueRef::Bool { .. }));
+    if let Some((op, ty)) = node.op.instruction.rsplit_once('_') {
+        if matches!(
+            op,
+            "add" | "sub" | "mul" | "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+        ) {
+            let kind = match ty {
+                "i32" => Some(CpuCallScalarKind::I32),
+                "i64" => Some(CpuCallScalarKind::I64),
+                "f32" => Some(CpuCallScalarKind::F32),
+                "f64" => Some(CpuCallScalarKind::F64),
+                _ => None,
+            };
+            if let Some(kind) = kind {
+                for name in args {
+                    require_value(node, name, kind, registers)?;
+                }
+            }
+        }
+    }
+    match node.op.instruction.as_str() {
+        "guard_return" | "select" => {
+            require_value(node, &args[0], CpuCallScalarKind::Bool, registers)?;
+            if node.op.instruction == "select" && args[1..].iter().any(is_bool) {
+                for name in &args[1..] {
+                    require_value(node, name, CpuCallScalarKind::Bool, registers)?;
+                }
+            }
+        }
+        "not" | "and" | "or" | "xor" => {
+            for name in args {
+                require_value(node, name, CpuCallScalarKind::Bool, registers)?;
+            }
+        }
+        "eq" | "ne" if args.iter().any(is_bool) => {
+            for name in args {
+                require_value(node, name, CpuCallScalarKind::Bool, registers)?;
+            }
+        }
+        "lt" | "le" | "gt" | "ge" | "add" | "sub" | "mul" | "div" | "rem"
+            if args.iter().any(is_bool) =>
+        {
+            return Err(
+                "resource value helper cannot use bool as arithmetic or ordered input".into(),
+            );
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 /// Strict native functions may not use the generic backend's scalar coercions.
 pub(super) fn validate(
     node: &Node,

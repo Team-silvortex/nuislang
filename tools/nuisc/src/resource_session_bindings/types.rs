@@ -53,9 +53,10 @@ fn declaration<'a>(
 ) -> Result<(), String> {
     if let Some(shadow) = shadows.get(name).filter(|_| !seen.contains(name)) {
         let previous = visible.get(shadow.previous.as_str()).copied();
-        if !scalar(previous) || !scalar(ty) {
+        let outer_kind = scalar_kind(previous);
+        if outer_kind.is_none() || outer_kind != scalar_kind(ty) {
             return Err(format!(
-                "resource shadow `{}` requires resolved i64 on both sides (outer={}, local={})",
+                "resource shadow `{}` requires matching resolved i64/bool kinds (outer={}, local={})",
                 shadow.source,
                 previous
                     .map(NirTypeRef::render)
@@ -74,8 +75,12 @@ fn declaration<'a>(
     Ok(())
 }
 
-fn scalar(ty: Option<&NirTypeRef>) -> bool {
-    ty.is_some_and(|ty| {
-        ty.name == "i64" && ty.generic_args.is_empty() && !ty.is_ref && !ty.is_optional
+fn scalar_kind(ty: Option<&NirTypeRef>) -> Option<&str> {
+    ty.filter(|ty| {
+        matches!(ty.name.as_str(), "i64" | "bool")
+            && ty.generic_args.is_empty()
+            && !ty.is_ref
+            && !ty.is_optional
     })
+    .map(|ty| ty.name.as_str())
 }

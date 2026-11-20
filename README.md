@@ -104,13 +104,47 @@ demonstrates early owned returns and a shared continuation: an untaken inner
 return preserves incoming resources and runs the function suffix once. Both
 nonempty arms can now return early or rejoin that shared suffix. Branch-local
 shadows resolved to i64, including inferred and aliased types, retain their own
-identities without replacing outer captures.
+identities without replacing outer captures. Bounded pure record helpers can
+return flat or nested i64/bool records by value while the caller retains its
+Bytes owners; projections also check unselected subtrees for resources. Boolean
+validation flags drive checked errors without publishing failed State. Exact
+i64/bool value parameters now compose through direct and helper-to-helper calls,
+with no implicit bool-to-integer coercion in native value calls.
+Immutable bool locals now retain their evaluated values across guarded returns
+and shared continuations, without leaking branch-local flags into the suffix.
+Same-kind bool shadows also keep independent identities, including inferred and
+aliased declarations; inner initializers read the outer value before shadowing it.
+Pure i64/bool helpers now support short-circuit initialization with selected-only
+RHS evaluation. Unoutlined resource reads are rejected instead of evaluated eagerly.
+Canonical negation such as `!(a || helper(...))` now stays short-circuited inside
+resource branch prefixes without splitting it into separate local initializers.
+Nested `&&`/`||` declarations, including negation on either side, now keep Buffer
+loads and live Bytes length reads behind selected owned branches with shared suffixes.
+Read results can now feed pure scalar/record helper arguments on the selected
+path, including nested record projections. Short-circuit bool arguments now
+retain left-to-right scalar snapshots, including nested and multiple arguments.
+Inlined conditional scalar helpers now accept `select` over ready, same-kind
+`i64` or `bool` values with an exact bool predicate; this does not select resources
+or replace guarded evaluation of short-circuit operands.
+The pure helper ABI still does not carry resources.
+Comparison and boolean XOR wrappers now preserve the same guarded reads,
+including nested wrappers and helper arguments. Both eager operands are evaluated
+left-to-right; only an inner `&&`/`||` RHS may be skipped.
+Direct `i64` local initializers now reuse those guarded arguments, including
+arithmetic, scalar record projections and computed indices. Declaration/result
+types remain exact; resource ownership and cleanup use the same existing paths.
+These expressions can also appear directly in `if` conditions: one internal bool
+snapshot reuses guarded evaluation without copying either arm or its shared suffix.
+Scalar fields of a directly returned mixed State now reuse that path too, with
+all fields staged in source order, including Bytes copies/moves and terminal cleanup.
+Direct checked `Err(...)` codes also reuse guarded i64 evaluation before owner
+cleanup, including callbacks that only borrow a Buffer and hold no Bytes.
 
 Use the [resource example ladder](examples/projects/domains/README.md#native-cpu-resource-sessions)
 to choose the minimal Bytes, mixed-State, checked or guarded example. The
-[latest scoped proof](docs/reference/nuis-native-resource-inferred-shadowing-v1.md)
+[latest scoped proof](docs/reference/nuis-native-resource-short-circuit-v1.md)
 owns validation details; the [module map](docs/repo-layout.md#native-resource-session-ownership)
-owns implementation entrypoints. Record helper calls within resource callbacks,
+owns implementation entrypoints. Inline `buffer_len` composition with resource short-circuit expressions,
 captured writes, broader resource layouts
 and provider/device completion remain open. CPU canvas
 export is not native ns-nova window integration or the GPU showcase.

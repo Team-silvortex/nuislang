@@ -347,6 +347,88 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
 }
 
 #[test]
+fn native_value_calls_keep_exact_scalar_arguments_without_legacy_coercion() {
+    use crate::{CpuHelperSignature, LlvmValueRef};
+    let values = [
+        (
+            CpuCallScalarKind::Bool,
+            LlvmValueRef::Bool {
+                i1: "true".into(),
+                i64: "1".into(),
+            },
+        ),
+        (CpuCallScalarKind::I32, LlvmValueRef::I32("1".into())),
+        (CpuCallScalarKind::I64, LlvmValueRef::I64("1".into())),
+        (CpuCallScalarKind::F32, LlvmValueRef::F32("1.0".into())),
+        (CpuCallScalarKind::F64, LlvmValueRef::F64("1.0".into())),
+    ];
+    for (expected, _) in &values {
+        for (actual, value) in &values {
+            for native in [false, true] {
+                if !native
+                    && !(*expected == CpuCallScalarKind::I64 && *actual == CpuCallScalarKind::Bool)
+                {
+                    continue;
+                }
+                let signature = CpuHelperSignature {
+                    params: vec![crate::call_parameters::CpuCallParameterKind::Scalar(
+                        *expected,
+                    )],
+                    implicit_parameters: vec![],
+                    mutex_permit_params: vec![None],
+                    ret: CpuCallScalarKind::OwnedBytes,
+                    owned_struct_return: true,
+                    owned_struct_layout: Some(
+                        yir_core::parse_owned_struct_layout("Value{value:i64}").unwrap(),
+                    ),
+                    native_value_return: native.then(|| {
+                        crate::native_session::aggregate_values::NativeValueReturn::helper(
+                            "Value{value:i64}",
+                        )
+                        .unwrap()
+                    }),
+                    owned_external_buffer_return: None,
+                };
+                let node = Node {
+                    name: "call".into(),
+                    resource: "cpu0".into(),
+                    op: Operation::parse(
+                        "cpu.call_owned_struct",
+                        vec!["helper".into(), "Value{value:i64}".into(), "arg".into()],
+                    )
+                    .unwrap(),
+                };
+                let mut registers = BTreeMap::from([("arg".into(), value.clone())]);
+                let mut body = vec![];
+                let mut next_reg = 0;
+                let mut last = None;
+                let result = crate::call_lowering::lower_cpu_call_node(
+                    &node,
+                    &mut body,
+                    &mut registers,
+                    &BTreeMap::from([("helper".into(), signature)]),
+                    &mut BTreeMap::new(),
+                    &Default::default(),
+                    &mut next_reg,
+                    &mut last,
+                );
+                if native && expected != actual {
+                    assert!(result.unwrap_err().contains("declared scalar kind"));
+                    assert!(body.is_empty());
+                    assert_eq!(next_reg, 0);
+                    assert_eq!(registers.len(), 1);
+                    assert!(last.is_none());
+                } else {
+                    assert!(result.unwrap());
+                    assert!(registers.contains_key("call"));
+                    assert!(!body.join("\n").contains("deferred lowering"));
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn emits_guard_return_as_real_branch() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {
@@ -759,6 +841,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         None,
         None,
         None,
+        false,
         false,
         &mut global_counter,
     )

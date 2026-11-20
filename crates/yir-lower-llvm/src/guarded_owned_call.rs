@@ -35,9 +35,12 @@ pub(super) fn lower(
         || signature.params.len() != call.inputs.len() + call.transfers.len()
         || signature.params.first().and_then(|p| p.scalar())
             != Some(CpuCallScalarKind::BorrowedBuffer)
-        || signature.params[1..call.inputs.len()]
-            .iter()
-            .any(|p| p.scalar() != Some(CpuCallScalarKind::I64))
+        || signature.params[1..call.inputs.len()].iter().any(|p| {
+            !matches!(
+                p.scalar(),
+                Some(CpuCallScalarKind::I64 | CpuCallScalarKind::Bool)
+            )
+        })
         || signature.params[call.inputs.len()..]
             .iter()
             .any(|p| p.scalar() != Some(CpuCallScalarKind::OwnedBytes))

@@ -5,6 +5,10 @@ use super::*;
 #[path = "core_exprs_scalars.rs"]
 mod core_exprs_scalars;
 
+#[cfg(test)]
+#[path = "core_exprs_logical_tests.rs"]
+mod logical_tests;
+
 use core_exprs_scalars::{
     lower_bool, lower_cast_bool_to_i64, lower_cast_f32_to_i64, lower_cast_f64_to_i64,
     lower_cast_i32_to_i64, lower_cast_i64_to_bool, lower_cast_i64_to_f32, lower_cast_i64_to_f64,
@@ -384,6 +388,13 @@ fn lower_binary(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
+    // Guarded outlining must handle any non-total RHS before this eager value
+    // path. Falling back here must not turn a skipped read/call into a trap.
+    if matches!(op, NirBinaryOp::And | NirBinaryOp::Or) && !eager_logical_rhs(rhs) {
+        return Err(
+            "short-circuit RHS requires guarded lowering; eager evaluation is not permitted".into(),
+        );
+    }
     let lhs_name = lower_expr(lhs, state, bindings)?;
     let rhs_name = lower_expr(rhs, state, bindings)?;
     let instruction = match op {
@@ -418,6 +429,40 @@ fn lower_binary(
         body_lowering::chain_statement_effect(state, &name);
     }
     Ok(name)
+}
+
+fn eager_logical_rhs(expr: &NirExpr) -> bool {
+    let mut pending = vec![expr];
+    let mut count = 0;
+    while let Some(expr) = pending.pop() {
+        count += 1;
+        if count > 4096 {
+            return false;
+        }
+        match expr {
+            NirExpr::Bool(_)
+            | NirExpr::Int(_)
+            | NirExpr::F32(_)
+            | NirExpr::F64(_)
+            | NirExpr::Var(_) => {}
+            NirExpr::Binary { op, lhs, rhs }
+                if !matches!(op, NirBinaryOp::Div | NirBinaryOp::Rem) =>
+            {
+                pending.extend([lhs.as_ref(), rhs.as_ref()])
+            }
+            NirExpr::FieldAccess { base, .. } => pending.push(base),
+            NirExpr::CastI64ToBool(value)
+            | NirExpr::CastBoolToI64(value)
+            | NirExpr::CastI64ToI32(value)
+            | NirExpr::CastI32ToI64(value)
+            | NirExpr::PackF32Word(value)
+            | NirExpr::UnpackF32Word(value)
+            | NirExpr::PackF64Word(value)
+            | NirExpr::UnpackF64Word(value) => pending.push(value),
+            _ => return false,
+        }
+    }
+    true
 }
 
 fn lower_struct_literal(

@@ -67,6 +67,11 @@ fn check_pixels(output: Output, path: &Path) {
 
 #[test]
 fn checked_canvas_errors_and_success_survive_source_free_delivery() {
+    delivery(SOURCE);
+}
+
+#[test]
+fn direct_resource_error_codes_survive_cache_nsb_and_binary_only_launch() {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
         target_pointer_width = "64"
@@ -74,7 +79,43 @@ fn checked_canvas_errors_and_success_survive_source_free_delivery() {
         return;
     }
     let project = Project::new();
-    fs::write(project.0.join("main.ns"), SOURCE).unwrap();
+    fs::write(project.0.join("main.ns"), with_error_codes(1..=7)).unwrap();
+    fs::write(project.0.join("nuis.toml"), MANIFEST).unwrap();
+    let build = project.0.join("build");
+    let output = project.command("build", &project.0, &[build.to_str().unwrap()]);
+    assert!(!output.status.success(), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("resource return helpers exceed the source closure bound"),
+        "{output:?}"
+    );
+    drop(project);
+
+    // Exercise every callback role without widening the source closure budget.
+    delivery(&with_error_codes([1, 4, 7]));
+}
+
+fn with_error_codes(codes: impl IntoIterator<Item = i64>) -> String {
+    let mut source = SOURCE.replace("mod cpu Main {", "mod cpu Main { fn error_code(valid: bool, code: i64) -> i64 { if valid { return code; } return 99; }");
+    for code in codes {
+        source = source.replace(
+            &format!("return Result.Err({code});"),
+            &format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); return Result.Err(error_code(bytes_len(saved) == 48 || load_at(pixels, 99) > 0, {code}));"),
+        );
+    }
+    assert!(!source.contains("return Result.Err(1)"));
+    source
+}
+
+fn delivery(source: &str) {
+    if !cfg!(all(
+        any(target_os = "macos", target_os = "linux"),
+        target_pointer_width = "64"
+    )) {
+        return;
+    }
+    let project = Project::new();
+    fs::write(project.0.join("main.ns"), source).unwrap();
     fs::write(project.0.join("nuis.toml"), MANIFEST).unwrap();
     project.build(None);
     let build = project.0.join("build");
@@ -137,14 +178,20 @@ fn checked_canvas_errors_and_success_survive_source_free_delivery() {
             .unwrap(),
         &image,
     );
-    for (width, code) in [(0, 1), (7, 2), (4, 3)] {
+    for (width, color, close, role, code) in [
+        (0, 1, 0, "open", 1),
+        (7, 1, 0, "open", 2),
+        (4, 1, 0, "open", 3),
+        (3, -1, 0, "event", 4),
+        (3, 1, -1, "close", 7),
+    ] {
         check_failure(
             Command::new(&bare)
-                .args(script(&image, width, 1, 0))
+                .args(script(&image, width, color, close))
                 .env("PATH", "")
                 .output()
                 .unwrap(),
-            "open",
+            role,
             code,
         );
         assert!(!image.exists());

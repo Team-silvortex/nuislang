@@ -21,6 +21,7 @@ mod loop_work;
 pub(crate) mod loops;
 #[cfg(test)]
 mod resource_boundary_tests;
+pub(crate) mod value_helpers;
 pub(crate) mod value_transport;
 
 pub use build_policy::{

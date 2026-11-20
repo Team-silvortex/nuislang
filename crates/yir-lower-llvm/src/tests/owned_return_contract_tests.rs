@@ -182,6 +182,7 @@ fn unavailable_declared_entry_result_traps_instead_of_using_an_unrelated_scalar(
             None,
             Some("result"),
             false,
+            false,
             &mut 0,
         )
         .unwrap();

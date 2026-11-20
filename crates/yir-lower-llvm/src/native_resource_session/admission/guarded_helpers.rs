@@ -35,6 +35,14 @@ pub(super) fn reachable<'a>(
             .iter()
             .filter(|n| function.body_nodes.contains(&n.name))
         {
+            if value_helpers::is_call(node) {
+                let helper = value_helpers::target(module, node)?;
+                depth = depth.max(1 + visit(helper, module, active, selected, depths)?);
+                if depth > MAX_RETURN_HELPER_DEPTH {
+                    return Err("resource return helpers exceed the closure depth bound".into());
+                }
+                continue;
+            }
             if !matches!(
                 node.op.instruction.as_str(),
                 "guard_call_owned_struct_return" | "tail_call_owned_struct_return"
@@ -137,14 +145,15 @@ pub(super) fn check(
         .zip(&helper.parameters)
         .enumerate()
     {
-        let kind = if index == 0 {
-            Kind::Buffer
+        let kind = parameter_kind(param, index)?;
+        let valid_segment = if index == 0 {
+            kind == Kind::Buffer
         } else if index < call.inputs.len() {
-            Kind::I64
+            matches!(kind, Kind::I64 | Kind::Bool)
         } else {
-            Kind::Bytes
+            kind == Kind::Bytes
         };
-        if values.get(input) != Some(&kind) || parameter_kind(param, index)? != kind {
+        if !valid_segment || values.get(input) != Some(&kind) {
             return Err("guarded resource helper capture drift".into());
         }
     }
@@ -166,6 +175,7 @@ pub(super) fn parameter_kind(
     match (index, param.ty.as_str(), &param.ownership) {
         (0, "ref Buffer", YirValueOwnership::Borrowed) => Ok(Kind::Buffer),
         (1.., "i64", YirValueOwnership::Value) => Ok(Kind::I64),
+        (1.., "bool", YirValueOwnership::Value) => Ok(Kind::Bool),
         (1.., "Bytes", YirValueOwnership::Owned) => Ok(Kind::Bytes),
         _ => Err("resource helper parameter ownership or type drift".into()),
     }

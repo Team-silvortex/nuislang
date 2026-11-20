@@ -60,5 +60,5 @@ pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTens
         .chain(DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS.iter())
         .chain(recalibration::CHECKS.iter())
-        .chain(resource_session::CHECKS.iter())
+        .chain(resource_session::checks())
 }

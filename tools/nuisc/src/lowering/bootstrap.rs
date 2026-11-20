@@ -297,7 +297,12 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         scoped_break_controls: outlined.break_controls.clone(),
         scoped_elided_record_seeds: outlined.elided_record_seeds.clone(),
         async_helper_functions: all_async_helper_functions.clone(),
-        pure_helpers: collect_pure_helper_functions(module),
+        // An owned return continuation keeps its guarded call contract even
+        // when this particular arm captures no Bytes and constructs only Err.
+        pure_helpers: collect_pure_helper_functions(module)
+            .difference(&owned_return_arms.functions)
+            .cloned()
+            .collect(),
         checked_arithmetic_helpers: speculation::collect_checked_arithmetic(module),
         inlineable_pure_helpers: collect_inlineable_pure_helper_exprs(module),
         pure_helper_blocks: collect_pure_helper_blocks(module),

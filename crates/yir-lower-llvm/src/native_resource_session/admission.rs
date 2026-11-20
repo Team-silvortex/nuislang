@@ -2,6 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use yir_core::{native_resource_session::ResourceSessionRegistration, EdgeKind, YirModule};
 
 mod guarded_helpers;
+mod value_helpers;
+
+pub(super) struct Selected {
+    pub module: YirModule,
+    pub value_helpers: BTreeSet<String>,
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub(super) enum Kind {
@@ -13,14 +19,33 @@ pub(super) enum Kind {
     Record(String, Vec<(String, Kind)>),
 }
 
+impl Kind {
+    pub(super) fn is_record_value(&self) -> bool {
+        match self {
+            Self::I64 | Self::Bool => true,
+            Self::Record(_, fields) => {
+                !fields.is_empty() && fields.iter().all(|(_, k)| k.is_record_value())
+            }
+            _ => false,
+        }
+    }
+}
+
 pub(super) fn select(
     module: &YirModule,
     registration: &ResourceSessionRegistration,
-) -> Result<YirModule, String> {
+) -> Result<Selected, String> {
     yir_verify::verify_module(module)?;
     let roots = registration.bind(module)?;
     let mixed = registration.mixed_layout(module)?;
     let functions = guarded_helpers::reachable(module, &roots)?;
+    let value_helpers = functions
+        .iter()
+        .flat_map(|f| &f.body_nodes)
+        .filter_map(|name| module.nodes.iter().find(|n| &n.name == name))
+        .filter(|n| value_helpers::is_call(n))
+        .map(|n| n.op.args[0].clone())
+        .collect::<BTreeSet<_>>();
     let order = crate::topological_order(module)?;
     let nodes = module
         .nodes
@@ -30,6 +55,7 @@ pub(super) fn select(
     let mut selected_nodes = BTreeSet::new();
     let mut metadata = BTreeSet::new();
     for function in &functions {
+        let value_helper = value_helpers.contains(&function.name);
         if !function
             .name
             .bytes()
@@ -46,23 +72,27 @@ pub(super) fn select(
         } else {
             "return_owned_bytes"
         };
-        if result.is_none_or(|node| {
-            node.op.instruction != return_op
-                && !(mixed.is_some() && node.op.instruction == "tail_call_owned_struct_return")
-        }) {
+        if !value_helper
+            && result.is_none_or(|node| {
+                node.op.instruction != return_op
+                    && !(mixed.is_some() && node.op.instruction == "tail_call_owned_struct_return")
+            })
+        {
             return Err("resource callback requires a direct owned Bytes return".to_owned());
         }
-        for index in 0..function.parameters.len() {
-            let instruction =
-                match guarded_helpers::parameter_kind(&function.parameters[index], index)? {
+        if !value_helper {
+            for (index, parameter) in function.parameters.iter().enumerate() {
+                let instruction = match guarded_helpers::parameter_kind(parameter, index)? {
                     Kind::Buffer => "param_buffer_ref",
                     Kind::I64 => "param_i64",
+                    Kind::Bool => "param_bool",
                     Kind::Bytes => "param_owned_bytes",
                     _ => unreachable!(),
                 };
-            let node = nodes[function.parameters[index].node.as_str()];
-            if node.op.instruction != instruction || node.op.args != [index.to_string()] {
-                return Err("resource callback parameter declaration drift".to_owned());
+                let node = nodes[parameter.node.as_str()];
+                if node.op.instruction != instruction || node.op.args != [index.to_string()] {
+                    return Err("resource callback parameter declaration drift".to_owned());
+                }
             }
         }
         let body = function
@@ -129,6 +159,9 @@ pub(super) fn select(
         let mut values = BTreeMap::new();
         let mut owners = BTreeSet::new();
         let mut copies = 0;
+        if value_helper {
+            value_helpers::validate(module, function, &metadata)?;
+        }
         for name in ordered {
             let node = nodes[name.as_str()];
             if !selected_nodes.insert(name.clone())
@@ -141,8 +174,16 @@ pub(super) fn select(
             {
                 return Err("resource callback has shared, cross-lane or non-CPU nodes".to_owned());
             }
+            if value_helper {
+                continue;
+            }
             let args = &node.op.args;
             let instruction = node.op.instruction.as_str();
+            if value_helpers::is_call(node) {
+                let kind = value_helpers::check(module, node, &values)?;
+                values.insert(name.clone(), kind);
+                continue;
+            }
             if matches!(
                 instruction,
                 "guard_call_owned_struct_return" | "tail_call_owned_struct_return"
@@ -169,7 +210,7 @@ pub(super) fn select(
                 }
             }
             let (inputs, output): (&[Kind], Kind) = match instruction {
-                "param_buffer_ref" | "param_i64" | "param_owned_bytes" => {
+                "param_buffer_ref" | "param_i64" | "param_bool" | "param_owned_bytes" => {
                     let index = function
                         .parameters
                         .iter()
@@ -201,11 +242,31 @@ pub(super) fn select(
                     values.insert(name.clone(), Kind::Bool);
                     continue;
                 }
-                "eq" | "ne" | "lt" | "le" | "gt" | "ge" if mixed.is_some() => {
+                "eq" | "ne" if mixed.is_some() => {
+                    if args.first().and_then(|name| values.get(name)) == Some(&Kind::Bool) {
+                        (&[Kind::Bool, Kind::Bool], Kind::Bool)
+                    } else {
+                        (&[Kind::I64, Kind::I64], Kind::Bool)
+                    }
+                }
+                "lt" | "le" | "gt" | "ge" if mixed.is_some() => {
                     (&[Kind::I64, Kind::I64], Kind::Bool)
                 }
                 "and" | "or" | "xor" if mixed.is_some() => (&[Kind::Bool, Kind::Bool], Kind::Bool),
                 "not" if mixed.is_some() => (&[Kind::Bool], Kind::Bool),
+                "select" if mixed.is_some() => {
+                    // Select consumes ready values; it neither guards evaluation nor
+                    // transfers ownership. Both arms must satisfy the same scalar kind.
+                    match args.get(1).and_then(|name| values.get(name)) {
+                        Some(Kind::I64) => (&[Kind::Bool, Kind::I64, Kind::I64], Kind::I64),
+                        Some(Kind::Bool) => (&[Kind::Bool, Kind::Bool, Kind::Bool], Kind::Bool),
+                        _ => {
+                            return Err(format!(
+                                "resource callback `{name}` select requires ready i64 or bool arms"
+                            ));
+                        }
+                    }
+                }
                 "add" | "sub" | "mul" | "div" | "rem" => (&[Kind::I64, Kind::I64], Kind::I64),
                 "buffer_len" => (&[Kind::Buffer], Kind::I64),
                 "load_at" => (&[Kind::Buffer, Kind::I64], Kind::I64),
@@ -277,5 +338,8 @@ pub(super) fn select(
         .filter(|r| selected.nodes.iter().any(|n| n.resource == r.name))
         .cloned()
         .collect();
-    Ok(selected)
+    Ok(Selected {
+        module: selected,
+        value_helpers,
+    })
 }

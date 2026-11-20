@@ -18,7 +18,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "!logical_root",
             "(!computed_gate && depth != 0)",
             "!computed_gate",
-            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool || negation,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "negated_roots && logical_root && negated_predicate(expr).is_some()",
             "rhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
         ],
     },
@@ -26,7 +27,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-computed-logical-gates-first-argument-and-selected-rhs-contract",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_logical.rs",
         required_patterns: &[
-            "!prefix::computed_logical_root(condition)",
+            "!prefix::computed_predicate_root(condition)",
             "control_values::value_type(condition, scope, self.catalog, self.layouts)?",
             "Prove the complete original tree before allocating names or helpers",
             "control_values::collect_inputs(rhs, &mut inputs)",

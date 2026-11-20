@@ -5,7 +5,9 @@ Navigational catalog only, not a cumulative acceptance receipt; the [mainline ma
 ## Current Evidence
 ### Resource Session Ladder
 
-The latest boundary is inferred resource shadowing below. Earlier receipts
+The latest admitted scope is bounded resource short-circuit evaluation in scalar
+declarations, direct bool conditions, returned mixed-State i64 fields and checked
+Err codes. Inline `buffer_len` composition remains a separate boundary. Earlier receipts
 remain scoped historical evidence, not competing descriptions of the latest
 admission. Follow the [runnable example ladder](../../examples/projects/domains/README.md#native-cpu-resource-sessions)
 and [implementation owners](../repo-layout.md#native-resource-session-ownership)
@@ -26,8 +28,15 @@ before reading the full history.
 | [Paired owned continuation](nuis-native-paired-owned-continuation-v1.md) | Nonempty then/else arms share the suffix while retaining independent early returns and cleanup. |
 | [Resource scalar shadowing](nuis-native-resource-scalar-shadowing-v1.md) | Explicit i64 local declarations retain lexical identities across early returns and shared continuations. |
 | [Inferred resource shadowing](nuis-native-resource-inferred-shadowing-v1.md) | Shared inference and alias resolution admit canonical i64 identities before optimization. |
+| [Resource record helpers](nuis-native-resource-record-helpers-v1.md) | Checked flat-i64 helper calls retain caller Bytes and reuse allocation-free value returns. |
+| [Nested resource records](nuis-native-resource-nested-records-v1.md) | Nested i64 projections check whole records, preserve field paths and retain the same value transport and ownership rules. |
+| [Boolean resource records](nuis-native-resource-boolean-records-v1.md) | Boolean helper-result predicates, negation and exact equality drive nonpublishing errors without broadening State or owner grants. |
+| [Boolean resource parameters](nuis-native-resource-boolean-parameters-v1.md) | Exact bool/i64 arguments compose through pure helpers; native value calls reject integer coercion without broadening resource captures. |
+| [Boolean resource captures](nuis-native-resource-boolean-captures-v1.md) | Immutable bool snapshots cross guarded/tail resource outlines with exact types, original owner partitions and separate branch scopes. |
+| [Boolean resource shadowing](nuis-native-resource-boolean-shadowing-v1.md) | Same-kind canonical bool declarations preserve outer initializer reads, nested lexical identities and root continuation values. |
+| [Resource short-circuit values](nuis-native-resource-short-circuit-v1.md) | Bounded bool/i64 declarations, direct bool conditions, returned mixed-State i64 fields and checked Err codes preserve lazy helper arguments, negation and comparison/XOR children through selected owned branches, source-ordered snapshots and shared suffixes. Ready same-kind scalar `select` is checked separately; unsupported eager fallback fails closed. |
 
-Record helpers within resource callbacks, captured writes, mutable resource carries, provider/device completion and
+Broader read/helper composition, captured writes, mutable resource carries, provider/device completion and
 native ns-nova windows remain separate. No row grants general resource loops,
 pure Nsld finalization or an all-Nuis host runtime.
 

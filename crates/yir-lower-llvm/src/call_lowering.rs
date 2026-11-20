@@ -290,6 +290,19 @@ pub(crate) fn lower_cpu_call_node(
                 .get(arg)
                 .ok_or_else(|| format!("missing record argument `{arg}`"))?;
             record_args.insert(index, layout.prepare(value)?);
+        } else if signature.native_value_return.is_some() {
+            // Native value helpers preserve exact kinds even when called from
+            // another helper, where resource callback admission does not run.
+            let exact = kind.scalar().and_then(|scalar| {
+                registers
+                    .get(arg)
+                    .and_then(|value| lower_scalar_value_arg(value, &scalar))
+            });
+            if exact.is_none() {
+                return Err(format!(
+                    "native value helper `{callee}` argument {index} must match its declared scalar kind"
+                ));
+            }
         }
     }
     let lowered_args = call_inputs

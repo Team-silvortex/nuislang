@@ -247,3 +247,109 @@ fn alias_cycles_and_invalid_inference_remain_semantic_errors() {
         .lower(&[])
         .is_err());
 }
+
+#[test]
+fn boolean_shadows_resolve_imported_aliases_and_keep_declaration_identity() {
+    let ast = crate::frontend::parse_nuis_ast(
+        r#"
+      use cpu Types;
+      mod cpu Main {
+        fn step(pixels: ref Buffer, width: i64) -> i64 {
+          let ready = width > 0;
+          if ready {
+            let ready: Decision = !ready;
+            if width > 1 { const ready: Identity<Decision> = !ready; }
+          }
+          if ready { return 1; }
+          return 0;
+        }
+      }
+    "#,
+    )
+    .unwrap();
+    let helper = crate::frontend::parse_nuis_ast(
+        r#"
+      mod cpu Types { pub type Identity<T> = T; pub type Decision = Identity<bool>; }
+    "#,
+    )
+    .unwrap();
+    let normalized = normalize(&ast, &BTreeSet::from(["step".into()]));
+    assert_eq!(normalized.shadows["step"].len(), 2);
+    let nir = normalized.lower(&[helper]).unwrap();
+    let step = nir.functions.iter().find(|f| f.name == "step").unwrap();
+    use nuis_semantics::model::{NirExpr, NirStmt};
+    let NirStmt::If { then_body, .. } = &step.body[1] else {
+        panic!()
+    };
+    let NirStmt::Let {
+        name, ty: Some(ty), ..
+    } = &then_body[0]
+    else {
+        panic!()
+    };
+    assert_eq!(ty.render(), "bool");
+    assert_ne!(name, "ready");
+    let NirStmt::If { condition, .. } = &step.body[2] else {
+        panic!()
+    };
+    assert_eq!(condition, &NirExpr::Var("ready".into()));
+}
+
+#[test]
+fn scalar_shadow_admission_requires_same_supported_canonical_kind() {
+    use nuis_semantics::model::NirStmt;
+    let ast = source("if width > 0 { let width = width + 1; } return width;");
+    let normalized = normalize(&ast, &BTreeSet::from(["step".into()]));
+    let nir = normalized.lower(&[]).unwrap();
+    for outer in ["i64", "bool", "i32", "f32", "f64", "Bytes", "Buffer"] {
+        for local in ["i64", "bool", "i32", "f32", "f64", "Bytes", "Buffer"] {
+            let mut changed = nir.clone();
+            let step = changed
+                .functions
+                .iter_mut()
+                .find(|f| f.name == "step")
+                .unwrap();
+            step.params[1].ty.name = outer.into();
+            let NirStmt::If { then_body, .. } = &mut step.body[0] else {
+                panic!()
+            };
+            let NirStmt::Let { ty: Some(ty), .. } = &mut then_body[0] else {
+                panic!()
+            };
+            ty.name = local.into();
+            assert_eq!(
+                types::validate(&changed, &normalized.shadows).is_ok(),
+                outer == local && matches!(outer, "i64" | "bool"),
+                "{outer}/{local}"
+            );
+        }
+    }
+    for case in 0..5 {
+        let mut changed = nir.clone();
+        let step = changed
+            .functions
+            .iter_mut()
+            .find(|f| f.name == "step")
+            .unwrap();
+        step.params[1].ty.name = "bool".into();
+        let NirStmt::If { then_body, .. } = &mut step.body[0] else {
+            panic!()
+        };
+        let NirStmt::Let { ty, .. } = &mut then_body[0] else {
+            panic!()
+        };
+        ty.as_mut().unwrap().name = "bool".into();
+        match case {
+            0 => *ty = None,
+            1 => ty.as_mut().unwrap().is_ref = true,
+            2 => ty.as_mut().unwrap().is_optional = true,
+            3 => ty
+                .as_mut()
+                .unwrap()
+                .generic_args
+                .push(step.params[1].ty.clone()),
+            _ => step.params[1].ty.is_optional = true,
+        }
+        assert!(types::validate(&changed, &normalized.shadows).is_err());
+    }
+}

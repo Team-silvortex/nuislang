@@ -43,18 +43,64 @@ native-resource-session-callbacks (active/95)
 
 The [2026-11-13 recalibration](reference/nuis-development-tensor-recalibration-2026-11-13.md)
 retains the preceding early/0 checkpoint. Current resource evidence is the
-[inferred resource-shadowing proof](reference/nuis-native-resource-inferred-shadowing-v1.md):
+[short-circuit proof](reference/nuis-native-resource-short-circuit-v1.md):
 fixed-extent synchronous Buffer/Bytes callbacks, flat i64-plus-Bytes State,
 checked errors and early owned returns execute natively. Both nonempty arms
 can rejoin one shared suffix after an untaken inner return, preserving ownership
 and once-only effects. Explicit, inferred and aliased i64 local declarations
 preserve lexical identities through shared semantic type resolution; true
-assignments remain distinct. Registration, cache, source-free NSB relocation,
+assignments remain distinct. Flat and nested i64/bool record helpers compose with held
+Bytes through checked calls and allocation-free private value returns. Projections
+check complete records, including unselected subtrees, without consuming owners.
+Boolean validation, negation and same-kind equality/inequality retain exact types
+and nonpublishing checked error paths. Exact bool/i64 parameters compose through
+direct and helper-to-helper calls without integer coercion in native value calls.
+Immutable bool locals cross resource-return outlines as typed value snapshots;
+branch-local flags remain separate from the shared root continuation's scope.
+Same-kind bool shadows retain separate identities across explicit, inferred,
+aliased and mutable/redeclared locals; each enclosing value is restored on exit.
+Bounded i64/bool scalar helpers share the record-helper call graph. Pure logical
+initializers preserve selected-only RHS evaluation; unoutlined non-total RHS
+expressions now fail rather than falling back to eager execution.
+Registration, cache, source-free NSB relocation,
 binary-only launch and final accepted CPU pixel export have scoped regressions.
 
-**Next:** admit the reproduced `measure(width).value` scalar-record helper inside
-resource callbacks. Type resolution succeeds, but native admission still rejects
-`call_owned_struct`; reuse existing callee contracts without bypassing owner checks. Captured writes,
+Canonical negation such as `!(a || helper(...))` now uses the same guarded
+normalization directly, including nested/double negation and original budgets.
+
+Nested resource-read declarations now reuse owned branch pairs and shared
+suffixes. Left/right logical subtrees and negation evaluate reads only on the
+selected path; resources do not enter the pure helper ABI. Lazy left results
+have independent lexical snapshots, and existing terminal continuations are
+forwarded rather than wrapped in redundant helpers.
+
+Read/helper composition now keeps argument reads and pure scalar/record calls
+inside selected owned regions, without widening pure helper signatures.
+Short-circuit bool arguments now preserve left-to-right snapshots and selected
+reads, including nested and multiple arguments.
+Inlined conditional helpers now admit exact bool-controlled `select` over two
+ready same-kind i64/bool values, without selecting records/resources or coercing types.
+Comparison/XOR wrappers now reuse ordered scalar snapshots and guarded logical
+children, including helper arguments and exact i64 ordering comparisons.
+Direct i64 local initialization now uses the same typed snapshots and guarded
+arguments, including inferred and const-alias declarations. Complete source
+proof still precedes extraction, and the existing closure limits remain.
+Direct inline bool conditions now reuse that path through one hygienic snapshot,
+without requiring a source local or duplicating either branch. The snapshot still
+counts toward the original capture limit; both arms retain existing owner joins.
+Directly returned mixed-State fields now use ordered snapshots, including
+`width: width + word(mode >= 0 && bytes_len(saved) == 48)` beside `pixels: move(saved)`.
+Plain State and checked Ok layouts share the contract; terminal cleanup bindings
+retain field order and exact Bytes transfer.
+Direct checked Err codes now use one typed snapshot before terminal cleanup.
+Owned continuations remain guarded even when they capture no Bytes; they are
+not candidates for eager pure-helper return selection.
+**Next:** admit borrowed `buffer_len` in the same scalar vocabulary, such as
+`width: buffer_len(pixels) + word(mode >= 0 && bytes_len(saved) == 48)`.
+This shape still rejects with `short-circuit RHS requires guarded lowering`.
+Preserve selected-only reads,
+borrow lifetimes, lexical identities, whole-state publication and native traps.
+Captured writes,
 resource-changing joins, general resource loops, broader layouts and provider/device
 completion remain separate. CPU export does not establish interactive frame dispatch.
 

@@ -144,7 +144,14 @@ pub fn emit_module_with_registries(
     yir_registry: &ModRegistry,
     emitter_registry: &BranchEffectLlvmEmitterRegistry,
 ) -> Result<String, String> {
-    emit_module_with_checks(module, yir_registry, emitter_registry, false, &[])
+    emit_module_with_checks(
+        module,
+        yir_registry,
+        emitter_registry,
+        false,
+        &[],
+        &Default::default(),
+    )
 }
 
 pub(crate) fn emit_native_scalar_module(
@@ -157,6 +164,21 @@ pub(crate) fn emit_native_scalar_module(
         &default_branch_effect_llvm_emitters(),
         true,
         roots,
+        &Default::default(),
+    )
+}
+
+pub(crate) fn emit_native_resource_module(
+    module: &YirModule,
+    value_helpers: &std::collections::BTreeSet<String>,
+) -> Result<String, String> {
+    emit_module_with_checks(
+        module,
+        &default_registry(),
+        &default_branch_effect_llvm_emitters(),
+        false,
+        &[],
+        value_helpers,
     )
 }
 
@@ -166,6 +188,7 @@ fn emit_module_with_checks(
     emitter_registry: &BranchEffectLlvmEmitterRegistry,
     require_scalar_values: bool,
     native_roots: &[&str],
+    value_helpers: &std::collections::BTreeSet<String>,
 ) -> Result<String, String> {
     verify_module_with_registry(module, yir_registry)?;
 
@@ -293,7 +316,8 @@ fn emit_module_with_checks(
         } else {
             None
         };
-        let native_value_return = if require_scalar_values {
+        let native_value_return = if require_scalar_values || value_helpers.contains(&function_name)
+        {
             owned_struct_layout
                 .as_ref()
                 .map(|_| {
@@ -410,6 +434,7 @@ fn emit_module_with_checks(
                 .and_then(|function| function.result.as_ref())
                 .map(|result| result.node.as_str()),
             require_scalar_values,
+            value_helpers.contains(function_name),
             &mut global_counter,
         )?;
         globals.extend(emitted.globals);
@@ -469,6 +494,7 @@ fn emit_module_with_checks(
             .find(|function| function.role == yir_core::YirFunctionRole::Entry)
             .and_then(|function| function.result.as_ref())
             .map(|result| result.node.as_str()),
+        false,
         false,
         &mut global_counter,
     )?;

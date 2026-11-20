@@ -1,4 +1,20 @@
 const SOURCE: &str = include_str!("native_resource_session/main.ns");
+#[path = "native_resource_session/boolean_captures.rs"]
+mod boolean_captures;
+#[cfg(unix)]
+#[path = "native_resource_session/boolean_negated_short_circuit.rs"]
+mod boolean_negated_short_circuit;
+#[path = "native_resource_session/boolean_parameters.rs"]
+mod boolean_parameters;
+#[path = "native_resource_session/boolean_records.rs"]
+mod boolean_records;
+#[path = "native_resource_session/boolean_shadowing.rs"]
+mod boolean_shadowing;
+#[path = "native_resource_session/boolean_short_circuit.rs"]
+mod boolean_short_circuit;
+#[cfg(unix)]
+#[path = "native_resource_session/boolean_short_circuit_traps.rs"]
+mod boolean_short_circuit_traps;
 #[path = "native_resource_session/checked.rs"]
 mod checked;
 #[path = "native_resource_session/continuations.rs"]
@@ -17,12 +33,46 @@ mod native;
 #[cfg(unix)]
 #[path = "native_resource_session/trap.rs"]
 mod native_trap;
+#[path = "native_resource_session/nested_records.rs"]
+mod nested_records;
+#[cfg(unix)]
+#[path = "native_resource_session/nested_resource_predicates.rs"]
+mod nested_resource_predicates;
 #[path = "native_resource_session/nested_returns.rs"]
 mod nested_returns;
 #[path = "native_resource_session/paired_continuations.rs"]
 mod paired_continuations;
+#[path = "native_resource_session/record_helpers.rs"]
+mod record_helpers;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_argument_predicates.rs"]
+mod resource_argument_predicates;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_conditions.rs"]
+mod resource_conditions;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_error_codes.rs"]
+mod resource_error_codes;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_helper_predicates.rs"]
+mod resource_helper_predicates;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_i64_initializers.rs"]
+mod resource_i64_initializers;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_predicates.rs"]
+mod resource_predicates;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_return_fields.rs"]
+mod resource_return_fields;
+#[cfg(unix)]
+#[path = "native_resource_session/resource_wrapped_predicates.rs"]
+mod resource_wrapped_predicates;
 #[path = "native_resource_session/retained_bytes.rs"]
 mod retained_bytes;
+#[cfg(unix)]
+#[path = "native_resource_session/scalar_selection.rs"]
+mod scalar_selection;
 #[path = "native_resource_session/scalar_shadowing.rs"]
 mod scalar_shadowing;
 #[path = "native_resource_session/transferred_bytes.rs"]

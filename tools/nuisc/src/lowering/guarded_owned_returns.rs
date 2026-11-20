@@ -1,7 +1,10 @@
+use super::buffer_loop_outline::PureValueCalls;
 use super::*;
 use nuis_semantics::model::NirParam;
 use std::collections::VecDeque;
-use yir_core::native_resource_session::{MAX_RETURN_HELPER_DEPTH, MAX_RETURN_HELPER_FUNCTIONS};
+use yir_core::native_resource_session::{
+    MixedResourceLayout, MAX_RETURN_HELPER_DEPTH, MAX_RETURN_HELPER_FUNCTIONS,
+};
 
 #[path = "guarded_owned_returns/branches.rs"]
 mod branches;
@@ -11,6 +14,8 @@ mod continuations;
 mod owners;
 #[path = "guarded_owned_returns/regions.rs"]
 mod regions;
+#[path = "guarded_owned_returns/resource_predicates.rs"]
+mod resource_predicates;
 
 #[derive(Default)]
 pub(super) struct Outlines {
@@ -40,7 +45,7 @@ pub(super) fn outline(
                 && f.params
                     .first()
                     .is_some_and(|p| p.ty.is_ref && p.ty.name == "Buffer")
-                && f.params[1..].iter().all(|p| scalar(&p.ty))
+                && f.params[1..].iter().all(|p| root_scalar(&p.ty))
                 && f.return_type
                     .as_ref()
                     .and_then(|t| module_owned_struct_layout(module, t))
@@ -48,6 +53,9 @@ pub(super) fn outline(
         })
         .map(|f| f.name.clone())
         .collect::<BTreeSet<_>>();
+    if eligible.is_empty() {
+        return Ok(Outlines::default());
+    }
     let reserved = module
         .functions
         .iter()
@@ -58,6 +66,8 @@ pub(super) fn outline(
         pending: VecDeque::new(),
         roots: host_entries.len(),
         outlines: Outlines::default(),
+        calls: PureValueCalls::collect(module),
+        return_layouts: resource_predicates::return_layouts(module, &eligible),
     };
     for function in &mut module.functions {
         if !eligible.contains(&function.name) {
@@ -78,6 +88,8 @@ struct OutlineContext {
     pending: VecDeque<(NirFunction, usize)>,
     roots: usize,
     outlines: Outlines,
+    calls: PureValueCalls,
+    return_layouts: BTreeMap<String, MixedResourceLayout>,
 }
 
 fn outline_body(
@@ -100,6 +112,20 @@ fn outline_body(
         .collect::<BTreeSet<_>>();
     let mut remaining = VecDeque::from(std::mem::take(&mut function.body));
     while let Some(mut statement) = remaining.pop_front() {
+        if let Some(replacement) = resource_predicates::split(
+            &statement,
+            &template,
+            &mut remaining,
+            &scope,
+            &live_bytes,
+            depth,
+            context,
+        )? {
+            for statement in replacement.into_iter().rev() {
+                remaining.push_front(statement);
+            }
+            continue;
+        }
         if let NirStmt::If {
             then_body,
             else_body,
@@ -165,7 +191,7 @@ fn outline_body(
             _ => None,
         };
         if let Some((name, ty)) = declaration {
-            if scalar(&ty) {
+            if capture_scalar(&ty) {
                 if let Some(old) = scope.iter_mut().find(|p| p.name == name) {
                     old.ty = ty;
                 } else {
@@ -178,8 +204,15 @@ fn outline_body(
     Ok(())
 }
 
-fn scalar(ty: &NirTypeRef) -> bool {
+fn root_scalar(ty: &NirTypeRef) -> bool {
     ty.name == "i64" && !ty.is_ref && !ty.is_optional && ty.generic_args.is_empty()
+}
+
+fn capture_scalar(ty: &NirTypeRef) -> bool {
+    matches!(ty.name.as_str(), "i64" | "bool")
+        && !ty.is_ref
+        && !ty.is_optional
+        && ty.generic_args.is_empty()
 }
 
 fn owned_bytes(ty: &NirTypeRef) -> bool {
@@ -267,7 +300,7 @@ fn emit(
         || input_count == 0
         || !function.params[1..input_count]
             .iter()
-            .all(|p| scalar(&p.ty))
+            .all(|p| capture_scalar(&p.ty))
         || !function.params[input_count..].iter().all(|p| {
             p.ty.name == "Bytes"
                 && !p.ty.is_ref

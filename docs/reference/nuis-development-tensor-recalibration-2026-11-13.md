@@ -41,6 +41,69 @@ then resolves inferred/aliased declarations through shared semantics and checks
 canonical i64 identities before optimization. The reproduced next gap is an
 ordinary scalar-record helper inside a resource callback (`call_owned_struct`);
 active/95 and the dependent coordinates remain unchanged.
+The [record-helper follow-up](nuis-native-resource-record-helpers-v1.md) closes
+that flat-i64 case through shared admission and allocation-free value returns.
+Both helper families share the original closure bounds; nested scalar-record
+projections are the next reproduced gap. Active/95 remains unchanged.
+The [nested-record follow-up](nuis-native-resource-nested-records-v1.md) then
+admits nested i64 value projections with whole-record resource checks, shared
+leaf/depth bounds and unchanged private transport. Boolean helper validation
+flags remain next; active/95 and the dependent coordinates remain unchanged.
+The [boolean-record follow-up](nuis-native-resource-boolean-records-v1.md) then
+admits bool result fields, exact predicates and same-kind equality/inequality,
+with checked errors and unchanged ownership. Bool helper parameters remain the
+next reproduced boundary; active/95 and other coordinates remain unchanged.
+The [boolean-parameter follow-up](nuis-native-resource-boolean-parameters-v1.md)
+then admits exact bool/i64 value arguments through both callback and helper calls,
+and rejects helper-internal bool-to-integer coercion. Immutable bool captures
+across outlined resource branches remain the next reproduced gap; active/95
+and the dependent coordinates remain unchanged.
+The [boolean-capture follow-up](nuis-native-resource-boolean-captures-v1.md)
+then preserves immutable bool snapshots through guarded arms and terminal
+continuations, with exact argument kinds and unchanged owner partitions.
+Same-kind bool shadowing was the next reproduced gap; active/95 and the
+dependent coordinates remain unchanged.
+The [boolean-shadowing follow-up](nuis-native-resource-boolean-shadowing-v1.md)
+then admits matching canonical i64/bool shadows before optimization, retaining
+outer initializer reads, nested lexical restoration and failure cleanup. It
+reproduces short-circuit bool initializer rejection at `call_bool` as the next
+boundary; active/95 and all other coordinate values remain unchanged.
+The [short-circuit follow-up](nuis-native-resource-short-circuit-v1.md) then
+admits pure i64/bool helper calls through the shared bounded closure and strict
+value checks, preserving selected-only RHS execution. It also closes the unsafe
+eager fallback for unoutlined resource RHS reads; selected-only resource capture
+remains open. Its negation follow-up now handles `!(a || helper(...))` directly
+in resource prefixes, with nested/double negation and unchanged source budgets.
+Active/95 and the dependent coordinates remain unchanged.
+The subsequent resource-read follow-up admits one lazy edge in bool declarations:
+Buffer loads and live Bytes length reads stay in selected owned regions, sharing
+one continuation without a new pure-helper resource ABI. Four predicates across
+three declaration forms each retain 120-event native evidence and failure cleanup.
+Nested resource logical trees were next. That follow-up now covers left/right
+subtrees and canonical negation, preserving selected-only reads, lexical
+snapshots, shared suffixes and failure cleanup. Redundant identity continuations
+are removed rather than raising the source/native closure bounds. Read/helper
+composition now reuses completed pure signatures and selected owned regions;
+logical bool arguments now retain left-to-right scalar snapshots, nested selection
+and existing owner cleanup. Inlined conditional scalar helpers producing `select`
+now admit exact bool predicates and ready same-kind i64/bool arms; no resource
+selection or speculative reads are granted. Comparison/XOR wrappers now use
+ordered snapshots and existing owned branches for their logical children.
+Direct i64 local initialization containing resource short-circuit arguments
+now shares that normalization with exact declaration/result kinds, unchanged
+ownership and closure limits. Eight compositions across three declaration forms
+each run 120 native events; full-width values and failure cleanup remain covered.
+Direct inline resource-bearing bool conditions now reuse the same path through
+one hygienic snapshot. Eight conditions retain 120-event evidence; paired arms
+preserve branch-local and incoming owners through early returns and shared suffixes.
+The snapshot counts toward the original capture bound. Returned mixed-State
+fields now normalize through shared layout contracts and source-ordered snapshots,
+including terminal cleanup bindings. Direct checked Err code expressions now
+share this route, including zero/full-width codes and borrowed-only callbacks.
+Inline `buffer_len` composition is the next reproduced gap; this does not admit
+arbitrary expressions or relax pure-helper resource isolation.
+Active/95 and the other
+coordinates remain unchanged.
 The early/0 decision and
 4515-check receipt below remain this audit's historical baseline, not the latest
 implementation status.

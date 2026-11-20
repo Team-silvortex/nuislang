@@ -217,3 +217,64 @@ fn owned_continuation_forwards_result_and_failure_without_a_branch_or_repacking(
     .is_err());
     assert_eq!(body, ["sentinel"]);
 }
+
+#[test]
+fn guarded_and_tail_calls_preserve_bool_captures_without_scalar_or_owner_coercion() {
+    for tail in [false, true] {
+        for case in 0..6 {
+            let (mut node, mut registers, mut signatures) = fixture();
+            node.op.args.insert(5, "flag".into());
+            let flag = LlvmValueRef::Bool {
+                i1: "%flag".into(),
+                i64: "%flag64".into(),
+            };
+            registers.insert("flag".into(), flag.clone());
+            let signature = signatures.get_mut("helper").unwrap();
+            signature.params.insert(2, Scalar(CpuCallScalarKind::Bool));
+            signature.mutex_permit_params.insert(2, None);
+            match case {
+                1 => {
+                    registers.insert("flag".into(), LlvmValueRef::I64("1".into()));
+                }
+                2 => {
+                    registers.insert("width".into(), flag);
+                }
+                3 => signature.params[2] = Scalar(CpuCallScalarKind::OwnedBytes),
+                4 => signature.params[2] = Scalar(CpuCallScalarKind::I64),
+                5 => signature.params[3] = Scalar(CpuCallScalarKind::Bool),
+                _ => {}
+            }
+            let layout = yir_core::parse_owned_struct_layout(&node.op.args[2]).unwrap();
+            if tail {
+                node.op.instruction = "tail_call_owned_struct_return".into();
+                node.op.args.remove(0);
+            }
+            let mut body = vec!["sentinel".into()];
+            let mut reg = 11;
+            let mut block = 17;
+            let result = lower(
+                &node,
+                &mut body,
+                &registers,
+                &BTreeMap::new(),
+                &signatures,
+                CpuCallScalarKind::I64,
+                Some(&layout),
+                &mut reg,
+                &mut block,
+            );
+            if case == 0 {
+                assert!(result.unwrap());
+                let text = body.join("\n");
+                assert!(text.contains("call i64 @nuis_fn_helper(ptr %buffer, i64 %len, i64 %width, i1 %flag, ptr %saved)"));
+                assert_eq!(text.contains("br i1"), !tail);
+                assert_eq!(text.matches("owned_blob_drop_v1").count(), 1);
+                assert!(!text.contains("aggregate_alloc"));
+            } else {
+                assert!(result.is_err(), "tail={tail} case={case}");
+                assert_eq!(body, ["sentinel"]);
+                assert_eq!((reg, block), (11, 17));
+            }
+        }
+    }
+}

@@ -18,7 +18,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
             "lhs.as_ref(),\n                        depth + 1,\n                        computed_gate,\n                        false,\n                        lazy_rhs,\n                        eager_root,",
             "rhs.as_ref(),\n                        depth + 1,\n                        computed_gate,\n                        false,\n                        true,\n                        eager_root,",
             "args.iter().enumerate().map(|(index, arg)|",
-            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "lhs.as_ref(),\n                        depth + 1,\n                        eager_bool || negation,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
+            "negated_roots && logical_root && negated_predicate(expr).is_some()",
             "rhs.as_ref(),\n                        depth + 1,\n                        eager_bool,\n                        false,\n                        lazy_rhs,\n                        eager_root && eager_bool,",
         ],
     },
@@ -26,7 +27,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "native-logical-trees-original-type-proof-before-names-and-selected-rhs",
         path: "tools/nuisc/src/lowering/buffer_loop_outline/conditional_values_logical.rs",
         required_patterns: &[
-            "!prefix::computed_logical_root(condition)",
+            "!prefix::computed_predicate_root(condition)",
             "control_values::value_type(condition, scope, self.catalog, self.layouts)?",
             "let (value, changed) = self.logical_tree(condition, scope)",
             "Generated symbols are deliberately absent from the original catalog",

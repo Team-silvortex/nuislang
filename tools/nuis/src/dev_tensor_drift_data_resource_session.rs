@@ -1,12 +1,266 @@
 use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
-pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
+#[path = "dev_tensor_drift_data_resource_negation.rs"]
+mod negation;
+
+pub(super) fn checks() -> impl Iterator<Item = &'static DevTensorDriftCheckSpec> {
+    CHECKS.iter().chain(negation::CHECKS.iter())
+}
+
+const CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "native-resource-short-circuit-calls",
+        path: "crates/yir-lower-llvm/src/native_resource_session/admission/value_helpers.rs",
+        required_patterns: &[
+            "pub(super) fn is_call",
+            "\"call_owned_struct\" | \"call_bool\" | \"call_i64\"",
+            "bounded scalar/record-call body",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-short-circuit-predicates",
+        path: "crates/yir-lower-llvm/src/function_lowering/strict_scalar.rs",
+        required_patterns: &[
+            "fn validate_resource_predicates",
+            "resource value helper cannot use bool as arithmetic or ordered input",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-short-circuit-runtime",
+        path: "tools/nuisc/tests/native_resource_session/boolean_short_circuit.rs",
+        required_patterns: &[
+            "short_circuit_shadows_preserve_four_owner_paths_for_120_events_per_form",
+            "boolean_helper_errors_and_return_failures_keep_state_and_release_owners",
+            "boolean_helpers_reject_signature_type_effect_and_external_dependency_drift",
+            "short_circuit_snapshot_survives_later_buffer_writes",
+            "nested_logical_helpers_preserve_the_selected_truth_table",
+            "scalar_record_and_resource_helpers_share_one_closure_budget",
+            "short_circuit_resource_prefix_negation_needs_no_separate_initializer",
+            "wrapped_resource_read_rhs_uses_owned_branch_normalization",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-short-circuit-traps",
+        path: "tools/nuisc/tests/native_resource_session/boolean_short_circuit_traps.rs",
+        required_patterns: &[
+            "short_circuit_rhs_traps_only_when_selected_in_a_separate_process",
+            "output.status.signal()",
+            "Duration::from_secs(60)",
+            "not_or_skip",
+            "not_and_take",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-logical-eager-fallback",
+        path: "tools/nuisc/src/lowering/core_exprs.rs",
+        required_patterns: &[
+            "!eager_logical_rhs(rhs)",
+            "short-circuit RHS requires guarded lowering",
+            "count > 4096",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-short-circuit-receipt",
+        path: "docs/reference/nuis-native-resource-short-circuit-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-shadow-types",
+        path: "tools/nuisc/src/resource_session_bindings_tests.rs",
+        required_patterns: &[
+            "boolean_shadows_resolve_imported_aliases_and_keep_declaration_identity",
+            "scalar_shadow_admission_requires_same_supported_canonical_kind",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-shadow-runtime",
+        path: "tools/nuisc/tests/native_resource_session/boolean_shadowing.rs",
+        required_patterns: &[
+            "same_kind_boolean_shadows_keep_outer_values_for_120_events_per_form",
+            "nested_boolean_shadows_restore_each_enclosing_scope",
+            "shadowed_boolean_errors_do_not_publish_branch_prefix_writes",
+            "boolean_shadow_return_allocation_failures_preserve_state_and_release_bytes",
+            "boolean_shadowing_keeps_mixed_kind_resource_and_mutability_boundaries",
+            "short_circuit_boolean_shadow_initializers_use_bounded_pure_helpers",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-shadow-receipt",
+        path: "docs/reference/nuis-native-resource-boolean-shadowing-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-shadow-example",
+        path: "examples/projects/domains/native_guarded_canvas_session_demo/main.ns",
+        required_patterns: &[
+            "let valid: bool = color >= 0",
+            "let valid = width > 0 && !validate_extent",
+            "const valid: bool = !(width <= 0 || validate_extent",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-capture-source",
+        path: "tools/nuisc/src/lowering/guarded_owned_returns.rs",
+        required_patterns: &[
+            "fn root_scalar",
+            "fn capture_scalar",
+            "if capture_scalar(&ty)",
+            ".all(|p| capture_scalar(&p.ty))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-capture-admission",
+        path: "crates/yir-lower-llvm/src/native_resource_session/admission/guarded_helpers.rs",
+        required_patterns: &[
+            "matches!(kind, Kind::I64 | Kind::Bool)",
+            "!valid_segment || values.get(input) != Some(&kind)",
+            "\"bool\", YirValueOwnership::Value) => Ok(Kind::Bool)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-capture-preflight",
+        path: "crates/yir-lower-llvm/src/guarded_owned_call_tests.rs",
+        required_patterns: &[
+            "guarded_and_tail_calls_preserve_bool_captures_without_scalar_or_owner_coercion",
+            "i1 %flag, ptr %saved",
+            "assert_eq!((reg, block), (11, 17))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-capture-runtime",
+        path: "tools/nuisc/tests/native_resource_session/boolean_captures.rs",
+        required_patterns: &[
+            "boolean_captures_preserve_four_paths_for_120_events_per_declaration",
+            "captured_boolean_snapshot_survives_buffer_writes_and_shared_continuation",
+            "boolean_capture_errors_and_failed_returns_preserve_committed_state_and_owners",
+            "guarded_and_tail_boolean_captures_reject_type_and_ownership_drift",
+            "boolean_captures_keep_exported_root_mixed_shadow_and_write_boundaries",
+            "boolean_captures_share_the_guarded_input_budget",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-capture-receipt",
+        path: "docs/reference/nuis-native-resource-boolean-captures-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-parameter-admission",
+        path: "crates/yir-lower-llvm/src/native_resource_session/admission/value_helpers.rs",
+        required_patterns: &[
+            "resource_value_parameters_preserve_exact_kinds_and_value_ownership",
+            "values.get(operand) != Some(&parameter_kind(parameter)?)",
+            "resource value helper requires i64/bool value parameters",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-value-call-exact-scalar-arguments",
+        path: "crates/yir-lower-llvm/src/call_lowering.rs",
+        required_patterns: &[
+            "signature.native_value_return.is_some()",
+            "lower_scalar_value_arg(value, &scalar)",
+            "must match its declared scalar kind",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-parameter-runtime",
+        path: "tools/nuisc/tests/native_resource_session/boolean_parameters.rs",
+        required_patterns: &[
+            "mixed_boolean_parameters_preserve_four_owner_paths_for_120_events",
+            "boolean_parameter_calls_reject_wrong_kinds_arity_and_unready_values",
+            "boolean_parameters_keep_application_and_allocation_failures_atomic",
+            "boolean_parameters_share_the_existing_argument_budget",
+            "direct_boolean_comparison_and_alias_parameters_execute_both_values",
+            "boolean_local_captures_use_typed_resource_outlines",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-parameter-receipt",
+        path: "docs/reference/nuis-native-resource-boolean-parameters-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-record-admission",
+        path: "crates/yir-lower-llvm/src/native_resource_session/admission/value_helpers.rs",
+        required_patterns: &[
+            "OwnedStructScalarLayout::Bool) => Kind::Bool",
+            "boolean_result_admission_keeps_other_scalar_and_resource_leaves_closed",
+            "resource value helper requires i64/bool record leaves",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-record-runtime",
+        path: "tools/nuisc/tests/native_resource_session/boolean_records.rs",
+        required_patterns: &[
+            "boolean_record_predicates_preserve_all_owner_paths_for_120_events",
+            "boolean_validation_error_cleans_held_bytes_and_never_publishes_prefix_writes",
+            "boolean_helper_equality_and_inequality_keep_the_full_truth_table",
+            "boolean_equality_admission_rejects_ordering_and_implicit_integer_coercion",
+            "boolean_helper_parameters_use_checked_resource_admission",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-boolean-record-receipt",
+        path: "docs/reference/nuis-native-resource-boolean-records-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-nested-record-admission",
+        path: "crates/yir-lower-llvm/src/native_resource_session/mixed_admission.rs",
+        required_patterns: &[
+            "!kind.is_record_value()",
+            "nested_projection_rejects_resources_even_in_an_unselected_sibling",
+            "nested_projection_requires_ready_exact_paths_and_preserves_owners",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-nested-record-runtime",
+        path: "tools/nuisc/tests/native_resource_session/nested_records.rs",
+        required_patterns: &[
+            "nested_record_helpers_preserve_four_owner_paths_for_120_events",
+            "nested_projection_preserves_repeated_names_and_reordered_construction",
+            "nested_helper_followed_by_failed_resource_return_keeps_both_state_halves",
+            "nested_helper_bounds_count_total_leaves_not_just_top_level_fields",
+            "nested_boolean_validation_flags_use_checked_resource_admission",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-nested-record-receipt",
+        path: "docs/reference/nuis-native-resource-nested-records-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-record-helper-admission",
+        path: "crates/yir-lower-llvm/src/native_resource_session/admission/value_helpers.rs",
+        required_patterns: &[
+            "crate::native_session::value_helpers::validate",
+            "resource value helper requires i64/bool value parameters",
+            "resource value helper operands must match ready declared i64/bool values",
+            "resource value helper requires i64/bool record leaves",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-record-helper-runtime",
+        path: "tools/nuisc/tests/native_resource_session/record_helpers.rs",
+        required_patterns: &[
+            "record_helpers_preserve_bytes_and_scalar_shadows_across_120_events",
+            "record_helper_then_resource_return_failure_never_publishes_or_leaks",
+            "resource_and_value_helpers_share_depth_and_function_budgets",
+            "helper_arguments_observe_buffer_reads_before_later_stores",
+            "nested_value_record_projection_uses_checked_resource_admission",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-record-helper-receipt",
+        path: "docs/reference/nuis-native-resource-record-helpers-v1.md",
+        required_patterns: &["active/95", "120 events", "## Remaining Boundaries"],
+    },
     DevTensorDriftCheckSpec {
         id: "native-resource-inferred-shadowing-types",
         path: "tools/nuisc/src/resource_session_bindings/types.rs",
         required_patterns: &[
             "pub(super) fn validate",
-            "requires resolved i64 on both sides",
+            "requires matching resolved i64/bool kinds",
+            "outer_kind.is_none() || outer_kind != scalar_kind(ty)",
             "seen.len() != shadows.len()",
             "visible.get(shadow.previous.as_str())",
         ],
@@ -17,9 +271,9 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "inferred_and_aliased_shadows_preserve_all_four_paths_for_120_events_each",
             "inferred_outer_locals_and_nested_generic_aliases_keep_lexical_identity",
-            "aliases_and_inference_do_not_grant_resource_or_non_i64_shadowing",
+            "aliases_and_inference_do_not_grant_resource_or_mixed_kind_shadowing",
             "inferred_suffix_allocation_failure_keeps_state_and_cleans_up",
-            "inferred_record_fields_resolve_without_granting_native_record_helper_calls",
+            "inferred_record_fields_resolve_through_checked_native_record_helper_calls",
         ],
     },
     DevTensorDriftCheckSpec {

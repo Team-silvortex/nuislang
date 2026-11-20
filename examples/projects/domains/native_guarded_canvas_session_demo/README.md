@@ -61,7 +61,18 @@ relocation and detached binary launch with empty PATH:
 env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test --locked -p nuis --test native_resource_session_workflow -j1 -- shared_resource_continuation --test-threads=1
 ```
 
-The [resolved capture proof](../../../../docs/reference/nuis-native-resource-inferred-shadowing-v1.md)
+Both continuing arms call `measure(width, height).extent.words` while retaining
+the snapshot. The helper returns a nested i64 record without a heap packet; no
+Buffer or Bytes is passed across that helper boundary.
+The root materializes snapshot word count before the branches. Both arms then
+use scalar-only AND/OR short-circuit extent checks with
+`validate_extent(invalid: bool)` before selecting error code 8,
+including a directly negated OR initializer rather than a split temporary,
+without publishing failed State or leaking the snapshot. The root's `heartbeat`
+and `first_pixel` flags cross the outlined arms and shared suffix as evaluated
+snapshots. Each arm's `valid` shadows the root's color-validation flag using
+its own lexical identity; inference and explicit const both resolve to bool.
+The [short-circuit proof](../../../../docs/reference/nuis-native-resource-short-circuit-v1.md)
 owns the current scope and links the resource/helper bounds. Captured writes, resource-changing joins
 and general resource loops remain unsupported here.
 This example is fixed-extent synchronous CPU execution, not GPU rendering,

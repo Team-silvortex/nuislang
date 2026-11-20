@@ -55,7 +55,9 @@ pub(super) fn node(
             let Some(Kind::Record(_, fields)) = values.get(&args[0]) else {
                 return Err("unavailable mixed record projection".to_owned());
             };
-            if fields.iter().any(|(_, kind)| kind != &Kind::I64) {
+            // Check the complete record, including unselected siblings. Projecting
+            // a scalar must never bypass an owner hidden in another subtree.
+            if fields.iter().any(|(_, kind)| !kind.is_record_value()) {
                 return Err("mixed resource projection must not alias an owned record".to_owned());
             }
             fields
@@ -100,4 +102,110 @@ pub(super) fn require_layout(
         return Err("mixed record does not match its declared State layout".to_owned());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nested_projection_rejects_resources_even_in_an_unselected_sibling() {
+        let layout = MixedResourceLayout::parse("Canvas{width:i64;pixels:Bytes}").unwrap();
+        let node = Node {
+            name: "projected".into(),
+            resource: "cpu".into(),
+            op: yir_core::Operation::parse("cpu.field", vec!["record".into(), "value".into()])
+                .unwrap(),
+        };
+        for forbidden in [Kind::Bytes, Kind::Buffer, Kind::Void] {
+            let mut values = BTreeMap::from([(
+                "record".into(),
+                Kind::Record(
+                    "Envelope".into(),
+                    vec![
+                        ("value".into(), Kind::I64),
+                        (
+                            "hidden".into(),
+                            Kind::Record("Nested".into(), vec![("payload".into(), forbidden)]),
+                        ),
+                    ],
+                ),
+            )]);
+            let before = values.clone();
+            let mut owners = BTreeSet::from(["snapshot".into()]);
+            assert!(super::node(&node, &layout, &mut values, &mut owners)
+                .unwrap_err()
+                .contains("must not alias"));
+            assert!(values == before);
+            assert_eq!(owners, BTreeSet::from(["snapshot".into()]));
+        }
+    }
+
+    #[test]
+    fn nested_projection_requires_ready_exact_paths_and_preserves_owners() {
+        let layout = MixedResourceLayout::parse("Canvas{width:i64;pixels:Bytes}").unwrap();
+        let nested = Kind::Record("Nested".into(), vec![("count".into(), Kind::I64)]);
+        let mut values = BTreeMap::from([(
+            "record".into(),
+            Kind::Record("Envelope".into(), vec![("value".into(), nested.clone())]),
+        )]);
+        let mut owners = BTreeSet::from(["snapshot".into()]);
+        let mut node = Node {
+            name: "projected".into(),
+            resource: "cpu".into(),
+            op: yir_core::Operation::parse("cpu.field", vec!["record".into(), "value".into()])
+                .unwrap(),
+        };
+        assert!(super::node(&node, &layout, &mut values, &mut owners).unwrap());
+        assert!(values.get("projected") == Some(&nested));
+        for args in [
+            vec!["future".into(), "value".into()],
+            vec!["record".into(), "value.count".into()],
+            vec!["record".into()],
+        ] {
+            node.op.args = args;
+            assert!(super::node(&node, &layout, &mut values, &mut owners).is_err());
+        }
+        assert_eq!(owners, BTreeSet::from(["snapshot".into()]));
+    }
+
+    #[test]
+    fn boolean_value_projection_does_not_grant_boolean_owned_state_fields() {
+        let layout = MixedResourceLayout::parse("Canvas{width:i64;pixels:Bytes}").unwrap();
+        let mut values = BTreeMap::from([
+            (
+                "record".into(),
+                Kind::Record(
+                    "Flags".into(),
+                    vec![("ready".into(), Kind::Bool), ("count".into(), Kind::I64)],
+                ),
+            ),
+            ("snapshot".into(), Kind::Bytes),
+        ]);
+        let mut owners = BTreeSet::from(["snapshot".into()]);
+        let projection = Node {
+            name: "flag".into(),
+            resource: "cpu".into(),
+            op: yir_core::Operation::parse("cpu.field", vec!["record".into(), "ready".into()])
+                .unwrap(),
+        };
+        assert!(node(&projection, &layout, &mut values, &mut owners).unwrap());
+        assert!(values.get("flag") == Some(&Kind::Bool));
+        let state = Node {
+            name: "state".into(),
+            resource: "cpu".into(),
+            op: yir_core::Operation::parse(
+                "cpu.struct",
+                vec![
+                    "Canvas".into(),
+                    "width=flag".into(),
+                    "pixels=snapshot".into(),
+                ],
+            )
+            .unwrap(),
+        };
+        assert!(node(&state, &layout, &mut values, &mut owners).is_err());
+        assert!(!values.contains_key("state"));
+        assert_eq!(owners, BTreeSet::from(["snapshot".into()]));
+    }
 }

@@ -102,12 +102,45 @@ The [2026-11-13 recalibration](nuis-development-tensor-recalibration-2026-11-13.
 reviews all coordinates and separates the bounded compiler profile from application
 closure. The change from active/99 to active/60 is a scope correction, not a loss of
 verified functionality. A scalar-profile regression reopens its dependents.
-The [inferred resource-shadowing proof](nuis-native-resource-inferred-shadowing-v1.md) is the
+The [short-circuit proof](nuis-native-resource-short-circuit-v1.md) is the
 current resource boundary: checked mixed State, nested early returns and
 nonempty then/else joins retain ownership, lexical i64 capture identities, complete State publication and
-source-free delivery. The [resource proof ladder](nuis-native-session-proof-index.md#resource-session-ladder)
-owns earlier acceptance scopes. Scalar-record helper calls in resource callbacks remain next; interactive
-frame dispatch still retains early/10.
+source-free delivery. Flat and nested i64/bool record helpers compose through checked,
+allocation-free value returns while callers retain Bytes ownership. Projections
+recursively check unselected siblings as well as the selected subtree. Boolean
+validation flags retain exact predicate types, cleanup and nonpublishing errors.
+Exact i64/bool value parameters compose through nested helper calls without
+implicit integer coercion in native value calls.
+Immutable bool declarations also cross guarded/tail resource outlines without
+recomputing predicates or leaking branch-only bindings into the root continuation.
+Same-kind bool shadows now preserve separate declaration identities and restore
+enclosing values, without granting mixed-kind shadows or escaping writes.
+Pure i64/bool helper calls now share the same closure and exact argument checks;
+short-circuit initializers retain lazy RHS evaluation. Unoutlined resource RHS
+reads fail explicitly instead of falling through to eager logical lowering.
+The [resource proof ladder](nuis-native-session-proof-index.md#resource-session-ladder)
+owns earlier acceptance scopes. Canonical negation in resource branch prefixes
+now normalizes directly without separate locals. Nested conditional Buffer/Bytes
+reads also use existing owned branch pairs and shared suffixes, with once-only
+left snapshots and no identity continuation hops. Pure helper signatures and
+owner partitions remain unchanged. Selected reads now feed exact scalar arguments
+of pure scalar/record helpers. Logical bool arguments now retain left-to-right
+snapshots and existing resource joins. Inlined conditional scalar returns now
+admit `select` over two ready same-kind i64/bool values under an exact bool
+predicate. Resource/record selection and implicit coercions remain rejected.
+Comparison/XOR wrappers now retain ordered eager operands and guarded inner
+short-circuit reads, without extending resource signatures or closure limits.
+Direct i64 initializers containing these resource short-circuit arguments now
+reuse the same guarded regions, exact result typing and ordered snapshots.
+Direct inline resource-bearing bool conditions now use one internal snapshot
+through that same declaration path, preserving both arms and the shared suffix.
+Returned mixed-State i64 fields now share ordered snapshots, including earlier
+Bytes copies/moves and terminal cleanup bindings. Direct checked Err code
+expressions now use the same guarded i64 path, including borrowed-only callbacks.
+Inline `buffer_len` composition remains the next reproduced boundary. Scalar
+selection alone does not make eager evaluation safe.
+Capture/closure bounds and the active/95 score remain unchanged.
+Interactive frame dispatch retains early/10.
 
 Repository maintenance records its scope in the [hygiene log](../repo-cleanup-candidates.md).
 Reorganizing entrypoints or reclaiming build outputs does not advance any

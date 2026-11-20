@@ -65,6 +65,35 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_logical_root(expr: &Nir
     computed_expression_roots(vec![(expr, 0, true)])
 }
 
+// The frontend represents !value as value == false. This permission is local
+// to predicate normalization, not a grant for arbitrary eager operand trees.
+pub(super) fn negated_predicate(expr: &NirExpr) -> Option<&NirExpr> {
+    match expr {
+        NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs,
+            rhs,
+        } if matches!(rhs.as_ref(), NirExpr::Bool(false)) => Some(lhs),
+        _ => None,
+    }
+}
+
+pub(super) fn computed_predicate_root(expr: &NirExpr) -> bool {
+    roots_with_permissions(
+        vec![Root {
+            value: expr,
+            depth: 0,
+            logical: true,
+            eager: false,
+        }],
+        true,
+        false,
+        |_, _| false,
+        |_, _, _| false,
+        true,
+    )
+}
+
 // Return trees share one budget across all roots, including duplicated suffixes.
 // Only direct logical children inherit permission in ordinary profiles.
 // The typed call profile separately admits eager bool operands, not new reads.
@@ -160,6 +189,7 @@ fn roots_with_fields(
         computed_bool_operands,
         bool_field,
         logical_argument,
+        false,
     )
 }
 
@@ -173,6 +203,7 @@ pub(in crate::lowering::buffer_loop_outline) fn computed_initializer_expression_
         false,
         |record, field| boolean_field(layouts, record, field),
         |_, _, _| false,
+        false,
     )
 }
 
@@ -182,6 +213,7 @@ fn roots_with_permissions(
     computed_bool_operands: bool,
     bool_field: impl Fn(&str, &str) -> bool,
     logical_argument: impl Fn(&str, usize, bool) -> bool,
+    negated_roots: bool,
 ) -> bool {
     let mut pending = pending
         .into_iter()
@@ -253,11 +285,12 @@ fn roots_with_permissions(
                 let eager_bool = (computed_bool_operands || eager_root)
                     && logical_root
                     && matches!(op, NirBinaryOp::Eq | NirBinaryOp::Ne | NirBinaryOp::Xor);
+                let negation = negated_roots && logical_root && negated_predicate(expr).is_some();
                 pending.extend([
                     (
                         lhs.as_ref(),
                         depth + 1,
-                        eager_bool,
+                        eager_bool || negation,
                         false,
                         lazy_rhs,
                         eager_root && eager_bool,

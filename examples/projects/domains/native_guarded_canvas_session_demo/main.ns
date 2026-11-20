@@ -7,6 +7,18 @@ mod cpu Main {
     width: i64, height: i64, events: i64, cursor: i64, pixels: Bytes,
   }
 
+  struct Extent { words: i64 }
+  struct Measurement { extent: Extent }
+  fn measure(width: Dimension, height: Dimension) -> Measurement {
+    return Measurement { extent: Extent { words: width * height } };
+  }
+
+  struct Validity { invalid: bool }
+  struct Validation { extent: Validity }
+  fn validate_extent(invalid: bool) -> Validation {
+    return Validation { extent: Validity { invalid: invalid } };
+  }
+
   fn canvas_open(pixels: ref Buffer, width: i64) -> Result<Canvas, i64> {
     if width <= 0 { return Result.Err(1); }
     if width > buffer_len(pixels) { return Result.Err(2); }
@@ -19,26 +31,32 @@ mod cpu Main {
 
   fn canvas_event(pixels: ref Buffer, width: Dimension, height: Dimension,
                   events: i64, cursor: i64, color: i64) -> Result<Canvas, i64> {
-    if color < 0 { return Result.Err(4); }
+    let valid: bool = color >= 0;
+    if !valid { return Result.Err(4); }
     if color > 4294967295 { return Result.Err(4); }
     if cursor < 0 { return Result.Err(5); }
     if cursor >= buffer_len(pixels) { return Result.Err(5); }
     if events == 9223372036854775807 { return Result.Err(6); }
     let snapshot: Bytes = copy_bytes(pixels);
-    if color == 0 {
+    // Read before the branch; its local validation prefix stays scalar-only.
+    let words: i64 = bytes_len(snapshot) / 8;
+    let heartbeat: bool = color == 0;
+    let first_pixel: bool = cursor == 0;
+    if heartbeat {
       // The first heartbeat exits here; later ones rejoin the shared suffix.
-      if cursor == 0 {
+      if first_pixel {
         return Result.Ok(Canvas {
           width: width, height: height, events: events + 1,
           cursor: cursor, pixels: move(snapshot),
         });
       }
       // Local width counts words; the shared suffix still sees canvas width.
-      let width = width * height;
-      if bytes_len(snapshot) / 8 != width { return Result.Err(8); }
+      let width = measure(width, height).extent.words;
+      let valid = width > 0 && !validate_extent(width != words).extent.invalid;
+      if !valid { return Result.Err(8); }
     } else {
       // Painting at cursor zero exits early; later pixels use the shared suffix.
-      if cursor == 0 {
+      if first_pixel {
         drop_bytes(snapshot);
         store_at(pixels, cursor, color);
         return Result.Ok(Canvas {
@@ -46,10 +64,11 @@ mod cpu Main {
           cursor: (cursor + 1) % buffer_len(pixels), pixels: copy_bytes(pixels),
         });
       }
-      const width: Dimension = width * height;
-      if bytes_len(snapshot) / 8 != width { return Result.Err(8); }
+      const width: Dimension = measure(width, height).extent.words;
+      const valid: bool = !(width <= 0 || validate_extent(width != words).extent.invalid);
+      if !valid { return Result.Err(8); }
     }
-    if color != 0 {
+    if !heartbeat {
       let retained_words: i64 = bytes_len(snapshot) / 8;
       drop_bytes(snapshot);
       store_at(pixels, cursor, color);

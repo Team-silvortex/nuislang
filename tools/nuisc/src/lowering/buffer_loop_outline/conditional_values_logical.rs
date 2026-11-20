@@ -1,18 +1,23 @@
 use super::*;
 
+#[cfg(test)]
+#[path = "conditional_values_negated_logical_tests.rs"]
+mod negated_tests;
+
 impl<L: control_values::ValueLayouts> Builder<'_, L> {
     pub(super) fn gated_condition(
         &mut self,
         condition: &NirExpr,
         scope: &Scope,
     ) -> Option<NirExpr> {
-        if !matches!(
+        if !(matches!(
             condition,
             NirExpr::Binary {
                 op: NirBinaryOp::And | NirBinaryOp::Or,
                 ..
             }
-        ) || !prefix::computed_logical_root(condition)
+        ) || prefix::negated_predicate(condition).is_some())
+            || !prefix::computed_predicate_root(condition)
             || control_values::value_type(condition, scope, self.catalog, self.layouts)?
                 != scalar_type("bool")
         {
@@ -39,6 +44,17 @@ impl<L: control_values::ValueLayouts> Builder<'_, L> {
         scope: &Scope,
         force: bool,
     ) -> (NirExpr, bool) {
+        if let Some(inner) = prefix::negated_predicate(expression) {
+            let (value, changed) = self.logical_tree_mode(inner, scope, force);
+            return (
+                NirExpr::Binary {
+                    op: NirBinaryOp::Eq,
+                    lhs: Box::new(value),
+                    rhs: Box::new(NirExpr::Bool(false)),
+                },
+                changed,
+            );
+        }
         let NirExpr::Binary {
             op: op @ (NirBinaryOp::And | NirBinaryOp::Or),
             lhs,

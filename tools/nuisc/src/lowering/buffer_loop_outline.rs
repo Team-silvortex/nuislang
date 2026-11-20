@@ -29,8 +29,11 @@ mod iteration_effects;
 mod iteration_prints;
 #[path = "buffer_loop_outline/logical_conditions.rs"]
 mod logical_conditions;
+#[path = "buffer_loop_outline/pure_value_calls.rs"]
+mod pure_value_calls;
 #[path = "buffer_loop_outline/ready_values.rs"]
 mod ready_values;
+pub(super) use pure_value_calls::PureValueCalls;
 #[path = "buffer_loop_outline/scalar_carries.rs"]
 mod scalar_carries;
 #[path = "buffer_loop_outline/scalar_control.rs"]

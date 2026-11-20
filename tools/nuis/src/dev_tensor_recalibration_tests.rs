@@ -51,14 +51,89 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
         .evidence
         .contains("before NIR merges declarations and assignments"));
     assert!(resource.blocker.contains("rebinding captured values"));
-    assert!(resource.next_step.contains("scalar shadowing"));
-    assert!(resource.next_step.contains("root continuation"));
+    assert!(resource.next_step.contains("buffer_len composition"));
+    assert!(resource.next_step.contains("terminal cleanup"));
     assert!(resource.evidence.contains("inferred and aliased i64"));
     assert!(resource.evidence.contains("before optimization"));
-    assert!(resource.next_step.contains("call_owned_struct"));
+    assert!(resource.evidence.contains("call_owned_struct"));
     assert!(resource
         .blocker
-        .contains("ordinary call_owned_struct helper results"));
+        .contains("inlined conditional scalar returns now admit ready same-kind i64/bool select"));
+    assert!(resource
+        .evidence
+        .contains("Logical bool arguments now normalize"));
+    assert!(resource
+        .next_action
+        .contains("direct i64 local initialization"));
+    assert!(resource
+        .evidence
+        .contains("Comparison/XOR wrappers now reuse ordered scalar snapshots"));
+    assert!(resource
+        .evidence
+        .contains("XOR and comparisons evaluate both operands"));
+    assert!(resource
+        .evidence
+        .contains("two ready same-kind i64/bool arms"));
+    assert!(resource
+        .evidence
+        .contains("invalid unselected arms under constant predicates"));
+    assert!(resource
+        .evidence
+        .contains("Resource-read arguments now compose"));
+    assert!(resource
+        .evidence
+        .contains("Single-edge resource-read initializers"));
+    assert!(resource
+        .evidence
+        .contains("Nested resource short-circuit trees"));
+    assert!(resource
+        .evidence
+        .contains("exact i64/bool value parameters"));
+    assert!(resource.evidence.contains("implicit bool-to-i64 coercion"));
+    assert!(resource.evidence.contains("64-argument bound"));
+    assert!(resource.evidence.contains("Immutable bool snapshots"));
+    assert!(resource.evidence.contains("33-input guard bound"));
+    assert!(resource
+        .evidence
+        .contains("matching canonical i64/bool shadow kinds"));
+    assert!(resource
+        .evidence
+        .contains("Bounded call_bool and call_i64 helpers"));
+    assert!(resource
+        .evidence
+        .contains("Canonical boolean negation now crosses pure resource branch prefixes directly"));
+    assert!(resource.blocker.contains(
+        "buffer_len composition with resource short-circuit expressions remains outside"
+    ));
+    assert!(resource
+        .evidence
+        .contains("Direct inline bool conditions now requeue one hygienic exact-bool snapshot"));
+    assert!(resource
+        .evidence
+        .contains("Direct i64 local initializers now use the same ordered scalar snapshots"));
+    assert!(resource.evidence.contains(
+        "Returned mixed-State i64 fields now normalize through the shared layout contract"
+    ));
+    assert!(resource
+        .next_action
+        .contains("reproduced buffer-length composition gap"));
+    assert!(resource
+        .evidence
+        .contains("Direct checked Err i64 expressions now requeue one intact typed snapshot"));
+    assert!(resource.evidence.contains("even with no captured Bytes"));
+    assert!(resource
+        .next_action
+        .contains("positive(load_at(pixels, 0))"));
+    assert!(resource
+        .next_action
+        .contains("choose(mode < 3 && load_at(pixels, 0) > 0).value"));
+    assert!(resource
+        .evidence
+        .contains("allocation-free private LLVM value returns"));
+    assert!(resource.evidence.contains("1..=64 i64/bool leaves"));
+    assert!(resource.evidence.contains("unselected siblings"));
+    assert!(resource.evidence.contains("same-kind equality/inequality"));
+    assert!(resource.evidence.contains("bool ordering remain rejected"));
     assert!(resource
         .evidence
         .contains("1..=16 i64 fields plus one owned Bytes"));
@@ -76,7 +151,7 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
     assert!(resource
         .evidence
         .contains("binary-only launch with empty PATH"));
-    assert!(resource.next_step.contains("source-free"));
+    assert!(resource.evidence.contains("source-free NSB"));
     assert!(scalar.blocker.contains("outside its admission"));
     assert_eq!(
         dev_tensor_summary().bootstrap_critical_average_progress,

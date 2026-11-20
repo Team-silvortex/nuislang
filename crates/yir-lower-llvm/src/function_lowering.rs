@@ -44,6 +44,7 @@ pub(super) fn emit_cpu_function(
     native_value_return: Option<&native_session::aggregate_values::NativeValueReturn>,
     declared_result: Option<&str>,
     require_scalar_values: bool,
+    pure_value_helper: bool,
     global_counter: &mut usize,
 ) -> Result<EmittedCpuFunction, String> {
     let ordered_names = ordered_node_names
@@ -138,7 +139,7 @@ pub(super) fn emit_cpu_function(
         if state.ends_with_terminal_return {
             continue;
         }
-        if require_scalar_values
+        if (require_scalar_values || pure_value_helper)
             && !matches!(
                 node.op.instruction.as_str(),
                 "guard_return"
@@ -285,7 +286,10 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
-        if require_scalar_values {
+        if require_scalar_values || pure_value_helper {
+            if pure_value_helper {
+                strict_scalar::validate_resource_predicates(node, registers)?;
+            }
             strict_scalar::validate(
                 node,
                 registers,
@@ -293,6 +297,8 @@ pub(super) fn emit_cpu_function(
                 function_return_kind,
                 function_return_layout.is_some(),
             )?;
+        }
+        if require_scalar_values {
             native_session::loops::emit_guard(
                 node,
                 nodes,
@@ -644,7 +650,7 @@ pub(super) fn emit_cpu_function(
         }
     }
 
-    if require_scalar_values {
+    if require_scalar_values || pure_value_helper {
         for name in required_values {
             if !state.registers.contains_key(name) {
                 return Err(format!(

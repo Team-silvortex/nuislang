@@ -82,12 +82,13 @@ Local validation for this worktree follow-up:
 
 ## Remaining Boundaries
 
-The concrete next case is `measure(width).value`, where the helper returns a
-scalar record. Semantic inference succeeds, but native resource admission still
-rejects `call_owned_struct`. A regression preserves this distinction: successful
-type resolution is not permission to execute an unadmitted callee. Reuse the
-existing value-record contract with independent call/ownership checks before
-claiming this helper composition.
+At this checkpoint the next case was `measure(width).value`, where the helper
+returns a scalar record: inference succeeded but native admission rejected
+`call_owned_struct`. The subsequent
+[record-helper proof](nuis-native-resource-record-helpers-v1.md) closes the bounded
+flat-i64 case using shared validation and allocation-free value transport. The
+historical test counts above remain this checkpoint's receipt; nested scalar
+records and arbitrary resource helpers are not implied by that follow-up.
 
 Expression-level control scopes, match/destructuring, loops and lambdas are not
 normalized here. Non-i64 shadows, resource-changing phi joins, arbitrary layouts,

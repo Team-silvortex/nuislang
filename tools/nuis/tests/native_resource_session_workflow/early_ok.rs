@@ -23,6 +23,112 @@ fn check(output: Output, image: &Path) {
 
 #[test]
 fn shared_resource_continuation_survives_cache_nsb_and_binary_only_launch() {
+    delivery(SOURCE);
+}
+
+#[test]
+fn nested_resource_reads_survive_cache_nsb_and_binary_only_launch() {
+    delivery(&nested_source());
+}
+
+#[test]
+fn resource_helper_reads_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace(
+            "mod cpu Main {",
+            "mod cpu Main { fn nonempty(value: i64) -> bool { return value > 0; }",
+        )
+        .replace(
+            "bytes_len(snapshot) == width * height * 8",
+            "nonempty(bytes_len(snapshot))",
+        )
+        .replace("load_at(pixels, 99) > 0", "nonempty(load_at(pixels, 99))");
+    delivery(&source);
+}
+
+#[test]
+fn resource_logical_arguments_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn decision(flag: bool) -> Validation { return Validation { extent: Validity { invalid: !flag } }; }")
+        .replace(
+            "color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)",
+            "!decision(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)).extent.invalid",
+        );
+    delivery(&source);
+}
+
+#[test]
+fn scalar_selection_survives_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
+        .replace(
+            "color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)",
+            "word(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) == 1",
+        );
+    delivery(&source);
+}
+
+#[test]
+fn wrapped_resource_predicates_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source().replace(
+        "color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)",
+        "((color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) == (width > 0)) ^ (height < 0)",
+    );
+    delivery(&source);
+}
+
+#[test]
+fn direct_i64_resource_arguments_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
+        .replace(
+            "let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);",
+            "let choice: i64 = word(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)); let valid = choice == 1;",
+        );
+    delivery(&source);
+}
+
+#[test]
+fn inline_resource_conditions_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source().replace(
+        "let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);\n    if !valid",
+        "if !(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0))",
+    );
+    assert!(!source.contains("let valid = color >= 0"));
+    delivery(&source);
+}
+
+#[test]
+fn returned_resource_fields_survive_cache_nsb_and_binary_only_launch() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
+        .replace("cursor: cursor, pixels: move(snapshot)", "cursor: cursor + word(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) - 1, pixels: move(snapshot)");
+    assert!(source.contains("cursor: cursor + word"));
+    delivery(&source);
+}
+
+fn nested_source() -> String {
+    let mut source = SOURCE.to_owned();
+    let start = source.find("    let valid: bool = color >= 0;").unwrap();
+    let end = source.find("\n  fn canvas_close").unwrap();
+    source.replace_range(start..end, r#"
+    let snapshot: Bytes = copy_bytes(pixels);
+    let valid = color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0);
+    if !valid { return Result.Err(8); }
+    if color == 0 {
+      return Result.Ok(Canvas { width: width, height: height, events: events + 1,
+                               cursor: cursor, pixels: move(snapshot) });
+    }
+    drop_bytes(snapshot);
+    store_at(pixels, cursor, color);
+    return Result.Ok(Canvas { width: width, height: height, events: events + 1,
+                             cursor: (cursor + 1) % buffer_len(pixels), pixels: copy_bytes(pixels) });
+  }
+"#);
+    source
+}
+
+fn delivery(source: &str) {
     if !cfg!(all(
         any(target_os = "macos", target_os = "linux"),
         target_pointer_width = "64"
@@ -30,7 +136,7 @@ fn shared_resource_continuation_survives_cache_nsb_and_binary_only_launch() {
         return;
     }
     let project = Project::new();
-    fs::write(project.0.join("main.ns"), SOURCE).unwrap();
+    fs::write(project.0.join("main.ns"), source).unwrap();
     fs::write(project.0.join("nuis.toml"), MANIFEST).unwrap();
     project.build(None);
     let build = project.0.join("build");
