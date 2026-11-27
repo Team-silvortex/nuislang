@@ -287,6 +287,7 @@ fn run() -> Result<(), String> {
             &runtime.staticlib_path,
             &exe_path,
             &runtime.embedded_module_bytes,
+            &module,
         )?);
     } else if use_window_host {
         let fabric_boot_plan = extract_fabric_boot_plan(

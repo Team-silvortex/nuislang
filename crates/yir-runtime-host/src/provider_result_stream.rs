@@ -52,18 +52,20 @@ pub(super) fn execute_with_provider_source(
 pub(super) fn provider_registry(
     source: ProviderResultSource,
 ) -> (yir_core::ModRegistry, Arc<Mutex<ProviderResultSource>>) {
-    provider_registry_with_failures(source, FailureState::default())
+    provider_registry_with_failures(source, FailureState::default(), None)
 }
 
 pub(super) fn provider_registry_with_failures(
     source: ProviderResultSource,
     failures: FailureState,
+    projection: Option<crate::native_packet_submit::RegisteredSites>,
 ) -> (yir_core::ModRegistry, Arc<Mutex<ProviderResultSource>>) {
     let state = Arc::new(Mutex::new(source));
     let mut registry = yir_verify::default_registry();
     registry.register(ProviderResultShaderMod {
         state: Arc::clone(&state),
         failures,
+        projection,
     });
     (registry, state)
 }
@@ -341,6 +343,7 @@ impl ProviderResultQueue {
 struct ProviderResultShaderMod {
     state: Arc<Mutex<ProviderResultSource>>,
     failures: FailureState,
+    projection: Option<crate::native_packet_submit::RegisteredSites>,
 }
 
 impl RegisteredMod for ProviderResultShaderMod {
@@ -408,22 +411,39 @@ impl ProviderResultShaderMod {
         }
         let descriptor =
             yir_domain_shader::ShaderMod.validate_draw_instanced(node, resource, state)?;
-        let arguments = descriptor.provider_arguments()?;
-        let frame = self
-            .state
-            .lock()
-            .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
-            .take(node, &arguments)?;
-        if frame.shape != [descriptor.width(), descriptor.height()] {
-            return Err(format!(
-                "provider runtime result dimensions for `{}` disagree with YIR",
-                node.name
-            )
-            .into());
-        }
-        let surface =
-            FrameSurface::from_rgba8(descriptor.width(), descriptor.height(), frame.payload)?;
-        state.stage_provider_physical_completion(node, frame.completion)?;
+        let submit = |arguments: DispatchArguments| -> Result<_, ProviderFailure> {
+            let frame = self
+                .state
+                .lock()
+                .map_err(|_| "provider runtime result queue lock was poisoned".to_owned())?
+                .take(node, &arguments)?;
+            if frame.shape != [descriptor.width(), descriptor.height()] {
+                return Err(format!(
+                    "provider runtime result dimensions for `{}` disagree with YIR",
+                    node.name
+                )
+                .into());
+            }
+            Ok((
+                FrameSurface::from_rgba8(descriptor.width(), descriptor.height(), frame.payload)?,
+                frame.completion,
+            ))
+        };
+        let (surface, completion) = if let Some((native, site)) = self
+            .projection
+            .as_ref()
+            .and_then(|(native, sites)| sites.get(&node.name).map(|site| (native, *site)))
+        {
+            let packet = descriptor.packet_binding().ok_or_else(|| {
+                "draw did not consume its registered native packet window".to_owned()
+            })?;
+            native.run(site, packet, |uniform| {
+                submit(descriptor.provider_arguments_with_packet(uniform)?)
+            })?
+        } else {
+            submit(descriptor.provider_arguments()?)?
+        };
+        state.stage_provider_physical_completion(node, completion)?;
         yir_domain_shader::ShaderMod.record_draw_instanced(node, resource, state, &surface);
         Ok(Value::Frame(surface))
     }

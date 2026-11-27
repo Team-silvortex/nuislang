@@ -437,14 +437,15 @@ fn validated_metal_render_request(
     let (vertex_count, instance_count) = draw::render_draw_counts(request)?;
     let source = std::fs::read_to_string(&code_asset_path)
         .map_err(|error| format!("failed to read Metal resource capability: {error}"))?;
-    if yir_domain_shader::fragment_uniform_capability(&source)? != draw::uniform_slot(request)? {
+    let uniform_slot = draw::uniform_slot(request)?;
+    if yir_domain_shader::fragment_uniform_capability(&source)? != uniform_slot {
         return Err(
             "Metal fragment uniform capability differs from verified code asset".to_owned(),
         );
     }
     let storage_capability = storage::capability(request)?;
     if yir_domain_shader::fragment_storage_capability(&source)? != storage_capability
-        || (storage_capability.is_some() && draw::uniform_slot(request)?.is_some())
+        || storage_capability.is_some_and(|s| Some(s.slot) == uniform_slot)
     {
         return Err(
             "Metal fragment storage capability differs from verified code asset".to_owned(),

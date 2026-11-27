@@ -11,7 +11,13 @@ pub(super) fn verify_data_expr_shape(
     match expr {
         NirExpr::DataOutputPipe(inner) => {
             let source = infer_data_kind(inner, data_bindings);
-            if matches!(source, NirDataKind::PipeOutput | NirDataKind::PipeInput) {
+            if source == NirDataKind::WindowMutable {
+                return Err("nir verify: data_output_pipe cannot wrap a mutable window".into());
+            }
+            if matches!(
+                source,
+                NirDataKind::PipeOutput { .. } | NirDataKind::PipeInput
+            ) {
                 return Err(format!(
                     "nir verify: data_output_pipe cannot wrap nested pipe `{}`",
                     render_data_expr_name(inner)
@@ -19,7 +25,10 @@ pub(super) fn verify_data_expr_shape(
             }
         }
         NirExpr::DataInputPipe(inner)
-            if infer_data_kind(inner, data_bindings) != NirDataKind::PipeOutput =>
+            if !matches!(
+                infer_data_kind(inner, data_bindings),
+                NirDataKind::PipeOutput { .. }
+            ) =>
         {
             return Err(format!(
                 "nir verify: data_input_pipe expects output pipe input, got `{}`",
@@ -32,7 +41,7 @@ pub(super) fn verify_data_expr_shape(
                 source,
                 NirDataKind::WindowMutable
                     | NirDataKind::WindowImmutable
-                    | NirDataKind::PipeOutput
+                    | NirDataKind::PipeOutput { .. }
                     | NirDataKind::PipeInput
                     | NirDataKind::Marker
                     | NirDataKind::HandleTable
@@ -89,7 +98,7 @@ pub(super) fn verify_data_expr_shape(
             }
             if matches!(
                 source,
-                NirDataKind::PipeOutput
+                NirDataKind::PipeOutput { .. }
                     | NirDataKind::PipeInput
                     | NirDataKind::Marker
                     | NirDataKind::HandleTable

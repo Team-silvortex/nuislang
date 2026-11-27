@@ -11,12 +11,16 @@ pub(crate) mod aggregate_values;
 pub(crate) mod aggregates;
 mod build_policy;
 mod calls;
+pub(crate) mod data_windows;
 mod emit;
 mod function;
 pub(crate) mod helper_entries;
 mod i64_prints;
 mod literal_prints;
 mod loop_work;
+mod pipe_events;
+mod profile_reads;
+mod unit_enums;
 
 pub(crate) mod loops;
 #[cfg(test)]
@@ -79,6 +83,8 @@ impl NativeSessionBridge {
 /// Nonnull pointers must refer to the supplied readable/writable extents. They may
 /// overlap: all inputs are read before outputs are written. No pointer escapes.
 /// Native traps are process failures, not catchable errors, retries or fuel limits.
+/// A local inline Data pipe pair requires the registered host event sink;
+/// it emits one resource event at each executed site, not a deferred replay.
 pub fn emit_registered(module: &YirModule, id: &str) -> Result<NativeSessionBridge, String> {
     emit_registered_with_loop_work_limit(module, id, DEFAULT_LOOP_WORK_LIMIT)
 }
@@ -164,6 +170,13 @@ fn emit_with_policy(
         .map(|callback| callback.function.as_str())
         .collect::<Vec<_>>();
     let mut llvm_ir = crate::emit_native_scalar_module(&selected, &roots)?;
+    if selected
+        .nodes
+        .iter()
+        .any(|n| n.op.module == "data" && n.op.instruction == "output_pipe")
+    {
+        llvm_ir.push_str("\ndeclare i32 @nuis_native_data_pipe_event_v1(ptr, i64, ptr, i64)\n");
+    }
     for callback in &callbacks {
         llvm_ir.push_str(&emit::callback(
             callback,

@@ -33,7 +33,7 @@ pub use application_outcome::*;
 pub use application_session::*;
 pub use branch_call_args::*;
 pub use branch_effect::*;
-pub use data_mod::{DataMod, LegacyFabricMod};
+pub use data_mod::{data_pipe_event, DataMod, LegacyFabricMod};
 pub use dynamic_pattern_carry::*;
 pub use glm::*;
 pub use loop_owned_struct::*;

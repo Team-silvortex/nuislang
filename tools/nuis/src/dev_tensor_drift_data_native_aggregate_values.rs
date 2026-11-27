@@ -6,10 +6,51 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-lower-llvm/src/native_session/aggregates.rs",
         required_patterns: &[
             "scalar_value_layout(encoded)",
-            "scalar_value_layout(&node.op.args[1])",
-            "layout.type_name != result.ty",
+            "helper_layout(&node.op.args[1])",
+            ".strip_prefix(yir_core::OWNED_VARIANT_UNION_LAYOUT_PREFIX)",
+            "!= result.ty",
             "super::ScalarStateLayout::parse(encoded)?",
             "iteration carry validation remain independent of callback registration",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-showcase-unit-enum-parent-differential",
+        path: "tools/nuisc/tests/ns_nova_application_session/native_outcome.rs",
+        required_patterns: &[
+            "native_parent_checks_enum_identity_before_emitting_discriminants",
+            "packaged_native_showcase_parent_matches_reference_at_every_delivery",
+            "native-session-aot-bundle:parent",
+            "native_session_completed=1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-showcase-shader-profile-literal-differential",
+        path: "tools/nuisc/tests/ns_nova_application_session/native_profile_reads.rs",
+        required_patterns: &[
+            "native_showcase_seeds_match_embedded_shader_profile_values",
+            "profile_read_refuses_nonliteral_or_ordered_ingress",
+            "native-session-aot-bundle:probe",
+            "native_session_completed=1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-showcase-inline-data-window-differential",
+        path: "tools/nuisc/tests/ns_nova_application_session/native_profile_reads.rs",
+        required_patterns: &[
+            "native_inline_packet_window_matches_embedded_at_each_delivery",
+            "inline_window_bounds_types_and_handoffs_fail_closed",
+            "native-session-aot-bundle:window_probe",
+            "cannot hand off to shader.uniform_binding",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-showcase-data-pipe-event-differential",
+        path: "tools/nuisc/tests/ns_nova_application_session/native_profile_reads.rs",
+        required_patterns: &[
+            "native_showcase_frame_pipe_matches_reference_events",
+            "native_pipe_packet_readback_matches_reference_events",
+            "native_pipe_requires_a_single_ordered_local_receiver",
+            "native-session-aot-bundle:frame_pipe",
         ],
     },
     DevTensorDriftCheckSpec {

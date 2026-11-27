@@ -8,6 +8,7 @@ use yir_core::{
 use yir_exec::{ExecutionTrace, FunctionInvocation};
 
 mod entry;
+mod pipe_events;
 pub use entry::{
     nuis_native_application_script_main, validate_native_application_script,
     NativeSessionDescriptorV1,
@@ -25,6 +26,7 @@ pub struct NativeSessionBindings<'a> {
     arguments: [Vec<ScalarKind>; 3],
     layout: ScalarStateLayout,
     callbacks: [NativeScalarCallback; 3],
+    pipe_sites: std::cell::OnceCell<pipe_events::SiteIndex<'a>>,
     _thread_local: PhantomData<Rc<()>>,
 }
 
@@ -58,6 +60,7 @@ impl<'a> NativeSessionBindings<'a> {
             arguments,
             layout,
             callbacks,
+            pipe_sites: Default::default(),
             _thread_local: PhantomData,
         })
     }
@@ -91,25 +94,31 @@ impl<'a> NativeSessionBindings<'a> {
         // Separate initialized storage prevents failed callbacks from overwriting
         // accepted session state. Publication happens only after full decoding.
         let mut output = vec![0; self.layout.fields().len()];
-        let status = unsafe {
+        let (status, events) = pipe_events::capture(|| unsafe {
             (self.callbacks[role])(
                 inputs.as_ptr(),
                 inputs.len() as u64,
                 output.as_mut_ptr(),
                 output.len() as u64,
             )
-        };
+        })?;
         if status != 0 {
             return Err(format!(
                 "native callback `{name}` rejected the call (status {status})"
             ));
         }
+        let mut trace = ExecutionTrace {
+            events: vec![format!("native-static-session {name}")],
+            ..ExecutionTrace::default()
+        };
+        if !events.is_empty() {
+            self.pipe_sites
+                .get_or_init(|| pipe_events::SiteIndex::new(self.module))
+                .append(events, &mut trace)?;
+        }
         Ok(FunctionInvocation {
             value: self.layout.unpack(&output)?,
-            trace: ExecutionTrace {
-                events: vec![format!("native-static-session {name}")],
-                ..ExecutionTrace::default()
-            },
+            trace,
         })
     }
 }

@@ -56,8 +56,7 @@ fn verify_frames(log: &str, count: usize) {
         for y in 0..120 {
             for x in 0..160 {
                 let offset = (y / 5 * 32 + x / 5) * 4;
-                let pixel = &input[offset..offset + 4];
-                rgba8.extend([255 - pixel[0], 255 - pixel[1], 255 - pixel[2], pixel[3]]);
+                rgba8.extend(image_result_pixel(&input, offset, index == 1));
             }
         }
         assert!(

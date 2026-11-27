@@ -519,6 +519,7 @@ version = "0.1.0"
 dependencies = [
  "nuis-runtime",
  "yir-core",
+ "yir-domain-shader",
  "yir-exec",
  "yir-host-render",
  "yir-lower-contract",

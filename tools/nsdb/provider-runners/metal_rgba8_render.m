@@ -171,7 +171,7 @@ int main(int argc, const char *argv[]) {
         BOOL hasStorage = strcmp(argv[9], "none") != 0;
         NSUInteger storageSlot = 0, storageElements = 0;
         NSData *storage = hasStorage ? readStorage(argv[9], argv[10], &storageSlot, &storageElements) : nil;
-        if ((hasStorage && (storage == nil || hasUniform)) ||
+        if ((hasStorage && (storage == nil || (hasUniform && storageSlot == uniformSlot))) ||
             (!hasStorage && strcmp(argv[10], "none") != 0)) {
             return fail(@"invalid immutable fragment storage carrier");
         }
@@ -212,13 +212,15 @@ int main(int argc, const char *argv[]) {
             return fail([NSString stringWithFormat:@"Metal render pipeline unavailable: %@", error]);
         }
         if (reflection == nil || reflection.vertexArguments.count != 0 ||
-            reflection.fragmentArguments.count != ((hasUniform || hasStorage) ? 1 : 0)) {
+            reflection.fragmentArguments.count != (NSUInteger)(hasUniform + hasStorage)) {
             return fail(@"Metal render resource reflection differs from admitted binding count");
         }
         id<MTLBuffer> uniformBuffer = nil;
         if (hasUniform) {
-            MTLArgument *argument = reflection.fragmentArguments[0];
-            if (argument.type != MTLArgumentTypeBuffer || argument.index != uniformSlot ||
+            MTLArgument *argument = nil;
+            for (MTLArgument *candidate in reflection.fragmentArguments)
+                if (candidate.index == uniformSlot) argument = candidate;
+            if (argument == nil || argument.type != MTLArgumentTypeBuffer ||
                 argument.access != MTLArgumentAccessReadOnly || argument.bufferDataSize != 16 ||
                 argument.bufferDataType != MTLDataTypeFloat4) {
                 return fail(@"Metal render uniform reflection differs from f32x4 capability");
@@ -229,7 +231,10 @@ int main(int argc, const char *argv[]) {
         }
         id<MTLBuffer> storageBuffer = nil;
         if (hasStorage) {
-            MTLArgument *argument = reflection.fragmentArguments[0];
+            MTLArgument *argument = nil;
+            for (MTLArgument *candidate in reflection.fragmentArguments)
+                if (candidate.index == storageSlot) argument = candidate;
+            if (argument == nil) return fail(@"missing reflected storage binding");
             MTLStructType *structure = argument.bufferStructType;
             MTLStructMember *member = structure.members.count == 1 ? structure.members[0] : nil;
             if (argument.type != MTLArgumentTypeBuffer || argument.index != storageSlot ||

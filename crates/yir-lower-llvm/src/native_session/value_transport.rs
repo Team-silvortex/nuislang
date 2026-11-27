@@ -10,6 +10,7 @@ mod tests;
 pub(crate) struct NativeValueLayout {
     layout: OwnedStructLayout,
     slots: usize,
+    unit_enum: Option<super::unit_enums::UnitEnum>,
 }
 
 /// Only a checked layout can create this ordered, resource-free scalar snapshot.
@@ -20,7 +21,22 @@ pub(crate) struct PreparedNativeValue {
 impl NativeValueLayout {
     pub(crate) fn parse(encoded: &str) -> Result<Self, String> {
         let (layout, slots) = super::aggregates::scalar_value_layout(encoded)?;
-        Ok(Self { layout, slots })
+        Ok(Self {
+            layout,
+            slots,
+            unit_enum: None,
+        })
+    }
+
+    pub(super) fn helper(encoded: &str) -> Result<Self, String> {
+        if let Some((layout, schema)) = super::unit_enums::UnitEnum::parse(encoded)? {
+            return Ok(Self {
+                layout,
+                slots: 1,
+                unit_enum: Some(schema),
+            });
+        }
+        Self::parse(encoded)
     }
 
     pub(crate) fn layout(&self) -> &OwnedStructLayout {
@@ -33,6 +49,11 @@ impl NativeValueLayout {
 
     /// Validate the entire nominal tree before emitting instructions or labels.
     pub(crate) fn prepare(&self, value: &LlvmValueRef) -> Result<PreparedNativeValue, String> {
+        if let Some(schema) = &self.unit_enum {
+            return Ok(PreparedNativeValue {
+                words: vec![LlvmValueRef::I64(schema.tag(value)?)],
+            });
+        }
         let mut words = Vec::with_capacity(self.slots);
         prepare_record(&self.layout, value, &mut words)
             .ok_or("native value does not match its declared transport layout")?;

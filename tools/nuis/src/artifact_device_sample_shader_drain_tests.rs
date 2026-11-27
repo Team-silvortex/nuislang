@@ -26,14 +26,18 @@ fn arguments(phase: bool) -> DispatchArguments {
         instance_count: if phase { 3 } else { 1 },
     }
     .to_dispatch();
-    yir_domain_shader::ShaderFragmentStorage {
+    let storage = yir_domain_shader::ShaderFragmentStorage {
         capability: yir_domain_shader::ShaderFragmentStorageCapability {
             slot: 3,
             element_count: 768,
         },
         upload: DispatchUpload::new("u32", vec![768], image_input(phase)).unwrap(),
-    }
-    .bind_dispatch(&mut arguments)
+    };
+    yir_domain_shader::bind_fragment_resources(
+        &mut arguments,
+        Some(image_uniform(if phase { 2 } else { 0 })),
+        Some(&storage),
+    )
     .unwrap();
     arguments
 }
@@ -130,11 +134,7 @@ fn drains_registered_metal_session_without_replacing_success_evidence() {
             let input = image_input(phase);
             for (index, pixel) in frame.payload.chunks_exact(4).enumerate() {
                 let offset = (index / 160 / 5 * 32 + index % 160 / 5) * 4;
-                let source = &input[offset..offset + 4];
-                assert_eq!(
-                    pixel,
-                    [255 - source[0], 255 - source[1], 255 - source[2], source[3]]
-                );
+                assert_eq!(pixel, image_result_pixel(&input, offset, phase));
             }
         }
         let drain = SessionDrain {

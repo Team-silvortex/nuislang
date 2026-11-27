@@ -38,8 +38,9 @@ pub(crate) fn validate(
             .map(|r| (r.name.as_str(), r))
             .collect(),
         incoming,
+        profile_reads: Default::default(),
         registry: &registry,
         literal_prints: None,
     }
-    .validate(function, false)
+    .validate(function, false, None)
 }

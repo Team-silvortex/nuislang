@@ -77,13 +77,24 @@ pub fn parse_options(
     ))
 }
 
-pub fn source(embedded_module: &str) -> String {
+pub fn source(embedded_module: &str, projected: bool) -> String {
+    let (declarations, call) = if projected {
+        (r#"typedef int32_t (*submit_fn)(void *, uint32_t, const uint32_t *);
+typedef int32_t (*packet_fn)(uint32_t, uint32_t, uint32_t, const int64_t *, void *, submit_fn);
+extern int32_t nuis_packet_submit_v2(uint32_t, uint32_t, uint32_t, const int64_t *, void *, submit_fn);
+extern int nuis_application_script_with_packet_submit_v2(const unsigned char *, size_t, int, const char *const *, packet_fn);"#,
+         "nuis_application_script_with_packet_submit_v2(embedded_yir, sizeof(embedded_yir), argc, argv, nuis_packet_submit_v2)")
+    } else {
+        ("extern int nuis_application_script_main(const unsigned char *, size_t, int, const char *const *);",
+         "nuis_application_script_main(embedded_yir, sizeof(embedded_yir), argc, argv)")
+    };
     format!(
         r#"#include <stddef.h>
-extern int nuis_application_script_main(const unsigned char *, size_t, int, const char *const *);
+#include <stdint.h>
+{declarations}
 static const unsigned char embedded_yir[] = {{{embedded_module}}};
 int main(int argc, const char **argv) {{
-    return nuis_application_script_main(embedded_yir, sizeof(embedded_yir), argc, argv);
+    return {call};
 }}
 "#
     )
@@ -94,6 +105,7 @@ pub fn build(
     runtime: &Path,
     binary: &Path,
     embedded_module: &str,
+    module: &yir_core::YirModule,
 ) -> Result<Vec<String>, String> {
     if !cfg!(any(target_os = "macos", target_os = "linux")) {
         return Err(
@@ -101,10 +113,19 @@ pub fn build(
                 .to_owned(),
         );
     }
-    fs::write(host, source(embedded_module))
+    let projection = yir_domain_shader::packet_projection::emit_llvm(module);
+    let site_count = projection.as_ref().map_or(0, |(count, _)| *count);
+    fs::write(host, source(embedded_module, projection.is_some()))
         .map_err(|error| format!("failed to write `{}`: {error}", host.display()))?;
     let mut command = Command::new("clang");
-    command.arg(host).arg(runtime).arg("-O2");
+    command.arg(host);
+    if let Some((_, source)) = projection {
+        let ir = host.with_extension("packet.ll");
+        fs::write(&ir, source)
+            .map_err(|error| format!("cannot emit native packet projection: {error}"))?;
+        command.arg(ir);
+    }
+    command.arg(runtime).arg("-O2");
     // Native Rust runtime libraries, not a window or device backend selection.
     if cfg!(target_os = "linux") {
         command.args(["-ldl", "-lpthread", "-lm", "-lrt", "-lutil"]);
@@ -125,6 +146,15 @@ pub fn build(
     Ok(vec![
         format!("cpu_host_source={}", host.display()),
         "cpu_host_binary_mode=embedded_yir_headless".to_owned(),
+        format!("native_packet_projection_site_count={site_count}"),
+        format!(
+            "native_packet_submit_contract={}",
+            if site_count == 0 {
+                "none"
+            } else {
+                "nuis_packet_submit_v2"
+            }
+        ),
         "runtime_bootstrap_mode=embedded_yir_session".to_owned(),
         format!("application_script_contract={CONTRACT}"),
         format!(
@@ -192,7 +222,7 @@ mod tests {
 
     #[test]
     fn headless_host_is_only_a_portable_process_entry() {
-        let host = source("0x79, 0x69, 0x72");
+        let host = source("0x79, 0x69, 0x72", false);
         assert!(host.contains("sizeof(embedded_yir)"));
         assert!(host.contains("nuis_application_script_main"));
         for forbidden in [

@@ -250,7 +250,12 @@ fn execute_nova_projection(image: bool) {
                     )
                     .unwrap(),
                 };
-                storage.bind_dispatch(&mut arguments).unwrap();
+                yir_domain_shader::bind_fragment_resources(
+                    &mut arguments,
+                    Some(image_uniform(instances - 1)),
+                    Some(&storage),
+                )
+                .unwrap();
             } else {
                 let tint: [f32; 4] = [
                     if instances == 1 { 1.0 } else { 0.0 },
@@ -378,18 +383,16 @@ fn execute_nova_projection(image: bool) {
             let input = image_input(phase);
             for (index, pixel) in frame.chunks_exact(4).enumerate() {
                 let source_index = (index / 160 / 5 * 32 + index % 160 / 5) * 4;
-                let source = &input[source_index..source_index + 4];
                 assert_eq!(
                     pixel,
-                    [255 - source[0], 255 - source[1], 255 - source[2], source[3]],
+                    image_result_pixel(&input, source_index, phase),
                     "GPU must invert Nuis image pixel at output {index}, phase {phase}"
                 );
             }
         }
-        assert!(observed_arguments
-            .iter()
-            .all(|wire| wire.len() <= 256 && wire.contains("immutable-upload-le:u32:768:3072:")));
-        assert!(!runtime_stream.contains("0000803f"));
+        assert!(observed_arguments.iter().all(|wire| wire
+            .contains("fragment.uniform.2:immutable-le:f32:4:")
+            && wire.contains("immutable-upload-le:u32:768:3072:")));
     } else {
         assert!(
             first_rgba
@@ -553,6 +556,34 @@ fn execute_nova_projection(image: bool) {
     );
 
     fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[cfg(target_os = "macos")]
+fn image_uniform(frame: u64) -> yir_domain_shader::ShaderFragmentUniform {
+    let mut bytes = [0; 16];
+    for (chunk, word) in
+        bytes
+            .chunks_exact_mut(4)
+            .zip([4109 + 2 * frame, 266 + 2 * frame, 134 + frame, 0])
+    {
+        chunk.copy_from_slice(&(word as f32).to_le_bytes());
+    }
+    yir_domain_shader::ShaderFragmentUniform { slot: 2, bytes }
+}
+
+#[cfg(target_os = "macos")]
+fn image_result_pixel(input: &[u8], offset: usize, phase: bool) -> [u8; 4] {
+    let pixel = &input[offset..offset + 4];
+    let alpha = if offset == 0 {
+        if phase {
+            243
+        } else {
+            213
+        }
+    } else {
+        pixel[3]
+    };
+    [255 - pixel[0], 255 - pixel[1], 255 - pixel[2], alpha]
 }
 
 #[cfg(target_os = "macos")]

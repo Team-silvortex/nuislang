@@ -65,7 +65,7 @@ fn script() -> ApplicationScript {
     ApplicationScript {
         id: "window".to_owned(),
         open: vec![160, 120],
-        events: vec![vec![0, 0], vec![1, 32]],
+        events: vec![vec![0, 0], vec![9, 0], vec![1, 32]],
         termination: ApplicationScriptTermination::Close(vec![1, 0]),
     }
 }
@@ -76,7 +76,9 @@ fn expected_frame(phase: usize) -> Vec<u8> {
         for x in 0..160 {
             let alternate = (x / 5 / 4 + y / 5 / 4 + phase) % 2;
             bytes.extend(if y < 5 && x < 20 {
-                [255, 0, 255, 255]
+                let frame = phase * 2;
+                let stamp = (4109 + 2 * frame + 3 * (266 + 2 * frame) + 7 * (134 + frame)) as u8;
+                [255, 0, 255, if x < 5 { stamp } else { 255 }]
             } else if alternate == 0 {
                 [0, 255, 255, 255]
             } else {
@@ -138,6 +140,44 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     let yir_path = output.join(format!("{}.yir", report.artifact_binary_name));
     let source = fs::read_to_string(&yir_path).unwrap();
     let module = yir_syntax::parse_module(&source).unwrap();
+    let render = module
+        .functions
+        .iter()
+        .find(|f| f.name.ends_with("render_showcase_frame"))
+        .unwrap();
+    let find = |name: &str| {
+        module
+            .nodes
+            .iter()
+            .find(|n| n.name == name && render.body_nodes.contains(&n.name))
+            .unwrap()
+    };
+    let draws: Vec<_> = module
+        .nodes
+        .iter()
+        .filter(|n| {
+            render.body_nodes.contains(&n.name) && n.op.full_name() == "shader.draw_instanced"
+        })
+        .collect();
+    let [draw] = draws.as_slice() else {
+        panic!("expected exactly one showcase draw site")
+    };
+    let received = find(&draw.op.args[1]);
+    assert_eq!(received.op.full_name(), "data.input_pipe");
+    assert_eq!(
+        find(&received.op.args[0]).op.full_name(),
+        "data.output_pipe"
+    );
+    let bindings = find(&draw.op.args[4]);
+    assert_eq!(bindings.op.full_name(), "shader.bind_set");
+    assert!(
+        bindings.op.args[1..]
+            .iter()
+            .map(|name| find(name))
+            .any(|binding| binding.op.full_name() == "shader.uniform_binding"
+                && binding.op.args[1] == received.name),
+        "the fragment uniform must bind the same SSA window as the draw, not a rebuilt packet"
+    );
     let recolor = module
         .functions
         .iter()
@@ -258,6 +298,15 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
     );
     assert!(status.success(), "{stdout}\n{stderr}");
     assert!(stdout.contains("exit_status: 0"), "{stdout}");
+    let completed_submissions: Vec<_> = stderr
+        .lines()
+        .filter_map(|l| l.strip_prefix("nuis: native_packet_submissions_completed="))
+        .collect();
+    assert_eq!(
+        completed_submissions,
+        ["0", "1", "1", "2", "2"],
+        "native submission must complete once per draw, never on open, ignored input or close: {stderr}"
+    );
     assert!(
         stdout.contains("runtime_provider_result_invocations: 2"),
         "{stdout}"
@@ -270,6 +319,31 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
 
     let stream = output.join("nuis.runtime.provider-result-stream.toml");
     let saved_stream = fs::read(&stream).unwrap();
+    let dispatches: Vec<_> = std::str::from_utf8(&saved_stream)
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("dispatch_arguments = \""))
+        .map(|wire| {
+            yir_core::provider_runtime_ipc::DispatchArguments::parse(
+                wire.strip_suffix('"').unwrap(),
+            )
+            .unwrap()
+        })
+        .collect();
+    assert_eq!(
+        dispatches.len(),
+        2,
+        "one completed physical dispatch per rendered frame"
+    );
+    for (args, frame) in dispatches.iter().zip([0, 2]) {
+        let expected = [4109 + 2 * frame, 266 + 2 * frame, 134 + frame, 0]
+            .into_iter()
+            .flat_map(|n| (n as f32).to_le_bytes())
+            .collect::<Vec<_>>();
+        assert_eq!(args.resources["fragment.uniform.2"].bytes, expected);
+        assert_eq!(args.uploads["fragment.storage.3"].shape, [768]);
+        assert_eq!(args.scalars["instance_count"], (1 + frame) as u64);
+    }
     let mut frames = Vec::new();
     let mut writes = 0;
     let mut run_exits = 0;
@@ -280,6 +354,36 @@ fn headless_buffer_loop_image_build_run_artifact_matches_direct_session_and_reje
         Duration::from_secs(90),
         |reply| {
             let trace = reply.trace.as_ref().unwrap();
+            let effects: Vec<_> = trace
+                .events
+                .iter()
+                .filter_map(|event| {
+                    let op = event.strip_prefix("effect ")?.split_once(' ')?.0;
+                    matches!(
+                        op,
+                        "data.output_pipe" | "data.input_pipe" | "shader.draw_instanced"
+                    )
+                    .then_some(op)
+                })
+                .collect();
+            if trace.presented_frames.is_empty() {
+                assert!(
+                    effects.is_empty(),
+                    "non-rendering callback ran effects: {effects:?}"
+                );
+            } else {
+                assert_eq!(trace.presented_frames.len(), 1);
+                assert_eq!(
+                    effects,
+                    [
+                        "data.output_pipe",
+                        "data.input_pipe",
+                        "shader.draw_instanced",
+                        "data.output_pipe",
+                        "data.input_pipe"
+                    ]
+                );
+            }
             run_exits += trace
                 .events
                 .iter()

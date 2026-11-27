@@ -73,7 +73,7 @@ pub struct ShaderDrawDescriptor {
     pub(crate) vertex_count: u64,
     pub(crate) instance_count: u64,
     pub(crate) unbound_rgba8_triangle_strip: bool,
-    pub(crate) fragment_uniform: Option<crate::ShaderFragmentUniform>,
+    pub(crate) fragment_uniform: Option<crate::fragment_uniform::UniformInput>,
     pub(crate) fragment_storage: Option<crate::ShaderFragmentStorage>,
 }
 
@@ -109,6 +109,33 @@ impl ShaderDrawDescriptor {
     }
 
     pub fn provider_arguments(&self) -> Result<DispatchArguments, String> {
+        self.arguments(self.fragment_uniform.map(|uniform| uniform.reference()))
+    }
+
+    pub fn packet_binding(&self) -> Option<crate::PacketBinding> {
+        match self.fragment_uniform {
+            Some(crate::fragment_uniform::UniformInput::Packet(packet)) => Some(packet),
+            _ => None,
+        }
+    }
+
+    pub fn provider_arguments_with_packet(
+        &self,
+        uniform: crate::ShaderFragmentUniform,
+    ) -> Result<DispatchArguments, String> {
+        if self
+            .packet_binding()
+            .is_none_or(|packet| packet.slot != uniform.slot)
+        {
+            return Err("native uniform does not match the packet binding".into());
+        }
+        self.arguments(Some(uniform))
+    }
+
+    fn arguments(
+        &self,
+        uniform: Option<crate::ShaderFragmentUniform>,
+    ) -> Result<DispatchArguments, String> {
         if !self.unbound_rgba8_triangle_strip {
             return Err("provider draw requires unbound rgba8_unorm triangle_strip; resource bindings or other pass formats/topologies are unsupported".to_owned());
         }
@@ -119,12 +146,7 @@ impl ShaderDrawDescriptor {
             instance_count: self.instance_count,
         }
         .to_dispatch();
-        if let Some(uniform) = self.fragment_uniform {
-            uniform.bind_dispatch(&mut arguments)?;
-        }
-        if let Some(storage) = &self.fragment_storage {
-            storage.bind_dispatch(&mut arguments)?;
-        }
+        crate::bind_fragment_resources(&mut arguments, uniform, self.fragment_storage.as_ref())?;
         Ok(arguments)
     }
 }

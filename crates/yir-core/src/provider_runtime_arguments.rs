@@ -8,6 +8,9 @@ pub use resource::DispatchResource;
 mod upload;
 pub use upload::{DispatchUpload, MAX_UPLOAD_BYTES};
 
+// Descriptor text only. Upload bodies travel outside the IPC header.
+pub(super) const MAX_ARGUMENT_WIRE_BYTES: usize = 512;
+
 /// Bounded, canonical inputs. Domain semantics belong to the registered adapter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DispatchArguments {
@@ -53,14 +56,19 @@ impl DispatchArguments {
                 .filter(|bytes| *bytes <= MAX_UPLOAD_BYTES)
                 .ok_or("runtime upload total exceeds byte budget")?;
         }
-        if wire.len() > 256 {
+        let limit = if self.resources.len() + self.uploads.len() > 1 {
+            MAX_ARGUMENT_WIRE_BYTES
+        } else {
+            256
+        };
+        if wire.len() > limit {
             return Err("runtime dispatch arguments exceed wire limit".to_owned());
         }
         Ok(wire)
     }
 
     pub fn parse(wire: &str) -> Result<Self, String> {
-        if wire.len() > 256 {
+        if wire.len() > MAX_ARGUMENT_WIRE_BYTES {
             return Err("runtime dispatch arguments exceed wire limit".to_owned());
         }
         let mut fields = wire.split('|');

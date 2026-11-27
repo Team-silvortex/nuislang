@@ -3,6 +3,14 @@ use crate::data_mod_describe::describe_data_node;
 
 pub struct DataMod;
 
+pub fn data_pipe_event(resource: &Resource, output: bool, value: &Value) -> String {
+    let op = if output { "output_pipe" } else { "input_pipe" };
+    format!(
+        "effect data.{op} @{} [{}]: {value}",
+        resource.name, resource.kind.raw
+    )
+}
+
 impl RegisteredMod for DataMod {
     fn module_name(&self) -> &'static str {
         "data"
@@ -99,13 +107,7 @@ impl RegisteredMod for DataMod {
                     direction: DataPipeDirection::Output,
                     payload: Box::new(value),
                 });
-                state.push_resource_event(
-                    resource,
-                    format!(
-                        "effect data.output_pipe @{} [{}]: {}",
-                        node.resource, resource.kind.raw, pipe
-                    ),
-                );
+                state.push_resource_event(resource, data_pipe_event(resource, true, &pipe));
                 Ok(pipe)
             }
             "input_pipe" => {
@@ -118,10 +120,7 @@ impl RegisteredMod for DataMod {
                         let value = (*payload).clone();
                         state.push_resource_event(
                             resource,
-                            format!(
-                                "effect data.input_pipe @{} [{}]: {}",
-                                node.resource, resource.kind.raw, value
-                            ),
+                            data_pipe_event(resource, false, &value),
                         );
                         Ok(value)
                     }

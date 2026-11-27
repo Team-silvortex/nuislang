@@ -44,6 +44,8 @@ impl<A: ScopeAdmission> SessionControl<'_, A> {
 pub enum ApplicationProviderSource<'a> {
     #[cfg(unix)]
     Ipc(&'a Path),
+    #[cfg(unix)]
+    IpcWithPacketSubmit(&'a Path, crate::NativePacketSubmit),
     Replay(&'a Path),
 }
 
@@ -130,16 +132,31 @@ fn with_session<T, A: ScopeAdmission>(
 ) -> Result<T, String> {
     control.checkpoint()?;
     ApplicationSession::preflight(module, entries, &arguments)?;
-    let provider = match provider {
+    let (provider, projection) = match provider {
         #[cfg(unix)]
-        ApplicationProviderSource::Ipc(path) => {
-            crate::provider_result_stream::ProviderResultSource::Live(
-                crate::provider_runtime_ipc::connect_provider_runtime(source, module, path)?,
+        ApplicationProviderSource::IpcWithPacketSubmit(path, native) => {
+            let sites = yir_domain_shader::packet_projection::sites(module);
+            if sites.is_empty() {
+                return Err("packaged native packet submitter has no registered draw sites".into());
+            }
+            (
+                crate::provider_result_stream::ProviderResultSource::Live(
+                    crate::provider_runtime_ipc::connect_provider_runtime(source, module, path)?,
+                ),
+                Some((native, sites)),
             )
         }
-        ApplicationProviderSource::Replay(path) => replay_source(source, path)?,
+        #[cfg(unix)]
+        ApplicationProviderSource::Ipc(path) => (
+            crate::provider_result_stream::ProviderResultSource::Live(
+                crate::provider_runtime_ipc::connect_provider_runtime(source, module, path)?,
+            ),
+            None,
+        ),
+        ApplicationProviderSource::Replay(path) => (replay_source(source, path)?, None),
     };
-    let (registry, provider) = provider_registry_with_failures(provider, control.failures.clone());
+    let (registry, provider) =
+        provider_registry_with_failures(provider, control.failures.clone(), projection);
     let result = (|| {
         control.checkpoint()?;
         let (mut application, opened) = ApplicationSession::open_with_failures(

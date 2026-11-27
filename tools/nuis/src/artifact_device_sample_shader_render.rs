@@ -266,7 +266,11 @@ fn compiled_fragment_resource_capabilities(
             ",fragment_storage_slot:u64:{},fragment_storage_count:u64:{}",
             storage.slot, storage.element_count
         )),
-        _ => Err("render currently admits one fragment resource capability".to_owned()),
+        (Some(slot), Some(storage)) if storage.slot != slot => Ok(format!(
+            ",fragment_uniform_slot:u64:{slot},fragment_storage_slot:u64:{},fragment_storage_count:u64:{}",
+            storage.slot, storage.element_count
+        )),
+        _ => Err("overlapping fragment resource slots".to_owned()),
     }
 }
 

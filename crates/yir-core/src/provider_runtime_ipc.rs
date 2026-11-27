@@ -161,7 +161,7 @@ impl Message {
                 fields.extend(error.fields()?);
             }
         }
-        if fields.iter().any(|value| !valid_field(value)) {
+        if !valid_fields(&fields) {
             return Err("runtime IPC field is invalid".to_owned());
         }
         let header = fields.join("\n");
@@ -195,7 +195,7 @@ impl Message {
         let header = std::str::from_utf8(&header)
             .map_err(|_| "runtime IPC header is not UTF-8".to_owned())?;
         let fields = header.split('\n').collect::<Vec<_>>();
-        if fields.iter().any(|field| !valid_field(field)) || fields[0] != CONTRACT {
+        if !valid_fields(&fields) || fields[0] != CONTRACT {
             return Err("runtime IPC contract or fields are invalid".to_owned());
         }
         match fields.get(1).copied() {
@@ -276,6 +276,24 @@ fn validate_frame(frame: &DispatchFrame) -> Result<(), String> {
 
 fn valid_field(value: &str) -> bool {
     !value.is_empty() && value.len() <= 256 && !value.contains(['\n', '\r', '\0'])
+}
+
+fn valid_fields<T: AsRef<str>>(fields: &[T]) -> bool {
+    let argument = match fields.get(1).map(AsRef::as_ref) {
+        Some("dispatch") => Some(8),
+        Some("frame") => Some(12),
+        _ => None,
+    };
+    fields.iter().enumerate().all(|(index, field)| {
+        let field = field.as_ref();
+        if Some(index) == argument {
+            !field.is_empty()
+                && field.len() <= arguments::MAX_ARGUMENT_WIRE_BYTES
+                && !field.contains(['\n', '\r', '\0'])
+        } else {
+            valid_field(field)
+        }
+    })
 }
 
 fn number(value: &str) -> Result<usize, String> {

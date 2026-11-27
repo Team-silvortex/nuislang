@@ -67,7 +67,8 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "crates/yir-lower-llvm/src/native_session/aggregates.rs",
         required_patterns: &[
             "pub(super) fn result_layout",
-            "scalar_value_layout(&node.op.args[1])",
+            "helper_layout(&node.op.args[1])",
+            "scalar_value_layout(encoded)",
             "result.ownership != YirValueOwnership::Owned",
             "flat_return_layout_has_a_slot_bound_not_precombined_arities",
             "scalar_return_call_rejects_missing_layout_and_resource_payloads",

@@ -30,6 +30,8 @@ pub(super) struct Channel {
 pub(super) enum OwnedProvider {
     #[cfg(unix)]
     Ipc(PathBuf),
+    #[cfg(unix)]
+    IpcWithPacketSubmit(PathBuf, crate::NativePacketSubmit),
     Replay(PathBuf),
 }
 
@@ -38,6 +40,10 @@ impl From<ApplicationProviderSource<'_>> for OwnedProvider {
         match provider {
             #[cfg(unix)]
             ApplicationProviderSource::Ipc(path) => Self::Ipc(path.to_owned()),
+            #[cfg(unix)]
+            ApplicationProviderSource::IpcWithPacketSubmit(path, native) => {
+                Self::IpcWithPacketSubmit(path.to_owned(), native)
+            }
             ApplicationProviderSource::Replay(path) => Self::Replay(path.to_owned()),
         }
     }
@@ -48,6 +54,10 @@ impl OwnedProvider {
         match self {
             #[cfg(unix)]
             Self::Ipc(path) => ApplicationProviderSource::Ipc(path),
+            #[cfg(unix)]
+            Self::IpcWithPacketSubmit(path, native) => {
+                ApplicationProviderSource::IpcWithPacketSubmit(path, native.clone())
+            }
             Self::Replay(path) => ApplicationProviderSource::Replay(path),
         }
     }

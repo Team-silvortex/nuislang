@@ -1,6 +1,29 @@
 use super::*;
 
 #[test]
+fn larger_argument_budget_is_not_a_larger_identity_or_diagnostic_budget() {
+    for (tag, arg) in [("dispatch", 8), ("frame", 12)] {
+        let mut fields = vec!["x".to_owned(); arg + 1];
+        fields[1] = tag.to_owned();
+        fields[arg] = "a".repeat(512);
+        assert!(valid_fields(&fields));
+        fields[arg].push('a');
+        assert!(!valid_fields(&fields));
+        fields[arg].pop();
+        fields[3] = "a".repeat(257);
+        assert!(!valid_fields(&fields));
+    }
+    assert!(!valid_fields(&[
+        "v4",
+        "rejected",
+        "dispatch",
+        "0",
+        "1",
+        &"a".repeat(257)
+    ]));
+}
+
+#[test]
 fn framed_ipc_rejects_corruption_truncation_and_unbounded_allocation() {
     let frame = Message::Frame(DispatchFrame {
         sequence: 2,

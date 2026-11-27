@@ -128,11 +128,7 @@ fn compiled_window_routes_appkit_events_through_registered_nuis_and_live_metal()
                 let input = image_input(phase);
                 for (index, pixel) in pixels.chunks_exact(4).enumerate() {
                     let source_index = (index / 160 / 5 * 32 + index % 160 / 5) * 4;
-                    let source = &input[source_index..source_index + 4];
-                    assert_eq!(
-                        pixel,
-                        [255 - source[0], 255 - source[1], 255 - source[2], source[3]]
-                    );
+                    assert_eq!(pixel, image_result_pixel(&input, source_index, phase));
                 }
             }
             let trace = session.event(vec![Value::Int(1), Value::Int(0x1f642)])?;

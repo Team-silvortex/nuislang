@@ -3,6 +3,11 @@ use std::{collections::BTreeSet, path::PathBuf, sync::OnceLock};
 use yir_core::{Value, YirFunctionRole, YirModule};
 use yir_runtime_host::{ApplicationSession, ApplicationSessionPhase};
 
+#[path = "ns_nova_application_session/native_outcome.rs"]
+mod native_outcome;
+#[path = "ns_nova_application_session/native_profile_reads.rs"]
+mod native_profile_reads;
+
 fn image_module() -> &'static YirModule {
     static MODULE: OnceLock<YirModule> = OnceLock::new();
     MODULE.get_or_init(|| {

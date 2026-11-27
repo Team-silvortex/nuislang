@@ -102,21 +102,36 @@ unsafe fn run(
         &binding.arguments,
         binding.layout.fields().len(),
     )?;
-    let (mut session, _) =
+    let (mut session, opened) =
         ApplicationSession::open_native_registered(&module, id, binding, script.open)?;
+    report_pipe_events(&opened);
     eprintln!("nuis: native_session_state=open:{}", session.state());
     for event in script.events {
-        if session.event(event).is_err() {
+        let Ok(delivery) = session.event(event) else {
             break;
-        }
+        };
+        report_pipe_events(&delivery);
         eprintln!("nuis: native_session_state=event:{}", session.state());
     }
-    if session.close(script.close).is_ok() {
+    if let Ok(closed) = session.close(script.close) {
+        if let Some(trace) = closed {
+            report_pipe_events(&trace);
+        }
         eprintln!("nuis: native_session_state=close:{}", session.state());
     }
     session.completion_status()?;
     eprintln!("nuis: native_session_completed=1");
     Ok(())
+}
+
+fn report_pipe_events(trace: &yir_exec::ExecutionTrace) {
+    for event in &trace.events {
+        if event.starts_with("effect data.output_pipe ")
+            || event.starts_with("effect data.input_pipe ")
+        {
+            eprintln!("nuis: native_session_data_event={event}");
+        }
+    }
 }
 
 /// Explicit native packaged-process entry. There is no provider selection,

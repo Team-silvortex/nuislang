@@ -17,12 +17,14 @@ pub(crate) struct NativeValueReturn {
 impl NativeValueReturn {
     pub(crate) fn helper(encoded: &str) -> Result<Self, String> {
         Ok(Self {
-            transport: NativeValueLayout::parse(encoded)?,
+            transport: NativeValueLayout::helper(encoded)?,
         })
     }
 
     pub(crate) fn callback(encoded: &str) -> Result<Self, String> {
-        Self::helper(encoded)
+        Ok(Self {
+            transport: NativeValueLayout::parse(encoded)?,
+        })
     }
 
     pub(crate) fn llvm_type(&self) -> String {

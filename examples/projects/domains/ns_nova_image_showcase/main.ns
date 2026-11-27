@@ -68,8 +68,9 @@ mod cpu Main {
     if filled == false { return state; }
     if marker.end != 4 || marker.written != 4 || marker.checksum != 17113021440 { return state; }
     let storage: Binding = shader_storage_binding(3, snapshot);
+    let packet_uniform: Binding = shader_uniform_binding(2, gpu_packet);
     let pipeline: Pipeline = shader_profile_pipeline("PixelMagicImageSurface");
-    let bindings: BindingSet = shader_bind_set(pipeline, storage);
+    let bindings: BindingSet = shader_bind_set(pipeline, packet_uniform, storage);
     let render_result: FrameStatus =
       shader_result(shader_draw_instanced(pass, gpu_packet, vertex_count, instance_count, bindings));
     let render_ready: bool = shader_frame_ready(render_result);

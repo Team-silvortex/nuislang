@@ -10,8 +10,10 @@ mod draw_request;
 mod execute_core;
 mod execute_effects;
 mod flow_state;
+mod fragment_resources;
 mod fragment_storage;
 mod fragment_uniform;
+pub use fragment_resources::{bind_fragment_resources, decode_fragment_resources};
 pub use fragment_storage::{
     fragment_storage_capability, ShaderFragmentStorage, ShaderFragmentStorageCapability,
     FRAGMENT_STORAGE_CAPABILITY_MARKER, SHADER_FRAGMENT_STORAGE_CONTRACT,
@@ -43,8 +45,8 @@ use execute_core::execute_shader_core_node;
 use execute_effects::execute_shader_effect_node;
 use flow_state::parse_shader_flow_state;
 pub use fragment_uniform::{
-    fragment_uniform_capability, ShaderFragmentUniform, FRAGMENT_UNIFORM_CAPABILITY_MARKER,
-    SHADER_FRAGMENT_UNIFORM_CONTRACT,
+    fragment_uniform_capability, PacketBinding, ShaderFragmentUniform,
+    FRAGMENT_UNIFORM_CAPABILITY_MARKER, SHADER_FRAGMENT_UNIFORM_CONTRACT,
 };
 use parse_ball_packet::parse_ball_packet;
 use yir_core::{
@@ -109,3 +111,4 @@ impl RegisteredMod for ShaderMod {
         ))
     }
 }
+pub mod packet_projection;

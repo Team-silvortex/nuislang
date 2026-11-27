@@ -150,10 +150,9 @@ fn executes_ns_nova_persistent_image_session_through_live_provider() {
         let input = image_input(phase);
         for (index, pixel) in frame.chunks_exact(4).enumerate() {
             let input_index = (index / 160 / 5 * 32 + index % 160 / 5) * 4;
-            let source = &input[input_index..input_index + 4];
             assert_eq!(
                 pixel,
-                [255 - source[0], 255 - source[1], 255 - source[2], source[3]],
+                image_result_pixel(&input, input_index, phase),
                 "GPU pixel {index}, phase {phase}"
             );
         }
@@ -256,6 +255,28 @@ fn drive_images(
         let reply = receive(session, ApplicationPumpOperation::Event);
         assert_eq!(reply.phase, ApplicationPumpPhase::Open);
         let trace = reply.trace?;
+        let pipe_and_draw = trace
+            .events
+            .iter()
+            .filter_map(|event| {
+                let op = event.strip_prefix("effect ")?.split_once(' ')?.0;
+                matches!(
+                    op,
+                    "data.output_pipe" | "data.input_pipe" | "shader.draw_instanced"
+                )
+                .then_some(op)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            pipe_and_draw,
+            [
+                "data.output_pipe",
+                "data.input_pipe",
+                "shader.draw_instanced",
+                "data.output_pipe",
+                "data.input_pipe"
+            ]
+        );
         let state = reply.state.as_ref().unwrap();
         assert_eq!(state_field(state, "frame_index"), ordinal);
         assert_eq!(state_field(state, "presented_frames"), ordinal);

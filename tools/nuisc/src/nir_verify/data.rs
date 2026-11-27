@@ -9,7 +9,7 @@ pub(super) enum NirDataKind {
     WindowImmutable,
     Marker,
     HandleTable,
-    PipeOutput,
+    PipeOutput { immutable_window: bool },
     PipeInput,
 }
 
@@ -39,8 +39,15 @@ pub(super) fn infer_data_kind(
         NirExpr::DataHandleTable(_) | NirExpr::DataProfileHandleTableRef { .. } => {
             NirDataKind::HandleTable
         }
-        NirExpr::DataOutputPipe(_) => NirDataKind::PipeOutput,
-        NirExpr::DataInputPipe(_) => NirDataKind::PipeInput,
+        NirExpr::DataOutputPipe(inner) => NirDataKind::PipeOutput {
+            immutable_window: infer_data_kind(inner, data_bindings) == NirDataKind::WindowImmutable,
+        },
+        NirExpr::DataInputPipe(inner) => match infer_data_kind(inner, data_bindings) {
+            NirDataKind::PipeOutput {
+                immutable_window: true,
+            } => NirDataKind::WindowImmutable,
+            _ => NirDataKind::PipeInput,
+        },
         NirExpr::DataCopyWindow { .. } => NirDataKind::WindowMutable,
         NirExpr::DataWriteWindow { .. } => NirDataKind::WindowMutable,
         NirExpr::DataImmutableWindow { .. }
@@ -59,7 +66,12 @@ pub(super) fn infer_data_kind_from_type(ty: &NirTypeRef) -> NirDataKind {
         };
     }
     if ty.name == "Pipe" && ty.generic_args.len() == 1 {
-        return NirDataKind::PipeOutput;
+        return NirDataKind::PipeOutput {
+            immutable_window: matches!(
+                ty.generic_args[0].window_mode(),
+                Some(nuis_semantics::model::NirWindowMode::Immutable)
+            ),
+        };
     }
     if ty.is_marker_type() {
         return NirDataKind::Marker;

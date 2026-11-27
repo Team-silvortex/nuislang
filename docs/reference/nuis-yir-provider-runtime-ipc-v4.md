@@ -24,6 +24,12 @@ are canonical decimal, without signs or leading zeros. Dispatch rejection uses
 `0..255`; receive/Finish/Drain rejection can also carry `256`, allowing a fully used
 session to finish or drain without granting a 257th dispatch.
 
+Dispatch and Frame share a canonical argument descriptor: at most 256 bytes
+for zero or one resource, or 512 bytes for multiple resources. Only that field
+has the larger allowance; target identity and diagnostics remain bounded to
+256 bytes, the header to 4096 bytes. Upload bodies are still transmitted and
+budgeted separately. Older readers reject oversized descriptors before use.
+
 | Phase | Meaning | Permitted Codes |
 | --- | --- | --- |
 | `receive` | Request could not be read or admitted at the current frontier | Request, Exchange |

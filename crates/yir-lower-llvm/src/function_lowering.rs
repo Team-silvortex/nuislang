@@ -96,6 +96,7 @@ pub(super) fn emit_cpu_function(
     }
     state.buffer_lengths.extend(param_buffer_lengths.clone());
     let mut required_values = Vec::new();
+    let mut inline_windows = Default::default();
 
     for (node_name, value) in param_bindings {
         state.registers.insert(node_name.clone(), value.clone());
@@ -137,6 +138,11 @@ pub(super) fn emit_cpu_function(
             .copied()
             .ok_or_else(|| format!("unknown resource `{}`", node.resource))?;
         if state.ends_with_terminal_return {
+            continue;
+        }
+        if require_scalar_values
+            && crate::native_session::data_windows::lower(node, &mut inline_windows, &mut state)?
+        {
             continue;
         }
         if (require_scalar_values || pure_value_helper)

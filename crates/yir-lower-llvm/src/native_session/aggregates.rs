@@ -18,7 +18,7 @@ pub(crate) fn parse(node: &Node) -> Result<Option<AggregateCall<'_>>, String> {
             node.name
         ));
     };
-    let (layout, _) = scalar_value_layout(encoded)
+    let layout = helper_layout(encoded)
         .map_err(|error| format!("native aggregate call `{}`: {error}", node.name))?;
     Ok(Some(AggregateCall {
         callee,
@@ -47,12 +47,23 @@ pub(super) fn result_layout(
     {
         return Err(fail());
     }
-    let (layout, _) =
-        scalar_value_layout(&node.op.args[1]).map_err(|error| format!("{}: {error}", fail()))?;
-    if layout.type_name != result.ty {
+    let layout = helper_layout(&node.op.args[1]).map_err(|error| format!("{}: {error}", fail()))?;
+    if layout
+        .type_name
+        .strip_prefix(yir_core::OWNED_VARIANT_UNION_LAYOUT_PREFIX)
+        .unwrap_or(&layout.type_name)
+        != result.ty
+    {
         return Err(fail());
     }
     Ok(layout)
+}
+
+fn helper_layout(encoded: &str) -> Result<OwnedStructLayout, String> {
+    if let Some((layout, _)) = super::unit_enums::UnitEnum::parse(encoded)? {
+        return Ok(layout);
+    }
+    scalar_value_layout(encoded).map(|(layout, _)| layout)
 }
 
 pub(super) fn scalar_value_layout(encoded: &str) -> Result<(OwnedStructLayout, usize), String> {

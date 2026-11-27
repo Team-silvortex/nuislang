@@ -29,6 +29,7 @@ pub(super) fn select(
             .map(|r| (r.name.as_str(), r))
             .collect(),
         incoming: BTreeMap::new(),
+        profile_reads: Default::default(),
     };
     for edge in &module.edges {
         admission
@@ -42,6 +43,9 @@ pub(super) fn select(
         .iter()
         .map(|f| (f.name.as_str(), f))
         .collect::<BTreeMap<_, _>>();
+    admission.profile_reads = super::profile_reads::ProfileReads::inspect(&admission);
+    let windows = super::data_windows::Edges::new(module, &admission.nodes);
+    let mut metadata = BTreeSet::new();
     let roots = [signature.open, signature.event, signature.close];
     let root_names = roots
         .iter()
@@ -59,7 +63,11 @@ pub(super) fn select(
             return Err("native scalar bridge exceeds its reachable-function bound".to_owned());
         }
         let function = functions[name];
-        admission.validate(function, root_names.contains(name))?;
+        admission.validate(
+            function,
+            root_names.contains(name),
+            Some((&windows, &mut metadata)),
+        )?;
         selected_nodes.extend(function.body_nodes.iter().cloned());
         if selected_nodes.len() > calls::MAX_TOTAL_NODES {
             return Err("native scalar bridge exceeds its total-node bound".to_owned());
@@ -79,6 +87,10 @@ pub(super) fn select(
         selected_functions.insert(name, function.clone());
     }
     calls::validate_graph(&graph)?;
+    selected_nodes.extend(metadata);
+    if selected_nodes.len() > calls::MAX_TOTAL_NODES {
+        return Err("native scalar bridge exceeds its total-node bound with Data metadata".into());
+    }
     if let Some(policy) = policy {
         policy.validate_closure(&selected_functions, &graph, &admission)?;
     }
@@ -150,6 +162,9 @@ pub(super) fn select(
         .filter(|r| selected.nodes.iter().any(|n| n.resource == r.name))
         .cloned()
         .collect();
+    admission
+        .profile_reads
+        .localize(&mut selected, &admission.nodes)?;
     Ok((selected, callbacks, state_layout))
 }
 
@@ -181,6 +196,7 @@ pub(super) fn admitted(instruction: &str) -> bool {
             | "pack_f64_word"
             | "unpack_f64_word"
             | "struct"
+            | "variant_is"
             | "field"
             | "select"
             | "guard_return"

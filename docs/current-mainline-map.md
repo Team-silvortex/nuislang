@@ -51,13 +51,67 @@ not the start of this experiment. Reopen a lowering case when the application re
 
 The first direct probe uses the real `ns_nova_image_showcase` project. Its
 embedded headless bundle renders and replays two 160x120 frames; the test
-compares every RGBA byte. The same project's native `window` registration
-now reaches verified YIR, but the scalar bridge rejects `cpu.variant_is` in
-`window_close` (the `NovaFailureKind` check). This is a build-time rejection,
-not a native render or an established native/reference match. Reproduce with:
+compares every RGBA byte. Its `parent` registration now runs as a native scalar
+binary: open, six outcome deliveries and close match the embedded reference
+state by state, including unknown failure codes. Only the discriminant of a
+validated private payload-free enum crosses the helper call; public State is
+unchanged. This exercises application control, not rendering.
+
+The full native `window` probe now passes the Shader profile reads in
+`render_showcase_frame`. The scalar bridge copies a profile i64 literal into
+the reading function only for an explicit, same-resource numeric operand.
+Mutable values, function locals and dependencies carrying order or lifetime
+constraints remain outside that rule. A packaged scalar probe runs the same
+color, speed and radius seed operations and matches embedded YIR at open, three
+events and close. It does not render or dispatch GPU work.
+
+A second native session captures a flat i64 packet in `data.immutable_window`
+and reads it back with `data.read_window`. The inline window is one **packet**,
+not one field: offset 0, length 1, index 0. It lives only within the callback
+and cannot carry a pointer or owner. Static Data profile bounds and incoming
+scheduler metadata keep their original edges. The packaged test checks all
+three packet fields against embedded YIR over successive events.
+
+The frame's single-receiver `data.output_pipe` / `data.input_pipe` pair is
+now admitted with its explicit effect edge. One packaged probe runs the actual
+showcase packet/uplink prefix and another reads the received packet into State.
+Both compare the two ordered resource events, including all field values, to
+embedded YIR on four deliveries, including a repeated frame. The host records executed sites per callback;
+it does not replay the graph. The native capture is bounded to 4096 events and
+4 MiB of event text per invocation. Pipe handles cannot leave their function.
+
+In the packaged headless `window`, the same received packet window is both the
+draw operand and the fragment uniform at slot 2. The separate read-only pixel
+snapshot remains at slot 3. One real Metal draw consumes both: the first texel
+encodes all three packet fields into alpha, while the remaining pixels retain
+the image result. Two rendered events have different packet bytes and full
+RGBA8 readbacks; an ignored key submits nothing. The live session checks one
+physical fence per frame and uplink output/input, draw, downlink output/input
+in that order.
+
+The live headless bundle now also compiles the CPU-side packet projection at
+this draw site to LLVM. It checks the ordinal in the verified module, fragment
+slot, record width and exact integer range before writing four f32 lanes.
+The generated `nuis_packet_submit_v2` keeps the four lanes on its stack and
+calls a synchronous, one-use provider continuation while that binding is live.
+Only the host continuation owns the transport. Projection failure makes no
+request; provider rejection propagates without retry or reference fallback.
+The open/draw/ignored/draw/close script observes cumulative *completed
+submissions* `0,1,1,2,2`, not merely conversions. Replay independently
+computes the reference uniform and verifies dispatch arguments and pixel bytes.
+
+This is a native CPU fragment plus native GPU execution, not a fully
+LLVM-lowered frame callback or zero-copy device memory. The strict scalar
+`native-session-aot-bundle:window` still rejects the received window at
+`shader.uniform_binding`; it must not silently fall back to the reference host.
+Reproduce with:
 
 ```sh
 cargo test -p nuis --test headless_image_loop --locked -j1  # macOS render provider
+cargo test -p yir-domain-shader --lib packet_projection --locked -j1  # no GPU required
+cargo test -p yir-runtime-host --lib native_packet_submit --locked -j1
+cargo test -p nuisc --test ns_nova_application_session --locked -j1 native_outcome
+cargo test -p nuisc --test ns_nova_application_session --locked -j1 native_profile_reads
 cargo run -p nuisc --bin nuisc --locked -j1 -- compile examples/projects/domains/ns_nova_image_showcase target/ns-nova-native-window-probe --packaging-mode native-session-aot-bundle:window
 ```
 

@@ -78,6 +78,7 @@ fn fixture() -> (ProviderResultShaderMod, Node, Resource, ExecutionState) {
     let source = ProviderResultSource::Replay(ProviderResultQueue::new(vec![frame]).unwrap());
     (
         ProviderResultShaderMod {
+            projection: None,
             state: Arc::new(Mutex::new(source)),
             failures: FailureState::default(),
         },
@@ -93,6 +94,70 @@ fn remaining(adapter: &ProviderResultShaderMod) -> usize {
         unreachable!()
     };
     queue.frames.len()
+}
+
+#[test]
+fn rejected_native_packet_projection_never_takes_a_frame_or_emits_a_draw() {
+    use yir_core::{DataWindow, ShaderBinding, ShaderBindingSet, StructValue};
+    use yir_domain_shader::packet_projection::Site;
+    unsafe extern "C" fn reject(
+        _: u32,
+        _: u32,
+        _: u32,
+        _: *const i64,
+        _: *mut std::ffi::c_void,
+        _: crate::native_packet_submit::SubmitFn,
+    ) -> i32 {
+        1
+    }
+    let (mut adapter, mut node, resource, mut state) = fixture();
+    let packet = Value::DataWindow(DataWindow {
+        immutable: true,
+        offset: 0,
+        len: 1,
+        base: Box::new(Value::Struct(StructValue {
+            type_name: "Packet".into(),
+            fields: vec![
+                ("color".into(), Value::Int(3)),
+                ("speed".into(), Value::Int(1)),
+            ],
+        })),
+    });
+    let Value::RenderPass(pass) = &state.values["pass"] else {
+        unreachable!()
+    };
+    let bindings = ShaderBindingSet {
+        pipeline: pass.pipeline.clone(),
+        bindings: vec![ShaderBinding {
+            kind: "uniform_binding".into(),
+            slot: 2,
+            value: Box::new(packet.clone()),
+        }],
+    };
+    node.op.args.push("bindings".into());
+    state.bind_value("packet", packet);
+    state.bind_value("bindings", Value::BindingSet(bindings));
+    let native = unsafe { crate::NativePacketSubmit::new(reject) };
+    adapter.projection = Some((
+        native.clone(),
+        [(
+            node.name.clone(),
+            Site {
+                ordinal: 0,
+                slot: 2,
+                width: 2,
+            },
+        )]
+        .into(),
+    ));
+    let error = adapter.execute(&node, &resource, &mut state).unwrap_err();
+    assert!(
+        error.contains("native packet submission rejected before dispatch"),
+        "{error}"
+    );
+    assert_eq!(remaining(&adapter), 1);
+    assert!(state.events.is_empty());
+    assert_eq!(native.completed(), 0);
 }
 
 #[test]

@@ -35,6 +35,9 @@ impl ShaderFragmentStorage {
         if !matches!(binding.kind.as_str(), "storage" | "storage_binding") {
             return Err("fragment storage requires a storage binding".to_owned());
         }
+        Self::from_binding(binding)
+    }
+    pub(crate) fn from_binding(binding: &yir_core::ShaderBinding) -> Result<Self, String> {
         let Value::OwnedBytes(elements) = binding.value.as_ref() else {
             return Err(
                 "fragment u32 storage requires an owned integer buffer snapshot".to_owned(),

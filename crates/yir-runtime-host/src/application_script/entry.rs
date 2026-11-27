@@ -117,7 +117,11 @@ fn provider_paths(
     }
 }
 
-fn run(source: &str, arguments: &[&str]) -> Result<i32, String> {
+fn run(
+    source: &str,
+    arguments: &[&str],
+    native: Option<crate::NativePacketSubmit>,
+) -> Result<i32, String> {
     let script = parse(arguments)?;
     let drain = matches!(
         script.termination,
@@ -134,7 +138,13 @@ fn run(source: &str, arguments: &[&str]) -> Result<i32, String> {
     } else {
         #[cfg(unix)]
         {
-            ApplicationProviderSource::Ipc(socket.as_deref().unwrap())
+            let path = socket.as_deref().unwrap();
+            match &native {
+                Some(native) => {
+                    ApplicationProviderSource::IpcWithPacketSubmit(path, native.clone())
+                }
+                None => ApplicationProviderSource::Ipc(path),
+            }
         }
         #[cfg(not(unix))]
         {
@@ -158,6 +168,12 @@ fn run(source: &str, arguments: &[&str]) -> Result<i32, String> {
                 reply.failure_kind.code()
             );
             if let Ok(trace) = &reply.trace {
+                if let Some(native) = native.as_ref().filter(|_| replay.is_none()) {
+                    eprintln!(
+                        "nuis: native_packet_submissions_completed={}",
+                        native.completed()
+                    );
+                }
                 for frame in &trace.presented_frames {
                     frames += 1;
                     if let Some(rgba8) = &frame.rgba8 {
@@ -204,6 +220,42 @@ pub unsafe extern "C" fn nuis_application_script_main(
     argc: i32,
     argv: *const *const c_char,
 ) -> i32 {
+    unsafe { script_entry(source, length, argc, argv, None) }
+}
+
+/// # Safety
+/// Same source/argv contract as `nuis_application_script_main`. The supplied
+/// statically linked driver must remain callable for the worker lifetime. It
+/// reads exactly width i64s; on success it calls the continuation synchronously
+/// on this thread with the original context and four aligned, readable u32s.
+/// It must not unwind or retain any pointers or attempt another submission.
+#[no_mangle]
+pub unsafe extern "C" fn nuis_application_script_with_packet_submit_v2(
+    source: *const u8,
+    length: usize,
+    argc: i32,
+    argv: *const *const c_char,
+    function: Option<crate::native_packet_submit::DriverFn>,
+) -> i32 {
+    let Some(function) = function else { return 1 };
+    unsafe {
+        script_entry(
+            source,
+            length,
+            argc,
+            argv,
+            Some(crate::NativePacketSubmit::new(function)),
+        )
+    }
+}
+
+unsafe fn script_entry(
+    source: *const u8,
+    length: usize,
+    argc: i32,
+    argv: *const *const c_char,
+    native: Option<crate::NativePacketSubmit>,
+) -> i32 {
     let result = std::panic::catch_unwind(|| -> Result<i32, String> {
         if source.is_null()
             || length > isize::MAX as usize
@@ -226,7 +278,7 @@ pub unsafe extern "C" fn nuis_application_script_main(
                     .map_err(|_| "application script argument is not UTF-8")
             })
             .collect::<Result<Vec<_>, _>>()?;
-        run(source, &arguments)
+        run(source, &arguments, native)
     });
     match result {
         Ok(Ok(status)) => status,

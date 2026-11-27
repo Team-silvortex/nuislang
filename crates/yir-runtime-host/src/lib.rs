@@ -50,6 +50,8 @@ pub use provider_application_session::{
     ApplicationProviderSource, PROVIDER_APPLICATION_SESSION_CONTRACT,
 };
 pub use provider_drain_observation::ProviderDrainObservation;
+mod native_packet_submit;
+pub use native_packet_submit::NativePacketSubmit;
 pub use provider_result_stream::{PROVIDER_RESULT_STREAM_CONTRACT, PROVIDER_RESULT_STREAM_ENV};
 #[cfg(unix)]
 pub use provider_runtime_ipc::execute_module_source_with_provider_ipc;

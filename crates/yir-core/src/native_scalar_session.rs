@@ -8,6 +8,7 @@ use crate::{
 
 pub const CONTRACT: &str = "nuis-native-scalar-session-bridge-v1";
 pub const MAX_SCALAR_SLOTS: usize = 64;
+pub const MAX_PIPE_SITE_BYTES: usize = 256;
 pub const MAX_BINDING_SOURCE_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -428,7 +428,7 @@ fn verify_data_fabric_protocol(
                             node.name, node.op.args[0]
                         ));
                     }
-                    DataValueKind::Other
+                    received_pipe_kind(&value_kinds, &nodes, &node.op.args[0])
                 }
                 SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
@@ -552,6 +552,22 @@ fn verify_data_fabric_protocol(
     Ok(())
 }
 
+fn received_pipe_kind(
+    kinds: &BTreeMap<String, DataValueKind>,
+    nodes: &BTreeMap<&str, &Node>,
+    output: &str,
+) -> DataValueKind {
+    if nodes.get(output).is_some_and(|n| {
+        n.op.semantic_op() == SemanticOp::DataOutputPipe
+            && n.op.args.first().and_then(|base| kinds.get(base))
+                == Some(&DataValueKind::WindowImmutable)
+    }) {
+        DataValueKind::WindowImmutable
+    } else {
+        DataValueKind::Other
+    }
+}
+
 fn infer_data_value_kind(
     value_kinds: &BTreeMap<String, DataValueKind>,
     nodes: &BTreeMap<&str, &Node>,
@@ -575,9 +591,10 @@ fn infer_data_value_kind(
                         DataValueKind::Other
                     }
                 }
-                SemanticOp::DataInputPipe | SemanticOp::DataMove | SemanticOp::DataReadWindow => {
-                    DataValueKind::Other
+                SemanticOp::DataInputPipe => {
+                    received_pipe_kind(value_kinds, nodes, &node.op.args[0])
                 }
+                SemanticOp::DataMove | SemanticOp::DataReadWindow => DataValueKind::Other,
                 SemanticOp::DataCopyWindow => DataValueKind::WindowMutable,
                 SemanticOp::DataWriteWindow => DataValueKind::WindowMutable,
                 SemanticOp::DataFreezeWindow => DataValueKind::WindowImmutable,

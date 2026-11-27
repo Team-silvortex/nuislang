@@ -47,15 +47,25 @@ The linked contract includes reproducible build, event, close and drain commands
    Shader checks each snapshot element fits u32 and serializes little-endian
    words. Nuis `Bytes` currently stores i64 Buffer elements, so this is an
    explicit checked conversion, not a reinterpretation of host memory.
-4. The 3,072-byte payload travels outside the 256-byte argument field in bounded
-   IPC v4. A registered inherited-FD carrier forwards it to Metal; application
-   paths and pointers cannot select device resources.
+4. The same window returned by the uplink is passed to the draw and bound by
+   `shader_uniform_binding(2, gpu_packet)`. Its three exact integer values
+   occupy the first three lanes of the fragment uniform; the fourth is zero.
+   In the live headless bundle this conversion runs as a linked, site-specific
+   LLVM routine. It holds the resulting uniform on the stack and calls the
+   registered host continuation once to submit this draw. It does not take
+   ownership of the Data window or the pixel snapshot. The replay path
+   computes the uniform independently and does not invoke the native submitter.
+   The 3,072-byte pixel payload travels outside the combined descriptor
+   (at most 512 bytes) in bounded IPC v4. An inherited-FD carrier forwards it
+   to Metal; application paths and pointers cannot select device resources.
 5. `PixelMagicImageSurface` reads the array and inverts RGB in inline WGSL.
    Generated MSL bounds-checks array reads, returning zero outside the array.
-   Reflection checks the exact read-only u32 array length and slot before upload.
+   Reflection checks both read-only slots, their types and sizes before upload.
 6. Full/clear/full GPU frames return through ns-nova completion, presentation,
    and commit. The first and third images invert complementary checkerboards,
-   each with the same 20x5 magenta marker at the top left.
+   each with a 20x5 magenta marker at the top left. The first 5x5 pixels encode
+   the three received packet fields in alpha (213 and 243 on the two full
+   frames), so readback also checks that the GPU consumed this frame's packet.
 
 ## Verify
 

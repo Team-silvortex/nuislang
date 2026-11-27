@@ -11,6 +11,7 @@ description = "Build a small AOT bundle from a YIR module using LLVM/clang when 
 [dependencies]
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 yir-core = { path = "../../crates/yir-core" }
+yir-domain-shader = { path = "../../crates/yir-domain-shader" }
 yir-exec = { path = "../../crates/yir-exec" }
 yir-host-render = { path = "../../crates/yir-host-render" }
 yir-lower-contract = { path = "../../crates/yir-lower-contract" }
