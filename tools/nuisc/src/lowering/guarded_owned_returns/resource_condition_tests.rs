@@ -83,6 +83,7 @@ fn resource_predicate_inline_condition_requeues_one_intact_bool_and_original_arm
         &live,
         1,
         &mut context,
+        &Default::default(),
     )
     .unwrap()
     .unwrap();
@@ -118,7 +119,8 @@ fn resource_predicate_inline_condition_requeues_one_intact_bool_and_original_arm
             &ready_scope,
             &live,
             1,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .unwrap()
         .is_none(),
@@ -176,7 +178,8 @@ fn resource_predicate_inline_condition_proof_rejects_invalid_trees_atomically() 
             &scope,
             &live,
             1,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .unwrap()
         .is_none());
@@ -218,7 +221,8 @@ fn resource_predicate_inline_conditions_keep_pure_and_ready_routes_unchanged() {
             &scope,
             &live,
             1,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .unwrap()
         .is_none());

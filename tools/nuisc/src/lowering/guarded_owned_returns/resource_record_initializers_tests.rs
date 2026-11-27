@@ -148,6 +148,7 @@ fn resource_predicate_record_initializers_preserve_nominal_bindings_and_scalar_a
                 &live,
                 1,
                 &mut context,
+                &Default::default(),
             )
             .unwrap()
             .unwrap();
@@ -209,7 +210,8 @@ fn resource_predicate_record_initializers_preserve_nominal_bindings_and_scalar_a
                 &scope,
                 &live,
                 1,
-                &mut context
+                &mut context,
+                &Default::default()
             )
             .unwrap()
             .is_none());
@@ -233,7 +235,8 @@ fn rejected(ty: NirTypeRef, value: NirExpr) {
         &scope,
         &live,
         1,
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .unwrap()
     .is_none());

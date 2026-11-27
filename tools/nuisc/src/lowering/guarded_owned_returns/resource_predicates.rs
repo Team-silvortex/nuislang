@@ -16,6 +16,8 @@ mod return_fields;
 #[cfg(test)]
 #[path = "resource_scalar_initializers_tests.rs"]
 mod scalar_tests;
+#[path = "resource_stores.rs"]
+mod stores;
 #[cfg(test)]
 #[path = "resource_predicates_tests.rs"]
 mod tests;
@@ -60,9 +62,17 @@ pub(super) fn split(
     live: &BTreeSet<String>,
     depth: usize,
     context: &mut OutlineContext,
+    locals: &LocalRecords,
 ) -> Result<Option<Vec<NirStmt>>, String> {
+    if matches!(statement, NirStmt::Expr(NirExpr::StoreAt { .. })) {
+        return Ok(stores::split(
+            statement, remaining, template, scope, live, context, locals,
+        ));
+    }
     if let NirStmt::Return(Some(value)) = statement {
-        return Ok(return_fields::split(value, template, scope, live, context));
+        return Ok(return_fields::split(
+            value, template, scope, live, context, locals,
+        ));
     }
     if let NirStmt::If { condition, .. } = statement {
         if !admitted(condition, scope, live, &context.calls, Kind::Bool)
@@ -122,7 +132,7 @@ pub(super) fn split(
             )));
         }
         return Ok(return_fields::split_cleanup_binding(
-            statement, template, remaining, scope, live, context,
+            statement, template, remaining, scope, live, context, locals,
         ));
     }
     // An i64 initializer may contain lazy bool arguments, never an i64 predicate.
@@ -187,6 +197,12 @@ pub(super) fn split(
             name: name.clone(),
             ty: ty.clone(),
         });
+    }
+    if let Some(mut snapshots) = return_fields::stage_guarded_return_tail(
+        remaining, name, template, &captures, live, context, locals,
+    ) {
+        snapshots.push(statement.clone());
+        return Ok(Some(snapshots));
     }
     // Share the suffix once. Its scalar argument is defined on each edge;
     // all existing Bytes owners move through the ordinary continuation proof.

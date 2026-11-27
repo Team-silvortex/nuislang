@@ -79,6 +79,26 @@ fn folds_integer_binary_constants() {
 }
 
 #[test]
+fn folds_a_left_associated_chain_inside_a_data_operand() {
+    let chain = (0..40).fold(NirExpr::Int(5), |lhs, _| NirExpr::Binary {
+        op: NirBinaryOp::Sub,
+        lhs: Box::new(lhs),
+        rhs: Box::new(NirExpr::Int(1)),
+    });
+    let mut module = sample_module(vec![NirStmt::Return(Some(NirExpr::DataOutputPipe(
+        Box::new(chain),
+    )))]);
+    assert!(simplify_nir_module(&mut module));
+    assert_eq!(
+        module.functions[0].body,
+        vec![NirStmt::Return(Some(NirExpr::DataOutputPipe(Box::new(
+            NirExpr::Int(-35),
+        ))))]
+    );
+    assert!(!simplify_nir_module(&mut module));
+}
+
+#[test]
 fn invalid_integer_division_and_remainder_are_not_evaluated_by_constant_folding() {
     for op in [NirBinaryOp::Div, NirBinaryOp::Rem] {
         for (lhs, rhs) in [(1, 0), (0, 0), (i64::MIN, -1)] {

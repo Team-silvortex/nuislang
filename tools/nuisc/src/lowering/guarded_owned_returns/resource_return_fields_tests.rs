@@ -1,4 +1,6 @@
 use super::*;
+#[path = "resource_guarded_store_tests.rs"]
+mod stores;
 
 fn ty(name: &str) -> NirTypeRef {
     NirTypeRef {
@@ -49,7 +51,7 @@ fn moved() -> NirExpr {
 
 fn fixture() -> (NirFunction, OutlineContext, Vec<NirParam>, BTreeSet<String>) {
     let module = crate::pipeline::compile_source(
-        "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; } fn main() -> i64 { return 0; } }",
+        "mod cpu Main { struct Prior { index: i64 } fn word(flag: bool) -> i64 { if flag { return 1; } return 0; } fn main() -> i64 { return 0; } }",
     ).unwrap().nir;
     let mut template = module
         .functions
@@ -86,6 +88,56 @@ fn fixture() -> (NirFunction, OutlineContext, Vec<NirParam>, BTreeSet<String>) {
     (template, context, scope, BTreeSet::from(["saved".into()]))
 }
 
+fn bound_index(context: &OutlineContext) -> (LocalRecords, NirExpr) {
+    let mut locals = LocalRecords::default();
+    let projection = NirExpr::FieldAccess {
+        base: Box::new(NirExpr::Var("prior".into())),
+        field: "index".into(),
+    };
+    locals.advance(
+        &NirStmt::Let {
+            name: "prior".into(),
+            ty: Some(ty("Prior")),
+            value: NirExpr::StructLiteral {
+                type_name: "Prior".into(),
+                type_args: vec![],
+                fields: vec![("index".into(), NirExpr::Int(0))],
+            },
+        },
+        &context.calls,
+    );
+    (locals, projection)
+}
+
+#[test]
+fn resource_predicate_return_fields_share_only_completed_record_projections() {
+    let (template, mut context, scope, live) = fixture();
+    let (locals, projection) = bound_index(&context);
+    let first = binary(NirBinaryOp::Add, lazy(), projection.clone());
+    let invalid = record(vec![
+        ("data", moved()),
+        ("a", first.clone()),
+        ("b", projection.clone()),
+    ]);
+    assert!(split(&invalid, &template, &scope, &live, &mut context, &locals).is_none());
+    assert!(context.reserved.is_empty());
+    let valid = record(vec![
+        ("a", first),
+        ("data", moved()),
+        ("b", projection.clone()),
+    ]);
+    let out = split(&valid, &template, &scope, &live, &mut context, &locals).unwrap();
+    let [NirStmt::Let { name, value, .. }, NirStmt::Let { value: a, .. }, NirStmt::Let { value: data, .. }, NirStmt::Let { value: b, .. }, NirStmt::Return(_)] =
+        out.as_slice()
+    else {
+        panic!("expected just one shared projection before the three fields")
+    };
+    assert_eq!(value, &projection);
+    assert_eq!(b, &NirExpr::Var(name.clone()));
+    assert_eq!(a, &binary(NirBinaryOp::Add, lazy(), b.clone()));
+    assert_eq!(data, &moved());
+}
+
 #[test]
 fn resource_predicate_return_fields_stage_all_fields_in_source_order() {
     let copy = NirExpr::CopyBufferOwned(Box::new(NirExpr::Var("pixels".into())));
@@ -98,7 +150,15 @@ fn resource_predicate_return_fields_stage_all_fields_in_source_order() {
         record(vec![("data", copy), ("b", lazy()), ("a", NirExpr::Int(9))]),
     ] {
         let (template, mut context, scope, live) = fixture();
-        let rewritten = split(&value, &template, &scope, &live, &mut context).unwrap();
+        let rewritten = split(
+            &value,
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &Default::default(),
+        )
+        .unwrap();
         let NirExpr::StructLiteral { fields, .. } = &value else {
             unreachable!()
         };
@@ -182,7 +242,15 @@ fn resource_predicate_return_fields_reject_invalid_whole_records_before_names() 
         ]),
     ] {
         let (template, mut context, scope, live) = fixture();
-        assert!(split(&value, &template, &scope, &live, &mut context).is_none());
+        assert!(split(
+            &value,
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &Default::default()
+        )
+        .is_none());
         assert!(
             context.reserved.is_empty()
                 && context.pending.is_empty()
@@ -220,7 +288,8 @@ fn resource_predicate_return_fields_share_original_aggregate_budgets() {
             &template,
             &scope,
             &live,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .is_none());
         assert!(context.reserved.is_empty());
@@ -235,7 +304,15 @@ fn resource_predicate_return_fields_leave_ready_records_and_unknown_layouts_unch
         ("b", NirExpr::Int(2)),
         ("data", moved()),
     ]);
-    assert!(split(&ready, &template, &scope, &live, &mut context).is_none());
+    assert!(split(
+        &ready,
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &Default::default()
+    )
+    .is_none());
     context.return_layouts.clear();
     assert!(split(
         &record(vec![
@@ -246,7 +323,8 @@ fn resource_predicate_return_fields_leave_ready_records_and_unknown_layouts_unch
         &template,
         &scope,
         &live,
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .is_none());
     assert!(context.reserved.is_empty());
@@ -277,7 +355,15 @@ fn resource_predicate_return_fields_validate_checked_wrapper_identity_and_type_a
             type_args,
             fields: vec![(field.into(), payload.clone())],
         };
-        assert!(split(&value, &template, &scope, &live, &mut context).is_none());
+        assert!(split(
+            &value,
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &Default::default()
+        )
+        .is_none());
         assert!(context.reserved.is_empty());
     }
     let value = NirExpr::StructLiteral {
@@ -285,7 +371,15 @@ fn resource_predicate_return_fields_validate_checked_wrapper_identity_and_type_a
         type_args: outcome.generic_args,
         fields: vec![("value".into(), payload)],
     };
-    let prefix = split(&value, &template, &scope, &live, &mut context).unwrap();
+    let prefix = split(
+        &value,
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &Default::default(),
+    )
+    .unwrap();
     let Some(NirStmt::Return(Some(NirExpr::StructLiteral {
         type_name,
         type_args,
@@ -325,12 +419,21 @@ fn resource_predicate_return_fields_preserve_terminal_cleanup_bindings_only() {
         &nonterminal,
         &scope,
         &live,
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .is_none());
     assert!(context.reserved.is_empty());
-    let prefix =
-        split_cleanup_binding(&binding, &template, &suffix, &scope, &live, &mut context).unwrap();
+    let prefix = split_cleanup_binding(
+        &binding,
+        &template,
+        &suffix,
+        &scope,
+        &live,
+        &mut context,
+        &Default::default(),
+    )
+    .unwrap();
     assert_eq!(prefix.len(), 4);
     assert!(
         matches!(prefix.last(), Some(NirStmt::Let { name, ty: Some(kind), .. }) if name == "result" && kind.name == "State")
@@ -396,7 +499,15 @@ fn resource_predicate_error_code_requeues_one_intact_i64_and_preserves_identity(
     let (template, mut context, scope, live) = error_fixture();
     let code = binary(NirBinaryOp::Add, NirExpr::Int(17), lazy());
     let value = error_value(code.clone());
-    let prefix = split(&value, &template, &scope, &live, &mut context).unwrap();
+    let prefix = split(
+        &value,
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &Default::default(),
+    )
+    .unwrap();
     let [NirStmt::Let {
         name,
         ty: Some(kind),
@@ -414,8 +525,246 @@ fn resource_predicate_error_code_requeues_one_intact_i64_and_preserves_identity(
         name: name.clone(),
         ty: kind.clone(),
     });
-    assert!(split(result, &template, &scope, &live, &mut context).is_none());
+    assert!(split(
+        result,
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &Default::default()
+    )
+    .is_none());
     assert!(context.pending.is_empty() && context.outlines.owners.is_empty());
+}
+
+#[test]
+fn resource_predicate_guarded_error_tail_freezes_one_leaf_without_moving_work_or_drops() {
+    let (template, mut context, scope, live) = error_fixture();
+    let (locals, leaf) = bound_index(&context);
+    let code = |leaf: NirExpr| {
+        error_value(binary(
+            NirBinaryOp::Add,
+            binary(NirBinaryOp::Add, leaf.clone(), lazy()),
+            leaf,
+        ))
+    };
+    let bind = |code| NirStmt::Let {
+        name: "out".into(),
+        ty: template.return_type.clone(),
+        value: code,
+    };
+    let drops = NirStmt::Expr(NirExpr::DropBytes(Box::new(NirExpr::Var("saved".into()))));
+    let ret = NirStmt::Return(Some(NirExpr::Var("out".into())));
+    let mut suffix = VecDeque::from([bind(code(leaf.clone())), drops.clone(), ret.clone()]);
+    let prefix = stage_guarded_return_tail(
+        &mut suffix,
+        "ok",
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &locals,
+    )
+    .unwrap();
+    let [NirStmt::Let {
+        name,
+        ty: Some(kind),
+        value,
+    }] = prefix.as_slice()
+    else {
+        panic!("expected one shared scalar snapshot")
+    };
+    assert_eq!((kind, value), (&ty("i64"), &leaf));
+    assert_eq!(
+        suffix,
+        VecDeque::from([bind(code(NirExpr::Var(name.clone()))), drops, ret])
+    );
+    let reserved = context.reserved.clone();
+    assert!(stage_guarded_return_tail(
+        &mut suffix,
+        "ok",
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &locals
+    )
+    .is_none());
+    assert_eq!(reserved, context.reserved);
+}
+
+#[test]
+fn resource_predicate_guarded_error_tail_does_not_cross_shadowing_or_unproved_suffixes() {
+    let (template, mut context, scope, live) = error_fixture();
+    let (locals, leaf) = bound_index(&context);
+    let returned = |value| NirStmt::Return(Some(error_value(value)));
+    let code = binary(NirBinaryOp::Add, leaf.clone(), lazy());
+    let invalid = NirExpr::BytesLen(Box::new(NirExpr::Var("missing".into())));
+    for (binding, mut suffix) in [
+        ("prior", VecDeque::from([returned(code.clone())])),
+        (
+            "ok",
+            VecDeque::from([returned(binary(NirBinaryOp::Add, leaf.clone(), invalid))]),
+        ),
+        (
+            "ok",
+            VecDeque::from([returned(binary(NirBinaryOp::Eq, leaf.clone(), lazy()))]),
+        ),
+        (
+            "ok",
+            VecDeque::from([NirStmt::Expr(lazy()), returned(code.clone())]),
+        ),
+        (
+            "ok",
+            VecDeque::from([
+                NirStmt::Const {
+                    name: "out".into(),
+                    ty: template.return_type.clone().unwrap(),
+                    value: error_value(code),
+                },
+                NirStmt::Return(Some(NirExpr::Var("different".into()))),
+            ]),
+        ),
+    ] {
+        let original = suffix.clone();
+        assert!(stage_guarded_return_tail(
+            &mut suffix,
+            binding,
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &locals
+        )
+        .is_none());
+        assert_eq!(suffix, original);
+        assert!(context.reserved.is_empty());
+    }
+}
+
+#[test]
+fn resource_predicate_guarded_state_tail_shares_leaves_and_checks_cleanup_after_moves() {
+    let (template, mut context, scope, mut live) = error_fixture();
+    live.insert("spare".into());
+    let (locals, leaf) = bound_index(&context);
+    let wrap = |payload| NirExpr::StructLiteral {
+        type_name: "Outcome.Ok".into(),
+        type_args: vec![ty("State"), ty("i64")],
+        fields: vec![("value".into(), payload)],
+    };
+    let state = |leaf: NirExpr| {
+        record(vec![
+            ("a", binary(NirBinaryOp::Add, leaf.clone(), lazy())),
+            ("data", moved()),
+            ("b", leaf),
+        ])
+    };
+    let tail = |payload, owners: &[&str]| {
+        let mut suffix = VecDeque::from([NirStmt::Const {
+            name: "out".into(),
+            ty: template.return_type.clone().unwrap(),
+            value: wrap(payload),
+        }]);
+        for &owner in owners {
+            suffix.push_back(NirStmt::Expr(NirExpr::DropBytes(Box::new(NirExpr::Var(
+                owner.into(),
+            )))));
+        }
+        suffix.push_back(NirStmt::Return(Some(NirExpr::Var("out".into()))));
+        suffix
+    };
+    for mut suffix in [
+        tail(state(leaf.clone()), &["saved"]),
+        tail(state(leaf.clone()), &["spare", "spare"]),
+        tail(
+            record(vec![("data", moved()), ("a", lazy()), ("b", leaf.clone())]),
+            &["spare"],
+        ),
+        tail(
+            record(vec![
+                ("a", leaf.clone()),
+                ("b", NirExpr::Bool(false)),
+                ("data", moved()),
+            ]),
+            &["spare"],
+        ),
+    ] {
+        let original = suffix.clone();
+        assert!(stage_guarded_return_tail(
+            &mut suffix,
+            "ok",
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &locals
+        )
+        .is_none());
+        assert_eq!(suffix, original);
+        assert!(context.reserved.is_empty());
+    }
+    let mut suffix = tail(state(leaf.clone()), &["spare"]);
+    let prefix = stage_guarded_return_tail(
+        &mut suffix,
+        "ok",
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &locals,
+    )
+    .unwrap();
+    let [NirStmt::Let {
+        name,
+        ty: Some(kind),
+        value,
+    }] = prefix.as_slice()
+    else {
+        panic!("expected one shared scalar capture across State fields")
+    };
+    assert_eq!((kind, value), (&ty("i64"), &leaf));
+    assert_eq!(suffix, tail(state(NirExpr::Var(name.clone())), &["spare"]));
+}
+
+#[test]
+fn resource_predicate_error_code_projections_prove_but_do_not_replace_the_payload() {
+    let (template, mut context, scope, live) = error_fixture();
+    let (locals, projection) = bound_index(&context);
+    let code = binary(NirBinaryOp::Add, projection.clone(), lazy());
+    let value = error_value(code.clone());
+    assert!(split(
+        &value,
+        &template,
+        &scope,
+        &live,
+        &mut context,
+        &LocalRecords::default()
+    )
+    .is_none());
+    assert!(split(
+        &value,
+        &template,
+        &scope,
+        &BTreeSet::new(),
+        &mut context,
+        &locals
+    )
+    .is_none());
+    let wrong_kind = error_value(binary(NirBinaryOp::Eq, projection, lazy()));
+    assert!(split(&wrong_kind, &template, &scope, &live, &mut context, &locals).is_none());
+    assert!(context.reserved.is_empty());
+    let out = split(&value, &template, &scope, &live, &mut context, &locals).unwrap();
+    let [NirStmt::Let {
+        name,
+        ty: Some(kind),
+        value,
+    }, NirStmt::Return(Some(wrapper))] = out.as_slice()
+    else {
+        panic!("expected an intact i64 payload before the registered Err");
+    };
+    assert_eq!(kind, &ty("i64"));
+    assert_eq!(value, &code);
+    assert_eq!(wrapper, &error_value(NirExpr::Var(name.clone())));
 }
 
 #[test]
@@ -468,7 +817,15 @@ fn resource_predicate_error_code_rejection_is_atomic_for_kinds_identity_owners_a
     }
     for value in invalid {
         let (template, mut context, scope, live) = error_fixture();
-        assert!(split(&value, &template, &scope, &live, &mut context).is_none());
+        assert!(split(
+            &value,
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &Default::default()
+        )
+        .is_none());
         assert!(
             context.reserved.is_empty()
                 && context.pending.is_empty()
@@ -481,7 +838,8 @@ fn resource_predicate_error_code_rejection_is_atomic_for_kinds_identity_owners_a
         &template,
         &scope,
         &BTreeSet::new(),
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .is_none());
     assert!(
@@ -497,7 +855,15 @@ fn resource_predicate_error_codes_preserve_terminal_cleanup_and_ready_routes() {
         NirExpr::Int(0),
         NirExpr::BytesLen(Box::new(NirExpr::Var("saved".into()))),
     ] {
-        assert!(split(&error_value(code), &template, &scope, &live, &mut context).is_none());
+        assert!(split(
+            &error_value(code),
+            &template,
+            &scope,
+            &live,
+            &mut context,
+            &Default::default()
+        )
+        .is_none());
     }
     assert!(context.reserved.is_empty());
     let binding = NirStmt::Let {
@@ -510,8 +876,16 @@ fn resource_predicate_error_codes_preserve_terminal_cleanup_and_ready_routes() {
         NirStmt::Return(Some(NirExpr::Var("result".into()))),
     ]);
     let original = suffix.clone();
-    let prefix =
-        split_cleanup_binding(&binding, &template, &suffix, &scope, &live, &mut context).unwrap();
+    let prefix = split_cleanup_binding(
+        &binding,
+        &template,
+        &suffix,
+        &scope,
+        &live,
+        &mut context,
+        &Default::default(),
+    )
+    .unwrap();
     assert_eq!(prefix.len(), 2);
     assert!(
         matches!(prefix.last(), Some(NirStmt::Let { name, ty, .. }) if name == "result" && ty == &template.return_type)

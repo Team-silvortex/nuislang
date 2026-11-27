@@ -2,6 +2,66 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "native-resource-lazy-store-index-execution",
+        path: "tools/nuisc/tests/native_resource_session/resource_record_conditions.rs",
+        required_patterns: &["cross_guard_store_with_a_lazy_resource_index_updates_only_the_selected_pixel", "guarded_store_native_trace_finishes_index_before_starting_value", "cross_guard_store_followed_by_a_projected_readback_local_remains_outside"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-lazy-store-index-delivery",
+        path: "tools/nuis/tests/native_resource_session_workflow/checked.rs",
+        required_patterns: &["lazy_pixel_store_index_and_value_survive_source_free_delivery", "cursor + bias(ok || load_at(pixels, 99) > 0)"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-lazy-store-value-operand-order",
+        path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_guarded_store_tests.rs",
+        required_patterns: &["resource_predicate_lazy_store_binds_index_then_intact_value_before_one_write"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-lazy-store-value-delivery",
+        path: "tools/nuis/tests/native_resource_session_workflow/checked.rs",
+        required_patterns: &["lazy_pixel_store_value_survives_source_free_delivery", "bias(ok || load_at(pixels, 99) > 0)"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-guarded-store-projections",
+        path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_guarded_store_tests.rs",
+        required_patterns: &["resource_predicate_guarded_stores_share_one_leaf_with_the_return", "resource_predicate_guarded_stores_reject_an_invalid_prefix_atomically"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-guarded-store-delivery",
+        path: "tools/nuis/tests/native_resource_session_workflow/checked.rs",
+        required_patterns: &["guarded_pixel_write_and_projected_state_survive_source_free_delivery", "load_at(pixels, cursor) - prior.pixel + color + bias(ok)"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-cross-guard-state-ownership",
+        path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_return_fields_tests.rs",
+        required_patterns: &["resource_predicate_guarded_state_tail_shares_leaves_and_checks_cleanup_after_moves"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-cross-guard-state-delivery",
+        path: "tools/nuis/tests/native_resource_session_workflow/checked.rs",
+        required_patterns: &["projected_checked_state_after_resource_guard_survives_source_free_delivery", "width: size.w + bias(ok)", "height: size.h"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-cross-guard-err-projection-order",
+        path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_return_fields_tests.rs",
+        required_patterns: &["resource_predicate_guarded_error_tail_freezes_one_leaf_without_moving_work_or_drops", "resource_predicate_guarded_error_tail_does_not_cross_shadowing_or_unproved_suffixes"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-cross-guard-err-delivery",
+        path: "tools/nuis/tests/native_resource_session_workflow/checked.rs",
+        required_patterns: &["projected_checked_error_after_resource_guard_survives_source_free_delivery", "return Result.Err(site.code + bias(ok))", "check_failure", "compile_cache: hit"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-return-field-projection-order",
+        path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_return_fields_tests.rs",
+        required_patterns: &["resource_predicate_return_fields_share_only_completed_record_projections", "assert_eq!(data, &moved())"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-resource-return-field-projection-delivery",
+        path: "tools/nuis/tests/native_resource_session_workflow/early_ok.rs",
+        required_patterns: &["local_record_return_field_survives_source_free_delivery", "bytes_len(snapshot) == prior.extent.words * 8", "compile_cache: hit"],
+    },
+    DevTensorDriftCheckSpec {
         id: "native-resource-record-condition-entry",
         path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_record_literals.rs",
         required_patterns: &["if let NirStmt::If { condition, .. } = statement", "statement, &ty, condition, template, scope, live, context, self"],
@@ -19,7 +79,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-resource-record-condition-execution",
         path: "tools/nuisc/tests/native_resource_session/resource_record_conditions.rs",
-        required_patterns: &["record_conditions_preserve_values_completed_reads_and_binding_forms_for_120_events", "record_conditions_keep_both_arms_local_owners_and_shared_fallthrough", "record_conditions_keep_branch_local_errors_and_failed_allocations_atomic", "record_conditions_keep_borrowed_only_registered_identity", "record_conditions_share_scalar_paths_without_widening_capture_bounds", "record_conditions_do_not_yet_admit_local_record_operands_in_returned_state"],
+        required_patterns: &["record_conditions_preserve_values_completed_reads_and_binding_forms_for_120_events", "record_conditions_keep_both_arms_local_owners_and_shared_fallthrough", "record_conditions_keep_branch_local_errors_and_failed_allocations_atomic", "record_conditions_keep_borrowed_only_registered_identity", "record_conditions_share_scalar_paths_without_widening_capture_bounds", "local_record_return_fields_keep_selected_reads_and_terminal_cleanup", "local_record_return_fields_still_reject_reads_after_move", "checked_error_codes_retain_local_record_values_and_selected_reads", "guarded_error_capture_cost_depends_on_distinct_used_leaves", "scalar_projections_survive_an_intervening_resource_guard_in_checked_errors", "returned_state_projections_cross_a_resource_guard_without_moving_owners_early", "guarded_stores_precede_projected_returns_once_on_both_edges", "guarded_stores_execute_before_projected_error_and_cleanup", "cross_guard_store_with_a_lazy_resource_value_is_not_made_eager"],
     },
     DevTensorDriftCheckSpec {
         id: "native-resource-record-condition-traps",
@@ -29,7 +89,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-resource-record-condition-delivery",
         path: "tools/nuis/tests/native_resource_session_workflow/early_ok.rs",
-        required_patterns: &["local_record_condition_survives_cache_nsb_and_binary_only_launch", "replace(\"if valid {\"", "compile_cache: hit"],
+        required_patterns: &["local_record_condition_survives_cache_nsb_and_binary_only_launch", "replacen(\"if !valid {\", &condition, 1)", "source.matches(&condition).count(), 1", "compile_cache: hit"],
     },
     DevTensorDriftCheckSpec {
         id: "native-resource-condition-checked-error-identity",
@@ -274,12 +334,12 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-resource-error-code-lowering",
         path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_return_fields.rs",
-        required_patterns: &["*type_name == outcome.err_variant", "!admitted(code, scope, live, &context.calls, Kind::I64)", "!arguments::contains_logic(code)", "value: code.clone()", "split_cleanup_binding"],
+        required_patterns: &["*type_name == outcome.err_variant", "locals.scalar_proof(code, &context.calls)", "!admitted(&proof, scope, live, &context.calls, Kind::I64)", "!arguments::contains_logic(&proof)", "value: code.clone()", "split_cleanup_binding"],
     },
     DevTensorDriftCheckSpec {
         id: "native-resource-error-code-proof",
         path: "tools/nuisc/src/lowering/guarded_owned_returns/resource_return_fields_tests.rs",
-        required_patterns: &["resource_predicate_error_code_requeues_one_intact_i64_and_preserves_identity", "resource_predicate_error_code_rejection_is_atomic_for_kinds_identity_owners_and_budgets", "resource_predicate_error_codes_preserve_terminal_cleanup_and_ready_routes"],
+        required_patterns: &["resource_predicate_error_code_requeues_one_intact_i64_and_preserves_identity", "resource_predicate_error_code_projections_prove_but_do_not_replace_the_payload", "resource_predicate_error_code_rejection_is_atomic_for_kinds_identity_owners_and_budgets", "resource_predicate_error_codes_preserve_terminal_cleanup_and_ready_routes"],
     },
     DevTensorDriftCheckSpec {
         id: "native-resource-owned-continuation-routing",
@@ -299,7 +359,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "native-resource-error-code-delivery",
         path: "tools/nuis/tests/native_resource_session_workflow/checked.rs",
-        required_patterns: &["direct_resource_error_codes_survive_cache_nsb_and_binary_only_launch", "return Result.Err(error_code(bytes_len(saved) == 48 || load_at(pixels, 99) > 0", "resource return helpers exceed the source closure bound", "delivery(&with_error_codes([1, 4, 7]))", "check_failure", "compile_cache: hit"],
+        required_patterns: &["direct_resource_error_codes_survive_cache_nsb_and_binary_only_launch", "return Result.Err(error_code({predicate}, {code}))", "bytes_len(saved) == 48 || load_at(pixels, 99) > 0", "resource return helpers exceed the source closure bound", "delivery(&with_error_codes([1, 4, 7]))", "local_record_error_codes_survive_source_free_delivery", "bytes_len(saved) == prior.words * 8", "check_failure", "compile_cache: hit"],
     },
     DevTensorDriftCheckSpec {
         id: "native-resource-return-field-lowering",

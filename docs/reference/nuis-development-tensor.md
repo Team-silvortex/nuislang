@@ -42,7 +42,8 @@ Each tensor cell carries:
 Short rule: `architecture tells where the work lives; module tells who owns it;
 function tells what capability is being matured`.
 
-For current scope boundaries and evidence limits, see the [scope audit](nuis-development-tensor-recalibration-2026-11-13.md).
+For scope boundaries and evidence limits, see the [scope audit](nuis-development-tensor-recalibration-2026-11-13.md);
+for current selection and its ranked alternatives, see the [mainline plan](nuis-development-tensor-mainline.md).
 Evidence drift blocks task-card readiness; clean anchors do not rerun tests.
 
 ## Source Structure
@@ -227,7 +228,7 @@ bootstrap selection with finer coordinates rather than downgrading those
 historical closures.
 
 The following historical `beta-0.1` baseline includes later proof annotations.
-For the current 37-cell inventory and task selection, use the scope audit above.
+For the current inventory and its actionable frontier, run `nuis dev-tensor --json`.
 
 * `standard-library/std/concurrency-task-thread-lock`: `stable/100`, required;
   recursive selected-prefix lowering and the native cancel/unlock project close

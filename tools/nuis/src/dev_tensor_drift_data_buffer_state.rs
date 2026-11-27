@@ -7,7 +7,9 @@ pub(crate) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "pub struct PixelRunStats",
             "pub fn recolor_run(",
-            "end > pixels.len || pixels.len > 4194304",
+            "let count: i64 = pixels.len;",
+            "if end > count {",
+            "if count > 4194304 {",
             "expected > 4294967295 || replacement < 0 || replacement > 4294967295",
             "if pixels[index] != expected { break; }",
             "pixels[index] = replacement",

@@ -821,8 +821,8 @@ Eighteen added isolated probes cover selected/skipped reads, division, nested
 logic, negation, XOR and helper arguments. Mandatory eager siblings and original
 record initializers still execute. The direct-condition project witness retains
 cache reuse, source-free NSB relocation, empty-PATH launch and exact final pixels.
-Local-record operands in directly returned State fields remain the next reproduced
-gap; later whole-record use across a resource continuation is not granted here.
+The subsequent return-field grant below covers local-record operands in directly
+returned State fields; neither route captures a whole record across a continuation.
 
 ## Execution Evidence
 
@@ -1502,6 +1502,233 @@ backend, runtime or native ABI. This is local native CPU and source-free deliver
 evidence, not a full-workspace run, fresh Linux/GPU validation or a performance
 measurement.
 
+### Local Record Condition Validation (2026-11-27)
+
+Validation reused the existing target directory, disabled incremental Cargo and
+kept builds and test workers serial. The implementation is included in
+`beta-0.19.2`; this resumed checkpoint fixes a delivery fixture and completes
+verification without widening compiler admission.
+
+| Check | Result |
+| --- | --- |
+| Source admission and normalization proofs | 54 passed in 1.95 seconds on resume |
+| Native resource suite excluding the isolated trap harness | 220 passed in 468.20 seconds at the preceding implementation checkpoint |
+| Isolated trap harness | 1 passed in 432.10 seconds on resume, covering all 518 child probes, including 18 direct-condition probes |
+| Native resource project workflow | 23 passed in the initial 24-test run; the remaining direct-condition fixture was corrected and its test passed in 9.82 seconds |
+| Tensor and CLI regressions | 51 passed in 14.13 seconds after synchronizing the next-task assertion |
+| Repository line limits and documentation host-path guard | 2 line-limit tests and 1 host-path test passed |
+
+The delivery failure occurred before compilation: the fixture tried to replace
+`if valid`, but its source contains `if !valid`. It now preserves the negation
+when inlining the predicate and asserts exactly one declaration and branch
+replacement. The corrected witness verifies cache reuse, deletion of source and
+manifest, relocated NSB launch, an empty PATH and exact final pixels. The other
+23 workflow tests were not rerun after this test-only correction; this is not a
+claim of a single clean 24-test workflow run.
+
+An earlier broad error-arm routing attempt introduced extra helpers into existing
+early-error/success paths. The final implementation limits that routing to an
+exact registered Err arm followed by an exact registered terminal Err. Existing
+early-return and closure-budget assertions remain unchanged, and the 220-test
+native run above passed after that narrowing. That run predates this resume; the
+current changes do not modify the compiler or those native tests.
+
+The first resumed tensor run exposed one stale assertion for the previous next
+task. It now checks directly returned State projections, constructor order, owner
+availability, selected-only reads and terminal cleanup. All 51 tensor tests then
+passed. The rebuilt CLI reports 4704 drift checks, zero failures, clean coverage
+and clean hierarchy. Resource callbacks remain active/95; their delivery evidence
+now records the exact fixture replacement checks. All other 36 complete cells
+match the pre-correction CLI snapshot exactly.
+
+Direct conditions retain completed scalar reads, intact branches and suffixes,
+selected-only resource access, original AST and YIR roundtrips, owner cleanup and
+committed State on checked errors or allocation failure. Flat and nested helper
+conditions retain their respective 29/30 and 27/28 acceptance/rejection boundaries,
+with 33 guard inputs at both accepted maxima. Local-record operands in directly
+returned State fields remain a reproduced rejection and the next task.
+
+Documentation links (5232), UTF-8 validation (6348 files), scoped formatting and
+diff whitespace checks pass. Workspace architecture remains 29 packages, six
+domains and 74 normal/build edges.
+
+This is local native CPU and source-free delivery evidence, not a full-workspace
+run, fresh Linux/GPU validation or a performance measurement. The extension does
+not change the LLVM backend, runtime or native ABI.
+
+### Local Record Operands In Returned State
+
+In `return Result.Ok(Canvas { width: word(prior.flags.valid && bytes_len(saved) == 48), pixels: move(saved) });`,
+the return-field proof now receives the same block-local record table as an
+ordinary declaration. It checks the original aggregate budget, registered layout
+and each field against the owners available at that point. Only after the whole
+constructor passes does it snapshot exact completed scalar projections, sharing
+repeated paths across fields. Calls, reads, moves and copies stay in their
+original field order. Terminal cleanup bindings use the same proof; no change
+to the native ABI or the checked Err payload route is required.
+
+The native regression runs the original checked return and a resource-first
+return with a spare owner over 120 alternating events each. It checks scalar
+and pixel State, a deliberately skipped out-of-range read, and zero tracked live
+blobs after every event. A separate negative still rejects a read of a moved
+owner under a false gate.
+
+In the resource-first case, an injected Result allocation failure on either
+branch preserves committed pixels and scalar State and releases all tracked blobs.
+The project workflow verifies cache reuse, source-free relocated NSB and empty-PATH
+binary execution against exact output pixels. Local validation: 55 source proofs,
+13 selected native-session tests, one delivery workflow and 51 tensor tests passed.
+The CLI reports 4706 drift checks with zero failures and clean coverage/hierarchy.
+The active/95 score is unchanged. This is not a full-suite or device-parity run.
+
+### Local Record Operands In Checked Errors
+
+A registered checked error may now return
+`Result.Err(word(prior.flags.valid && bytes_len(saved) == 48))` directly.
+After bounding the original aggregate and matching its registered variant,
+type arguments and payload, the compiler uses the local record's scalar types
+to prove the code is i64. It requeues the **original** expression as a typed
+initializer before constructing the error and dropping unused owners. The
+ordinary initializer pass saves completed projections; resource reads remain
+inside the selected branch. No ABI, capture limit or layout change is needed.
+
+Native cases cover a held Bytes owner, two owners with a read completed before
+a later write, and a nested borrowed-only error. Zero and full-width negative
+codes are application errors; injected Result allocation failure is instead a
+transport failure. Both leave committed pixels/scalars intact and release all
+tracked blobs. The delivery fixture exercises the projected predicate at four
+return sites across open, event and close.
+
+Local CPU validation passed: 56 source proofs, 9 record-condition native tests,
+all 3 checked-session delivery workflows and 51 tensor tests. Delivery checks
+cache reuse, relocated NSB, source-free launch with an empty PATH and no output
+frame on application failure. These are scoped tests, not a fresh full-suite or
+GPU/Linux parity run.
+
+### Checked Errors After A Resource Guard
+
+```nuis
+let prior = packet(mode, true, 0);
+let valid = mode == 0 && bytes_len(saved) == 48;
+return Result.Err(prior.left + word(valid));
+```
+
+Before outlining the guarded initializer, the compiler checks the immediately
+following registered Err using the scope in which its code will execute. It
+may also recognize the equivalent terminal binding, owner drops and final
+return of that binding. After bounding the aggregate and proving the exact i64
+payload and owner availability, it snapshots only completed bool/i64 record
+fields. Duplicate paths share one snapshot. The actual code, including calls,
+arithmetic and any lazy reads, stays after the guard. Neither a whole record
+nor a resource pointer becomes a new scalar capture. Shadowed record roots,
+nonterminal suffixes and mismatched return bindings do not take this route.
+
+The native capture-budget regression keeps the same 40-term sum in both cases:
+40 uses of one field compile, whereas 40 distinct fields exceed the existing
+call-edge limit. This also covers an optimizer regression: checking whether an
+expression was a data operation used to clone the entire subtree at every
+binary node. The simplifier now dispatches by ownership and keeps the original
+left-to-right operand order. No test stack or capture limit was raised.
+
+Local CPU validation: 58 resource lowering tests, 22 optimizer tests, 11 native
+record-condition tests and all four checked-session delivery workflows passed.
+The cross-guard project returned the expected application error after cache
+reuse, binary-only launch with an empty PATH, and relocated NSB materialization.
+All 51 tensor tests passed; the CLI reported 4708 drift checks, zero failures
+and clean coverage and hierarchy. This run did not exercise Linux or a GPU.
+
+### Checked State After A Resource Guard
+
+A terminal registered `Ok(State { ... })` now uses the same cross-guard
+scalar snapshots. Before allocating a snapshot the compiler checks every
+field against the registered layout and the owners still available in
+source order. A result binding may be followed by drops of distinct spare
+owners and a return of that binding, not a drop of the transferred owner.
+Only projections of completed local records cross the guard. Repeated
+projections across fields share one snapshot; reads, calls, copies and
+moves remain where the State constructor evaluates them.
+
+Native cases distinguish returning an earlier Bytes snapshot from copying a
+buffer after a write, run both predicate edges, and inject Result allocation
+failure on both. Failure leaves the committed pixels and scalars unchanged
+and releases all tracked blobs. No callback layout or backend ABI changed.
+
+Local CPU validation passed: 59 source lowering tests, 12 native record-condition
+tests and the checked-State delivery workflow. The delivery fixture projects both
+dimensions, transfers its pixel buffer, then verifies exact PPM bytes after cache
+reuse, empty-PATH binary launch and NSB relocation without the original source.
+All 51 tensor tests passed; 4710 drift checks reported zero failures and clean
+coverage and hierarchy. No new Linux or GPU execution was tested.
+
+### Buffer Writes Between Guard And Return
+
+The checked return may be preceded by consecutive `store_at` statements on a
+borrowed Buffer. This first case covers exact, eager i64 indices and values.
+The compiler checks all stores, the return layout and its terminal cleanup
+before reserving snapshots. A completed record field shared by indices,
+values and the return uses one scalar capture. The store, its operand reads
+and calls, and the return stay in the shared continuation, in source order.
+
+The native witness starts with pixel 9. After the guard it writes
+`pixel + 1 + word(valid)`, then writes `pixel * 2 + prior.left` using the
+updated pixel and the **original** field (9). On the selected/skipped edges
+the returned pixels are 47/29 and the returned scalar values are 56/38.
+The skipped edge includes an out-of-range guard read that must not run.
+The emitted YIR contains exactly two store nodes for the two source writes.
+
+Local CPU validation passed: 61 lowering tests, 14 native record-condition
+tests and the guarded pixel-write delivery workflow. The checked error reads
+the updated pixel without publishing failed State; injected allocation failure
+preserves the original scalars and pixels and releases all tracked blobs.
+The workflow checks exact PPM bytes after cache reuse, empty-PATH binary
+launch and NSB relocation. All 51 tensor tests passed; 4712 drift checks
+reported zero failures, with clean coverage and hierarchy. No fresh Linux
+or GPU execution is claimed.
+
+### Short-Circuit Reads In Store Values
+
+`store_at(pixels, index, word(valid && load_at(pixels, i) == 9))` first
+binds the eager i64 index, then evaluates the intact value through the existing
+guarded i64 initializer. The selected and skipped paths rejoin at one store.
+Only completed scalar record fields may be snapshotted ahead of the guard;
+the original reads, checked arithmetic and surrounding writes retain their
+positions. This works with or without a separate preceding guard.
+
+Native cases exercise skipped out-of-range reads with both AND and OR. A
+three-write case starts with 9, writes 10, computes 28 using the updated
+buffer and a saved field, then doubles it to 56. YIR has exactly three stores;
+the returned scalar is 65. Checked errors can observe the guarded write
+without publishing the modified State.
+
+Local CPU validation passed: 62 lowering tests, 15 native record-condition
+tests and the lazy pixel-store delivery workflow. After removing source and
+manifest, both empty-PATH binary execution and relocated NSB delivery produced
+the expected PPM bytes. All 51 tensor tests passed; 4714 drift checks reported
+zero failures, with clean coverage and hierarchy. Linux/GPU were not rerun.
+
+### Short-Circuit Reads In Store Indices
+
+Each operand of `store_at(buffer, index, value)` now uses the same bounded
+i64 proof. If either needs a guard, the compiler binds the entire index first,
+then the entire value, and emits one store using those bindings. A skipped
+index read does not skip evaluation of the value; only the unselected
+subexpression is skipped. The store's own destination bounds check is not
+moved into index evaluation.
+
+The native regression runs all four combinations of AND in the index and OR
+in the value, with out-of-range addresses on the skipped edges. It checks
+all six pixels: only the selected destination changes and the increment is
+applied once. A separate test instruments only a scalar probe in the emitted
+LLVM, leaving the generated guards, loads and store intact. Its trace checks
+index completion before value entry on every combination. Allocation failure
+keeps the old pixels and scalar State and releases the tracked blobs.
+
+Local CPU validation passed: 63 lowering tests, 17 native record-condition
+tests and the dual-operand pixel-store delivery workflow. The source-free
+binary with empty PATH and the relocated NSB both produced the expected PPM
+bytes. All 51 tensor tests passed; 4716 drift checks reported zero failures
+and clean coverage and hierarchy. No fresh Linux or GPU run is claimed.
+
 ## Remaining Boundaries
 
 The ready-scalar `select` grant does not admit resource or record selection.
@@ -1518,10 +1745,11 @@ Previously bound record fields after earlier logic now use shared safe scalar pr
 Local-record scalar operands inside constructor predicates now share exact snapshots.
 Standalone bool/i64 initializers now share those snapshots and retain declaration identity.
 Direct resource conditions now reuse exact local-record projections with intact arms.
-The next reproduced gap is a directly returned State field using a local-record operand:
-`let prior: Packet = packet(0, mode == 0, 0); return Result.Ok(Canvas { width: word(prior.flags.valid && bytes_len(saved) == 48), pixels: move(saved) });`.
-It still rejects with `short-circuit RHS requires guarded lowering` instead of
-speculating reads. The nested/read-helper/logical-argument/wrapper grant applies
+Returned State fields and checked Err codes admit block-local scalar projections.
+After a guarded store, a separate local such as
+`let observed: i64 = load_at(pixels, 0) + prior.left;` before the checked
+return still falls outside the terminal-suffix projection proof.
+The continuation does not capture the whole record. The nested/read-helper/logical-argument/wrapper grant applies
 to bool/i64 declarations, direct bool conditions and the bounded mixed-State fields
 and checked Err codes above, plus helper-returned and nested-literal record locals,
 not arbitrary record expressions or record-valued resource captures, additional resource

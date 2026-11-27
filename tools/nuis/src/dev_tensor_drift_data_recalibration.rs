@@ -31,7 +31,7 @@ pub(super) const CHECKS: &[DevTensorDriftCheckSpec] = &[
         id: "tensor-recalibration-dependency-sequence",
         path: "tools/nuis/src/dev_tensor_mainline_tests.rs",
         required_patterns: &[
-            "mainline_recalibration_advances_resources_frames_sessions_then_failure_safety",
+            "mainline_recalibration_opens_frame_and_shader_without_closing_resources_or_session",
             "compiler-toolchain/nuisc/native-scalar-record-session-profile",
             "compiler-toolchain/nuisc/native-resource-session-callbacks",
         ],

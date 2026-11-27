@@ -391,9 +391,10 @@ fn lower_binary(
     // Guarded outlining must handle any non-total RHS before this eager value
     // path. Falling back here must not turn a skipped read/call into a trap.
     if matches!(op, NirBinaryOp::And | NirBinaryOp::Or) && !eager_logical_rhs(rhs) {
-        return Err(
-            "short-circuit RHS requires guarded lowering; eager evaluation is not permitted".into(),
-        );
+        return Err(format!(
+            "short-circuit RHS requires guarded lowering; eager evaluation is not permitted (function={})",
+            state.call_stack.last().map(String::as_str).unwrap_or("<entry>")
+        ));
     }
     let lhs_name = lower_expr(lhs, state, bindings)?;
     let rhs_name = lower_expr(rhs, state, bindings)?;

@@ -4,6 +4,9 @@ This is a scope and dependency audit at the beta-0.18.8 Git baseline, with the
 existing uncommitted lowering work preserved. It is not a release, a fresh
 all-platform certification, or a rewrite of historical execution receipts.
 
+For current selection rather than this historical snapshot, see the
+[2026-11-27 native-frame recalibration](nuis-development-tensor-mainline.md#2026-11-27-start-one-native-frame).
+
 The subsequent [native Buffer/Bytes proof](nuis-native-resource-session-v1.md)
 first advanced the resource coordinate to active/35; the later
 [artifact proof](nuis-native-resource-session-artifacts-v1.md) advances it to active/60.
@@ -113,7 +116,12 @@ scalar operands inside bounded constructors now share the same projection cache;
 standalone bool/i64 declarations now reuse that proof and snapshot planning.
 Direct resource conditions now reuse the same proof with intact arms and exact
 registered checked-error identity. Local-record operands in directly returned
-State fields are the next reproduced gap.
+State fields now preserve ordered owner transfer and terminal cleanup. Checked
+Err payloads now reuse block-local projection proof too. An immediately following
+Err or checked mixed-State return can use scalar fields from before a guarded
+initializer. Straight-line buffer writes may intervene without changing write
+order or owner availability. Both store operands can use a guarded i64
+initializer: finish the index before evaluating the value, then write once.
 This does not admit arbitrary
 expressions, record-valued resource captures or resource-bearing pure helpers.
 Active/95 and the other
@@ -146,8 +154,8 @@ every missing feature in the repository.
 
 ## Actionable Dependency Path
 
-The selected goal remains `standard-library/ns-nova/interactive-image-workflow`.
-Its current goal-to-prerequisite path is:
+The selected goal at this checkpoint was `standard-library/ns-nova/interactive-image-workflow`.
+Its goal-to-prerequisite path on November 13 was:
 
 `interactive-image-workflow -> persistent-application-session -> native-cpu-frame-dispatch -> native-resource-session-callbacks`
 

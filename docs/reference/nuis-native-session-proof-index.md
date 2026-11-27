@@ -18,7 +18,16 @@ constructors now reuse that cache with exact type proof and selected-only reads.
 Standalone bool/i64 declarations and direct resource conditions now share that
 proof and snapshot planner. Conditions keep intact arms and registered checked-error
 dispatch even without held Bytes. Directly returned State fields using those
-operands remain a separate boundary. Earlier receipts
+operands now share exact scalar snapshots without capturing a record or hoisting
+a resource read. Checked Err payloads admit the same operands by requeueing
+the original i64 expression, not its type witnesses. A terminal checked error
+or success State following a guarded initializer can retain just the required
+scalar leaves. The State still moves or copies its Bytes in field order.
+Intervening buffer writes share those snapshots but execute in source order
+in the continuation, as verified by dependent pixel updates on both guard edges.
+Both store operands admit guarded resource reads without duplicating the
+store. A native trace verifies that the index finishes before the value starts.
+Earlier receipts
 remain scoped historical evidence, not competing descriptions of the latest
 admission. Follow the [runnable example ladder](../../examples/projects/domains/README.md#native-cpu-resource-sessions)
 and [implementation owners](../repo-layout.md#native-resource-session-ownership)

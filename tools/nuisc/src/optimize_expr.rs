@@ -14,10 +14,51 @@ pub(super) fn simplify_expr(
     inline_templates: &BTreeMap<String, InlineTemplate>,
     active_inline: &mut BTreeSet<String>,
 ) -> (NirExpr, bool) {
-    if let Some(result) = simplify_data_expr(expr.clone(), env, inline_templates, active_inline) {
-        return result;
+    // Keep arithmetic chains out of the large dispatch frame. Preserve the
+    // original tree and simplify its operands in source order.
+    match expr {
+        NirExpr::Binary { op, lhs, rhs } => {
+            let (lhs, left) = simplify_expr(*lhs, env, inline_templates, active_inline);
+            let (rhs, right) = simplify_expr(*rhs, env, inline_templates, active_inline);
+            if let (NirExpr::Int(lhs_value), NirExpr::Int(rhs_value)) = (&lhs, &rhs) {
+                if let Some(folded) = fold_int_binary(op, *lhs_value, *rhs_value) {
+                    // Comparisons stay bool through bindings and branch folding;
+                    // their integer implementation result is not a source kind.
+                    let value = if matches!(
+                        op,
+                        NirBinaryOp::Eq
+                            | NirBinaryOp::Ne
+                            | NirBinaryOp::Lt
+                            | NirBinaryOp::Le
+                            | NirBinaryOp::Gt
+                            | NirBinaryOp::Ge
+                    ) {
+                        NirExpr::Bool(folded != 0)
+                    } else {
+                        NirExpr::Int(folded)
+                    };
+                    return (value, true);
+                }
+            }
+            (
+                NirExpr::Binary {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                },
+                left || right,
+            )
+        }
+        other => simplify_non_binary(other, env, inline_templates, active_inline),
     }
+}
 
+fn simplify_non_binary(
+    expr: NirExpr,
+    env: &BTreeMap<String, NirExpr>,
+    inline_templates: &BTreeMap<String, InlineTemplate>,
+    active_inline: &mut BTreeSet<String>,
+) -> (NirExpr, bool) {
     match expr {
         NirExpr::Var(name) => match env.get(&name) {
             Some(value) => (value.clone(), true),
@@ -547,38 +588,6 @@ pub(super) fn simplify_expr(
                 changed,
             )
         }
-        NirExpr::Binary { op, lhs, rhs } => {
-            let (lhs, left) = simplify_expr(*lhs, env, inline_templates, active_inline);
-            let (rhs, right) = simplify_expr(*rhs, env, inline_templates, active_inline);
-            if let (NirExpr::Int(lhs_value), NirExpr::Int(rhs_value)) = (&lhs, &rhs) {
-                if let Some(folded) = fold_int_binary(op, *lhs_value, *rhs_value) {
-                    // Comparisons stay bool through bindings and branch folding;
-                    // their integer implementation result is not a source kind.
-                    let value = if matches!(
-                        op,
-                        NirBinaryOp::Eq
-                            | NirBinaryOp::Ne
-                            | NirBinaryOp::Lt
-                            | NirBinaryOp::Le
-                            | NirBinaryOp::Gt
-                            | NirBinaryOp::Ge
-                    ) {
-                        NirExpr::Bool(folded != 0)
-                    } else {
-                        NirExpr::Int(folded)
-                    };
-                    return (value, true);
-                }
-            }
-            (
-                NirExpr::Binary {
-                    op,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                },
-                left || right,
-            )
-        }
-        other => (other, false),
+        other => simplify_data_expr(other, env, inline_templates, active_inline),
     }
 }

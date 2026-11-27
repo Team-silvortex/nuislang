@@ -350,8 +350,9 @@ mod cpu NovaAppRuntime {
     let fallback: i64 = failure_code(reason_failure(reason));
     let selected: i64 = if reported != 0 { reported } else { fallback };
     let retained: i64 = if state.failure_kind != 0 { state.failure_kind } else { selected };
-    let effective: i64 = if retained == 0 && state.status == status_failed() { 8 } else { retained };
-    let stopped: bool = close_requested(reason) && state.status != status_failed() && effective == 0;
+    let already_failed: bool = state.status == status_failed();
+    let effective: i64 = if retained == 0 && already_failed { 8 } else { retained };
+    let stopped: bool = close_requested(reason) && !already_failed && effective == 0;
     return NovaAppState {
       status: if stopped { status_stopped() } else { status_failed() },
       width: state.width,

@@ -50,8 +50,9 @@ impl<'a> FunctionAdmission<'a> {
                         .unwrap_or(false))
             {
                 return Err(format!(
-                    "native scalar bridge does not admit {} `{name}`",
-                    node.op.full_name()
+                    "native scalar bridge does not admit {} `{name}` in function `{}`",
+                    node.op.full_name(),
+                    function.name
                 ));
             }
             super::loops::validate(node, &self.nodes)?;

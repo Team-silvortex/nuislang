@@ -5,10 +5,10 @@ Use code/tests and the live development tensor to resolve implementation claims.
 
 ## Current Direction
 
-The current `beta-0.18.*` priority is ns-nova application-led development.
-Git history is authoritative; dated committed identity and worktree follow-ups
-are separated in the [snapshot](versioning/nuis-beta-0.18.0-snapshot.md).
-The [validation checklist](versioning/nuis-beta-0.18.0-release-checklist.md) gives
+The current `beta-0.19.*` priority is ns-nova application-led development.
+Git history is authoritative; the [dated snapshot](versioning/nuis-beta-0.19.0-snapshot.md)
+separates this minor's committed identity from its worktree follow-ups.
+The [validation checklist](versioning/nuis-beta-0.19.0-release-checklist.md) gives
 operating gates; the [proof index](reference/nuis-native-session-proof-index.md)
 catalogues detailed native-session receipts without duplicating them here.
 
@@ -32,13 +32,33 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo run -p nuis -- dev-tensor --json
 
 The goal is `standard-library/ns-nova/interactive-image-workflow`.
 The [declared dependency plan](reference/nuis-development-tensor.mainline.toml)
-selects this chain, not the globally lowest percentage:
+selects a prerequisite of this goal, not the globally lowest percentage:
 
 ```text
-native-resource-session-callbacks (active/95)
-  -> native CPU frame dispatch (early/10)
-  -> standard-library/ns-nova/persistent-application-session (active/60)
-  -> interactive-image-workflow
+Rank  Actionable now                         Required for
+1     native-cpu-frame-dispatch (early/10)   persistent-application-session
+2     shader-resource-bindings (early/15)    interactive-image-workflow
+3     native-resource-session-callbacks      persistent-application-session
+      (active/95)
+```
+
+**Next proof:** drive the same fixed-size ns-nova input through native dispatch
+and the retained embedded-YIR reference. Identify the actual CPU execution
+route and compare State, output bytes, event/completion order and close outcome.
+A native executable silently falling back to embedded YIR does not pass.
+General resource callbacks still gate `standard-library/ns-nova/persistent-application-session`,
+not the start of this experiment. Reopen a lowering case when the application reproduces it.
+
+The first direct probe uses the real `ns_nova_image_showcase` project. Its
+embedded headless bundle renders and replays two 160x120 frames; the test
+compares every RGBA byte. The same project's native `window` registration
+now reaches verified YIR, but the scalar bridge rejects `cpu.variant_is` in
+`window_close` (the `NovaFailureKind` check). This is a build-time rejection,
+not a native render or an established native/reference match. Reproduce with:
+
+```sh
+cargo test -p nuis --test headless_image_loop --locked -j1  # macOS render provider
+cargo run -p nuisc --bin nuisc --locked -j1 -- compile examples/projects/domains/ns_nova_image_showcase target/ns-nova-native-window-probe --packaging-mode native-session-aot-bundle:window
 ```
 
 The [2026-11-13 recalibration](reference/nuis-development-tensor-recalibration-2026-11-13.md)
@@ -131,10 +151,19 @@ Direct resource conditions now reuse that proof without an intermediate declarat
 Original arms and suffix remain intact. Checked-error arms use registered outcome
 identity even without held Bytes, rather than selecting owned Results as scalars.
 Generated temporaries remain inside the unchanged 33-input guard budget.
-**Next:** admit local-record operands in directly returned State fields:
+Directly returned State fields now admit local-record operands:
 `return Result.Ok(Canvas { width: word(prior.flags.valid && bytes_len(saved) == 48), pixels: move(saved) });`.
-This return still rejects with `short-circuit RHS requires guarded lowering`.
-Preserve selected-only reads,
+Checked error payloads now admit the same operands:
+`return Result.Err(word(prior.flags.valid && bytes_len(saved) == 48));`.
+An immediately following checked error or success State can also use a prior
+record's scalar fields after a guarded boolean initializer. Resource moves and
+copies stay in the State constructor; the continuation does not capture the record.
+Consecutive buffer writes can now intervene: their indices, values and the
+return can reuse the same completed field, while reads and writes stay in order.
+Both i64 store operands may independently short-circuit resource reads. The
+index finishes before the value starts; all four combinations feed one store.
+**Resource-callback backlog (not the selected task):** retain a prior record field in a local that reads back the buffer after
+the write and before the checked return. Preserve selected-only reads,
 borrow lifetimes, lexical identities, whole-state publication and native traps.
 Captured writes,
 resource-changing joins, general resource loops, broader layouts and provider/device

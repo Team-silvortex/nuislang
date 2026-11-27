@@ -13,16 +13,7 @@ pub(super) fn prepare(
     context: &mut OutlineContext,
     locals: &LocalRecords,
 ) -> (NirExpr, Vec<NirStmt>, BTreeSet<String>) {
-    let mut planner = Planner {
-        template,
-        scope,
-        live,
-        context,
-        locals,
-        branched: false,
-        prefix: vec![],
-        leaves: BTreeMap::new(),
-    };
+    let mut planner = Planner::new(template, scope, live, context, locals);
     let value = planner.visit(value, ty);
     let names = planner
         .leaves
@@ -48,7 +39,65 @@ struct Planner<'a> {
     leaves: BTreeMap<Vec<String>, NirExpr>,
 }
 
-impl Planner<'_> {
+pub(in super::super) fn prepare_operands<'a>(
+    values: impl IntoIterator<Item = &'a mut NirExpr>,
+    template: &NirFunction,
+    scope: &[NirParam],
+    live: &BTreeSet<String>,
+    context: &mut OutlineContext,
+    locals: &LocalRecords,
+) -> Vec<NirStmt> {
+    if locals.0.is_empty() {
+        return vec![];
+    }
+    let mut planner = Planner::new(template, scope, live, context, locals);
+    for value in values {
+        *value = planner.operands(value);
+    }
+    planner.prefix
+}
+
+pub(in super::super) fn prepare_return_fields(
+    fields: &mut [(String, NirExpr)],
+    resource: &str,
+    template: &NirFunction,
+    scope: &[NirParam],
+    live: &BTreeSet<String>,
+    context: &mut OutlineContext,
+    locals: &LocalRecords,
+) -> Vec<NirStmt> {
+    prepare_operands(
+        fields
+            .iter_mut()
+            .filter_map(|(f, v)| (f != resource).then_some(v)),
+        template,
+        scope,
+        live,
+        context,
+        locals,
+    )
+}
+
+impl<'a> Planner<'a> {
+    fn new(
+        template: &'a NirFunction,
+        scope: &'a [NirParam],
+        live: &'a BTreeSet<String>,
+        context: &'a mut OutlineContext,
+        locals: &'a LocalRecords,
+    ) -> Self {
+        Self {
+            template,
+            scope,
+            live,
+            context,
+            locals,
+            branched: false,
+            prefix: vec![],
+            leaves: BTreeMap::new(),
+        }
+    }
+
     // The caller proves the original expression and any expanded constructor shape.
     fn visit(&mut self, value: &NirExpr, ty: &NirTypeRef) -> NirExpr {
         if let NirExpr::StructLiteral {

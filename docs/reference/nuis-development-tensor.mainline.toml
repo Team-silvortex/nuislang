@@ -24,6 +24,7 @@ depends_on = [
 coordinate = "standard-library/ns-nova/persistent-application-session"
 depends_on = [
   "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
+  "compiler-toolchain/nuisc/native-resource-session-callbacks",
   "standard-library/std/concurrency-task-thread-lock",
   "heterogeneous-runtime/nustar/registered-domain-contracts",
 ]
@@ -34,7 +35,8 @@ depends_on = ["standard-library/ns-nova/persistent-application-session"]
 
 [[nodes]]
 coordinate = "heterogeneous-runtime/shader/shader-resource-bindings"
-depends_on = ["standard-library/ns-nova/persistent-application-session"]
+# Reflection and one bounded image submission can be tested without a persistent window.
+depends_on = ["heterogeneous-runtime/nustar/registered-domain-contracts"]
 
 [[nodes]]
 coordinate = "standard-library/ns-nova/sustained-runtime-performance"
@@ -52,7 +54,12 @@ depends_on = [
 
 [[nodes]]
 coordinate = "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
-depends_on = ["compiler-toolchain/nuisc/native-resource-session-callbacks"]
+# Start one fixed-extent differential frame with the checked canvas receipt.
+# General callback ownership is still a hard prerequisite of session closure.
+depends_on = [
+  "compiler-toolchain/nuisc/native-scalar-record-session-profile",
+  "heterogeneous-runtime/nustar/registered-domain-contracts",
+]
 
 [[nodes]]
 coordinate = "compiler-toolchain/nuisc/native-resource-session-callbacks"

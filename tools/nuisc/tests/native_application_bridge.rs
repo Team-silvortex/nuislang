@@ -704,6 +704,7 @@ fn native_bridge_rejects_signature_layout_lane_and_initialization_drift() {
     let effectful = nuisc::pipeline::compile_project(&project.0).unwrap();
     let error = emit_registered(&effectful.yir, "counter").unwrap_err();
     assert!(error.contains("does not admit cpu.print"), "{error}");
+    assert!(error.contains("in function `step`"), "{error}");
 }
 #[path = "native_application_bridge/return_plain_tree.rs"]
 mod return_plain_tree;

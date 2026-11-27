@@ -222,14 +222,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "compiler-toolchain/nuisc/native-resource-session-callbacks"
+        "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("declared mainline goal"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "compiler-toolchain/nuisc/native-resource-session-callbacks"
+        "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -270,7 +270,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "compiler-toolchain/nuisc/native-resource-session-callbacks"
+        "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -417,6 +417,11 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
     assert!(json.contains("declared mainline goal"));
     assert!(json.contains("\"mainline_protocol\":\"nuis-dev-tensor-mainline-v1\""));
+    assert!(json.contains(concat!(
+        "\"mainline_actionable_frontier\":[\"compiler-toolchain/nuisc/native-cpu-frame-dispatch\",",
+        "\"heterogeneous-runtime/shader/shader-resource-bindings\",",
+        "\"compiler-toolchain/nuisc/native-resource-session-callbacks\"]"
+    )));
     assert!(json
         .contains("\"mainline_target\":\"standard-library/ns-nova/interactive-image-workflow\""));
     assert!(json.contains("\"module\":\"nuis-runtime\""));
@@ -659,11 +664,16 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: compiler-toolchain/nuisc/native-resource-session-callbacks"
+        "weakest_bootstrap_task_card_common_ancestor_path: compiler-toolchain/nuisc/native-cpu-frame-dispatch"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("declared mainline goal"));
     assert!(text.contains("mainline_id: ns-nova-application-led"));
+    assert!(text.contains(concat!(
+        "mainline_actionable_frontier: compiler-toolchain/nuisc/native-cpu-frame-dispatch, ",
+        "heterogeneous-runtime/shader/shader-resource-bindings, ",
+        "compiler-toolchain/nuisc/native-resource-session-callbacks"
+    )));
     assert!(text.contains(
         "cell: architecture=standard-library module=std function=concurrency-task-thread-lock"
     ));

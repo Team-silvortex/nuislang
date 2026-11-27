@@ -16,10 +16,10 @@ architecture commitment, not a claim of an implemented CAS or resident collector
 
 ## Current Line
 
-The repository is on `beta-0.18.*`. Git history is authoritative; the dated
-[current snapshot](docs/versioning/nuis-beta-0.18.0-snapshot.md) records committed
-identity separately from worktree follow-ups. Cargo package and protocol versions
-are independent. Use the [validation checklist](docs/versioning/nuis-beta-0.18.0-release-checklist.md)
+The repository is on `beta-0.19.*`. Git history is authoritative; the dated
+[current snapshot](docs/versioning/nuis-beta-0.19.0-snapshot.md) records this
+minor's committed identity separately from worktree follow-ups. Cargo package and protocol versions
+are independent. Use the [validation checklist](docs/versioning/nuis-beta-0.19.0-release-checklist.md)
 for operating gates and the [versioning index](docs/versioning/README.md) for history.
 
 The mainline is **ns-nova application-led development**: grow one Nuis-owned
@@ -92,90 +92,20 @@ and the actual resident collector remain unimplemented. Existing caches are unch
 ## Current Mainline
 
 The application goal is `standard-library/ns-nova/interactive-image-workflow`.
-The selected prerequisite is
-`compiler-toolchain/nuisc/native-resource-session-callbacks`; native frame dispatch
-and persistent application closure remain its dependent gates. Consult
-`nuis dev-tensor --json` for its live evidence, next action and validation command.
-The current native CPU slice supports fixed-extent Buffer/Bytes callbacks,
-flat i64-plus-Bytes State and checked `Result<State, i64>` errors. Registered
-exports survive cache reuse, source-free NSB relocation and binary-only launch.
-The [guarded canvas guide](examples/projects/domains/native_guarded_canvas_session_demo/README.md)
-demonstrates early owned returns and a shared continuation: an untaken inner
-return preserves incoming resources and runs the function suffix once. Both
-nonempty arms can now return early or rejoin that shared suffix. Branch-local
-shadows resolved to i64, including inferred and aliased types, retain their own
-identities without replacing outer captures. Bounded pure record helpers can
-return flat or nested i64/bool records by value while the caller retains its
-Bytes owners; projections also check unselected subtrees for resources. Boolean
-validation flags drive checked errors without publishing failed State. Exact
-i64/bool value parameters now compose through direct and helper-to-helper calls,
-with no implicit bool-to-integer coercion in native value calls.
-Immutable bool locals now retain their evaluated values across guarded returns
-and shared continuations, without leaking branch-local flags into the suffix.
-Same-kind bool shadows also keep independent identities, including inferred and
-aliased declarations; inner initializers read the outer value before shadowing it.
-Pure i64/bool helpers now support short-circuit initialization with selected-only
-RHS evaluation. Unoutlined resource reads are rejected instead of evaluated eagerly.
-Canonical negation such as `!(a || helper(...))` now stays short-circuited inside
-resource branch prefixes without splitting it into separate local initializers.
-Nested `&&`/`||` declarations, including negation on either side, now keep Buffer
-loads and live Bytes length reads behind selected owned branches with shared suffixes.
-Read results can now feed pure scalar/record helper arguments on the selected
-path, including nested record projections. Short-circuit bool arguments now
-retain left-to-right scalar snapshots, including nested and multiple arguments.
-Inlined conditional scalar helpers now accept `select` over ready, same-kind
-`i64` or `bool` values with an exact bool predicate; this does not select resources
-or replace guarded evaluation of short-circuit operands.
-The pure helper ABI still does not carry resources.
-Comparison and boolean XOR wrappers now preserve the same guarded reads,
-including nested wrappers and helper arguments. Both eager operands are evaluated
-left-to-right; only an inner `&&`/`||` RHS may be skipped.
-Direct `i64` local initializers now reuse those guarded arguments, including
-arithmetic, scalar record projections and computed indices. Declaration/result
-types remain exact; resource ownership and cleanup use the same existing paths.
-These expressions can also appear directly in `if` conditions: one internal bool
-snapshot reuses guarded evaluation without copying either arm or its shared suffix.
-Scalar fields of a directly returned mixed State now reuse that path too, with
-all fields staged in source order, including Bytes copies/moves and terminal cleanup.
-Direct checked `Err(...)` codes also reuse guarded i64 evaluation before owner
-cleanup, including callbacks that only borrow a Buffer and hold no Bytes.
-Borrowed `buffer_len` now composes with the same guarded expressions in scalar
-initializers, conditions, returned State fields and checked error codes. It
-retains exact `ref Buffer` admission and passes only scalar values to pure helpers.
-Pure helper results can now initialize typed, inferred or const-alias value-record
-locals with those guarded arguments, including nested record projections. Only
-scalar argument snapshots cross owned continuations; native record limits remain.
-Nested record literal locals now stage i64/bool leaves in source field order,
-keeping lazy subtrees selected-only. Native local value construction shares the
-existing value-layout bounds, without widening owned State or resource captures.
-Record-valued helper fields now execute once, then freeze all scalar leaves
-before later fields can branch. Nested projections use the same path; complete
-constructor typing and bounded shape expansion precede temporary allocation.
-Previously bound pure records and their nested projections can fill fields before
-later resource logic. A block-local type table proves availability separately
-from scalar capture parameters; rebinding and control-flow boundaries invalidate it.
-Late record fields also survive earlier short-circuit fields: only projections
-of completed pure records are saved early, with shared snapshots for repeated
-paths. Helper calls, resource reads and checked arithmetic retain source order.
-Local-record scalar fields can also participate in resource predicates inside
-those constructors, such as `prior.flags.valid && bytes_len(saved) == 48`.
-Exact i64/bool projections share snapshots with later record fields; lazy reads
-remain selected-only, including nested conditions and helper arguments.
-The same local-record proof now also supports standalone bool/i64 initializers,
-without wrapping them in a record constructor. Explicit, inferred and const-alias
-declarations retain lexical identity, eager operand order and existing owner cleanup.
-Direct resource `if` conditions now reuse the same proof and scalar snapshots,
-without an intermediate source declaration. Original arms and their shared suffix
-remain intact; registered error returns stay guarded even without held Bytes.
+The selected prerequisite is `compiler-toolchain/nuisc/native-cpu-frame-dispatch`:
+compare one fixed-size, headless ns-nova frame against the embedded-YIR reference.
+Native callback delivery and embedded application execution each have evidence;
+equivalence on the same input is **not** established. `nuis dev-tensor --json`
+lists the selected task and the other actionable dependencies in `mainline_actionable_frontier`.
 
-Use the [resource example ladder](examples/projects/domains/README.md#native-cpu-resource-sessions)
-to choose the minimal Bytes, mixed-State, checked or guarded example. The
-[latest scoped proof](docs/reference/nuis-native-resource-short-circuit-v1.md)
-owns validation details; the [module map](docs/repo-layout.md#native-resource-session-ownership)
-owns implementation entrypoints. Local-record operands in directly returned State fields,
-captured writes, broader resource layouts
-and provider/device completion remain open. CPU canvas
-export is not native ns-nova window integration or the GPU showcase.
+The native CPU profile runs checked, fixed-extent Buffer/Bytes callbacks with
+scalar state. The [guarded canvas guide](examples/projects/domains/native_guarded_canvas_session_demo/README.md)
+shows early returns and ownership cleanup; the [example ladder](examples/projects/domains/README.md#native-cpu-resource-sessions)
+covers cache reuse, source-free NSB delivery and binary-only launch.
+Guarded reads remain lazy and a buffer write evaluates its index before its
+value, then writes once. For supported combinations and their limits, see the
+[resource lowering proof](docs/reference/nuis-native-resource-short-circuit-v1.md)
+and [implementation map](docs/repo-layout.md#native-resource-session-ownership).
 
 The image showcase exercises real Metal image processing and explicit stateful
 AppKit sessions. Its compiled host still embeds the YIR lifecycle runtime.
@@ -297,7 +227,7 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-The [current validation checklist](docs/versioning/nuis-beta-0.18.0-release-checklist.md)
+The [current validation checklist](docs/versioning/nuis-beta-0.19.0-release-checklist.md)
 separates existing CI coverage from focused native, migration and provider checks.
 The [beta-0.12 checklist](docs/versioning/nuis-beta-0.12.0-release-checklist.md)
 remains historical evidence, not a current acceptance result.

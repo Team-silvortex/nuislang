@@ -370,7 +370,8 @@ fn resource_argument_snapshots_preserve_order_and_prove_before_allocating_names(
         &scope,
         &live,
         1,
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .unwrap()
     .is_none());
@@ -596,7 +597,8 @@ fn resource_wrapper_rejection_is_atomic_for_bad_types_owners_and_budget() {
             &scope,
             &live,
             1,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .unwrap()
         .is_none());

@@ -45,12 +45,25 @@ fn returned_resource_fields_keep_source_order_and_owners_for_120_events() {
 
 #[test]
 fn returned_resource_fields_failed_result_allocation_preserves_state_and_releases_staged_bytes() {
-    for fields in [
-        "width: width + word(mode == 0 && bytes_len(saved) == 48), pixels: move(saved)",
-        "pixels: move(saved), width: width + word(mode == 0 && load_at(pixels, 3) == 9)",
-        "pixels: copy_bytes(pixels), width: width + word(mode == 0 && bytes_len(saved) == 48)",
+    for (prefix, fields) in [
+        (
+            "",
+            "width: width + word(mode == 0 && bytes_len(saved) == 48), pixels: move(saved)",
+        ),
+        (
+            "",
+            "pixels: move(saved), width: width + word(mode == 0 && load_at(pixels, 3) == 9)",
+        ),
+        (
+            "",
+            "pixels: copy_bytes(pixels), width: width + word(mode == 0 && bytes_len(saved) == 48)",
+        ),
+        (
+            "let prior = choose(mode == 0);",
+            "pixels: move(saved), width: width + word(prior.value && bytes_len(spare) == 48)",
+        ),
     ] {
-        let source = source(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); store_at(pixels, 0, 99); return Result.Ok(Canvas {{ {fields} }});"));
+        let source = source(&format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); {prefix} store_at(pixels, 0, 99); return Result.Ok(Canvas {{ {fields} }});"));
         let program = compile(&source);
         let bridge = bridge(&program);
         let mut llvm = bridge.llvm_ir.clone();

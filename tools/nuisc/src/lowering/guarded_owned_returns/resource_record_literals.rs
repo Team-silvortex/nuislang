@@ -10,6 +10,7 @@ mod liveness;
 mod local_tests;
 #[path = "resource_record_operands.rs"]
 mod operands;
+pub(super) use liveness::{prepare_operands, prepare_return_fields};
 #[cfg(test)]
 #[path = "resource_record_literals_tests.rs"]
 mod tests;
@@ -18,6 +19,26 @@ mod tests;
 pub(in crate::lowering) struct LocalRecords(BTreeMap<String, NirTypeRef>);
 
 impl LocalRecords {
+    pub(super) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(super) fn can_cross_binding(&self, binding: &str) -> bool {
+        !self.0.is_empty() && !self.0.contains_key(binding)
+    }
+
+    pub(super) fn scalar_proof<'a>(
+        &self,
+        value: &'a NirExpr,
+        calls: &PureValueCalls,
+    ) -> std::borrow::Cow<'a, NirExpr> {
+        if self.0.is_empty() {
+            std::borrow::Cow::Borrowed(value)
+        } else {
+            std::borrow::Cow::Owned(operands::for_proof(value, self, calls))
+        }
+    }
+
     pub(in crate::lowering) fn advance(&mut self, statement: &NirStmt, calls: &PureValueCalls) {
         match statement {
             NirStmt::Let { name, ty, .. } => self.bind(name, ty.as_ref(), calls),

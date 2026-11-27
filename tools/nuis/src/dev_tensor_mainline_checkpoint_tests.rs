@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
+fn headless_checkpoint_evidence_does_not_close_native_frame_dispatch() {
     let session = crate::dev_tensor_data::DEV_TENSOR_CELLS
         .iter()
         .find(|cell| cell.module == "ns-nova" && cell.function == "persistent-application-session")
@@ -65,7 +65,7 @@ fn headless_checkpoint_evidence_keeps_callback_lowering_as_the_next_boundary() {
     assert_eq!(selected.status, "ready");
     assert_eq!(
         selected.selected,
-        "compiler-toolchain/nuisc/native-resource-session-callbacks"
+        "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
     );
     assert!(selected
         .dependency_path

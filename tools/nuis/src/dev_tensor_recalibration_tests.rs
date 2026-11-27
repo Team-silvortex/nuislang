@@ -53,7 +53,10 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
     assert!(resource.blocker.contains("rebinding captured values"));
     assert!(resource
         .next_step
-        .contains("scalar projections of block-local records"));
+        .contains("readback local between a guarded store and its checked return"));
+    assert!(resource
+        .next_step
+        .contains("constructor order, owner availability, selected-only reads"));
     assert!(resource.next_step.contains("terminal cleanup"));
     assert!(resource.evidence.contains("inferred and aliased i64"));
     assert!(resource.evidence.contains("before optimization"));
@@ -106,7 +109,7 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
         .contains("Canonical boolean negation now crosses pure resource branch prefixes directly"));
     assert!(resource
         .blocker
-        .contains("local-record operands in directly returned State fields remain outside"));
+        .contains("projected readback local after the write remains outside"));
     assert!(resource
         .evidence
         .contains("Direct inline bool conditions now requeue one hygienic exact-bool snapshot"));
@@ -118,9 +121,20 @@ fn dev_tensor_recalibration_keeps_scopes_and_preparation_separate() {
     ));
     assert!(resource
         .next_action
-        .contains("reproduced returned-State local-record operand gap"));
+        .contains("preserve the projected readback local after a guarded store"));
+    assert!(resource
+        .evidence
+        .contains("index completion before value entry"));
+    assert!(resource.evidence.contains("rejoin at one write"));
+    assert!(resource
+        .evidence
+        .contains("dependent updates produce 47 and 29"));
+    assert!(resource.evidence.contains("moved versus copied pixels"));
     assert!(resource.evidence.contains(
         "Direct resource conditions now share the same exact local-record scalar projection proof"
+    ));
+    assert!(resource.evidence.contains(
+        "Direct-condition delivery now asserts exactly one declaration and negated branch replacement"
     ));
     assert!(resource
         .evidence

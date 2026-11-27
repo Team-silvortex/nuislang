@@ -81,6 +81,7 @@ fn resource_predicate_record_conditions_preserve_arms_expressions_and_requeue_on
         &live,
         1,
         &mut context,
+        &Default::default(),
     )
     .unwrap()
     .unwrap();

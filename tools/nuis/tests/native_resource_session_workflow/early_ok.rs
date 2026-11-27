@@ -149,10 +149,16 @@ fn local_record_i64_initializer_survives_cache_nsb_and_binary_only_launch() {
 #[test]
 fn local_record_condition_survives_cache_nsb_and_binary_only_launch() {
     let predicate = "!prior.extent.invalid && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)";
-    let source = record_scalar_source(false)
-        .replace(&format!("let valid: bool = {predicate};"), "")
-        .replace("if valid {", &format!("if {predicate} {{"));
-    assert!(source.contains(&format!("if {predicate} {{")));
+    let declaration = format!("let valid: bool = {predicate};");
+    let condition = format!("if !({predicate}) {{");
+    let source = record_scalar_source(false);
+    assert_eq!(source.matches(&declaration).count(), 1);
+    assert_eq!(source.matches("if !valid {").count(), 1);
+    let source = source
+        .replacen(&declaration, "", 1)
+        .replacen("if !valid {", &condition, 1);
+    assert_eq!(source.matches(&condition).count(), 1);
+    assert!(!source.contains(&declaration) && !source.contains("if !valid {"));
     delivery(&source);
 }
 
@@ -197,6 +203,21 @@ fn returned_resource_fields_survive_cache_nsb_and_binary_only_launch() {
         .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
         .replace("cursor: cursor, pixels: move(snapshot)", "cursor: cursor + word(color >= 0 && (bytes_len(snapshot) == width * height * 8 || load_at(pixels, 99) > 0)) - 1, pixels: move(snapshot)");
     assert!(source.contains("cursor: cursor + word"));
+    delivery(&source);
+}
+
+#[test]
+fn local_record_return_field_survives_source_free_delivery() {
+    let source = nested_source()
+        .replace("mod cpu Main {", "mod cpu Main { fn word(flag: bool) -> i64 { if flag { return 1; } return 0; }")
+        .replace("if color == 0 {", "if color == 0 { let prior = measure(width, height);")
+        .replace("cursor: cursor, pixels: move(snapshot)", "cursor: cursor + word(prior.extent.words == width * height && (bytes_len(snapshot) == prior.extent.words * 8 || load_at(pixels, 99) > 0)) - 1, pixels: move(snapshot)");
+    assert_eq!(
+        source
+            .matches("cursor: cursor + word(prior.extent.words")
+            .count(),
+        1
+    );
     delivery(&source);
 }
 

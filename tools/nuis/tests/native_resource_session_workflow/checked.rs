@@ -96,11 +96,115 @@ fn direct_resource_error_codes_survive_cache_nsb_and_binary_only_launch() {
 }
 
 fn with_error_codes(codes: impl IntoIterator<Item = i64>) -> String {
+    with_code_expression(
+        codes,
+        "",
+        "bytes_len(saved) == 48 || load_at(pixels, 99) > 0",
+    )
+}
+
+#[test]
+fn projected_checked_error_after_resource_guard_survives_source_free_delivery() {
+    let source = SOURCE.replace("mod cpu Main {", "mod cpu Main { struct ErrorSite { code: i64 } fn bias(ok: bool) -> i64 { if ok { return 0; } return 99; }");
+    assert_eq!(source.matches("return Result.Err(1);").count(), 1);
+    let source = source.replacen(
+        "return Result.Err(1);",
+        r#"
+        let saved: Bytes = copy_bytes(pixels);
+        let site = ErrorSite { code: 1 };
+        let ok = bytes_len(saved) == 48 || load_at(pixels, 99) > 0;
+        return Result.Err(site.code + bias(ok));"#,
+        1,
+    );
+    delivery(&source);
+}
+
+#[test]
+fn projected_checked_state_after_resource_guard_survives_source_free_delivery() {
+    let source = SOURCE.replace("mod cpu Main {", "mod cpu Main { struct Size { w: i64, h: i64 } fn bias(ok: bool) -> i64 { if ok { return 0; } return 99; }");
+    let old = "return Result.Ok(Canvas {\n      width: width, height: height, events: events, cursor: cursor,\n      pixels: copy_bytes(pixels),";
+    assert_eq!(source.matches(old).count(), 1);
+    let source = source.replacen(
+        old,
+        r#"let saved: Bytes = copy_bytes(pixels);
+        let size = Size { w: width, h: height };
+        let ok = bytes_len(saved) == 48 || load_at(pixels, 99) > 0;
+        return Result.Ok(Canvas { pixels: move(saved), width: size.w + bias(ok),
+            height: size.h, events: events, cursor: cursor,"#,
+        1,
+    );
+    delivery(&source);
+}
+
+#[test]
+fn guarded_pixel_write_and_projected_state_survive_source_free_delivery() {
+    delivery(&guarded_pixel_source());
+}
+
+#[test]
+fn lazy_pixel_store_value_survives_source_free_delivery() {
+    let source = guarded_pixel_source();
+    let eager = "color + bias(ok)";
+    assert_eq!(source.matches(eager).count(), 1);
+    delivery(&source.replacen(eager, "color + bias(ok || load_at(pixels, 99) > 0)", 1));
+}
+
+#[test]
+fn lazy_pixel_store_index_and_value_survive_source_free_delivery() {
+    let source = guarded_pixel_source();
+    let original =
+        "store_at(pixels, cursor, load_at(pixels, cursor) - prior.pixel + color + bias(ok))";
+    assert_eq!(source.matches(original).count(), 1);
+    let guarded = "store_at(pixels, cursor + bias(ok || load_at(pixels, 99) > 0), load_at(pixels, cursor) - prior.pixel + color + bias(ok && load_at(pixels, cursor) == prior.pixel))";
+    delivery(&source.replacen(original, guarded, 1));
+}
+
+fn guarded_pixel_source() -> String {
+    let source = SOURCE.replace("mod cpu Main {", "mod cpu Main { struct Before { pixel: i64, width: i64 } fn bias(ok: bool) -> i64 { if ok { return 0; } return 1; }");
+    let old =
+        "store_at(pixels, cursor, color);\n    return Result.Ok(Canvas {\n      width: width,";
+    assert_eq!(source.matches(old).count(), 1);
+    source.replacen(
+        old,
+        r#"let prior = Before { pixel: load_at(pixels, cursor), width: width };
+        let ok = cursor >= 0 && load_at(pixels, cursor) == 4278190080;
+        store_at(pixels, cursor, load_at(pixels, cursor) - prior.pixel + color + bias(ok));
+        return Result.Ok(Canvas { width: prior.width,"#,
+        1,
+    )
+}
+
+#[test]
+fn local_record_error_codes_survive_source_free_delivery() {
+    let source = with_code_expression(
+        [1, 4, 7],
+        "let prior = Snapshot { words: buffer_len(pixels) };",
+        "bytes_len(saved) == prior.words * 8 || load_at(pixels, 99) > 0",
+    )
+    .replace(
+        "mod cpu Main {",
+        "mod cpu Main { struct Snapshot { words: i64 }",
+    );
+    // Open and close each have one site; event has both color range checks.
+    assert_eq!(
+        source
+            .matches("bytes_len(saved) == prior.words * 8")
+            .count(),
+        4
+    );
+    delivery(&source);
+}
+
+fn with_code_expression(
+    codes: impl IntoIterator<Item = i64>,
+    prefix: &str,
+    predicate: &str,
+) -> String {
     let mut source = SOURCE.replace("mod cpu Main {", "mod cpu Main { fn error_code(valid: bool, code: i64) -> i64 { if valid { return code; } return 99; }");
     for code in codes {
         source = source.replace(
             &format!("return Result.Err({code});"),
-            &format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); return Result.Err(error_code(bytes_len(saved) == 48 || load_at(pixels, 99) > 0, {code}));"),
+            &format!("let saved: Bytes = copy_bytes(pixels); let spare: Bytes = copy_bytes(pixels); {prefix} return Result.Err(error_code({predicate}, {code}));"),
         );
     }
     assert!(!source.contains("return Result.Err(1)"));

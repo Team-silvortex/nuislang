@@ -128,6 +128,7 @@ fn resource_predicate_i64_initializers_preserve_order_types_and_lazy_subtrees() 
             &live,
             1,
             &mut context,
+            &Default::default(),
         )
         .unwrap()
         .unwrap();
@@ -259,7 +260,8 @@ fn resource_predicate_i64_admission_rejects_invalid_types_before_allocating_name
             &scope,
             &live,
             1,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .unwrap()
         .is_none());
@@ -291,7 +293,8 @@ fn resource_predicate_i64_keeps_plain_scalar_initializers_on_the_existing_route(
         &scope,
         &live,
         1,
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .unwrap()
     .is_none());
@@ -327,6 +330,7 @@ fn resource_predicate_buffer_length_stages_in_order_without_walking_lazy_childre
         &live,
         1,
         &mut context,
+        &Default::default(),
     )
     .unwrap()
     .unwrap();
@@ -416,7 +420,8 @@ fn resource_predicate_buffer_length_rejects_nonborrowed_or_hidden_invalid_operan
             &scope,
             &live,
             1,
-            &mut context
+            &mut context,
+            &Default::default()
         )
         .unwrap()
         .is_none());
@@ -468,7 +473,8 @@ fn resource_predicate_buffer_length_keeps_original_budgets_and_ready_route() {
         &scope,
         &live,
         1,
-        &mut context
+        &mut context,
+        &Default::default()
     )
     .unwrap()
     .is_none());

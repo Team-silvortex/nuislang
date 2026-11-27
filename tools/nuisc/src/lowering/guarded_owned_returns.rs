@@ -129,6 +129,7 @@ fn outline_body(
             &live_bytes,
             depth,
             context,
+            &local_records,
         )? {
             for statement in replacement.into_iter().rev() {
                 remaining.push_front(statement);

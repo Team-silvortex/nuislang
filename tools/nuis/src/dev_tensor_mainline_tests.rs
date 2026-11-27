@@ -95,6 +95,7 @@ fn mainline_advances_goal_then_compiler_and_stops_at_scope_completion() {
     let selection = select_from_plan(&plan(), &inventory).unwrap();
     assert_eq!(selection.status, "complete");
     assert_eq!(selection.selected, "<none>");
+    assert!(selection.actionable_frontier.is_empty());
     assert!(selection
         .reason
         .contains("not project or self-hosting completion"));
@@ -112,6 +113,7 @@ fn mainline_explicit_regression_preempts_features_but_respects_dependencies() {
     let selected = select_from_plan(&plan, &cells()).unwrap();
     assert_eq!(selected.selected, "test/module/compiler");
     assert_eq!(selected.source, "mainline-blocking-regression");
+    assert_eq!(selected.actionable_frontier, ["test/module/compiler"]);
     let mut inventory = cells();
     inventory[2] = cell("base", "usable", 99);
     assert_eq!(
@@ -144,9 +146,11 @@ fn mainline_frontier_order_is_status_progress_then_coordinate() {
     );
     plan.nodes.get_mut("test/module/app").unwrap().reverse();
     inventory.reverse();
+    let selection = select_from_plan(&plan, &inventory).unwrap();
+    assert_eq!(selection.selected, "test/module/compiler");
     assert_eq!(
-        select_from_plan(&plan, &inventory).unwrap().selected,
-        "test/module/compiler"
+        selection.actionable_frontier,
+        ["test/module/compiler", "test/module/session"]
     );
 }
 
@@ -233,7 +237,7 @@ fn mainline_rejects_duplicate_or_invalid_tensor_inventory() {
 }
 
 #[test]
-fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() {
+fn repository_mainline_selects_one_native_frame_without_claiming_self_hosting() {
     let selected = mainline_selection(crate::dev_tensor_data::DEV_TENSOR_CELLS);
     assert_eq!(selected.status, "ready");
     assert_eq!(
@@ -242,7 +246,7 @@ fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() 
     );
     assert_eq!(
         selected.selected,
-        "compiler-toolchain/nuisc/native-resource-session-callbacks"
+        "compiler-toolchain/nuisc/native-cpu-frame-dispatch"
     );
     assert!(selected
         .pending_goals
@@ -253,26 +257,34 @@ fn repository_mainline_selects_persistent_state_without_claiming_self_hosting() 
 }
 
 #[test]
-fn mainline_recalibration_advances_resources_frames_sessions_then_failure_safety() {
+fn mainline_recalibration_opens_frame_and_shader_without_closing_resources_or_session() {
     let source = include_str!("../../../docs/reference/nuis-development-tensor.mainline.toml");
     let mut cells = crate::dev_tensor_data::DEV_TENSOR_CELLS.to_vec();
-    let path = select_from_source(source, &cells).unwrap().dependency_path;
+    let selection = select_from_source(source, &cells).unwrap();
     assert_eq!(
-        path,
+        selection.actionable_frontier,
+        [
+            "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
+            "heterogeneous-runtime/shader/shader-resource-bindings",
+            "compiler-toolchain/nuisc/native-resource-session-callbacks",
+        ]
+    );
+    assert_eq!(
+        selection.dependency_path,
         [
             "standard-library/ns-nova/interactive-image-workflow",
             "standard-library/ns-nova/persistent-application-session",
             "compiler-toolchain/nuisc/native-cpu-frame-dispatch",
-            "compiler-toolchain/nuisc/native-resource-session-callbacks",
         ]
     );
     for (completed, next) in [
+        ("native-cpu-frame-dispatch", "shader-resource-bindings"),
+        (
+            "shader-resource-bindings",
+            "native-resource-session-callbacks",
+        ),
         (
             "native-resource-session-callbacks",
-            "native-cpu-frame-dispatch",
-        ),
-        (
-            "native-cpu-frame-dispatch",
             "persistent-application-session",
         ),
         (
@@ -281,9 +293,8 @@ fn mainline_recalibration_advances_resources_frames_sessions_then_failure_safety
         ),
         (
             "lifecycle-failure-resource-safety",
-            "shader-resource-bindings",
+            "interactive-image-workflow",
         ),
-        ("shader-resource-bindings", "interactive-image-workflow"),
     ] {
         let cell = cells.iter_mut().find(|c| c.function == completed).unwrap();
         cell.status = "stable";

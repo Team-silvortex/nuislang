@@ -26,13 +26,17 @@ dependency registration order do not decide priority.
 4. Walk that root's dependency closure. Only incomplete nodes whose prerequisites
    are closed are actionable. Choose the weakest actionable node by
    `status_rank -> progress -> coordinate`.
-5. Publish the goal, selected coordinate, pending goals and a deterministic
+5. Publish the goal, the entire ranked actionable frontier for that root,
+   the selected coordinate (its first entry), pending goals and a deterministic
    shortest dependency path. Task/handoff ancestry still resolves through the
    existing hierarchy; dependency edges do not become hierarchy parent edges.
 
 JSON and text expose `mainline_protocol`, `mainline_plan_source`,
 `mainline_status`, `mainline_id`, `mainline_target`, `mainline_selected`,
 `mainline_reason`, `mainline_dependency_path`, and `mainline_pending_goals`.
+`mainline_actionable_frontier` is an ordered array in JSON and a comma-separated
+list in text. It is empty for invalid or complete plans. It does not include
+unrelated goals or turn all candidates into simultaneous assignments.
 The existing `weakest_bootstrap_task_card_*` fields retain their transport names
 but now carry the selected mainline task. Separate `weakest_bootstrap_*`
 statistics remain preparation-gate diagnostics, not current task selection.
@@ -89,14 +93,33 @@ self-hosting preparation gates. `required = false` and `bootstrap_critical = fal
 mean they are outside that historical prerequisite set; they are nevertheless
 mandatory dependencies/goals of the declared mainline plan.
 
+### 2026-11-27: Start One Native Frame
+
+At Git baseline `335e49bb` (beta-0.19.2), the working inventory covers 37
+function coordinates across 10 architectures: 26 stable, one usable, three
+active and seven early. These count declared scopes, not the percentage of the
+engine implemented. Sustained performance and compiler ownership transfer
+remain later goals; neither is an additional prerequisite for this frame.
+
 The current goal is `standard-library/ns-nova/interactive-image-workflow`.
-Its first actionable prerequisite is
-`compiler-toolchain/nuisc/native-resource-session-callbacks`, followed by
-`compiler-toolchain/nuisc/native-cpu-frame-dispatch` and then
-`standard-library/ns-nova/persistent-application-session`. Shader resources and
-failure testing follow that prerequisite, rather than their lower scores
-prematurely displacing session work. A reopened shared std/runtime prerequisite
-can correctly take priority within the same dependency chain.
+The old graph gated the first native frame on *all* resource callbacks, and
+Shader binding work on a complete persistent session. Another callback test
+therefore kept winning even after the checked fixed-size canvas had a source-free
+receipt. The issue was the dependency graph, not a change in module maturity.
+
+The actionable frontier is native CPU frame dispatch (early/10), Shader
+resource bindings (early/15), then native resource callbacks (active/95).
+Start with one registered headless ns-nova event at a fixed extent. Record which
+CPU route actually ran; compare output bytes, scalar State, event/completion
+order and close outcome against embedded YIR on identical input. The two
+existing witnesses are inputs to this comparison, not evidence that it passed.
+If the frame exposes an unsupported callback, keep the failing application input
+as the reproducer. Otherwise leave further callback permutations in its backlog.
+
+Full session closure still requires frame dispatch **and** general callback
+ownership; lifecycle failure remains downstream of that session. Shader
+reflection can start independently, but remains required for interactive
+closure. No score, device claim or bootstrap replacement authority changed.
 
 The [2026-11-13 recalibration](nuis-development-tensor-recalibration-2026-11-13.md)
 reviews all coordinates and separates the bounded compiler profile from application
@@ -152,7 +175,12 @@ cache and selected-only reads. Standalone bool/i64 declarations now reuse that
 proof while retaining declaration identity and one-time requeueing. Direct resource
 conditions now share exact scalar projections without rewriting either arm or the
 suffix; registered error returns stay guarded without held Bytes. Directly returned
-State fields using local-record operands are the next reproduced boundary. Scalar
+State fields using local-record operands now retain field-order ownership checks.
+Checked Err codes now reuse the block-local proof before terminal cleanup.
+Terminal checked errors and checked mixed-State returns now carry only needed scalar
+leaves across a preceding resource guard. Index and value may both guard
+resource reads; they finish in source order before one buffer write. A separate
+readback declaration using the prior record is not covered. Scalar
 selection alone does not make eager evaluation safe.
 Capture/closure bounds and the active/95 score remain unchanged.
 Interactive frame dispatch retains early/10.

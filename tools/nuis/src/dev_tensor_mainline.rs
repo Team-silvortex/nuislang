@@ -25,6 +25,7 @@ pub(crate) struct MainlineSelection {
     pub(crate) id: String,
     pub(crate) target: String,
     pub(crate) selected: String,
+    pub(crate) actionable_frontier: Vec<String>,
     pub(crate) reason: String,
     pub(crate) dependency_path: Vec<String>,
     pub(crate) pending_goals: Vec<String>,
@@ -44,6 +45,7 @@ pub(crate) fn mainline_selection(cells: &[DevTensorCell]) -> MainlineSelection {
         id: "<unavailable>".to_owned(),
         target: "<none>".to_owned(),
         selected: "<none>".to_owned(),
+        actionable_frontier: Vec::new(),
         reason,
         dependency_path: Vec::new(),
         pending_goals: Vec::new(),
@@ -149,13 +151,14 @@ fn select_from_plan(
             id: plan.id.clone(),
             target: "<none>".to_owned(),
             selected: "<none>".to_owned(),
+            actionable_frontier: Vec::new(),
             reason: "all declared mainline goals are closed; this is not project or self-hosting completion".to_owned(),
             dependency_path: Vec::new(),
             pending_goals,
         });
     };
     let paths = dependency_paths(plan, target);
-    let selected = paths
+    let mut frontier = paths
         .keys()
         .filter(|coordinate| {
             !closed[coordinate.as_str()]
@@ -163,7 +166,13 @@ fn select_from_plan(
                     .iter()
                     .all(|dep| closed[dep.as_str()])
         })
-        .min_by_key(|coordinate| dev_tensor_cell_weakness_key(inventory[coordinate.as_str()]))
+        .cloned()
+        .collect::<Vec<_>>();
+    frontier.sort_by_cached_key(|coordinate| {
+        dev_tensor_cell_weakness_key(inventory[coordinate.as_str()])
+    });
+    let selected = frontier
+        .first()
         .ok_or_else(|| "no actionable dependency frontier".to_owned())?;
     Ok(MainlineSelection {
         status: "ready",
@@ -180,6 +189,7 @@ fn select_from_plan(
             if interrupt.is_some() { "blocking regression" } else { "mainline goal" },
         ),
         dependency_path: paths[selected].clone(),
+        actionable_frontier: frontier,
         pending_goals,
     })
 }

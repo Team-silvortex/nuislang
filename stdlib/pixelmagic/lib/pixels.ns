@@ -11,7 +11,14 @@ mod cpu PixelMagicPixels {
   pub fn recolor_run(
     pixels: ref Buffer, start: i64, end: i64, expected: i64, replacement: i64
   ) -> PixelRunStats {
-    if start < 0 || start > end || end > pixels.len || pixels.len > 4194304 {
+    if start < 0 || start > end {
+      return PixelRunStats { end: 0 - 1, written: 0, checksum: 0 };
+    }
+    let count: i64 = pixels.len;
+    if end > count {
+      return PixelRunStats { end: 0 - 1, written: 0, checksum: 0 };
+    }
+    if count > 4194304 {
       return PixelRunStats { end: 0 - 1, written: 0, checksum: 0 };
     }
     if expected < 0 || expected > 4294967295 || replacement < 0 || replacement > 4294967295 {
@@ -102,10 +109,17 @@ mod cpu PixelMagicPixels {
     if width <= 0 || width > 2048 || tile_size <= 0 || tile_size > 2048 {
       return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
     }
-    if phase < 0 || phase > 1 || start < 0 || start > end || end > pixels.len {
+    if phase < 0 || phase > 1 || start < 0 || start > end {
       return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
     }
-    if pixels.len > 4194304 || pixels.len % width != 0 {
+    let count: i64 = pixels.len;
+    if end > count {
+      return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
+    }
+    if count > 4194304 {
+      return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
+    }
+    if count % width != 0 {
       return CheckerboardStats { red_count: 0 - 1, checksum: 0 };
     }
     if start == end { return CheckerboardStats { red_count: 0, checksum: 0 }; }
